@@ -17,7 +17,7 @@
 - **数据库**: PostgreSQL
 - **AI / 文档解析服务**: Python + FastAPI
 - **OCR / 文档结构化**: PaddleOCR
-- **大模型能力**: OpenAI API
+- **大模型能力**: DeepSeek API（默认）/ OpenAI API（备用）
 - **对象存储**: MinIO
 - **认证授权**: Go 自建 JWT + 基础 RBAC
 - **监控排障**: slog + pprof + 基础 metrics

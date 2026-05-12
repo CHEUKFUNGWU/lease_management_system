@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Table, Button, Tag, Space, message } from "antd";
 import { PlusOutlined, EyeOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
@@ -26,6 +27,7 @@ interface Contract {
 export default function ContractsPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
   const { token } = useAuth();
 
   useEffect(() => {
@@ -116,7 +118,7 @@ export default function ContractsPage() {
           }}
         >
           <h1>合同台账</h1>
-          <Button type="primary" icon={<PlusOutlined />}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => router.push("/contracts/new")}>
             新增合同
           </Button>
         </div>

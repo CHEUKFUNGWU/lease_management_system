@@ -12,6 +12,9 @@ import {
   Tabs,
   Row,
   Col,
+  DatePicker,
+  Select,
+  InputNumber,
 } from "antd";
 import { RobotOutlined, LockOutlined, UserOutlined, MailOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
@@ -162,11 +165,12 @@ export default function LoginPage() {
         name="role"
         initialValue="user"
       >
-        <Input
-          prefix={<UserOutlined />}
-          placeholder="角色 (admin/reviewer/approver/user)"
-          size="large"
-        />
+        <Select placeholder="选择角色" size="large">
+          <Select.Option value="user">普通用户</Select.Option>
+          <Select.Option value="reviewer">复核员</Select.Option>
+          <Select.Option value="approver">审批员</Select.Option>
+          <Select.Option value="admin">管理员</Select.Option>
+        </Select>
       </Form.Item>
 
       <Form.Item>

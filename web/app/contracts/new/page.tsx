@@ -10,17 +10,20 @@ import {
   DatePicker,
   Select,
   message,
-  InputNumber,
+  Alert,
+  Tag,
+  Space,
 } from "antd";
-import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons";
-import AppLayout from "../components/AppLayout";
-import ProtectedRoute from "../components/ProtectedRoute";
-import { contractApi } from "../lib/api";
-import { useAuth } from "../context/AuthContext";
+import { ArrowLeftOutlined, SaveOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import AppLayout from "../../components/AppLayout";
+import ProtectedRoute from "../../components/ProtectedRoute";
+import { contractApi } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 
 export default function NewContractPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [drMissing, setDrMissing] = useState(false);
   const router = useRouter();
   const { token } = useAuth();
 
@@ -28,6 +31,12 @@ export default function NewContractPage() {
     if (!token) {
       message.error("请先登录");
       return;
+    }
+
+    // Check discount rate
+    if (!values.discount_rate_type) {
+      setDrMissing(true);
+      message.warning("折现率未填写，合同将标记为折现率缺失状态");
     }
 
     setLoading(true);
@@ -44,6 +53,9 @@ export default function NewContractPage() {
         lease_end_date: values.lease_end_date?.format("YYYY-MM-DD"),
         asset_category: values.asset_category,
         property_category: values.property_category,
+        discount_rate_type: values.discount_rate_type,
+        discount_rate_version: values.discount_rate_version,
+        discount_rate_missing: !values.discount_rate_type,
       };
 
       await contractApi.create(data, token);
@@ -69,6 +81,17 @@ export default function NewContractPage() {
         </div>
 
         <Card title="新增合同">
+          {drMissing && (
+            <Alert
+              message="折现率缺失警告"
+              description="此合同未填写折现率。根据会计政策，折现率缺失的合同不能进行正式会计计算。请后续在合同详情页补充折现率。"
+              type="warning"
+              showIcon
+              icon={<ExclamationCircleOutlined />}
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           <Form
             form={form}
             layout="vertical"
@@ -171,6 +194,36 @@ export default function NewContractPage() {
             >
               <DatePicker style={{ width: "100%" }} />
             </Form.Item>
+
+            <Card title="折现率设置" size="small" style={{ marginBottom: 16 }}>
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Alert
+                  message="提示"
+                  description="如果合同未明确折现率，可以留空。系统会标记为缺失状态，需要后续人工确认。"
+                  type="info"
+                  showIcon
+                />
+                
+                <Form.Item
+                  label="折现率类型"
+                  name="discount_rate_type"
+                >
+                  <Select placeholder="选择折现率类型" allowClear>
+                    <Select.Option value="ibr">集团 IBR</Select.Option>
+                    <Select.Option value="entity_specific">法人特定利率</Select.Option>
+                    <Select.Option value="contract_specific">合同特定利率</Select.Option>
+                    <Select.Option value="implicit_rate">隐含利率</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  label="折现率版本/编号"
+                  name="discount_rate_version"
+                >
+                  <Input placeholder="例如：IBR-2024-Q1" />
+                </Form.Item>
+              </Space>
+            </Card>
 
             <Form.Item>
               <Button

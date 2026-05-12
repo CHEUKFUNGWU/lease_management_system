@@ -34,11 +34,14 @@ func main() {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(database.Pool)
 	contractRepo := repository.NewContractRepository(database.Pool)
+	roleRepo := repository.NewRoleRepository(database.Pool)
+	approvalRepo := repository.NewApprovalRepository(database.Pool)
 	
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo)
 	contractHandler := handlers.NewContractHandler(contractRepo)
 	calcHandler := handlers.NewCalculationHandler(contractRepo)
+	approvalHandler := handlers.NewApprovalHandler(approvalRepo)
 	
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -86,6 +89,22 @@ func main() {
 		// Calculations
 		api.POST("/contracts/:id/calculate", calcHandler.Calculate)
 		api.GET("/contracts/:id/schedule", calcHandler.GetAmortizationSchedule)
+		
+		// Approval workflow
+		api.POST("/contracts/:id/submit", approvalHandler.SubmitForReview)
+		api.POST("/contracts/:id/review", approvalHandler.Review)
+		api.POST("/contracts/:id/approve", approvalHandler.Approve)
+		api.POST("/contracts/:id/reject", approvalHandler.Reject)
+		api.GET("/contracts/:id/approval-status", approvalHandler.GetStatus)
+		api.GET("/contracts-by-status", approvalHandler.ListByStatus)
+		
+		// Discount Rate
+		api.GET("/contracts/:id/discount-rate-status", handlers.CheckDiscountRate(contractRepo))
+		api.POST("/contracts/:id/confirm-discount-rate", handlers.ConfirmDiscountRate(contractRepo))
+		
+		// Roles & Permissions
+		api.GET("/roles", handlers.ListRoles(roleRepo))
+		api.GET("/my-permissions", handlers.GetMyPermissions(roleRepo))
 	}
 	
 	port := cfg.Port

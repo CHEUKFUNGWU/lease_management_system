@@ -102,6 +102,33 @@ export const contractApi = {
     
   getSchedule: (id: string, token: string) =>
     apiRequest(`/api/v1/contracts/${id}/schedule`, { token }),
+    
+  submitForReview: (id: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ contract_id: id }),
+      token,
+    }),
+    
+  review: (id: string, approved: boolean, reason: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/review`, {
+      method: "POST",
+      body: JSON.stringify({ contract_id: id, approved, reason }),
+      token,
+    }),
+    
+  approve: (id: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ contract_id: id }),
+      token,
+    }),
+    
+  getApprovalStatus: (id: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/approval-status`, { token }),
+    
+  getDiscountRateStatus: (id: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/discount-rate-status`, { token }),
 };
 
 // AI APIs

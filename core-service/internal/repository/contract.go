@@ -31,9 +31,28 @@ type Contract struct {
 	TerminationAssessment        *bool   `json:"termination_assessment"`
 	DiscountRateType             *string `json:"discount_rate_type"`
 	DiscountRateVersion          *string `json:"discount_rate_version"`
+	DiscountRateMissing          bool    `json:"discount_rate_missing"`
+	DiscountRateSource           *string `json:"discount_rate_source"`
+	DiscountRatePolicyID         *string `json:"discount_rate_policy_id"`
+	DiscountRateConfirmedBy      *string `json:"discount_rate_confirmed_by"`
+	DiscountRateConfirmedAt      *time.Time `json:"discount_rate_confirmed_at"`
+	AIExtractedDiscountRate      *string `json:"ai_extracted_discount_rate"`
+	AISuggestedRatePolicies      interface{} `json:"ai_suggested_rate_policies"`
 	Status               string     `json:"status"`
-	CreatedBy            *string    `json:"created_by"`
+	ApprovalStatus       string     `json:"approval_status"`
+	IsOfficialVersion    bool       `json:"is_official_version"`
+	DraftVersionNo       int        `json:"draft_version_no"`
+	IncludedInReporting  bool       `json:"included_in_reporting"`
+	ReportMode           string     `json:"report_mode"`
+	ReviewedBy           *string    `json:"reviewed_by"`
+	ReviewedAt           *time.Time `json:"reviewed_at"`
 	ApprovedBy           *string    `json:"approved_by"`
+	ApprovedAt           *time.Time `json:"approved_at"`
+	RejectedReason       *string    `json:"rejected_reason"`
+	SubmittedAt          *time.Time `json:"submitted_at"`
+	AIConfidenceScore    *float64   `json:"ai_confidence_score"`
+	SourceReferenceLocator interface{} `json:"source_reference_locator"`
+	CreatedBy            *string    `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }

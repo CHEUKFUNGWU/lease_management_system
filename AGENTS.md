@@ -50,6 +50,20 @@
 - 必须包含字段级置信度评分、低置信度人工必审、原文定位高亮、差异留痕
 - AI 模块仅为录入前台和辅助分析入口，正式入库和计量仍由主系统规则控制
 - AI 问答必须基于权限范围检索，展示引用来源，区分"系统正式数据"与"AI 推断/建议"
+- **AI 默认运行在 Assist Mode**：负责识别、建议、草稿生成，正式入库需人工审批
+- Auto-Post Mode 需另行定义适用范围和阈值
+
+### 报表双模式
+- **Working Report**：可包含 Draft / Pending Approval 数据，用于内部试算和测试
+- **Official Report**：仅包含 Approved 数据，用于正式财务和审计
+- 报表需显示 approval_status、is_official_version、生成时间和版本
+- 导出文件应标注 Draft / Pending Approval / Official
+
+### Discount Rate 人机协同
+- AI **不得猜测折现率**，缺失时必须触发 human-in-the-loop
+- 处理顺序：检查合同文本 → 系统政策库匹配 → 无法唯一确定则人工确认
+- 缺少 discount rate 的合同标记为 `discount_rate_missing = true`
+- 需记录折现率来源、确认人、确认时间
 
 ## 实施阶段（优先级）
 
@@ -69,14 +83,38 @@
 - **固定资产/工程系统**：获取装修完工、恢复义务、减值线索
 - **审批与身份系统**：单点登录、组织架构同步、审批流程集成
 
-## 权限分离（最小集合）
+## 角色与权限模型
 
-- 合同录入 / 合同复核 / 合同审批
-- 利率维护 / 选择权判断维护
-- 月结执行 / 分录审核
-- 报表查询 / 披露下载 / 审计只读
+### 系统角色（6个）
 
-所有关键动作保留日志：新增、修改、删除、导入、导出、重算、审批、锁账/解锁
+| 角色 | 代码 | 主要职责 |
+|------|------|----------|
+| System Admin | `admin` | 用户/角色管理、主数据配置、系统参数 |
+| Finance Editor | `editor` | 上传合同、维护草稿、录入台账 |
+| Finance Reviewer | `reviewer` | 复核合同/付款计划/事件草稿 |
+| Finance Approver | `approver` | 审批正式入库、关键会计处理 |
+| Auditor Readonly | `auditor` | 只读查看、导出审计资料 |
+| Business Readonly | `readonly` | 查看授权范围内合同和报表 |
+
+### 数据权限维度
+
+- 法人 (legal_entity)
+- 门店 (store)
+- 区域 (region)
+- 品牌 (brand)
+
+### 审批流程
+
+```
+Agent 生成草稿 → Editor 修改确认 → Reviewer 复核 → Approver 审批 → 正式入库
+```
+
+- MVP 阶段 Editor 和 Reviewer 可为同一人
+- 未批准数据可保留计算，但需区分 Working Report / Official Report
+
+### 关键动作日志
+
+新增、修改、删除、导入、导出、重算、审批、锁账/解锁
 
 ## 风险红线（设计时必须规避）
 

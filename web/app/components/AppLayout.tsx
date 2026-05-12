@@ -10,6 +10,7 @@ import {
   SettingOutlined,
   LogoutOutlined,
   UserOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -47,6 +48,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       key: "/ai-chat",
       icon: <RobotOutlined />,
       label: <Link href="/ai-chat">AI 助手</Link>,
+    },
+    {
+      key: "/reports",
+      icon: <BarChartOutlined />,
+      label: <Link href="/reports">报表查询</Link>,
     },
     {
       key: "/settings",

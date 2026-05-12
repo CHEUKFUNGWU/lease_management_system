@@ -21,6 +21,9 @@ interface Contract {
   lease_start_date: string;
   lease_end_date: string;
   status: string;
+  approval_status: string;
+  is_official_version: boolean;
+  discount_rate_missing: boolean;
   created_at: string;
 }
 
@@ -74,24 +77,49 @@ export default function ContractsPage() {
       key: "lease_end_date",
     },
     {
-      title: "状态",
-      dataIndex: "status",
-      key: "status",
-      render: (status: string) => {
+      title: "审批状态",
+      dataIndex: "approval_status",
+      key: "approval_status",
+      render: (status: string, record: Contract) => {
         const colors: Record<string, string> = {
           draft: "default",
-          pending: "processing",
+          submitted: "processing",
+          reviewed: "processing",
+          pending_approval: "warning",
           approved: "success",
           rejected: "error",
+          returned_to_editor: "orange",
         };
         const labels: Record<string, string> = {
           draft: "草稿",
-          pending: "待审批",
+          submitted: "已提交",
+          reviewed: "已复核",
+          pending_approval: "待审批",
           approved: "已审批",
           rejected: "已驳回",
+          returned_to_editor: "退回编辑",
         };
-        return <Tag color={colors[status] || "default"}>{labels[status] || status}</Tag>;
+        return (
+          <Space>
+            <Tag color={colors[status] || "default"}>{labels[status] || status}</Tag>
+            {record.is_official_version && <Tag color="blue">正式版</Tag>}
+            {!record.is_official_version && status !== "draft" && <Tag>工作版</Tag>}
+          </Space>
+        );
       },
+    },
+    {
+      title: "折现率",
+      key: "discount_rate",
+      render: (_: any, record: Contract) => (
+        <span>
+          {record.discount_rate_missing ? (
+            <Tag color="error">缺失</Tag>
+          ) : (
+            <Tag color="success">已设置</Tag>
+          )}
+        </span>
+      ),
     },
     {
       title: "操作",

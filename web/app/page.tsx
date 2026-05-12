@@ -1,18 +1,73 @@
 "use client";
 
-import { Button, Typography } from "antd";
+import AppLayout from "../components/AppLayout";
+import ProtectedRoute from "../components/ProtectedRoute";
+import { Card, Row, Col, Statistic } from "antd";
+import {
+  FileTextOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  RobotOutlined,
+} from "@ant-design/icons";
 
-const { Title, Paragraph } = Typography;
-
-export default function Home() {
+export default function HomePage() {
   return (
-    <main style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
-      <Title>IFRS 16 租赁管理系统</Title>
-      <Paragraph>
-        欢迎使用 IFRS 16 租赁管理系统。系统支持合同管理、租赁计量、
-        事件变更、会计分录、披露报表及 AI Agent 智能录入。
-      </Paragraph>
-      <Button type="primary">开始使用</Button>
-    </main>
+    <ProtectedRoute>
+      <AppLayout>
+        <h1 style={{ marginBottom: 24 }}>仪表板</h1>
+
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} lg={6}>
+            <Card>
+              <Statistic
+                title="合同总数"
+                value={128}
+                prefix={<FileTextOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <Card>
+              <Statistic
+                title="已审批"
+                value={96}
+                prefix={<CheckCircleOutlined style={{ color: "#52c41a" }} />}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <Card>
+              <Statistic
+                title="待处理"
+                value={32}
+                prefix={<ClockCircleOutlined style={{ color: "#faad14" }} />}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <Card>
+              <Statistic
+                title="AI 任务"
+                value={15}
+                prefix={<RobotOutlined style={{ color: "#1890ff" }} />}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          <Col xs={24} lg={12}>
+            <Card title="最近上传">
+              <p>暂无数据</p>
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="待审批事项">
+              <p>暂无数据</p>
+            </Card>
+          </Col>
+        </Row>
+      </AppLayout>
+    </ProtectedRoute>
   );
 }

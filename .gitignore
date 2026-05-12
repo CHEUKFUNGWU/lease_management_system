@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.env
+
+# Build outputs
+.next/
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+postgres_data/
+minio_data/
+
+# Test coverage
+coverage/
+.coverage
+htmlcov/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

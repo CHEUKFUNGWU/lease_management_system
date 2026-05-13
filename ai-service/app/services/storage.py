@@ -55,3 +55,30 @@ def download_from_minio(bucket_name: str, object_name: str) -> bytes:
     finally:
         response.close()
         response.release_conn()
+
+
+def generate_presigned_url(bucket_name: str, object_name: str, expires_hours: int = 24) -> str:
+    """生成 MinIO 文件的预签名 URL（用于 PaddleOCR fileUrl 方式）。
+    
+    注意：生成的 URL 使用 MinIO 的内部地址（minio:9000），
+    外部服务（如 PaddleOCR AI Studio）可能无法访问。
+    仅在 MinIO 对外可访问时使用此 URL。
+    
+    Args:
+        bucket_name: MinIO bucket 名称
+        object_name: 对象路径
+        expires_hours: URL 有效期（小时）
+    
+    Returns:
+        str: 预签名 URL
+    """
+    from datetime import timedelta
+    
+    client = get_minio_client()
+    
+    url = client.presigned_get_object(
+        bucket_name=bucket_name,
+        object_name=object_name,
+        expires=timedelta(hours=expires_hours),
+    )
+    return url

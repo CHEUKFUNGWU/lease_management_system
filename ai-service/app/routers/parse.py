@@ -27,7 +27,9 @@ class ParseResponse(BaseModel):
 
 class ContractDraftRequest(BaseModel):
     file_id: str
-    file_content: str
+    object_name: str  # MinIO object name for file download
+    content_type: str = "application/pdf"  # MIME type for text extraction
+    file_content: Optional[str] = None  # Optional: pre-extracted text (if provided, skip extraction)
     mode: str = "assist"  # "assist" or "auto-post"
 
 
@@ -130,6 +132,24 @@ async def parse_contract(request: ContractDraftRequest):
             detail="当前仅支持 Assist Mode。Auto-Post Mode 需另行配置"
         )
     
+    # Extract text: use provided file_content or download from MinIO + PaddleOCR
+    file_content = request.file_content
+    if not file_content:
+        # Download file from MinIO
+        try:
+            file_data = download_from_minio("ifrs16-uploads", request.object_name)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"文件下载失败: {str(e)}")
+        
+        # Extract text using PaddleOCR (primary) + fallback
+        try:
+            file_content = await extract_text(file_data, request.content_type)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"文本提取失败: {str(e)}")
+        
+        if len(file_content) > 15000:
+            file_content = file_content[:15000] + "\n... (truncated)"
+    
     prompt = f"""
     你是一位专业的 IFRS 16 租赁合同解析专家。请从以下合同文本中提取关键字段。
     
@@ -141,7 +161,7 @@ async def parse_contract(request: ContractDraftRequest):
     5. 识别租赁成分和非租赁成分(CAM、服务费)
     
     合同文本:
-    {request.file_content}
+    {file_content}
     
     请提取以下字段（JSON 格式）:
     - contract_number: 合同编号

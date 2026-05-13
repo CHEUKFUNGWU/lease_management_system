@@ -1,16 +1,17 @@
 """PaddleOCR AI Studio 异步 API 集成。
 
 调用流程：
-1. 提交解析任务 (POST /api/v2/ocr/jobs) — 支持文件直传或 URL
+1. 提交解析任务 (POST /api/v2/ocr/jobs) — 支持 fileUrl 或 multipart 文件上传
 2. 轮询任务状态 (GET /api/v2/ocr/jobs/{jobId})
-3. 下载结果（Markdown + JSON）
+3. 下载结果（JSON 格式，从 layoutParsingResults 提取 Markdown）
 
 支持模型：PaddleOCR-VL-1.5、PaddleOCR-VL、PP-StructureV3、PP-OCRv5
 每日免费额度：3000 页
+
+注意：base64 JSON 方式提交文件返回 500，必须使用 multipart form data 方式。
 """
 
 import asyncio
-import base64
 import logging
 import time
 from typing import Optional
@@ -37,71 +38,12 @@ class PaddleOCRClient:
     def is_available(self) -> bool:
         return self.enabled and bool(self.access_token)
 
-    async def submit_file(
-        self,
-        file_data: bytes,
-        file_type: int = 0,
-        use_doc_orientation_classify: bool = True,
-        use_doc_unwarping: bool = True,
-        use_chart_recognition: bool = False,
-        page_ranges: Optional[str] = None,
-    ) -> str:
-        """提交文件解析任务。
-
-        Args:
-            file_data: 文件二进制内容
-            file_type: 0=PDF, 1=图片
-            use_doc_orientation_classify: 图片方向矫正
-            use_doc_unwarping: 图片扭曲矫正
-            use_chart_recognition: 图表识别
-            page_ranges: 页码范围，如 "1-10"
-
-        Returns:
-            jobId: 任务 ID
-        """
-        file_b64 = base64.b64encode(file_data).decode("ascii")
-
-        payload = {
-            "file": file_b64,
-            "model": self.model,
-            "optionalPayload": {
-                "useDocOrientationClassify": use_doc_orientation_classify,
-                "useDocUnwarping": use_doc_unwarping,
-                "useChartRecognition": use_chart_recognition,
-            },
-        }
-        if page_ranges:
-            payload["pageRanges"] = page_ranges
-
-        headers = {
-            "Authorization": f"bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
-
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(self.api_url, json=payload, headers=headers)
-
-        if resp.status_code == 429:
-            raise RuntimeError("PaddleOCR: 每日配额已用完 (3000页)")
-        if resp.status_code == 403:
-            raise RuntimeError("PaddleOCR: Token 无效或 URL 不匹配")
-        if resp.status_code != 200:
-            raise RuntimeError(f"PaddleOCR: 提交任务失败 ({resp.status_code}): {resp.text}")
-
-        data = resp.json()
-        job_id = data.get("data", {}).get("jobId")
-        if not job_id:
-            raise RuntimeError(f"PaddleOCR: 响应中无 jobId: {data}")
-
-        logger.info(f"PaddleOCR 任务已提交: jobId={job_id}, model={self.model}")
-        return job_id
-
     async def submit_url(
         self,
         file_url: str,
         model: Optional[str] = None,
     ) -> str:
-        """通过文件 URL 提交解析任务（适用于 MinIO presigned URL）。
+        """通过文件 URL 提交解析任务（推荐方式，适用于公开可访问的文件）。
 
         Args:
             file_url: 可公开访问的文件 URL
@@ -123,6 +65,10 @@ class PaddleOCRClient:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(self.api_url, json=payload, headers=headers)
 
+        if resp.status_code == 429:
+            raise RuntimeError("PaddleOCR: 每日配额已用完 (3000页)")
+        if resp.status_code == 403:
+            raise RuntimeError("PaddleOCR: Token 无效或 URL 不匹配")
         if resp.status_code != 200:
             raise RuntimeError(f"PaddleOCR: URL 提交失败 ({resp.status_code}): {resp.text}")
 
@@ -132,6 +78,53 @@ class PaddleOCRClient:
             raise RuntimeError(f"PaddleOCR: 响应中无 jobId: {data}")
 
         logger.info(f"PaddleOCR URL 任务已提交: jobId={job_id}")
+        return job_id
+
+    async def submit_file(
+        self,
+        file_data: bytes,
+        filename: str = "document.pdf",
+        content_type: str = "application/pdf",
+    ) -> str:
+        """通过 multipart form data 提交文件解析任务。
+
+        注意：PaddleOCR API 的 base64 JSON 方式返回 500，必须使用 multipart 方式。
+
+        Args:
+            file_data: 文件二进制内容
+            filename: 文件名
+            content_type: MIME 类型
+
+        Returns:
+            jobId: 任务 ID
+        """
+        headers = {
+            "Authorization": f"bearer {self.access_token}",
+        }
+
+        files = {
+            "file": (filename, file_data, content_type),
+        }
+        data = {
+            "model": self.model,
+        }
+
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(self.api_url, files=files, data=data, headers=headers)
+
+        if resp.status_code == 429:
+            raise RuntimeError("PaddleOCR: 每日配额已用完 (3000页)")
+        if resp.status_code == 403:
+            raise RuntimeError("PaddleOCR: Token 无效或 URL 不匹配")
+        if resp.status_code != 200:
+            raise RuntimeError(f"PaddleOCR: 提交任务失败 ({resp.status_code}): {resp.text}")
+
+        result = resp.json()
+        job_id = result.get("data", {}).get("jobId")
+        if not job_id:
+            raise RuntimeError(f"PaddleOCR: 响应中无 jobId: {result}")
+
+        logger.info(f"PaddleOCR 文件任务已提交: jobId={job_id}, model={self.model}")
         return job_id
 
     async def get_result(self, job_id: str) -> dict:
@@ -186,61 +179,133 @@ class PaddleOCRClient:
 
             await asyncio.sleep(self.poll_interval)
 
-    async def download_markdown(self, markdown_url: str) -> str:
-        """下载 Markdown 结果。"""
+    async def _extract_markdown_from_json_url(self, json_url: str) -> str:
+        """从 JSON 结果 URL 下载并提取 Markdown 文本。
+
+        PaddleOCR API 返回的 JSON 结构：
+        {
+            "logId": ...,
+            "result": {
+                "layoutParsingResults": [
+                    {
+                        "markdown": { "text": "..." },
+                        "prunedResult": {...},
+                        "outputImages": {...},
+                        "inputImage": {...}
+                    }
+                ],
+                "dataInfo": {...},
+                "preprocessedImages": [...]
+            },
+            "errorCode": 0,
+            "errorMsg": ""
+        }
+        """
         async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.get(markdown_url)
+            resp = await client.get(json_url)
+
         if resp.status_code != 200:
-            raise RuntimeError(f"PaddleOCR: 下载 Markdown 失败 ({resp.status_code})")
-        return resp.text
+            raise RuntimeError(f"PaddleOCR: 下载 JSON 结果失败 ({resp.status_code})")
+
+        json_result = resp.json()
+
+        # 尝试从 result.layoutParsingResults 提取
+        result_obj = json_result.get("result", {})
+        layout_results = result_obj.get("layoutParsingResults", [])
+
+        if layout_results:
+            parts = []
+            for i, page in enumerate(layout_results):
+                md = page.get("markdown", {})
+                text = md.get("text", "") if isinstance(md, dict) else str(md) if md else ""
+                if text:
+                    parts.append(f"--- Page {i + 1} ---\n{text}")
+            if parts:
+                logger.info(f"PaddleOCR: 从 JSON 结果提取了 {len(parts)} 页文本")
+                return "\n\n".join(parts)
+
+        # 回退：尝试顶层 layoutParsingResults（旧版 API 格式）
+        layout_results = json_result.get("layoutParsingResults", [])
+        if layout_results:
+            parts = []
+            for i, page in enumerate(layout_results):
+                md = page.get("markdown", {})
+                text = md.get("text", "") if isinstance(md, dict) else str(md) if md else ""
+                if text:
+                    parts.append(f"--- Page {i + 1} ---\n{text}")
+            if parts:
+                return "\n\n".join(parts)
+
+        raise RuntimeError("PaddleOCR: JSON 结果中无可用文本")
+
+    async def extract_text_from_url(self, file_url: str) -> str:
+        """一站式：通过 URL 提交 → 等待 → 返回 Markdown 文本。
+
+        Args:
+            file_url: 可公开访问的文件 URL
+
+        Returns:
+            Markdown 格式的文档文本
+        """
+        job_id = await self.submit_url(file_url)
+        result = await self.wait_for_result(job_id)
+        return await self._extract_result_text(result)
 
     async def extract_text_from_file(
         self,
         file_data: bytes,
-        file_type: int = 0,
-        page_ranges: Optional[str] = None,
+        filename: str = "document.pdf",
+        content_type: str = "application/pdf",
     ) -> str:
         """一站式：提交文件 → 等待 → 返回 Markdown 文本。
 
+        使用 multipart form data 方式提交文件（base64 JSON 方式不可用）。
+
         Args:
             file_data: 文件二进制内容
-            file_type: 0=PDF, 1=图片
-            page_ranges: 页码范围
+            filename: 文件名
+            content_type: MIME 类型
 
         Returns:
             Markdown 格式的文档文本
         """
         job_id = await self.submit_file(
             file_data=file_data,
-            file_type=file_type,
-            page_ranges=page_ranges,
+            filename=filename,
+            content_type=content_type,
         )
 
         result = await self.wait_for_result(job_id)
+        return await self._extract_result_text(result)
 
-        # 获取结果 URL
+    async def _extract_result_text(self, result: dict) -> str:
+        """从 PaddleOCR 任务结果中提取文本。
+
+        优先级：
+        1. markdownUrl（直接下载 Markdown）— 当前 API 不返回此字段
+        2. jsonUrl（下载 JSON，从 layoutParsingResults 提取）— 主要方式
+        """
         result_url = result.get("resultUrl", {})
-        markdown_url = result_url.get("markdownUrl")
 
-        if not markdown_url:
-            # 回退：尝试从 layoutParsingResults 获取
-            logger.warning("PaddleOCR: 无 markdownUrl，尝试从 JSON 结果提取")
-            json_url = result_url.get("jsonUrl")
-            if json_url:
-                async with httpx.AsyncClient(timeout=60) as client:
-                    resp = await client.get(json_url)
-                if resp.status_code == 200:
-                    json_result = resp.json()
-                    # 从 JSON 中拼接文本
-                    parts = []
-                    for page in json_result.get("layoutParsingResults", []):
-                        md = page.get("markdown", {})
-                        if md.get("text"):
-                            parts.append(md["text"])
-                    return "\n\n".join(parts)
-            raise RuntimeError("PaddleOCR: 无可用的结果 URL")
+        # 优先尝试 markdownUrl（当前 API 不返回，但保留兼容性）
+        markdown_url = result_url.get("markdownUrl") if isinstance(result_url, dict) else None
+        if markdown_url:
+            logger.info("PaddleOCR: 使用 markdownUrl 下载结果")
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.get(markdown_url)
+            if resp.status_code == 200:
+                return resp.text
+            logger.warning(f"PaddleOCR: markdownUrl 下载失败 ({resp.status_code})，尝试 jsonUrl")
 
-        return await self.download_markdown(markdown_url)
+        # 主要方式：从 jsonUrl 提取
+        json_url = result_url.get("jsonUrl") if isinstance(result_url, dict) else None
+        if json_url:
+            logger.info("PaddleOCR: 使用 jsonUrl 下载结果")
+            return await self._extract_markdown_from_json_url(json_url)
+
+        # 最后尝试：result 可能直接包含数据
+        logger.warning("PaddleOCR: 无 resultUrl，尝试从结果直接提取")
+        raise RuntimeError("PaddleOCR: 无可用的结果 URL")
 
 
 # 全局单例

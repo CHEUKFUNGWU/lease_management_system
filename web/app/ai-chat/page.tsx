@@ -20,6 +20,8 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { aiChatApi } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -33,12 +35,13 @@ interface Message {
 }
 
 export default function AIChatPage() {
+  const { token } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
       role: "assistant",
       content:
-        "你好！我是 IFRS 16 AI 助手。我可以帮你：\n\n1. 识别和解析租赁合同\n2. 提取付款计划\n3. 判断合同变更类型\n4. 回答 IFRS 16 相关问题\n\n请直接描述你的需求或上传文件。",
+        "你好！我是 IFRS 16 AI 助手。我可以帮你：\n\n1. 查询合同台账信息\n2. 查看 IFRS 16 计量结果\n3. 了解审批状态\n4. 回答 IFRS 16 会计问题\n\n例如：\n- \"当前有多少份合同？\"\n- \"合同 LEASE-2024-001 的最新计量结果\"\n- \"2024-01 期间的分录\"",
       timestamp: new Date(),
     },
   ]);
@@ -55,7 +58,7 @@ export default function AIChatPage() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !token) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -68,17 +71,27 @@ export default function AIChatPage() {
     setInput("");
     setLoading(true);
 
-    // TODO: 调用 AI Service API
-    setTimeout(() => {
+    try {
+      const data = await aiChatApi.chat({ message: input }, token);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `收到你的问题："${input}"\n\n我正在处理中。实际实现时会调用 AI Service 接口。`,
+        content: data.answer || "抱歉，我无法理解您的问题。",
         timestamp: new Date(),
+        sources: data.sources?.map((s: any) => s.title || s.type),
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } catch (error: any) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `请求失败：${error.message || "未知错误"}`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -155,7 +168,6 @@ export default function AIChatPage() {
                           {msg.sources.map((source, idx) => (
                             <Tag
                               key={idx}
-                              size="small"
                               icon={<FileTextOutlined />}
                             >
                               {source}

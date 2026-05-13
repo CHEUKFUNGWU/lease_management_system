@@ -6,6 +6,7 @@ interface User {
   id: string;
   username: string;
   role: string;
+  legal_entity_id?: string;
 }
 
 interface AuthContextType {

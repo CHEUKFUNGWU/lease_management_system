@@ -1,0 +1,7 @@
+# OCR dependencies (optional — install separately if needed)
+# NOTE: PaddlePaddle/PaddleOCR are heavy and may not work on ARM (Apple Silicon).
+# For MVP, the AI service uses pymupdf + LLM for document parsing instead.
+# Install only if you need native OCR support:
+#   pip install -r requirements-ocr.txt
+paddlepaddle==2.6.0
+paddleocr==2.7.0

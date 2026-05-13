@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -12,7 +10,7 @@ services:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/migrations:/docker-entrypoint-initdb.d/migrations
+      - ./db/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ifrs16} -d ${DB_NAME:-ifrs16}"]
       interval: 5s
@@ -60,9 +58,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    volumes:
-      - ./core-service:/app
-    working_dir: /app
 
   ai-service:
     build:
@@ -77,6 +72,10 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      PADDLEOCR_API_URL: ${PADDLEOCR_API_URL:-https://paddleocr.aistudio-app.com/api/v2/ocr/jobs}
+      PADDLEOCR_ACCESS_TOKEN: ${PADDLEOCR_ACCESS_TOKEN:-}
+      PADDLEOCR_MODEL: ${PADDLEOCR_MODEL:-PaddleOCR-VL-1.5}
+      PADDLEOCR_ENABLED: ${PADDLEOCR_ENABLED:-false}
       CORE_SERVICE_URL: http://core-service:8080
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
@@ -86,9 +85,6 @@ services:
     depends_on:
       - core-service
       - minio
-    volumes:
-      - ./ai-service:/app
-    working_dir: /app
 
   web:
     build:
@@ -103,10 +99,6 @@ services:
     depends_on:
       - core-service
       - ai-service
-    volumes:
-      - ./web:/app
-      - /app/node_modules
-    working_dir: /app
 
 volumes:
   postgres_data:

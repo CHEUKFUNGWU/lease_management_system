@@ -2,16 +2,18 @@ package handlers
 
 import (
 	"net/http"
-	
+
 	"github.com/gin-gonic/gin"
+	"github.com/ifrs16/core-service/internal/middleware"
 	"github.com/ifrs16/core-service/internal/repository"
 )
 
 func CheckDiscountRate(contractRepo *repository.ContractRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		
-		contract, err := contractRepo.GetByID(c.Request.Context(), id)
+		legalEntityID := middleware.GetTenantID(c)
+
+		contract, err := contractRepo.GetByID(c.Request.Context(), id, legalEntityID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get contract: " + err.Error()})
 			return

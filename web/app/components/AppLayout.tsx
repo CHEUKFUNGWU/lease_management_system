@@ -11,6 +11,7 @@ import {
   LogoutOutlined,
   UserOutlined,
   BarChartOutlined,
+  SafetyOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
-  const menuItems = [
+  const baseMenuItems = [
     {
       key: "/",
       icon: <HomeOutlined />,
@@ -60,6 +61,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: <Link href="/settings">设置</Link>,
     },
   ];
+
+  const adminMenuItem = {
+    key: "/admin/users",
+    icon: <SafetyOutlined />,
+    label: <Link href="/admin/users">管理后台</Link>,
+  };
+
+  const menuItems = user?.role === "admin"
+    ? [...baseMenuItems, adminMenuItem]
+    : baseMenuItems;
 
   const userMenuItems = [
     {

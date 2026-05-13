@@ -36,12 +36,20 @@ func main() {
 	contractRepo := repository.NewContractRepository(database.Pool)
 	roleRepo := repository.NewRoleRepository(database.Pool)
 	approvalRepo := repository.NewApprovalRepository(database.Pool)
+	psRepo := repository.NewPaymentScheduleRepository(database.Pool)
+	eventRepo := repository.NewEventRepository(database.Pool)
+	mcRepo := repository.NewMonthlyClosingRepository(database.Pool)
 	
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo)
 	contractHandler := handlers.NewContractHandler(contractRepo)
-	calcHandler := handlers.NewCalculationHandler(contractRepo)
-	approvalHandler := handlers.NewApprovalHandler(approvalRepo)
+	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo)
+	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo)
+	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
+	reportHandler := handlers.NewReportHandler(contractRepo, psRepo)
+	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo)
+	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, psRepo)
+	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo)
 	
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -71,13 +79,43 @@ func main() {
 		})
 	})
 	
-	// Public routes
+	// Public routes - registration disabled, only login is public
 	r.POST("/api/v1/auth/register", authHandler.Register)
 	r.POST("/api/v1/auth/login", authHandler.Login)
+	
+	// Public: list active legal entities for registration
+	r.GET("/api/v1/legal-entities", func(c *gin.Context) {
+		rows, err := database.Pool.Query(c.Request.Context(), 
+			`SELECT id, code, name, country, currency FROM legal_entities WHERE is_active = true ORDER BY code`)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "failed to fetch legal entities"})
+			return
+		}
+		defer rows.Close()
+		
+		type LegalEntity struct {
+			ID       string `json:"id"`
+			Code     string `json:"code"`
+			Name     string `json:"name"`
+			Country  string `json:"country"`
+			Currency string `json:"currency"`
+		}
+		
+		var entities []LegalEntity
+		for rows.Next() {
+			var e LegalEntity
+			if err := rows.Scan(&e.ID, &e.Code, &e.Name, &e.Country, &e.Currency); err != nil {
+				continue
+			}
+			entities = append(entities, e)
+		}
+		c.JSON(200, gin.H{"legal_entities": entities})
+	})
 	
 	// Protected routes
 	api := r.Group("/api/v1")
 	api.Use(middleware.JWTAuth(cfg.JWTSecret))
+	api.Use(middleware.TenantMiddleware())
 	{
 		api.GET("/me", handlers.GetCurrentUser())
 		
@@ -102,6 +140,32 @@ func main() {
 		api.GET("/contracts/:id/discount-rate-status", handlers.CheckDiscountRate(contractRepo))
 		api.POST("/contracts/:id/confirm-discount-rate", handlers.ConfirmDiscountRate(contractRepo))
 		
+		// Payment Schedules
+		api.POST("/contracts/:id/payment-schedules", psHandler.Create)
+		api.GET("/contracts/:id/payment-schedules", psHandler.ListByContract)
+		
+		// Events
+		api.POST("/contracts/:id/events", eventHandler.Create)
+		api.GET("/contracts/:id/events", eventHandler.ListByContract)
+		
+		// Reports
+		api.GET("/reports/liability-rolling", reportHandler.LiabilityRolling)
+		api.GET("/reports/liability-rolling/export", reportHandler.ExportLiabilityRolling)
+		api.GET("/reports/contract-summary", reportHandler.ContractSummary)
+		
+		// Monthly Closing
+		api.POST("/monthly-closing/generate", monthlyClosingHandler.Generate)
+		api.GET("/monthly-closing/batches", monthlyClosingHandler.ListBatches)
+		api.GET("/monthly-closing/entries", monthlyClosingHandler.GetJournalEntries)
+		api.GET("/contracts/:id/measurement-results", monthlyClosingHandler.GetMeasurementResults)
+		
+		// AI Chat
+		api.POST("/ai/chat", aiChatHandler.Chat)
+		
+		// Admin: user management
+		api.GET("/admin/users", authHandler.AdminListUsers)
+		api.POST("/admin/users", authHandler.AdminCreateUser)
+
 		// Roles & Permissions
 		api.GET("/roles", handlers.ListRoles(roleRepo))
 		api.GET("/my-permissions", handlers.GetMyPermissions(roleRepo))

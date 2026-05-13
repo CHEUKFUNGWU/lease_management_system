@@ -1,25 +1,27 @@
-.PHONY: help setup up down restart logs migrate web core ai db
+.PHONY: help setup up down restart logs migrate web core ai db reset-db
 
 help: ## 显示帮助信息
 	@echo "IFRS 16 租赁管理系统 — 常用命令"
 	@echo ""
-	@echo "  make setup    复制 .env.example 到 .env 并初始化项目"
-	@echo "  make up       启动所有 Docker 服务"
-	@echo "  make down     停止所有 Docker 服务"
-	@echo "  make restart  重启所有服务"
-	@echo "  make logs     查看所有服务日志"
-	@echo "  make db       进入 PostgreSQL 命令行"
-	@echo "  make migrate  执行数据库迁移"
-	@echo "  make web      进入前端开发容器"
-	@echo "  make core     进入核心服务容器"
-	@echo "  make ai       进入 AI 服务容器"
+	@echo "  make setup      复制 .env.example 到 .env 并初始化项目"
+	@echo "  make up         启动所有 Docker 服务"
+	@echo "  make down       停止所有 Docker 服务"
+	@echo "  make restart    重启所有服务"
+	@echo "  make logs       查看所有服务日志"
+	@echo "  make db         进入 PostgreSQL 命令行"
+	@echo "  make migrate    在 Docker 中执行数据库迁移"
+	@echo "  make reset-db   删除数据库卷并重建（清空所有数据）"
+	@echo "  make web        进入前端开发容器"
+	@echo "  make core       进入核心服务容器"
+	@echo "  make ai         进入 AI 服务容器"
 	@echo ""
 
 setup: ## 初始化项目环境
 	@if [ ! -f .env ]; then cp .env.example .env; echo "已创建 .env"; fi
 	@echo "初始化完成。请编辑 .env 文件配置环境变量，然后运行 make up"
 
-up: ## 启动所有服务	docker-compose up -d
+up: ## 启动所有服务
+	docker-compose up -d
 
 down: ## 停止所有服务
 	docker-compose down
@@ -32,9 +34,24 @@ logs: ## 查看服务日志
 db: ## 进入 PostgreSQL 命令行
 	docker-compose exec postgres psql -U ifrs16 -d ifrs16
 
-migrate: ## 执行数据库迁移
-	@echo "执行数据库迁移..."
-	cd db && goose postgres "host=localhost port=5432 user=ifrs16 password=ifrs16_secret dbname=ifrs16 sslmode=disable" up
+migrate: ## 在 Docker 中执行数据库迁移
+	@echo "在 PostgreSQL 容器中执行迁移..."
+	@for f in db/init/*.sql; do \
+		echo "  运行: $$f"; \
+		docker-compose exec -T postgres psql -U ifrs16 -d ifrs16 -f /docker-entrypoint-initdb.d/$$(basename $$f); \
+	done
+	@echo "迁移完成"
+
+reset-db: ## 删除数据库卷并重建
+	@echo "⚠️  这将删除所有数据库数据！"
+	@echo "按 Ctrl+C 取消，5 秒后继续..."
+	@sleep 5
+	docker-compose down -v
+	@echo "数据库卷已删除，运行 make up 重建..."
+	docker-compose up -d postgres
+	@echo "等待 PostgreSQL 启动..."
+	@sleep 5
+	@echo "数据库已重建完成"
 
 web: ## 进入前端开发容器
 	docker-compose exec web sh

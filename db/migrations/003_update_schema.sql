@@ -23,15 +23,18 @@ CREATE TABLE IF NOT EXISTS user_data_scopes (
 );
 
 -- 3. AI 草稿审批状态枚举类型
-CREATE TYPE IF NOT EXISTS approval_status AS ENUM (
-    'draft',
-    'submitted',
-    'reviewed',
-    'pending_approval',
-    'approved',
-    'rejected',
-    'returned_to_editor'
-);
+DO $$ BEGIN
+    CREATE TYPE approval_status AS ENUM (
+        'draft',
+        'submitted',
+        'reviewed',
+        'pending_approval',
+        'approved',
+        'rejected',
+        'returned_to_editor'
+    );
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- 4. 合同表增加审批和版本控制字段
 ALTER TABLE lease_contracts

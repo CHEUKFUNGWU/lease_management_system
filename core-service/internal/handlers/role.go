@@ -9,8 +9,6 @@ import (
 
 func ListRoles(roleRepo *repository.RoleRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
-		
 		// For now, return static roles. In production, query from DB
 		roles := []gin.H{
 			{"id": "11111111-1111-1111-1111-111111111111", "name": "System Admin", "description": "系统管理员"},

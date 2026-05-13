@@ -2,19 +2,20 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 	
 	"github.com/gin-gonic/gin"
+	"github.com/ifrs16/core-service/internal/middleware"
 	"github.com/ifrs16/core-service/internal/repository"
-	"github.com/ifrs16/core-service/internal/services/ifrs16"
+	ifrs16svc "github.com/ifrs16/core-service/internal/services/ifrs16"
 )
 
 type CalculationHandler struct {
 	contractRepo *repository.ContractRepository
+	psRepo       *repository.PaymentScheduleRepository
 }
 
-func NewCalculationHandler(contractRepo *repository.ContractRepository) *CalculationHandler {
-	return &CalculationHandler{contractRepo: contractRepo}
+func NewCalculationHandler(contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository) *CalculationHandler {
+	return &CalculationHandler{contractRepo: contractRepo, psRepo: psRepo}
 }
 
 type CalculateRequest struct {
@@ -27,7 +28,7 @@ type CalculateResponse struct {
 	InitialLiability float64                       `json:"initial_liability"`
 	InitialROUAsset  float64                       `json:"initial_rou_asset"`
 	TotalDays        int                           `json:"total_days"`
-	MonthlySummary   []ifrs16.MonthlyEntry         `json:"monthly_summary"`
+	MonthlySummary   []ifrs16svc.MonthlyEntry      `json:"monthly_summary"`
 }
 
 func (h *CalculationHandler) Calculate(c *gin.Context) {
@@ -37,8 +38,11 @@ func (h *CalculationHandler) Calculate(c *gin.Context) {
 		return
 	}
 	
-	// Get contract
-	contract, err := h.contractRepo.GetByID(c.Request.Context(), req.ContractID)
+	ctx := c.Request.Context()
+	legalEntityID := middleware.GetTenantID(c)
+	
+	// Get contract with tenant isolation
+	contract, err := h.contractRepo.GetByID(ctx, req.ContractID, legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get contract: " + err.Error()})
 		return
@@ -48,37 +52,46 @@ func (h *CalculationHandler) Calculate(c *gin.Context) {
 		return
 	}
 	
-	// For MVP, create sample payments based on contract
-	// In production, this would come from lease_payment_schedules table
-	payments := []ifrs16.LeasePayment{
-		{
-			Date:   contract.CommencementDate,
-			Amount: 100000,
-			Timing: "postpaid",
-			Type:   "fixed",
-		},
+	// Load payment schedules from database
+	schedules, err := h.psRepo.GetByContractID(c.Request.Context(), req.ContractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get payment schedules: " + err.Error()})
+		return
 	}
 	
-	// Add monthly payments
-	currentDate := contract.CommencementDate.AddDate(0, 1, 0)
-	for currentDate.Before(contract.LeaseEndDate) {
-		payments = append(payments, ifrs16.LeasePayment{
-			Date:   currentDate,
-			Amount: 100000,
-			Timing: "postpaid",
-			Type:   "fixed",
-		})
-		currentDate = currentDate.AddDate(0, 1, 0)
+	var payments []ifrs16svc.LeasePayment
+	if len(schedules) == 0 {
+		// Fallback: generate monthly payments if no schedules exist
+		payments = []ifrs16svc.LeasePayment{
+			{
+				Date:   contract.CommencementDate,
+				Amount: 100000,
+				Timing: "postpaid",
+				Type:   "fixed",
+			},
+		}
+		currentDate := contract.CommencementDate.AddDate(0, 1, 0)
+		for currentDate.Before(contract.LeaseEndDate) {
+			payments = append(payments, ifrs16svc.LeasePayment{
+				Date:   currentDate,
+				Amount: 100000,
+				Timing: "postpaid",
+				Type:   "fixed",
+			})
+			currentDate = currentDate.AddDate(0, 1, 0)
+		}
+	} else {
+		payments = repository.ToIFRS16Payments(schedules)
 	}
 	
-	calculation := ifrs16.LeaseCalculation{
+	calculation := ifrs16svc.LeaseCalculation{
 		CommencementDate: contract.CommencementDate,
 		LeaseEndDate:     contract.LeaseEndDate,
 		DiscountRate:     req.DiscountRate,
 		Payments:         payments,
 	}
 	
-	result, err := ifrs16.Calculate(calculation)
+	result, err := ifrs16svc.Calculate(calculation)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "calculation failed: " + err.Error()})
 		return
@@ -95,8 +108,9 @@ func (h *CalculationHandler) Calculate(c *gin.Context) {
 
 func (h *CalculationHandler) GetAmortizationSchedule(c *gin.Context) {
 	contractID := c.Param("id")
+	legalEntityID := middleware.GetTenantID(c)
 	
-	contract, err := h.contractRepo.GetByID(c.Request.Context(), contractID)
+	contract, err := h.contractRepo.GetByID(c.Request.Context(), contractID, legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get contract: " + err.Error()})
 		return

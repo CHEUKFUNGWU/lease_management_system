@@ -92,7 +92,7 @@ func LoadUserPermissions(roleRepo interface {
 			return
 		}
 		
-		id, ok := userID.(string)
+		_, ok := userID.(string)
 		if !ok {
 			c.Next()
 			return

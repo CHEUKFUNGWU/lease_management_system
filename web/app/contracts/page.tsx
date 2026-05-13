@@ -126,7 +126,7 @@ export default function ContractsPage() {
       key: "action",
       render: (_: any, record: Contract) => (
         <Space size="small">
-          <Button type="link" icon={<EyeOutlined />}>
+          <Button type="link" icon={<EyeOutlined />} onClick={() => router.push(`/contracts/${record.id}`)}>
             查看
           </Button>
         </Space>

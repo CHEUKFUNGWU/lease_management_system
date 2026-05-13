@@ -67,15 +67,34 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
-  
-  register: (username: string, email: string, password: string, role: string) =>
+
+  register: (username: string, email: string, password: string, role: string, legalEntityId?: string) =>
     apiRequest("/api/v1/auth/register", {
       method: "POST",
-      body: JSON.stringify({ username, email, password, role }),
+      body: JSON.stringify({ username, email, password, role, legal_entity_id: legalEntityId }),
     }),
-  
+
   me: (token: string) =>
     apiRequest("/api/v1/me", { token }),
+};
+
+// Admin APIs
+export const adminApi = {
+  listUsers: (token: string) =>
+    apiRequest("/api/v1/admin/users", { token }),
+
+  createUser: (data: any, token: string) =>
+    apiRequest("/api/v1/admin/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
+// Legal Entity APIs
+export const legalEntityApi = {
+  list: () =>
+    apiRequest("/api/v1/legal-entities"),
 };
 
 // Contract APIs
@@ -131,6 +150,72 @@ export const contractApi = {
     apiRequest(`/api/v1/contracts/${id}/discount-rate-status`, { token }),
 };
 
+// Payment Schedule APIs
+export const paymentScheduleApi = {
+  create: (contractId: string, data: any, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/payment-schedules`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  
+  list: (contractId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/payment-schedules`, { token }),
+};
+
+// Event APIs
+export const eventApi = {
+  create: (contractId: string, data: any, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  
+  list: (contractId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events`, { token }),
+};
+
+// Monthly Closing APIs
+export const monthlyClosingApi = {
+  generate: (data: any, token: string) =>
+    apiRequest("/api/v1/monthly-closing/generate", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  listBatches: (period: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/batches?period=${period}`, { token }),
+  getEntries: (params: { contract_id?: string; period?: string; status?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    if (params.contract_id) qs.append("contract_id", params.contract_id);
+    if (params.period) qs.append("period", params.period);
+    if (params.status) qs.append("status", params.status);
+    return apiRequest(`/api/v1/monthly-closing/entries?${qs.toString()}`, { token });
+  },
+  getMeasurementResults: (contractId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/measurement-results`, { token }),
+};
+
+// AI Chat APIs
+export const aiChatApi = {
+  chat: (data: { message: string; contract_id?: string; history?: any[] }, token: string) =>
+    apiRequest("/api/v1/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
+// Report APIs
+export const reportApi = {
+  liabilityRolling: (mode: "working" | "official", token: string) =>
+    apiRequest(`/api/v1/reports/liability-rolling?mode=${mode}`, { token }),
+
+  contractSummary: (mode: "working" | "official", token: string) =>
+    apiRequest(`/api/v1/reports/contract-summary?mode=${mode}`, { token }),
+};
+
 // AI APIs
 export const aiApi = {
   upload: (formData: FormData) =>
@@ -138,9 +223,19 @@ export const aiApi = {
       method: "POST",
       body: formData,
     }),
-    
+
   parse: (data: any) =>
     aiRequest("/api/v1/parse", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  parsePaymentSchedule: (data: {
+    file_id: string;
+    object_name: string;
+    content_type: string;
+  }) =>
+    aiRequest("/api/v1/parse/payment-schedule", {
       method: "POST",
       body: JSON.stringify(data),
     }),

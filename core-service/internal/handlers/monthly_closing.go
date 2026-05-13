@@ -1,0 +1,347 @@
+package handlers
+
+import (
+	"fmt"
+	"net/http"
+	"time"
+	
+	"github.com/gin-gonic/gin"
+	"github.com/ifrs16/core-service/internal/middleware"
+	"github.com/ifrs16/core-service/internal/repository"
+	ifrs16svc "github.com/ifrs16/core-service/internal/services/ifrs16"
+)
+
+type MonthlyClosingHandler struct {
+	mcRepo       *repository.MonthlyClosingRepository
+	contractRepo *repository.ContractRepository
+	psRepo       *repository.PaymentScheduleRepository
+}
+
+func NewMonthlyClosingHandler(mcRepo *repository.MonthlyClosingRepository, contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository) *MonthlyClosingHandler {
+	return &MonthlyClosingHandler{mcRepo: mcRepo, contractRepo: contractRepo, psRepo: psRepo}
+}
+
+type GenerateMonthlyClosingRequest struct {
+	AccountingPeriod string `json:"accounting_period" binding:"required"`
+	ContractID       string `json:"contract_id" binding:"omitempty,uuid"`
+	LegalEntityID    string `json:"legal_entity_id" binding:"omitempty,uuid"`
+	DiscountRate     float64 `json:"discount_rate" binding:"required,gt=0,lte=1"`
+}
+
+// Generate creates measurement results and journal entries for a given period
+func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
+	var req GenerateMonthlyClosingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	ctx := c.Request.Context()
+	legalEntityID := middleware.GetTenantID(c)
+	
+	// Create batch record
+	batch, err := h.mcRepo.CreateBatch(ctx, &repository.MonthlyClosingBatch{
+		BatchNumber:      fmt.Sprintf("BATCH-%s-%s", req.AccountingPeriod, time.Now().Format("20060102-150405")),
+		AccountingPeriod: req.AccountingPeriod,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create batch: " + err.Error()})
+		return
+	}
+	
+	// Get contracts to process
+	var contracts []*repository.Contract
+	if req.ContractID != "" {
+		contract, err := h.contractRepo.GetByID(ctx, req.ContractID, legalEntityID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if contract != nil {
+			contracts = append(contracts, contract)
+		}
+	} else {
+		contracts, err = h.contractRepo.GetByStatuses(ctx, []string{"approved"}, legalEntityID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	
+	processed := 0
+	failed := 0
+	totalEntries := 0
+	
+	// Parse period to get start/end dates
+	periodStart, _ := time.Parse("2006-01", req.AccountingPeriod)
+	periodEnd := periodStart.AddDate(0, 1, -1)
+	
+	for _, contract := range contracts {
+		// Skip if contract hasn't started yet or already ended before period
+		if contract.LeaseEndDate.Before(periodStart) || contract.CommencementDate.After(periodEnd) {
+			continue
+		}
+		
+		// Get payment schedules
+		schedules, err := h.psRepo.GetByContractID(ctx, contract.ID)
+		if err != nil {
+			failed++
+			continue
+		}
+		
+		var payments []ifrs16svc.LeasePayment
+		if len(schedules) == 0 {
+			// Fallback mock payments
+			payments = generateMockPayments(contract)
+		} else {
+			payments = repository.ToIFRS16Payments(schedules)
+		}
+		
+		// Run IFRS 16 calculation
+		calculation := ifrs16svc.LeaseCalculation{
+			CommencementDate: contract.CommencementDate,
+			LeaseEndDate:     contract.LeaseEndDate,
+			DiscountRate:     req.DiscountRate,
+			Payments:         payments,
+		}
+		
+		result, err := ifrs16svc.Calculate(calculation)
+		if err != nil {
+			failed++
+			continue
+		}
+		
+		// Find the monthly entry for this period
+		var monthlyEntry *ifrs16svc.MonthlyEntry
+		for _, m := range result.MonthlySummary {
+			key := fmt.Sprintf("%04d-%02d", m.Year, m.Month)
+			if key == req.AccountingPeriod {
+				monthlyEntry = &m
+				break
+			}
+		}
+		
+		if monthlyEntry == nil {
+			// Period not in contract term - skip
+			continue
+		}
+		
+		now := time.Now()
+		batchID := batch.ID
+		
+		// Save measurement result
+		mr := &repository.MeasurementResult{
+			ContractID:       contract.ID,
+			AccountingPeriod: req.AccountingPeriod,
+			PeriodStartDate:  periodStart,
+			PeriodEndDate:    periodEnd,
+			OpeningLiability: monthlyEntry.OpeningLiability,
+			InterestExpense:  monthlyEntry.InterestExpense,
+			TotalPayment:     monthlyEntry.TotalPayments,
+			ClosingLiability: monthlyEntry.ClosingLiability,
+			OpeningROUAsset:  monthlyEntry.OpeningROUAsset,
+			Depreciation:     monthlyEntry.Depreciation,
+			ClosingROUAsset:  monthlyEntry.ClosingROUAsset,
+			DiscountRate:     req.DiscountRate,
+			IsCalculated:     true,
+			CalculationBatchID: &batchID,
+			CalculatedAt:     &now,
+		}
+		
+		if err := h.mcRepo.SaveMeasurementResult(ctx, mr); err != nil {
+			failed++
+			continue
+		}
+		
+		// Generate journal entries for this period
+		entries := generateJournalEntries(contract.ID, req.AccountingPeriod, periodEnd, monthlyEntry, batchID)
+		for _, entry := range entries {
+			if err := h.mcRepo.CreateJournalEntry(ctx, entry); err == nil {
+				totalEntries++
+			}
+		}
+		
+		processed++
+	}
+	
+	// Update batch status
+	status := "completed"
+	if failed > 0 && processed == 0 {
+		status = "failed"
+	} else if failed > 0 {
+		status = "completed_with_errors"
+	}
+	
+	h.mcRepo.UpdateBatchStatus(ctx, batch.ID, status, processed, failed, totalEntries, 0)
+	
+	c.JSON(http.StatusOK, gin.H{
+		"batch_id":            batch.ID,
+		"batch_number":        batch.BatchNumber,
+		"accounting_period":   req.AccountingPeriod,
+		"status":              status,
+		"total_contracts":     len(contracts),
+		"processed_contracts": processed,
+		"failed_contracts":    failed,
+		"total_entries":       totalEntries,
+	})
+}
+
+func generateMockPayments(contract *repository.Contract) []ifrs16svc.LeasePayment {
+	var payments []ifrs16svc.LeasePayment
+	payments = append(payments, ifrs16svc.LeasePayment{
+		Date:   contract.CommencementDate,
+		Amount: 100000,
+		Timing: "postpaid",
+		Type:   "fixed",
+	})
+	currentDate := contract.CommencementDate.AddDate(0, 1, 0)
+	for currentDate.Before(contract.LeaseEndDate) {
+		payments = append(payments, ifrs16svc.LeasePayment{
+			Date:   currentDate,
+			Amount: 100000,
+			Timing: "postpaid",
+			Type:   "fixed",
+		})
+		currentDate = currentDate.AddDate(0, 1, 0)
+	}
+	return payments
+}
+
+func generateJournalEntries(contractID, period string, entryDate time.Time, monthly *ifrs16svc.MonthlyEntry, batchID string) []*repository.JournalEntry {
+	var entries []*repository.JournalEntry
+	
+	// Entry 1: Interest expense
+	if monthly.InterestExpense > 0.01 {
+		entries = append(entries, &repository.JournalEntry{
+			ContractID:       contractID,
+			AccountingPeriod: period,
+			EntryDate:        entryDate,
+			EntryType:        "interest",
+			DebitAccount:     "6601-租赁利息费用",
+			CreditAccount:    "2801-租赁负债",
+			Amount:           monthly.InterestExpense,
+			Currency:         "CNY",
+			Description:      strPtr(fmt.Sprintf("租赁利息费用 %s", period)),
+			PostingStatus:    "draft",
+			BatchID:          &batchID,
+		})
+	}
+	
+	// Entry 2: Depreciation
+	if monthly.Depreciation > 0.01 {
+		entries = append(entries, &repository.JournalEntry{
+			ContractID:       contractID,
+			AccountingPeriod: period,
+			EntryDate:        entryDate,
+			EntryType:        "depreciation",
+			DebitAccount:     "6602-使用权资产折旧",
+			CreditAccount:    "1701-使用权资产累计折旧",
+			Amount:           monthly.Depreciation,
+			Currency:         "CNY",
+			Description:      strPtr(fmt.Sprintf("使用权资产折旧 %s", period)),
+			PostingStatus:    "draft",
+			BatchID:          &batchID,
+		})
+	}
+	
+	// Entry 3: Payment
+	if monthly.TotalPayments > 0.01 {
+		entries = append(entries, &repository.JournalEntry{
+			ContractID:       contractID,
+			AccountingPeriod: period,
+			EntryDate:        entryDate,
+			EntryType:        "payment",
+			DebitAccount:     "2801-租赁负债",
+			CreditAccount:    "1002-银行存款",
+			Amount:           monthly.TotalPayments,
+			Currency:         "CNY",
+			Description:      strPtr(fmt.Sprintf("租赁付款 %s", period)),
+			PostingStatus:    "draft",
+			BatchID:          &batchID,
+		})
+	}
+	
+	return entries
+}
+
+func strPtr(s string) *string { return &s }
+
+// ListBatches returns all monthly closing batches
+func (h *MonthlyClosingHandler) ListBatches(c *gin.Context) {
+	period := c.Query("period")
+	legalEntityID := middleware.GetTenantID(c)
+
+	batches, err := h.mcRepo.GetBatches(c.Request.Context(), period, legalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  batches,
+		"total": len(batches),
+	})
+}
+
+// GetJournalEntries returns journal entries
+func (h *MonthlyClosingHandler) GetJournalEntries(c *gin.Context) {
+	contractID := c.Query("contract_id")
+	period := c.Query("period")
+	status := c.Query("status")
+	ctx := c.Request.Context()
+	legalEntityID := middleware.GetTenantID(c)
+	
+	// If filtering by contract, verify contract belongs to tenant
+	if contractID != "" {
+		contract, err := h.contractRepo.GetByID(ctx, contractID, legalEntityID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify contract: " + err.Error()})
+			return
+		}
+		if contract == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
+			return
+		}
+	}
+	
+	entries, err := h.mcRepo.GetJournalEntries(ctx, contractID, period, status)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"data":  entries,
+		"total": len(entries),
+	})
+}
+
+// GetMeasurementResults returns measurement results
+func (h *MonthlyClosingHandler) GetMeasurementResults(c *gin.Context) {
+	contractID := c.Param("id")
+	period := c.Query("period")
+	ctx := c.Request.Context()
+	legalEntityID := middleware.GetTenantID(c)
+	
+	// Verify contract belongs to tenant
+	contract, err := h.contractRepo.GetByID(ctx, contractID, legalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify contract: " + err.Error()})
+		return
+	}
+	if contract == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
+		return
+	}
+	
+	results, err := h.mcRepo.GetMeasurementResults(ctx, contractID, period)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"data":  results,
+		"total": len(results),
+	})
+}

@@ -5,6 +5,7 @@ import (
 	"time"
 	
 	"github.com/gin-gonic/gin"
+	"github.com/ifrs16/core-service/internal/middleware"
 	"github.com/ifrs16/core-service/internal/repository"
 )
 
@@ -92,7 +93,8 @@ func (h *ContractHandler) Create(c *gin.Context) {
 }
 
 func (h *ContractHandler) GetAll(c *gin.Context) {
-	contracts, err := h.contractRepo.GetAll(c.Request.Context())
+	legalEntityID := middleware.GetTenantID(c)
+	contracts, err := h.contractRepo.GetAll(c.Request.Context(), legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list contracts: " + err.Error()})
 		return
@@ -103,7 +105,8 @@ func (h *ContractHandler) GetAll(c *gin.Context) {
 
 func (h *ContractHandler) GetByID(c *gin.Context) {
 	id := c.Param("id")
-	contract, err := h.contractRepo.GetByID(c.Request.Context(), id)
+	legalEntityID := middleware.GetTenantID(c)
+	contract, err := h.contractRepo.GetByID(c.Request.Context(), id, legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get contract: " + err.Error()})
 		return

@@ -39,19 +39,21 @@ func JWTAuth(jwtSecret string) gin.HandlerFunc {
 			c.Set("user_id", claims["user_id"])
 			c.Set("username", claims["username"])
 			c.Set("role", claims["role"])
+			c.Set("legal_entity_id", claims["legal_entity_id"])
 		}
 		
 		c.Next()
 	}
 }
 
-func GenerateToken(userID, username, role, jwtSecret string) (string, error) {
+func GenerateToken(userID, username, role, legalEntityID, jwtSecret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  userID,
-		"username": username,
-		"role":     role,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
-		"iat":      time.Now().Unix(),
+		"user_id":         userID,
+		"username":        username,
+		"role":            role,
+		"legal_entity_id": legalEntityID,
+		"exp":             time.Now().Add(time.Hour * 24).Unix(),
+		"iat":             time.Now().Unix(),
 	})
 	
 	return token.SignedString([]byte(jwtSecret))

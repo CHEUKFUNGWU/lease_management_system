@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o"
     
+    # PaddleOCR 配置（AI Studio 异步 API）
+    paddleocr_api_url: str = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"
+    paddleocr_access_token: str = ""
+    paddleocr_model: str = "PaddleOCR-VL-1.5"
+    paddleocr_enabled: bool = False  # 需要配置 token 后手动开启
+    paddleocr_max_poll_seconds: int = 120  # 轮询超时
+    paddleocr_poll_interval: float = 2.0  # 轮询间隔
+    
     # Core Service 地址
     core_service_url: str = "http://core-service:8080"
     

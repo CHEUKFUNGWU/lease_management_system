@@ -484,6 +484,73 @@ CREATE INDEX IF NOT EXISTS idx_monthly_closing_period ON monthly_closing_batches
 
 -- +goose StatementEnd
 
+-- ============================================================================
+-- Migration 004: Period Locks
+-- ============================================================================
+
+-- +goose Up
+CREATE TABLE IF NOT EXISTS period_locks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    accounting_period VARCHAR(7) NOT NULL,
+    legal_entity_id UUID REFERENCES legal_entities(id),
+    is_locked BOOLEAN NOT NULL DEFAULT false,
+    locked_by UUID REFERENCES users(id),
+    locked_at TIMESTAMP WITH TIME ZONE,
+    unlocked_by UUID REFERENCES users(id),
+    unlocked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE(accounting_period, legal_entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_period_locks_period ON period_locks(accounting_period);
+
+-- +goose Down
+DROP TABLE IF EXISTS period_locks;
+
+-- ============================================================================
+-- Migration 005: IFRS 16 Modification/Reassessment — Event Adjustments
+-- ============================================================================
+
+-- +goose Up
+-- Add IFRS 16 treatment classification to events
+ALTER TABLE lease_events ADD COLUMN IF NOT EXISTS ifrs16_treatment VARCHAR(20);
+
+-- Event adjustments: stores one record per approved event with before/after state
+CREATE TABLE IF NOT EXISTS event_adjustments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    event_id UUID NOT NULL UNIQUE REFERENCES lease_events(id) ON DELETE CASCADE,
+    contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    adjustment_type VARCHAR(20) NOT NULL CHECK (adjustment_type IN ('modification', 'reassessment', 'impairment')),
+    effective_date DATE NOT NULL,
+    liability_before DECIMAL(18,2) NOT NULL,
+    liability_after DECIMAL(18,2) NOT NULL,
+    liability_adjustment DECIMAL(18,2) NOT NULL,
+    rou_before DECIMAL(18,2) NOT NULL,
+    rou_after DECIMAL(18,2) NOT NULL,
+    rou_adjustment DECIMAL(18,2) NOT NULL,
+    pnl_gain DECIMAL(18,2) NOT NULL DEFAULT 0,
+    pnl_loss DECIMAL(18,2) NOT NULL DEFAULT 0,
+    revised_discount_rate DECIMAL(10,6) NOT NULL,
+    discount_rate_source VARCHAR(100),
+    calculation_batch_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_adjustments_event ON event_adjustments(event_id);
+CREATE INDEX IF NOT EXISTS idx_event_adjustments_contract ON event_adjustments(contract_id);
+CREATE INDEX IF NOT EXISTS idx_event_adjustments_effective ON event_adjustments(effective_date);
+
+-- +goose Down
+DROP INDEX IF EXISTS idx_event_adjustments_effective;
+DROP INDEX IF EXISTS idx_event_adjustments_contract;
+DROP INDEX IF EXISTS idx_event_adjustments_event;
+DROP TABLE IF EXISTS event_adjustments;
+ALTER TABLE lease_events DROP COLUMN IF EXISTS ifrs16_treatment;
+
+-- ============================================================================
+-- Migration 003 Down (original)
+-- ============================================================================
+
 -- +goose Down
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_monthly_closing_period;

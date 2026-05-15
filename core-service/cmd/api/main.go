@@ -14,6 +14,7 @@ import (
 	"github.com/ifrs16/core-service/internal/handlers"
 	"github.com/ifrs16/core-service/internal/middleware"
 	"github.com/ifrs16/core-service/internal/repository"
+	"github.com/ifrs16/core-service/internal/services/audit"
 )
 
 func main() {
@@ -39,17 +40,22 @@ func main() {
 	psRepo := repository.NewPaymentScheduleRepository(database.Pool)
 	eventRepo := repository.NewEventRepository(database.Pool)
 	mcRepo := repository.NewMonthlyClosingRepository(database.Pool)
+	auditRepo := repository.NewAuditRepository(database.Pool)
+	
+	// Initialize audit logger
+	auditLogger := audit.NewLogger(auditRepo)
 	
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo)
-	contractHandler := handlers.NewContractHandler(contractRepo)
+	contractHandler := handlers.NewContractHandler(contractRepo, auditLogger)
 	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo)
-	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo)
+	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
 	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
 	reportHandler := handlers.NewReportHandler(contractRepo, psRepo)
-	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo)
-	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, psRepo)
-	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo)
+	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, auditLogger)
+	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, psRepo, auditLogger)
+	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo)
+	auditHandler := handlers.NewAuditHandler(auditRepo)
 	
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -123,6 +129,7 @@ func main() {
 		api.POST("/contracts", contractHandler.Create)
 		api.GET("/contracts", contractHandler.GetAll)
 		api.GET("/contracts/:id", contractHandler.GetByID)
+		api.PUT("/contracts/:id", contractHandler.Update)
 		
 		// Calculations
 		api.POST("/contracts/:id/calculate", calcHandler.Calculate)
@@ -148,6 +155,17 @@ func main() {
 		api.POST("/contracts/:id/events", eventHandler.Create)
 		api.GET("/contracts/:id/events", eventHandler.ListByContract)
 		
+		// Event approval workflow
+		api.POST("/contracts/:id/events/:eventId/submit", eventHandler.SubmitForReview)
+		api.POST("/contracts/:id/events/:eventId/review", eventHandler.Review)
+		api.POST("/contracts/:id/events/:eventId/approve", eventHandler.Approve)
+		api.POST("/contracts/:id/events/:eventId/reject", eventHandler.Reject)
+		
+		// Event IFRS 16 recalculation
+		api.POST("/contracts/:id/events/:eventId/recalculate", eventHandler.RecalculateEvent)
+		api.POST("/contracts/:id/events/:eventId/preview", eventHandler.PreviewEventAdjustment)
+		api.GET("/contracts/:id/events/:eventId/adjustment", eventHandler.GetEventAdjustment)
+		
 		// Reports
 		api.GET("/reports/liability-rolling", reportHandler.LiabilityRolling)
 		api.GET("/reports/liability-rolling/export", reportHandler.ExportLiabilityRolling)
@@ -159,8 +177,22 @@ func main() {
 		api.GET("/monthly-closing/entries", monthlyClosingHandler.GetJournalEntries)
 		api.GET("/contracts/:id/measurement-results", monthlyClosingHandler.GetMeasurementResults)
 		
+		// Monthly Closing - Approval & Posting
+		api.POST("/monthly-closing/entries/:id/approve", monthlyClosingHandler.ApproveEntry)
+		api.POST("/monthly-closing/entries/:id/post", monthlyClosingHandler.PostEntry)
+		api.POST("/monthly-closing/batches/:id/approve", monthlyClosingHandler.ApproveBatch)
+		api.POST("/monthly-closing/batches/:id/post", monthlyClosingHandler.PostBatch)
+		
+		// Monthly Closing - Period Locking
+		api.POST("/monthly-closing/periods/:period/lock", monthlyClosingHandler.LockPeriod)
+		api.POST("/monthly-closing/periods/:period/unlock", monthlyClosingHandler.UnlockPeriod)
+		api.GET("/monthly-closing/periods/:period/lock-status", monthlyClosingHandler.GetPeriodLockStatus)
+		
 		// AI Chat
 		api.POST("/ai/chat", aiChatHandler.Chat)
+		
+		// Audit Logs
+		api.GET("/audit-logs", auditHandler.List)
 		
 		// Admin: user management
 		api.GET("/admin/users", authHandler.AdminListUsers)

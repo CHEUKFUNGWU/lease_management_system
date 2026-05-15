@@ -51,7 +51,7 @@ export default function LoginPage() {
       <Col xs={24} sm={16} md={12} lg={8} xl={6}>
         <Card>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <RobotOutlined style={{ fontSize: 48, color: "#1890ff" }} />
+            <RobotOutlined style={{ fontSize: 48, color: "#000" }} />
             <Title level={3} style={{ marginTop: 16 }}>
               IFRS 16 租赁管理系统
             </Title>

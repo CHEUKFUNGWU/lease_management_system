@@ -168,22 +168,19 @@ func (r *PaymentScheduleRepository) DeleteByContractID(ctx context.Context, cont
 	return nil
 }
 
-// ToIFRS16Payments converts repository payment schedules to IFRS 16 engine format
+// ToIFRS16Payments converts repository payment schedules to IFRS 16 engine format.
+// ALL payments are passed to the engine — filtering (variable/non-lease exclusion from PV)
+// is handled by the calculation engine itself.
 func ToIFRS16Payments(schedules []*PaymentSchedule) []ifrs16.LeasePayment {
 	var payments []ifrs16.LeasePayment
 	for _, ps := range schedules {
-		// Skip non-lease components and variable rent for liability calculation
-		if !ps.IncludedInLiabilityPV {
-			continue
-		}
-		
 		paymentType := "fixed"
-		if ps.IsVariable {
+		if ps.IsVariable || ps.AmountType == "turnover_rent" {
 			paymentType = "variable"
-		} else if ps.IsNonLeaseComponent {
+		} else if ps.IsNonLeaseComponent || ps.AmountType == "cam" || ps.AmountType == "service_charge" {
 			paymentType = "non_lease"
 		}
-		
+
 		payments = append(payments, ifrs16.LeasePayment{
 			Date:   ps.DueDate,
 			Amount: ps.Amount,

@@ -6,15 +6,17 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ifrs16/core-service/internal/middleware"
 	"github.com/ifrs16/core-service/internal/repository"
+	"github.com/ifrs16/core-service/internal/services/audit"
 )
 
 type ApprovalHandler struct {
 	approvalRepo *repository.ApprovalRepository
 	contractRepo *repository.ContractRepository
+	auditLogger  *audit.Logger
 }
 
-func NewApprovalHandler(approvalRepo *repository.ApprovalRepository, contractRepo *repository.ContractRepository) *ApprovalHandler {
-	return &ApprovalHandler{approvalRepo: approvalRepo, contractRepo: contractRepo}
+func NewApprovalHandler(approvalRepo *repository.ApprovalRepository, contractRepo *repository.ContractRepository, auditLogger *audit.Logger) *ApprovalHandler {
+	return &ApprovalHandler{approvalRepo: approvalRepo, contractRepo: contractRepo, auditLogger: auditLogger}
 }
 
 type SubmitRequest struct {
@@ -71,6 +73,10 @@ func (h *ApprovalHandler) SubmitForReview(c *gin.Context) {
 		"status": "submitted",
 		"message": "合同已提交复核",
 	})
+	// Audit log
+	if h.auditLogger != nil {
+		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, "submit", nil, nil, userIDStr, c)
+	}
 }
 
 func (h *ApprovalHandler) Review(c *gin.Context) {
@@ -114,6 +120,14 @@ func (h *ApprovalHandler) Review(c *gin.Context) {
 		"status": status,
 		"message": message,
 	})
+	// Audit log
+	if h.auditLogger != nil {
+		action := "review_approved"
+		if !req.Approved {
+			action = "review_returned"
+		}
+		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, action, nil, nil, userIDStr, c)
+	}
 }
 
 func (h *ApprovalHandler) Approve(c *gin.Context) {
@@ -150,6 +164,10 @@ func (h *ApprovalHandler) Approve(c *gin.Context) {
 		"status": "approved",
 		"message": "合同已审批通过",
 	})
+	// Audit log
+	if h.auditLogger != nil {
+		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, "approve", nil, nil, userIDStr, c)
+	}
 }
 
 func (h *ApprovalHandler) Reject(c *gin.Context) {
@@ -186,6 +204,10 @@ func (h *ApprovalHandler) Reject(c *gin.Context) {
 		"status": "rejected",
 		"message": "合同已驳回",
 	})
+	// Audit log
+	if h.auditLogger != nil {
+		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, "reject", nil, nil, userIDStr, c)
+	}
 }
 
 func (h *ApprovalHandler) GetStatus(c *gin.Context) {
@@ -232,7 +254,7 @@ func (h *ApprovalHandler) ListByStatus(c *gin.Context) {
 	if legalEntityID != "" {
 		var filtered []*repository.Contract
 		for _, c := range contracts {
-			if c.LegalEntityID == legalEntityID {
+			if c.LegalEntityID != nil && *c.LegalEntityID == legalEntityID {
 				filtered = append(filtered, c)
 			}
 		}

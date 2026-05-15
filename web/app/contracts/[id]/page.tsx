@@ -39,6 +39,9 @@ import {
   WarningOutlined,
   EditOutlined,
   ImportOutlined,
+  CheckOutlined,
+  StopOutlined,
+  UndoOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
@@ -53,7 +56,13 @@ interface ContractDetail {
   legal_entity_id: string;
   store_id: string;
   landlord_id: string;
+  lessee_name: string;
+  lessor_name: string;
+  store_name: string;
+  store_address: string;
+  tags: string;
   currency: string;
+  signing_date?: string;
   commencement_date: string;
   lease_start_date: string;
   lease_end_date: string;
@@ -103,12 +112,14 @@ interface MonthlyEntry {
   OpeningROUAsset: number;
   Depreciation: number;
   ClosingROUAsset: number;
+  VariableRentExpense: number;
+  NonLeaseExpense: number;
 }
 
 export default function ContractDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const contractId = params.id as string;
 
   const [contract, setContract] = useState<ContractDetail | null>(null);
@@ -128,6 +139,25 @@ export default function ContractDetailPage() {
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [eventForm] = Form.useForm();
   const [eventLoading, setEventLoading] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectModalType, setRejectModalType] = useState<'review' | 'approve'>('review');
+  const [rejectReason, setRejectReason] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editForm] = Form.useForm();
+  const [editLoading, setEditLoading] = useState(false);
+  const [eventRejectModalOpen, setEventRejectModalOpen] = useState(false);
+  const [eventRejectReason, setEventRejectReason] = useState('');
+  const [eventRejectEventId, setEventRejectEventId] = useState<string | null>(null);
+  const [eventRejectType, setEventRejectType] = useState<'review' | 'approve'>('review');
+  const [eventActionLoading, setEventActionLoading] = useState<string | null>(null);
+  const [editDraftModalOpen, setEditDraftModalOpen] = useState(false);
+  const [editDraftIndex, setEditDraftIndex] = useState<number>(-1);
+  const [editDraftForm] = Form.useForm();
+  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
+  const [adjustmentModalData, setAdjustmentModalData] = useState<any>(null);
+  const [adjustmentModalTitle, setAdjustmentModalTitle] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (token && contractId) {
@@ -190,6 +220,179 @@ export default function ContractDetailPage() {
     }
   };
 
+  const handleEventSubmitForReview = async (eventId: string) => {
+    setEventActionLoading(eventId + '_submit');
+    try {
+      await eventApi.submitForReview(contractId, eventId, token!);
+      message.success('事件已提交复核');
+      loadEvents();
+    } catch (error: any) {
+      message.error(error.message || '提交失败');
+    } finally {
+      setEventActionLoading(null);
+    }
+  };
+
+  const handleEventReviewApprove = async (eventId: string) => {
+    setEventActionLoading(eventId + '_review');
+    try {
+      await eventApi.review(contractId, eventId, true, '', token!);
+      message.success('复核通过');
+      loadEvents();
+    } catch (error: any) {
+      message.error(error.message || '复核失败');
+    } finally {
+      setEventActionLoading(null);
+    }
+  };
+
+  const handleEventApprove = async (eventId: string) => {
+    setEventActionLoading(eventId + '_approve');
+    try {
+      await eventApi.approve(contractId, eventId, token!);
+      message.success('审批通过');
+      loadEvents();
+    } catch (error: any) {
+      message.error(error.message || '审批失败');
+    } finally {
+      setEventActionLoading(null);
+    }
+  };
+
+  const handleEventRejectOpen = (eventId: string, type: 'review' | 'approve') => {
+    setEventRejectEventId(eventId);
+    setEventRejectType(type);
+    setEventRejectReason('');
+    setEventRejectModalOpen(true);
+  };
+
+  const handleEventRejectSubmit = async () => {
+    if (!eventRejectReason.trim()) {
+      message.warning('请输入原因');
+      return;
+    }
+    if (!eventRejectEventId) return;
+
+    setEventActionLoading(eventRejectEventId + '_reject');
+    try {
+      if (eventRejectType === 'review') {
+        await eventApi.review(contractId, eventRejectEventId, false, eventRejectReason, token!);
+        message.success('已退回编辑');
+      } else {
+        await eventApi.reject(contractId, eventRejectEventId, eventRejectReason, token!);
+        message.success('已驳回');
+      }
+      setEventRejectModalOpen(false);
+      setEventRejectReason('');
+      setEventRejectEventId(null);
+      loadEvents();
+    } catch (error: any) {
+      message.error(error.message || '操作失败');
+    } finally {
+      setEventActionLoading(null);
+    }
+  };
+
+  const handlePreviewAdjustment = async (eventId: string) => {
+    setPreviewLoading(true);
+    try {
+      const data = await eventApi.previewAdjustment(contractId, eventId, token!);
+      setAdjustmentModalTitle("事件影响预览");
+      setAdjustmentModalData(data);
+      setAdjustmentModalOpen(true);
+    } catch (error: any) {
+      message.error(error.message || "预览失败");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleViewAdjustment = async (eventId: string) => {
+    try {
+      const data = await eventApi.getAdjustment(contractId, eventId, token!);
+      setAdjustmentModalTitle("事件调整详情");
+      setAdjustmentModalData(data);
+      setAdjustmentModalOpen(true);
+    } catch (error: any) {
+      message.error(error.message || "获取调整详情失败");
+    }
+  };
+
+  const handleRecalculateEvent = async (eventId: string) => {
+    try {
+      await eventApi.recalculate(contractId, eventId, token!);
+      message.success("事件重算完成");
+      loadEvents();
+    } catch (error: any) {
+      message.error(error.message || "重算失败");
+    }
+  };
+
+  const handleSubmitForReview = async () => {
+    setActionLoading('submit');
+    try {
+      await contractApi.submitForReview(contractId, token!);
+      message.success('提交复核成功');
+      loadContract();
+    } catch (error: any) {
+      message.error(error.message || '提交失败');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReviewApprove = async () => {
+    setActionLoading('review_approve');
+    try {
+      await contractApi.review(contractId, true, '', token!);
+      message.success('复核通过');
+      loadContract();
+    } catch (error: any) {
+      message.error(error.message || '复核失败');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApprove = async () => {
+    setActionLoading('approve');
+    try {
+      await contractApi.approve(contractId, token!);
+      message.success('审批通过');
+      loadContract();
+    } catch (error: any) {
+      message.error(error.message || '审批失败');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectReason.trim()) {
+      message.warning('请输入原因');
+      return;
+    }
+
+    const loadingKey = rejectModalType === 'review' ? 'review_reject' : 'approve_reject';
+    setActionLoading(loadingKey);
+    try {
+      if (rejectModalType === 'review') {
+        await contractApi.review(contractId, false, rejectReason, token!);
+        message.success('已退回编辑');
+      } else {
+        await contractApi.reject(contractId, rejectReason, token!);
+        message.success('已驳回');
+      }
+      setRejectModalOpen(false);
+      setRejectReason('');
+      loadContract();
+    } catch (error: any) {
+      message.error(error.message || '操作失败');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleCalculate = async () => {
     setCalcLoading(true);
     try {
@@ -205,6 +408,61 @@ export default function ContractDetailPage() {
       message.error(error.message || "计算失败");
     } finally {
       setCalcLoading(false);
+    }
+  };
+
+  const handleEditOpen = () => {
+    if (!contract) return;
+    editForm.setFieldsValue({
+      contract_number: contract.contract_number,
+      contract_name: contract.contract_name,
+      lessee_name: contract.lessee_name,
+      lessor_name: contract.lessor_name,
+      store_name: contract.store_name,
+      store_address: contract.store_address,
+      currency: contract.currency,
+      signing_date: contract.signing_date ? dayjs(contract.signing_date) : null,
+      commencement_date: dayjs(contract.commencement_date),
+      lease_start_date: dayjs(contract.lease_start_date),
+      lease_end_date: dayjs(contract.lease_end_date),
+      discount_rate_type: contract.discount_rate_type || "",
+      discount_rate_version: contract.discount_rate_version || "",
+      tags: contract.tags || "",
+    });
+    setEditModalOpen(true);
+  };
+
+  const handleUpdate = async (values: any) => {
+    setEditLoading(true);
+    try {
+      const payload: Record<string, any> = {
+        contract_number: values.contract_number,
+        contract_name: values.contract_name,
+        lessee_name: values.lessee_name,
+        lessor_name: values.lessor_name,
+        store_name: values.store_name,
+        store_address: values.store_address,
+        currency: values.currency,
+        commencement_date: values.commencement_date.format("YYYY-MM-DD"),
+        lease_start_date: values.lease_start_date.format("YYYY-MM-DD"),
+        lease_end_date: values.lease_end_date.format("YYYY-MM-DD"),
+        discount_rate_type: values.discount_rate_type || null,
+        discount_rate_version: values.discount_rate_version || null,
+        tags: values.tags || "",
+      };
+      if (values.signing_date) {
+        payload.signing_date = values.signing_date.format("YYYY-MM-DD");
+      } else {
+        payload.signing_date = null;
+      }
+      await contractApi.update(contractId, payload, token!);
+      message.success("合同更新成功");
+      setEditModalOpen(false);
+      loadContract();
+    } catch (error: any) {
+      message.error(error.message || "更新失败");
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -241,11 +499,15 @@ export default function ContractDetailPage() {
   };
 
   const handleImportDrafts = async () => {
-    if (aiDrafts.length === 0) return;
+    const confirmedDrafts = aiDrafts.filter((d) => d.confirmed && !d.skipped);
+    if (confirmedDrafts.length === 0) {
+      message.warning("没有已确认的草稿可导入");
+      return;
+    }
     setImportLoading(true);
     try {
       let successCount = 0;
-      for (const draft of aiDrafts) {
+      for (const draft of confirmedDrafts) {
         await paymentScheduleApi.create(contractId, {
           contract_id: contractId,
           effective_start_date: draft.period_start || draft.due_date,
@@ -272,6 +534,62 @@ export default function ContractDetailPage() {
     } finally {
       setImportLoading(false);
     }
+  };
+
+  const handleOpenEditDraft = (index: number) => {
+    const draft = aiDrafts[index];
+    editDraftForm.setFieldsValue({
+      due_date: draft.due_date ? dayjs(draft.due_date) : null,
+      amount: draft.amount,
+      payment_timing: draft.payment_timing || "postpaid",
+      amount_type: draft.amount_type || "",
+      is_fixed: draft.is_fixed ?? true,
+      is_lease_component: draft.is_lease_component ?? true,
+    });
+    setEditDraftIndex(index);
+    setEditDraftModalOpen(true);
+  };
+
+  const handleSaveEditDraft = (values: any) => {
+    const updated = [...aiDrafts];
+    updated[editDraftIndex] = {
+      ...updated[editDraftIndex],
+      due_date: values.due_date?.format("YYYY-MM-DD"),
+      amount: values.amount,
+      payment_timing: values.payment_timing,
+      amount_type: values.amount_type,
+      is_fixed: values.is_fixed,
+      is_lease_component: values.is_lease_component,
+    };
+    setAiDrafts(updated);
+    setEditDraftModalOpen(false);
+    message.success("草稿行已更新");
+  };
+
+  const handleConfirmDraft = (index: number) => {
+    const updated = [...aiDrafts];
+    updated[index] = { ...updated[index], confirmed: true };
+    setAiDrafts(updated);
+  };
+
+  const handleSkipDraft = (index: number) => {
+    const updated = [...aiDrafts];
+    updated[index] = { ...updated[index], skipped: true, confirmed: false };
+    setAiDrafts(updated);
+  };
+
+  const handleRestoreDraft = (index: number) => {
+    const updated = [...aiDrafts];
+    updated[index] = { ...updated[index], skipped: false };
+    setAiDrafts(updated);
+  };
+
+  const handleConfirmAll = () => {
+    const updated = aiDrafts.map((d) =>
+      d.skipped ? d : { ...d, confirmed: true }
+    );
+    setAiDrafts(updated);
+    message.success("已全选确认");
   };
 
   const handleCreateSchedule = async (values: any) => {
@@ -317,6 +635,16 @@ export default function ContractDetailPage() {
     pending_approval: "待审批",
     approved: "已审批",
     rejected: "已驳回",
+  };
+
+  const eventTypeLabels: Record<string, string> = {
+    area_adjustment: "面积调整",
+    rent_change: "租金变更",
+    renewal: "续租",
+    early_termination: "提前终止",
+    index_update: "指数更新",
+    discount_rate_change: "折现率变更",
+    impairment: "减值",
   };
 
   const scheduleColumns = [
@@ -417,6 +745,18 @@ export default function ContractDetailPage() {
       render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       align: "right" as const,
     },
+    {
+      title: "变量租金",
+      dataIndex: "VariableRentExpense",
+      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      align: "right" as const,
+    },
+    {
+      title: "非租赁费用",
+      dataIndex: "NonLeaseExpense",
+      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      align: "right" as const,
+    },
   ];
 
   const sortedMonthly = calcResult
@@ -456,6 +796,74 @@ export default function ContractDetailPage() {
                     }
                     extra={
                       <Space>
+                        {/* Approval workflow buttons */}
+                        {user && contract.approval_status === 'draft' && (user.role === 'editor' || user.role === 'admin') && (
+                          <Button
+                            type="primary"
+                            onClick={handleSubmitForReview}
+                            loading={actionLoading === 'submit'}
+                          >
+                            提交复核
+                          </Button>
+                        )}
+
+                        {user && contract.approval_status === 'submitted' && (user.role === 'reviewer' || user.role === 'admin') && (
+                          <>
+                            <Button
+                              type="primary"
+                              style={{ background: '#10B981', borderColor: '#10B981' }}
+                              onClick={handleReviewApprove}
+                              loading={actionLoading === 'review_approve'}
+                            >
+                              复核通过
+                            </Button>
+                            <Button
+                              danger
+                              onClick={() => { setRejectModalType('review'); setRejectReason(''); setRejectModalOpen(true); }}
+                            >
+                              退回编辑
+                            </Button>
+                          </>
+                        )}
+
+                        {user && (contract.approval_status === 'reviewed' || contract.approval_status === 'pending_approval') && (user.role === 'approver' || user.role === 'admin') && (
+                          <>
+                            <Button
+                              type="primary"
+                              style={{ background: '#10B981', borderColor: '#10B981' }}
+                              onClick={handleApprove}
+                              loading={actionLoading === 'approve'}
+                            >
+                              审批通过
+                            </Button>
+                            <Button
+                              danger
+                              onClick={() => { setRejectModalType('approve'); setRejectReason(''); setRejectModalOpen(true); }}
+                            >
+                              驳回
+                            </Button>
+                          </>
+                        )}
+
+                        {user && contract.approval_status === 'rejected' && (user.role === 'editor' || user.role === 'admin') && (
+                          <Button
+                            type="primary"
+                            onClick={handleSubmitForReview}
+                            loading={actionLoading === 'submit'}
+                          >
+                            重新提交
+                          </Button>
+                        )}
+
+                        {user && (contract.approval_status === 'draft' || contract.approval_status === 'rejected') && (user.role === 'editor' || user.role === 'admin') && (
+                          <Button
+                            icon={<EditOutlined />}
+                            onClick={handleEditOpen}
+                          >
+                            编辑
+                          </Button>
+                        )}
+
                         <Button
                           icon={<CalculatorOutlined />}
                           onClick={handleCalculate}
@@ -607,14 +1015,19 @@ export default function ContractDetailPage() {
                   >
                     {/* AI Draft Preview */}
                     {showDraftPanel && aiDrafts.length > 0 && (
-                      <div style={{ marginBottom: 16, padding: 16, background: "#f6ffed", border: "1px solid #b7eb8f", borderRadius: 4 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <div style={{ marginBottom: 16, padding: 16, background: "#FAFAFA", border: "1px solid #EAEAEA", borderRadius: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
                           <Space>
-                            <RobotOutlined style={{ color: "#52c41a" }} />
+                            <RobotOutlined style={{ color: "#10B981" }} />
                             <span style={{ fontWeight: "bold" }}>AI 识别结果草稿</span>
-                            <Tag color="green">{aiDrafts.length} 笔待确认</Tag>
+                            <Tag color="green">
+                              {aiDrafts.filter((d) => d.confirmed && !d.skipped).length} 笔已确认 / {aiDrafts.length} 笔总计
+                            </Tag>
                           </Space>
                           <Space>
+                            <Button size="small" onClick={handleConfirmAll}>
+                              全选确认
+                            </Button>
                             <Button size="small" onClick={() => { setShowDraftPanel(false); setAiDrafts([]); }}>
                               取消
                             </Button>
@@ -625,7 +1038,7 @@ export default function ContractDetailPage() {
                               onClick={handleImportDrafts}
                               loading={importLoading}
                             >
-                              批量导入
+                              导入已确认行
                             </Button>
                           </Space>
                         </div>
@@ -636,7 +1049,7 @@ export default function ContractDetailPage() {
                             description={
                               <ul style={{ margin: 0, paddingLeft: 16 }}>
                                 {aiWarnings.slice(0, 5).map((w, i) => (
-                                  <li key={i}><WarningOutlined style={{ color: "#faad14" }} /> {w}</li>
+                                  <li key={i}><WarningOutlined style={{ color: "#F59E0B" }} /> {w}</li>
                                 ))}
                                 {aiWarnings.length > 5 && <li>... 等 {aiWarnings.length - 5} 条警告</li>}
                               </ul>
@@ -665,12 +1078,71 @@ export default function ContractDetailPage() {
                                 </Tag>
                               ),
                             },
+                            {
+                              title: "操作",
+                              key: "action",
+                              width: 210,
+                              render: (_: any, record: any, index: number) => (
+                                <Space size="small">
+                                  <Button
+                                    size="small"
+                                    icon={<EditOutlined />}
+                                    onClick={() => handleOpenEditDraft(index)}
+                                  >
+                                    编辑
+                                  </Button>
+                                  {!record.skipped && !record.confirmed && (
+                                    <>
+                                      <Button
+                                        size="small"
+                                        icon={<CheckOutlined />}
+                                        style={{ color: "#10B981", borderColor: "#10B981" }}
+                                        onClick={() => handleConfirmDraft(index)}
+                                      >
+                                        确认
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        icon={<StopOutlined />}
+                                        danger
+                                        onClick={() => handleSkipDraft(index)}
+                                      >
+                                        跳过
+                                      </Button>
+                                    </>
+                                  )}
+                                  {record.confirmed && (
+                                    <Tag color="success" icon={<CheckCircleOutlined />}>已确认</Tag>
+                                  )}
+                                  {record.skipped && (
+                                    <Button
+                                      size="small"
+                                      icon={<UndoOutlined />}
+                                      onClick={() => handleRestoreDraft(index)}
+                                    >
+                                      恢复
+                                    </Button>
+                                  )}
+                                </Space>
+                              ),
+                            },
                           ]}
                           dataSource={aiDrafts}
                           rowKey={(r, i) => `draft-${i}`}
                           pagination={false}
                           size="small"
-                          scroll={{ x: 600 }}
+                          scroll={{ x: 850 }}
+                          onRow={(record: any) => ({
+                            style: {
+                              backgroundColor: record.confirmed
+                                ? "#FAFAFA"
+                                : record.skipped
+                                ? "#fafafa"
+                                : undefined,
+                              textDecoration: record.skipped ? "line-through" : undefined,
+                              opacity: record.skipped ? 0.6 : undefined,
+                            },
+                          })}
                         />
                       </div>
                     )}
@@ -706,7 +1178,7 @@ export default function ContractDetailPage() {
                       >
                         <Table
                           columns={[
-                            { title: "事件类型", dataIndex: "event_type", width: 150 },
+                            { title: "事件类型", dataIndex: "event_type", width: 150, render: (v: string) => eventTypeLabels[v] || v },
                             { title: "生效日", dataIndex: "effective_date", width: 110, render: (v: string) => dayjs(v).format("YYYY-MM-DD") },
                             { title: "原值", dataIndex: "original_value", width: 120 },
                             { title: "新值", dataIndex: "new_value", width: 120 },
@@ -715,18 +1187,118 @@ export default function ContractDetailPage() {
                               title: "状态",
                               dataIndex: "approval_status",
                               width: 100,
-                              render: (v: string) => (
-                                <Tag color={v === "approved" ? "green" : v === "draft" ? "default" : "orange"}>
-                                  {v === "approved" ? "已审批" : v === "draft" ? "草稿" : v}
-                                </Tag>
-                              ),
+                              render: (v: string) => {
+                                const eventStatusColors: Record<string, string> = {
+                                  draft: "default",
+                                  submitted: "processing",
+                                  reviewed: "warning",
+                                  approved: "success",
+                                  rejected: "error",
+                                  returned_to_editor: "orange",
+                                };
+                                const eventStatusLabels: Record<string, string> = {
+                                  draft: "草稿",
+                                  submitted: "已提交",
+                                  reviewed: "已复核",
+                                  approved: "已审批",
+                                  rejected: "已驳回",
+                                  returned_to_editor: "已退回",
+                                };
+                                return (
+                                  <Tag color={eventStatusColors[v] || "default"}>
+                                    {eventStatusLabels[v] || v}
+                                  </Tag>
+                                );
+                              },
                             },
                             { title: "创建时间", dataIndex: "created_at", width: 150, render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm") },
+                            {
+                              title: "操作",
+                              key: "action",
+                              width: 280,
+                              render: (_: any, event: any) => {
+                                const isModifiable = ["area_adjustment", "rent_change", "renewal", "early_termination", "index_update", "discount_rate_change", "impairment"].includes(event.event_type);
+                                return (
+                                <Space size="small">
+                                  {event.approval_status === "approved" && isModifiable && (
+                                    <Button size="small" onClick={() => handleViewAdjustment(event.id)}>查看调整</Button>
+                                  )}
+                                  {(event.approval_status === "submitted" || event.approval_status === "reviewed") && isModifiable && (
+                                    <Button size="small" onClick={() => handlePreviewAdjustment(event.id)} loading={previewLoading}>预览影响</Button>
+                                  )}
+                                  {event.approval_status === "draft" && isModifiable && (user?.role === "editor" || user?.role === "admin") && (
+                                    <Button size="small" onClick={() => handleRecalculateEvent(event.id)}>重算</Button>
+                                  )}
+                                  {user && event.approval_status === 'draft' && (user.role === 'editor' || user.role === 'admin') && (
+                                    <Button
+                                      size="small"
+                                      type="primary"
+                                      onClick={() => handleEventSubmitForReview(event.id)}
+                                      loading={eventActionLoading === event.id + '_submit'}
+                                    >
+                                      提交复核
+                                    </Button>
+                                  )}
+                                  {user && event.approval_status === 'submitted' && (user.role === 'reviewer' || user.role === 'admin') && (
+                                    <>
+                                      <Button
+                                        size="small"
+                                        type="primary"
+                                        style={{ background: '#10B981', borderColor: '#10B981' }}
+                                        onClick={() => handleEventReviewApprove(event.id)}
+                                        loading={eventActionLoading === event.id + '_review'}
+                                      >
+                                        复核通过
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        danger
+                                        onClick={() => handleEventRejectOpen(event.id, 'review')}
+                                      >
+                                        退回编辑
+                                      </Button>
+                                    </>
+                                  )}
+                                  {user && event.approval_status === 'reviewed' && (user.role === 'approver' || user.role === 'admin') && (
+                                    <>
+                                      <Button
+                                        size="small"
+                                        type="primary"
+                                        style={{ background: '#10B981', borderColor: '#10B981' }}
+                                        onClick={() => handleEventApprove(event.id)}
+                                        loading={eventActionLoading === event.id + '_approve'}
+                                      >
+                                        审批通过
+                                      </Button>
+                                      <Button
+                                        size="small"
+                                        danger
+                                        onClick={() => handleEventRejectOpen(event.id, 'approve')}
+                                      >
+                                        驳回
+                                      </Button>
+                                    </>
+                                  )}
+                                  {user && event.approval_status === 'rejected' && (user.role === 'editor' || user.role === 'admin') && (
+                                    <Button
+                                      size="small"
+                                      type="primary"
+                                      onClick={() => handleEventSubmitForReview(event.id)}
+                                      loading={eventActionLoading === event.id + '_submit'}
+                                    >
+                                      重新提交
+                                    </Button>
+                                  )}
+                                </Space>
+                                );
+                              },
+                            },
                           ]}
                           dataSource={events}
                           rowKey="id"
                           pagination={{ pageSize: 10 }}
                           size="small"
+                          scroll={{ x: 1000 }}
                           locale={{ emptyText: "暂无事件记录" }}
                         />
                       </Card>
@@ -1014,6 +1586,314 @@ export default function ContractDetailPage() {
               <Input.TextArea rows={2} placeholder="例如：合同补充协议签署日期 2024-06-15" />
             </Form.Item>
           </Form>
+        </Modal>
+
+        <Modal
+          title="编辑合同"
+          open={editModalOpen}
+          onCancel={() => setEditModalOpen(false)}
+          onOk={() => editForm.submit()}
+          confirmLoading={editLoading}
+          width={700}
+        >
+          <Form
+            form={editForm}
+            layout="vertical"
+            onFinish={handleUpdate}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="合同编号"
+                  name="contract_number"
+                  rules={[{ required: true, message: "请输入合同编号" }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="合同名称"
+                  name="contract_name"
+                  rules={[{ required: true, message: "请输入合同名称" }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="承租方" name="lessee_name">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="出租方" name="lessor_name">
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="门店名称" name="store_name">
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="门店地址" name="store_address">
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="币种"
+                  name="currency"
+                  rules={[{ required: true, message: "请选择币种" }]}
+                >
+                  <Select>
+                    <Select.Option value="CNY">人民币 (CNY)</Select.Option>
+                    <Select.Option value="USD">美元 (USD)</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="签约日期" name="signing_date">
+                  <DatePicker style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="租赁起始日"
+                  name="commencement_date"
+                  rules={[{ required: true, message: "请选择租赁起始日" }]}
+                >
+                  <DatePicker style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="租赁开始日"
+                  name="lease_start_date"
+                  rules={[{ required: true, message: "请选择租赁开始日" }]}
+                >
+                  <DatePicker style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="租期结束日"
+                  name="lease_end_date"
+                  rules={[{ required: true, message: "请选择租期结束日" }]}
+                >
+                  <DatePicker style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="折现率类型" name="discount_rate_type">
+                  <Input placeholder="例如：incremental_borrowing_rate" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="折现率版本" name="discount_rate_version">
+                  <Input placeholder="例如：v1.0" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="标签" name="tags">
+                  <Input placeholder="逗号分隔的标签" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Form>
+        </Modal>
+
+        <Modal
+          title={rejectModalType === 'review' ? '退回编辑' : '驳回'}
+          open={rejectModalOpen}
+          onCancel={() => setRejectModalOpen(false)}
+          onOk={handleRejectSubmit}
+          confirmLoading={actionLoading === (rejectModalType === 'review' ? 'review_reject' : 'approve_reject')}
+          okText="确认"
+          cancelText="取消"
+        >
+          <p style={{ marginBottom: 8 }}>
+            {rejectModalType === 'review' ? '请输入退回编辑的原因：' : '请输入驳回的原因：'}
+          </p>
+          <Input.TextArea
+            rows={4}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="请输入原因..."
+          />
+        </Modal>
+
+        <Modal
+          title={eventRejectType === 'review' ? '退回编辑' : '驳回'}
+          open={eventRejectModalOpen}
+          onCancel={() => setEventRejectModalOpen(false)}
+          onOk={handleEventRejectSubmit}
+          confirmLoading={eventRejectEventId ? eventActionLoading === eventRejectEventId + '_reject' : false}
+          okText="确认"
+          cancelText="取消"
+        >
+          <p style={{ marginBottom: 8 }}>
+            {eventRejectType === 'review' ? '请输入退回编辑的原因：' : '请输入驳回的原因：'}
+          </p>
+          <Input.TextArea
+            rows={4}
+            value={eventRejectReason}
+            onChange={(e) => setEventRejectReason(e.target.value)}
+            placeholder="请输入原因..."
+          />
+        </Modal>
+
+        <Modal
+          title="编辑草稿行"
+          open={editDraftModalOpen}
+          onCancel={() => setEditDraftModalOpen(false)}
+          onOk={() => editDraftForm.submit()}
+          width={500}
+        >
+          <Form
+            form={editDraftForm}
+            layout="vertical"
+            onFinish={handleSaveEditDraft}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="付款日"
+                  name="due_date"
+                  rules={[{ required: true, message: "请选择付款日" }]}
+                >
+                  <DatePicker style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label="金额"
+                  name="amount"
+                  rules={[{ required: true, message: "请输入金额" }]}
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    min={0}
+                    precision={2}
+                    prefix="¥"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item
+              label="付款时点"
+              name="payment_timing"
+              rules={[{ required: true }]}
+            >
+              <Select>
+                <Select.Option value="prepaid">先付 (Prepaid)</Select.Option>
+                <Select.Option value="postpaid">后付 (Postpaid)</Select.Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="金额类型" name="amount_type">
+              <Input placeholder="例如：fixed_rent, turnover_rent, CAM" />
+            </Form.Item>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="固定租金" name="is_fixed">
+                  <Select>
+                    <Select.Option value={true}>是</Select.Option>
+                    <Select.Option value={false}>否</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="租赁成分" name="is_lease_component">
+                  <Select>
+                    <Select.Option value={true}>是</Select.Option>
+                    <Select.Option value={false}>否</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          </Form>
+        </Modal>
+
+        <Modal
+          title={adjustmentModalTitle}
+          open={adjustmentModalOpen}
+          onCancel={() => setAdjustmentModalOpen(false)}
+          footer={[
+            <Button key="close" onClick={() => setAdjustmentModalOpen(false)}>关闭</Button>,
+          ]}
+          width={700}
+        >
+          {adjustmentModalData && (
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="调整类型">
+                <Tag color="blue">{adjustmentModalData.adjustment_type || "-"}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="生效日期">
+                {adjustmentModalData.effective_date ? dayjs(adjustmentModalData.effective_date).format("YYYY-MM-DD") : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="折现率">
+                {adjustmentModalData.discount_rate != null ? `${(adjustmentModalData.discount_rate * 100).toFixed(2)}%` : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="调整前租赁负债">
+                {adjustmentModalData.liability_before != null ? `¥${adjustmentModalData.liability_before.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="调整后租赁负债">
+                {adjustmentModalData.liability_after != null ? (
+                  <span style={{ fontWeight: "bold", color: "#1677ff" }}>¥{adjustmentModalData.liability_after.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                ) : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="负债变动额">
+                {adjustmentModalData.liability_change != null ? (
+                  <span style={{ fontWeight: "bold", color: adjustmentModalData.liability_change >= 0 ? "#cf1322" : "#389e0d" }}>
+                    {adjustmentModalData.liability_change >= 0 ? "+" : ""}¥{adjustmentModalData.liability_change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                ) : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="调整前使用权资产">
+                {adjustmentModalData.asset_before != null ? `¥${adjustmentModalData.asset_before.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="调整后使用权资产">
+                {adjustmentModalData.asset_after != null ? (
+                  <span style={{ fontWeight: "bold", color: "#1677ff" }}>¥{adjustmentModalData.asset_after.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                ) : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="资产变动额">
+                {adjustmentModalData.asset_change != null ? (
+                  <span style={{ fontWeight: "bold", color: adjustmentModalData.asset_change >= 0 ? "#cf1322" : "#389e0d" }}>
+                    {adjustmentModalData.asset_change >= 0 ? "+" : ""}¥{adjustmentModalData.asset_change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                ) : "-"}
+              </Descriptions.Item>
+              <Descriptions.Item label="损益影响 (PnL)">
+                {adjustmentModalData.pnl_impact != null ? (
+                  <span style={{ fontWeight: "bold", color: adjustmentModalData.pnl_impact >= 0 ? "#389e0d" : "#cf1322" }}>
+                    {adjustmentModalData.pnl_impact >= 0 ? "+" : ""}¥{adjustmentModalData.pnl_impact.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                ) : "-"}
+              </Descriptions.Item>
+            </Descriptions>
+          )}
         </Modal>
       </AppLayout>
     </ProtectedRoute>

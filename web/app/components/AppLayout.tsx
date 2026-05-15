@@ -12,6 +12,8 @@ import {
   UserOutlined,
   BarChartOutlined,
   SafetyOutlined,
+  AuditOutlined,
+  CalculatorOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -56,6 +58,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: <Link href="/reports">报表查询</Link>,
     },
     {
+      key: "/monthly-closing",
+      icon: <CalculatorOutlined />,
+      label: <Link href="/monthly-closing">月结跑批</Link>,
+    },
+    {
+      key: "/audit-logs",
+      icon: <AuditOutlined />,
+      label: <Link href="/audit-logs">审计日志</Link>,
+    },
+    {
       key: "/settings",
       icon: <SettingOutlined />,
       label: <Link href="/settings">设置</Link>,
@@ -95,22 +107,77 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           alignItems: "center",
           justifyContent: "space-between",
           background: "#fff",
-          borderBottom: "1px solid #f0f0f0",
-          padding: "0 24px",
+          borderBottom: "1px solid #EAEAEA",
+          padding: "0 32px",
+          height: 64,
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <RobotOutlined style={{ fontSize: 24, color: "#1890ff" }} />
-          <span style={{ fontSize: 18, fontWeight: 600 }}>
-            IFRS 16 租赁管理系统
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: "#000",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <RobotOutlined style={{ fontSize: 18, color: "#fff" }} />
+          </div>
+          <span
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              letterSpacing: "-0.5px",
+              color: "#000",
+            }}
+          >
+            IFRS 16
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              color: "#999",
+              fontWeight: 400,
+              marginLeft: 4,
+            }}
+          >
+            租赁管理系统
           </span>
         </div>
 
         {user && (
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <Avatar icon={<UserOutlined />} />
-              <span>{user.username}</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+                padding: "6px 12px",
+                borderRadius: 9999,
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#F5F5F5")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
+              <Avatar
+                size={32}
+                icon={<UserOutlined />}
+                style={{ background: "#000" }}
+              />
+              <span style={{ fontSize: 14, fontWeight: 500 }}>
+                {user.username}
+              </span>
             </div>
           </Dropdown>
         )}
@@ -118,27 +185,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <Layout>
         <Sider
-          width={200}
+          width={220}
           style={{
             background: "#fff",
-            borderRight: "1px solid #f0f0f0",
+            borderRight: "1px solid #EAEAEA",
+            padding: "12px 8px",
+            position: "sticky",
+            top: 64,
+            height: "calc(100vh - 64px)",
+            overflowY: "auto",
           }}
         >
           <Menu
             mode="inline"
             selectedKeys={[pathname]}
-            style={{ height: "100%", borderRight: 0 }}
+            style={{
+              height: "100%",
+              borderRight: 0,
+              background: "transparent",
+            }}
             items={menuItems}
           />
         </Sider>
 
         <Content
           style={{
-            margin: 24,
-            padding: 24,
-            background: "#fff",
-            borderRadius: 8,
-            minHeight: 280,
+            padding: "32px 48px",
+            background: "#FFFFFF",
+            minHeight: "calc(100vh - 64px)",
+            maxWidth: 1440,
+            width: "100%",
           }}
         >
           {children}

@@ -77,6 +77,26 @@ type MonthlyClosingBatch struct {
 	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
+type EventAdjustment struct {
+	ID                   string     `json:"id"`
+	EventID              string     `json:"event_id"`
+	ContractID           string     `json:"contract_id"`
+	AdjustmentType       string     `json:"adjustment_type"`
+	EffectiveDate        time.Time  `json:"effective_date"`
+	LiabilityBefore      float64    `json:"liability_before"`
+	LiabilityAfter       float64    `json:"liability_after"`
+	LiabilityAdjustment  float64    `json:"liability_adjustment"`
+	ROUBefore            float64    `json:"rou_before"`
+	ROUAfter             float64    `json:"rou_after"`
+	ROUAdjustment        float64    `json:"rou_adjustment"`
+	PnLGain              float64    `json:"pnl_gain"`
+	PnLLoss              float64    `json:"pnl_loss"`
+	RevisedDiscountRate  float64    `json:"revised_discount_rate"`
+	DiscountRateSource   *string    `json:"discount_rate_source"`
+	CalculationBatchID   *string    `json:"calculation_batch_id"`
+	CreatedAt            time.Time  `json:"created_at"`
+}
+
 type MonthlyClosingRepository struct {
 	db *pgxpool.Pool
 }
@@ -318,6 +338,176 @@ func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contra
 	return entries, nil
 }
 
+// ApproveJournalEntry approves a single journal entry in draft status
+func (r *MonthlyClosingRepository) ApproveJournalEntry(ctx context.Context, entryID string, userID string) error {
+	query := `
+		UPDATE journal_entries SET
+			posting_status = 'approved',
+			approved_by = $1,
+			approved_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $2 AND posting_status = 'draft'
+	`
+	result, err := r.db.Exec(ctx, query, userID, entryID)
+	if err != nil {
+		return fmt.Errorf("failed to approve journal entry: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("journal entry not found or not in draft status")
+	}
+	return nil
+}
+
+// PostJournalEntry posts an approved journal entry
+func (r *MonthlyClosingRepository) PostJournalEntry(ctx context.Context, entryID string, userID string, erpRef string) error {
+	query := `
+		UPDATE journal_entries SET
+			posting_status = 'posted',
+			posted_by = $1,
+			posted_at = NOW(),
+			erp_reference = $2,
+			updated_at = NOW()
+		WHERE id = $3 AND posting_status = 'approved'
+	`
+	var erpRefVal interface{}
+	if erpRef == "" {
+		erpRefVal = nil
+	} else {
+		erpRefVal = erpRef
+	}
+	result, err := r.db.Exec(ctx, query, userID, erpRefVal, entryID)
+	if err != nil {
+		return fmt.Errorf("failed to post journal entry: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("journal entry not found or not in approved status")
+	}
+	return nil
+}
+
+// ApproveBatchEntries approves all draft journal entries in a batch
+func (r *MonthlyClosingRepository) ApproveBatchEntries(ctx context.Context, batchID string, userID string) (int, error) {
+	query := `
+		UPDATE journal_entries SET
+			posting_status = 'approved',
+			approved_by = $1,
+			approved_at = NOW(),
+			updated_at = NOW()
+		WHERE batch_id = $2 AND posting_status = 'draft'
+	`
+	result, err := r.db.Exec(ctx, query, userID, batchID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to approve batch entries: %w", err)
+	}
+	return int(result.RowsAffected()), nil
+}
+
+// PostBatchEntries posts all approved journal entries in a batch
+func (r *MonthlyClosingRepository) PostBatchEntries(ctx context.Context, batchID string, userID string) (int, error) {
+	query := `
+		UPDATE journal_entries SET
+			posting_status = 'posted',
+			posted_by = $1,
+			posted_at = NOW(),
+			updated_at = NOW()
+		WHERE batch_id = $2 AND posting_status = 'approved'
+	`
+	result, err := r.db.Exec(ctx, query, userID, batchID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to post batch entries: %w", err)
+	}
+	count := int(result.RowsAffected())
+
+	// Update the batch posted_entries count
+	if count > 0 {
+		updateQuery := `
+			UPDATE monthly_closing_batches SET
+				posted_entries = posted_entries + $1,
+				updated_at = NOW()
+			WHERE id = $2
+		`
+		_, err = r.db.Exec(ctx, updateQuery, count, batchID)
+		if err != nil {
+			return count, fmt.Errorf("failed to update batch posted entries: %w", err)
+		}
+	}
+
+	return count, nil
+}
+
+// LockPeriod locks an accounting period for the given legal entity
+func (r *MonthlyClosingRepository) LockPeriod(ctx context.Context, period, legalEntityID, userID string) error {
+	query := `
+		INSERT INTO period_locks (accounting_period, legal_entity_id, is_locked, locked_by, locked_at, created_at, updated_at)
+		VALUES ($1, $2, true, $3, NOW(), NOW(), NOW())
+		ON CONFLICT (accounting_period, legal_entity_id) DO UPDATE SET
+			is_locked = true,
+			locked_by = $3,
+			locked_at = NOW(),
+			unlocked_by = NULL,
+			unlocked_at = NULL,
+			updated_at = NOW()
+	`
+	var legalEntityIDVal interface{}
+	if legalEntityID == "" {
+		legalEntityIDVal = nil
+	} else {
+		legalEntityIDVal = legalEntityID
+	}
+	_, err := r.db.Exec(ctx, query, period, legalEntityIDVal, userID)
+	if err != nil {
+		return fmt.Errorf("failed to lock period: %w", err)
+	}
+	return nil
+}
+
+// UnlockPeriod unlocks an accounting period for the given legal entity
+func (r *MonthlyClosingRepository) UnlockPeriod(ctx context.Context, period, legalEntityID, userID string) error {
+	query := `
+		UPDATE period_locks SET
+			is_locked = false,
+			unlocked_by = $1,
+			unlocked_at = NOW(),
+			updated_at = NOW()
+		WHERE accounting_period = $2 AND (legal_entity_id = $3 OR legal_entity_id IS NULL)
+	`
+	var legalEntityIDVal interface{}
+	if legalEntityID == "" {
+		legalEntityIDVal = nil
+	} else {
+		legalEntityIDVal = legalEntityID
+	}
+	result, err := r.db.Exec(ctx, query, userID, period, legalEntityIDVal)
+	if err != nil {
+		return fmt.Errorf("failed to unlock period: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("period lock not found for period %s", period)
+	}
+	return nil
+}
+
+// IsPeriodLocked checks if a period is locked
+func (r *MonthlyClosingRepository) IsPeriodLocked(ctx context.Context, period, legalEntityID string) (bool, error) {
+	query := `
+		SELECT is_locked FROM period_locks
+		WHERE accounting_period = $1 AND (legal_entity_id = $2 OR legal_entity_id IS NULL)
+	`
+	var legalEntityIDVal interface{}
+	if legalEntityID == "" {
+		legalEntityIDVal = nil
+	} else {
+		legalEntityIDVal = legalEntityID
+	}
+	var isLocked bool
+	err := r.db.QueryRow(ctx, query, period, legalEntityIDVal).Scan(&isLocked)
+	if err != nil {
+		// No lock record means not locked
+		return false, nil
+	}
+	return isLocked, nil
+}
+
 func (r *MonthlyClosingRepository) UpdateBatchStatus(ctx context.Context, batchID, status string, processed, failed, total, posted int) error {
 	now := time.Now()
 	var completedAt interface{}
@@ -339,6 +529,118 @@ func (r *MonthlyClosingRepository) UpdateBatchStatus(ctx context.Context, batchI
 	_, err := r.db.Exec(ctx, query, status, processed, failed, total, posted, completedAt, now, batchID)
 	if err != nil {
 		return fmt.Errorf("failed to update batch: %w", err)
+	}
+	return nil
+}
+
+// CreateEventAdjustment inserts a new event adjustment record.
+func (r *MonthlyClosingRepository) CreateEventAdjustment(ctx context.Context, adj *EventAdjustment) (*EventAdjustment, error) {
+	adj.ID = uuid.New().String()
+	adj.CreatedAt = time.Now()
+
+	query := `
+		INSERT INTO event_adjustments (
+			id, event_id, contract_id, adjustment_type, effective_date,
+			liability_before, liability_after, liability_adjustment,
+			rou_before, rou_after, rou_adjustment,
+			pnl_gain, pnl_loss, revised_discount_rate, discount_rate_source,
+			calculation_batch_id, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+	`
+
+	_, err := r.db.Exec(ctx, query,
+		adj.ID, adj.EventID, adj.ContractID, adj.AdjustmentType, adj.EffectiveDate,
+		adj.LiabilityBefore, adj.LiabilityAfter, adj.LiabilityAdjustment,
+		adj.ROUBefore, adj.ROUAfter, adj.ROUAdjustment,
+		adj.PnLGain, adj.PnLLoss, adj.RevisedDiscountRate, adj.DiscountRateSource,
+		adj.CalculationBatchID, adj.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create event adjustment: %w", err)
+	}
+	return adj, nil
+}
+
+// GetEventAdjustmentsForContract returns all event adjustments for a contract, ordered by effective date.
+func (r *MonthlyClosingRepository) GetEventAdjustmentsForContract(ctx context.Context, contractID string) ([]*EventAdjustment, error) {
+	query := `
+		SELECT id, event_id, contract_id, adjustment_type, effective_date,
+			liability_before, liability_after, liability_adjustment,
+			rou_before, rou_after, rou_adjustment,
+			pnl_gain, pnl_loss, revised_discount_rate, discount_rate_source,
+			calculation_batch_id, created_at
+		FROM event_adjustments
+		WHERE contract_id = $1
+		ORDER BY effective_date ASC
+	`
+
+	rows, err := r.db.Query(ctx, query, contractID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list event adjustments: %w", err)
+	}
+	defer rows.Close()
+
+	var adjustments []*EventAdjustment
+	for rows.Next() {
+		a := &EventAdjustment{}
+		err := rows.Scan(
+			&a.ID, &a.EventID, &a.ContractID, &a.AdjustmentType, &a.EffectiveDate,
+			&a.LiabilityBefore, &a.LiabilityAfter, &a.LiabilityAdjustment,
+			&a.ROUBefore, &a.ROUAfter, &a.ROUAdjustment,
+			&a.PnLGain, &a.PnLLoss, &a.RevisedDiscountRate, &a.DiscountRateSource,
+			&a.CalculationBatchID, &a.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan event adjustment: %w", err)
+		}
+		adjustments = append(adjustments, a)
+	}
+	return adjustments, nil
+}
+
+// GetEventAdjustmentByEventID returns the event adjustment record for a specific event.
+func (r *MonthlyClosingRepository) GetEventAdjustmentByEventID(ctx context.Context, eventID string) (*EventAdjustment, error) {
+	query := `
+		SELECT id, event_id, contract_id, adjustment_type, effective_date,
+			liability_before, liability_after, liability_adjustment,
+			rou_before, rou_after, rou_adjustment,
+			pnl_gain, pnl_loss, revised_discount_rate, discount_rate_source,
+			calculation_batch_id, created_at
+		FROM event_adjustments
+		WHERE event_id = $1
+	`
+
+	a := &EventAdjustment{}
+	err := r.db.QueryRow(ctx, query, eventID).Scan(
+		&a.ID, &a.EventID, &a.ContractID, &a.AdjustmentType, &a.EffectiveDate,
+		&a.LiabilityBefore, &a.LiabilityAfter, &a.LiabilityAdjustment,
+		&a.ROUBefore, &a.ROUAfter, &a.ROUAdjustment,
+		&a.PnLGain, &a.PnLLoss, &a.RevisedDiscountRate, &a.DiscountRateSource,
+		&a.CalculationBatchID, &a.CreatedAt,
+	)
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get event adjustment: %w", err)
+	}
+	return a, nil
+}
+
+// LinkAdjustmentToBatch updates an event adjustment's calculation_batch_id.
+func (r *MonthlyClosingRepository) LinkAdjustmentToBatch(ctx context.Context, adjustmentID, batchID string) error {
+	query := `UPDATE event_adjustments SET calculation_batch_id = $1 WHERE id = $2`
+	_, err := r.db.Exec(ctx, query, batchID, adjustmentID)
+	return err
+}
+
+// UpdateMeasurementResultsFromDate overwrites measurement_results from a given effective date forward.
+func (r *MonthlyClosingRepository) UpdateMeasurementResultsFromDate(ctx context.Context, contractID, effectivePeriod string, periods []*MeasurementResult) error {
+	for _, mr := range periods {
+		// Use the existing SaveMeasurementResult which handles upsert
+		if err := r.SaveMeasurementResult(ctx, mr); err != nil {
+			return fmt.Errorf("failed to update measurement result for period %s: %w", mr.AccountingPeriod, err)
+		}
 	}
 	return nil
 }

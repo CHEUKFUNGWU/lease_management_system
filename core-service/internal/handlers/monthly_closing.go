@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ifrs16/core-service/internal/middleware"
 	"github.com/ifrs16/core-service/internal/repository"
+	"github.com/ifrs16/core-service/internal/services/audit"
 	ifrs16svc "github.com/ifrs16/core-service/internal/services/ifrs16"
 )
 
@@ -15,10 +16,11 @@ type MonthlyClosingHandler struct {
 	mcRepo       *repository.MonthlyClosingRepository
 	contractRepo *repository.ContractRepository
 	psRepo       *repository.PaymentScheduleRepository
+	auditLogger  *audit.Logger
 }
 
-func NewMonthlyClosingHandler(mcRepo *repository.MonthlyClosingRepository, contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository) *MonthlyClosingHandler {
-	return &MonthlyClosingHandler{mcRepo: mcRepo, contractRepo: contractRepo, psRepo: psRepo}
+func NewMonthlyClosingHandler(mcRepo *repository.MonthlyClosingRepository, contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository, auditLogger *audit.Logger) *MonthlyClosingHandler {
+	return &MonthlyClosingHandler{mcRepo: mcRepo, contractRepo: contractRepo, psRepo: psRepo, auditLogger: auditLogger}
 }
 
 type GenerateMonthlyClosingRequest struct {
@@ -38,6 +40,17 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 	
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
+	
+	// Check if period is locked
+	isLocked, err := h.mcRepo.IsPeriodLocked(ctx, req.AccountingPeriod, legalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check period lock: " + err.Error()})
+		return
+	}
+	if isLocked {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "期间已锁账，无法重新生成分录"})
+		return
+	}
 	
 	// Create batch record
 	batch, err := h.mcRepo.CreateBatch(ctx, &repository.MonthlyClosingBatch{
@@ -71,6 +84,7 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 	processed := 0
 	failed := 0
 	totalEntries := 0
+	batchID := batch.ID
 	
 	// Parse period to get start/end dates
 	periodStart, _ := time.Parse("2006-01", req.AccountingPeriod)
@@ -127,7 +141,6 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 		}
 		
 		now := time.Now()
-		batchID := batch.ID
 		
 		// Save measurement result
 		mr := &repository.MeasurementResult{
@@ -164,6 +177,33 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 		processed++
 	}
 	
+	// Link existing event adjustment journal entries to this batch
+	for _, contract := range contracts {
+		entries, err := h.mcRepo.GetJournalEntries(ctx, contract.ID, req.AccountingPeriod, "draft")
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.BatchID == nil && (entry.EntryType == "modification" || entry.EntryType == "reassessment" || entry.EntryType == "impairment") {
+				if err := h.mcRepo.CreateJournalEntry(ctx, &repository.JournalEntry{
+					ContractID:       entry.ContractID,
+					AccountingPeriod: entry.AccountingPeriod,
+					EntryDate:        entry.EntryDate,
+					EntryType:        entry.EntryType,
+					DebitAccount:     entry.DebitAccount,
+					CreditAccount:    entry.CreditAccount,
+					Amount:           entry.Amount,
+					Currency:         entry.Currency,
+					Description:      entry.Description,
+					PostingStatus:    "draft",
+					BatchID:          &batchID,
+				}); err == nil {
+					totalEntries++
+				}
+			}
+		}
+	}
+
 	// Update batch status
 	status := "completed"
 	if failed > 0 && processed == 0 {
@@ -184,6 +224,19 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 		"failed_contracts":    failed,
 		"total_entries":       totalEntries,
 	})
+
+	// Audit log: monthly closing generated
+	if h.auditLogger != nil {
+		uid, _ := c.Get("user_id")
+		uidStr, _ := uid.(string)
+		h.auditLogger.Log(ctx, "monthly_closing_batches", batch.ID, "generate", nil, map[string]interface{}{
+			"batch_id":          batch.ID,
+			"accounting_period": req.AccountingPeriod,
+			"status":            status,
+			"processed":         processed,
+			"total_entries":     totalEntries,
+		}, uidStr, c)
+	}
 }
 
 func generateMockPayments(contract *repository.Contract) []ifrs16svc.LeasePayment {
@@ -260,11 +313,161 @@ func generateJournalEntries(contractID, period string, entryDate time.Time, mont
 			BatchID:          &batchID,
 		})
 	}
-	
+
+	// Entry 4: Variable rent expense (turnover rent, sales-based rent)
+	if monthly.VariableRentExpense > 0.01 {
+		entries = append(entries, &repository.JournalEntry{
+			ContractID:       contractID,
+			AccountingPeriod: period,
+			EntryDate:        entryDate,
+			EntryType:        "variable_rent",
+			DebitAccount:     "6603-租赁费用-变量租金",
+			CreditAccount:    "2202-应付账款",
+			Amount:           monthly.VariableRentExpense,
+			Currency:         "CNY",
+			Description:      strPtr(fmt.Sprintf("变量租金 %s", period)),
+			PostingStatus:    "draft",
+			BatchID:          &batchID,
+		})
+	}
+
+	// Entry 5: Non-lease expense (CAM, service charge, management fee, etc.)
+	if monthly.NonLeaseExpense > 0.01 {
+		entries = append(entries, &repository.JournalEntry{
+			ContractID:       contractID,
+			AccountingPeriod: period,
+			EntryDate:        entryDate,
+			EntryType:        "non_lease",
+			DebitAccount:     "6604-租赁费用-非租赁成分",
+			CreditAccount:    "2202-应付账款",
+			Amount:           monthly.NonLeaseExpense,
+			Currency:         "CNY",
+			Description:      strPtr(fmt.Sprintf("非租赁成分 %s", period)),
+			PostingStatus:    "draft",
+			BatchID:          &batchID,
+		})
+	}
+
 	return entries
 }
 
 func strPtr(s string) *string { return &s }
+
+// ApproveEntry approves a single journal entry
+func (h *MonthlyClosingHandler) ApproveEntry(c *gin.Context) {
+	entryID := c.Param("id")
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+
+	if err := h.mcRepo.ApproveJournalEntry(c.Request.Context(), entryID, userIDStr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Audit log
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c.Request.Context(), "journal_entries", entryID, "approve", nil, nil, userIDStr, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "分录审批成功", "entry_id": entryID})
+}
+
+// PostEntry posts a single journal entry
+func (h *MonthlyClosingHandler) PostEntry(c *gin.Context) {
+	entryID := c.Param("id")
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+
+	var req struct {
+		ERPReference string `json:"erp_reference"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	if err := h.mcRepo.PostJournalEntry(c.Request.Context(), entryID, userIDStr, req.ERPReference); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Audit log
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c.Request.Context(), "journal_entries", entryID, "post", nil, nil, userIDStr, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "分录过账成功", "entry_id": entryID})
+}
+
+// ApproveBatch approves all draft entries in a batch
+func (h *MonthlyClosingHandler) ApproveBatch(c *gin.Context) {
+	batchID := c.Param("id")
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+
+	count, err := h.mcRepo.ApproveBatchEntries(c.Request.Context(), batchID, userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "批次审批成功", "approved_count": count})
+}
+
+// PostBatch posts all approved entries in a batch
+func (h *MonthlyClosingHandler) PostBatch(c *gin.Context) {
+	batchID := c.Param("id")
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+
+	count, err := h.mcRepo.PostBatchEntries(c.Request.Context(), batchID, userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "批次过账成功", "posted_count": count})
+}
+
+// LockPeriod locks an accounting period
+func (h *MonthlyClosingHandler) LockPeriod(c *gin.Context) {
+	period := c.Param("period")
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+	legalEntityID := middleware.GetTenantID(c)
+
+	if err := h.mcRepo.LockPeriod(c.Request.Context(), period, legalEntityID, userIDStr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Audit log
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c.Request.Context(), "period_locks", period, "lock", nil, nil, userIDStr, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "期间锁账成功", "period": period})
+}
+
+// UnlockPeriod unlocks an accounting period
+func (h *MonthlyClosingHandler) UnlockPeriod(c *gin.Context) {
+	period := c.Param("period")
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+	legalEntityID := middleware.GetTenantID(c)
+
+	if err := h.mcRepo.UnlockPeriod(c.Request.Context(), period, legalEntityID, userIDStr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// Audit log
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c.Request.Context(), "period_locks", period, "unlock", nil, nil, userIDStr, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "期间解锁成功", "period": period})
+}
+
+// GetPeriodLockStatus returns the lock status for a period
+func (h *MonthlyClosingHandler) GetPeriodLockStatus(c *gin.Context) {
+	period := c.Param("period")
+	legalEntityID := middleware.GetTenantID(c)
+
+	isLocked, err := h.mcRepo.IsPeriodLocked(c.Request.Context(), period, legalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"period": period, "is_locked": isLocked})
+}
 
 // ListBatches returns all monthly closing batches
 func (h *MonthlyClosingHandler) ListBatches(c *gin.Context) {

@@ -11,12 +11,19 @@ import {
   Space,
   Tag,
   Spin,
+  Upload,
+  message,
+  Tooltip,
 } from "antd";
 import {
   SendOutlined,
   UserOutlined,
   RobotOutlined,
   FileTextOutlined,
+  PaperClipOutlined,
+  FilePdfOutlined,
+  FileExcelOutlined,
+  FileImageOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -26,12 +33,21 @@ import { useAuth } from "../context/AuthContext";
 const { TextArea } = Input;
 const { Text } = Typography;
 
+interface UploadedFile {
+  file_id: string;
+  original_name: string;
+  content_type: string;
+  object_name?: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
   sources?: string[];
+  attachments?: UploadedFile[];
+  model?: string;
 }
 
 export default function AIChatPage() {
@@ -41,12 +57,13 @@ export default function AIChatPage() {
       id: "welcome",
       role: "assistant",
       content:
-        "你好！我是 IFRS 16 AI 助手。我可以帮你：\n\n1. 查询合同台账信息\n2. 查看 IFRS 16 计量结果\n3. 了解审批状态\n4. 回答 IFRS 16 会计问题\n\n例如：\n- \"当前有多少份合同？\"\n- \"合同 LEASE-2024-001 的最新计量结果\"\n- \"2024-01 期间的分录\"",
+        "你好！我是 IFRS 16 AI 助手。我可以帮你：\n\n1. 查询合同台账信息\n2. 查看 IFRS 16 计量结果\n3. 了解审批状态\n4. 回答 IFRS 16 会计问题\n\n你还可以上传合同文件或租金表，我会帮你解析其中的关键信息。",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lastUploadedFile, setLastUploadedFile] = useState<UploadedFile | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -56,6 +73,63 @@ export default function AIChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const getFileIcon = (type: string) => {
+    if (type.includes("pdf")) return <FilePdfOutlined style={{ color: "#EF4444" }} />;
+    if (type.includes("excel") || type.includes("sheet"))
+      return <FileExcelOutlined style={{ color: "#10B981" }} />;
+    return <FileImageOutlined style={{ color: "#666" }} />;
+  };
+
+  const handleFileUpload = async (options: any) => {
+    const { file, onSuccess, onError, onProgress } = options;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("file_type", "contract");
+
+    try {
+      const response = await fetch(`${window.location.origin}/api/ai/files/upload`, {
+        method: "POST",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `上传失败: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      const uploadedFile: UploadedFile = {
+        file_id: data.file_id,
+        original_name: data.original_name,
+        content_type: data.content_type,
+        object_name: data.object_name,
+      };
+
+      setLastUploadedFile(uploadedFile);
+
+      // Add a message showing the uploaded file
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: `已上传文件: ${data.original_name}`,
+        timestamp: new Date(),
+        attachments: [uploadedFile],
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      message.success(`${data.original_name} 上传成功`);
+      
+      onSuccess(data, file);
+    } catch (err: any) {
+      onError(err);
+      message.error(`上传失败: ${err.message}`);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !token) return;
@@ -67,18 +141,35 @@ export default function AIChatPage() {
       timestamp: new Date(),
     };
 
+    // Build conversation history from existing messages (last 10, excluding welcome)
+    const existingMessages = [...messages];
+    const history = existingMessages
+      .filter(m => m.id !== "welcome")
+      .slice(-10)
+      .map(m => ({ role: m.role, content: m.content }));
+
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
 
     try {
-      const data = await aiChatApi.chat({ message: input }, token);
+      const chatData: any = { message: input, history };
+      if (lastUploadedFile) {
+        chatData.file_id = lastUploadedFile.file_id;
+        chatData.object_name = lastUploadedFile.object_name;
+        chatData.content_type = lastUploadedFile.content_type;
+        // Clear the uploaded file after sending
+        setLastUploadedFile(null);
+      }
+
+      const data = await aiChatApi.chat(chatData, token);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: data.answer || "抱歉，我无法理解您的问题。",
         timestamp: new Date(),
         sources: data.sources?.map((s: any) => s.title || s.type),
+        model: data.model,
       };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error: any) {
@@ -107,7 +198,7 @@ export default function AIChatPage() {
         <Card
           title={
             <Space>
-              <RobotOutlined style={{ color: "#1890ff" }} />
+              <RobotOutlined style={{ color: "#000" }} />
               <span>AI 助手</span>
             </Space>
           }
@@ -145,7 +236,7 @@ export default function AIChatPage() {
                       }
                       style={{
                         backgroundColor:
-                          msg.role === "user" ? "#87d068" : "#1890ff",
+                          msg.role === "user" ? "#666" : "#000",
                       }}
                     />
                     <div
@@ -154,12 +245,21 @@ export default function AIChatPage() {
                         padding: 12,
                         borderRadius: 8,
                         backgroundColor:
-                          msg.role === "user" ? "#f6ffed" : "#f0f5ff",
+                          msg.role === "user" ? "#F5F5F5" : "#FAFAFA",
                       }}
                     >
                       <Text style={{ whiteSpace: "pre-wrap" }}>
                         {msg.content}
                       </Text>
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          {msg.attachments.map((att, idx) => (
+                            <Tag key={idx} icon={getFileIcon(att.content_type)}>
+                              {att.original_name}
+                            </Tag>
+                          ))}
+                        </div>
+                      )}
                       {msg.sources && (
                         <div style={{ marginTop: 8 }}>
                           <Text type="secondary" style={{ fontSize: 12 }}>
@@ -174,6 +274,11 @@ export default function AIChatPage() {
                             </Tag>
                           ))}
                         </div>
+                      )}
+                      {msg.model && (
+                        <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
+                          模型: {msg.model}
+                        </Text>
                       )}
                     </div>
                   </Space>
@@ -194,8 +299,37 @@ export default function AIChatPage() {
               borderTop: "1px solid #f0f0f0",
               display: "flex",
               gap: 8,
+              alignItems: "flex-end",
             }}
           >
+            <Upload
+              customRequest={handleFileUpload}
+              showUploadList={false}
+              beforeUpload={(file) => {
+                const allowedTypes = [
+                  "application/pdf",
+                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  "application/vnd.ms-excel",
+                  "image/jpeg",
+                  "image/png",
+                  "image/tiff",
+                ];
+                if (!allowedTypes.includes(file.type)) {
+                  message.error("不支持的文件类型，请上传 PDF、Excel 或图片文件");
+                  return Upload.LIST_IGNORE;
+                }
+                const isLt50M = file.size / 1024 / 1024 < 50;
+                if (!isLt50M) {
+                  message.error("文件大小不能超过 50MB");
+                  return Upload.LIST_IGNORE;
+                }
+                return true;
+              }}
+            >
+              <Tooltip title="上传文件">
+                <Button icon={<PaperClipOutlined />} />
+              </Tooltip>
+            </Upload>
             <TextArea
               value={input}
               onChange={(e) => setInput(e.target.value)}

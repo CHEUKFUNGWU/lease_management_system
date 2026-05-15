@@ -85,6 +85,8 @@ def _check_critical_fields(extracted: dict) -> tuple[list, list]:
     
     critical_fields = [
         ("contract_number", "合同编号"),
+        ("lessee", "承租方"),
+        ("lessor", "出租方"),
         ("commencement_date", "租赁起始日"),
         ("lease_start_date", "租赁开始日"),
         ("lease_end_date", "租期结束日"),
@@ -159,6 +161,8 @@ async def parse_contract(request: ContractDraftRequest):
     3. 区分先付租金(prepaid)和后付租金(postpaid)
     4. 区分固定租金和变量租金
     5. 识别租赁成分和非租赁成分(CAM、服务费)
+    6. 承租方(lessee)是租赁合同的乙方，即使用物业并支付租金的一方
+    7. 出租方(lessor)是租赁合同的甲方，即提供物业并收取租金的一方
     
     合同文本:
     {file_content}
@@ -166,20 +170,21 @@ async def parse_contract(request: ContractDraftRequest):
     请提取以下字段（JSON 格式）:
     - contract_number: 合同编号
     - contract_name: 合同名称
-    - legal_entity: 法人主体
-    - store_name: 门店名称
-    - landlord: 出租方
+    - lessee: 承租方名称（合同中承租人/乙方对应的完整公司名称）
+    - lessor: 出租方名称（合同中出租人/甲方对应的完整公司名称）
+    - store_name: 门店/物业名称（如有明确提及，否则留空）
+    - store_address: 门店/物业地址（如有明确提及，否则留空）
     - commencement_date: 租赁起始日 (YYYY-MM-DD)
     - lease_start_date: 租赁开始日 (YYYY-MM-DD)
     - lease_end_date: 租期结束日 (YYYY-MM-DD)
     - currency: 币种 (CNY/USD/EUR)。如果合同中没有明确提到货币，返回 null 或空字符串，不要猜测
-    - fixed_rent_amount: 固定租金金额
+    - fixed_rent_amount: 固定租金金额（仅数字，不含货币单位）
     - payment_frequency: 付款频率 (monthly/quarterly/yearly)
-    - payment_timing: 付款时点 (prepaid/postpaid)
+    - payment_timing: 付款时点 (prepaid/postpaid)。如果合同写明"每月X日前支付"则为prepaid；"每月X日后支付"或"月末支付"则为postpaid
     - renewal_option: 是否有续租选择权 (true/false)
     - termination_option: 是否有终止选择权 (true/false)
-    - cam_amount: 物业管理费 (如有)
-    - service_fee: 服务费 (如有)
+    - cam_amount: 物业管理费 (如有，仅数字)
+    - service_fee: 服务费 (如有，仅数字)
     - discount_rate_type: 折现率类型 (如合同中提及)
     - discount_rate: 折现率数值 (如合同中提及)
     

@@ -99,8 +99,15 @@ export const legalEntityApi = {
 
 // Contract APIs
 export const contractApi = {
-  list: (token: string) =>
-    apiRequest("/api/v1/contracts", { token }),
+  list: (token: string, params?: { search?: string; status?: string; sort_by?: string; sort_order?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.search) qs.append("search", params.search);
+    if (params?.status) qs.append("status", params.status);
+    if (params?.sort_by) qs.append("sort_by", params.sort_by);
+    if (params?.sort_order) qs.append("sort_order", params.sort_order);
+    const queryString = qs.toString();
+    return apiRequest(`/api/v1/contracts${queryString ? `?${queryString}` : ""}`, { token });
+  },
   
   get: (id: string, token: string) =>
     apiRequest(`/api/v1/contracts/${id}`, { token }),
@@ -108,6 +115,13 @@ export const contractApi = {
   create: (data: any, token: string) =>
     apiRequest("/api/v1/contracts", {
       method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+    
+  update: (id: string, data: any, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}`, {
+      method: "PUT",
       body: JSON.stringify(data),
       token,
     }),
@@ -143,6 +157,13 @@ export const contractApi = {
       token,
     }),
     
+  reject: (id: string, reason: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ contract_id: id, reason }),
+      token,
+    }),
+    
   getApprovalStatus: (id: string, token: string) =>
     apiRequest(`/api/v1/contracts/${id}/approval-status`, { token }),
     
@@ -174,6 +195,35 @@ export const eventApi = {
   
   list: (contractId: string, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/events`, { token }),
+    
+  submitForReview: (contractId: string, eventId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/submit`, { method: "POST", token }),
+    
+  review: (contractId: string, eventId: string, approved: boolean, reason: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/review`, {
+      method: "POST",
+      body: JSON.stringify({ approved, reason }),
+      token,
+    }),
+    
+  approve: (contractId: string, eventId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/approve`, { method: "POST", token }),
+    
+  reject: (contractId: string, eventId: string, reason: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+      token,
+    }),
+
+  recalculate: (contractId: string, eventId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/recalculate`, { method: "POST", token }),
+
+  previewAdjustment: (contractId: string, eventId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/preview`, { method: "POST", token }),
+
+  getAdjustment: (contractId: string, eventId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/adjustment`, { token }),
 };
 
 // Monthly Closing APIs
@@ -195,11 +245,36 @@ export const monthlyClosingApi = {
   },
   getMeasurementResults: (contractId: string, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/measurement-results`, { token }),
+  approveEntry: (entryId: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/entries/${entryId}/approve`, { method: "POST", token }),
+  postEntry: (entryId: string, erpReference: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/entries/${entryId}/post`, {
+      method: "POST",
+      body: JSON.stringify({ erp_reference: erpReference }),
+      token,
+    }),
+  approveBatch: (batchId: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/batches/${batchId}/approve`, { method: "POST", token }),
+  postBatch: (batchId: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/batches/${batchId}/post`, { method: "POST", token }),
+  lockPeriod: (period: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/periods/${period}/lock`, { method: "POST", token }),
+  unlockPeriod: (period: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/periods/${period}/unlock`, { method: "POST", token }),
+  getLockStatus: (period: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/periods/${period}/lock-status`, { token }),
 };
 
 // AI Chat APIs
 export const aiChatApi = {
-  chat: (data: { message: string; contract_id?: string; history?: any[] }, token: string) =>
+  chat: (data: { 
+    message: string; 
+    contract_id?: string; 
+    history?: any[];
+    file_id?: string;
+    object_name?: string;
+    content_type?: string;
+  }, token: string) =>
     apiRequest("/api/v1/ai/chat", {
       method: "POST",
       body: JSON.stringify(data),
@@ -230,6 +305,17 @@ export const aiApi = {
       body: JSON.stringify(data),
     }),
 
+  parseContract: (data: {
+    file_id: string;
+    object_name: string;
+    content_type: string;
+  }) =>
+    aiRequest("/api/v1/parse/contract", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" } as Record<string, string>,
+      body: JSON.stringify(data),
+    }),
+
   parsePaymentSchedule: (data: {
     file_id: string;
     object_name: string;
@@ -239,4 +325,24 @@ export const aiApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+};
+
+// Audit APIs
+export const auditApi = {
+  list: (params: {
+    table_name?: string;
+    record_id?: string;
+    action?: string;
+    changed_by?: string;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+    offset?: number;
+  }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== "") qs.append(k, String(v));
+    });
+    return apiRequest(`/api/v1/audit-logs?${qs.toString()}`, { token });
+  },
 };

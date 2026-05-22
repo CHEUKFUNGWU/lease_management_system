@@ -547,8 +547,10 @@ func (h *ReportHandler) Amortization(c *gin.Context) {
 			bucket.sumInterest += entry.InterestExpense
 			bucket.sumPayment += entry.Payment
 			bucket.sumPrepaidPayment += entry.PrepaidPayment
+			bucket.liabilityAdjustment += entry.LiabilityAdjustment
 			bucket.lastClosingLiability = entry.ClosingLiability
 			bucket.sumDepreciation += entry.Depreciation
+			bucket.rouAdjustment += entry.ROUAdjustment
 			bucket.lastClosingROU = entry.ClosingROUAsset
 			bucket.sumVariableRent += entry.VariableRentExpense
 			bucket.sumNonLease += entry.NonLeaseExpense

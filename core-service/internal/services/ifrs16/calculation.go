@@ -39,9 +39,11 @@ type DailyEntry struct {
 	InterestExpense     float64
 	Payment             float64
 	PrepaidPayment      float64 // Prepaid rent at/before commencement (capitalized into ROU, not reducing liability)
+	LiabilityAdjustment float64 // Rounding/settlement adjustment to force liability to zero at lease end
 	ClosingLiability    float64
 	OpeningROUAsset     float64
 	Depreciation        float64
+	ROUAdjustment       float64 // Rounding adjustment to force ROU to zero at lease end
 	ClosingROUAsset     float64
 	VariableRentExpense float64
 	NonLeaseExpense     float64
@@ -54,9 +56,11 @@ type MonthlyEntry struct {
 	InterestExpense     float64
 	TotalPayments       float64
 	PrepaidPayment      float64 // Prepaid rent at/before commencement (capitalized into ROU)
+	LiabilityAdjustment float64
 	ClosingLiability    float64
 	OpeningROUAsset     float64
 	Depreciation        float64
+	ROUAdjustment       float64
 	ClosingROUAsset     float64
 	VariableRentExpense float64
 	NonLeaseExpense     float64
@@ -229,18 +233,8 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 		depreciation := dailyDepreciation
 		currentROUAsset = currentROUAsset - depreciation
 
-		// Force zero on the last day of the lease term to avoid rounding dust
-		isLastDay := day == leaseTermDays-1
-		if isLastDay {
-			if math.Abs(currentLiability) < 1.0 {
-				currentLiability = 0
-			}
-			if math.Abs(currentROUAsset) < 1.0 {
-				currentROUAsset = 0
-			}
-		}
-
-		schedule = append(schedule, DailyEntry{
+		// Build the entry
+		entry := DailyEntry{
 			Date:                currentDate,
 			OpeningLiability:    round(openingLiability),
 			InterestExpense:     round(interest),
@@ -252,7 +246,29 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 			ClosingROUAsset:     round(currentROUAsset),
 			VariableRentExpense: round(variableRent),
 			NonLeaseExpense:     round(nonLeaseExpense),
-		})
+		}
+
+		// Force zero on the last day of the lease term.
+		// The daily amortization accumulates floating-point drift over the lease term
+		// because the PV calculation (fractional-day discounting) and daily compounding
+		// (integer-day rate) don't perfectly reconcile. The residual is recorded as a
+		// rounding adjustment so the formula balances:
+		//   Closing = Opening + Interest - Payment + Adjustment = 0
+		isLastDay := day == leaseTermDays-1
+		if isLastDay {
+			if currentLiability != 0 {
+				entry.LiabilityAdjustment = round(-currentLiability)
+				entry.ClosingLiability = 0
+				currentLiability = 0
+			}
+			if currentROUAsset != 0 {
+				entry.ROUAdjustment = round(-currentROUAsset)
+				entry.ClosingROUAsset = 0
+				currentROUAsset = 0
+			}
+		}
+
+		schedule = append(schedule, entry)
 	}
 
 	return schedule
@@ -282,7 +298,9 @@ func aggregateMonthly(dailyEntries []DailyEntry) []MonthlyEntry {
 		m.InterestExpense += entry.InterestExpense
 		m.TotalPayments += entry.Payment
 		m.PrepaidPayment += entry.PrepaidPayment
+		m.LiabilityAdjustment += entry.LiabilityAdjustment
 		m.Depreciation += entry.Depreciation
+		m.ROUAdjustment += entry.ROUAdjustment
 		m.ClosingLiability = entry.ClosingLiability
 		m.ClosingROUAsset = entry.ClosingROUAsset
 		m.VariableRentExpense += entry.VariableRentExpense

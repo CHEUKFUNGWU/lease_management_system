@@ -81,22 +81,22 @@ const buildAmortColumns = (view: string, granularity: string) => {
     {
       title: "租赁负债 Roll-forward",
       children: [
-        { title: "期初", dataIndex: "opening_liability", width: 130, align: "right" as const, render: fmtNum },
-        { title: "利息", dataIndex: "interest_expense", width: 110, align: "right" as const, render: fmtNum },
-        { title: "付款", dataIndex: "payment", width: 110, align: "right" as const, render: fmtNum },
+        { title: "负债期初", dataIndex: "opening_liability", width: 130, align: "right" as const, render: fmtNum },
+        { title: "负债利息", dataIndex: "interest_expense", width: 110, align: "right" as const, render: fmtNum },
+        { title: "负债付款", dataIndex: "payment", width: 110, align: "right" as const, render: fmtNum },
         { title: "先付租金", dataIndex: "prepaid_payment", width: 110, align: "right" as const, render: fmtNum },
-        { title: "调整", dataIndex: "liability_adjustment", width: 110, align: "right" as const, render: fmtNum },
-        { title: "期末", dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
+        { title: "负债调整", dataIndex: "liability_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: "负债期末", dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
       ],
     },
     {
       title: "使用权资产 Roll-forward",
       children: [
-        { title: "期初", dataIndex: "opening_rou_asset", width: 130, align: "right" as const, render: fmtNum },
-        { title: "折旧", dataIndex: "depreciation", width: 100, align: "right" as const, render: fmtNum },
-        { title: "减值", dataIndex: "impairment", width: 100, align: "right" as const, render: fmtNum },
-        { title: "调整", dataIndex: "rou_adjustment", width: 110, align: "right" as const, render: fmtNum },
-        { title: "期末", dataIndex: "closing_rou_asset", width: 130, align: "right" as const, render: fmtNum },
+        { title: "资产期初", dataIndex: "opening_rou_asset", width: 130, align: "right" as const, render: fmtNum },
+        { title: "资产折旧", dataIndex: "depreciation", width: 100, align: "right" as const, render: fmtNum },
+        { title: "资产减值", dataIndex: "impairment", width: 100, align: "right" as const, render: fmtNum },
+        { title: "资产调整", dataIndex: "rou_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: "资产期末", dataIndex: "closing_rou_asset", width: 130, align: "right" as const, render: fmtNum },
       ],
     },
     {

@@ -274,6 +274,15 @@ export const aiChatApi = {
     file_id?: string;
     object_name?: string;
     content_type?: string;
+    page_context?: {
+      page?: string;
+      title?: string;
+      contract_id?: string;
+      period?: string;
+      report_view?: string;
+      filters?: Record<string, string>;
+      summary?: string;
+    };
   }, token: string) =>
     apiRequest("/api/v1/ai/chat", {
       method: "POST",
@@ -289,6 +298,61 @@ export const reportApi = {
 
   contractSummary: (mode: "working" | "official", token: string) =>
     apiRequest(`/api/v1/reports/contract-summary?mode=${mode}`, { token }),
+
+  tags: (token: string) =>
+    apiRequest(`/api/v1/reports/tags`, { token }),
+
+  tagSummary: (token: string) =>
+    apiRequest(`/api/v1/reports/tags/summary`, { token }),
+
+  amortization: (params: {
+    mode: "working" | "official";
+    view: "contract" | "store" | "tag" | "summary";
+    granularity: "day" | "month" | "quarter" | "half_year" | "year";
+    start_date: string;
+    end_date: string;
+    contract_id?: string;
+    store?: string;
+    tag?: string;
+    tags?: string[];
+    discount_rate_override?: number;
+    report_currency?: string;
+    exchange_rate?: number;
+  }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === "") return;
+      if (Array.isArray(v)) {
+        v.forEach((item) => qs.append(k, String(item)));
+      } else {
+        qs.append(k, String(v));
+      }
+    });
+    return apiRequest(`/api/v1/reports/amortization?${qs.toString()}`, { token });
+  },
+
+  cashflowForecast: (params: {
+    mode: "working" | "official";
+    view: "contract" | "store" | "summary";
+    granularity: "month" | "quarter" | "year";
+    start_date: string;
+    end_date: string;
+    contract_id?: string;
+    store?: string;
+    tag?: string;
+    tags?: string[];
+  }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v === undefined || v === "") return;
+      if (Array.isArray(v)) {
+        v.forEach((item) => qs.append(k, String(item)));
+      } else {
+        qs.append(k, String(v));
+      }
+    });
+    return apiRequest(`/api/v1/reports/cashflow-forecast?${qs.toString()}`, { token });
+  },
 };
 
 // AI APIs
@@ -345,4 +409,16 @@ export const auditApi = {
     });
     return apiRequest(`/api/v1/audit-logs?${qs.toString()}`, { token });
   },
+};
+
+// Settings APIs
+export const settingsApi = {
+  getGlobal: (token: string) =>
+    apiRequest(`/api/v1/settings/global`, { token }),
+  updateGlobal: (data: { global_discount_rate: number }, token: string) =>
+    apiRequest(`/api/v1/settings/global`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+      token,
+    }),
 };

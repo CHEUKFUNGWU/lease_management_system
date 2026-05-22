@@ -10,17 +10,18 @@ import (
 )
 
 type CalculationHandler struct {
-	contractRepo *repository.ContractRepository
-	psRepo       *repository.PaymentScheduleRepository
+	contractRepo       *repository.ContractRepository
+	psRepo             *repository.PaymentScheduleRepository
+	systemSettingRepo  *repository.SystemSettingRepository
 }
 
-func NewCalculationHandler(contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository) *CalculationHandler {
-	return &CalculationHandler{contractRepo: contractRepo, psRepo: psRepo}
+func NewCalculationHandler(contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository, systemSettingRepo *repository.SystemSettingRepository) *CalculationHandler {
+	return &CalculationHandler{contractRepo: contractRepo, psRepo: psRepo, systemSettingRepo: systemSettingRepo}
 }
 
 type CalculateRequest struct {
 	ContractID   string  `json:"contract_id" binding:"required,uuid"`
-	DiscountRate float64 `json:"discount_rate" binding:"required,gt=0,lte=1"`
+	DiscountRate float64 `json:"discount_rate" binding:"omitempty,gt=0,lte=1"`
 }
 
 type CalculateResponse struct {
@@ -84,11 +85,31 @@ func (h *CalculationHandler) Calculate(c *gin.Context) {
 		payments = repository.ToIFRS16Payments(schedules)
 	}
 	
+	// Determine discount rate priority:
+	// 1) explicit request override
+	// 2) global system setting
+	// 3) contract.DiscountRateValue
+	// 4) fallback 0.05
+	discountRate := req.DiscountRate
+	if discountRate <= 0 {
+		discountRate = resolveGlobalDiscountRate(c.Request.Context(), h.systemSettingRepo)
+	}
+	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
+		discountRate = *contract.DiscountRateValue
+	}
+	if discountRate <= 0 {
+		discountRate = 0.05
+	}
+
 	calculation := ifrs16svc.LeaseCalculation{
 		CommencementDate: contract.CommencementDate,
 		LeaseEndDate:     contract.LeaseEndDate,
-		DiscountRate:     req.DiscountRate,
+		DiscountRate:     discountRate,
 		Payments:         payments,
+		PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
+			CommencementDate: contract.CommencementDate,
+			Payments:         payments,
+		}),
 	}
 	
 	result, err := ifrs16svc.Calculate(calculation)

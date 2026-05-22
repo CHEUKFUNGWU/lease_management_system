@@ -41,6 +41,7 @@ func main() {
 	eventRepo := repository.NewEventRepository(database.Pool)
 	mcRepo := repository.NewMonthlyClosingRepository(database.Pool)
 	auditRepo := repository.NewAuditRepository(database.Pool)
+	systemSettingRepo := repository.NewSystemSettingRepository(database.Pool)
 	
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
@@ -48,14 +49,15 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo)
 	contractHandler := handlers.NewContractHandler(contractRepo, auditLogger)
-	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo)
+	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo, systemSettingRepo)
 	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
 	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
-	reportHandler := handlers.NewReportHandler(contractRepo, psRepo)
-	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, auditLogger)
-	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, psRepo, auditLogger)
+	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo)
+	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, auditLogger)
+	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger)
 	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
+	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -170,6 +172,10 @@ func main() {
 		api.GET("/reports/liability-rolling", reportHandler.LiabilityRolling)
 		api.GET("/reports/liability-rolling/export", reportHandler.ExportLiabilityRolling)
 		api.GET("/reports/contract-summary", reportHandler.ContractSummary)
+		api.GET("/reports/amortization", reportHandler.Amortization)
+		api.GET("/reports/tags", reportHandler.Tags)
+		api.GET("/reports/tags/summary", reportHandler.TagSummary)
+		api.GET("/reports/cashflow-forecast", reportHandler.CashflowForecast)
 		
 		// Monthly Closing
 		api.POST("/monthly-closing/generate", monthlyClosingHandler.Generate)
@@ -201,6 +207,10 @@ func main() {
 		// Roles & Permissions
 		api.GET("/roles", handlers.ListRoles(roleRepo))
 		api.GET("/my-permissions", handlers.GetMyPermissions(roleRepo))
+
+		// Global Settings
+		api.GET("/settings/global", settingsHandler.GetGlobal)
+		api.PUT("/settings/global", settingsHandler.UpdateGlobal)
 	}
 	
 	port := cfg.Port

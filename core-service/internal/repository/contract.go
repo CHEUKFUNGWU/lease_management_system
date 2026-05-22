@@ -36,6 +36,7 @@ type Contract struct {
 	TerminationAssessment        *bool   `json:"termination_assessment"`
 	DiscountRateType             *string `json:"discount_rate_type"`
 	DiscountRateVersion          *string `json:"discount_rate_version"`
+	DiscountRateValue            *float64 `json:"discount_rate_value"`
 	DiscountRateMissing          bool    `json:"discount_rate_missing"`
 	DiscountRateSource           *string `json:"discount_rate_source"`
 	DiscountRatePolicyID         *string `json:"discount_rate_policy_id"`
@@ -84,7 +85,7 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 			commencement_date, lease_start_date, lease_end_date,
 			original_non_cancellable_period, renewal_option_description,
 			termination_option_description, renewal_assessment,
-			termination_assessment, discount_rate_type, discount_rate_version,
+			termination_assessment, discount_rate_type, discount_rate_version, discount_rate_value,
 			status, created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, draft_version_no,
 			included_in_reporting, report_mode, reviewed_by, reviewed_at,
@@ -93,7 +94,7 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 			discount_rate_confirmed_by, discount_rate_confirmed_at,
 			ai_extracted_discount_rate, ai_suggested_rate_policies,
 			ai_confidence_score, source_reference_locator, approved_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50)
 		RETURNING approval_status, is_official_version, draft_version_no,
 			included_in_reporting, report_mode
 	`
@@ -108,7 +109,7 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 		contract.LeaseEndDate, contract.OriginalNonCancellablePeriod,
 		contract.RenewalOptionDescription, contract.TerminationOptionDescription,
 		contract.RenewalAssessment, contract.TerminationAssessment,
-		contract.DiscountRateType, contract.DiscountRateVersion,
+		contract.DiscountRateType, contract.DiscountRateVersion, contract.DiscountRateValue,
 		contract.Status, contract.CreatedBy, contract.ApprovedBy,
 		contract.CreatedAt, contract.UpdatedAt,
 		contract.ApprovalStatus, contract.IsOfficialVersion, contract.DraftVersionNo,
@@ -153,14 +154,14 @@ func (r *ContractRepository) List(ctx context.Context, legalEntityID string, fil
 	// Build SELECT column list (reusable)
 	sel := `
 		SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-			lessee_name, lessor_name, store_name, store_address, tags,
+			COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
 			asset_category, property_category, currency, signing_date,
 			commencement_date, lease_start_date, lease_end_date, status,
 			created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, draft_version_no,
 			included_in_reporting, report_mode, reviewed_by, reviewed_at,
 			rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
-			discount_rate_missing, discount_rate_source, discount_rate_policy_id,
+			discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
 			discount_rate_confirmed_by, discount_rate_confirmed_at,
 			ai_extracted_discount_rate, ai_suggested_rate_policies,
 			ai_confidence_score, source_reference_locator, approved_at
@@ -237,7 +238,7 @@ func (r *ContractRepository) List(ctx context.Context, legalEntityID string, fil
 			&c.ApprovalStatus, &c.IsOfficialVersion, &c.DraftVersionNo,
 			&c.IncludedInReporting, &c.ReportMode, &c.ReviewedBy, &c.ReviewedAt,
 			&c.RejectedReason, &c.SubmittedAt, &c.DiscountRateType, &c.DiscountRateVersion,
-			&c.DiscountRateMissing, &c.DiscountRateSource, &c.DiscountRatePolicyID,
+			&c.DiscountRateValue, &c.DiscountRateMissing, &c.DiscountRateSource, &c.DiscountRatePolicyID,
 			&c.DiscountRateConfirmedBy, &c.DiscountRateConfirmedAt,
 			&c.AIExtractedDiscountRate, &c.AISuggestedRatePolicies,
 			&c.AIConfidenceScore, &c.SourceReferenceLocator, &c.ApprovedAt,
@@ -266,14 +267,14 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 	if legalEntityID != "" {
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-				lessee_name, lessor_name, store_name, store_address, tags,
+				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
 				asset_category, property_category, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
 				included_in_reporting, report_mode, reviewed_by, reviewed_at,
 				rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
-				discount_rate_missing, discount_rate_source, discount_rate_policy_id,
+				discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
 				discount_rate_confirmed_by, discount_rate_confirmed_at,
 				ai_extracted_discount_rate, ai_suggested_rate_policies,
 				ai_confidence_score, source_reference_locator, approved_at
@@ -285,14 +286,14 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 	} else {
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-				lessee_name, lessor_name, store_name, store_address, tags,
+				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
 				asset_category, property_category, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
 				included_in_reporting, report_mode, reviewed_by, reviewed_at,
 				rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
-				discount_rate_missing, discount_rate_source, discount_rate_policy_id,
+				discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
 				discount_rate_confirmed_by, discount_rate_confirmed_at,
 				ai_extracted_discount_rate, ai_suggested_rate_policies,
 				ai_confidence_score, source_reference_locator, approved_at
@@ -323,7 +324,7 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 			&c.ApprovalStatus, &c.IsOfficialVersion, &c.DraftVersionNo,
 			&c.IncludedInReporting, &c.ReportMode, &c.ReviewedBy, &c.ReviewedAt,
 			&c.RejectedReason, &c.SubmittedAt, &c.DiscountRateType, &c.DiscountRateVersion,
-			&c.DiscountRateMissing, &c.DiscountRateSource, &c.DiscountRatePolicyID,
+			&c.DiscountRateValue, &c.DiscountRateMissing, &c.DiscountRateSource, &c.DiscountRatePolicyID,
 			&c.DiscountRateConfirmedBy, &c.DiscountRateConfirmedAt,
 			&c.AIExtractedDiscountRate, &c.AISuggestedRatePolicies,
 			&c.AIConfidenceScore, &c.SourceReferenceLocator, &c.ApprovedAt,
@@ -333,7 +334,7 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 		}
 		contracts = append(contracts, c)
 	}
-	
+
 	return contracts, nil
 }
 
@@ -379,13 +380,14 @@ func (r *ContractRepository) Update(ctx context.Context, contract *Contract, leg
 			lease_end_date = $15,
 			discount_rate_type = $16,
 			discount_rate_version = $17,
-			discount_rate_missing = $18,
-			discount_rate_source = $19,
-			discount_rate_policy_id = $20,
-			status = $21,
-			updated_by = $22,
+			discount_rate_value = $18,
+			discount_rate_missing = $19,
+			discount_rate_source = $20,
+			discount_rate_policy_id = $21,
+			status = $22,
+			updated_by = $23,
 			updated_at = NOW()
-		WHERE id = $23`
+		WHERE id = $24`
 
 	args := []interface{}{
 		contract.ContractNumber,
@@ -405,6 +407,7 @@ func (r *ContractRepository) Update(ctx context.Context, contract *Contract, leg
 		contract.LeaseEndDate,
 		contract.DiscountRateType,
 		contract.DiscountRateVersion,
+		contract.DiscountRateValue,
 		contract.DiscountRateMissing,
 		contract.DiscountRateSource,
 		contract.DiscountRatePolicyID,
@@ -414,7 +417,7 @@ func (r *ContractRepository) Update(ctx context.Context, contract *Contract, leg
 	}
 
 	if legalEntityID != "" {
-		query += ` AND legal_entity_id = $24`
+		query += ` AND legal_entity_id = $25`
 		args = append(args, legalEntityID)
 	}
 
@@ -435,14 +438,14 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 	if legalEntityID != "" {
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-				lessee_name, lessor_name, store_name, store_address, tags,
+				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
 				asset_category, property_category, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
 				included_in_reporting, report_mode, reviewed_by, reviewed_at,
 				rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
-				discount_rate_missing, discount_rate_source, discount_rate_policy_id,
+				discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
 				discount_rate_confirmed_by, discount_rate_confirmed_at,
 				ai_extracted_discount_rate, ai_suggested_rate_policies,
 				ai_confidence_score, source_reference_locator, approved_at
@@ -452,14 +455,14 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 	} else {
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-				lessee_name, lessor_name, store_name, store_address, tags,
+				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
 				asset_category, property_category, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
 				included_in_reporting, report_mode, reviewed_by, reviewed_at,
 				rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
-				discount_rate_missing, discount_rate_source, discount_rate_policy_id,
+				discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
 				discount_rate_confirmed_by, discount_rate_confirmed_at,
 				ai_extracted_discount_rate, ai_suggested_rate_policies,
 				ai_confidence_score, source_reference_locator, approved_at
@@ -480,7 +483,7 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 		&c.ApprovalStatus, &c.IsOfficialVersion, &c.DraftVersionNo,
 		&c.IncludedInReporting, &c.ReportMode, &c.ReviewedBy, &c.ReviewedAt,
 		&c.RejectedReason, &c.SubmittedAt, &c.DiscountRateType, &c.DiscountRateVersion,
-		&c.DiscountRateMissing, &c.DiscountRateSource, &c.DiscountRatePolicyID,
+		&c.DiscountRateValue, &c.DiscountRateMissing, &c.DiscountRateSource, &c.DiscountRatePolicyID,
 		&c.DiscountRateConfirmedBy, &c.DiscountRateConfirmedAt,
 		&c.AIExtractedDiscountRate, &c.AISuggestedRatePolicies,
 		&c.AIConfidenceScore, &c.SourceReferenceLocator, &c.ApprovedAt,

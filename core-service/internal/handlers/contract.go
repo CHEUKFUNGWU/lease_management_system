@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 	
 	"github.com/gin-gonic/gin"
@@ -43,6 +44,7 @@ type ContractRequest struct {
 	TerminationAssessment        *bool   `json:"termination_assessment"`
 	DiscountRateType             *string `json:"discount_rate_type"`
 	DiscountRateVersion          *string `json:"discount_rate_version"`
+	DiscountRateValue            *float64 `json:"discount_rate_value"`
 }
 
 // UpdateContractRequest represents the editable fields for updating a contract.
@@ -64,6 +66,47 @@ type UpdateContractRequest struct {
 	LeaseEndDate        string  `json:"lease_end_date"`
 	DiscountRateType    *string `json:"discount_rate_type"`
 	DiscountRateVersion *string `json:"discount_rate_version"`
+	DiscountRateValue   *float64 `json:"discount_rate_value"`
+}
+
+func normalizeTags(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer(",", " ", "，", " ", ";", " ", "；", " ", "|", " ", "\n", " ", "\t", " ")
+	normalized := replacer.Replace(raw)
+	parts := strings.Fields(normalized)
+	if len(parts) == 0 {
+		return ""
+	}
+	seen := make(map[string]struct{})
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		tag := strings.TrimSpace(part)
+		if tag == "" {
+			continue
+		}
+		if !strings.HasPrefix(tag, "#") {
+			tag = "#" + tag
+		}
+		if _, exists := seen[tag]; exists {
+			continue
+		}
+		seen[tag] = struct{}{}
+		result = append(result, tag)
+	}
+	return strings.Join(result, ", ")
+}
+
+func normalizeDiscountRateValue(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+	normalized := *v
+	if normalized > 1 {
+		normalized = normalized / 100
+	}
+	return &normalized
 }
 
 func (h *ContractHandler) Create(c *gin.Context) {
@@ -100,7 +143,7 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		LessorName:                   req.LessorName,
 		StoreName:                    req.StoreName,
 		StoreAddress:                 req.StoreAddress,
-		Tags:                         req.Tags,
+		Tags:                         normalizeTags(req.Tags),
 		AssetCategory:                req.AssetCategory,
 		PropertyCategory:             req.PropertyCategory,
 		SigningDate:                  signingDate,
@@ -110,6 +153,7 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		TerminationAssessment:        req.TerminationAssessment,
 		DiscountRateType:             req.DiscountRateType,
 		DiscountRateVersion:          req.DiscountRateVersion,
+		DiscountRateValue:            normalizeDiscountRateValue(req.DiscountRateValue),
 		CreatedBy:                    createdBy,
 	}
 
@@ -256,7 +300,7 @@ func (h *ContractHandler) Update(c *gin.Context) {
 		LessorName:            req.LessorName,
 		StoreName:             req.StoreName,
 		StoreAddress:          req.StoreAddress,
-		Tags:                  req.Tags,
+		Tags:                  normalizeTags(req.Tags),
 		Currency:              req.Currency,
 		SigningDate:           signingDate,
 		CommencementDate:      commencementDate,
@@ -264,6 +308,7 @@ func (h *ContractHandler) Update(c *gin.Context) {
 		LeaseEndDate:          leaseEndDate,
 		DiscountRateType:      req.DiscountRateType,
 		DiscountRateVersion:   req.DiscountRateVersion,
+		DiscountRateValue:     normalizeDiscountRateValue(req.DiscountRateValue),
 		Status:                existing.Status,
 	}
 

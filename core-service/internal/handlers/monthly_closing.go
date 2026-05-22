@@ -13,21 +13,22 @@ import (
 )
 
 type MonthlyClosingHandler struct {
-	mcRepo       *repository.MonthlyClosingRepository
-	contractRepo *repository.ContractRepository
-	psRepo       *repository.PaymentScheduleRepository
-	auditLogger  *audit.Logger
+	mcRepo            *repository.MonthlyClosingRepository
+	contractRepo      *repository.ContractRepository
+	psRepo            *repository.PaymentScheduleRepository
+	systemSettingRepo *repository.SystemSettingRepository
+	auditLogger       *audit.Logger
 }
 
-func NewMonthlyClosingHandler(mcRepo *repository.MonthlyClosingRepository, contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository, auditLogger *audit.Logger) *MonthlyClosingHandler {
-	return &MonthlyClosingHandler{mcRepo: mcRepo, contractRepo: contractRepo, psRepo: psRepo, auditLogger: auditLogger}
+func NewMonthlyClosingHandler(mcRepo *repository.MonthlyClosingRepository, contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository, systemSettingRepo *repository.SystemSettingRepository, auditLogger *audit.Logger) *MonthlyClosingHandler {
+	return &MonthlyClosingHandler{mcRepo: mcRepo, contractRepo: contractRepo, psRepo: psRepo, systemSettingRepo: systemSettingRepo, auditLogger: auditLogger}
 }
 
 type GenerateMonthlyClosingRequest struct {
 	AccountingPeriod string `json:"accounting_period" binding:"required"`
 	ContractID       string `json:"contract_id" binding:"omitempty,uuid"`
 	LegalEntityID    string `json:"legal_entity_id" binding:"omitempty,uuid"`
-	DiscountRate     float64 `json:"discount_rate" binding:"required,gt=0,lte=1"`
+	DiscountRate     float64 `json:"discount_rate" binding:"omitempty,gt=0,lte=1"`
 }
 
 // Generate creates measurement results and journal entries for a given period
@@ -111,12 +112,32 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 			payments = repository.ToIFRS16Payments(schedules)
 		}
 		
+		// Determine discount rate priority:
+		// 1) request override
+		// 2) global system setting
+		// 3) contract value
+		// 4) fallback 0.05
+		discountRate := req.DiscountRate
+		if discountRate <= 0 {
+			discountRate = resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
+		}
+		if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
+			discountRate = *contract.DiscountRateValue
+		}
+		if discountRate <= 0 {
+			discountRate = 0.05
+		}
+
 		// Run IFRS 16 calculation
 		calculation := ifrs16svc.LeaseCalculation{
 			CommencementDate: contract.CommencementDate,
 			LeaseEndDate:     contract.LeaseEndDate,
-			DiscountRate:     req.DiscountRate,
+			DiscountRate:     discountRate,
 			Payments:         payments,
+			PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
+				CommencementDate: contract.CommencementDate,
+				Payments:         payments,
+			}),
 		}
 		
 		result, err := ifrs16svc.Calculate(calculation)
@@ -155,7 +176,7 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 			OpeningROUAsset:  monthlyEntry.OpeningROUAsset,
 			Depreciation:     monthlyEntry.Depreciation,
 			ClosingROUAsset:  monthlyEntry.ClosingROUAsset,
-			DiscountRate:     req.DiscountRate,
+			DiscountRate:     discountRate,
 			IsCalculated:     true,
 			CalculationBatchID: &batchID,
 			CalculatedAt:     &now,

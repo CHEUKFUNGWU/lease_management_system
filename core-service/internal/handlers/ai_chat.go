@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +27,16 @@ func NewAIChatHandler(contractRepo *repository.ContractRepository, mcRepo *repos
 	return &AIChatHandler{contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo}
 }
 
+type PageContext struct {
+	Page       string            `json:"page,omitempty"`
+	Title      string            `json:"title,omitempty"`
+	ContractID string            `json:"contract_id,omitempty"`
+	Period     string            `json:"period,omitempty"`
+	ReportView string            `json:"report_view,omitempty"`
+	Filters    map[string]string `json:"filters,omitempty"`
+	Summary    string            `json:"summary,omitempty"`
+}
+
 type AIChatRequest struct {
 	Message     string        `json:"message" binding:"required"`
 	ContractID  string        `json:"contract_id,omitempty"`
@@ -33,6 +44,7 @@ type AIChatRequest struct {
 	FileID      string        `json:"file_id,omitempty"`
 	ObjectName  string        `json:"object_name,omitempty"`
 	ContentType string        `json:"content_type,omitempty"`
+	PageContext *PageContext  `json:"page_context,omitempty"`
 }
 
 type ChatMessage struct {
@@ -72,6 +84,12 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	var sources []Source
 	var contextData strings.Builder
 
+	// Resolve effective contract ID: explicit req.ContractID takes priority over page context
+	effectiveContractID := req.ContractID
+	if effectiveContractID == "" && req.PageContext != nil && req.PageContext.ContractID != "" {
+		effectiveContractID = req.PageContext.ContractID
+	}
+
 	// 1. Handle file upload if present — keep existing parse behavior
 	if req.FileID != "" && req.ObjectName != "" {
 		parsed, err := h.parseFile(c, req.FileID, req.ObjectName, req.ContentType)
@@ -91,11 +109,27 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		}
 	}
 
-	// 2. Detect intent and retrieve permission-filtered data
+	// 2. Page-context-aware data retrieval
+	// 2a. Contract detail context: always retrieve full contract data regardless of message keywords
+	if effectiveContractID != "" {
+		h.retrieveContractDetail(ctx, effectiveContractID, legalEntityID, &contextData, &sources)
+	}
+
+	// 2b. Reports page context
+	if req.PageContext != nil && req.PageContext.Page == "reports" {
+		h.appendReportsContext(req.PageContext, &contextData)
+	}
+
+	// 2c. Monthly closing page context
+	if req.PageContext != nil && req.PageContext.Page == "monthly-closing" {
+		h.appendMonthlyClosingContext(ctx, req.PageContext, &contextData, &sources)
+	}
+
+	// 3. Keyword-based retrieval (backward compatible, works alongside page context)
 	msgLower := strings.ToLower(req.Message)
 
-	// Contract queries
-	if containsAny(msgLower, []string{"合同", "租赁", "门店", "承租", "出租", "lease", "contract"}) {
+	// Contract list queries (only if no specific contract ID is resolved)
+	if effectiveContractID == "" && containsAny(msgLower, []string{"合同", "租赁", "门店", "承租", "出租", "lease", "contract"}) {
 		contracts, err := h.contractRepo.GetAll(ctx, legalEntityID)
 		if err == nil && len(contracts) > 0 {
 			contextData.WriteString(fmt.Sprintf("\n## 合同数据（共 %d 份）\n", len(contracts)))
@@ -113,8 +147,8 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		}
 	}
 
-	// Measurement / liability / depreciation queries
-	if containsAny(msgLower, []string{"负债", "折旧", "利息", "摊销", "rou", "计量", "measurement", "depreciation", "liability"}) {
+	// Measurement / liability / depreciation queries (only if contract detail context hasn't already loaded them)
+	if effectiveContractID == "" && containsAny(msgLower, []string{"负债", "折旧", "利息", "摊销", "rou", "计量", "measurement", "depreciation", "liability"}) {
 		if req.ContractID != "" {
 			results, err := h.mcRepo.GetMeasurementResults(ctx, req.ContractID, "")
 			if err == nil && len(results) > 0 {
@@ -134,8 +168,8 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		}
 	}
 
-	// Journal entry queries
-	if containsAny(msgLower, []string{"分录", "journal", "会计", "过账", "post", "voucher", "entry", "凭证"}) {
+	// Journal entry queries (only if contract detail context hasn't already loaded them)
+	if effectiveContractID == "" && containsAny(msgLower, []string{"分录", "journal", "会计", "过账", "post", "voucher", "entry", "凭证"}) {
 		if req.ContractID != "" {
 			entries, err := h.mcRepo.GetJournalEntries(ctx, req.ContractID, "", "")
 			if err == nil && len(entries) > 0 {
@@ -159,8 +193,8 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		}
 	}
 
-	// Event queries
-	if containsAny(msgLower, []string{"事件", "变更", "modification", "reassessment", "impairment", "event", "change"}) {
+	// Event queries (only if contract detail context hasn't already loaded them)
+	if effectiveContractID == "" && containsAny(msgLower, []string{"事件", "变更", "modification", "reassessment", "impairment", "event", "change"}) {
 		if req.ContractID != "" {
 			events, err := h.eventRepo.GetByContractID(ctx, req.ContractID)
 			if err == nil && len(events) > 0 {
@@ -183,7 +217,7 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		}
 	}
 
-	// 3. If no context was built and no file was parsed, provide helpful guidance
+	// 4. If no context was built and no file was parsed, provide helpful guidance
 	if contextData.Len() == 0 {
 		contextData.WriteString(`
 ## 系统信息
@@ -194,21 +228,14 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 `)
 	}
 
-	// 4. Build system prompt
-	systemPrompt := fmt.Sprintf(`你是 IFRS 16 租赁管理系统的 AI 助手。你只能基于以下系统数据回答问题，不能编造信息。
+	// 5. Build system prompt
+	isWorkingData := false
+	if req.PageContext != nil && (req.PageContext.ReportView == "working" || req.PageContext.Page == "monthly-closing") {
+		isWorkingData = true
+	}
+	systemPrompt := h.buildSystemPrompt(userIDStr, roleStr, legalEntityID, contextData.String(), isWorkingData)
 
-当前用户: %s
-角色: %s
-可访问法人: %s
-
-%s
-
-请用中文回答。回答要求：
-1. 对于引用的每个事实，请在括号中标注数据来源，格式为「（来源：合同 LEASE-XXXX-XXXX）」或「（来源：计量结果 2024-01）」。
-2. 如果系统数据不足以回答问题，请明确告知用户「根据当前系统数据，我无法回答这个问题」。
-3. 回答应简洁专业，适合财务和审计人员阅读。`, userIDStr, roleStr, legalEntityID, contextData.String())
-
-	// 5. Call AI Service
+	// 6. Call AI Service
 	answer, modelName, err := h.callLLM(c, systemPrompt, req.Message, req.History)
 	if err != nil {
 		// Fallback: return context data without LLM if AI Service is unavailable
@@ -223,7 +250,8 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		return
 	}
 
-	// 6. Extract sources from answer and merge with context sources
+	// 7. Extract sources from answer and merge with context sources.
+	// If no source citations found in the answer, fall back to all known sources.
 	extractedSources := extractSourcesFromAnswer(answer, sources)
 
 	c.JSON(http.StatusOK, AIChatResponse{
@@ -233,6 +261,208 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		IsOfficial: false,
 		Model:      modelName,
 	})
+}
+
+// retrieveContractDetail fetches and appends contract basic info, latest measurements,
+// events, and latest journal entries for a given contract ID.
+func (h *AIChatHandler) retrieveContractDetail(ctx context.Context, contractID, legalEntityID string, contextData *strings.Builder, sources *[]Source) {
+	// Contract basic info
+	contract, err := h.contractRepo.GetByID(ctx, contractID, legalEntityID)
+	if err == nil && contract != nil {
+		contextData.WriteString(fmt.Sprintf("\n## 合同详情\n- ID: %s\n- 编号: %s\n- 名称: %s\n- 状态: %s\n- 审批状态: %s\n- 承租方: %s\n- 出租方: %s\n- 门店: %s\n- 币种: %s\n",
+			contract.ID, contract.ContractNumber, contract.ContractName,
+			contract.ApprovalStatus, contract.Status, contract.LesseeName,
+			contract.LessorName, contract.StoreName, contract.Currency))
+		if contract.CommencementDate.Year() > 1 {
+			contextData.WriteString(fmt.Sprintf("- 租赁开始日: %s\n", contract.CommencementDate.Format("2006-01-02")))
+		}
+		if contract.LeaseEndDate.Year() > 1 {
+			contextData.WriteString(fmt.Sprintf("- 租赁结束日: %s\n", contract.LeaseEndDate.Format("2006-01-02")))
+		}
+		if contract.DiscountRateValue != nil {
+			contextData.WriteString(fmt.Sprintf("- 折现率: %.4f%%\n", *contract.DiscountRateValue*100))
+		}
+		if contract.DiscountRateMissing {
+			contextData.WriteString("- ⚠️ 折现率缺失，需要人工补充\n")
+		}
+		*sources = append(*sources, Source{
+			Type:    "contract",
+			ID:      contract.ID,
+			Title:   contract.ContractName,
+			Snippet: fmt.Sprintf("编号: %s, 状态: %s", contract.ContractNumber, contract.ApprovalStatus),
+		})
+	}
+
+	// Latest measurement results
+	results, err := h.mcRepo.GetMeasurementResults(ctx, contractID, "")
+	if err == nil && len(results) > 0 {
+		contextData.WriteString(fmt.Sprintf("\n## 计量结果（合同 %s，共 %d 期）\n", contractID, len(results)))
+		for _, r := range results {
+			contextData.WriteString(fmt.Sprintf("- 期间: %s, 期初负债: %.2f, 期末负债: %.2f, 利息: %.2f, 本金偿还: %.2f, 折旧: %.2f, 期末ROU: %.2f\n",
+				r.AccountingPeriod, r.OpeningLiability, r.ClosingLiability, r.InterestExpense,
+				r.PrincipalRepayment, r.Depreciation, r.ClosingROUAsset))
+		}
+		*sources = append(*sources, Source{
+			Type:    "measurement",
+			ID:      contractID,
+			Title:   "计量结果",
+			Snippet: fmt.Sprintf("合同 %s 共 %d 期", contractID, len(results)),
+		})
+	}
+
+	// Events for this contract
+	events, err := h.eventRepo.GetByContractID(ctx, contractID)
+	if err == nil && len(events) > 0 {
+		contextData.WriteString(fmt.Sprintf("\n## 变更事件（合同 %s，共 %d 条）\n", contractID, len(events)))
+		for _, ev := range events {
+			reason := ""
+			if ev.ChangeReason != nil {
+				reason = *ev.ChangeReason
+			}
+			contextData.WriteString(fmt.Sprintf("- 类型: %s, 生效日: %s, 状态: %s, 审批状态: %s, 原因: %s\n",
+				ev.EventType, ev.EffectiveDate.Format("2006-01-02"), ev.Status, ev.ApprovalStatus, reason))
+		}
+		*sources = append(*sources, Source{
+			Type:    "event",
+			ID:      contractID,
+			Title:   "变更事件",
+			Snippet: fmt.Sprintf("合同 %s 共 %d 条", contractID, len(events)),
+		})
+	}
+
+	// Latest journal entries for this contract
+	entries, err := h.mcRepo.GetJournalEntries(ctx, contractID, "", "")
+	if err == nil && len(entries) > 0 {
+		contextData.WriteString(fmt.Sprintf("\n## 会计分录（合同 %s，共 %d 条）\n", contractID, len(entries)))
+		for _, e := range entries {
+			desc := ""
+			if e.Description != nil {
+				desc = *e.Description
+			}
+			contextData.WriteString(fmt.Sprintf("- 期间: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
+				e.AccountingPeriod, e.EntryType, e.DebitAccount, e.CreditAccount,
+				e.Amount, e.Currency, e.PostingStatus, desc))
+		}
+		*sources = append(*sources, Source{
+			Type:    "journal",
+			ID:      contractID,
+			Title:   "会计分录",
+			Snippet: fmt.Sprintf("合同 %s 共 %d 条", contractID, len(entries)),
+		})
+	}
+}
+
+// appendReportsContext appends report page context info from the frontend payload.
+// It does not query the reports endpoint internally; it uses the provided context only.
+func (h *AIChatHandler) appendReportsContext(pc *PageContext, contextData *strings.Builder) {
+	contextData.WriteString("\n## 当前报表上下文\n")
+	if pc.Title != "" {
+		contextData.WriteString(fmt.Sprintf("- 报表标题: %s\n", pc.Title))
+	}
+	if pc.ReportView != "" {
+		contextData.WriteString(fmt.Sprintf("- 报表口径: %s\n", pc.ReportView))
+	}
+	if pc.Period != "" {
+		contextData.WriteString(fmt.Sprintf("- 覆盖期间: %s\n", pc.Period))
+	}
+	if len(pc.Filters) > 0 {
+		contextData.WriteString("- 筛选条件:\n")
+		for k, v := range pc.Filters {
+			contextData.WriteString(fmt.Sprintf("  - %s: %s\n", k, v))
+		}
+	}
+	if pc.Summary != "" {
+		contextData.WriteString(fmt.Sprintf("- 摘要: %s\n", pc.Summary))
+	}
+}
+
+// appendMonthlyClosingContext appends monthly closing page context and queries
+// journal entries for the selected period if provided.
+func (h *AIChatHandler) appendMonthlyClosingContext(ctx context.Context, pc *PageContext, contextData *strings.Builder, sources *[]Source) {
+	contextData.WriteString("\n## 当前结账中心上下文\n")
+	if pc.Period != "" {
+		contextData.WriteString(fmt.Sprintf("- 选定期间: %s\n", pc.Period))
+	}
+	if pc.Summary != "" {
+		contextData.WriteString(fmt.Sprintf("- 摘要: %s\n", pc.Summary))
+	}
+
+	if pc.Period != "" {
+		entries, err := h.mcRepo.GetJournalEntries(ctx, "", pc.Period, "")
+		if err == nil && len(entries) > 0 {
+			showCount := len(entries)
+			if showCount > 20 {
+				showCount = 20
+			}
+			postedCount := 0
+			for _, e := range entries {
+				if e.PostingStatus == "posted" {
+					postedCount++
+				}
+			}
+			contextData.WriteString(fmt.Sprintf("\n### 期间 %s 的会计分录（共 %d 条，显示前 %d 条）\n", pc.Period, len(entries), showCount))
+			for i, e := range entries {
+				if i >= showCount {
+					break
+				}
+				desc := ""
+				if e.Description != nil {
+					desc = *e.Description
+				}
+				contextData.WriteString(fmt.Sprintf("- 合同: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
+					e.ContractID, e.EntryType, e.DebitAccount, e.CreditAccount,
+					e.Amount, e.Currency, e.PostingStatus, desc))
+			}
+			contextData.WriteString(fmt.Sprintf("\n汇总: 共 %d 条分录，其中 %d 条已过账\n", len(entries), postedCount))
+			*sources = append(*sources, Source{
+				Type:    "journal",
+				ID:      pc.Period,
+				Title:   fmt.Sprintf("期间 %s 会计分录", pc.Period),
+				Snippet: fmt.Sprintf("共 %d 条", len(entries)),
+			})
+		}
+	}
+}
+
+// buildSystemPrompt constructs the structured system prompt for the LLM.
+func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextData string, isWorkingData bool) string {
+	workingWarning := ""
+	if isWorkingData {
+		workingWarning = "\n⚠️ 注意：当前页面展示的是 Working/试算数据，这不是 Official 口径，请在回答中提醒用户。\n"
+	}
+
+	return fmt.Sprintf(`你是 IFRS 16 租赁管理系统的 AI 助手。你只能基于以下系统数据回答问题，不能编造信息。
+
+当前用户: %s
+角色: %s
+可访问法人: %s
+%s
+%s
+
+请用中文回答，并严格遵循以下结构：
+
+【结论】
+用 1-3 句话给出直接回答。
+
+【依据】
+逐条列出支撑结论的事实，每条标注来源，格式为：
+- ...（来源：合同 LEASE-XXXX-XXXX）
+- ...（来源：计量结果 2024-01）
+- ...（来源：会计分录 2024-01）
+
+【建议动作】
+根据数据和结论，给出具体可执行的建议操作，例如：
+- 去补折现率
+- 去执行重算
+- 去查看摊销报表
+- 去审批待处理事件
+- 无需操作，数据正常
+
+规则：
+- 只能基于提供的系统数据回答，不得编造任何不在上下文中的数字、日期或事实
+- 数据不足时明确说"根据当前系统数据，我无法确认"，并说明缺少哪类数据
+- 如果是 Working 数据或页面试算数据，要提醒"这不是 Official 口径"
+- 建议动作应尽量具体，直接指向系统中的操作页面`, userID, role, legalEntityID, workingWarning, contextData)
 }
 
 // callLLM sends the prompt and message history to the AI Service chat endpoint.

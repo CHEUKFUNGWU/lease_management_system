@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Form,
   Input,
+  InputNumber,
   Button,
   Card,
   DatePicker,
@@ -19,6 +20,7 @@ import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { contractApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import { normalizeTagValues, DEFAULT_TAG_SUGGESTIONS } from "../../lib/tags";
 
 export default function NewContractPage() {
   const [form] = Form.useForm();
@@ -55,6 +57,8 @@ export default function NewContractPage() {
         property_category: values.property_category,
         discount_rate_type: values.discount_rate_type,
         discount_rate_version: values.discount_rate_version,
+        discount_rate_value: values.discount_rate_value ?? null,
+        tags: normalizeTagValues(values.tags),
         discount_rate_missing: !values.discount_rate_type,
       };
 
@@ -172,6 +176,22 @@ export default function NewContractPage() {
             </Form.Item>
 
             <Form.Item
+              label="标签"
+              name="tags"
+              tooltip="用于报表按标签汇总，例如 #华东 #直营 #旗舰店"
+            >
+              <Select
+                mode="tags"
+                tokenSeparators={[",", "，", ";", "；", " ", "|"]}
+                placeholder="输入标签后回车，例如 #华东、#直营、#旗舰店"
+                options={DEFAULT_TAG_SUGGESTIONS.map((tag) => ({
+                  value: tag,
+                  label: tag,
+                }))}
+              />
+            </Form.Item>
+
+            <Form.Item
               label="租赁起始日 (Commencement Date)"
               name="commencement_date"
               rules={[{ required: true, message: "请选择租赁起始日" }]}
@@ -203,6 +223,19 @@ export default function NewContractPage() {
                   type="info"
                   showIcon
                 />
+
+                <Form.Item
+                  label="折现率数值 (%)"
+                  name="discount_rate_value"
+                  help="可直接填写年化折现率，填写 5 会自动按 5% 处理。"
+                >
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    min={0}
+                    step={0.01}
+                    placeholder="例如 5 或 5.25"
+                  />
+                </Form.Item>
                 
                 <Form.Item
                   label="折现率类型"

@@ -102,6 +102,20 @@ def _check_critical_fields(extracted: dict) -> tuple[list, list]:
     return missing, warnings
 
 
+def _sanitize_confidence_scores(scores: dict) -> dict[str, float]:
+    """将 LLM 返回的置信度统一清洗为 float，None/空值转为 0.0。"""
+    sanitized: dict[str, float] = {}
+    for key, value in (scores or {}).items():
+        if value is None or value == "":
+            sanitized[key] = 0.0
+            continue
+        try:
+            sanitized[key] = float(value)
+        except (TypeError, ValueError):
+            sanitized[key] = 0.0
+    return sanitized
+
+
 @router.post("/parse", response_model=ParseResponse)
 async def parse_document(request: ParseRequest):
     """
@@ -223,7 +237,7 @@ async def parse_contract(request: ContractDraftRequest):
             }
         
         extracted = parsed.get("extracted_fields", {})
-        confidence = parsed.get("confidence_scores", {})
+        confidence = _sanitize_confidence_scores(parsed.get("confidence_scores", {}))
         
         # Check for discount rate missing
         dr_missing, dr_warnings = _check_discount_rate_missing(extracted)

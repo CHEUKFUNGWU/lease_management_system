@@ -47,6 +47,7 @@ import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { contractApi, paymentScheduleApi, eventApi, aiApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import { parseTagString, normalizeTagValues, DEFAULT_TAG_SUGGESTIONS } from "../../lib/tags";
 import dayjs from "dayjs";
 
 interface ContractDetail {
@@ -68,6 +69,7 @@ interface ContractDetail {
   lease_end_date: string;
   discount_rate_type?: string;
   discount_rate_version?: string;
+  discount_rate_value?: number;
   discount_rate_missing: boolean;
   status: string;
   approval_status: string;
@@ -396,9 +398,10 @@ export default function ContractDetailPage() {
   const handleCalculate = async () => {
     setCalcLoading(true);
     try {
+      const discountRate = contract?.discount_rate_value ?? 0.05;
       const data = await contractApi.calculate(
         contractId,
-        0.05, // TODO: use contract's actual discount rate
+        discountRate,
         token!
       );
       setCalcResult(data);
@@ -427,7 +430,8 @@ export default function ContractDetailPage() {
       lease_end_date: dayjs(contract.lease_end_date),
       discount_rate_type: contract.discount_rate_type || "",
       discount_rate_version: contract.discount_rate_version || "",
-      tags: contract.tags || "",
+      discount_rate_value: contract.discount_rate_value ?? null,
+      tags: parseTagString(contract.tags || ""),
     });
     setEditModalOpen(true);
   };
@@ -448,7 +452,8 @@ export default function ContractDetailPage() {
         lease_end_date: values.lease_end_date.format("YYYY-MM-DD"),
         discount_rate_type: values.discount_rate_type || null,
         discount_rate_version: values.discount_rate_version || null,
-        tags: values.tags || "",
+        discount_rate_value: values.discount_rate_value ?? null,
+        tags: normalizeTagValues(values.tags),
       };
       if (values.signing_date) {
         payload.signing_date = values.signing_date.format("YYYY-MM-DD");
@@ -872,6 +877,13 @@ export default function ContractDetailPage() {
                         >
                           IFRS 16 计算
                         </Button>
+
+                        <Button
+                          icon={<RobotOutlined />}
+                          onClick={() => router.push(`/ai-chat?page=contract-detail&title=合同详情&contract_id=${encodeURIComponent(contractId)}`)}
+                        >
+                          AI 分析
+                        </Button>
                       </Space>
                     }
                   >
@@ -883,7 +895,9 @@ export default function ContractDetailPage() {
                         {contract.currency}
                       </Descriptions.Item>
                       <Descriptions.Item label="折现率">
-                        {contract.discount_rate_missing ? (
+                        {contract.discount_rate_value != null ? (
+                          <Tag color="success">{(contract.discount_rate_value * 100).toFixed(2)}%</Tag>
+                        ) : contract.discount_rate_missing ? (
                           <Tag color="error">缺失</Tag>
                         ) : (
                           <Tag color="success">
@@ -1462,19 +1476,53 @@ export default function ContractDetailPage() {
 
             <Row gutter={16}>
               <Col span={12}>
-                <Form.Item
-                  label="覆盖开始日"
-                  name="coverage_start_date"
+                <Form.Item label="租期结束日"
+                  name="lease_end_date"
+                  rules={[{ required: true, message: "请选择租期结束日" }]}
                 >
                   <DatePicker style={{ width: "100%" }} />
                 </Form.Item>
               </Col>
               <Col span={12}>
+                <Form.Item label="折现率类型" name="discount_rate_type">
+                  <Input placeholder="例如：incremental_borrowing_rate" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
                 <Form.Item
-                  label="覆盖结束日"
-                  name="coverage_end_date"
+                  label="折现率数值 (%)"
+                  name="discount_rate_value"
+                  help="可直接填写年化折现率，填写 5 会自动按 5% 处理。"
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <InputNumber style={{ width: "100%" }} min={0} step={0.01} placeholder="例如 5 或 5.25" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="折现率版本" name="discount_rate_version">
+                  <Input placeholder="例如：v1.0" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="标签"
+                  name="tags"
+                  tooltip="用于报表按标签汇总，例如 #华东 #直营 #旗舰店"
+                >
+                  <Select
+                    mode="tags"
+                    tokenSeparators={[",", "，", ";", "；", " ", "|"]}
+                    placeholder="输入标签后回车，例如 #华东、#直营、#旗舰店"
+                    options={DEFAULT_TAG_SUGGESTIONS.map((tag) => ({
+                      value: tag,
+                      label: tag,
+                    }))}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -1713,8 +1761,20 @@ export default function ContractDetailPage() {
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item label="标签" name="tags">
-                  <Input placeholder="逗号分隔的标签" />
+                <Form.Item
+                  label="标签"
+                  name="tags"
+                  tooltip="用于报表按标签汇总，例如 #华东 #直营 #旗舰店"
+                >
+                  <Select
+                    mode="tags"
+                    tokenSeparators={[",", "，", ";", "；", " ", "|"]}
+                    placeholder="输入标签后回车，例如 #华东、#直营、#旗舰店"
+                    options={DEFAULT_TAG_SUGGESTIONS.map((tag) => ({
+                      value: tag,
+                      label: tag,
+                    }))}
+                  />
                 </Form.Item>
               </Col>
             </Row>

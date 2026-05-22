@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS lease_contracts (
     termination_assessment BOOLEAN,
     discount_rate_type VARCHAR(50),
     discount_rate_version VARCHAR(50),
+    discount_rate_value DECIMAL(10,6),
     status VARCHAR(50) NOT NULL DEFAULT 'draft',
     created_by UUID REFERENCES users(id),
     approved_by UUID REFERENCES users(id),
@@ -303,6 +304,7 @@ ALTER TABLE lease_contracts
 
 -- 5. Contract table: discount rate human-in-the-loop columns
 ALTER TABLE lease_contracts
+    ADD COLUMN IF NOT EXISTS discount_rate_value DECIMAL(10,6),
     ADD COLUMN IF NOT EXISTS discount_rate_missing BOOLEAN NOT NULL DEFAULT false,
     ADD COLUMN IF NOT EXISTS discount_rate_source VARCHAR(100),
     ADD COLUMN IF NOT EXISTS discount_rate_policy_id UUID,
@@ -546,6 +548,26 @@ DROP INDEX IF EXISTS idx_event_adjustments_contract;
 DROP INDEX IF EXISTS idx_event_adjustments_event;
 DROP TABLE IF EXISTS event_adjustments;
 ALTER TABLE lease_events DROP COLUMN IF EXISTS ifrs16_treatment;
+
+-- ============================================================================
+-- Migration 006: System Settings
+-- ============================================================================
+
+-- +goose Up
+CREATE TABLE IF NOT EXISTS system_settings (
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value TEXT NOT NULL,
+    description TEXT,
+    updated_by UUID REFERENCES users(id),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO system_settings (setting_key, setting_value, description)
+VALUES ('global_discount_rate', '0.05', '集团默认折现率（年化，小数）')
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- +goose Down
+DROP TABLE IF EXISTS system_settings;
 
 -- ============================================================================
 -- Migration 003 Down (original)

@@ -13,15 +13,16 @@ import (
 )
 
 type EventHandler struct {
-	eventRepo    *repository.EventRepository
-	contractRepo *repository.ContractRepository
-	mcRepo       *repository.MonthlyClosingRepository
-	psRepo       *repository.PaymentScheduleRepository
-	auditLogger  *audit.Logger
+	eventRepo         *repository.EventRepository
+	contractRepo      *repository.ContractRepository
+	mcRepo            *repository.MonthlyClosingRepository
+	psRepo            *repository.PaymentScheduleRepository
+	systemSettingRepo *repository.SystemSettingRepository
+	auditLogger       *audit.Logger
 }
 
-func NewEventHandler(eventRepo *repository.EventRepository, contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, psRepo *repository.PaymentScheduleRepository, auditLogger *audit.Logger) *EventHandler {
-	return &EventHandler{eventRepo: eventRepo, contractRepo: contractRepo, mcRepo: mcRepo, psRepo: psRepo, auditLogger: auditLogger}
+func NewEventHandler(eventRepo *repository.EventRepository, contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, psRepo *repository.PaymentScheduleRepository, systemSettingRepo *repository.SystemSettingRepository, auditLogger *audit.Logger) *EventHandler {
+	return &EventHandler{eventRepo: eventRepo, contractRepo: contractRepo, mcRepo: mcRepo, psRepo: psRepo, systemSettingRepo: systemSettingRepo, auditLogger: auditLogger}
 }
 
 type CreateEventRequest struct {
@@ -301,11 +302,15 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 	}
 	payments := repository.ToIFRS16Payments(schedules)
 
-	// Determine discount rate: use contract's discount rate if confirmed, otherwise default to 0.05
-	discountRate := 0.05
-	if contract.DiscountRateType != nil {
-		// For MVP, use a default. The DiscountRateType is a type string, not a numeric value.
-		// We'll use a reasonable default or extract from the existing calculation.
+	// Determine discount rate priority:
+	// 1) global system setting
+	// 2) contract.DiscountRateValue
+	// 3) fallback 0.05
+	discountRate := resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
+	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
+		discountRate = *contract.DiscountRateValue
+	}
+	if discountRate <= 0 {
 		discountRate = 0.05
 	}
 
@@ -328,6 +333,10 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		LeaseEndDate:     leaseEndDate,
 		DiscountRate:     discountRate,
 		Payments:         payments,
+		PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
+			CommencementDate: contract.CommencementDate,
+			Payments:         payments,
+		}),
 	}
 
 	carryingLiability, carryingROU, err := ifrs16svc.GetCarryingAmount(calcInput, event.EffectiveDate)
@@ -605,7 +614,13 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 	}
 	payments := repository.ToIFRS16Payments(schedules)
 
-	discountRate := 0.05
+	discountRate := resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
+	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
+		discountRate = *contract.DiscountRateValue
+	}
+	if discountRate <= 0 {
+		discountRate = 0.05
+	}
 	leaseEndDate := contract.LeaseEndDate
 	if event.EventType == "early_termination" && event.NewValue != nil {
 		if parsedDate, err := time.Parse("2006-01-02", *event.NewValue); err == nil {
@@ -623,6 +638,10 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 		LeaseEndDate:     leaseEndDate,
 		DiscountRate:     discountRate,
 		Payments:         payments,
+		PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
+			CommencementDate: contract.CommencementDate,
+			Payments:         payments,
+		}),
 	}
 
 	carryingLiability, carryingROU, err := ifrs16svc.GetCarryingAmount(calcInput, event.EffectiveDate)

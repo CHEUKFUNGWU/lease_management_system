@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Card,
   Input,
@@ -50,8 +51,50 @@ interface Message {
   model?: string;
 }
 
-export default function AIChatPage() {
+const contextChipMap: Record<string, string[]> = {
+  "contract-detail": [
+    "这份合同有什么风险？",
+    "为什么不能计算？",
+    "这份合同的关键会计影响是什么？",
+  ],
+  reports: [
+    "帮我解释这张报表的结果",
+    "这次查询用了什么口径？",
+    "有哪些异常值得关注？",
+  ],
+  "monthly-closing": [
+    "当前期间还有哪些阻塞项？",
+    "这些分录主要来自什么？",
+    "下一步建议做什么？",
+  ],
+};
+
+const defaultChips = [
+  "列出折现率缺失合同",
+  "有哪些待审批事项？",
+  "哪些合同即将到期？",
+];
+
+function AIChatPageContent() {
   const { token } = useAuth();
+  const searchParams = useSearchParams();
+
+  const pageContext = useMemo(() => {
+    const page = searchParams.get("page");
+    if (!page) return undefined;
+    return {
+      page,
+      title: searchParams.get("title") || undefined,
+      contract_id: searchParams.get("contract_id") || undefined,
+      period: searchParams.get("period") || undefined,
+      report_view: searchParams.get("report_view") || undefined,
+      tags: searchParams.getAll("tags"),
+      summary: searchParams.get("summary") || undefined,
+    };
+  }, [searchParams]);
+
+  const chips = pageContext ? (contextChipMap[pageContext.page!] || defaultChips) : defaultChips;
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -131,13 +174,14 @@ export default function AIChatPage() {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || !token) return;
+  const handleSend = async (messageOverride?: string) => {
+    const msg = messageOverride ?? input;
+    if (!msg.trim() || !token) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: msg,
       timestamp: new Date(),
     };
 
@@ -153,13 +197,27 @@ export default function AIChatPage() {
     setLoading(true);
 
     try {
-      const chatData: any = { message: input, history };
+      const chatData: any = { message: msg, history };
       if (lastUploadedFile) {
         chatData.file_id = lastUploadedFile.file_id;
         chatData.object_name = lastUploadedFile.object_name;
         chatData.content_type = lastUploadedFile.content_type;
         // Clear the uploaded file after sending
         setLastUploadedFile(null);
+      }
+      if (pageContext) {
+        chatData.page_context = {
+          page: pageContext.page,
+          title: pageContext.title,
+          contract_id: pageContext.contract_id,
+          period: pageContext.period,
+          report_view: pageContext.report_view,
+          summary: pageContext.summary,
+        };
+      }
+      const contractIdFromUrl = searchParams.get("contract_id");
+      if (contractIdFromUrl) {
+        chatData.contract_id = contractIdFromUrl;
       }
 
       const data = await aiChatApi.chat(chatData, token);
@@ -185,6 +243,10 @@ export default function AIChatPage() {
     }
   };
 
+  const handleChipClick = (question: string) => {
+    handleSend(question);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -205,6 +267,67 @@ export default function AIChatPage() {
           style={{ height: "calc(100vh - 140px)" }}
           bodyStyle={{ height: "calc(100% - 57px)", padding: 0 }}
         >
+          {/* Context strip */}
+          {pageContext && (
+            <div
+              style={{
+                padding: "8px 16px",
+                borderBottom: "1px solid #f0f0f0",
+                background: "#FAFAFA",
+              }}
+            >
+              <Space wrap size={[4, 4]}>
+                <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>
+                  当前上下文：
+                </Text>
+                <Tag color="blue">{pageContext.title || pageContext.page}</Tag>
+                {pageContext.contract_id && (
+                  <Tag color="geekblue">{pageContext.contract_id}</Tag>
+                )}
+                {pageContext.period && (
+                  <Tag color="purple">{pageContext.period}</Tag>
+                )}
+                {pageContext.report_view && (
+                  <Tag color="cyan">{pageContext.report_view}</Tag>
+                )}
+                {pageContext.tags && pageContext.tags.length > 0 &&
+                  pageContext.tags.map((t: string, i: number) => (
+                    <Tag key={i} color="green">{t}</Tag>
+                  ))
+                }
+              </Space>
+            </div>
+          )}
+
+          {/* Quick question chips */}
+          <div
+            style={{
+              padding: "8px 16px",
+              borderBottom: "1px solid #f0f0f0",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              alignItems: "center",
+            }}
+          >
+            <Text type="secondary" style={{ fontSize: 12, whiteSpace: "nowrap", marginRight: 2 }}>
+              快捷提问：
+            </Text>
+            {chips.map((chip, idx) => (
+              <Button
+                key={idx}
+                size="small"
+                type="default"
+                ghost
+                onClick={() => handleChipClick(chip)}
+                disabled={loading}
+                style={{ fontSize: 12, borderRadius: 12 }}
+              >
+                {chip}
+              </Button>
+            ))}
+          </div>
+
           <div
             style={{
               height: "calc(100% - 80px)",
@@ -341,7 +464,7 @@ export default function AIChatPage() {
             <Button
               type="primary"
               icon={<SendOutlined />}
-              onClick={handleSend}
+              onClick={() => handleSend()}
               loading={loading}
             >
               发送
@@ -350,5 +473,13 @@ export default function AIChatPage() {
         </Card>
       </AppLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function AIChatPage() {
+  return (
+    <Suspense fallback={<Spin size="large" style={{ display: "block", padding: 120, textAlign: "center" }} />}>
+      <AIChatPageContent />
+    </Suspense>
   );
 }

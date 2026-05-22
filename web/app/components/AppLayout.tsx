@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Layout, Menu, Button, Avatar, Dropdown } from "antd";
+import { Layout, Menu, Button, Avatar, Dropdown, FloatButton } from "antd";
 import {
   HomeOutlined,
   FileTextOutlined,
@@ -11,6 +11,7 @@ import {
   LogoutOutlined,
   UserOutlined,
   BarChartOutlined,
+  LineChartOutlined,
   SafetyOutlined,
   AuditOutlined,
   CalculatorOutlined,
@@ -29,6 +30,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     logout();
     router.push("/login");
+  };
+
+  const buildAIChatUrl = () => {
+    const params = new URLSearchParams();
+
+    if (pathname === "/reports") {
+      params.set("page", "reports");
+      params.set("title", "报表查询");
+    } else if (pathname === "/monthly-closing") {
+      params.set("page", "monthly-closing");
+      params.set("title", "结账中心");
+    } else if (pathname.startsWith("/contracts/") && pathname !== "/contracts/new") {
+      const segments = pathname.split("/").filter(Boolean);
+      const contractId = segments[1];
+      if (contractId) {
+        params.set("page", "contract-detail");
+        params.set("title", "合同详情");
+        params.set("contract_id", contractId);
+      }
+    } else if (pathname === "/settings") {
+      params.set("page", "settings");
+      params.set("title", "设置 / 标签总管");
+    } else if (pathname === "/cashflow-forecast") {
+      params.set("page", "cashflow-forecast");
+      params.set("title", "现金流预测");
+    }
+
+    const query = params.toString();
+    return query ? `/ai-chat?${query}` : "/ai-chat";
   };
 
   const baseMenuItems = [
@@ -58,9 +88,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: <Link href="/reports">报表查询</Link>,
     },
     {
+      key: "/cashflow-forecast",
+      icon: <LineChartOutlined />,
+      label: <Link href="/cashflow-forecast">现金流预测</Link>,
+    },
+    {
       key: "/monthly-closing",
       icon: <CalculatorOutlined />,
-      label: <Link href="/monthly-closing">月结跑批</Link>,
+      label: <Link href="/monthly-closing">结账中心</Link>,
     },
     {
       key: "/audit-logs",
@@ -220,6 +255,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </Content>
       </Layout>
+
+      <FloatButton
+        icon={<RobotOutlined />}
+        tooltip={<span>AI 助手</span>}
+        onClick={() => router.push(buildAIChatUrl())}
+        style={{
+          right: 28,
+          bottom: 28,
+        }}
+        type="primary"
+      />
     </Layout>
   );
 }

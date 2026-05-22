@@ -21,8 +21,9 @@ import {
   Switch,
   Descriptions,
 } from "antd";
-import { CalculatorOutlined, HistoryOutlined, LockOutlined, UnlockOutlined, CheckOutlined, SendOutlined, RollbackOutlined } from "@ant-design/icons";
+import { CalculatorOutlined, HistoryOutlined, LockOutlined, UnlockOutlined, CheckOutlined, SendOutlined, RollbackOutlined, RobotOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { monthlyClosingApi } from "../lib/api";
@@ -30,6 +31,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function MonthlyClosingPage() {
   const { token, user } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -78,7 +80,7 @@ export default function MonthlyClosingPage() {
       );
       setResult(data);
       setSelectedPeriod(period);
-      message.success(`月结生成完成：处理 ${data.processed_contracts} 份合同`);
+      message.success(`结账生成完成：处理 ${data.processed_contracts} 份合同`);
       await checkLockStatus(period);
       loadBatches(period);
       loadEntries(period);
@@ -183,7 +185,7 @@ export default function MonthlyClosingPage() {
 
   const handleLockPeriod = async () => {
     if (!token || !selectedPeriod) {
-      message.error("请先生成月结");
+      message.error("请先生成结账结果");
       return;
     }
     setLockLoading(true);
@@ -200,7 +202,7 @@ export default function MonthlyClosingPage() {
 
   const handleUnlockPeriod = async () => {
     if (!token || !selectedPeriod) {
-      message.error("请先生成月结");
+      message.error("请先生成结账结果");
       return;
     }
     setLockLoading(true);
@@ -378,9 +380,9 @@ export default function MonthlyClosingPage() {
   const tabItems = [
     {
       key: "generate",
-      label: "生成月结",
+      label: "生成结账",
       children: (
-        <Card title="生成月度会计分录">
+        <Card title="生成结账分录">
           <Form layout="vertical" onFinish={handleGenerate}>
             <Row gutter={16}>
               <Col span={12}>
@@ -399,13 +401,13 @@ export default function MonthlyClosingPage() {
               </Col>
             </Row>
             <Button type="primary" icon={<CalculatorOutlined />} htmlType="submit" loading={loading} size="large">
-              生成月结分录
+              生成结账分录
             </Button>
           </Form>
 
           {result && (
             <Alert
-              message="月结生成结果"
+              message="结账生成结果"
               description={
                 <Space direction="vertical">
                   <span>批次号: {result.batch_number}</span>
@@ -494,7 +496,7 @@ export default function MonthlyClosingPage() {
               pagination={{ pageSize: 20 }}
               size="small"
               scroll={{ x: 1100 }}
-              locale={{ emptyText: "暂无分录，请先生成月结" }}
+              locale={{ emptyText: "暂无分录，请先生成结账" }}
             />
           </Spin>
         </Card>
@@ -504,7 +506,7 @@ export default function MonthlyClosingPage() {
       key: "batches",
       label: "批次历史",
       children: (
-        <Card title="月结批次历史" extra={<Button onClick={() => refresh()}>刷新</Button>}>
+        <Card title="结账批次历史" extra={<Button onClick={() => refresh()}>刷新</Button>}>
           <Table
             columns={batchColumns}
             dataSource={batches}
@@ -522,7 +524,7 @@ export default function MonthlyClosingPage() {
       children: (
         <Card title="期间锁账控制">
           {!selectedPeriod ? (
-            <Alert message="请先生成月结后再进行锁账操作" type="info" showIcon />
+            <Alert message="请先生成结账后再进行锁账操作" type="info" showIcon />
           ) : (
             <>
               <Descriptions bordered column={2} style={{ marginBottom: 24 }}>
@@ -573,7 +575,31 @@ export default function MonthlyClosingPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <h1>月结跑批</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h1 style={{ margin: 0 }}>结账中心</h1>
+          <Button
+            icon={<RobotOutlined />}
+            onClick={() => {
+              const parts: string[] = [];
+              if (selectedPeriod) {
+                parts.push(`期间: ${selectedPeriod}`);
+              }
+              const draftCount = entries.filter((e: any) => e.posting_status === "draft").length;
+              const approvedCount = entries.filter((e: any) => e.posting_status === "approved").length;
+              const postedCount = entries.filter((e: any) => e.posting_status === "posted").length;
+              parts.push(`分录: ${draftCount}草稿/${approvedCount}已审批/${postedCount}已过账`);
+              const summary = parts.join('; ');
+              let url = `/ai-chat?page=monthly-closing&title=结账中心`;
+              if (selectedPeriod) {
+                url += `&period=${encodeURIComponent(selectedPeriod)}`;
+              }
+              url += `&summary=${encodeURIComponent(summary)}`;
+              router.push(url);
+            }}
+          >
+            AI 分析
+          </Button>
+        </div>
 
         <Tabs activeKey={activeTab} onChange={(key) => {
           setActiveTab(key);

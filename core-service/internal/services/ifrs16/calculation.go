@@ -38,6 +38,7 @@ type DailyEntry struct {
 	OpeningLiability    float64
 	InterestExpense     float64
 	Payment             float64
+	PrepaidPayment      float64 // Prepaid rent at/before commencement (capitalized into ROU, not reducing liability)
 	ClosingLiability    float64
 	OpeningROUAsset     float64
 	Depreciation        float64
@@ -52,6 +53,7 @@ type MonthlyEntry struct {
 	OpeningLiability    float64
 	InterestExpense     float64
 	TotalPayments       float64
+	PrepaidPayment      float64 // Prepaid rent at/before commencement (capitalized into ROU)
 	ClosingLiability    float64
 	OpeningROUAsset     float64
 	Depreciation        float64
@@ -81,6 +83,22 @@ type RemeasurementOutput struct {
 	ForwardSchedule []DailyEntry
 }
 
+// CalculatePrepaidRent computes the total prepaid rent at or before commencement date.
+// Only fixed lease payments (not variable or non-lease) with Timing == "prepaid"
+// and Date <= CommencementDate are included.
+func CalculatePrepaidRent(input LeaseCalculation) float64 {
+	var prepaidRent float64
+	for _, payment := range input.Payments {
+		if payment.Type == "variable" || payment.Type == "non_lease" {
+			continue
+		}
+		if payment.Timing == "prepaid" && !payment.Date.After(input.CommencementDate) {
+			prepaidRent += payment.Amount
+		}
+	}
+	return round(prepaidRent)
+}
+
 // Calculate performs full IFRS 16 calculation with daily granularity
 func Calculate(input LeaseCalculation) (*CalculationResult, error) {
 	result := &CalculationResult{}
@@ -89,9 +107,14 @@ func Calculate(input LeaseCalculation) (*CalculationResult, error) {
 	result.InitialLiability = calculateInitialLiability(input)
 	
 	// 2. Calculate initial ROU asset
+	// If PrepaidRent is not explicitly set, compute it from payments
+	prepaidRent := input.PrepaidRent
+	if prepaidRent == 0 {
+		prepaidRent = CalculatePrepaidRent(input)
+	}
 	result.InitialROUAsset = result.InitialLiability + 
 		input.InitialDirectCost + 
-		input.PrepaidRent - 
+		prepaidRent - 
 		input.IncentiveReceived +
 		input.RestorationCost
 	
@@ -181,6 +204,7 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 		payment := 0.0
 		variableRent := 0.0
 		nonLeaseExpense := 0.0
+		prepaidAtCommencement := 0.0
 
 		for _, p := range payments {
 			if !isSameDay(p.Date, currentDate) {
@@ -193,6 +217,8 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 				nonLeaseExpense += p.Amount
 			default:
 				if p.Timing == "prepaid" && !p.Date.After(commencementDate) {
+					// Prepaid at/before commencement: capitalized into ROU, does not reduce liability
+					prepaidAtCommencement += p.Amount
 					continue
 				}
 				payment += p.Amount
@@ -203,11 +229,15 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 		depreciation := dailyDepreciation
 		currentROUAsset = currentROUAsset - depreciation
 
-		if currentROUAsset < 0.01 {
-			currentROUAsset = 0
-		}
-		if currentLiability < 0.01 {
-			currentLiability = 0
+		// Force zero on the last day of the lease term to avoid rounding dust
+		isLastDay := day == leaseTermDays-1
+		if isLastDay {
+			if math.Abs(currentLiability) < 1.0 {
+				currentLiability = 0
+			}
+			if math.Abs(currentROUAsset) < 1.0 {
+				currentROUAsset = 0
+			}
 		}
 
 		schedule = append(schedule, DailyEntry{
@@ -215,6 +245,7 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 			OpeningLiability:    round(openingLiability),
 			InterestExpense:     round(interest),
 			Payment:             round(payment),
+			PrepaidPayment:      round(prepaidAtCommencement),
 			ClosingLiability:    round(currentLiability),
 			OpeningROUAsset:     round(openingROUAsset),
 			Depreciation:        round(depreciation),
@@ -250,6 +281,7 @@ func aggregateMonthly(dailyEntries []DailyEntry) []MonthlyEntry {
 		m := monthMap[key]
 		m.InterestExpense += entry.InterestExpense
 		m.TotalPayments += entry.Payment
+		m.PrepaidPayment += entry.PrepaidPayment
 		m.Depreciation += entry.Depreciation
 		m.ClosingLiability = entry.ClosingLiability
 		m.ClosingROUAsset = entry.ClosingROUAsset

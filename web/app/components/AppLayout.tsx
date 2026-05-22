@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Layout, Menu, Button, Avatar, Dropdown, FloatButton } from "antd";
+import { Layout, Menu, Button, Avatar, Dropdown, FloatButton, Select } from "antd";
 import {
   HomeOutlined,
   FileTextOutlined,
@@ -15,10 +15,13 @@ import {
   SafetyOutlined,
   AuditOutlined,
   CalculatorOutlined,
+  GlobalOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 
 const { Header, Sider, Content } = Layout;
 
@@ -26,6 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { language, setLanguage } = useLanguage();
 
   const handleLogout = () => {
     logout();
@@ -65,54 +69,54 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     {
       key: "/",
       icon: <HomeOutlined />,
-      label: <Link href="/">首页</Link>,
+      label: <Link href="/">{t("nav.home", language)}</Link>,
     },
     {
       key: "/contracts",
       icon: <FileTextOutlined />,
-      label: <Link href="/contracts">合同台账</Link>,
+      label: <Link href="/contracts">{t("nav.contracts", language)}</Link>,
     },
     {
       key: "/upload",
       icon: <UploadOutlined />,
-      label: <Link href="/upload">文件上传</Link>,
+      label: <Link href="/upload">{t("nav.upload", language)}</Link>,
     },
     {
       key: "/ai-chat",
       icon: <RobotOutlined />,
-      label: <Link href="/ai-chat">AI 助手</Link>,
+      label: <Link href="/ai-chat">{t("nav.ai_chat", language)}</Link>,
     },
     {
       key: "/reports",
       icon: <BarChartOutlined />,
-      label: <Link href="/reports">报表查询</Link>,
+      label: <Link href="/reports">{t("nav.reports", language)}</Link>,
     },
     {
       key: "/cashflow-forecast",
       icon: <LineChartOutlined />,
-      label: <Link href="/cashflow-forecast">现金流预测</Link>,
+      label: <Link href="/cashflow-forecast">{t("nav.cashflow", language)}</Link>,
     },
     {
       key: "/monthly-closing",
       icon: <CalculatorOutlined />,
-      label: <Link href="/monthly-closing">结账中心</Link>,
+      label: <Link href="/monthly-closing">{t("nav.monthly_closing", language)}</Link>,
     },
     {
       key: "/audit-logs",
       icon: <AuditOutlined />,
-      label: <Link href="/audit-logs">审计日志</Link>,
+      label: <Link href="/audit-logs">{t("nav.audit_logs", language)}</Link>,
     },
     {
       key: "/settings",
       icon: <SettingOutlined />,
-      label: <Link href="/settings">设置</Link>,
+      label: <Link href="/settings">{t("nav.settings", language)}</Link>,
     },
   ];
 
   const adminMenuItem = {
     key: "/admin/users",
     icon: <SafetyOutlined />,
-    label: <Link href="/admin/users">管理后台</Link>,
+    label: <Link href="/admin/users">{t("nav.admin", language)}</Link>,
   };
 
   const menuItems = user?.role === "admin"
@@ -123,12 +127,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     {
       key: "profile",
       icon: <UserOutlined />,
-      label: "个人资料",
+      label: t("user.profile", language),
     },
     {
       key: "logout",
       icon: <LogoutOutlined />,
-      label: "退出登录",
+      label: t("user.logout", language),
       danger: true,
       onClick: handleLogout,
     },
@@ -182,40 +186,55 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               marginLeft: 4,
             }}
           >
-            租赁管理系统
+            {t("app.title", language)}
           </span>
         </div>
 
-        {user && (
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                cursor: "pointer",
-                padding: "6px 12px",
-                borderRadius: 9999,
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "#F5F5F5")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "transparent")
-              }
-            >
-              <Avatar
-                size={32}
-                icon={<UserOutlined />}
-                style={{ background: "#000" }}
-              />
-              <span style={{ fontSize: 14, fontWeight: 500 }}>
-                {user.username}
-              </span>
-            </div>
-          </Dropdown>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <Select
+            value={language}
+            onChange={(value) => setLanguage(value as any)}
+            style={{ width: 120 }}
+            variant="borderless"
+            options={[
+              { value: "zh-CN", label: t("lang.zh_CN", language) },
+              { value: "zh-TW", label: t("lang.zh_TW", language) },
+              { value: "en", label: t("lang.en", language) },
+            ]}
+            suffixIcon={<GlobalOutlined />}
+          />
+
+          {user && (
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  cursor: "pointer",
+                  padding: "6px 12px",
+                  borderRadius: 9999,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#F5F5F5")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+              >
+                <Avatar
+                  size={32}
+                  icon={<UserOutlined />}
+                  style={{ background: "#000" }}
+                />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>
+                  {user.username}
+                </span>
+              </div>
+            </Dropdown>
+          )}
+        </div>
       </Header>
 
       <Layout>
@@ -258,7 +277,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <FloatButton
         icon={<RobotOutlined />}
-        tooltip={<span>AI 助手</span>}
+        tooltip={<span>{t("nav.ai_chat", language)}</span>}
         onClick={() => router.push(buildAIChatUrl())}
         style={{
           right: 28,

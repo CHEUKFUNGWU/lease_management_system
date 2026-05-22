@@ -16,6 +16,7 @@ class ChatRequest(BaseModel):
     system_prompt: Optional[str] = None
     temperature: float = 0.3
     max_tokens: Optional[int] = 2000
+    language: Optional[str] = "zh-CN"
 
 
 class Source(BaseModel):
@@ -45,9 +46,18 @@ async def chat(request: ChatRequest):
     AI Service 仅负责调用 LLM 并返回结果。
     """
     try:
+        lang = request.language or "zh-CN"
+        system_prompt = request.system_prompt or ""
+        if lang == "zh-CN":
+            system_prompt += "\n\n请用简体中文回答。"
+        elif lang == "zh-TW":
+            system_prompt += "\n\n請用繁體中文回答。"
+        elif lang == "en":
+            system_prompt += "\n\nPlease answer in English."
+        
         messages = []
-        if request.system_prompt:
-            messages.append({"role": "system", "content": request.system_prompt})
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
         
         for msg in request.messages:
             messages.append({"role": msg.role, "content": msg.content})

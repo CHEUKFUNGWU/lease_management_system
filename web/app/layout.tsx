@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { AuthProvider } from "./context/AuthContext";
+import { LanguageProvider } from "./context/LanguageContext";
 import ThemeProvider from "./components/ThemeProvider";
 import "./globals.css";
 
@@ -19,7 +20,9 @@ export default function RootLayout({
       <body>
         <AntdRegistry>
           <ThemeProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <LanguageProvider>{children}</LanguageProvider>
+            </AuthProvider>
           </ThemeProvider>
         </AntdRegistry>
       </body>

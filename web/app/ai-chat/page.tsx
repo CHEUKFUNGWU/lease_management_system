@@ -30,6 +30,8 @@ import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { aiChatApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -77,6 +79,7 @@ const defaultChips = [
 
 function AIChatPageContent() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const searchParams = useSearchParams();
 
   const pageContext = useMemo(() => {
@@ -99,8 +102,7 @@ function AIChatPageContent() {
     {
       id: "welcome",
       role: "assistant",
-      content:
-        "你好！我是 IFRS 16 AI 助手。我可以帮你：\n\n1. 查询合同台账信息\n2. 查看 IFRS 16 计量结果\n3. 了解审批状态\n4. 回答 IFRS 16 会计问题\n\n你还可以上传合同文件或租金表，我会帮你解析其中的关键信息。",
+      content: t("ai.welcome", language),
       timestamp: new Date(),
     },
   ]);
@@ -159,18 +161,18 @@ function AIChatPageContent() {
       const userMessage: Message = {
         id: Date.now().toString(),
         role: "user",
-        content: `已上传文件: ${data.original_name}`,
+        content: `${t("ai.file_uploaded", language)}${data.original_name}`,
         timestamp: new Date(),
         attachments: [uploadedFile],
       };
 
       setMessages((prev) => [...prev, userMessage]);
-      message.success(`${data.original_name} 上传成功`);
-      
+      message.success(`${data.original_name} ${t("ai.upload_success", language)}`);
+
       onSuccess(data, file);
     } catch (err: any) {
       onError(err);
-      message.error(`上传失败: ${err.message}`);
+      message.error(`${t("ai.upload_failed", language)}: ${err.message}`);
     }
   };
 
@@ -197,7 +199,7 @@ function AIChatPageContent() {
     setLoading(true);
 
     try {
-      const chatData: any = { message: msg, history };
+      const chatData: any = { message: msg, history, language };
       if (lastUploadedFile) {
         chatData.file_id = lastUploadedFile.file_id;
         chatData.object_name = lastUploadedFile.object_name;
@@ -224,7 +226,7 @@ function AIChatPageContent() {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.answer || "抱歉，我无法理解您的问题。",
+        content: data.answer || (language === "en" ? "Sorry, I couldn't understand your question." : "抱歉，我无法理解您的问题。"),
         timestamp: new Date(),
         sources: data.sources?.map((s: any) => s.title || s.type),
         model: data.model,
@@ -234,7 +236,7 @@ function AIChatPageContent() {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `请求失败：${error.message || "未知错误"}`,
+        content: language === "en" ? `Request failed: ${error.message || "Unknown error"}` : `请求失败：${error.message || "未知错误"}`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -261,7 +263,7 @@ function AIChatPageContent() {
           title={
             <Space>
               <RobotOutlined style={{ color: "#000" }} />
-              <span>AI 助手</span>
+              <span>{t("nav.ai_chat", language)}</span>
             </Space>
           }
           style={{ height: "calc(100vh - 140px)" }}
@@ -278,7 +280,7 @@ function AIChatPageContent() {
             >
               <Space wrap size={[4, 4]}>
                 <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>
-                  当前上下文：
+                  {t("ai.context", language)}
                 </Text>
                 <Tag color="blue">{pageContext.title || pageContext.page}</Tag>
                 {pageContext.contract_id && (
@@ -311,7 +313,7 @@ function AIChatPageContent() {
             }}
           >
             <Text type="secondary" style={{ fontSize: 12, whiteSpace: "nowrap", marginRight: 2 }}>
-              快捷提问：
+              {t("ai.quick_questions", language)}
             </Text>
             {chips.map((chip, idx) => (
               <Button
@@ -386,7 +388,7 @@ function AIChatPageContent() {
                       {msg.sources && (
                         <div style={{ marginTop: 8 }}>
                           <Text type="secondary" style={{ fontSize: 12 }}>
-                            引用来源:
+                            {t("ai.sources", language)}
                           </Text>
                           {msg.sources.map((source, idx) => (
                             <Tag
@@ -400,7 +402,7 @@ function AIChatPageContent() {
                       )}
                       {msg.model && (
                         <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
-                          模型: {msg.model}
+                          {t("ai.model", language)}{msg.model}
                         </Text>
                       )}
                     </div>
@@ -410,7 +412,7 @@ function AIChatPageContent() {
             />
             {loading && (
               <div style={{ textAlign: "center", padding: 16 }}>
-                <Spin tip="AI 思考中..." />
+                <Spin tip={t("ai.thinking", language)} />
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -438,12 +440,12 @@ function AIChatPageContent() {
                   "image/tiff",
                 ];
                 if (!allowedTypes.includes(file.type)) {
-                  message.error("不支持的文件类型，请上传 PDF、Excel 或图片文件");
+                  message.error(t("ai.unsupported_file", language));
                   return Upload.LIST_IGNORE;
                 }
                 const isLt50M = file.size / 1024 / 1024 < 50;
                 if (!isLt50M) {
-                  message.error("文件大小不能超过 50MB");
+                  message.error(t("ai.file_too_large", language));
                   return Upload.LIST_IGNORE;
                 }
                 return true;
@@ -457,7 +459,7 @@ function AIChatPageContent() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="输入问题，按 Enter 发送，Shift+Enter 换行..."
+              placeholder={t("ai.placeholder", language)}
               autoSize={{ minRows: 1, maxRows: 4 }}
               style={{ flex: 1 }}
             />
@@ -467,7 +469,7 @@ function AIChatPageContent() {
               onClick={() => handleSend()}
               loading={loading}
             >
-              发送
+              {t("ai.send", language)}
             </Button>
           </div>
         </Card>

@@ -13,6 +13,8 @@ import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 import { fmtNum } from "../lib/format";
 import { exportCSV, exportExcel } from "../lib/export";
 import dayjs from "dayjs";
@@ -32,84 +34,84 @@ const statusColor: Record<string, string> = {
   rejected: "error",
 };
 
-const statusText: Record<string, string> = {
-  draft: "草稿",
-  submitted: "已提交",
-  reviewed: "已复核",
-  pending_approval: "待审批",
-  approved: "已审批",
-  rejected: "已驳回",
-};
+const getStatusText = (lang: string): Record<string, string> => ({
+  draft: t("status.draft", lang as any),
+  submitted: t("status.submitted", lang as any),
+  reviewed: t("status.reviewed", lang as any),
+  pending_approval: t("status.pending_approval", lang as any),
+  approved: t("status.approved", lang as any),
+  rejected: t("status.rejected", lang as any),
+});
 
 /* ──────────────── amortisation column builder ──────────────── */
 
-const buildAmortColumns = (view: string, granularity: string) => {
+const buildAmortColumns = (view: string, granularity: string, lang: string) => {
   const idCols: any[] = [];
 
   if (view === "contract") {
     idCols.push(
-      { title: "合同编号", dataIndex: "contract_number", width: 150, fixed: "left" as const },
-      { title: "合同名称", dataIndex: "contract_name", width: 200, ellipsis: true, fixed: "left" as const },
+      { title: t("reports.contract_number", lang as any), dataIndex: "contract_number", width: 150, fixed: "left" as const },
+      { title: t("reports.contract_name", lang as any), dataIndex: "contract_name", width: 200, ellipsis: true, fixed: "left" as const },
     );
   } else if (view === "store") {
     idCols.push(
-      { title: "门店", dataIndex: "store_name", width: 160, fixed: "left" as const },
+      { title: t("reports.store", lang as any), dataIndex: "store_name", width: 160, fixed: "left" as const },
     );
   } else if (view === "tag") {
     idCols.push(
-      { title: "标签", dataIndex: "group_label", width: 160, fixed: "left" as const },
+      { title: t("reports.tags", lang as any), dataIndex: "group_label", width: 160, fixed: "left" as const },
     );
   } else {
     idCols.push(
-      { title: "分组标签", dataIndex: "group_label", width: 180, fixed: "left" as const },
+      { title: lang === "en" ? "Group Label" : "分组标签", dataIndex: "group_label", width: 180, fixed: "left" as const },
     );
   }
 
   const periodCols = granularity !== "day"
     ? [
-        { title: "期间", dataIndex: "period_key", width: 100 },
-        { title: "期间起", dataIndex: "period_start", width: 110 },
-        { title: "期间止", dataIndex: "period_end", width: 110 },
+        { title: lang === "en" ? "Period" : "期间", dataIndex: "period_key", width: 100 },
+        { title: lang === "en" ? "Period Start" : "期间起", dataIndex: "period_start", width: 110 },
+        { title: lang === "en" ? "Period End" : "期间止", dataIndex: "period_end", width: 110 },
       ]
     : [
-        { title: "日期", dataIndex: "period_key", width: 110 },
-        { title: "期间起", dataIndex: "period_start", width: 110 },
-        { title: "期间止", dataIndex: "period_end", width: 110 },
+        { title: t("reports.day", lang as any), dataIndex: "period_key", width: 110 },
+        { title: lang === "en" ? "Period Start" : "期间起", dataIndex: "period_start", width: 110 },
+        { title: lang === "en" ? "Period End" : "期间止", dataIndex: "period_end", width: 110 },
       ];
 
   const financialCols = [
     {
-      title: "租赁负债 Roll-forward",
+      title: lang === "en" ? "Lease Liability Roll-forward" : "租赁负债 Roll-forward",
       children: [
-        { title: "负债期初", dataIndex: "opening_liability", width: 130, align: "right" as const, render: fmtNum },
-        { title: "负债利息", dataIndex: "interest_expense", width: 110, align: "right" as const, render: fmtNum },
-        { title: "负债付款", dataIndex: "payment", width: 110, align: "right" as const, render: fmtNum },
-        { title: "先付租金", dataIndex: "prepaid_payment", width: 110, align: "right" as const, render: fmtNum },
-        { title: "负债调整", dataIndex: "liability_adjustment", width: 110, align: "right" as const, render: fmtNum },
-        { title: "负债期末", dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Opening Liability" : "负债期初", dataIndex: "opening_liability", width: 130, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Interest" : "负债利息", dataIndex: "interest_expense", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Payment" : "负债付款", dataIndex: "payment", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Prepaid Rent" : "先付租金", dataIndex: "prepaid_payment", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Adjustment" : "负债调整", dataIndex: "liability_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Closing Liability" : "负债期末", dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
       ],
     },
     {
-      title: "使用权资产 Roll-forward",
+      title: lang === "en" ? "ROU Asset Roll-forward" : "使用权资产 Roll-forward",
       children: [
-        { title: "资产期初", dataIndex: "opening_rou_asset", width: 130, align: "right" as const, render: fmtNum },
-        { title: "资产折旧", dataIndex: "depreciation", width: 100, align: "right" as const, render: fmtNum },
-        { title: "资产减值", dataIndex: "impairment", width: 100, align: "right" as const, render: fmtNum },
-        { title: "资产调整", dataIndex: "rou_adjustment", width: 110, align: "right" as const, render: fmtNum },
-        { title: "资产期末", dataIndex: "closing_rou_asset", width: 130, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Opening ROU" : "资产期初", dataIndex: "opening_rou_asset", width: 130, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Depreciation" : "资产折旧", dataIndex: "depreciation", width: 100, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Impairment" : "资产减值", dataIndex: "impairment", width: 100, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Adjustment" : "资产调整", dataIndex: "rou_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Closing ROU" : "资产期末", dataIndex: "closing_rou_asset", width: 130, align: "right" as const, render: fmtNum },
       ],
     },
     {
-      title: "期间费用与调整",
+      title: lang === "en" ? "Period Expenses & Adjustments" : "期间费用与调整",
       children: [
-        { title: "变动租金", dataIndex: "variable_rent_expense", width: 110, align: "right" as const, render: fmtNum },
-        { title: "非租赁", dataIndex: "non_lease_expense", width: 110, align: "right" as const, render: fmtNum },
-        { title: "损益调整", dataIndex: "pnl_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Variable Rent" : "变动租金", dataIndex: "variable_rent_expense", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "Non-lease" : "非租赁", dataIndex: "non_lease_expense", width: 110, align: "right" as const, render: fmtNum },
+        { title: lang === "en" ? "P&L Adjustment" : "损益调整", dataIndex: "pnl_adjustment", width: 110, align: "right" as const, render: fmtNum },
       ],
     },
   ];
 
-  return [...idCols, ...periodCols, { title: "币种", dataIndex: "currency", width: 80 }, ...financialCols];
+  return [...idCols, ...periodCols, { title: t("reports.currency", lang as any), dataIndex: "currency", width: 80 }, ...financialCols];
 };
 
 
@@ -127,6 +129,7 @@ export default function ReportsPage() {
 
 function ReportsPageContent() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -146,8 +149,8 @@ function ReportsPageContent() {
     setLoading(true);
     try {
       const [liabilityRes, summaryRes] = await Promise.all([
-        reportApi.liabilityRolling(mode, token),
-        reportApi.contractSummary(mode, token),
+        reportApi.liabilityRolling(mode, token, language),
+        reportApi.contractSummary(mode, token, language),
       ]);
       setData(liabilityRes.data || []);
       setSummary(summaryRes);
@@ -210,7 +213,7 @@ function ReportsPageContent() {
     const start = amortDateRange?.[0]?.format("YYYY-MM-DD") || "";
     const end = amortDateRange?.[1]?.format("YYYY-MM-DD") || "";
     if (!start || !end) {
-      message.warning("请选择开始日期和结束日期");
+      message.warning(t("reports.please_select_dates", language));
       return;
     }
 
@@ -229,15 +232,16 @@ function ReportsPageContent() {
           discount_rate_override: discountRateOverride ? Number(discountRateOverride) : undefined,
           report_currency: reportCurrency || undefined,
           exchange_rate: exchangeRate ? Number(exchangeRate) : undefined,
+          language,
         },
         token,
       );
       setAmortData(res.data || []);
       setAmortFetched(true);
-      message.success(`摊销报表查询完成，共 ${res.total || 0} 条`);
+      message.success(t("reports.query_complete", language, { count: String(res.total || 0) }));
     } catch (error: any) {
       console.error("Failed to fetch amortization:", error);
-      message.error(error?.message || "摊销报表查询失败");
+      message.error(error?.message || t("reports.query_failed", language));
     } finally {
       setAmortLoading(false);
     }
@@ -285,7 +289,7 @@ function ReportsPageContent() {
     setTagsFromUrl(null);
   };
 
-  const amortCols = useMemo(() => buildAmortColumns(amortView, amortGranularity), [amortView, amortGranularity]);
+  const amortCols = useMemo(() => buildAmortColumns(amortView, amortGranularity, language), [amortView, amortGranularity, language]);
 
   const amortSummary = useMemo(() => {
     if (!amortData.length) return null;
@@ -310,14 +314,14 @@ function ReportsPageContent() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <Title level={2}>报表查询</Title>
+        <Title level={2}>{t("reports.title", language)}</Title>
 
         {/* ─── common report‑mode selector ─── */}
         <Card style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Space>
               <Title level={4} style={{ margin: 0 }}>
-                报表模式
+                {t("reports.mode", language)}
               </Title>
               <Radio.Group
                 value={reportMode}
@@ -325,10 +329,10 @@ function ReportsPageContent() {
                 buttonStyle="solid"
               >
                 <Radio.Button value="working">
-                  <FileTextOutlined /> 工作报表 (Working)
+                  <FileTextOutlined /> {t("reports.working", language)}
                 </Radio.Button>
                 <Radio.Button value="official">
-                  <SafetyOutlined /> 正式报表 (Official)
+                  <SafetyOutlined /> {t("reports.official", language)}
                 </Radio.Button>
               </Radio.Group>
             </Space>
@@ -336,8 +340,8 @@ function ReportsPageContent() {
 
           {reportMode === "working" && (
             <Alert
-              message="工作报表模式"
-              description="包含 Draft、Submitted、Reviewed、Pending Approval 状态的数据。用于内部试算、讨论和预演。"
+              message={t("reports.working_alert_title", language)}
+              description={t("reports.working_alert_desc", language)}
               type="warning"
               showIcon
               style={{ marginTop: 12 }}
@@ -345,8 +349,8 @@ function ReportsPageContent() {
           )}
           {reportMode === "official" && (
             <Alert
-              message="正式报表模式"
-              description="仅包含 Approved 状态的数据。用于正式财务报告、审计提交和法定披露。"
+              message={t("reports.official_alert_title", language)}
+              description={t("reports.official_alert_desc", language)}
               type="success"
               showIcon
               style={{ marginTop: 12 }}
@@ -364,7 +368,7 @@ function ReportsPageContent() {
                ================================ */
             {
               key: "ledger",
-              label: "合同台账",
+              label: t("reports.tab_ledger", language),
               children: (
                 <>
                   {/* summary cards */}
@@ -372,13 +376,13 @@ function ReportsPageContent() {
                     <Row gutter={16} style={{ marginBottom: 24 }}>
                       <Col span={8}>
                         <Card>
-                          <Statistic title="合同总数" value={summary.total_contracts} />
+                          <Statistic title={t("reports.total_contracts", language)} value={summary.total_contracts} />
                         </Card>
                       </Col>
                       <Col span={8}>
                         <Card>
                           <Statistic
-                            title="已审批"
+                            title={t("reports.approved", language)}
                             value={summary.approved_count}
                             valueStyle={{ color: "#3f8600" }}
                           />
@@ -387,7 +391,7 @@ function ReportsPageContent() {
                       <Col span={8}>
                         <Card>
                           <Statistic
-                            title="草稿/待处理"
+                            title={t("reports.draft_pending", language)}
                             value={summary.draft_count + summary.pending_count}
                             valueStyle={{ color: "#cf1322" }}
                           />
@@ -400,15 +404,15 @@ function ReportsPageContent() {
                   <Card
                     title={
                       <span>
-                        合同台账
+                        {t("reports.tab_ledger", language)}
                         {reportMode === "working" && (
                           <Tag color="orange" style={{ marginLeft: 8 }}>
-                            含未审批数据
+                            {t("reports.contains_unapproved", language)}
                           </Tag>
                         )}
                         {reportMode === "official" && (
                           <Tag color="green" style={{ marginLeft: 8 }}>
-                            仅正式数据
+                            {t("reports.official_only", language)}
                           </Tag>
                         )}
                       </span>
@@ -420,7 +424,7 @@ function ReportsPageContent() {
                           if (!token) return;
                           const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
                           const res = await fetch(
-                            `${apiUrl}/api/v1/reports/liability-rolling/export?mode=${reportMode}`,
+                            `${apiUrl}/api/v1/reports/liability-rolling/export?mode=${reportMode}&language=${language}`,
                             { headers: { Authorization: `Bearer ${token}` } },
                           );
                           const blob = await res.blob();
@@ -432,51 +436,51 @@ function ReportsPageContent() {
                           window.URL.revokeObjectURL(url);
                         }}
                       >
-                        导出 CSV
+                        {t("reports.export_csv", language)}
                       </Button>
                     }
                   >
                     <Spin spinning={loading}>
                       <Table
                         columns={[
-                          { title: "合同编号", dataIndex: "contract_number", width: 150 },
-                          { title: "合同名称", dataIndex: "contract_name", ellipsis: true },
+                          { title: t("reports.contract_number", language), dataIndex: "contract_number", width: 150 },
+                          { title: t("reports.contract_name", language), dataIndex: "contract_name", ellipsis: true },
                           {
-                            title: "审批状态",
+                            title: t("reports.approval_status", language),
                             dataIndex: "approval_status",
                             width: 100,
                             render: (s: string) => (
                               <Tag color={statusColor[s] || "default"}>
-                                {statusText[s] || s}
+                                {getStatusText(language)[s] || s}
                               </Tag>
                             ),
                           },
                           {
-                            title: "正式版本",
+                            title: t("reports.is_official", language),
                             dataIndex: "is_official_version",
                             width: 90,
                             render: (v: boolean) =>
-                              v ? <Tag color="green">是</Tag> : <Tag>否</Tag>,
+                              v ? <Tag color="green">{t("reports.yes", language)}</Tag> : <Tag>{t("reports.no", language)}</Tag>,
                           },
                           {
-                            title: "折现率缺失",
+                            title: t("reports.discount_rate_missing", language),
                             dataIndex: "discount_rate_missing",
                             width: 100,
                             render: (v: boolean) =>
                               v ? (
-                                <Tag color="red">缺失</Tag>
+                                <Tag color="red">{t("reports.missing", language)}</Tag>
                               ) : (
-                                <Tag color="green">已填</Tag>
+                                <Tag color="green">{t("reports.filled", language)}</Tag>
                               ),
                           },
-                          { title: "币种", dataIndex: "currency", width: 80 },
-                          { title: "起始日", dataIndex: "commencement_date", width: 110 },
-                          { title: "结束日", dataIndex: "lease_end_date", width: 110 },
+                          { title: t("reports.currency", language), dataIndex: "currency", width: 80 },
+                          { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110 },
+                          { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110 },
                         ]}
                         dataSource={data}
                         rowKey="contract_id"
                         pagination={{ pageSize: 10 }}
-                        locale={{ emptyText: "暂无数据" }}
+                        locale={{ emptyText: t("reports.empty", language) }}
                       />
                     </Spin>
                   </Card>
@@ -489,7 +493,7 @@ function ReportsPageContent() {
                ================================ */
             {
               key: "amortization",
-              label: "摊销报表",
+              label: t("reports.tab_amortization", language),
               children: (
                 <>
                   {/* tags‑from‑URL banner */}
@@ -498,9 +502,9 @@ function ReportsPageContent() {
                       message={
                         <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                           <TagOutlined />
-                          已从标签总管带入标签筛选：
-                          {tagsFromUrl.map((t) => (
-                            <Tag key={t} color="blue">{t}</Tag>
+                          {language === "en" ? "Tags imported from Tag Manager: " : "已从标签总管带入标签筛选："}
+                          {tagsFromUrl.map((tg) => (
+                            <Tag key={tg} color="blue">{tg}</Tag>
                           ))}
                         </span>
                       }
@@ -517,40 +521,40 @@ function ReportsPageContent() {
                     <Row gutter={[16, 12]} align="middle">
                       <Col>
                         <Space>
-                          <span>视图维度：</span>
+                          <span>{t("reports.view_dimension", language)}：</span>
                           <Select
                             value={amortView}
                             onChange={(v) => { setAmortView(v as any); setAmortFetched(false); }}
                             style={{ width: 120 }}
                             options={[
-                              { value: "contract", label: "合同维度" },
-                              { value: "store", label: "门店维度" },
-                              { value: "tag", label: "标签维度" },
-                              { value: "summary", label: "汇总" },
+                              { value: "contract", label: t("reports.contract_view", language) },
+                              { value: "store", label: t("reports.store_view", language) },
+                              { value: "tag", label: t("reports.tag_view", language) },
+                              { value: "summary", label: t("reports.summary_view", language) },
                             ]}
                           />
                         </Space>
                       </Col>
                       <Col>
                         <Space>
-                          <span>粒度：</span>
+                          <span>{t("reports.granularity", language)}：</span>
                           <Select
                             value={amortGranularity}
                             onChange={(v) => { setAmortGranularity(v as any); setAmortFetched(false); }}
                             style={{ width: 100 }}
                             options={[
-                              { value: "day", label: "日" },
-                              { value: "month", label: "月" },
-                              { value: "quarter", label: "季" },
-                              { value: "half_year", label: "半年" },
-                              { value: "year", label: "年" },
+                              { value: "day", label: t("reports.day", language) },
+                              { value: "month", label: t("reports.month", language) },
+                              { value: "quarter", label: t("reports.quarter", language) },
+                              { value: "half_year", label: t("reports.half_year", language) },
+                              { value: "year", label: t("reports.year", language) },
                             ]}
                           />
                         </Space>
                       </Col>
                       <Col>
                         <Space>
-                          <span>日期范围：</span>
+                          <span>{t("reports.date_range", language)}：</span>
                           <RangePicker
                             value={amortDateRange}
                             onChange={(dates) => { setAmortDateRange(dates as any); setAmortFetched(false); }}
@@ -560,7 +564,7 @@ function ReportsPageContent() {
                       </Col>
                       <Col>
                         <Button type="primary" icon={<SearchOutlined />} onClick={fetchAmort} loading={amortLoading}>
-                          查询
+                          {t("reports.search", language)}
                         </Button>
                       </Col>
                       <Col>
@@ -569,7 +573,7 @@ function ReportsPageContent() {
                           onClick={handleAmortReset}
                           disabled={amortLoading}
                         >
-                          重置
+                          {t("reports.reset", language)}
                         </Button>
                       </Col>
                        <Col>
@@ -579,12 +583,12 @@ function ReportsPageContent() {
                             exportCSV(
                               amortData,
                               amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                              `IFRS16_摊销报表_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
+                              `IFRS16_${language === "en" ? "Amortization" : "摊销报表"}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
                             )
                           }
                           disabled={!amortData.length}
                         >
-                          导出 CSV
+                          {t("reports.export_csv", language)}
                         </Button>
                       </Col>
                       <Col>
@@ -594,12 +598,12 @@ function ReportsPageContent() {
                             exportExcel(
                               amortData,
                               amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                              `IFRS16_摊销报表_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
+                              `IFRS16_${language === "en" ? "Amortization" : "摊销报表"}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
                             )
                           }
                           disabled={!amortData.length}
                         >
-                          导出 Excel
+                          {t("reports.export_excel", language)}
                         </Button>
                       </Col>
                       <Col>
@@ -607,20 +611,20 @@ function ReportsPageContent() {
                           icon={<RobotOutlined />}
                           onClick={() => {
                             const parts: string[] = [];
-                            parts.push(`模式: ${reportMode === 'working' ? '工作' : '正式'}`);
-                            parts.push(`视图: ${amortView}`);
-                            parts.push(`粒度: ${amortGranularity}`);
+                            parts.push(`${language === "en" ? "Mode" : "模式"}: ${reportMode === 'working' ? (language === "en" ? 'Working' : '工作') : (language === "en" ? 'Official' : '正式')}`);
+                            parts.push(`${language === "en" ? "View" : "视图"}: ${amortView}`);
+                            parts.push(`${language === "en" ? "Granularity" : "粒度"}: ${amortGranularity}`);
                             if (amortDateRange) {
-                              parts.push(`期间: ${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`);
+                              parts.push(`${language === "en" ? "Period" : "期间"}: ${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`);
                             }
                             if (amortSummary) {
-                              parts.push(`期末负债: ¥${fmtNum(amortSummary.closingLiability)}`);
-                              parts.push(`期末资产: ¥${fmtNum(amortSummary.closingROU)}`);
-                              parts.push(`利息: ¥${fmtNum(amortSummary.totalInterest)}`);
-                              parts.push(`折旧: ¥${fmtNum(amortSummary.totalDepreciation)}`);
+                              parts.push(`${language === "en" ? "Closing Liability" : "期末负债"}: ¥${fmtNum(amortSummary.closingLiability)}`);
+                              parts.push(`${language === "en" ? "Closing ROU" : "期末资产"}: ¥${fmtNum(amortSummary.closingROU)}`);
+                              parts.push(`${language === "en" ? "Interest" : "利息"}: ¥${fmtNum(amortSummary.totalInterest)}`);
+                              parts.push(`${language === "en" ? "Depreciation" : "折旧"}: ¥${fmtNum(amortSummary.totalDepreciation)}`);
                             }
                             const summary = parts.join('; ');
-                            let url = `/ai-chat?page=reports&title=摊销报表&report_view=${amortView}&summary=${encodeURIComponent(summary)}`;
+                            let url = `/ai-chat?page=reports&title=${encodeURIComponent(language === "en" ? "Amortization Report" : "摊销报表")}&report_view=${amortView}&summary=${encodeURIComponent(summary)}`;
                             if (amortDateRange) {
                               url += `&period=${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`;
                             }
@@ -630,7 +634,7 @@ function ReportsPageContent() {
                             router.push(url);
                           }}
                         >
-                          AI 分析
+                          {t("reports.ai_analysis", language)}
                         </Button>
                       </Col>
                     </Row>
@@ -641,7 +645,7 @@ function ReportsPageContent() {
                       onClick={() => setShowFilters(!showFilters)}
                       style={{ marginTop: 8, padding: 0 }}
                     >
-                      {showFilters ? "收起筛选条件 ▲" : "展开筛选条件 ▼"}
+                      {showFilters ? t("reports.collapse_filters", language) : t("reports.expand_filters", language)}
                     </Button>
 
                     {showFilters && (
@@ -649,11 +653,11 @@ function ReportsPageContent() {
                         {amortView !== "contract" && (
                           <Col span={8}>
                             <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>合同 ID：</span>
+                              <span>{t("reports.contract_id", language)}：</span>
                               <Input
                                 value={amortContractId}
                                 onChange={(e) => { setAmortContractId(e.target.value); setAmortFetched(false); }}
-                                placeholder="输入合同 ID 筛选"
+                                placeholder={language === "en" ? "Enter contract ID" : "输入合同 ID 筛选"}
                                 allowClear
                               />
                             </Space>
@@ -662,11 +666,11 @@ function ReportsPageContent() {
                         {amortView !== "store" && (
                           <Col span={8}>
                             <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>门店：</span>
+                              <span>{t("reports.store", language)}：</span>
                               <Input
                                 value={amortStore}
                                 onChange={(e) => { setAmortStore(e.target.value); setAmortFetched(false); }}
-                                placeholder="输入门店名称筛选"
+                                placeholder={language === "en" ? "Enter store name" : "输入门店名称筛选"}
                                 allowClear
                               />
                             </Space>
@@ -674,15 +678,15 @@ function ReportsPageContent() {
                         )}
                         <Col span={8}>
                           <Space direction="vertical" style={{ width: "100%" }}>
-                            <span>标签：</span>
+                            <span>{t("reports.tags", language)}：</span>
                             <Select
                               mode="tags"
                               value={selectedTags}
                               onChange={(v) => { setSelectedTags(v); setAmortFetched(false); }}
                               style={{ width: "100%" }}
-                              placeholder="选择或输入一个或多个标签"
+                              placeholder={language === "en" ? "Select or enter one or more tags" : "选择或输入一个或多个标签"}
                               loading={tagLoading}
-                              options={availableTags.map((t) => ({ value: t, label: t }))}
+                              options={availableTags.map((tg) => ({ value: tg, label: tg }))}
                             />
                           </Space>
                         </Col>
@@ -692,8 +696,11 @@ function ReportsPageContent() {
                     {showFilters && (
                       <>
                         <Alert
-                          message="折现率与汇率覆盖（可选）"
-                          description="不填写则优先使用合同台账中的折现率数值。如填写折现率覆盖，将按该利率实时重算选中范围内合同。如填写报表货币和汇率，将按统一汇率换算展示金额。"
+                          message={language === "en" ? "Discount Rate & Currency Override (Optional)" : "折现率与汇率覆盖（可选）"}
+                          description={language === "en"
+                            ? "Leave blank to use the discount rate from the contract ledger. If a discount rate override is provided, the selected contracts will be recalculated in real-time. If a report currency and exchange rate are provided, amounts will be converted uniformly."
+                            : "不填写则优先使用合同台账中的折现率数值。如填写折现率覆盖，将按该利率实时重算选中范围内合同。如填写报表货币和汇率，将按统一汇率换算展示金额。"
+                          }
                           type="info"
                           showIcon
                           style={{ marginTop: 12 }}
@@ -701,23 +708,23 @@ function ReportsPageContent() {
                         <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
                           <Col span={8}>
                             <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>折现率覆盖 (%)：</span>
+                              <span>{t("reports.discount_rate_override", language)}：</span>
                               <Input
                                 value={discountRateOverride}
                                 onChange={(e) => { setDiscountRateOverride(e.target.value); setAmortFetched(false); }}
-                                placeholder="例如 5 或 5.25"
+                                placeholder={language === "en" ? "e.g. 5 or 5.25" : "例如 5 或 5.25"}
                                 allowClear
                               />
                             </Space>
                           </Col>
                           <Col span={8}>
                             <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>报表货币：</span>
+                              <span>{t("reports.report_currency", language)}：</span>
                               <Select
                                 value={reportCurrency || undefined}
                                 onChange={(v) => { setReportCurrency(v || ""); setAmortFetched(false); }}
                                 style={{ width: "100%" }}
-                                placeholder="选择货币"
+                                placeholder={language === "en" ? "Select currency" : "选择货币"}
                                 allowClear
                                 options={[
                                   { value: "CNY", label: "CNY — 人民币" },
@@ -730,11 +737,11 @@ function ReportsPageContent() {
                           </Col>
                           <Col span={8}>
                             <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>汇率：</span>
+                              <span>{t("reports.exchange_rate", language)}：</span>
                               <Input
                                 value={exchangeRate}
                                 onChange={(e) => { setExchangeRate(e.target.value); setAmortFetched(false); }}
-                                placeholder="例如 7.20"
+                                placeholder={language === "en" ? "e.g. 7.20" : "例如 7.20"}
                                 allowClear
                               />
                             </Space>
@@ -749,12 +756,12 @@ function ReportsPageContent() {
                     <div style={{ marginBottom: 16 }}>
                       {discountRateOverride && (
                         <Tag color="blue" style={{ fontSize: 13, padding: "2px 10px" }}>
-                          折现率覆盖: {Number(discountRateOverride).toFixed(2)}%
+                          {language === "en" ? "Discount Rate Override" : "折现率覆盖"}: {Number(discountRateOverride).toFixed(2)}%
                         </Tag>
                       )}
                       {reportCurrency && (
                         <Tag color="purple" style={{ fontSize: 13, padding: "2px 10px" }}>
-                          报表货币: {reportCurrency}{exchangeRate ? ` @ ${Number(exchangeRate).toFixed(2)}` : ""}
+                          {language === "en" ? "Report Currency" : "报表货币"}: {reportCurrency}{exchangeRate ? ` @ ${Number(exchangeRate).toFixed(2)}` : ""}
                         </Tag>
                       )}
                     </div>
@@ -763,7 +770,7 @@ function ReportsPageContent() {
                   {/* tag view caveat */}
                   {amortView === "tag" && amortFetched && amortData.length > 0 && (
                     <Alert
-                      message="同一合同可归入多个标签组，因此标签汇总总额可能大于总计汇总。"
+                      message={t("reports.tag_caveat", language)}
                       type="info"
                       showIcon
                       style={{ marginBottom: 16 }}
@@ -776,7 +783,7 @@ function ReportsPageContent() {
                       <Col span={6}>
                         <Card size="small">
                           <Statistic
-                            title="期末负债合计"
+                            title={t("reports.closing_liability", language)}
                             value={amortSummary.closingLiability}
                             precision={2}
                             valueStyle={{ fontSize: 16 }}
@@ -786,7 +793,7 @@ function ReportsPageContent() {
                       <Col span={6}>
                         <Card size="small">
                           <Statistic
-                            title="期末使用权资产合计"
+                            title={t("reports.closing_rou", language)}
                             value={amortSummary.closingROU}
                             precision={2}
                             valueStyle={{ fontSize: 16 }}
@@ -796,7 +803,7 @@ function ReportsPageContent() {
                       <Col span={6}>
                         <Card size="small">
                           <Statistic
-                            title="期间利息合计"
+                            title={t("reports.total_interest", language)}
                             value={amortSummary.totalInterest}
                             precision={2}
                             valueStyle={{ fontSize: 16 }}
@@ -806,7 +813,7 @@ function ReportsPageContent() {
                       <Col span={6}>
                         <Card size="small">
                           <Statistic
-                            title="期间折旧合计"
+                            title={t("reports.total_depreciation", language)}
                             value={amortSummary.totalDepreciation}
                             precision={2}
                             valueStyle={{ fontSize: 16 }}
@@ -820,15 +827,15 @@ function ReportsPageContent() {
                   <Card
                     title={
                       <span>
-                        摊销报表
+                        {t("reports.amortization_table", language)}
                         {reportMode === "working" && (
                           <Tag color="orange" style={{ marginLeft: 8 }}>
-                            含未审批数据
+                            {t("reports.contains_unapproved", language)}
                           </Tag>
                         )}
                         {reportMode === "official" && (
                           <Tag color="green" style={{ marginLeft: 8 }}>
-                            仅正式数据
+                            {t("reports.official_only", language)}
                           </Tag>
                         )}
                       </span>
@@ -842,7 +849,7 @@ function ReportsPageContent() {
                         pagination={{ pageSize: 20, showSizeChanger: true }}
                         scroll={{ x: "max-content" }}
                         size="small"
-                        locale={{ emptyText: amortFetched ? "暂无数据" : "请设置查询条件后点击「查询」" }}
+                        locale={{ emptyText: amortFetched ? t("reports.empty", language) : t("reports.no_data_hint", language) }}
                       />
                     </Spin>
                   </Card>

@@ -237,6 +237,11 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 	if mode == "" {
 		mode = "working"
 	}
+
+	lang := c.Query("language")
+	if lang == "" {
+		lang = "zh-CN"
+	}
 	
 	var statuses []string
 	if mode == "official" {
@@ -271,12 +276,31 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 	c.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
 	
 	// Header
-	writer.Write([]string{
-		"合同编号", "合同名称", "审批状态", "是否正式版", "报表模式",
-		"法人主体ID", "门店ID", "出租方ID", "币种",
-		"租赁起始日", "租赁结束日", "折现率类型", "折现率缺失",
-		"创建时间",
-	})
+	var headers []string
+	switch lang {
+	case "en":
+		headers = []string{
+			"Contract Number", "Contract Name", "Approval Status", "Is Official Version", "Report Mode",
+			"Legal Entity ID", "Store ID", "Landlord ID", "Currency",
+			"Commencement Date", "Lease End Date", "Discount Rate Type", "Discount Rate Missing",
+			"Created At",
+		}
+	case "zh-TW":
+		headers = []string{
+			"合同編號", "合同名稱", "審批狀態", "是否正式版", "報表模式",
+			"法人主體ID", "門店ID", "出租方ID", "幣種",
+			"租賃起始日", "租賃結束日", "折現率類型", "折現率缺失",
+			"創建時間",
+		}
+	default: // zh-CN
+		headers = []string{
+			"合同编号", "合同名称", "审批状态", "是否正式版", "报表模式",
+			"法人主体ID", "门店ID", "出租方ID", "币种",
+			"租赁起始日", "租赁结束日", "折现率类型", "折现率缺失",
+			"创建时间",
+		}
+	}
+	writer.Write(headers)
 	
 	// Data rows
 	for _, contract := range contracts {

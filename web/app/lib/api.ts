@@ -267,13 +267,14 @@ export const monthlyClosingApi = {
 
 // AI Chat APIs
 export const aiChatApi = {
-  chat: (data: { 
-    message: string; 
-    contract_id?: string; 
+  chat: (data: {
+    message: string;
+    contract_id?: string;
     history?: any[];
     file_id?: string;
     object_name?: string;
     content_type?: string;
+    language?: string;
     page_context?: {
       page?: string;
       title?: string;
@@ -293,11 +294,11 @@ export const aiChatApi = {
 
 // Report APIs
 export const reportApi = {
-  liabilityRolling: (mode: "working" | "official", token: string) =>
-    apiRequest(`/api/v1/reports/liability-rolling?mode=${mode}`, { token }),
+  liabilityRolling: (mode: "working" | "official", token: string, language?: string) =>
+    apiRequest(`/api/v1/reports/liability-rolling?mode=${mode}${language ? `&language=${language}` : ""}`, { token }),
 
-  contractSummary: (mode: "working" | "official", token: string) =>
-    apiRequest(`/api/v1/reports/contract-summary?mode=${mode}`, { token }),
+  contractSummary: (mode: "working" | "official", token: string, language?: string) =>
+    apiRequest(`/api/v1/reports/contract-summary?mode=${mode}${language ? `&language=${language}` : ""}`, { token }),
 
   tags: (token: string) =>
     apiRequest(`/api/v1/reports/tags`, { token }),
@@ -318,6 +319,7 @@ export const reportApi = {
     discount_rate_override?: number;
     report_currency?: string;
     exchange_rate?: number;
+    language?: string;
   }, token: string) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
@@ -341,6 +343,7 @@ export const reportApi = {
     store?: string;
     tag?: string;
     tags?: string[];
+    language?: string;
   }, token: string) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {

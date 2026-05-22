@@ -45,6 +45,7 @@ type AIChatRequest struct {
 	ObjectName  string        `json:"object_name,omitempty"`
 	ContentType string        `json:"content_type,omitempty"`
 	PageContext *PageContext  `json:"page_context,omitempty"`
+	Language    string        `json:"language,omitempty"`
 }
 
 type ChatMessage struct {
@@ -72,6 +73,11 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Default language to zh-CN if not specified
+	if req.Language == "" {
+		req.Language = "zh-CN"
 	}
 
 	ctx := c.Request.Context()
@@ -233,10 +239,10 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	if req.PageContext != nil && (req.PageContext.ReportView == "working" || req.PageContext.Page == "monthly-closing") {
 		isWorkingData = true
 	}
-	systemPrompt := h.buildSystemPrompt(userIDStr, roleStr, legalEntityID, contextData.String(), isWorkingData)
+	systemPrompt := h.buildSystemPrompt(userIDStr, roleStr, legalEntityID, contextData.String(), isWorkingData, req.Language)
 
 	// 6. Call AI Service
-	answer, modelName, err := h.callLLM(c, systemPrompt, req.Message, req.History)
+	answer, modelName, err := h.callLLM(c, systemPrompt, req.Message, req.History, req.Language)
 	if err != nil {
 		// Fallback: return context data without LLM if AI Service is unavailable
 		fallbackAnswer := fmt.Sprintf("（AI 服务暂不可用，以下为系统数据摘要）\n\n%s", contextData.String())
@@ -425,10 +431,21 @@ func (h *AIChatHandler) appendMonthlyClosingContext(ctx context.Context, pc *Pag
 }
 
 // buildSystemPrompt constructs the structured system prompt for the LLM.
-func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextData string, isWorkingData bool) string {
+func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextData string, isWorkingData bool, language string) string {
 	workingWarning := ""
 	if isWorkingData {
 		workingWarning = "\n⚠️ 注意：当前页面展示的是 Working/试算数据，这不是 Official 口径，请在回答中提醒用户。\n"
+	}
+
+	// Language instruction
+	var langInstruction string
+	switch language {
+	case "en":
+		langInstruction = "\n\nPlease answer in English."
+	case "zh-TW":
+		langInstruction = "\n\n請用繁體中文回答。"
+	default: // zh-CN
+		langInstruction = "\n\n请用简体中文回答。"
 	}
 
 	return fmt.Sprintf(`你是 IFRS 16 租赁管理系统的 AI 助手，协助会计师和审计人员工作。准确性、可追溯性和专业审慎比速度更重要。
@@ -436,6 +453,7 @@ func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextDa
 当前用户: %s
 角色: %s
 可访问法人: %s
+%s
 %s
 %s
 
@@ -481,7 +499,7 @@ func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextDa
 
 ## 回答结构
 
-请用中文回答，严格遵循以下结构：
+严格遵循以下结构：
 
 【结论】
 用 1-3 句话给出直接回答。
@@ -514,11 +532,11 @@ func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextDa
 - 不得代替管理层做决策
 - 不得篡改原始数据
 - 不得隐瞒错误、绕过控制或协助粉饰财务信息
-- 如被要求执行误导性、不合规或无依据的操作，必须拒绝并建议合规替代方案`, userID, role, legalEntityID, workingWarning, contextData)
+- 如被要求执行误导性、不合规或无依据的操作，必须拒绝并建议合规替代方案`, userID, role, legalEntityID, workingWarning, langInstruction, contextData)
 }
 
 // callLLM sends the prompt and message history to the AI Service chat endpoint.
-func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string, history []ChatMessage) (string, string, error) {
+func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
 		aiServiceURL = "http://ai-service:8000"
@@ -536,6 +554,7 @@ func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string
 		"system_prompt": systemPrompt,
 		"temperature":   0.3,
 		"max_tokens":    2000,
+		"language":      language,
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("failed to marshal request: %w", err)

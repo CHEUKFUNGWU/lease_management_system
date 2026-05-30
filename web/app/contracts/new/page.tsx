@@ -20,6 +20,8 @@ import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { contractApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
+import { t } from "../../lib/i18n";
 import { normalizeTagValues, DEFAULT_TAG_SUGGESTIONS } from "../../lib/tags";
 
 export default function NewContractPage() {
@@ -28,17 +30,18 @@ export default function NewContractPage() {
   const [drMissing, setDrMissing] = useState(false);
   const router = useRouter();
   const { token } = useAuth();
+  const { language } = useLanguage();
 
   const handleSubmit = async (values: any) => {
     if (!token) {
-      message.error("请先登录");
+      message.error(t("contract_new.please_login", language));
       return;
     }
 
     // Check discount rate
     if (!values.discount_rate_type) {
       setDrMissing(true);
-      message.warning("折现率未填写，合同将标记为折现率缺失状态");
+      message.warning(t("contract_new.discount_rate_empty_warning", language));
     }
 
     setLoading(true);
@@ -63,10 +66,10 @@ export default function NewContractPage() {
       };
 
       await contractApi.create(data, token);
-      message.success("合同创建成功！");
+      message.success(t("contract_new.create_success", language));
       router.push("/contracts");
     } catch (error: any) {
-      message.error(error.message || "创建失败");
+      message.error(error.message || t("contract_new.create_failed", language));
     } finally {
       setLoading(false);
     }
@@ -80,15 +83,15 @@ export default function NewContractPage() {
             icon={<ArrowLeftOutlined />}
             onClick={() => router.push("/contracts")}
           >
-            返回
+            {t("contract_new.back", language)}
           </Button>
         </div>
 
-        <Card title="新增合同">
+        <Card title={t("contract_new.title", language)}>
           {drMissing && (
             <Alert
-              message="折现率缺失警告"
-              description="此合同未填写折现率。根据会计政策，折现率缺失的合同不能进行正式会计计算。请后续在合同详情页补充折现率。"
+              message={t("contract_new.discount_rate_missing_title", language)}
+              description={t("contract_new.discount_rate_missing_desc", language)}
               type="warning"
               showIcon
               icon={<ExclamationCircleOutlined />}
@@ -103,87 +106,87 @@ export default function NewContractPage() {
             initialValues={{ currency: "CNY" }}
           >
             <Form.Item
-              label="合同编号"
+              label={t("contract_new.contract_number", language)}
               name="contract_number"
-              rules={[{ required: true, message: "请输入合同编号" }]}
+              rules={[{ required: true, message: t("contract_new.please_enter_number", language) }]}
             >
-              <Input placeholder="例如：LEASE-2024-001" />
+              <Input placeholder={t("contract_new.contract_number_placeholder", language)} />
             </Form.Item>
 
             <Form.Item
-              label="合同名称"
+              label={t("contract_new.contract_name", language)}
               name="contract_name"
-              rules={[{ required: true, message: "请输入合同名称" }]}
+              rules={[{ required: true, message: t("contract_new.please_enter_name", language) }]}
             >
-              <Input placeholder="例如：南京东路旗舰店租赁合同" />
+              <Input placeholder={t("contract_new.contract_name_placeholder", language)} />
             </Form.Item>
 
             <Form.Item
-              label="法人主体"
+              label={t("contract_new.legal_entity", language)}
               name="legal_entity_id"
-              rules={[{ required: true, message: "请选择法人主体" }]}
+              rules={[{ required: true, message: t("contract_new.please_select_entity", language) }]}
             >
-              <Select placeholder="选择法人主体">
+              <Select placeholder={t("contract_new.select_legal_entity", language)}>
                 <Select.Option value="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
-                  零售集团总公司
+                  {t("contract_new.entity_le001", language)}
                 </Select.Option>
                 <Select.Option value="b2c3d4e5-f6a7-8901-bcde-f12345678901">
-                  零售集团上海公司
+                  {t("contract_new.entity_le002", language)}
                 </Select.Option>
               </Select>
             </Form.Item>
 
             <Form.Item
-              label="门店"
+              label={t("contract_new.store", language)}
               name="store_id"
-              rules={[{ required: true, message: "请选择门店" }]}
+              rules={[{ required: true, message: t("contract_new.please_select_store", language) }]}
             >
-              <Select placeholder="选择门店">
+              <Select placeholder={t("contract_new.select_store", language)}>
                 <Select.Option value="c3d4e5f6-a7b8-9012-cdef-123456789012">
-                  南京东路旗舰店
+                  {t("contract_new.store_nanjing", language)}
                 </Select.Option>
                 <Select.Option value="d4e5f6a7-b8c9-0123-def1-234567890123">
-                  淮海路店
+                  {t("contract_new.store_huaihai", language)}
                 </Select.Option>
               </Select>
             </Form.Item>
 
             <Form.Item
-              label="出租方"
+              label={t("contract_new.lessor", language)}
               name="landlord_id"
-              rules={[{ required: true, message: "请选择出租方" }]}
+              rules={[{ required: true, message: t("contract_new.please_select_lessor", language) }]}
             >
-              <Select placeholder="选择出租方">
+              <Select placeholder={t("contract_new.select_lessor", language)}>
                 <Select.Option value="e5f6a7b8-c9d0-1234-ef12-345678901234">
-                  上海商业地产集团
+                  {t("contract_new.lessor_shanghai", language)}
                 </Select.Option>
                 <Select.Option value="f6a7b8c9-d0e1-2345-f123-456789012345">
-                  北京购物中心管理
+                  {t("contract_new.lessor_beijing", language)}
                 </Select.Option>
               </Select>
             </Form.Item>
 
             <Form.Item
-              label="币种"
+              label={t("contract_new.currency", language)}
               name="currency"
               rules={[{ required: true }]}
             >
               <Select>
-                <Select.Option value="CNY">人民币 (CNY)</Select.Option>
-                <Select.Option value="USD">美元 (USD)</Select.Option>
-                <Select.Option value="EUR">欧元 (EUR)</Select.Option>
+                <Select.Option value="CNY">{t("contract_new.currency_cny", language)}</Select.Option>
+                <Select.Option value="USD">{t("contract_new.currency_usd", language)}</Select.Option>
+                <Select.Option value="EUR">{t("contract_new.currency_eur", language)}</Select.Option>
               </Select>
             </Form.Item>
 
             <Form.Item
-              label="标签"
+              label={t("contract_new.tags", language)}
               name="tags"
-              tooltip="用于报表按标签汇总，例如 #华东 #直营 #旗舰店"
+              tooltip={t("contract_new.tags_help", language)}
             >
               <Select
                 mode="tags"
                 tokenSeparators={[",", "，", ";", "；", " ", "|"]}
-                placeholder="输入标签后回车，例如 #华东、#直营、#旗舰店"
+                placeholder={t("contract_new.tags_placeholder", language)}
                 options={DEFAULT_TAG_SUGGESTIONS.map((tag) => ({
                   value: tag,
                   label: tag,
@@ -192,68 +195,68 @@ export default function NewContractPage() {
             </Form.Item>
 
             <Form.Item
-              label="租赁起始日 (Commencement Date)"
+              label={t("contract_new.commencement_date", language)}
               name="commencement_date"
-              rules={[{ required: true, message: "请选择租赁起始日" }]}
+              rules={[{ required: true, message: t("contract_new.please_select_date", language) }]}
             >
               <DatePicker style={{ width: "100%" }} />
             </Form.Item>
 
             <Form.Item
-              label="租赁开始日 (Lease Start Date)"
+              label={t("contract_new.lease_start_date", language)}
               name="lease_start_date"
-              rules={[{ required: true, message: "请选择租赁开始日" }]}
+              rules={[{ required: true, message: t("contract_new.please_select_start", language) }]}
             >
               <DatePicker style={{ width: "100%" }} />
             </Form.Item>
 
             <Form.Item
-              label="租赁结束日 (Lease End Date)"
+              label={t("contract_new.lease_end_date", language)}
               name="lease_end_date"
-              rules={[{ required: true, message: "请选择租赁结束日" }]}
+              rules={[{ required: true, message: t("contract_new.please_select_end", language) }]}
             >
               <DatePicker style={{ width: "100%" }} />
             </Form.Item>
 
-            <Card title="折现率设置" size="small" style={{ marginBottom: 16 }}>
+            <Card title={t("contract_new.discount_rate_section", language)} size="small" style={{ marginBottom: 16 }}>
               <Space direction="vertical" style={{ width: "100%" }}>
                 <Alert
-                  message="提示"
-                  description="如果合同未明确折现率，可以留空。系统会标记为缺失状态，需要后续人工确认。"
+                  message={t("contract_new.discount_rate_tip", language)}
+                  description={t("contract_new.discount_rate_tip_desc", language)}
                   type="info"
                   showIcon
                 />
 
                 <Form.Item
-                  label="折现率数值 (%)"
+                  label={t("contract_new.discount_rate_value", language)}
                   name="discount_rate_value"
-                  help="可直接填写年化折现率，填写 5 会自动按 5% 处理。"
+                  help={t("contract_new.discount_rate_help", language)}
                 >
                   <InputNumber
                     style={{ width: "100%" }}
                     min={0}
                     step={0.01}
-                    placeholder="例如 5 或 5.25"
+                    placeholder={t("contract_new.discount_rate_placeholder", language)}
                   />
                 </Form.Item>
                 
                 <Form.Item
-                  label="折现率类型"
+                  label={t("contract_new.discount_rate_type", language)}
                   name="discount_rate_type"
                 >
-                  <Select placeholder="选择折现率类型" allowClear>
-                    <Select.Option value="ibr">集团 IBR</Select.Option>
-                    <Select.Option value="entity_specific">法人特定利率</Select.Option>
-                    <Select.Option value="contract_specific">合同特定利率</Select.Option>
-                    <Select.Option value="implicit_rate">隐含利率</Select.Option>
+                  <Select placeholder={t("contract_new.select_discount_rate_type", language)} allowClear>
+                    <Select.Option value="ibr">{t("contract_new.rate_type_group_ibr", language)}</Select.Option>
+                    <Select.Option value="entity_specific">{t("contract_new.rate_type_entity", language)}</Select.Option>
+                    <Select.Option value="contract_specific">{t("contract_new.rate_type_contract", language)}</Select.Option>
+                    <Select.Option value="implicit_rate">{t("contract_new.rate_type_implicit", language)}</Select.Option>
                   </Select>
                 </Form.Item>
 
                 <Form.Item
-                  label="折现率版本/编号"
+                  label={t("contract_new.discount_rate_version", language)}
                   name="discount_rate_version"
                 >
-                  <Input placeholder="例如：IBR-2024-Q1" />
+                  <Input placeholder={t("contract_new.discount_rate_version_placeholder", language)} />
                 </Form.Item>
               </Space>
             </Card>
@@ -266,7 +269,7 @@ export default function NewContractPage() {
                 loading={loading}
                 size="large"
               >
-                创建合同
+                {t("contract_new.create_button", language)}
               </Button>
             </Form.Item>
           </Form>

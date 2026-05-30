@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,11 +55,46 @@ type ChatMessage struct {
 }
 
 type AIChatResponse struct {
-	Answer     string   `json:"answer"`
-	Sources    []Source `json:"sources"`
-	Confidence float64  `json:"confidence"`
-	IsOfficial bool     `json:"is_official"`
-	Model      string   `json:"model,omitempty"`
+	Answer          string                   `json:"answer"`
+	Sources         []Source                 `json:"sources"`
+	Confidence      float64                  `json:"confidence"`
+	IsOfficial      bool                     `json:"is_official"`
+	Model           string                   `json:"model,omitempty"`
+	DraftContracts  []ContractDraftItem      `json:"draft_contracts,omitempty"`
+	BatchSummary    *BatchParseSummary       `json:"batch_summary,omitempty"`
+}
+
+type ContractDraftItem struct {
+	ContractNumber      string   `json:"contract_number"`
+	ContractName        string   `json:"contract_name"`
+	Lessee              string   `json:"lessee"`
+	Lessor              string   `json:"lessor"`
+	StoreName           string   `json:"store_name"`
+	StoreAddress        string   `json:"store_address"`
+	CommencementDate    string   `json:"commencement_date"`
+	LeaseStartDate      string   `json:"lease_start_date"`
+	LeaseEndDate        string   `json:"lease_end_date"`
+	Currency            string   `json:"currency"`
+	FixedRentAmount     float64  `json:"fixed_rent_amount"`
+	PaymentFrequency    string   `json:"payment_frequency"`
+	PaymentTiming       string   `json:"payment_timing"`
+	RenewalOption       bool     `json:"renewal_option"`
+	TerminationOption   bool     `json:"termination_option"`
+	CAMAmount           float64  `json:"cam_amount"`
+	ServiceFee          float64  `json:"service_fee"`
+	DiscountRateType    string   `json:"discount_rate_type"`
+	DiscountRate        float64  `json:"discount_rate"`
+	Confidence          float64  `json:"confidence"`
+	MissingFields       []string `json:"missing_fields"`
+	Warnings            []string `json:"warnings"`
+}
+
+type BatchParseSummary struct {
+	TotalCount              int      `json:"total_count"`
+	OverallConfidence       float64  `json:"overall_confidence"`
+	RequiresHumanConfirm    bool     `json:"requires_human_confirmation"`
+	MissingFields           []string `json:"missing_fields"`
+	Warnings                []string `json:"warnings"`
 }
 
 type Source struct {
@@ -98,6 +134,38 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 
 	// 1. Handle file upload if present — keep existing parse behavior
 	if req.FileID != "" && req.ObjectName != "" {
+		// Check intent: batch contract import from ledger file
+		msgLower := strings.ToLower(req.Message)
+		isBatchImportIntent := containsAny(msgLower, []string{"录入", "导入", "录入台账", "批量创建", "创建合同", "导入台账", "import", "batch create", "create contracts", "ledger"})
+
+		if isBatchImportIntent {
+			// Call batch contract parsing endpoint
+			batchResult, err := h.parseContractBatch(c, req.FileID, req.ObjectName, req.ContentType)
+			if err != nil {
+				c.JSON(http.StatusOK, AIChatResponse{
+					Answer:     fmt.Sprintf("文件解析失败: %s", err.Error()),
+					Sources:    sources,
+					Confidence: 0.5,
+					IsOfficial: false,
+					Model:      "fallback",
+				})
+				return
+			}
+
+			// Return structured draft response for frontend to render confirmation panel
+			c.JSON(http.StatusOK, AIChatResponse{
+				Answer:         batchResult.SummaryText,
+				Sources:        batchResult.Sources,
+				Confidence:     batchResult.Confidence,
+				IsOfficial:     false,
+				Model:          "batch-parser",
+				DraftContracts: batchResult.Contracts,
+				BatchSummary:   batchResult.Summary,
+			})
+			return
+		}
+
+		// Default single-file parse behavior
 		parsed, err := h.parseFile(c, req.FileID, req.ObjectName, req.ContentType)
 		if err != nil {
 			contextData.WriteString(fmt.Sprintf("\n## 文件解析失败\n错误: %s\n", err.Error()))
@@ -696,6 +764,191 @@ func (h *AIChatHandler) parseFile(c *gin.Context, fileID, objectName, contentTyp
 	}
 
 	return result, nil
+}
+
+type BatchParseResult struct {
+	SummaryText string
+	Sources     []Source
+	Confidence  float64
+	Contracts   []ContractDraftItem
+	Summary     *BatchParseSummary
+}
+
+func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, contentType string) (*BatchParseResult, error) {
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		aiServiceURL = "http://ai-service:8000"
+	}
+
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"file_id":      fileID,
+		"object_name":  objectName,
+		"content_type": contentType,
+		"mode":         "assist",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", aiServiceURL+"/api/v1/parse/contract-batch", bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", c.GetHeader("Authorization"))
+
+	client := &http.Client{Timeout: 180 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	contractsRaw, _ := result["contracts"].([]interface{})
+	contracts := make([]ContractDraftItem, 0, len(contractsRaw))
+	for _, cr := range contractsRaw {
+		cmap, ok := cr.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		item := ContractDraftItem{
+			ContractNumber:    getString(cmap, "contract_number"),
+			ContractName:      getString(cmap, "contract_name"),
+			Lessee:            getString(cmap, "lessee"),
+			Lessor:            getString(cmap, "lessor"),
+			StoreName:         getString(cmap, "store_name"),
+			StoreAddress:      getString(cmap, "store_address"),
+			CommencementDate:  getString(cmap, "commencement_date"),
+			LeaseStartDate:    getString(cmap, "lease_start_date"),
+			LeaseEndDate:      getString(cmap, "lease_end_date"),
+			Currency:          getString(cmap, "currency"),
+			PaymentFrequency:  getString(cmap, "payment_frequency"),
+			PaymentTiming:     getString(cmap, "payment_timing"),
+			DiscountRateType:  getString(cmap, "discount_rate_type"),
+			RenewalOption:     getBool(cmap, "renewal_option"),
+			TerminationOption: getBool(cmap, "termination_option"),
+			FixedRentAmount:   getFloat64(cmap, "fixed_rent_amount"),
+			CAMAmount:         getFloat64(cmap, "cam_amount"),
+			ServiceFee:        getFloat64(cmap, "service_fee"),
+			DiscountRate:      getFloat64(cmap, "discount_rate"),
+			Confidence:        getFloat64(cmap, "confidence"),
+			MissingFields:     getStringSlice(cmap, "missing_fields"),
+			Warnings:          getStringSlice(cmap, "warnings"),
+		}
+		contracts = append(contracts, item)
+	}
+
+	totalCount := getInt(result, "total_count")
+	overallConf := getFloat64(result, "overall_confidence")
+	if overallConf == 0 {
+		if scores, ok := result["confidence_scores"].(map[string]interface{}); ok {
+			overallConf = getFloat64(scores, "overall")
+		}
+	}
+	requiresHuman := getBool(result, "requires_human_confirmation")
+
+	// Build summary text
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("已从文件中识别出 **%d** 份合同。\n\n", totalCount))
+	if requiresHuman {
+		summary.WriteString("⚠️ **需要人工确认**：部分合同存在缺失字段或低置信度识别结果，请逐条核对后再确认入库。\n\n")
+	} else {
+		summary.WriteString("✅ 识别结果总体良好，建议快速核对后确认入库。\n\n")
+	}
+	summary.WriteString("请在下方表格中逐条编辑、跳过或确认每份合同。确认后将批量创建为草稿状态合同，进入正常审批流程。")
+
+	sources := []Source{{
+		Type:    "file",
+		ID:      fileID,
+		Title:   "合同台账文件",
+		Snippet: objectName,
+	}}
+
+	return &BatchParseResult{
+		SummaryText: summary.String(),
+		Sources:     sources,
+		Confidence:  overallConf,
+		Contracts:   contracts,
+		Summary: &BatchParseSummary{
+			TotalCount:           totalCount,
+			OverallConfidence:    overallConf,
+			RequiresHumanConfirm: requiresHuman,
+			MissingFields:        getStringSlice(result, "missing_fields"),
+			Warnings:             getStringSlice(result, "warnings"),
+		},
+	}, nil
+}
+
+// Helper functions for safe type extraction
+func getString(m map[string]interface{}, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func getBool(m map[string]interface{}, key string) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return false
+}
+
+func getFloat64(m map[string]interface{}, key string) float64 {
+	switch v := m[key].(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case string:
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return 0
+}
+
+func getInt(m map[string]interface{}, key string) int {
+	switch v := m[key].(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	case int64:
+		return int(v)
+	}
+	return 0
+}
+
+func getStringSlice(m map[string]interface{}, key string) []string {
+	if arr, ok := m[key].([]interface{}); ok {
+		result := make([]string, 0, len(arr))
+		for _, v := range arr {
+			if s, ok := v.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	}
+	return []string{}
 }
 
 func containsAny(msg string, targets []string) bool {

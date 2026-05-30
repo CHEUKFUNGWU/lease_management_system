@@ -189,6 +189,132 @@ func (h *ContractHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, created)
 }
 
+// CreateBatch creates multiple contracts from AI parsed draft data
+func (h *ContractHandler) CreateBatch(c *gin.Context) {
+	type BatchContractRequest struct {
+		Contracts []ContractRequest `json:"contracts" binding:"required"`
+	}
+
+	var req BatchContractRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID, _ := c.Get("user_id")
+	var createdBy *string
+	if id, ok := userID.(string); ok {
+		createdBy = &id
+	}
+
+	// Auto-fill legal_entity_id from JWT tenant context
+	jwtLegalEntityID := middleware.GetTenantID(c)
+
+	createdContracts := make([]*repository.Contract, 0)
+	failedContracts := make([]map[string]interface{}, 0)
+
+	for i, contractReq := range req.Contracts {
+		commencementDate, err := time.Parse("2006-01-02", contractReq.CommencementDate)
+		if err != nil {
+			failedContracts = append(failedContracts, map[string]interface{}{
+				"index":   i,
+				"number":  contractReq.ContractNumber,
+				"error":   "invalid commencement_date: " + err.Error(),
+			})
+			continue
+		}
+		leaseStartDate, err := time.Parse("2006-01-02", contractReq.LeaseStartDate)
+		if err != nil {
+			failedContracts = append(failedContracts, map[string]interface{}{
+				"index":   i,
+				"number":  contractReq.ContractNumber,
+				"error":   "invalid lease_start_date: " + err.Error(),
+			})
+			continue
+		}
+		leaseEndDate, err := time.Parse("2006-01-02", contractReq.LeaseEndDate)
+		if err != nil {
+			failedContracts = append(failedContracts, map[string]interface{}{
+				"index":   i,
+				"number":  contractReq.ContractNumber,
+				"error":   "invalid lease_end_date: " + err.Error(),
+			})
+			continue
+		}
+
+		var signingDate *time.Time
+		if contractReq.SigningDate != nil {
+			sd, _ := time.Parse("2006-01-02", *contractReq.SigningDate)
+			signingDate = &sd
+		}
+
+		contract := &repository.Contract{
+			ContractNumber:               contractReq.ContractNumber,
+			ContractName:                 contractReq.ContractName,
+			Currency:                     contractReq.Currency,
+			CommencementDate:             commencementDate,
+			LeaseStartDate:               leaseStartDate,
+			LeaseEndDate:                 leaseEndDate,
+			LesseeName:                   contractReq.LesseeName,
+			LessorName:                   contractReq.LessorName,
+			StoreName:                    contractReq.StoreName,
+			StoreAddress:                 contractReq.StoreAddress,
+			Tags:                         normalizeTags(contractReq.Tags),
+			AssetCategory:                contractReq.AssetCategory,
+			PropertyCategory:             contractReq.PropertyCategory,
+			SigningDate:                  signingDate,
+			RenewalOptionDescription:     contractReq.RenewalOptionDescription,
+			TerminationOptionDescription: contractReq.TerminationOptionDescription,
+			RenewalAssessment:            contractReq.RenewalAssessment,
+			TerminationAssessment:        contractReq.TerminationAssessment,
+			DiscountRateType:             contractReq.DiscountRateType,
+			DiscountRateVersion:          contractReq.DiscountRateVersion,
+			DiscountRateValue:            normalizeDiscountRateValue(contractReq.DiscountRateValue),
+			CreatedBy:                    createdBy,
+		}
+
+		// Auto-fill legal_entity_id from JWT tenant context if not provided
+		if contractReq.LegalEntityID != nil && *contractReq.LegalEntityID != "" {
+			contract.LegalEntityID = contractReq.LegalEntityID
+		} else if jwtLegalEntityID != "" {
+			contract.LegalEntityID = &jwtLegalEntityID
+		}
+		if contractReq.StoreID != nil && *contractReq.StoreID != "" {
+			contract.StoreID = contractReq.StoreID
+		}
+		if contractReq.LandlordID != nil && *contractReq.LandlordID != "" {
+			contract.LandlordID = contractReq.LandlordID
+		}
+
+		created, err := h.contractRepo.Create(c.Request.Context(), contract)
+		if err != nil {
+			failedContracts = append(failedContracts, map[string]interface{}{
+				"index":   i,
+				"number":  contractReq.ContractNumber,
+				"error":   "failed to create: " + err.Error(),
+			})
+			continue
+		}
+
+		createdContracts = append(createdContracts, created)
+
+		// Audit log: contract created
+		if h.auditLogger != nil {
+			uid, _ := c.Get("user_id")
+			uidStr, _ := uid.(string)
+			h.auditLogger.Log(c.Request.Context(), "lease_contracts", created.ID, "create", nil, created, uidStr, c)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":           true,
+		"created_count":     len(createdContracts),
+		"failed_count":      len(failedContracts),
+		"created_contracts": createdContracts,
+		"failed_contracts":  failedContracts,
+	})
+}
+
 func (h *ContractHandler) GetAll(c *gin.Context) {
 	legalEntityID := middleware.GetTenantID(c)
 	

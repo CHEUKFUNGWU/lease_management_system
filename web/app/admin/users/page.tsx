@@ -19,8 +19,10 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { adminApi, legalEntityApi } from "../../lib/api";
+import { t } from "../../lib/i18n";
 
 const { Title } = Typography;
 
@@ -41,11 +43,12 @@ export default function AdminUsersPage() {
   const [form] = Form.useForm();
   const [legalEntities, setLegalEntities] = useState<any[]>([]);
   const { user, token } = useAuth();
+  const { language } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
-      message.error("需要管理员权限");
+      message.error(t("admin_users.need_admin", language));
       router.push("/login");
       return;
     }
@@ -60,7 +63,7 @@ export default function AdminUsersPage() {
       const data = await adminApi.listUsers(token);
       setUsers(data.data || []);
     } catch (error: any) {
-      message.error(error.message || "获取用户列表失败");
+      message.error(error.message || t("admin_users.load_failed", language));
     } finally {
       setLoading(false);
     }
@@ -88,12 +91,12 @@ export default function AdminUsersPage() {
         },
         token
       );
-      message.success("用户创建成功");
+      message.success(t("admin_users.create_success", language));
       setModalVisible(false);
       form.resetFields();
       fetchUsers();
     } catch (error: any) {
-      message.error(error.message || "创建用户失败");
+      message.error(error.message || t("admin_users.create_failed", language));
     }
   };
 
@@ -105,25 +108,25 @@ export default function AdminUsersPage() {
   };
 
   const roleLabelMap: Record<string, string> = {
-    admin: "管理员",
-    reviewer: "复核员",
-    approver: "审批员",
-    user: "普通用户",
+    admin: t("admin_users.role_admin", language),
+    reviewer: t("admin_users.role_reviewer", language),
+    approver: t("admin_users.role_approver", language),
+    user: t("admin_users.role_user", language),
   };
 
   const columns = [
     {
-      title: "用户名",
+      title: t("admin_users.col_username", language),
       dataIndex: "username",
       key: "username",
     },
     {
-      title: "邮箱",
+      title: t("admin_users.col_email", language),
       dataIndex: "email",
       key: "email",
     },
     {
-      title: "角色",
+      title: t("admin_users.col_role", language),
       dataIndex: "role",
       key: "role",
       render: (role: string) => (
@@ -133,7 +136,7 @@ export default function AdminUsersPage() {
       ),
     },
     {
-      title: "法人主体",
+      title: t("admin_users.col_legal_entity", language),
       dataIndex: "legal_entity_id",
       key: "legal_entity_id",
       render: (id: string) => {
@@ -142,17 +145,17 @@ export default function AdminUsersPage() {
       },
     },
     {
-      title: "状态",
+      title: t("admin_users.col_status", language),
       dataIndex: "is_active",
       key: "is_active",
       render: (active: boolean) => (
         <Tag color={active ? "success" : "default"}>
-          {active ? "活跃" : "禁用"}
+          {active ? t("admin_users.status_active", language) : t("admin_users.status_disabled", language)}
         </Tag>
       ),
     },
     {
-      title: "创建时间",
+      title: t("admin_users.col_created_at", language),
       dataIndex: "created_at",
       key: "created_at",
       render: (date: string) => new Date(date).toLocaleString("zh-CN"),
@@ -170,14 +173,14 @@ export default function AdminUsersPage() {
         }}
       >
         <Title level={3} style={{ margin: 0 }}>
-          <UserOutlined /> 用户管理
+          <UserOutlined /> {t("admin_users.title", language)}
         </Title>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => setModalVisible(true)}
         >
-          新建用户
+          {t("admin_users.new_user", language)}
         </Button>
       </div>
 
@@ -192,7 +195,7 @@ export default function AdminUsersPage() {
       </Card>
 
       <Modal
-        title="新建用户"
+        title={t("admin_users.modal_title", language)}
         open={modalVisible}
         onCancel={() => {
           setModalVisible(false);
@@ -208,58 +211,58 @@ export default function AdminUsersPage() {
         >
           <Form.Item
             name="username"
-            label="用户名"
+            label={t("admin_users.label_username", language)}
             rules={[
-              { required: true, message: "请输入用户名" },
-              { min: 3, message: "至少3个字符" },
+              { required: true, message: t("admin_users.username_placeholder", language) },
+              { min: 3, message: t("admin_users.username_min", language) },
             ]}
           >
-            <Input placeholder="用户名" />
+            <Input placeholder={t("admin_users.username_placeholder", language)} />
           </Form.Item>
 
           <Form.Item
             name="email"
-            label="邮箱"
+            label={t("admin_users.label_email", language)}
             rules={[
-              { required: true, message: "请输入邮箱" },
-              { type: "email", message: "请输入有效邮箱" },
+              { required: true, message: t("admin_users.email_placeholder", language) },
+              { type: "email", message: t("admin_users.email_invalid", language) },
             ]}
           >
-            <Input placeholder="邮箱" />
+            <Input placeholder={t("admin_users.email_placeholder", language)} />
           </Form.Item>
 
           <Form.Item
             name="password"
-            label="密码"
+            label={t("admin_users.label_password", language)}
             rules={[
-              { required: true, message: "请输入密码" },
-              { min: 6, message: "至少6个字符" },
+              { required: true, message: t("admin_users.password_placeholder", language) },
+              { min: 6, message: t("admin_users.password_min", language) },
             ]}
           >
-            <Input.Password placeholder="密码" />
+            <Input.Password placeholder={t("admin_users.password_placeholder", language)} />
           </Form.Item>
 
           <Form.Item
             name="role"
-            label="角色"
+            label={t("admin_users.label_role", language)}
             initialValue="user"
-            rules={[{ required: true, message: "请选择角色" }]}
+            rules={[{ required: true, message: t("admin_users.role_placeholder", language) }]}
           >
-            <Select placeholder="选择角色">
-              <Select.Option value="user">普通用户</Select.Option>
-              <Select.Option value="reviewer">复核员</Select.Option>
-              <Select.Option value="approver">审批员</Select.Option>
-              <Select.Option value="admin">管理员</Select.Option>
+            <Select placeholder={t("admin_users.role_placeholder", language)}>
+              <Select.Option value="user">{t("admin_users.role_user", language)}</Select.Option>
+              <Select.Option value="reviewer">{t("admin_users.role_reviewer", language)}</Select.Option>
+              <Select.Option value="approver">{t("admin_users.role_approver", language)}</Select.Option>
+              <Select.Option value="admin">{t("admin_users.role_admin", language)}</Select.Option>
             </Select>
           </Form.Item>
 
           <Form.Item
             name="legal_entity_id"
-            label="所属法人"
-            rules={[{ required: true, message: "请选择所属法人" }]}
+            label={t("admin_users.label_legal_entity", language)}
+            rules={[{ required: true, message: t("admin_users.legal_entity_placeholder", language) }]}
           >
             <Select
-              placeholder="选择所属法人"
+              placeholder={t("admin_users.legal_entity_placeholder", language)}
               options={legalEntities.map((e) => ({
                 value: e.id,
                 label: `${e.code} - ${e.name}`,
@@ -269,9 +272,9 @@ export default function AdminUsersPage() {
 
           <Form.Item>
             <Space style={{ width: "100%", justifyContent: "flex-end" }}>
-              <Button onClick={() => setModalVisible(false)}>取消</Button>
+              <Button onClick={() => setModalVisible(false)}>{t("admin_users.cancel", language)}</Button>
               <Button type="primary" htmlType="submit">
-                创建
+                {t("admin_users.create", language)}
               </Button>
             </Space>
           </Form.Item>

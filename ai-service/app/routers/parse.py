@@ -499,3 +499,237 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
+
+
+class ContractBatchDraftRequest(BaseModel):
+    file_id: str
+    object_name: str
+    content_type: str = "application/pdf"
+    file_content: Optional[str] = None
+    mode: str = "assist"
+
+
+class ContractBatchItem(BaseModel):
+    contract_number: str
+    contract_name: str
+    lessee: str
+    lessor: str
+    store_name: Optional[str] = ""
+    store_address: Optional[str] = ""
+    commencement_date: str
+    lease_start_date: str
+    lease_end_date: str
+    currency: Optional[str] = ""
+    fixed_rent_amount: Optional[float] = 0.0
+    payment_frequency: Optional[str] = "monthly"
+    payment_timing: Optional[str] = "postpaid"
+    renewal_option: Optional[bool] = False
+    termination_option: Optional[bool] = False
+    cam_amount: Optional[float] = 0.0
+    service_fee: Optional[float] = 0.0
+    discount_rate_type: Optional[str] = ""
+    discount_rate: Optional[float] = 0.0
+    confidence: Optional[float] = 0.8
+    missing_fields: Optional[List[str]] = []
+    warnings: Optional[List[str]] = []
+
+
+class ContractBatchDraftResponse(BaseModel):
+    task_id: str
+    file_id: str
+    mode: str
+    draft_type: str = "contract_batch_draft"
+    status: str
+    contracts: List[ContractBatchItem]
+    total_count: int
+    confidence_scores: Dict[str, float]
+    missing_fields: List[str]
+    warnings: List[str]
+    requires_human_confirmation: bool
+
+
+@router.post("/parse/contract-batch", response_model=ContractBatchDraftResponse)
+async def parse_contract_batch(request: ContractBatchDraftRequest):
+    """
+    解析合同台账文件，批量提取多份合同草稿
+
+    适用于：用户上传包含多份合同的 Excel/PDF 台账，AI 提取每份合同的关键字段。
+
+    默认 Assist Mode：
+    - AI 只生成草稿，不直接写入正式台账
+    - 所有结果需 Editor 逐条确认
+    - 关键字段缺失时必须标记人工确认
+    """
+
+    if request.mode != "assist":
+        raise HTTPException(
+            status_code=400,
+            detail="当前仅支持 Assist Mode。Auto-Post Mode 需另行配置"
+        )
+
+    # Extract text: use provided file_content or download from MinIO + PaddleOCR
+    file_content = request.file_content
+    if not file_content:
+        try:
+            file_data = download_from_minio("ifrs16-uploads", request.object_name)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"文件下载失败: {str(e)}")
+
+        try:
+            file_content = await extract_text(file_data, request.content_type)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"文本提取失败: {str(e)}")
+
+        if len(file_content) > 20000:
+            file_content = file_content[:20000] + "\n... (truncated)"
+
+    prompt = f"""
+    你是一位专业的 IFRS 16 租赁合同台账解析专家。请从以下合同台账内容中提取每一份合同的字段。
+
+    【重要规则 — 必须遵守】
+    1. 台账中可能包含多份合同，请逐条提取
+    2. 如果合同中未明确提到折现率/利率，不要猜测，标记为缺失
+    3. 如果合同中未明确提到货币（币种），不要猜测，标记为缺失或 unknown
+    4. 区分先付租金(prepaid)和后付租金(postpaid)
+    5. 区分固定租金和变量租金
+    6. 识别租赁成分和非租赁成分(CAM、服务费)
+    7. 承租方(lessee)是租赁合同的乙方，即使用物业并支付租金的一方
+    8. 出租方(lessor)是租赁合同的甲方，即提供物业并收取租金的一方
+
+    合同台账内容:
+    {file_content}
+
+    请以 JSON 格式输出，包含以下顶层字段:
+    - contracts: 合同列表，每个元素包含:
+      - contract_number: 合同编号
+      - contract_name: 合同名称
+      - lessee: 承租方名称
+      - lessor: 出租方名称
+      - store_name: 门店/物业名称（如有）
+      - store_address: 门店/物业地址（如有）
+      - commencement_date: 租赁起始日 (YYYY-MM-DD)
+      - lease_start_date: 租赁开始日 (YYYY-MM-DD)
+      - lease_end_date: 租期结束日 (YYYY-MM-DD)
+      - currency: 币种 (CNY/USD/EUR)。如果未明确提到，返回 null 或空字符串，不要猜测
+      - fixed_rent_amount: 固定租金金额（仅数字）
+      - payment_frequency: 付款频率 (monthly/quarterly/yearly)
+      - payment_timing: 付款时点 (prepaid/postpaid)
+      - renewal_option: 是否有续租选择权 (true/false)
+      - termination_option: 是否有终止选择权 (true/false)
+      - cam_amount: 物业管理费 (如有，仅数字)
+      - service_fee: 服务费 (如有，仅数字)
+      - discount_rate_type: 折现率类型 (如合同中提及)
+      - discount_rate: 折现率数值 (如合同中提及)
+      - confidence: 该份合同识别的置信度 (0-1)
+      - missing_fields: 该份合同缺失的字段列表
+      - warnings: 该份合同的警告列表
+    - total_count: 识别到的合同总数
+    - overall_confidence: 总体置信度 (0-1)
+    - missing_fields: 全局缺失字段汇总
+    - warnings: 全局警告列表
+    """
+
+    try:
+        response = await llm_client.chat_completion(
+            messages=[
+                {"role": "system", "content": "你是一位专业的 IFRS 16 租赁合同台账解析专家。请准确提取每份合同字段。如果字段未在合同中出现，不要猜测，标记为缺失。"},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=4000,
+            response_format={"type": "json_object"}
+        )
+
+        content = response["choices"][0]["message"]["content"]
+
+        try:
+            parsed = json.loads(content)
+        except:
+            parsed = {
+                "contracts": [],
+                "total_count": 0,
+                "overall_confidence": 0.0,
+                "missing_fields": [],
+                "warnings": ["解析响应格式异常，请人工检查"]
+            }
+
+        contracts_raw = parsed.get("contracts", [])
+        validated_contracts = []
+        all_warnings = parsed.get("warnings", [])
+        all_missing = parsed.get("missing_fields", [])
+
+        for i, c in enumerate(contracts_raw):
+            # Validate required fields
+            if not c.get("contract_number") or not c.get("lessee") or not c.get("lessor"):
+                all_warnings.append(f"第 {i+1} 份合同缺少必要字段 (contract_number/lessee/lessor)，已跳过")
+                continue
+
+            # Check discount rate missing
+            dr_missing, dr_warnings = _check_discount_rate_missing(c)
+            all_warnings.extend(dr_warnings)
+
+            # Check currency missing
+            currency_missing, currency_warnings = _check_currency_missing(c)
+            all_warnings.extend(currency_warnings)
+
+            # Check critical fields
+            missing_fields, field_warnings = _check_critical_fields(c)
+            all_warnings.extend(field_warnings)
+
+            contract_confidence = c.get("confidence", 0.8)
+            if missing_fields:
+                contract_confidence = min(contract_confidence, 0.7)
+
+            validated_contracts.append(ContractBatchItem(
+                contract_number=c.get("contract_number", ""),
+                contract_name=c.get("contract_name", ""),
+                lessee=c.get("lessee", ""),
+                lessor=c.get("lessor", ""),
+                store_name=c.get("store_name", ""),
+                store_address=c.get("store_address", ""),
+                commencement_date=c.get("commencement_date", ""),
+                lease_start_date=c.get("lease_start_date", ""),
+                lease_end_date=c.get("lease_end_date", ""),
+                currency=c.get("currency", ""),
+                fixed_rent_amount=float(c.get("fixed_rent_amount", 0) or 0),
+                payment_frequency=c.get("payment_frequency", "monthly"),
+                payment_timing=c.get("payment_timing", "postpaid"),
+                renewal_option=bool(c.get("renewal_option", False)),
+                termination_option=bool(c.get("termination_option", False)),
+                cam_amount=float(c.get("cam_amount", 0) or 0),
+                service_fee=float(c.get("service_fee", 0) or 0),
+                discount_rate_type=c.get("discount_rate_type", ""),
+                discount_rate=float(c.get("discount_rate", 0) or 0),
+                confidence=contract_confidence,
+                missing_fields=missing_fields + (["discount_rate"] if dr_missing else []) + (["currency"] if currency_missing else []),
+                warnings=dr_warnings + currency_warnings + field_warnings + c.get("warnings", [])
+            ))
+
+        overall_confidence = parsed.get("overall_confidence", 0.8)
+        low_confidence_count = sum(1 for c in validated_contracts if (c.confidence or 1.0) < 0.8)
+
+        requires_human = (
+            overall_confidence < 0.8 or
+            len(validated_contracts) == 0 or
+            low_confidence_count > len(validated_contracts) / 2 or
+            len(all_missing) > 0
+        )
+
+        return {
+            "task_id": "task_batch_" + request.file_id,
+            "file_id": request.file_id,
+            "mode": "assist",
+            "draft_type": "contract_batch_draft",
+            "status": "draft_generated",
+            "contracts": validated_contracts,
+            "total_count": len(validated_contracts),
+            "confidence_scores": {
+                "overall": overall_confidence,
+                "average_item": sum((c.confidence or 0.8) for c in validated_contracts) / max(len(validated_contracts), 1),
+            },
+            "missing_fields": all_missing,
+            "warnings": all_warnings + ["AI Assist Mode: 合同台账草稿需人工逐条确认后入库"],
+            "requires_human_confirmation": requires_human,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"批量解析失败: {str(e)}")

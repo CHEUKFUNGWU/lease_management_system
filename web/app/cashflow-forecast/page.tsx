@@ -13,6 +13,8 @@ import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t, type Language } from "../lib/i18n";
 import { fmtNum } from "../lib/format";
 import { exportCSV } from "../lib/export";
 import dayjs from "dayjs";
@@ -24,47 +26,47 @@ const { RangePicker } = DatePicker;
 
 /* ──────────────── column builder ──────────────── */
 
-const buildColumns = (view: string) => {
+const buildColumns = (view: string, language: Language) => {
   const idCols: any[] = [];
 
   if (view === "contract") {
     idCols.push(
-      { title: "合同编号", dataIndex: "contract_number", width: 150, fixed: "left" as const },
-      { title: "合同名称", dataIndex: "contract_name", width: 200, ellipsis: true, fixed: "left" as const },
-      { title: "门店", dataIndex: "store_name", width: 140 },
-      { title: "币种", dataIndex: "currency", width: 80 },
+      { title: t("cashflow.col_contract_number", language), dataIndex: "contract_number", width: 150, fixed: "left" as const },
+      { title: t("cashflow.col_contract_name", language), dataIndex: "contract_name", width: 200, ellipsis: true, fixed: "left" as const },
+      { title: t("cashflow.col_store", language), dataIndex: "store_name", width: 140 },
+      { title: t("cashflow.col_currency", language), dataIndex: "currency", width: 80 },
     );
   } else if (view === "store") {
     idCols.push(
-      { title: "门店", dataIndex: "store_name", width: 180, fixed: "left" as const },
-      { title: "币种", dataIndex: "currency", width: 80 },
+      { title: t("cashflow.col_store", language), dataIndex: "store_name", width: 180, fixed: "left" as const },
+      { title: t("cashflow.col_currency", language), dataIndex: "currency", width: 80 },
     );
   } else {
     idCols.push(
-      { title: "分组", dataIndex: "group_label", width: 180, fixed: "left" as const },
-      { title: "币种", dataIndex: "currency", width: 80 },
+      { title: t("cashflow.col_group", language), dataIndex: "group_label", width: 180, fixed: "left" as const },
+      { title: t("cashflow.col_currency", language), dataIndex: "currency", width: 80 },
     );
   }
 
   const periodCols = [
-    { title: "期间", dataIndex: "period_key", width: 100 },
-    { title: "期间起", dataIndex: "period_start", width: 110 },
-    { title: "期间止", dataIndex: "period_end", width: 110 },
+    { title: t("cashflow.col_period", language), dataIndex: "period_key", width: 100 },
+    { title: t("cashflow.col_period_start", language), dataIndex: "period_start", width: 110 },
+    { title: t("cashflow.col_period_end", language), dataIndex: "period_end", width: 110 },
   ];
 
   const cashflowCols = {
-    title: "现金流出",
+    title: t("cashflow.col_cash_outflow", language),
     children: [
-      { title: "固定租金", dataIndex: "fixed_rent", width: 120, align: "right" as const, render: fmtNum },
-      { title: "变量租金", dataIndex: "variable_rent", width: 120, align: "right" as const, render: fmtNum },
-      { title: "非租赁", dataIndex: "non_lease_expense", width: 120, align: "right" as const, render: fmtNum },
-      { title: "税额", dataIndex: "tax_amount", width: 100, align: "right" as const, render: fmtNum },
-      { title: "总现金流出", dataIndex: "total_cash_outflow", width: 130, align: "right" as const, render: fmtNum },
+      { title: t("cashflow.col_fixed_rent", language), dataIndex: "fixed_rent", width: 120, align: "right" as const, render: fmtNum },
+      { title: t("cashflow.col_variable_rent", language), dataIndex: "variable_rent", width: 120, align: "right" as const, render: fmtNum },
+      { title: t("cashflow.col_non_lease", language), dataIndex: "non_lease_expense", width: 120, align: "right" as const, render: fmtNum },
+      { title: t("cashflow.col_tax", language), dataIndex: "tax_amount", width: 100, align: "right" as const, render: fmtNum },
+      { title: t("cashflow.col_total_outflow", language), dataIndex: "total_cash_outflow", width: 130, align: "right" as const, render: fmtNum },
     ],
   };
 
   const metaCols = [
-    { title: "笔数", dataIndex: "schedule_count", width: 80, align: "right" as const },
+    { title: t("cashflow.col_count", language), dataIndex: "schedule_count", width: 80, align: "right" as const },
   ];
 
   return [
@@ -79,6 +81,7 @@ const buildColumns = (view: string) => {
 
 export default function CashflowForecastPage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
 
   /* ---- controls ---- */
   const [reportMode, setReportMode] = useState<"working" | "official">("working");
@@ -123,7 +126,7 @@ export default function CashflowForecastPage() {
     const start = dateRange?.[0]?.format("YYYY-MM-DD") || "";
     const end = dateRange?.[1]?.format("YYYY-MM-DD") || "";
     if (!start || !end) {
-      message.warning("请选择开始日期和结束日期");
+      message.warning(t("cashflow.please_select_date", language));
       return;
     }
 
@@ -145,10 +148,10 @@ export default function CashflowForecastPage() {
       );
       setData(res.data || []);
       setFetched(true);
-      message.success(`现金流预测查询完成，共 ${res.total || 0} 条`);
+      message.success(t("cashflow.query_success", language, { total: String(res.total || 0) }));
     } catch (error: any) {
       console.error("Failed to fetch cashflow forecast:", error);
-      message.error(error?.message || "现金流预测查询失败");
+      message.error(error?.message || t("cashflow.query_failed", language));
     } finally {
       setLoading(false);
     }
@@ -179,7 +182,7 @@ export default function CashflowForecastPage() {
   }, [data]);
 
   /* ---- table columns ---- */
-  const columns = useMemo(() => buildColumns(view), [view]);
+  const columns = useMemo(() => buildColumns(view, language), [view, language]);
   const flatColumns = useMemo(
     () => columns.flatMap((c: any) => (c.children ? c.children : [c])),
     [columns],
@@ -191,10 +194,10 @@ export default function CashflowForecastPage() {
         {/* ─── page heading ─── */}
         <Title level={2}>
           <LineChartOutlined style={{ marginRight: 8 }} />
-          未来租金现金流预测
+          {t("cashflow.title", language)}
         </Title>
         <Typography.Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
-          基于合同与付款计划预测未来期间的租金现金流出，可按合同、门店或汇总查看。
+          {t("cashflow.description", language)}
         </Typography.Text>
 
         {/* ─── report mode card ─── */}
@@ -202,7 +205,7 @@ export default function CashflowForecastPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Space>
               <Title level={4} style={{ margin: 0 }}>
-                报表模式
+                {t("cashflow.report_mode", language)}
               </Title>
               <Radio.Group
                 value={reportMode}
@@ -210,10 +213,10 @@ export default function CashflowForecastPage() {
                 buttonStyle="solid"
               >
                 <Radio.Button value="working">
-                  <FileTextOutlined /> 工作报表 (Working)
+                  <FileTextOutlined /> {t("cashflow.working_mode", language)}
                 </Radio.Button>
                 <Radio.Button value="official">
-                  <SafetyOutlined /> 正式报表 (Official)
+                  <SafetyOutlined /> {t("cashflow.official_mode", language)}
                 </Radio.Button>
               </Radio.Group>
             </Space>
@@ -221,8 +224,8 @@ export default function CashflowForecastPage() {
 
           {reportMode === "working" && (
             <Alert
-              message="工作报表模式"
-              description="包含 Draft、Submitted、Reviewed、Pending Approval 状态的数据。用于内部试算、讨论和预演。"
+              message={t("reports.working_alert_title", language)}
+              description={t("reports.working_alert_desc", language)}
               type="warning"
               showIcon
               style={{ marginTop: 12 }}
@@ -230,8 +233,8 @@ export default function CashflowForecastPage() {
           )}
           {reportMode === "official" && (
             <Alert
-              message="正式报表模式"
-              description="仅包含 Approved 状态的数据。用于正式财务报告、审计提交和法定披露。"
+              message={t("reports.official_alert_title", language)}
+              description={t("reports.official_alert_desc", language)}
               type="success"
               showIcon
               style={{ marginTop: 12 }}
@@ -244,37 +247,37 @@ export default function CashflowForecastPage() {
           <Row gutter={[16, 12]} align="middle">
             <Col>
               <Space>
-                <span>视图维度：</span>
+                <span>{t("cashflow.view_dimension", language)}</span>
                 <Select
                   value={view}
                   onChange={(v) => { setView(v); setFetched(false); }}
                   style={{ width: 120 }}
                   options={[
-                    { value: "contract", label: "合同维度" },
-                    { value: "store", label: "门店维度" },
-                    { value: "summary", label: "汇总" },
+                    { value: "contract", label: t("cashflow.dimension_contract", language) },
+                    { value: "store", label: t("cashflow.dimension_store", language) },
+                    { value: "summary", label: t("cashflow.dimension_summary", language) },
                   ]}
                 />
               </Space>
             </Col>
             <Col>
               <Space>
-                <span>粒度：</span>
+                <span>{t("cashflow.granularity", language)}</span>
                 <Select
                   value={granularity}
                   onChange={(v) => { setGranularity(v); setFetched(false); }}
                   style={{ width: 100 }}
                   options={[
-                    { value: "month", label: "月" },
-                    { value: "quarter", label: "季" },
-                    { value: "year", label: "年" },
+                    { value: "month", label: t("cashflow.granularity_month", language) },
+                    { value: "quarter", label: t("cashflow.granularity_quarter", language) },
+                    { value: "year", label: t("cashflow.granularity_year", language) },
                   ]}
                 />
               </Space>
             </Col>
             <Col>
               <Space>
-                <span>日期范围：</span>
+                <span>{t("cashflow.date_range", language)}</span>
                 <RangePicker
                   value={dateRange}
                   onChange={(dates) => { setDateRange(dates as any); setFetched(false); }}
@@ -286,7 +289,7 @@ export default function CashflowForecastPage() {
             </Col>
             <Col>
               <Button type="primary" icon={<SearchOutlined />} onClick={fetchData} loading={loading}>
-                查询
+                {t("cashflow.query", language)}
               </Button>
             </Col>
             <Col>
@@ -295,7 +298,7 @@ export default function CashflowForecastPage() {
                 onClick={handleReset}
                 disabled={loading}
               >
-                重置
+                {t("cashflow.reset", language)}
               </Button>
             </Col>
             <Col>
@@ -305,12 +308,12 @@ export default function CashflowForecastPage() {
                   exportCSV(
                     data,
                     flatColumns,
-                    `IFRS16_现金流预测_${reportMode}_${dayjs().format("YYYY-MM-DD")}`,
+                    `IFRS16_${t("cashflow.title", language)}_${reportMode}_${dayjs().format("YYYY-MM-DD")}`,
                   )
                 }
                 disabled={!data.length}
               >
-                导出 CSV
+                {t("cashflow.export_csv", language)}
               </Button>
             </Col>
           </Row>
@@ -321,18 +324,18 @@ export default function CashflowForecastPage() {
             onClick={() => setShowFilters(!showFilters)}
             style={{ marginTop: 8, padding: 0 }}
           >
-            {showFilters ? "收起筛选条件 ▲" : "展开筛选条件 ▼"}
+            {showFilters ? `${t("cashflow.toggle_collapse", language)} ▲` : `${t("cashflow.toggle_expand", language)} ▼`}
           </Button>
 
           {showFilters && (
             <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
               <Col span={8}>
                 <Space direction="vertical" style={{ width: "100%" }}>
-                  <span>合同 ID：</span>
+                  <span>{t("cashflow.filter_contract_id", language)}</span>
                   <Input
                     value={contractId}
                     onChange={(e) => { setContractId(e.target.value); setFetched(false); }}
-                    placeholder="输入合同 ID 筛选"
+                    placeholder={t("cashflow.filter_contract_placeholder", language)}
                     allowClear
                   />
                 </Space>
@@ -340,11 +343,11 @@ export default function CashflowForecastPage() {
               {view !== "store" && (
                 <Col span={8}>
                   <Space direction="vertical" style={{ width: "100%" }}>
-                    <span>门店：</span>
+                    <span>{t("cashflow.filter_store", language)}</span>
                     <Input
                       value={store}
                       onChange={(e) => { setStore(e.target.value); setFetched(false); }}
-                      placeholder="输入门店名称筛选"
+                      placeholder={t("cashflow.filter_store_placeholder", language)}
                       allowClear
                     />
                   </Space>
@@ -352,13 +355,13 @@ export default function CashflowForecastPage() {
               )}
               <Col span={8}>
                 <Space direction="vertical" style={{ width: "100%" }}>
-                  <span>标签：</span>
+                  <span>{t("cashflow.filter_tags", language)}</span>
                   <Select
                     mode="tags"
                     value={selectedTags}
                     onChange={(v) => { setSelectedTags(v); setFetched(false); }}
                     style={{ width: "100%" }}
-                    placeholder="选择或输入一个或多个标签"
+                    placeholder={t("cashflow.filter_tags_placeholder", language)}
                     loading={tagLoading}
                     options={availableTags.map((t) => ({ value: t, label: t }))}
                   />
@@ -374,7 +377,7 @@ export default function CashflowForecastPage() {
             <Col span={6}>
               <Card size="small">
                 <Statistic
-                  title="总现金流出"
+                  title={t("cashflow.stat_total_outflow", language)}
                   value={summary.totalOutflow}
                   precision={2}
                   valueStyle={{ fontSize: 16, color: "#1677ff" }}
@@ -384,7 +387,7 @@ export default function CashflowForecastPage() {
             <Col span={6}>
               <Card size="small">
                 <Statistic
-                  title="固定租金"
+                  title={t("cashflow.stat_fixed_rent", language)}
                   value={summary.fixedRent}
                   precision={2}
                   valueStyle={{ fontSize: 16 }}
@@ -394,7 +397,7 @@ export default function CashflowForecastPage() {
             <Col span={6}>
               <Card size="small">
                 <Statistic
-                  title="变量租金"
+                  title={t("cashflow.stat_variable_rent", language)}
                   value={summary.variableRent}
                   precision={2}
                   valueStyle={{ fontSize: 16, color: "#fa8c16" }}
@@ -404,7 +407,7 @@ export default function CashflowForecastPage() {
             <Col span={6}>
               <Card size="small">
                 <Statistic
-                  title="非租赁成分"
+                  title={t("cashflow.stat_non_lease", language)}
                   value={summary.nonLease}
                   precision={2}
                   valueStyle={{ fontSize: 16, color: "#722ed1" }}
@@ -418,15 +421,15 @@ export default function CashflowForecastPage() {
         <Card
           title={
             <span>
-              现金流预测
+              {t("cashflow.table_title", language)}
               {reportMode === "working" && (
                 <Tag color="orange" style={{ marginLeft: 8 }}>
-                  含未审批数据
+                  {t("cashflow.table_working_hint", language)}
                 </Tag>
               )}
               {reportMode === "official" && (
                 <Tag color="green" style={{ marginLeft: 8 }}>
-                  仅正式数据
+                  {t("cashflow.table_official_hint", language)}
                 </Tag>
               )}
             </span>
@@ -444,8 +447,8 @@ export default function CashflowForecastPage() {
               size="small"
               locale={{
                 emptyText: fetched
-                  ? "当前范围内暂无未来付款计划"
-                  : "请设置查询条件后点击「查询」",
+                  ? t("cashflow.empty_title", language)
+                  : t("cashflow.empty_hint", language),
               }}
             />
           </Spin>

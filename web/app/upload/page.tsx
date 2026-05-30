@@ -51,6 +51,8 @@ import {
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 import { aiRequest, contractApi } from "../lib/api";
 
 const { Dragger } = Upload;
@@ -98,6 +100,7 @@ function defaultFormData(): Record<string, any> {
 // ── Component ──
 export default function UploadPage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const router = useRouter();
 
   // step: 0 = upload, 1 = parsing, 2 = batch review, 3 = complete
@@ -169,7 +172,7 @@ export default function UploadPage() {
             : it
         )
       );
-      message.success(`${file.name} 上传成功`);
+      message.success(t("upload.upload_success", language, { name: file.name }));
     } catch (err: any) {
       setBatchItems((prev) =>
         prev.map((it) =>
@@ -177,12 +180,12 @@ export default function UploadPage() {
             ? {
                 ...it,
                 status: "error",
-                error: err.message || "上传失败",
+                error: err.message || t("upload.status_failed", language),
               }
             : it
         )
       );
-      message.error(`${file.name} 上传失败: ${err.message}`);
+      message.error(t("upload.upload_failed", language, { name: file.name }) + `: ${err.message}`);
     }
   };
 
@@ -205,12 +208,12 @@ export default function UploadPage() {
         "image/tiff",
       ];
       if (!allowedTypes.includes(file.type)) {
-        message.error("不支持的文件类型，请上传 PDF、Excel 或图片文件");
+        message.error(t("upload.unsupported_file", language));
         return Upload.LIST_IGNORE;
       }
       const isLt50M = file.size / 1024 / 1024 < 50;
       if (!isLt50M) {
-        message.error("文件大小不能超过 50MB");
+        message.error(t("upload.file_too_large", language));
         return Upload.LIST_IGNORE;
       }
       return true;
@@ -228,13 +231,13 @@ export default function UploadPage() {
 
   const handleStartParse = useCallback(async () => {
     if (!token) {
-      message.error("请先登录");
+      message.error(t("upload.please_login", language));
       return;
     }
 
     const toParse = batchItems.filter((it) => it.status === "uploaded");
     if (toParse.length === 0) {
-      message.warning("没有待解析的文件");
+      message.warning(t("upload.no_files", language));
       return;
     }
 
@@ -329,13 +332,13 @@ export default function UploadPage() {
               ? {
                   ...it,
                   status: "error",
-                  error: err.message || "解析失败",
+                  error: err.message || t("upload.parse_failed", language),
                   parseResult: null,
                 }
               : it
           )
         );
-        message.error(`${item.original_name} 解析失败: ${err.message}`);
+        message.error(`${item.original_name} ${t("upload.parse_failed", language)}: ${err.message}`);
       }
     }
 
@@ -351,7 +354,7 @@ export default function UploadPage() {
       if (index < 0 || index >= batchItems.length) return;
       const item = batchItems[index];
       if (item.status !== "parsed") {
-        message.warning("只能编辑已解析完成的合同");
+        message.warning(t("upload.edit_only_parsed", language));
         return;
       }
       setEditingIndex(index);
@@ -409,7 +412,7 @@ export default function UploadPage() {
           )
         );
         setEditingIndex(null);
-        message.success("修改已保存");
+        message.success(t("upload.modify_saved", language));
       })
       .catch(() => {
         // validation failed
@@ -425,11 +428,11 @@ export default function UploadPage() {
 
   const handleBatchCreate = useCallback(async () => {
     if (!token) {
-      message.error("请先登录");
+      message.error(t("upload.please_login", language));
       return;
     }
     if (selectedKeys.length === 0) {
-      message.warning("请至少选择一个合同");
+      message.warning(t("upload.select_at_least_one", language));
       return;
     }
 
@@ -493,7 +496,7 @@ export default function UploadPage() {
       } catch (err: any) {
         failedCount++;
         message.error(
-          `${item.original_name} 创建失败: ${err.message || "未知错误"}`
+          `${item.original_name}${t("upload.create_failed_divider", language)}${err.message || t("upload.unknown_error", language)}`
         );
       }
     }
@@ -532,7 +535,7 @@ export default function UploadPage() {
     return (
       <Space size={4}>
         <Text>{label}</Text>
-        <Tooltip title={`AI 置信度: ${(score * 100).toFixed(0)}%`}>
+        <Tooltip title={t("upload.ai_confidence", language, { score: (score * 100).toFixed(0) })}>
           <Tag
             color={confidenceColor(score)}
             style={{ fontSize: 11, lineHeight: "16px", padding: "0 4px" }}
@@ -577,7 +580,7 @@ export default function UploadPage() {
 
   const columns: ColumnsType<BatchItem> = [
     {
-      title: "文件",
+      title: t("upload.col_file", language),
       dataIndex: "original_name",
       key: "file",
       width: 200,
@@ -591,7 +594,7 @@ export default function UploadPage() {
       ),
     },
     {
-      title: "合同编号",
+      title: t("upload.col_contract_number", language),
       key: "contract_number",
       width: 160,
       render: (_: any, record: BatchItem) => {
@@ -601,7 +604,7 @@ export default function UploadPage() {
       },
     },
     {
-      title: "承租方",
+      title: t("upload.col_lessee", language),
       key: "lessee",
       width: 140,
       render: (_: any, record: BatchItem) => {
@@ -611,7 +614,7 @@ export default function UploadPage() {
       },
     },
     {
-      title: "出租方",
+      title: t("upload.col_lessor", language),
       key: "lessor",
       width: 140,
       render: (_: any, record: BatchItem) => {
@@ -621,7 +624,7 @@ export default function UploadPage() {
       },
     },
     {
-      title: "门店",
+      title: t("upload.col_store", language),
       key: "store_name",
       width: 120,
       render: (_: any, record: BatchItem) => {
@@ -631,7 +634,7 @@ export default function UploadPage() {
       },
     },
     {
-      title: "起始日",
+      title: t("upload.col_start_date", language),
       key: "commencement_date",
       width: 110,
       render: (_: any, record: BatchItem) => {
@@ -648,7 +651,7 @@ export default function UploadPage() {
       },
     },
     {
-      title: "结束日",
+      title: t("upload.col_end_date", language),
       key: "lease_end_date",
       width: 110,
       render: (_: any, record: BatchItem) => {
@@ -665,7 +668,7 @@ export default function UploadPage() {
       },
     },
     {
-      title: "租金",
+      title: t("upload.col_rent", language),
       key: "fixed_rent_amount",
       width: 100,
       render: (_: any, record: BatchItem) => {
@@ -678,24 +681,24 @@ export default function UploadPage() {
       },
     },
     {
-      title: "状态",
+      title: t("upload.col_status", language),
       key: "status",
       width: 90,
       fixed: "right",
       render: (_: any, record: BatchItem) => {
         const statusMap: Record<string, { color: string; label: string }> = {
-          uploading: { color: "processing", label: "上传中" },
-          uploaded: { color: "blue", label: "已上传" },
-          parsing: { color: "processing", label: "解析中" },
-          parsed: { color: "green", label: "已解析" },
-          error: { color: "red", label: "失败" },
+          uploading: { color: "processing", label: t("upload.status_uploading", language) },
+          uploaded: { color: "blue", label: t("upload.status_uploaded", language) },
+          parsing: { color: "processing", label: t("upload.status_parsing", language) },
+          parsed: { color: "green", label: t("upload.status_parsed", language) },
+          error: { color: "red", label: t("upload.status_failed", language) },
         };
         const s = statusMap[record.status] || { color: "default", label: record.status };
         return <Tag color={s.color}>{s.label}</Tag>;
       },
     },
     {
-      title: "操作",
+      title: t("upload.col_action", language),
       key: "actions",
       width: 80,
       fixed: "right",
@@ -706,7 +709,7 @@ export default function UploadPage() {
           disabled={record.status !== "parsed"}
           onClick={() => openEditModal(index)}
         >
-          编辑
+          {t("upload.action_edit", language)}
         </Button>
       ),
     },
@@ -737,7 +740,7 @@ export default function UploadPage() {
     <ProtectedRoute>
       <AppLayout>
         <Title level={3} style={{ marginBottom: 24 }}>
-          智能合同录入 — AI 辅助批量解析
+          {t("upload.title", language)}
         </Title>
 
         {/* ── Steps indicator ── */}
@@ -747,12 +750,12 @@ export default function UploadPage() {
             size="small"
             items={[
               {
-                title: "上传文件",
+                title: t("upload.step_upload", language),
                 icon:
                   step === 0 ? <CloudUploadOutlined /> : <CheckCircleOutlined />,
               },
               {
-                title: "AI 解析",
+                title: t("upload.step_parse", language),
                 icon:
                   step === 1 ? (
                     <LoadingOutlined spin />
@@ -763,7 +766,7 @@ export default function UploadPage() {
                   ),
               },
               {
-                title: "批量确认",
+                title: t("upload.step_confirm", language),
                 icon:
                   step === 2 ? (
                     <EditOutlined />
@@ -774,7 +777,7 @@ export default function UploadPage() {
                   ),
               },
               {
-                title: "完成",
+                title: t("upload.step_complete", language),
                 icon:
                   step === 3 && !creating ? (
                     <CheckCircleOutlined />
@@ -795,9 +798,9 @@ export default function UploadPage() {
               title={
                 <Space>
                   <CloudUploadOutlined />
-                  <Text>上传合同文件</Text>
+                  <Text>{t("upload.upload_card_title", language)}</Text>
                   {batchItems.length > 0 && (
-                    <Tag color="blue">{batchItems.length} 个文件</Tag>
+                    <Tag color="blue">{t("upload.file_count", language, { n: String(batchItems.length) })}</Tag>
                   )}
                 </Space>
               }
@@ -808,7 +811,7 @@ export default function UploadPage() {
                     icon={<ReloadOutlined />}
                     size="small"
                   >
-                    重新上传
+                    {t("upload.reupload", language)}
                   </Button>
                 ) : undefined
               }
@@ -823,10 +826,10 @@ export default function UploadPage() {
                   <UploadOutlined />
                 </p>
                 <p className="ant-upload-text">
-                  点击或拖拽合同文件到此区域（支持批量）
+                  {t("upload.drag_hint", language)}
                 </p>
                 <p className="ant-upload-hint">
-                  支持 PDF、Excel、JPG、PNG、TIFF 格式，单个文件不超过 50MB
+                  {t("upload.support_formats", language)}
                 </p>
               </Dragger>
             </Card>
@@ -834,7 +837,7 @@ export default function UploadPage() {
             {/* ── Uploaded files list ── */}
             {batchItems.length > 0 && (
               <Card
-                title="已上传文件"
+                title={t("upload.uploaded_files", language)}
                 extra={
                   step === 0 && (
                     <Button
@@ -843,7 +846,7 @@ export default function UploadPage() {
                       onClick={handleStartParse}
                       disabled={!canStartParse}
                     >
-                      开始解析 ({uploadedCount} 个)
+                      {t("upload.start_parse", language, { n: String(uploadedCount) })}
                     </Button>
                   )
                 }
@@ -905,15 +908,15 @@ export default function UploadPage() {
                           }
                         >
                           {item.status === "uploading"
-                            ? "上传中"
+                            ? t("upload.status_uploading", language)
                             : item.status === "uploaded"
-                            ? "已上传"
+                            ? t("upload.status_uploaded", language)
                             : item.status === "parsing"
-                            ? "解析中"
+                            ? t("upload.status_parsing", language)
                             : item.status === "parsed"
-                            ? "已解析"
+                            ? t("upload.status_parsed", language)
                             : item.status === "error"
-                            ? "失败"
+                            ? t("upload.status_failed", language)
                             : item.status}
                         </Tag>
                         {item.status === "error" && item.error && (
@@ -928,7 +931,7 @@ export default function UploadPage() {
                             danger
                             onClick={() => handleRemoveFile(item.file_id)}
                           >
-                            移除
+                            {t("upload.remove", language)}
                           </Button>
                         )}
                       </Space>
@@ -952,7 +955,7 @@ export default function UploadPage() {
               <Paragraph
                 style={{ marginTop: 24, fontSize: 16, color: "#666" }}
               >
-                解析第 {parsingIndex}/{parsingTotal} 份合同...
+                {t("upload.parsing_progress", language, { n: String(parsingIndex), total: String(parsingTotal) })}
               </Paragraph>
               <Progress
                 percent={Math.round((parsingIndex / parsingTotal) * 100)}
@@ -960,7 +963,7 @@ export default function UploadPage() {
                 style={{ maxWidth: 400, margin: "16px auto" }}
               />
               <Paragraph type="secondary">
-                正在使用 PaddleOCR + DeepSeek 大模型提取合同关键字段
+                {t("upload.parsing_detail", language)}
               </Paragraph>
             </div>
           </Card>
@@ -974,17 +977,17 @@ export default function UploadPage() {
             title={
               <Space>
                 <EditOutlined />
-                <span>批量确认合同信息</span>
-                <Tag color="green">{parsedCount} 份已解析</Tag>
+                <span>{t("upload.confirm_title", language)}</span>
+                <Tag color="green">{t("upload.parsed_count", language, { n: String(parsedCount) })}</Tag>
                 {errorCount > 0 && (
-                  <Tag color="red">{errorCount} 份失败</Tag>
+                  <Tag color="red">{t("upload.failed_count", language, { n: String(errorCount) })}</Tag>
                 )}
               </Space>
             }
             extra={
               <Space>
                 <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                  重新上传
+                  {t("upload.reupload_btn", language)}
                 </Button>
                 <Button
                   type="primary"
@@ -993,14 +996,14 @@ export default function UploadPage() {
                   disabled={!canBatchCreate}
                   onClick={handleBatchCreate}
                 >
-                  批量创建合同 ({selectedKeys.length > 0 ? selectedKeys.length : 0})
+                  {t("upload.batch_create", language, { n: String(selectedKeys.length > 0 ? selectedKeys.length : 0) })}
                 </Button>
               </Space>
             }
           >
             {errorCount > 0 && (
               <Alert
-                message={`${errorCount} 份文件解析失败，请检查后重新上传`}
+                message={t("upload.parse_failed_alert", language, { n: String(errorCount) })}
                 type="warning"
                 showIcon
                 style={{ marginBottom: 16 }}
@@ -1044,7 +1047,7 @@ export default function UploadPage() {
                 <Paragraph
                   style={{ marginTop: 24, fontSize: 16, color: "#666" }}
                 >
-                  创建第 {parsingIndex}/{parsingTotal} 份合同...
+                  {t("upload.creating_progress", language, { n: String(parsingIndex), total: String(parsingTotal) })}
                 </Paragraph>
                 <Progress
                   percent={Math.round(
@@ -1059,15 +1062,15 @@ export default function UploadPage() {
                 status={createResult.failed > 0 ? "warning" : "success"}
                 title={
                   createResult.failed > 0
-                    ? `部分创建成功`
-                    : `全部创建成功！`
+                    ? t("upload.partial_success", language)
+                    : t("upload.all_success", language)
                 }
                 subTitle={
                   <Space direction="vertical">
                     <Text>
-                      成功创建 {createResult.success} 份合同
+                      {t("upload.success_count", language, { n: String(createResult.success) })}
                       {createResult.failed > 0 &&
-                        `，${createResult.failed} 份失败`}
+                        `，${t("upload.failed_count_result", language, { n: String(createResult.failed) })}`}
                     </Text>
                     {createResult.contracts.length > 0 && (
                       <div style={{ textAlign: "left", maxHeight: 200, overflow: "auto" }}>
@@ -1090,20 +1093,20 @@ export default function UploadPage() {
                     icon={<ArrowRightOutlined />}
                     onClick={() => router.push("/contracts")}
                   >
-                    查看合同列表
+                    {t("upload.view_contracts", language)}
                   </Button>,
                   <Button
                     key="reset"
                     icon={<ReloadOutlined />}
                     onClick={handleReset}
                   >
-                    重新上传
+                    {t("upload.reupload_btn", language)}
                   </Button>,
                 ]}
               />
             ) : (
               <div style={{ textAlign: "center", padding: "24px", color: "#999" }}>
-                处理中...
+                {t("upload.processing", language)}
               </div>
             )}
           </Card>
@@ -1116,7 +1119,7 @@ export default function UploadPage() {
           title={
             <Space>
               <EditOutlined />
-              <span>编辑合同信息</span>
+              <span>{t("upload.edit_modal_title", language)}</span>
               {editingItem?.original_name && (
                 <Tag color="blue">{editingItem.original_name}</Tag>
               )}
@@ -1126,8 +1129,8 @@ export default function UploadPage() {
           onCancel={() => setEditingIndex(null)}
           onOk={handleSaveEdit}
           width={900}
-          okText="保存"
-          cancelText="取消"
+          okText={t("upload.save", language)}
+          cancelText={t("upload.cancel", language)}
           destroyOnClose={false}
           maskClosable={false}
           styles={{ body: { maxHeight: "65vh", overflow: "auto" } }}
@@ -1142,8 +1145,7 @@ export default function UploadPage() {
                       <Space>
                         <WarningOutlined />
                         <span>
-                          AI 解析提示 (
-                          {editingItem.parseResult.warnings.length} 条)
+                          {t("upload.ai_tips", language, { n: String(editingItem.parseResult.warnings.length) })}
                         </span>
                       </Space>
                     }
@@ -1175,25 +1177,24 @@ export default function UploadPage() {
                       <Space>
                         <ExclamationCircleOutlined />
                         <span>
-                          缺失关键字段 (
-                          {editingItem.parseResult.missing_fields.length} 个):
+                          {t("upload.missing_fields_title", language, { count: String(editingItem.parseResult.missing_fields.length) })}
                         </span>
                       </Space>
                     }
                     description={editingItem.parseResult.missing_fields
                       .map((f: string) => {
                         const labels: Record<string, string> = {
-                          contract_number: "合同编号",
-                          contract_name: "合同名称",
-                          lessee: "承租方",
-                          lessor: "出租方",
-                          commencement_date: "租赁起始日",
-                          lease_start_date: "租赁开始日",
-                          lease_end_date: "租期结束日",
-                          currency: "币种",
-                          fixed_rent_amount: "固定租金金额",
-                          payment_timing: "付款时点",
-                          discount_rate: "折现率",
+                          contract_number: t("upload.missing_field_label.contract_number", language),
+                          contract_name: t("upload.missing_field_label.contract_name", language),
+                          lessee: t("upload.missing_field_label.lessee", language),
+                          lessor: t("upload.missing_field_label.lessor", language),
+                          commencement_date: t("upload.missing_field_label.commencement_date", language),
+                          lease_start_date: t("upload.missing_field_label.lease_start_date", language),
+                          lease_end_date: t("upload.missing_field_label.lease_end_date", language),
+                          currency: t("upload.missing_field_label.currency", language),
+                          fixed_rent_amount: t("upload.missing_field_label.fixed_rent_amount", language),
+                          payment_timing: t("upload.missing_field_label.payment_timing", language),
+                          discount_rate: t("upload.missing_field_label.discount_rate", language),
                         };
                         return labels[f] || f;
                       })
@@ -1212,26 +1213,26 @@ export default function UploadPage() {
               >
                 {/* ── 合同基本信息 ── */}
                 <Divider orientation="left" plain>
-                  合同基本信息
+                  {t("upload.section_basic", language)}
                 </Divider>
 
                 <Row gutter={24}>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      label={confidenceLabel("合同编号", "contract_number")}
+                      label={confidenceLabel(t("upload.field.contract_number", language), "contract_number")}
                       name="contract_number"
-                      rules={[{ required: true, message: "请输入合同编号" }]}
+                      rules={[{ required: true, message: t("upload.validation.contract_number_required", language) }]}
                     >
-                      <Input placeholder="例如: LEASE-2024-001" />
+                      <Input placeholder={t("upload.placeholder.contract_number", language)} />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      label={confidenceLabel("合同名称", "contract_name")}
+                      label={confidenceLabel(t("upload.field.contract_name", language), "contract_name")}
                       name="contract_name"
-                      rules={[{ required: true, message: "请输入合同名称" }]}
+                      rules={[{ required: true, message: t("upload.validation.contract_name_required", language) }]}
                     >
-                      <Input placeholder="例如: 南京东路旗舰店租赁合同" />
+                      <Input placeholder={t("upload.placeholder.contract_name", language)} />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -1239,20 +1240,20 @@ export default function UploadPage() {
                 <Row gutter={24}>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      label={confidenceLabel("承租方 (Lessee)", "lessee")}
+                      label={confidenceLabel(t("upload.field.lessee", language), "lessee")}
                       name="lessee"
-                      rules={[{ required: true, message: "请输入承租方" }]}
+                      rules={[{ required: true, message: t("upload.validation.lessee_required", language) }]}
                     >
-                      <Input placeholder="例如: 零售集团上海公司" />
+                      <Input placeholder={t("upload.placeholder.lessee", language)} />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      label={confidenceLabel("出租方 (Lessor)", "lessor")}
+                      label={confidenceLabel(t("upload.field.lessor", language), "lessor")}
                       name="lessor"
-                      rules={[{ required: true, message: "请输入出租方" }]}
+                      rules={[{ required: true, message: t("upload.validation.lessor_required", language) }]}
                     >
-                      <Input placeholder="例如: 上海商业地产集团" />
+                      <Input placeholder={t("upload.placeholder.lessor", language)} />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -1260,37 +1261,37 @@ export default function UploadPage() {
                 <Row gutter={24}>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      label={confidenceLabel("门店/物业", "store_name")}
+                      label={confidenceLabel(t("upload.field.store_name", language), "store_name")}
                       name="store_name"
                     >
-                      <Input placeholder="例如: 南京东路旗舰店（可选）" />
+                      <Input placeholder={t("upload.placeholder.store_name", language)} />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      label={confidenceLabel("物业地址", "store_address")}
+                      label={confidenceLabel(t("upload.field.store_address", language), "store_address")}
                       name="store_address"
                     >
-                      <Input placeholder="例如: 上海市黄浦区南京东路100号（可选）" />
+                      <Input placeholder={t("upload.placeholder.store_address", language)} />
                     </Form.Item>
                   </Col>
                 </Row>
 
                 {/* ── 日期与金额 ── */}
                 <Divider orientation="left" plain>
-                  日期与金额
+                  {t("upload.section_dates", language)}
                 </Divider>
 
                 <Row gutter={24}>
                   <Col xs={24} md={8}>
                     <Form.Item
                       label={confidenceLabel(
-                        "租赁起始日 (Commencement)",
+                        t("upload.field.commencement_date", language),
                         "commencement_date"
                       )}
                       name="commencement_date"
                       rules={[
-                        { required: true, message: "请选择租赁起始日" },
+                        { required: true, message: t("upload.validation.commencement_date_required", language) },
                       ]}
                     >
                       <DatePicker style={{ width: "100%" }} />
@@ -1299,12 +1300,12 @@ export default function UploadPage() {
                   <Col xs={24} md={8}>
                     <Form.Item
                       label={confidenceLabel(
-                        "租赁开始日 (Start)",
+                        t("upload.field.lease_start_date", language),
                         "lease_start_date"
                       )}
                       name="lease_start_date"
                       rules={[
-                        { required: true, message: "请选择租赁开始日" },
+                        { required: true, message: t("upload.validation.lease_start_date_required", language) },
                       ]}
                     >
                       <DatePicker style={{ width: "100%" }} />
@@ -1313,12 +1314,12 @@ export default function UploadPage() {
                   <Col xs={24} md={8}>
                     <Form.Item
                       label={confidenceLabel(
-                        "租赁结束日 (End)",
+                        t("upload.field.lease_end_date", language),
                         "lease_end_date"
                       )}
                       name="lease_end_date"
                       rules={[
-                        { required: true, message: "请选择租赁结束日" },
+                        { required: true, message: t("upload.validation.lease_end_date_required", language) },
                       ]}
                     >
                       <DatePicker style={{ width: "100%" }} />
@@ -1329,58 +1330,58 @@ export default function UploadPage() {
                 <Row gutter={24}>
                   <Col xs={24} md={6}>
                     <Form.Item
-                      label={confidenceLabel("币种", "currency")}
+                      label={confidenceLabel(t("upload.field.currency", language), "currency")}
                       name="currency"
-                      rules={[{ required: true, message: "请选择币种" }]}
+                      rules={[{ required: true, message: t("upload.validation.currency_required", language) }]}
                     >
                       <Select>
-                        <Select.Option value="CNY">人民币 (CNY)</Select.Option>
-                        <Select.Option value="USD">美元 (USD)</Select.Option>
-                        <Select.Option value="EUR">欧元 (EUR)</Select.Option>
+                        <Select.Option value="CNY">{t("upload.option.currency_cny", language)}</Select.Option>
+                        <Select.Option value="USD">{t("upload.option.currency_usd", language)}</Select.Option>
+                        <Select.Option value="EUR">{t("upload.option.currency_eur", language)}</Select.Option>
                       </Select>
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={6}>
                     <Form.Item
                       label={confidenceLabel(
-                        "固定租金金额",
+                        t("upload.field.fixed_rent_amount", language),
                         "fixed_rent_amount"
                       )}
                       name="fixed_rent_amount"
                     >
                       <InputNumber
                         style={{ width: "100%" }}
-                        placeholder="月租金金额"
+                        placeholder={t("upload.placeholder.fixed_rent_amount", language)}
                         min={0}
                         precision={2}
-                        addonAfter="元/月"
+                        addonAfter={t("upload.addon_after.monthly", language)}
                       />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={6}>
                     <Form.Item
-                      label={confidenceLabel("付款时点", "payment_timing")}
+                      label={confidenceLabel(t("upload.field.payment_timing", language), "payment_timing")}
                       name="payment_timing"
                     >
-                      <Select placeholder="选择" allowClear>
+                      <Select placeholder={t("upload.placeholder.select", language)} allowClear>
                         <Select.Option value="prepaid">
-                          先付 (Prepaid)
+                          {t("upload.option.payment_prepaid", language)}
                         </Select.Option>
                         <Select.Option value="postpaid">
-                          后付 (Postpaid)
+                          {t("upload.option.payment_postpaid", language)}
                         </Select.Option>
                       </Select>
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={6}>
                     <Form.Item
-                      label={confidenceLabel("付款频率", "payment_frequency")}
+                      label={confidenceLabel(t("upload.field.payment_frequency", language), "payment_frequency")}
                       name="payment_frequency"
                     >
-                      <Select placeholder="选择" allowClear>
-                        <Select.Option value="monthly">月度</Select.Option>
-                        <Select.Option value="quarterly">季度</Select.Option>
-                        <Select.Option value="yearly">年度</Select.Option>
+                      <Select placeholder={t("upload.placeholder.select", language)} allowClear>
+                        <Select.Option value="monthly">{t("upload.option.frequency_monthly", language)}</Select.Option>
+                        <Select.Option value="quarterly">{t("upload.option.frequency_quarterly", language)}</Select.Option>
+                        <Select.Option value="yearly">{t("upload.option.frequency_yearly", language)}</Select.Option>
                       </Select>
                     </Form.Item>
                   </Col>
@@ -1388,12 +1389,12 @@ export default function UploadPage() {
 
                 {/* ── 折现率设置 ── */}
                 <Divider orientation="left" plain>
-                  折现率设置
+                  {t("upload.section_discount", language)}
                 </Divider>
 
                 <Alert
-                  message="提示"
-                  description="AI 不会猜测折现率。如果合同未明确提到折现率，请留空，系统将标记为缺失状态，需后续人工确认。"
+                  message={t("upload.discount_rate_alert_title", language)}
+                  description={t("upload.discount_rate_alert_desc", language)}
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
@@ -1403,33 +1404,33 @@ export default function UploadPage() {
                   <Col xs={24} md={8}>
                     <Form.Item
                       label={confidenceLabel(
-                        "折现率类型",
+                        t("upload.field.discount_rate_type", language),
                         "discount_rate_type"
                       )}
                       name="discount_rate_type"
                     >
-                      <Select placeholder="选择折现率类型" allowClear>
-                        <Select.Option value="ibr">集团 IBR</Select.Option>
+                      <Select placeholder={t("upload.placeholder.discount_rate_type", language)} allowClear>
+                        <Select.Option value="ibr">{t("upload.option.rate_type_ibr", language)}</Select.Option>
                         <Select.Option value="entity_specific">
-                          法人特定利率
+                          {t("upload.option.rate_type_entity", language)}
                         </Select.Option>
                         <Select.Option value="contract_specific">
-                          合同特定利率
+                          {t("upload.option.rate_type_contract", language)}
                         </Select.Option>
                         <Select.Option value="implicit_rate">
-                          隐含利率
+                          {t("upload.option.rate_type_implicit", language)}
                         </Select.Option>
                       </Select>
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={8}>
                     <Form.Item
-                      label={confidenceLabel("折现率 (%)", "discount_rate")}
+                      label={confidenceLabel(t("upload.field.discount_rate", language), "discount_rate")}
                       name="discount_rate"
                     >
                       <InputNumber
                         style={{ width: "100%" }}
-                        placeholder="例如: 5.0"
+                        placeholder={t("upload.placeholder.discount_rate", language)}
                         min={0}
                         max={100}
                         precision={2}
@@ -1441,18 +1442,18 @@ export default function UploadPage() {
 
                 {/* ── 其他费用 ── */}
                 <Divider orientation="left" plain>
-                  其他费用
+                  {t("upload.section_other", language)}
                 </Divider>
 
                 <Row gutter={24}>
                   <Col xs={24} md={8}>
                     <Form.Item
-                      label={confidenceLabel("物业管理费 (CAM)", "cam_amount")}
+                      label={confidenceLabel(t("upload.field.cam_amount", language), "cam_amount")}
                       name="cam_amount"
                     >
                       <InputNumber
                         style={{ width: "100%" }}
-                        placeholder="金额（可选）"
+                        placeholder={t("upload.placeholder.cam_amount", language)}
                         min={0}
                         precision={2}
                       />
@@ -1460,12 +1461,12 @@ export default function UploadPage() {
                   </Col>
                   <Col xs={24} md={8}>
                     <Form.Item
-                      label={confidenceLabel("服务费", "service_fee")}
+                      label={confidenceLabel(t("upload.field.service_fee", language), "service_fee")}
                       name="service_fee"
                     >
                       <InputNumber
                         style={{ width: "100%" }}
-                        placeholder="金额（可选）"
+                        placeholder={t("upload.placeholder.service_fee", language)}
                         min={0}
                         precision={2}
                       />
@@ -1475,17 +1476,17 @@ export default function UploadPage() {
 
                 {/* ── 标签/备注 ── */}
                 <Divider orientation="left" plain>
-                  标签 / 备注
+                  {t("upload.section_tags", language)}
                 </Divider>
 
                 <Row gutter={24}>
                   <Col xs={24} md={12}>
                     <Form.Item
-                      label={confidenceLabel("标签/备注", "tags")}
+                      label={confidenceLabel(t("upload.field.tags", language), "tags")}
                       name="tags"
                     >
                       <Input
-                        placeholder="例如: #重要 #续租需关注 或输入备注信息（可选）"
+                        placeholder={t("upload.placeholder.tags", language)}
                       />
                     </Form.Item>
                   </Col>
@@ -1506,8 +1507,7 @@ export default function UploadPage() {
               }}
             >
               <InfoCircleOutlined style={{ fontSize: 20, marginRight: 8 }} />
-              支持批量上传合同文件，上传后 AI 将依次解析并提取关键信息。
-              您可以在批量确认表格中逐个编辑或选中合同一键创建。
+              {t("upload.hint_text", language)}
             </div>
           </Card>
         )}

@@ -14,7 +14,9 @@ import {
 } from "antd";
 import { SafetyOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useAuth } from "../../context/AuthContext";
+import { useLanguage } from "../../context/LanguageContext";
 import { authApi } from "../../lib/api";
+import { t } from "../../lib/i18n";
 
 const { Title, Text } = Typography;
 
@@ -22,13 +24,14 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+  const { language } = useLanguage();
 
   const handleLogin = async (values: any) => {
     setLoading(true);
     try {
       const data = await authApi.login(values.username, values.password);
       if (data.role !== "admin") {
-        message.error("非管理员账号，请使用普通登录入口");
+        message.error(t("admin_login.not_admin", language));
         setLoading(false);
         return;
       }
@@ -38,10 +41,10 @@ export default function AdminLoginPage() {
         role: data.role,
         legal_entity_id: data.legal_entity_id || undefined,
       });
-      message.success("管理员登录成功！");
+      message.success(t("admin_login.success", language));
       router.push("/admin/users");
     } catch (error: any) {
-      message.error(error.message || "登录失败");
+      message.error(error.message || t("admin_login.failed", language));
     } finally {
       setLoading(false);
     }
@@ -57,12 +60,12 @@ export default function AdminLoginPage() {
         <Card>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <SafetyOutlined style={{ fontSize: 48, color: "#cf1322" }} />
-            <Title level={3} style={{ marginTop: 16 }}>
-              管理后台登录
-            </Title>
-            <Text type="secondary">
-              IFRS 16 租赁管理系统 — 管理员通道
-            </Text>
+              <Title level={3} style={{ marginTop: 16 }}>
+                {t("admin_login.title", language)}
+              </Title>
+              <Text type="secondary">
+                {t("admin_login.subtitle", language)}
+              </Text>
           </div>
 
           <Form
@@ -73,22 +76,22 @@ export default function AdminLoginPage() {
           >
             <Form.Item
               name="username"
-              rules={[{ required: true, message: "请输入管理员用户名" }]}
+              rules={[{ required: true, message: t("admin_login.username_required", language) }]}
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="管理员用户名"
+                placeholder={t("admin_login.username_placeholder", language)}
                 size="large"
               />
             </Form.Item>
 
             <Form.Item
               name="password"
-              rules={[{ required: true, message: "请输入密码" }]}
+              rules={[{ required: true, message: t("admin_login.password_required", language) }]}
             >
               <Input.Password
                 prefix={<LockOutlined />}
-                placeholder="密码"
+                placeholder={t("admin_login.password_placeholder", language)}
                 size="large"
               />
             </Form.Item>
@@ -102,14 +105,14 @@ export default function AdminLoginPage() {
                 block
                 danger
               >
-                管理员登录
+                {t("admin_login.login_button", language)}
               </Button>
             </Form.Item>
           </Form>
 
           <div style={{ textAlign: "center", marginTop: 16 }}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              <a href="/login">返回普通用户登录</a>
+              <a href="/login">{t("admin_login.back_to_user", language)}</a>
             </Text>
           </div>
         </Card>

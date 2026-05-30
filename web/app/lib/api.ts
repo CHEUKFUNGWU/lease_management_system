@@ -118,7 +118,14 @@ export const contractApi = {
       body: JSON.stringify(data),
       token,
     }),
-    
+
+  batchCreate: (contracts: any[], token: string) =>
+    apiRequest("/api/v1/contracts/batch", {
+      method: "POST",
+      body: JSON.stringify({ contracts }),
+      token,
+    }),
+
   update: (id: string, data: any, token: string) =>
     apiRequest(`/api/v1/contracts/${id}`, {
       method: "PUT",

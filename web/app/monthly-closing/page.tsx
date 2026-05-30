@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import {
   Card,
   Button,
@@ -18,22 +19,83 @@ import {
   Space,
   Modal,
   Popconfirm,
-  Switch,
   Descriptions,
+  Empty,
+  Skeleton,
 } from "antd";
-import { CalculatorOutlined, HistoryOutlined, LockOutlined, UnlockOutlined, CheckOutlined, SendOutlined, RollbackOutlined, RobotOutlined } from "@ant-design/icons";
+import {
+  CalculatorOutlined,
+  HistoryOutlined,
+  LockOutlined,
+  UnlockOutlined,
+  CheckOutlined,
+  SendOutlined,
+  RollbackOutlined,
+} from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { monthlyClosingApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
+
+// ─── Page Header ───────────────────────────────────────────────
+
+function PageHeader({ selectedPeriod, entries }: { selectedPeriod: string; entries: any[] }) {
+  const { language } = useLanguage();
+  const draftCount = entries.filter((e: any) => e.posting_status === "draft").length;
+  const approvedCount = entries.filter((e: any) => e.posting_status === "approved").length;
+  const postedCount = entries.filter((e: any) => e.posting_status === "posted").length;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: 32,
+      }}
+    >
+      <div>
+        <h1 style={{ marginBottom: 4, fontSize: 28, letterSpacing: "-0.04em", fontWeight: 700 }}>
+          {t("monthly.title", language)}
+        </h1>
+        <p style={{ color: "var(--fg-muted)", fontSize: 14, margin: 0 }}>
+          {t("monthly.subtitle", language)}
+        </p>
+        {selectedPeriod && (
+          <Space size={12} style={{ marginTop: 8 }}>
+            <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>
+              {t("monthly.current_period", language)}：<strong style={{ color: "var(--fg-primary)" }}>{selectedPeriod}</strong>
+            </span>
+            <span style={{ color: "var(--border-strong)" }}>·</span>
+            <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+              {t("monthly.status_summary", language, {
+                draftCount: String(draftCount),
+                approvedCount: String(approvedCount),
+                postedCount: String(postedCount),
+              })}
+            </span>
+          </Space>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────────
 
 export default function MonthlyClosingPage() {
+  const { language } = useLanguage();
   const { token, user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [entriesLoading, setEntriesLoading] = useState(false);
+  const [batchesLoading, setBatchesLoading] = useState(false);
+  const [entriesLoaded, setEntriesLoaded] = useState(false);
+  const [batchesLoaded, setBatchesLoaded] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState<any>(null);
   const [entries, setEntries] = useState<any[]>([]);
@@ -42,6 +104,7 @@ export default function MonthlyClosingPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
   const [isLocked, setIsLocked] = useState(false);
   const [lockLoading, setLockLoading] = useState(false);
+  const [lockStatusLoading, setLockStatusLoading] = useState(false);
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [postingEntry, setPostingEntry] = useState<any>(null);
   const [erpReference, setErpReference] = useState("");
@@ -52,21 +115,27 @@ export default function MonthlyClosingPage() {
   const isReviewer = role === "reviewer" || isApprover;
   const canManage = isReviewer;
 
-  const checkLockStatus = useCallback(async (period: string) => {
-    if (!token || !period) return;
-    try {
-      const data = await monthlyClosingApi.getLockStatus(period, token);
-      setIsLocked(data.is_locked);
-    } catch {
-      setIsLocked(false);
-    }
-  }, [token]);
+  const checkLockStatus = useCallback(
+    async (period: string) => {
+      if (!token || !period) return;
+      setLockStatusLoading(true);
+      try {
+        const data = await monthlyClosingApi.getLockStatus(period, token);
+        setIsLocked(data.is_locked);
+      } catch {
+        setIsLocked(false);
+      } finally {
+        setLockStatusLoading(false);
+      }
+    },
+    [token]
+  );
 
   const handleGenerate = async (values: any) => {
     if (!token) return;
     const period = values.period?.format("YYYY-MM");
     if (!period) {
-      message.error("请选择期间");
+      message.error(t("monthly.select_period", language));
       return;
     }
     setLoading(true);
@@ -80,13 +149,13 @@ export default function MonthlyClosingPage() {
       );
       setResult(data);
       setSelectedPeriod(period);
-      message.success(`结账生成完成：处理 ${data.processed_contracts} 份合同`);
+      message.success(t("monthly.generate_success", language, { count: String(data.processed_contracts) }));
       await checkLockStatus(period);
       loadBatches(period);
       loadEntries(period);
       setActiveTab("entries");
     } catch (error: any) {
-      message.error(error.message || "生成失败");
+      message.error(error.message || t("monthly.generate_failed", language));
     } finally {
       setLoading(false);
     }
@@ -96,10 +165,14 @@ export default function MonthlyClosingPage() {
     if (!token) return;
     setEntriesLoading(true);
     try {
-      const data = await monthlyClosingApi.getEntries({ period, status: status || undefined }, token);
+      const data = await monthlyClosingApi.getEntries(
+        { period, status: status || undefined },
+        token
+      );
       setEntries(data.data || []);
+      setEntriesLoaded(true);
     } catch (error: any) {
-      message.error(error.message || "加载分录失败");
+      message.error(error.message || t("monthly.load_entries_failed", language));
     } finally {
       setEntriesLoading(false);
     }
@@ -107,11 +180,15 @@ export default function MonthlyClosingPage() {
 
   const loadBatches = async (period: string) => {
     if (!token) return;
+    setBatchesLoading(true);
     try {
       const data = await monthlyClosingApi.listBatches(period, token);
       setBatches(data.data || []);
+      setBatchesLoaded(true);
     } catch (error: any) {
       console.error(error);
+    } finally {
+      setBatchesLoading(false);
     }
   };
 
@@ -126,75 +203,75 @@ export default function MonthlyClosingPage() {
 
   const handleApproveEntry = async (entryId: string) => {
     if (!token) return;
-    setActionLoading(prev => ({ ...prev, [entryId]: true }));
+    setActionLoading((prev) => ({ ...prev, [entryId]: true }));
     try {
       await monthlyClosingApi.approveEntry(entryId, token);
-      message.success("分录审批成功");
+      message.success(t("monthly.approve_success", language));
       refresh();
     } catch (error: any) {
-      message.error(error.message || "审批失败");
+      message.error(error.message || t("monthly.approve_failed", language));
     } finally {
-      setActionLoading(prev => ({ ...prev, [entryId]: false }));
+      setActionLoading((prev) => ({ ...prev, [entryId]: false }));
     }
   };
 
   const handlePostEntry = async () => {
     if (!token || !postingEntry) return;
-    setActionLoading(prev => ({ ...prev, [postingEntry.id]: true }));
+    setActionLoading((prev) => ({ ...prev, [postingEntry.id]: true }));
     try {
       await monthlyClosingApi.postEntry(postingEntry.id, erpReference, token);
-      message.success("分录过账成功");
+      message.success(t("monthly.post_success", language));
       setPostModalOpen(false);
       setPostingEntry(null);
       setErpReference("");
       refresh();
     } catch (error: any) {
-      message.error(error.message || "过账失败");
+      message.error(error.message || t("monthly.post_failed", language));
     } finally {
-      setActionLoading(prev => ({ ...prev, [postingEntry.id]: false }));
+      setActionLoading((prev) => ({ ...prev, [postingEntry.id]: false }));
     }
   };
 
   const handleApproveBatch = async (batchId: string) => {
     if (!token) return;
-    setActionLoading(prev => ({ ...prev, [`batch_${batchId}`]: true }));
+    setActionLoading((prev) => ({ ...prev, [`batch_${batchId}`]: true }));
     try {
       const data = await monthlyClosingApi.approveBatch(batchId, token);
-      message.success(`批次审批成功：${data.approved_count} 笔分录已审批`);
+      message.success(t("monthly.batch_approve_success", language, { count: String(data.approved_count) }));
       refresh();
     } catch (error: any) {
-      message.error(error.message || "批次审批失败");
+      message.error(error.message || t("monthly.batch_approve_failed", language));
     } finally {
-      setActionLoading(prev => ({ ...prev, [`batch_${batchId}`]: false }));
+      setActionLoading((prev) => ({ ...prev, [`batch_${batchId}`]: false }));
     }
   };
 
   const handlePostBatch = async (batchId: string) => {
     if (!token) return;
-    setActionLoading(prev => ({ ...prev, [`postbatch_${batchId}`]: true }));
+    setActionLoading((prev) => ({ ...prev, [`postbatch_${batchId}`]: true }));
     try {
       const data = await monthlyClosingApi.postBatch(batchId, token);
-      message.success(`批次过账成功：${data.posted_count} 笔分录已过账`);
+      message.success(t("monthly.batch_post_success", language, { count: String(data.posted_count) }));
       refresh();
     } catch (error: any) {
-      message.error(error.message || "批次过账失败");
+      message.error(error.message || t("monthly.batch_post_failed", language));
     } finally {
-      setActionLoading(prev => ({ ...prev, [`postbatch_${batchId}`]: false }));
+      setActionLoading((prev) => ({ ...prev, [`postbatch_${batchId}`]: false }));
     }
   };
 
   const handleLockPeriod = async () => {
     if (!token || !selectedPeriod) {
-      message.error("请先生成结账结果");
+      message.error(t("monthly.no_period", language));
       return;
     }
     setLockLoading(true);
     try {
       await monthlyClosingApi.lockPeriod(selectedPeriod, token);
-      message.success(`期间 ${selectedPeriod} 已锁账`);
+      message.success(t("monthly.lock_success", language, { period: selectedPeriod }));
       await checkLockStatus(selectedPeriod);
     } catch (error: any) {
-      message.error(error.message || "锁账失败");
+      message.error(error.message || t("monthly.lock_failed", language));
     } finally {
       setLockLoading(false);
     }
@@ -202,16 +279,16 @@ export default function MonthlyClosingPage() {
 
   const handleUnlockPeriod = async () => {
     if (!token || !selectedPeriod) {
-      message.error("请先生成结账结果");
+      message.error(t("monthly.no_period", language));
       return;
     }
     setLockLoading(true);
     try {
       await monthlyClosingApi.unlockPeriod(selectedPeriod, token);
-      message.success(`期间 ${selectedPeriod} 已解锁`);
+      message.success(t("monthly.unlock_success", language, { period: selectedPeriod }));
       await checkLockStatus(selectedPeriod);
     } catch (error: any) {
-      message.error(error.message || "解锁失败");
+      message.error(error.message || t("monthly.unlock_failed", language));
     } finally {
       setLockLoading(false);
     }
@@ -223,37 +300,60 @@ export default function MonthlyClosingPage() {
     setPostModalOpen(true);
   };
 
+  // ─── entryColumns ────────────────────────────────────────────
+
   const entryColumns = [
-    { title: "期间", dataIndex: "accounting_period", width: 90 },
-    { title: "分录类型", dataIndex: "entry_type", width: 100, render: (v: string) => {
-      const labels: Record<string, string> = { interest: "利息", depreciation: "折旧", payment: "付款" };
-      return <Tag color="blue">{labels[v] || v}</Tag>;
-    }},
-    { title: "借方科目", dataIndex: "debit_account", width: 150 },
-    { title: "贷方科目", dataIndex: "credit_account", width: 150 },
+    { title: t("monthly.col_period", language), dataIndex: "accounting_period", width: 90 },
     {
-      title: "金额",
+      title: t("monthly.col_entry_type", language),
+      dataIndex: "entry_type",
+      width: 100,
+      render: (v: string) => {
+        const labels: Record<string, string> = {
+          interest: t("monthly.entry_interest", language),
+          depreciation: t("monthly.entry_depreciation", language),
+          payment: t("monthly.entry_payment", language),
+        };
+        return <Tag color="processing">{labels[v] || v}</Tag>;
+      },
+    },
+    { title: t("monthly.col_debit_account", language), dataIndex: "debit_account", width: 150 },
+    { title: t("monthly.col_credit_account", language), dataIndex: "credit_account", width: 150 },
+    {
+      title: t("monthly.col_amount", language),
       dataIndex: "amount",
       width: 120,
       align: "right" as const,
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      render: (v: number) =>
+        `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
     },
-    { title: "币种", dataIndex: "currency", width: 60 },
-    { title: "描述", dataIndex: "description", ellipsis: true },
+    { title: t("monthly.col_currency", language), dataIndex: "currency", width: 60 },
+    { title: t("monthly.col_description", language), dataIndex: "description", ellipsis: true },
     {
-      title: "状态",
+      title: t("monthly.col_status", language),
       dataIndex: "posting_status",
       width: 80,
-      render: (v: string) => (
-        <Tag color={v === "posted" ? "green" : v === "approved" ? "blue" : "default"}>
-          {v === "posted" ? "已过账" : v === "approved" ? "已审批" : "草稿"}
-        </Tag>
-      ),
+      render: (v: string) => {
+        const statusLabels: Record<string, string> = {
+          posted: t("monthly.status_posted", language),
+          approved: t("monthly.status_approved", language),
+          draft: t("monthly.status_draft", language),
+        };
+        return (
+          <Tag
+            color={
+              v === "posted" ? "success" : v === "approved" ? "processing" : "default"
+            }
+          >
+            {statusLabels[v] || t("monthly.status_draft", language)}
+          </Tag>
+        );
+      },
     },
     {
-      title: "操作",
+      title: t("monthly.col_actions", language),
       key: "actions",
-      width: 200,
+      width: 220,
       render: (_: any, record: any) => {
         const status = record.posting_status;
         const actions: React.ReactNode[] = [];
@@ -261,16 +361,16 @@ export default function MonthlyClosingPage() {
           actions.push(
             <Popconfirm
               key="approve"
-              title="确认审批该分录？"
+              title={t("monthly.approve_confirm", language)}
               onConfirm={() => handleApproveEntry(record.id)}
             >
               <Button
-                type="link"
+                type="text"
                 size="small"
                 icon={<CheckOutlined />}
                 loading={actionLoading[record.id]}
               >
-                审批
+                {t("monthly.approve_entry", language)}
               </Button>
             </Popconfirm>
           );
@@ -279,28 +379,23 @@ export default function MonthlyClosingPage() {
           actions.push(
             <Button
               key="post"
-              type="link"
+              type="text"
               size="small"
               icon={<SendOutlined />}
               loading={actionLoading[record.id]}
               onClick={() => openPostModal(record)}
             >
-              过账
+              {t("monthly.post_entry", language)}
             </Button>
           );
           actions.push(
             <Popconfirm
               key="reject"
-              title="确认驳回该分录？"
-              onConfirm={() => message.info("驳回功能待实现")}
+              title={t("monthly.reject_confirm", language)}
+              onConfirm={() => message.info(t("monthly.reject_coming_soon", language))}
             >
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<RollbackOutlined />}
-              >
-                驳回
+              <Button type="text" size="small" icon={<RollbackOutlined />}>
+                {t("monthly.reject_entry", language)}
               </Button>
             </Popconfirm>
           );
@@ -309,66 +404,78 @@ export default function MonthlyClosingPage() {
           actions.push(
             <Button
               key="reverse"
-              type="link"
+              type="text"
               size="small"
-              danger
               icon={<RollbackOutlined />}
-              onClick={() => message.info("冲销功能待实现")}
+              onClick={() => message.info(t("monthly.reverse_confirm", language))}
             >
-              冲销
+              {t("monthly.reverse_entry", language)}
             </Button>
           );
         }
         if (actions.length === 0) {
-          return <span style={{ color: "#999" }}>-</span>;
+          return <span style={{ color: "var(--fg-muted)" }}>-</span>;
         }
         return <Space size={0}>{actions}</Space>;
       },
     },
   ];
 
+  // ─── batchColumns ────────────────────────────────────────────
+
   const batchColumns = [
-    { title: "批次号", dataIndex: "batch_number" },
-    { title: "期间", dataIndex: "accounting_period" },
-    { title: "状态", dataIndex: "status", render: (v: string) => <Tag color={v === "completed" ? "green" : "orange"}>{v}</Tag> },
-    { title: "合同数", dataIndex: "total_contracts" },
-    { title: "处理数", dataIndex: "processed_contracts" },
-    { title: "失败数", dataIndex: "failed_contracts" },
-    { title: "分录数", dataIndex: "total_entries" },
-    { title: "已过账", dataIndex: "posted_entries" },
-    { title: "创建时间", dataIndex: "created_at", render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm") },
+    { title: t("monthly.col_batch_number", language), dataIndex: "batch_number" },
+    { title: t("monthly.col_period", language), dataIndex: "accounting_period" },
     {
-      title: "操作",
+      title: t("monthly.col_status", language),
+      dataIndex: "status",
+      render: (v: string) => (
+        <Tag color={v === "completed" ? "processing" : "warning"}>{v}</Tag>
+      ),
+    },
+    { title: t("monthly.col_total_contracts", language), dataIndex: "total_contracts" },
+    { title: t("monthly.col_processed", language), dataIndex: "processed_contracts" },
+    { title: t("monthly.col_failed", language), dataIndex: "failed_contracts" },
+    { title: t("monthly.col_total_entries", language), dataIndex: "total_entries" },
+    { title: t("monthly.col_posted_entries", language), dataIndex: "posted_entries" },
+    {
+      title: t("monthly.col_created_at", language),
+      dataIndex: "created_at",
+      render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm"),
+    },
+    {
+      title: t("monthly.col_actions", language),
       key: "actions",
       width: 220,
       render: (_: any, record: any) => {
-        if (!canManage) return <span style={{ color: "#999" }}>-</span>;
+        if (!canManage)
+          return <span style={{ color: "var(--fg-muted)" }}>-</span>;
         return (
-          <Space>
+          <Space size={0}>
             <Popconfirm
-              title={`确认审批批次 ${record.batch_number} 中所有草稿分录？`}
+              title={t("monthly.approve_all_confirm", language, { batch: record.batch_number })}
               onConfirm={() => handleApproveBatch(record.id)}
             >
               <Button
-                type="link"
+                type="text"
                 size="small"
                 icon={<CheckOutlined />}
                 loading={actionLoading[`batch_${record.id}`]}
               >
-                审批全部
+                {t("monthly.approve_all", language)}
               </Button>
             </Popconfirm>
             <Popconfirm
-              title={`确认过账批次 ${record.batch_number} 中所有已审批分录？`}
+              title={t("monthly.post_all_confirm", language, { batch: record.batch_number })}
               onConfirm={() => handlePostBatch(record.id)}
             >
               <Button
-                type="link"
+                type="text"
                 size="small"
                 icon={<SendOutlined />}
                 loading={actionLoading[`postbatch_${record.id}`]}
               >
-                过账全部
+                {t("monthly.post_all", language)}
               </Button>
             </Popconfirm>
           </Space>
@@ -377,44 +484,105 @@ export default function MonthlyClosingPage() {
     },
   ];
 
+  // ─── Skeleton Loading for Entries ───────────────────────────
+
+  const EntrySkeleton = () => (
+    <div style={{ padding: "8px 0" }}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton
+          key={i}
+          active
+          paragraph={{ rows: 1, width: ["100%"] }}
+          title={false}
+          style={{ padding: "8px 16px" }}
+        />
+      ))}
+    </div>
+  );
+
+  // ─── Skeleton Loading for Batches ───────────────────────────
+
+  const BatchSkeleton = () => (
+    <div style={{ padding: "8px 0" }}>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Skeleton
+          key={i}
+          active
+          paragraph={{ rows: 1, width: ["100%"] }}
+          title={false}
+          style={{ padding: "8px 16px" }}
+        />
+      ))}
+    </div>
+  );
+
+  // ─── Tab Items ──────────────────────────────────────────────
+
   const tabItems = [
     {
       key: "generate",
-      label: "生成结账",
+      label: t("monthly.tab_generate", language),
       children: (
-        <Card title="生成结账分录">
+        <Card
+          title={
+            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+              {t("monthly.generate_closing", language)}
+            </span>
+          }
+        >
           <Form layout="vertical" onFinish={handleGenerate}>
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
-                  label="会计期间"
+                  label={t("monthly.accounting_period", language)}
                   name="period"
-                  rules={[{ required: true, message: "请选择期间" }]}
+                  rules={[{ required: true, message: t("monthly.select_period", language) }]}
                 >
-                  <DatePicker.MonthPicker style={{ width: "100%" }} placeholder="YYYY-MM" />
+                  <DatePicker.MonthPicker
+                    style={{ width: "100%" }}
+                    placeholder="YYYY-MM"
+                  />
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item label="折现率" name="discount_rate" initialValue={0.05}>
+                <Form.Item label={t("monthly.discount_rate", language)} name="discount_rate" initialValue={0.05}>
                   <Input type="number" step={0.001} />
                 </Form.Item>
               </Col>
             </Row>
-            <Button type="primary" icon={<CalculatorOutlined />} htmlType="submit" loading={loading} size="large">
-              生成结账分录
+            <Button
+              type="primary"
+              icon={<CalculatorOutlined />}
+              htmlType="submit"
+              loading={loading}
+              size="large"
+            >
+              {t("monthly.generate_btn", language)}
             </Button>
           </Form>
 
           {result && (
             <Alert
-              message="结账生成结果"
+              message={t("monthly.result_title", language)}
               description={
                 <Space direction="vertical">
-                  <span>批次号: {result.batch_number}</span>
-                  <span>状态: <Tag color={result.status === "completed" ? "green" : "orange"}>{result.status}</Tag></span>
-                  <span>处理合同: {result.processed_contracts} / {result.total_contracts}</span>
-                  <span>失败: {result.failed_contracts}</span>
-                  <span>生成分录: {result.total_entries} 笔</span>
+                  <span>
+                    {t("monthly.batch_number", language)}:{" "}
+                    <strong style={{ color: "var(--fg-primary)" }}>
+                      {result.batch_number}
+                    </strong>
+                  </span>
+                  <span>
+                    {t("monthly.status", language)}:{" "}
+                    <Tag color={result.status === "completed" ? "processing" : "warning"}>
+                      {result.status}
+                    </Tag>
+                  </span>
+                  <span>
+                    {t("monthly.processed_contracts", language)}: {result.processed_contracts} / {result.total_contracts}
+                  </span>
+                  <span>{t("monthly.failed_contracts", language)}: {result.failed_contracts}</span>
+                  <span>{t("monthly.total_entries", language)}: {result.total_entries} 笔</span>
                 </Space>
               }
               type="info"
@@ -427,123 +595,242 @@ export default function MonthlyClosingPage() {
     },
     {
       key: "entries",
-      label: "分录预览",
+      label: t("monthly.tab_entries", language),
       children: (
         <Card
-          title="会计分录预览"
+          title={
+            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+              {t("monthly.entries_preview", language)}
+            </span>
+          }
           extra={
             canManage && entries.length > 0 ? (
               <Space>
                 <Button
+                  size="small"
                   icon={<CheckOutlined />}
                   onClick={() => {
-                    const draftEntries = entries.filter((e: any) => e.posting_status === "draft");
+                    const draftEntries = entries.filter(
+                      (e: any) => e.posting_status === "draft"
+                    );
                     if (draftEntries.length === 0) {
-                      message.info("没有可审批的草稿分录");
+                      message.info(t("monthly.no_draft_entries", language));
                       return;
                     }
-                    // Approve all draft entries one by one
-                    Promise.all(draftEntries.map((e: any) =>
-                      monthlyClosingApi.approveEntry(e.id, token!)
-                        .catch(err => ({ error: err }))
-                    )).then(results => {
+                    Promise.all(
+                      draftEntries.map((e: any) =>
+                        monthlyClosingApi
+                          .approveEntry(e.id, token!)
+                          .catch((err) => ({ error: err }))
+                      )
+                    ).then((results) => {
                       const succeeded = results.filter((r: any) => !r.error).length;
-                      message.success(`批量审批完成：${succeeded} 笔`);
+                      message.success(t("monthly.batch_approve_success_msg", language, { count: String(succeeded) }));
                       refresh();
                     });
                   }}
                 >
-                  批量审批
+                  {t("monthly.batch_approve", language)}
                 </Button>
                 <Button
+                  size="small"
                   icon={<SendOutlined />}
                   onClick={() => {
-                    const approvedEntries = entries.filter((e: any) => e.posting_status === "approved");
+                    const approvedEntries = entries.filter(
+                      (e: any) => e.posting_status === "approved"
+                    );
                     if (approvedEntries.length === 0) {
-                      message.info("没有可过账的已审批分录");
+                      message.info(t("monthly.no_approved_entries", language));
                       return;
                     }
-                    Promise.all(approvedEntries.map((e: any) =>
-                      monthlyClosingApi.postEntry(e.id, "", token!)
-                        .catch(err => ({ error: err }))
-                    )).then(results => {
+                    Promise.all(
+                      approvedEntries.map((e: any) =>
+                        monthlyClosingApi
+                          .postEntry(e.id, "", token!)
+                          .catch((err) => ({ error: err }))
+                      )
+                    ).then((results) => {
                       const succeeded = results.filter((r: any) => !r.error).length;
-                      message.success(`批量过账完成：${succeeded} 笔`);
+                      message.success(t("monthly.batch_post_success_msg", language, { count: String(succeeded) }));
                       refresh();
                     });
                   }}
                 >
-                  批量过账
+                  {t("monthly.batch_post", language)}
                 </Button>
-                <Button onClick={() => refresh()}>刷新</Button>
+                <Button size="small" onClick={() => refresh()}>
+                  {t("monthly.refresh", language)}
+                </Button>
               </Space>
             ) : undefined
           }
         >
           {isLocked && (
             <Alert
-              message={`期间 ${selectedPeriod} 已锁账，分录不可修改`}
+              message={t("monthly.locked_warning", language, { period: selectedPeriod })}
               type="warning"
               showIcon
               style={{ marginBottom: 16 }}
             />
           )}
-          <Spin spinning={entriesLoading}>
-            <Table
-              columns={entryColumns}
-              dataSource={entries}
-              rowKey="id"
-              pagination={{ pageSize: 20 }}
-              size="small"
-              scroll={{ x: 1100 }}
-              locale={{ emptyText: "暂无分录，请先生成结账" }}
+          {entriesLoading && !entriesLoaded ? (
+            <EntrySkeleton />
+          ) : entries.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t("monthly.no_entries", language)}
             />
-          </Spin>
+          ) : (
+            <Spin spinning={entriesLoading && entriesLoaded}>
+              <Table
+                columns={entryColumns}
+                dataSource={entries}
+                rowKey="id"
+                pagination={{ pageSize: 20 }}
+                size="small"
+                scroll={{ x: 1100 }}
+              />
+            </Spin>
+          )}
         </Card>
       ),
     },
     {
       key: "batches",
-      label: "批次历史",
+      label: t("monthly.tab_batches", language),
       children: (
-        <Card title="结账批次历史" extra={<Button onClick={() => refresh()}>刷新</Button>}>
-          <Table
-            columns={batchColumns}
-            dataSource={batches}
-            rowKey="id"
-            pagination={{ pageSize: 10 }}
-            size="small"
-            scroll={{ x: 1200 }}
-          />
+        <Card
+          title={
+            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+              {t("monthly.batch_history", language)}
+            </span>
+          }
+          extra={
+            <Button size="small" onClick={() => refresh()}>
+              {t("monthly.refresh", language)}
+            </Button>
+          }
+        >
+          {batchesLoading && !batchesLoaded ? (
+            <BatchSkeleton />
+          ) : batches.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t("monthly.no_batches", language)}
+            />
+          ) : (
+            <Spin spinning={batchesLoading && batchesLoaded}>
+              <Table
+                columns={batchColumns}
+                dataSource={batches}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+                size="small"
+                scroll={{ x: 1200 }}
+              />
+            </Spin>
+          )}
         </Card>
       ),
     },
     {
       key: "lock",
-      label: "锁账控制",
+      label: t("monthly.tab_lock", language),
       children: (
-        <Card title="期间锁账控制">
+        <Card
+          title={
+            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+              {t("monthly.lock_control", language)}
+            </span>
+          }
+        >
           {!selectedPeriod ? (
-            <Alert message="请先生成结账后再进行锁账操作" type="info" showIcon />
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t("monthly.lock_first", language)}
+            />
+          ) : lockStatusLoading ? (
+            <div style={{ padding: "24px 0" }}>
+              <Skeleton active paragraph={{ rows: 2 }} />
+            </div>
           ) : (
             <>
-              <Descriptions bordered column={2} style={{ marginBottom: 24 }}>
-                <Descriptions.Item label="会计期间">{selectedPeriod}</Descriptions.Item>
-                <Descriptions.Item label="锁账状态">
-                  <Tag color={isLocked ? "red" : "green"}>{isLocked ? "已锁账" : "未锁账"}</Tag>
-                </Descriptions.Item>
-              </Descriptions>
+              {/* Lock Status Indicator */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 20,
+                  padding: "24px 28px",
+                  borderRadius: 10,
+                  marginBottom: 24,
+                  border: `1px solid ${
+                    isLocked ? "var(--border-strong)" : "var(--border-default)"
+                  }`,
+                  background: isLocked
+                    ? "var(--bg-inset)"
+                    : "var(--bg-page)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 22,
+                    background: isLocked
+                      ? "var(--fg-primary)"
+                      : "var(--bg-inset)",
+                    color: isLocked ? "var(--fg-inverse)" : "var(--fg-tertiary)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isLocked ? <LockOutlined /> : <UnlockOutlined />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 2 }}>
+                    {t("monthly.accounting_period_label", language)} {selectedPeriod}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "var(--fg-muted)",
+                    }}
+                  >
+                    {isLocked
+                      ? t("monthly.lock_desc_locked", language)
+                      : t("monthly.lock_desc_unlocked", language)}
+                  </div>
+                </div>
+                <div style={{ flexShrink: 0 }}>
+                  {isLocked ? (
+                    <Tag color="error" style={{ margin: 0, fontSize: 13 }}>
+                      <LockOutlined style={{ marginRight: 4 }} />
+                      {t("monthly.locked", language)}
+                    </Tag>
+                  ) : (
+                    <Tag color="success" style={{ margin: 0, fontSize: 13 }}>
+                      <UnlockOutlined style={{ marginRight: 4 }} />
+                      {t("monthly.unlocked", language)}
+                    </Tag>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
               <Space>
                 {!isLocked ? (
                   <Button
                     type="primary"
-                    danger
                     icon={<LockOutlined />}
                     loading={lockLoading}
                     disabled={!isApprover}
                     onClick={handleLockPeriod}
                   >
-                    {isApprover ? "锁账" : "锁账（仅审批员/管理员可操作）"}
+                    {isApprover ? t("monthly.lock_btn", language) : t("monthly.lock_btn_disabled", language)}
                   </Button>
                 ) : (
                   <Button
@@ -552,14 +839,20 @@ export default function MonthlyClosingPage() {
                     disabled={!isAdmin}
                     onClick={handleUnlockPeriod}
                   >
-                    {isAdmin ? "解锁" : "解锁（仅管理员可操作）"}
+                    {isAdmin ? t("monthly.unlock_btn", language) : t("monthly.unlock_btn_disabled", language)}
                   </Button>
                 )}
-                <Button onClick={() => checkLockStatus(selectedPeriod)}>刷新状态</Button>
+                <Button
+                  onClick={() => checkLockStatus(selectedPeriod)}
+                  loading={lockStatusLoading}
+                >
+                  {t("monthly.refresh_status", language)}
+                </Button>
               </Space>
+
               {!isAdmin && isLocked && (
                 <Alert
-                  message="如需解锁，请联系管理员"
+                  message={t("monthly.contact_admin", language)}
                   type="info"
                   showIcon
                   style={{ marginTop: 16 }}
@@ -572,82 +865,77 @@ export default function MonthlyClosingPage() {
     },
   ];
 
+  // ─── Render ─────────────────────────────────────────────────
+
   return (
     <ProtectedRoute>
       <AppLayout>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h1 style={{ margin: 0 }}>结账中心</h1>
-          <Button
-            icon={<RobotOutlined />}
-            onClick={() => {
-              const parts: string[] = [];
-              if (selectedPeriod) {
-                parts.push(`期间: ${selectedPeriod}`);
-              }
-              const draftCount = entries.filter((e: any) => e.posting_status === "draft").length;
-              const approvedCount = entries.filter((e: any) => e.posting_status === "approved").length;
-              const postedCount = entries.filter((e: any) => e.posting_status === "posted").length;
-              parts.push(`分录: ${draftCount}草稿/${approvedCount}已审批/${postedCount}已过账`);
-              const summary = parts.join('; ');
-              let url = `/ai-chat?page=monthly-closing&title=结账中心`;
-              if (selectedPeriod) {
-                url += `&period=${encodeURIComponent(selectedPeriod)}`;
-              }
-              url += `&summary=${encodeURIComponent(summary)}`;
-              router.push(url);
-            }}
-          >
-            AI 分析
-          </Button>
-        </div>
-
-        <Tabs activeKey={activeTab} onChange={(key) => {
-          setActiveTab(key);
-          if (key === "entries" && selectedPeriod) {
-            loadEntries(selectedPeriod);
-            checkLockStatus(selectedPeriod);
-          }
-          if (key === "batches" && selectedPeriod) {
-            loadBatches(selectedPeriod);
-          }
-          if (key === "lock" && selectedPeriod) {
-            checkLockStatus(selectedPeriod);
-          }
-        }} items={tabItems} />
-
-        <Modal
-          title="过账确认"
-          open={postModalOpen}
-          onOk={handlePostEntry}
-          onCancel={() => {
-            setPostModalOpen(false);
-            setPostingEntry(null);
-            setErpReference("");
-          }}
-          confirmLoading={postingEntry ? actionLoading[postingEntry.id] : false}
-          okText="确认过账"
-          cancelText="取消"
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
         >
-          <p>确认将以下分录过账？</p>
-          {postingEntry && (
-            <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
-              <Descriptions.Item label="分录类型">
-                <Tag color="blue">{postingEntry.entry_type}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="金额">
-                ¥{postingEntry.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </Descriptions.Item>
-              <Descriptions.Item label="描述">{postingEntry.description}</Descriptions.Item>
-            </Descriptions>
-          )}
-          <Form.Item label="ERP 凭证号（可选）">
-            <Input
-              placeholder="输入 ERP 凭证号"
-              value={erpReference}
-              onChange={(e) => setErpReference(e.target.value)}
-            />
-          </Form.Item>
-        </Modal>
+          <PageHeader selectedPeriod={selectedPeriod} entries={entries} />
+
+          <Tabs
+            activeKey={activeTab}
+            onChange={(key) => {
+              setActiveTab(key);
+              if (key === "entries" && selectedPeriod) {
+                loadEntries(selectedPeriod);
+                checkLockStatus(selectedPeriod);
+              }
+              if (key === "batches" && selectedPeriod) {
+                loadBatches(selectedPeriod);
+              }
+              if (key === "lock" && selectedPeriod) {
+                checkLockStatus(selectedPeriod);
+              }
+            }}
+            items={tabItems}
+          />
+
+          <Modal
+            title={t("monthly.posting_confirm", language)}
+            open={postModalOpen}
+            onOk={handlePostEntry}
+            onCancel={() => {
+              setPostModalOpen(false);
+              setPostingEntry(null);
+              setErpReference("");
+            }}
+            confirmLoading={postingEntry ? actionLoading[postingEntry.id] : false}
+            okText={t("monthly.ok", language) + t("monthly.post_entry", language)}
+            cancelText={t("monthly.cancel", language)}
+          >
+            <p style={{ marginBottom: 16, color: "var(--fg-secondary)" }}>
+              {t("monthly.posting_confirm_desc", language)}
+            </p>
+            {postingEntry && (
+              <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+                <Descriptions.Item label={t("monthly.entry_type", language)}>
+                  <Tag color="processing">{postingEntry.entry_type}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label={t("monthly.amount", language)}>
+                  ¥
+                  {postingEntry.amount?.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}
+                </Descriptions.Item>
+                <Descriptions.Item label={t("monthly.description", language)}>
+                  {postingEntry.description}
+                </Descriptions.Item>
+              </Descriptions>
+            )}
+            <Form.Item label={t("monthly.erp_reference", language)}>
+              <Input
+                placeholder={t("monthly.erp_placeholder", language)}
+                value={erpReference}
+                onChange={(e) => setErpReference(e.target.value)}
+              />
+            </Form.Item>
+          </Modal>
+        </motion.div>
       </AppLayout>
     </ProtectedRoute>
   );

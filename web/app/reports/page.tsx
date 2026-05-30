@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, Suspense } from "react";
+import { motion } from "framer-motion";
 import {
-  Card, Radio, Alert, Tag, Typography, Table, Spin, Statistic,
+  Card, Radio, Tag, Typography, Table, Spin, Statistic,
   Row, Col, Button, Tabs, DatePicker, Select, Input, Space, message,
 } from "antd";
 import {
@@ -19,6 +20,7 @@ import { fmtNum } from "../lib/format";
 import { exportCSV, exportExcel } from "../lib/export";
 import dayjs from "dayjs";
 import { useSearchParams, useRouter } from "next/navigation";
+import { fadeInUp, staggerContainer, staggerItem } from "../design-system/animations";
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -29,7 +31,7 @@ const statusColor: Record<string, string> = {
   draft: "default",
   submitted: "processing",
   reviewed: "warning",
-  pending_approval: "orange",
+  pending_approval: "warning",
   approved: "success",
   rejected: "error",
 };
@@ -63,56 +65,97 @@ const buildAmortColumns = (view: string, granularity: string, lang: string) => {
     );
   } else {
     idCols.push(
-      { title: lang === "en" ? "Group Label" : "分组标签", dataIndex: "group_label", width: 180, fixed: "left" as const },
+      { title: t("reports.amortization_group", lang as any), dataIndex: "group_label", width: 180, fixed: "left" as const },
     );
   }
 
   const periodCols = granularity !== "day"
     ? [
-        { title: lang === "en" ? "Period" : "期间", dataIndex: "period_key", width: 100 },
-        { title: lang === "en" ? "Period Start" : "期间起", dataIndex: "period_start", width: 110 },
-        { title: lang === "en" ? "Period End" : "期间止", dataIndex: "period_end", width: 110 },
+        { title: t("reports.col_period", lang as any), dataIndex: "period_key", width: 100 },
+        { title: t("reports.col_period_start", lang as any), dataIndex: "period_start", width: 110 },
+        { title: t("reports.col_period_end", lang as any), dataIndex: "period_end", width: 110 },
       ]
     : [
         { title: t("reports.day", lang as any), dataIndex: "period_key", width: 110 },
-        { title: lang === "en" ? "Period Start" : "期间起", dataIndex: "period_start", width: 110 },
-        { title: lang === "en" ? "Period End" : "期间止", dataIndex: "period_end", width: 110 },
+        { title: t("reports.col_period_start", lang as any), dataIndex: "period_start", width: 110 },
+        { title: t("reports.col_period_end", lang as any), dataIndex: "period_end", width: 110 },
       ];
 
   const financialCols = [
     {
-      title: lang === "en" ? "Lease Liability Roll-forward" : "租赁负债 Roll-forward",
+      title: t("reports.group_liability", lang as any),
       children: [
-        { title: lang === "en" ? "Opening Liability" : "负债期初", dataIndex: "opening_liability", width: 130, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Interest" : "负债利息", dataIndex: "interest_expense", width: 110, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Payment" : "负债付款", dataIndex: "payment", width: 110, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Prepaid Rent" : "先付租金", dataIndex: "prepaid_payment", width: 110, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Adjustment" : "负债调整", dataIndex: "liability_adjustment", width: 110, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Closing Liability" : "负债期末", dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_opening_liability", lang as any), dataIndex: "opening_liability", width: 130, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_interest", lang as any), dataIndex: "interest_expense", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_payment", lang as any), dataIndex: "payment", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_prepaid", lang as any), dataIndex: "prepaid_payment", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_liability_adjustment", lang as any), dataIndex: "liability_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_closing_liability", lang as any), dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
       ],
     },
     {
-      title: lang === "en" ? "ROU Asset Roll-forward" : "使用权资产 Roll-forward",
+      title: t("reports.group_rou", lang as any),
       children: [
-        { title: lang === "en" ? "Opening ROU" : "资产期初", dataIndex: "opening_rou_asset", width: 130, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Depreciation" : "资产折旧", dataIndex: "depreciation", width: 100, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Impairment" : "资产减值", dataIndex: "impairment", width: 100, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Adjustment" : "资产调整", dataIndex: "rou_adjustment", width: 110, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Closing ROU" : "资产期末", dataIndex: "closing_rou_asset", width: 130, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_opening_rou", lang as any), dataIndex: "opening_rou_asset", width: 130, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_depreciation", lang as any), dataIndex: "depreciation", width: 100, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_impairment", lang as any), dataIndex: "impairment", width: 100, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_rou_adjustment", lang as any), dataIndex: "rou_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_closing_rou", lang as any), dataIndex: "closing_rou_asset", width: 130, align: "right" as const, render: fmtNum },
       ],
     },
     {
-      title: lang === "en" ? "Period Expenses & Adjustments" : "期间费用与调整",
+      title: t("reports.group_expenses", lang as any),
       children: [
-        { title: lang === "en" ? "Variable Rent" : "变动租金", dataIndex: "variable_rent_expense", width: 110, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "Non-lease" : "非租赁", dataIndex: "non_lease_expense", width: 110, align: "right" as const, render: fmtNum },
-        { title: lang === "en" ? "P&L Adjustment" : "损益调整", dataIndex: "pnl_adjustment", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_variable_rent", lang as any), dataIndex: "variable_rent_expense", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_non_lease", lang as any), dataIndex: "non_lease_expense", width: 110, align: "right" as const, render: fmtNum },
+        { title: t("reports.col_pl_adjustment", lang as any), dataIndex: "pnl_adjustment", width: 110, align: "right" as const, render: fmtNum },
       ],
     },
   ];
 
   return [...idCols, ...periodCols, { title: t("reports.currency", lang as any), dataIndex: "currency", width: 80 }, ...financialCols];
 };
+
+
+/* ──────────────── KPI stat card ──────────────── */
+
+function KPIStatCard({ title, value, loading }: { title: string; value: number; loading: boolean }) {
+  return (
+    <motion.div variants={staggerItem}>
+      <Card
+        bodyStyle={{ padding: "20px 24px" }}
+        style={{ borderRadius: 10, height: "100%" }}
+      >
+        {loading ? (
+          <Spin />
+        ) : (
+          <Statistic
+            title={
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#8C8C8C",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {title}
+              </span>
+            }
+            value={value}
+            valueStyle={{
+              fontSize: 28,
+              fontWeight: 700,
+              letterSpacing: "-0.03em",
+              color: "#000",
+            }}
+          />
+        )}
+      </Card>
+    </motion.div>
+  );
+}
 
 
 /* ──────────────── page component (Suspense wrapper) ──────────────── */
@@ -314,550 +357,683 @@ function ReportsPageContent() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <Title level={2}>{t("reports.title", language)}</Title>
-
-        {/* ─── common report‑mode selector ─── */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Space>
-              <Title level={4} style={{ margin: 0 }}>
-                {t("reports.mode", language)}
-              </Title>
-              <Radio.Group
-                value={reportMode}
-                onChange={(e) => setReportMode(e.target.value)}
-                buttonStyle="solid"
-              >
-                <Radio.Button value="working">
-                  <FileTextOutlined /> {t("reports.working", language)}
-                </Radio.Button>
-                <Radio.Button value="official">
-                  <SafetyOutlined /> {t("reports.official", language)}
-                </Radio.Button>
-              </Radio.Group>
-            </Space>
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+        >
+          {/* ─── Page Header ─── */}
+          <div style={{ marginBottom: 24 }}>
+            <h1
+              style={{
+                marginBottom: 4,
+                fontSize: 28,
+                fontWeight: 700,
+                letterSpacing: "-0.04em",
+              }}
+            >
+              {t("reports.title", language)}
+            </h1>
+            <p style={{ color: "#8C8C8C", fontSize: 14, margin: 0 }}>
+              {t("reports.subtitle", language)}
+            </p>
           </div>
 
-          {reportMode === "working" && (
-            <Alert
-              message={t("reports.working_alert_title", language)}
-              description={t("reports.working_alert_desc", language)}
-              type="warning"
-              showIcon
-              style={{ marginTop: 12 }}
-            />
-          )}
-          {reportMode === "official" && (
-            <Alert
-              message={t("reports.official_alert_title", language)}
-              description={t("reports.official_alert_desc", language)}
-              type="success"
-              showIcon
-              style={{ marginTop: 12 }}
-            />
-          )}
-        </Card>
+          {/* ─── Report mode selector ─── */}
+          <Card style={{ marginBottom: 16 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <Space>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 14,
+                    color: "#000",
+                  }}
+                >
+                  {t("reports.mode", language)}
+                </span>
+                <Radio.Group
+                  value={reportMode}
+                  onChange={(e) => setReportMode(e.target.value)}
+                  buttonStyle="solid"
+                >
+                  <Radio.Button value="working">
+                    <FileTextOutlined /> {t("reports.working", language)}
+                  </Radio.Button>
+                  <Radio.Button value="official">
+                    <SafetyOutlined /> {t("reports.official", language)}
+                  </Radio.Button>
+                </Radio.Group>
+              </Space>
 
-        {/* ─── tabs ─── */}
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            /* ================================
-               Tab 1 — 合同台账
-               ================================ */
-            {
-              key: "ledger",
-              label: t("reports.tab_ledger", language),
-              children: (
-                <>
-                  {/* summary cards */}
-                  {summary && (
-                    <Row gutter={16} style={{ marginBottom: 24 }}>
-                      <Col span={8}>
-                        <Card>
-                          <Statistic title={t("reports.total_contracts", language)} value={summary.total_contracts} />
-                        </Card>
-                      </Col>
-                      <Col span={8}>
-                        <Card>
-                          <Statistic
-                            title={t("reports.approved", language)}
-                            value={summary.approved_count}
-                            valueStyle={{ color: "#3f8600" }}
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={8}>
-                        <Card>
-                          <Statistic
-                            title={t("reports.draft_pending", language)}
-                            value={summary.draft_count + summary.pending_count}
-                            valueStyle={{ color: "#cf1322" }}
-                          />
-                        </Card>
-                      </Col>
-                    </Row>
-                  )}
+              <span
+                style={{
+                  fontSize: 12,
+                  color: "#8C8C8C",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                {reportMode === "working" ? (
+                  <>
+                    <span style={{ opacity: 0.5 }}>⚠</span>
+                    {t("reports.working_hint", language)}
+                  </>
+                ) : (
+                  <>
+                    <span style={{ opacity: 0.5 }}>✓</span>
+                    {t("reports.official_hint", language)}
+                  </>
+                )}
+              </span>
+            </div>
+          </Card>
 
-                  {/* contract ledger table */}
-                  <Card
-                    title={
-                      <span>
-                        {t("reports.tab_ledger", language)}
-                        {reportMode === "working" && (
-                          <Tag color="orange" style={{ marginLeft: 8 }}>
-                            {t("reports.contains_unapproved", language)}
-                          </Tag>
-                        )}
-                        {reportMode === "official" && (
-                          <Tag color="green" style={{ marginLeft: 8 }}>
-                            {t("reports.official_only", language)}
-                          </Tag>
-                        )}
-                      </span>
-                    }
-                    extra={
-                      <Button
-                        icon={<DownloadOutlined />}
-                        onClick={async () => {
-                          if (!token) return;
-                          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-                          const res = await fetch(
-                            `${apiUrl}/api/v1/reports/liability-rolling/export?mode=${reportMode}&language=${language}`,
-                            { headers: { Authorization: `Bearer ${token}` } },
-                          );
-                          const blob = await res.blob();
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `IFRS16_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
-                          a.click();
-                          window.URL.revokeObjectURL(url);
-                        }}
+          {/* ─── tabs ─── */}
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={[
+              /* ================================
+                 Tab 1 — 合同台账
+                 ================================ */
+              {
+                key: "ledger",
+                label: t("reports.tab_ledger", language),
+                children: (
+                  <>
+                    {/* summary KPI cards */}
+                    {summary && (
+                      <motion.div
+                        variants={staggerContainer}
+                        initial="initial"
+                        animate="animate"
                       >
-                        {t("reports.export_csv", language)}
-                      </Button>
-                    }
-                  >
-                    <Spin spinning={loading}>
-                      <Table
-                        columns={[
-                          { title: t("reports.contract_number", language), dataIndex: "contract_number", width: 150 },
-                          { title: t("reports.contract_name", language), dataIndex: "contract_name", ellipsis: true },
-                          {
-                            title: t("reports.approval_status", language),
-                            dataIndex: "approval_status",
-                            width: 100,
-                            render: (s: string) => (
-                              <Tag color={statusColor[s] || "default"}>
-                                {getStatusText(language)[s] || s}
-                              </Tag>
-                            ),
-                          },
-                          {
-                            title: t("reports.is_official", language),
-                            dataIndex: "is_official_version",
-                            width: 90,
-                            render: (v: boolean) =>
-                              v ? <Tag color="green">{t("reports.yes", language)}</Tag> : <Tag>{t("reports.no", language)}</Tag>,
-                          },
-                          {
-                            title: t("reports.discount_rate_missing", language),
-                            dataIndex: "discount_rate_missing",
-                            width: 100,
-                            render: (v: boolean) =>
-                              v ? (
-                                <Tag color="red">{t("reports.missing", language)}</Tag>
-                              ) : (
-                                <Tag color="green">{t("reports.filled", language)}</Tag>
-                              ),
-                          },
-                          { title: t("reports.currency", language), dataIndex: "currency", width: 80 },
-                          { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110 },
-                          { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110 },
-                        ]}
-                        dataSource={data}
-                        rowKey="contract_id"
-                        pagination={{ pageSize: 10 }}
-                        locale={{ emptyText: t("reports.empty", language) }}
-                      />
-                    </Spin>
-                  </Card>
-                </>
-              ),
-            },
+                        <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+                          <Col xs={24} sm={8}>
+                            <KPIStatCard
+                              title={t("reports.total_contracts", language)}
+                              value={summary.total_contracts}
+                              loading={loading}
+                            />
+                          </Col>
+                          <Col xs={24} sm={8}>
+                            <KPIStatCard
+                              title={t("reports.approved", language)}
+                              value={summary.approved_count}
+                              loading={loading}
+                            />
+                          </Col>
+                          <Col xs={24} sm={8}>
+                            <KPIStatCard
+                              title={t("reports.draft_pending", language)}
+                              value={summary.draft_count + summary.pending_count}
+                              loading={loading}
+                            />
+                          </Col>
+                        </Row>
+                      </motion.div>
+                    )}
 
-            /* ================================
-               Tab 2 — 摊销报表
-               ================================ */
-            {
-              key: "amortization",
-              label: t("reports.tab_amortization", language),
-              children: (
-                <>
-                  {/* tags‑from‑URL banner */}
-                  {tagsFromUrl && tagsFromUrl.length > 0 && activeTab === "amortization" && (
-                    <Alert
-                      message={
-                        <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <TagOutlined />
-                          {language === "en" ? "Tags imported from Tag Manager: " : "已从标签总管带入标签筛选："}
-                          {tagsFromUrl.map((tg) => (
-                            <Tag key={tg} color="blue">{tg}</Tag>
-                          ))}
-                        </span>
+                    {/* contract ledger table */}
+                    <Card
+                      title={
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+                            {t("reports.tab_ledger", language)}
+                          </span>
+                          <Tag style={{ fontSize: 11 }}>
+                            {reportMode === "working"
+                              ? t("reports.mode_working", language)
+                              : t("reports.mode_official", language)}
+                          </Tag>
+                        </div>
                       }
-                      type="info"
-                      showIcon={false}
-                      closable
-                      onClose={() => setTagsFromUrl(null)}
-                      style={{ marginBottom: 16 }}
-                    />
-                  )}
-
-                  {/* controls */}
-                  <Card style={{ marginBottom: 16 }}>
-                    <Row gutter={[16, 12]} align="middle">
-                      <Col>
-                        <Space>
-                          <span>{t("reports.view_dimension", language)}：</span>
-                          <Select
-                            value={amortView}
-                            onChange={(v) => { setAmortView(v as any); setAmortFetched(false); }}
-                            style={{ width: 120 }}
-                            options={[
-                              { value: "contract", label: t("reports.contract_view", language) },
-                              { value: "store", label: t("reports.store_view", language) },
-                              { value: "tag", label: t("reports.tag_view", language) },
-                              { value: "summary", label: t("reports.summary_view", language) },
-                            ]}
-                          />
-                        </Space>
-                      </Col>
-                      <Col>
-                        <Space>
-                          <span>{t("reports.granularity", language)}：</span>
-                          <Select
-                            value={amortGranularity}
-                            onChange={(v) => { setAmortGranularity(v as any); setAmortFetched(false); }}
-                            style={{ width: 100 }}
-                            options={[
-                              { value: "day", label: t("reports.day", language) },
-                              { value: "month", label: t("reports.month", language) },
-                              { value: "quarter", label: t("reports.quarter", language) },
-                              { value: "half_year", label: t("reports.half_year", language) },
-                              { value: "year", label: t("reports.year", language) },
-                            ]}
-                          />
-                        </Space>
-                      </Col>
-                      <Col>
-                        <Space>
-                          <span>{t("reports.date_range", language)}：</span>
-                          <RangePicker
-                            value={amortDateRange}
-                            onChange={(dates) => { setAmortDateRange(dates as any); setAmortFetched(false); }}
-                            allowClear={false}
-                          />
-                        </Space>
-                      </Col>
-                      <Col>
-                        <Button type="primary" icon={<SearchOutlined />} onClick={fetchAmort} loading={amortLoading}>
-                          {t("reports.search", language)}
-                        </Button>
-                      </Col>
-                      <Col>
-                        <Button
-                          icon={<ClearOutlined />}
-                          onClick={handleAmortReset}
-                          disabled={amortLoading}
-                        >
-                          {t("reports.reset", language)}
-                        </Button>
-                      </Col>
-                       <Col>
+                      extra={
                         <Button
                           icon={<DownloadOutlined />}
-                          onClick={() =>
-                            exportCSV(
-                              amortData,
-                              amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                              `IFRS16_${language === "en" ? "Amortization" : "摊销报表"}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
-                            )
-                          }
-                          disabled={!amortData.length}
+                          onClick={async () => {
+                            if (!token) return;
+                            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+                            const res = await fetch(
+                              `${apiUrl}/api/v1/reports/liability-rolling/export?mode=${reportMode}&language=${language}`,
+                              { headers: { Authorization: `Bearer ${token}` } },
+                            );
+                            const blob = await res.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `IFRS16_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                          }}
                         >
                           {t("reports.export_csv", language)}
                         </Button>
-                      </Col>
-                      <Col>
-                        <Button
-                          icon={<DownloadOutlined />}
-                          onClick={() =>
-                            exportExcel(
-                              amortData,
-                              amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                              `IFRS16_${language === "en" ? "Amortization" : "摊销报表"}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
-                            )
-                          }
-                          disabled={!amortData.length}
-                        >
-                          {t("reports.export_excel", language)}
-                        </Button>
-                      </Col>
-                      <Col>
-                        <Button
-                          icon={<RobotOutlined />}
-                          onClick={() => {
-                            const parts: string[] = [];
-                            parts.push(`${language === "en" ? "Mode" : "模式"}: ${reportMode === 'working' ? (language === "en" ? 'Working' : '工作') : (language === "en" ? 'Official' : '正式')}`);
-                            parts.push(`${language === "en" ? "View" : "视图"}: ${amortView}`);
-                            parts.push(`${language === "en" ? "Granularity" : "粒度"}: ${amortGranularity}`);
-                            if (amortDateRange) {
-                              parts.push(`${language === "en" ? "Period" : "期间"}: ${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`);
-                            }
-                            if (amortSummary) {
-                              parts.push(`${language === "en" ? "Closing Liability" : "期末负债"}: ¥${fmtNum(amortSummary.closingLiability)}`);
-                              parts.push(`${language === "en" ? "Closing ROU" : "期末资产"}: ¥${fmtNum(amortSummary.closingROU)}`);
-                              parts.push(`${language === "en" ? "Interest" : "利息"}: ¥${fmtNum(amortSummary.totalInterest)}`);
-                              parts.push(`${language === "en" ? "Depreciation" : "折旧"}: ¥${fmtNum(amortSummary.totalDepreciation)}`);
-                            }
-                            const summary = parts.join('; ');
-                            let url = `/ai-chat?page=reports&title=${encodeURIComponent(language === "en" ? "Amortization Report" : "摊销报表")}&report_view=${amortView}&summary=${encodeURIComponent(summary)}`;
-                            if (amortDateRange) {
-                              url += `&period=${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`;
-                            }
-                            if (selectedTags.length > 0) {
-                              url += selectedTags.map(t => `&tags=${encodeURIComponent(t)}`).join('');
-                            }
-                            router.push(url);
-                          }}
-                        >
-                          {t("reports.ai_analysis", language)}
-                        </Button>
-                      </Col>
-                    </Row>
-
-                    {/* advanced filters toggle */}
-                    <Button
-                      type="link"
-                      onClick={() => setShowFilters(!showFilters)}
-                      style={{ marginTop: 8, padding: 0 }}
+                      }
                     >
-                      {showFilters ? t("reports.collapse_filters", language) : t("reports.expand_filters", language)}
-                    </Button>
+                      <Spin spinning={loading}>
+                        <Table
+                          columns={[
+                            { title: t("reports.contract_number", language), dataIndex: "contract_number", width: 150 },
+                            { title: t("reports.contract_name", language), dataIndex: "contract_name", ellipsis: true },
+                            {
+                              title: t("reports.approval_status", language),
+                              dataIndex: "approval_status",
+                              width: 100,
+                              render: (s: string) => (
+                                <Tag color={statusColor[s] || "default"}>
+                                  {getStatusText(language)[s] || s}
+                                </Tag>
+                              ),
+                            },
+                            {
+                              title: t("reports.is_official", language),
+                              dataIndex: "is_official_version",
+                              width: 90,
+                              render: (v: boolean) =>
+                                v ? <Tag>{t("reports.yes", language)}</Tag> : <Tag>{t("reports.no", language)}</Tag>,
+                            },
+                            {
+                              title: t("reports.discount_rate_missing", language),
+                              dataIndex: "discount_rate_missing",
+                              width: 100,
+                              render: (v: boolean) =>
+                                v ? (
+                                  <Tag color="error">{t("reports.missing", language)}</Tag>
+                                ) : (
+                                  <Tag color="success">{t("reports.filled", language)}</Tag>
+                                ),
+                            },
+                            { title: t("reports.currency", language), dataIndex: "currency", width: 80 },
+                            { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110 },
+                            { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110 },
+                          ]}
+                          dataSource={data}
+                          rowKey="contract_id"
+                          pagination={{ pageSize: 10 }}
+                          locale={{ emptyText: t("reports.empty", language) }}
+                        />
+                      </Spin>
+                    </Card>
+                  </>
+                ),
+              },
 
-                    {showFilters && (
-                      <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
-                        {amortView !== "contract" && (
-                          <Col span={8}>
-                            <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>{t("reports.contract_id", language)}：</span>
-                              <Input
-                                value={amortContractId}
-                                onChange={(e) => { setAmortContractId(e.target.value); setAmortFetched(false); }}
-                                placeholder={language === "en" ? "Enter contract ID" : "输入合同 ID 筛选"}
-                                allowClear
-                              />
-                            </Space>
-                          </Col>
-                        )}
-                        {amortView !== "store" && (
-                          <Col span={8}>
-                            <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>{t("reports.store", language)}：</span>
-                              <Input
-                                value={amortStore}
-                                onChange={(e) => { setAmortStore(e.target.value); setAmortFetched(false); }}
-                                placeholder={language === "en" ? "Enter store name" : "输入门店名称筛选"}
-                                allowClear
-                              />
-                            </Space>
-                          </Col>
-                        )}
-                        <Col span={8}>
-                          <Space direction="vertical" style={{ width: "100%" }}>
-                            <span>{t("reports.tags", language)}：</span>
+              /* ================================
+                 Tab 2 — 摊销报表
+                 ================================ */
+              {
+                key: "amortization",
+                label: t("reports.tab_amortization", language),
+                children: (
+                  <>
+                    {/* tags‑from‑URL banner */}
+                    {tagsFromUrl && tagsFromUrl.length > 0 && activeTab === "amortization" && (
+                      <div
+                        style={{
+                          marginBottom: 16,
+                          padding: "10px 14px",
+                          borderRadius: 8,
+                          background: "#F7F7F7",
+                          border: "1px solid #E5E5E5",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          fontSize: 13,
+                          color: "#595959",
+                        }}
+                      >
+                        <TagOutlined style={{ opacity: 0.5 }} />
+                        {t("reports.tags_imported", language)}
+                        {tagsFromUrl.map((tg) => (
+                          <Tag key={tg}>{tg}</Tag>
+                        ))}
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => setTagsFromUrl(null)}
+                          style={{ marginLeft: "auto", padding: 0, fontSize: 12 }}
+                        >
+                          {t("reports.dismiss", language)}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* controls */}
+                    <Card style={{ marginBottom: 16 }}>
+                      <Row gutter={[12, 10]} align="middle" style={{ marginBottom: showFilters ? 8 : 0 }}>
+                        <Col>
+                          <Space size={4}>
+                            <span style={{ fontSize: 13, color: "#595959" }}>
+                              {t("reports.view_dimension", language)}
+                            </span>
                             <Select
-                              mode="tags"
-                              value={selectedTags}
-                              onChange={(v) => { setSelectedTags(v); setAmortFetched(false); }}
-                              style={{ width: "100%" }}
-                              placeholder={language === "en" ? "Select or enter one or more tags" : "选择或输入一个或多个标签"}
-                              loading={tagLoading}
-                              options={availableTags.map((tg) => ({ value: tg, label: tg }))}
+                              value={amortView}
+                              onChange={(v) => { setAmortView(v as any); setAmortFetched(false); }}
+                              style={{ width: 110 }}
+                              size="small"
+                              options={[
+                                { value: "contract", label: t("reports.contract_view", language) },
+                                { value: "store", label: t("reports.store_view", language) },
+                                { value: "tag", label: t("reports.tag_view", language) },
+                                { value: "summary", label: t("reports.summary_view", language) },
+                              ]}
                             />
                           </Space>
+                        </Col>
+                        <Col>
+                          <Space size={4}>
+                            <span style={{ fontSize: 13, color: "#595959" }}>
+                              {t("reports.granularity", language)}
+                            </span>
+                            <Select
+                              value={amortGranularity}
+                              onChange={(v) => { setAmortGranularity(v as any); setAmortFetched(false); }}
+                              style={{ width: 90 }}
+                              size="small"
+                              options={[
+                                { value: "day", label: t("reports.day", language) },
+                                { value: "month", label: t("reports.month", language) },
+                                { value: "quarter", label: t("reports.quarter", language) },
+                                { value: "half_year", label: t("reports.half_year", language) },
+                                { value: "year", label: t("reports.year", language) },
+                              ]}
+                            />
+                          </Space>
+                        </Col>
+                        <Col>
+                          <Space size={4}>
+                            <span style={{ fontSize: 13, color: "#595959" }}>
+                              {t("reports.date_range", language)}
+                            </span>
+                            <RangePicker
+                              value={amortDateRange}
+                              onChange={(dates) => { setAmortDateRange(dates as any); setAmortFetched(false); }}
+                              allowClear={false}
+                              size="small"
+                              style={{ width: 220 }}
+                            />
+                          </Space>
+                        </Col>
+                        <Col>
+                          <Space size={6}>
+                            <Button
+                              type="primary"
+                              size="small"
+                              icon={<SearchOutlined />}
+                              onClick={fetchAmort}
+                              loading={amortLoading}
+                            >
+                              {t("reports.search", language)}
+                            </Button>
+                            <Button
+                              size="small"
+                              icon={<ClearOutlined />}
+                              onClick={handleAmortReset}
+                              disabled={amortLoading}
+                            >
+                              {t("reports.reset", language)}
+                            </Button>
+                          </Space>
+                        </Col>
+
+                        {/* export + AI buttons row */}
+                        <Col flex="auto" />
+                        <Col>
+                          <Space size={6}>
+                            <Button
+                              size="small"
+                              icon={<DownloadOutlined />}
+                              onClick={() =>
+                                exportCSV(
+                                  amortData,
+                                  amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
+                                  `IFRS16_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
+                                )
+                              }
+                              disabled={!amortData.length}
+                            >
+                              CSV
+                            </Button>
+                            <Button
+                              size="small"
+                              icon={<DownloadOutlined />}
+                              onClick={() =>
+                                exportExcel(
+                                  amortData,
+                                  amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
+                                  `IFRS16_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
+                                )
+                              }
+                              disabled={!amortData.length}
+                            >
+                              Excel
+                            </Button>
+                            <Button
+                              type="primary"
+                              size="small"
+                              icon={<RobotOutlined />}
+                              onClick={() => {
+                                const parts: string[] = [];
+                                parts.push(`${t("reports.ai_chat_mode", language)}: ${reportMode === 'working' ? t("reports.ai_chat_working", language) : t("reports.ai_chat_official", language)}`);
+                                parts.push(`${t("reports.ai_chat_view", language)}: ${amortView}`);
+                                parts.push(`${t("reports.ai_chat_granularity", language)}: ${amortGranularity}`);
+                                if (amortDateRange) {
+                                  parts.push(`${t("reports.ai_chat_period", language)}: ${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`);
+                                }
+                                if (amortSummary) {
+                                  parts.push(`${t("reports.ai_chat_closing_liability", language)}: ¥${fmtNum(amortSummary.closingLiability)}`);
+                                  parts.push(`${t("reports.ai_chat_closing_rou", language)}: ¥${fmtNum(amortSummary.closingROU)}`);
+                                  parts.push(`${t("reports.ai_chat_interest", language)}: ¥${fmtNum(amortSummary.totalInterest)}`);
+                                  parts.push(`${t("reports.ai_chat_depreciation", language)}: ¥${fmtNum(amortSummary.totalDepreciation)}`);
+                                }
+                                const summary = parts.join('; ');
+                                let url = `/ai-chat?page=reports&title=${encodeURIComponent(t("reports.ai_chat_report_title", language))}&report_view=${amortView}&summary=${encodeURIComponent(summary)}`;
+                                if (amortDateRange) {
+                                  url += `&period=${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`;
+                                }
+                                if (selectedTags.length > 0) {
+                                  url += selectedTags.map(t => `&tags=${encodeURIComponent(t)}`).join('');
+                                }
+                                router.push(url);
+                              }}
+                            >
+                              {t("reports.ai_analysis", language)}
+                            </Button>
+                          </Space>
+                        </Col>
+                      </Row>
+
+                      {/* advanced filters toggle */}
+                      <Button
+                        type="link"
+                        onClick={() => setShowFilters(!showFilters)}
+                        style={{ padding: 0, fontSize: 12 }}
+                      >
+                        {showFilters
+                          ? t("reports.collapse_filters", language)
+                          : t("reports.expand_filters", language)}
+                      </Button>
+
+                      {showFilters && (
+                        <>
+                          <Row gutter={[12, 10]} style={{ marginTop: 8 }}>
+                            {amortView !== "contract" && (
+                              <Col xs={24} sm={8}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                    {t("reports.contract_id", language)}
+                                  </span>
+                                  <Input
+                                    size="small"
+                                    value={amortContractId}
+                                    onChange={(e) => { setAmortContractId(e.target.value); setAmortFetched(false); }}
+                                    placeholder={t("reports.filter_contract_id", language)}
+                                     allowClear
+                                  />
+                                </div>
+                              </Col>
+                            )}
+                            {amortView !== "store" && (
+                              <Col xs={24} sm={8}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                    {t("reports.store", language)}
+                                  </span>
+                                  <Input
+                                    size="small"
+                                    value={amortStore}
+                                    onChange={(e) => { setAmortStore(e.target.value); setAmortFetched(false); }}
+                                    placeholder={t("reports.filter_store", language)}
+                                     allowClear
+                                  />
+                                </div>
+                              </Col>
+                            )}
+                            <Col xs={24} sm={8}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                  {t("reports.tags", language)}
+                                </span>
+                                <Select
+                                  mode="tags"
+                                  size="small"
+                                  value={selectedTags}
+                                  onChange={(v) => { setSelectedTags(v); setAmortFetched(false); }}
+                                  style={{ width: "100%" }}
+                                  placeholder={t("reports.filter_tags", language)}
+                                  loading={tagLoading}
+                                  options={availableTags.map((tg) => ({ value: tg, label: tg }))}
+                                />
+                              </div>
+                            </Col>
+                          </Row>
+
+                          {/* discount rate & currency override */}
+                          <div
+                            style={{
+                              marginTop: 12,
+                              padding: "10px 14px",
+                              borderRadius: 8,
+                              background: "#F7F7F7",
+                              border: "1px solid #E5E5E5",
+                              fontSize: 12,
+                              color: "#8C8C8C",
+                            }}
+                          >
+                            <span style={{ fontWeight: 600, color: "#595959" }}>
+                              {t("reports.override_title", language)}
+                            </span>
+                            <span style={{ marginLeft: 8 }}>
+                              {t("reports.override_desc", language)}
+                            </span>
+                          </div>
+                          <Row gutter={[12, 10]} style={{ marginTop: 10 }}>
+                            <Col xs={24} sm={8}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                  {t("reports.discount_rate_override", language)}
+                                </span>
+                                <Input
+                                  size="small"
+                                  value={discountRateOverride}
+                                  onChange={(e) => { setDiscountRateOverride(e.target.value); setAmortFetched(false); }}
+                                  placeholder={t("reports.override_placeholder", language)}
+                                   allowClear
+                                 />
+                               </div>
+                             </Col>
+                             <Col xs={24} sm={8}>
+                               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                 <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                   {t("reports.report_currency", language)}
+                                 </span>
+                                 <Select
+                                   size="small"
+                                   value={reportCurrency || undefined}
+                                   onChange={(v) => { setReportCurrency(v || ""); setAmortFetched(false); }}
+                                   style={{ width: "100%" }}
+                                   placeholder={t("reports.select_currency", language)}
+                                  allowClear
+                                   options={[
+                                    { value: "CNY", label: t("reports.option.currency_cny", language) },
+                                    { value: "USD", label: t("reports.option.currency_usd", language) },
+                                    { value: "HKD", label: t("reports.option.currency_hkd", language) },
+                                    { value: "EUR", label: t("reports.option.currency_eur", language) },
+                                  ]}
+                                />
+                              </div>
+                            </Col>
+                            <Col xs={24} sm={8}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                  {t("reports.exchange_rate", language)}
+                                </span>
+                                <Input
+                                  size="small"
+                                  value={exchangeRate}
+                                  onChange={(e) => { setExchangeRate(e.target.value); setAmortFetched(false); }}
+                                  placeholder={t("reports.exchange_rate_placeholder", language)}
+                                   allowClear
+                                />
+                              </div>
+                            </Col>
+                          </Row>
+                        </>
+                      )}
+                    </Card>
+
+                    {/* override summary tags */}
+                    {(discountRateOverride || reportCurrency) && amortFetched && (
+                      <div style={{ marginBottom: 16 }}>
+                        {discountRateOverride && (
+                          <Tag style={{ fontSize: 12, padding: "2px 10px" }}>
+                            {t("reports.discount_rate_override", language)}: {Number(discountRateOverride).toFixed(2)}%
+                          </Tag>
+                        )}
+                        {reportCurrency && (
+                          <Tag style={{ fontSize: 12, padding: "2px 10px" }}>
+                            {t("reports.report_currency", language)}: {reportCurrency}{exchangeRate ? ` @ ${Number(exchangeRate).toFixed(2)}` : ""}
+                          </Tag>
+                        )}
+                      </div>
+                    )}
+
+                    {/* tag view caveat */}
+                    {amortView === "tag" && amortFetched && amortData.length > 0 && (
+                      <div
+                        style={{
+                          marginBottom: 16,
+                          padding: "10px 14px",
+                          borderRadius: 8,
+                          background: "#F7F7F7",
+                          border: "1px solid #E5E5E5",
+                          fontSize: 12,
+                          color: "#8C8C8C",
+                        }}
+                      >
+                        {t("reports.tag_caveat", language)}
+                      </div>
+                    )}
+
+                    {/* roll‑forward summary bar */}
+                    {amortSummary && (
+                      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+                        <Col xs={24} sm={12} lg={6}>
+                          <Card
+                            bodyStyle={{ padding: "16px 20px" }}
+                            style={{ borderRadius: 10 }}
+                          >
+                            <Statistic
+                              title={
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                  {t("reports.closing_liability", language)}
+                                </span>
+                              }
+                              value={amortSummary.closingLiability}
+                              precision={2}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                            />
+                          </Card>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                          <Card
+                            bodyStyle={{ padding: "16px 20px" }}
+                            style={{ borderRadius: 10 }}
+                          >
+                            <Statistic
+                              title={
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                  {t("reports.closing_rou", language)}
+                                </span>
+                              }
+                              value={amortSummary.closingROU}
+                              precision={2}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                            />
+                          </Card>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                          <Card
+                            bodyStyle={{ padding: "16px 20px" }}
+                            style={{ borderRadius: 10 }}
+                          >
+                            <Statistic
+                              title={
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                  {t("reports.total_interest", language)}
+                                </span>
+                              }
+                              value={amortSummary.totalInterest}
+                              precision={2}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                            />
+                          </Card>
+                        </Col>
+                        <Col xs={24} sm={12} lg={6}>
+                          <Card
+                            bodyStyle={{ padding: "16px 20px" }}
+                            style={{ borderRadius: 10 }}
+                          >
+                            <Statistic
+                              title={
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                  {t("reports.total_depreciation", language)}
+                                </span>
+                              }
+                              value={amortSummary.totalDepreciation}
+                              precision={2}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                            />
+                          </Card>
                         </Col>
                       </Row>
                     )}
 
-                    {showFilters && (
-                      <>
-                        <Alert
-                          message={language === "en" ? "Discount Rate & Currency Override (Optional)" : "折现率与汇率覆盖（可选）"}
-                          description={language === "en"
-                            ? "Leave blank to use the discount rate from the contract ledger. If a discount rate override is provided, the selected contracts will be recalculated in real-time. If a report currency and exchange rate are provided, amounts will be converted uniformly."
-                            : "不填写则优先使用合同台账中的折现率数值。如填写折现率覆盖，将按该利率实时重算选中范围内合同。如填写报表货币和汇率，将按统一汇率换算展示金额。"
-                          }
-                          type="info"
-                          showIcon
-                          style={{ marginTop: 12 }}
+                    {/* result table */}
+                    <Card
+                      title={
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+                            {t("reports.amortization_table", language)}
+                          </span>
+                          <Tag style={{ fontSize: 11 }}>
+                            {reportMode === "working"
+                              ? t("reports.mode_working", language)
+                              : t("reports.mode_official", language)}
+                          </Tag>
+                        </div>
+                      }
+                    >
+                      <Spin spinning={amortLoading}>
+                        <Table
+                          columns={amortCols}
+                          dataSource={amortData}
+                          rowKey={(record: any, index?: number) => `${record.group_key || index}-${record.period_key || index}`}
+                          pagination={{ pageSize: 20, showSizeChanger: true }}
+                          scroll={{ x: "max-content" }}
+                          size="small"
+                          locale={{ emptyText: amortFetched ? t("reports.empty", language) : t("reports.no_data_hint", language) }}
                         />
-                        <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
-                          <Col span={8}>
-                            <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>{t("reports.discount_rate_override", language)}：</span>
-                              <Input
-                                value={discountRateOverride}
-                                onChange={(e) => { setDiscountRateOverride(e.target.value); setAmortFetched(false); }}
-                                placeholder={language === "en" ? "e.g. 5 or 5.25" : "例如 5 或 5.25"}
-                                allowClear
-                              />
-                            </Space>
-                          </Col>
-                          <Col span={8}>
-                            <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>{t("reports.report_currency", language)}：</span>
-                              <Select
-                                value={reportCurrency || undefined}
-                                onChange={(v) => { setReportCurrency(v || ""); setAmortFetched(false); }}
-                                style={{ width: "100%" }}
-                                placeholder={language === "en" ? "Select currency" : "选择货币"}
-                                allowClear
-                                options={[
-                                  { value: "CNY", label: "CNY — 人民币" },
-                                  { value: "USD", label: "USD — 美元" },
-                                  { value: "HKD", label: "HKD — 港元" },
-                                  { value: "EUR", label: "EUR — 欧元" },
-                                ]}
-                              />
-                            </Space>
-                          </Col>
-                          <Col span={8}>
-                            <Space direction="vertical" style={{ width: "100%" }}>
-                              <span>{t("reports.exchange_rate", language)}：</span>
-                              <Input
-                                value={exchangeRate}
-                                onChange={(e) => { setExchangeRate(e.target.value); setAmortFetched(false); }}
-                                placeholder={language === "en" ? "e.g. 7.20" : "例如 7.20"}
-                                allowClear
-                              />
-                            </Space>
-                          </Col>
-                        </Row>
-                      </>
-                    )}
-                  </Card>
-
-                  {/* override summary tags */}
-                  {(discountRateOverride || reportCurrency) && amortFetched && (
-                    <div style={{ marginBottom: 16 }}>
-                      {discountRateOverride && (
-                        <Tag color="blue" style={{ fontSize: 13, padding: "2px 10px" }}>
-                          {language === "en" ? "Discount Rate Override" : "折现率覆盖"}: {Number(discountRateOverride).toFixed(2)}%
-                        </Tag>
-                      )}
-                      {reportCurrency && (
-                        <Tag color="purple" style={{ fontSize: 13, padding: "2px 10px" }}>
-                          {language === "en" ? "Report Currency" : "报表货币"}: {reportCurrency}{exchangeRate ? ` @ ${Number(exchangeRate).toFixed(2)}` : ""}
-                        </Tag>
-                      )}
-                    </div>
-                  )}
-
-                  {/* tag view caveat */}
-                  {amortView === "tag" && amortFetched && amortData.length > 0 && (
-                    <Alert
-                      message={t("reports.tag_caveat", language)}
-                      type="info"
-                      showIcon
-                      style={{ marginBottom: 16 }}
-                    />
-                  )}
-
-                  {/* roll‑forward summary bar */}
-                  {amortSummary && (
-                    <Row gutter={16} style={{ marginBottom: 16 }}>
-                      <Col span={6}>
-                        <Card size="small">
-                          <Statistic
-                            title={t("reports.closing_liability", language)}
-                            value={amortSummary.closingLiability}
-                            precision={2}
-                            valueStyle={{ fontSize: 16 }}
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card size="small">
-                          <Statistic
-                            title={t("reports.closing_rou", language)}
-                            value={amortSummary.closingROU}
-                            precision={2}
-                            valueStyle={{ fontSize: 16 }}
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card size="small">
-                          <Statistic
-                            title={t("reports.total_interest", language)}
-                            value={amortSummary.totalInterest}
-                            precision={2}
-                            valueStyle={{ fontSize: 16 }}
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card size="small">
-                          <Statistic
-                            title={t("reports.total_depreciation", language)}
-                            value={amortSummary.totalDepreciation}
-                            precision={2}
-                            valueStyle={{ fontSize: 16 }}
-                          />
-                        </Card>
-                      </Col>
-                    </Row>
-                  )}
-
-                  {/* result table */}
-                  <Card
-                    title={
-                      <span>
-                        {t("reports.amortization_table", language)}
-                        {reportMode === "working" && (
-                          <Tag color="orange" style={{ marginLeft: 8 }}>
-                            {t("reports.contains_unapproved", language)}
-                          </Tag>
-                        )}
-                        {reportMode === "official" && (
-                          <Tag color="green" style={{ marginLeft: 8 }}>
-                            {t("reports.official_only", language)}
-                          </Tag>
-                        )}
-                      </span>
-                    }
-                  >
-                    <Spin spinning={amortLoading}>
-                      <Table
-                        columns={amortCols}
-                        dataSource={amortData}
-                        rowKey={(record: any, index?: number) => `${record.group_key || index}-${record.period_key || index}`}
-                        pagination={{ pageSize: 20, showSizeChanger: true }}
-                        scroll={{ x: "max-content" }}
-                        size="small"
-                        locale={{ emptyText: amortFetched ? t("reports.empty", language) : t("reports.no_data_hint", language) }}
-                      />
-                    </Spin>
-                  </Card>
-                </>
-              ),
-            },
-          ]}
-        />
+                      </Spin>
+                    </Card>
+                  </>
+                ),
+              },
+            ]}
+          />
+        </motion.div>
       </AppLayout>
     </ProtectedRoute>
   );

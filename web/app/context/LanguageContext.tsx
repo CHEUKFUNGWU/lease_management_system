@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-export type Language = "zh-CN" | "zh-TW" | "en";
+export type Language = "zh-CN" | "zh-HK" | "en";
 
 interface LanguageContextType {
   language: Language;
@@ -18,7 +18,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Language | null;
-    if (stored && ["zh-CN", "zh-TW", "en"].includes(stored)) {
+    if (stored && ["zh-CN", "zh-HK", "en"].includes(stored)) {
       setLanguageState(stored);
     }
   }, []);

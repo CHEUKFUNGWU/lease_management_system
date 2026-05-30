@@ -129,6 +129,7 @@ func main() {
 		
 		// Contracts
 		api.POST("/contracts", contractHandler.Create)
+		api.POST("/contracts/batch", contractHandler.CreateBatch)
 		api.GET("/contracts", contractHandler.GetAll)
 		api.GET("/contracts/:id", contractHandler.GetByID)
 		api.PUT("/contracts/:id", contractHandler.Update)

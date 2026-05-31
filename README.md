@@ -1,20 +1,19 @@
-# IFRS 16 租赁管理系统
+# Lease Management System
 
-零售集团 IFRS 16 租赁管理系统，覆盖合同管理、租赁计量、事件变更、会计分录、披露报表、审计留痕及 AI Agent 智能录入。
+零售集团统一租赁管理平台。以 AI 录入为入口、以租赁全生命周期管理为日常、以 IFRS 16 合规计量为核心会计能力，覆盖合同管理、关键日期提醒、条款义务、租赁计量、事件变更、会计分录、披露报表、审计留痕及 AI Agent 智能录入。
 
 ## 技术栈
 
-- **前端**: Next.js + TypeScript + Ant Design
-- **核心后端**: Golang + Gin
-- **数据访问**: pgx + sqlc + goose
-- **数据库**: PostgreSQL
-- **AI / 文档解析服务**: Python + FastAPI
-- **OCR / 文档结构化**: PaddleOCR
-- **大模型能力**: OpenAI API
+- **前端**: Next.js 14 + TypeScript + Ant Design
+- **核心后端**: Go 1.23 + Gin
+- **数据访问**: pgx（手写 SQL）
+- **数据库**: PostgreSQL 16
+- **AI / 文档解析服务**: Python 3.11 + FastAPI
+- **OCR / 文档结构化**: PaddleOCR-VL-1.5 / PyMuPDF fallback
+- **大模型能力**: DeepSeek API（默认）/ OpenAI API（备用）
 - **对象存储**: MinIO
-- **认证授权**: Go 自建 JWT + 基础 RBAC
-- **监控排障**: slog + pprof + 基础 metrics
-- **部署**: Docker
+- **认证授权**: Go 自建 JWT + 基础 RBAC + 多租户行级过滤
+- **部署**: Docker Compose
 
 ## 项目结构
 
@@ -43,8 +42,9 @@
 │   ├── main.py                 # 服务入口
 │   ├── Dockerfile
 │   └── requirements.txt
-├── db/                         # 数据库迁移
-│   └── migrations/             # goose 迁移文件
+├── db/                         # 数据库初始化与迁移
+│   ├── init/                   # PostgreSQL 容器自动初始化 schema
+│   └── migrations/             # 增量迁移 SQL
 └── scripts/                    # 辅助脚本
 ```
 
@@ -65,7 +65,7 @@
 make setup
 ```
 
-编辑 `.env` 文件配置环境变量（特别是 `OPENAI_API_KEY`）。
+编辑 `.env` 文件配置环境变量（特别是 `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` / `PADDLEOCR_ACCESS_TOKEN`）。
 
 ### 3. 启动服务
 
@@ -93,13 +93,17 @@ make migrate    # 执行数据库迁移
 make web        # 进入前端容器
 make core       # 进入核心服务容器
 make ai         # 进入 AI 服务容器
+make ifrs16-regression # 运行 IFRS 16 计量回归测试并生成对数报告
 ```
 
 ## 核心业务链路
 
-1. **新合同上传**: 用户上传 PDF/Excel → AI 识别 → 生成草稿 → 人工确认 → 正式入库 → 触发计量
+1. **AI 合同录入**: 用户在 AI 录入窗口上传 PDF/Excel → OCR/LLM 识别 → 生成结构化草稿卡片 → 人工确认 → 草稿合同 → 审批正式入库
 2. **租金表上传**: 上传租金表 → AI 提取付款计划 → 批量确认 → 写入付款计划 → 触发重算
-3. **AI 问答**: 聊天窗口提问 → 权限校验 → AI 基于台账回答 → 返回引用来源
+3. **范围闸门**: AI 初判 `lease_scope` → 人工复核 → 资本化 / 短期豁免 / 低价值豁免 / 非租赁合同分流
+4. **月结与总账**: 按期间生成计量结果与会计分录 → 复核/审批 → 过账 → ERP CSV 导出与凭证号回写
+5. **租赁管理**: 合同库、附件、关键日期、条款义务、组合分析、ROI、敏感性、多准则对比
+6. **AI 问答**: 聊天窗口提问 → 权限校验 → AI 基于台账回答 → 返回引用来源
 
 ## 开发规范
 
@@ -113,6 +117,9 @@ make ai         # 进入 AI 服务容器
 
 - [需求文档](docs/IFRS16_IT_需求文档.md)
 - [MVP 技术架构方案](docs/IFRS16_MVP_技术架构方案.md)
+- [租赁平台进阶提升方案](docs/租赁平台进阶提升方案.md)
+- [IFRS 16 计量回归对数报告](docs/IFRS16_计量回归对数报告.md)
+- [IFRS 16 计量方法与准则映射白皮书](docs/IFRS16_计量方法与准则映射白皮书.md)
 - [开发规范](AGENTS.md)
 
 ## License

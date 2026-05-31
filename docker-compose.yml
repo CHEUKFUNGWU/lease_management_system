@@ -1,3 +1,5 @@
+name: lease_management_system
+
 services:
   postgres:
     image: postgres:16-alpine

@@ -1,7 +1,7 @@
 .PHONY: help setup up down restart logs migrate web core ai db reset-db ifrs16-regression
 
 help: ## 显示帮助信息
-	@echo "IFRS 16 租赁管理系统 — 常用命令"
+	@echo "Lease Management System — 常用命令"
 	@echo ""
 	@echo "  make setup      复制 .env.example 到 .env 并初始化项目"
 	@echo "  make up         启动所有 Docker 服务"

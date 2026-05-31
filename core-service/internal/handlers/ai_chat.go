@@ -60,8 +60,26 @@ type AIChatResponse struct {
 	Confidence     float64             `json:"confidence"`
 	IsOfficial     bool                `json:"is_official"`
 	Model          string              `json:"model,omitempty"`
+	AgentMode      bool                `json:"agent_mode,omitempty"`
+	AgentPlan      []AgentPlanStep     `json:"agent_plan,omitempty"`
+	ToolCalls      []AgentToolCall     `json:"tool_calls,omitempty"`
 	DraftContracts []ContractDraftItem `json:"draft_contracts,omitempty"`
 	BatchSummary   *BatchParseSummary  `json:"batch_summary,omitempty"`
+}
+
+type AgentPlanStep struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Status string `json:"status"` // pending | running | completed | needs_review
+}
+
+type AgentToolCall struct {
+	Tool           string `json:"tool"`
+	Skill          string `json:"skill"`
+	Status         string `json:"status"` // completed | failed | needs_review
+	InputSummary   string `json:"input_summary"`
+	OutputSummary  string `json:"output_summary"`
+	RequiresReview bool   `json:"requires_review"`
 }
 
 type ContractDraftItem struct {
@@ -165,7 +183,10 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 				Sources:        batchResult.Sources,
 				Confidence:     batchResult.Confidence,
 				IsOfficial:     false,
-				Model:          "batch-parser",
+				Model:          "lease-agent",
+				AgentMode:      true,
+				AgentPlan:      batchResult.AgentPlan,
+				ToolCalls:      batchResult.ToolCalls,
 				DraftContracts: batchResult.Contracts,
 				BatchSummary:   batchResult.Summary,
 			})
@@ -523,7 +544,7 @@ func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextDa
 		langInstruction = "\n\n请用简体中文回答。"
 	}
 
-	return fmt.Sprintf(`你是 IFRS 16 租赁管理系统的 AI 助手，协助会计师和审计人员工作。准确性、可追溯性和专业审慎比速度更重要。
+	return fmt.Sprintf(`你是 IFRS 16 租赁管理系统的 AI Agent，协助会计师和审计人员工作。准确性、可追溯性和专业审慎比速度更重要。
 
 当前用户: %s
 角色: %s
@@ -534,6 +555,8 @@ func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextDa
 
 ## 核心原则
 
+- 你不是普通聊天机器人。你应把用户目标拆解为可执行步骤，并说明需要调用或已经调用的系统工具/Office skill
+- Office skill 只负责读取、展开或生成文件；字段语义、会计判断和风险提示由 AI Agent 完成；正式入库和计量由 Core Service 规则控制
 - 只能基于以上系统数据回答问题，不得编造任何数字、日期、会计分录、准则引用或审计结论
 - 严格区分：事实（系统数据）、假设（用户提供的参数）、计算结果（系统输出的计量数值）、会计估计（如折现率、租赁期限判断）、专业判断（如分类建议）
 - 保留原始数值，不得擅自四舍五入、归并、重分类或净额列示（例如 ¥3,255,676.79 不得写成约 ¥326万）
@@ -777,6 +800,8 @@ type BatchParseResult struct {
 	SummaryText string
 	Sources     []Source
 	Confidence  float64
+	AgentPlan   []AgentPlanStep
+	ToolCalls   []AgentToolCall
 	Contracts   []ContractDraftItem
 	Summary     *BatchParseSummary
 }
@@ -889,16 +914,21 @@ func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, c
 		}
 	}
 	requiresHuman := getBool(result, "requires_human_confirmation")
+	warnings := getStringSlice(result, "warnings")
+	missingFields := getStringSlice(result, "missing_fields")
 
 	// Build summary text
 	var summary strings.Builder
-	summary.WriteString(fmt.Sprintf("已从文件中识别出 **%d** 份合同。\n\n", totalCount))
+	summary.WriteString(fmt.Sprintf("Agent 已完成文件理解和合同草稿生成：识别出 **%d** 份合同。\n\n", totalCount))
 	if requiresHuman {
-		summary.WriteString("⚠️ **需要人工确认**：部分合同存在缺失字段或低置信度识别结果，请逐条核对后再确认入库。\n\n")
+		summary.WriteString("⚠️ **需要人工确认**：部分合同存在缺失字段、低置信度识别结果或会计判断事项，请逐条核对后再确认入库。\n\n")
 	} else {
-		summary.WriteString("✅ 识别结果总体良好，建议快速核对后确认入库。\n\n")
+		summary.WriteString("识别结果总体良好，建议快速核对后确认入库。\n\n")
 	}
-	summary.WriteString("请在下方表格中逐条编辑、跳过或确认每份合同。确认后将批量创建为草稿状态合同，进入正常审批流程。")
+	if len(missingFields) > 0 {
+		summary.WriteString(fmt.Sprintf("需要优先确认的字段：%s。\n\n", strings.Join(missingFields, ", ")))
+	}
+	summary.WriteString("请在下方草稿表格中逐条编辑、跳过或确认每份合同。确认后 Agent 只会创建 draft 合同，正式入库仍进入正常审批流程。")
 
 	sources := []Source{{
 		Type:    "file",
@@ -907,19 +937,70 @@ func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, c
 		Snippet: objectName,
 	}}
 
+	officeSkill := "Office Excel Skill"
+	if !isExcelContentType(contentType) {
+		officeSkill = "Office Document Skill"
+	}
+	toolCalls := []AgentToolCall{
+		{
+			Tool:           "office.file_reader",
+			Skill:          officeSkill,
+			Status:         "completed",
+			InputSummary:   fmt.Sprintf("读取上传文件 %s", objectName),
+			OutputSummary:  "已将文件展开为可供 LLM 理解的文本/表格证据",
+			RequiresReview: false,
+		},
+		{
+			Tool:           "lease.contract_batch_parser",
+			Skill:          "Lease Intake Skill",
+			Status:         statusFromReview(requiresHuman),
+			InputSummary:   "基于文件证据语义识别合同台账字段、范围判定和缺失项",
+			OutputSummary:  fmt.Sprintf("生成 %d 份合同草稿，缺失字段 %d 类，警告 %d 条", len(contracts), len(missingFields), len(warnings)),
+			RequiresReview: requiresHuman,
+		},
+		{
+			Tool:           "lease.draft_contract_creator",
+			Skill:          "Core Service Draft Skill",
+			Status:         "needs_review",
+			InputSummary:   "等待用户确认草稿卡片",
+			OutputSummary:  "确认后批量创建 draft 合同，不绕过审批",
+			RequiresReview: true,
+		},
+	}
+	agentPlan := []AgentPlanStep{
+		{ID: "read_file", Title: "读取 Office 文件并保留证据", Status: "completed"},
+		{ID: "understand_ledger", Title: "理解非标准台账并生成合同草稿", Status: statusFromReview(requiresHuman)},
+		{ID: "human_review", Title: "人工确认缺失字段和会计判断", Status: "needs_review"},
+		{ID: "create_draft", Title: "确认后创建 draft 合同并进入审批", Status: "pending"},
+	}
+
 	return &BatchParseResult{
 		SummaryText: summary.String(),
 		Sources:     sources,
 		Confidence:  overallConf,
+		AgentPlan:   agentPlan,
+		ToolCalls:   toolCalls,
 		Contracts:   contracts,
 		Summary: &BatchParseSummary{
 			TotalCount:           totalCount,
 			OverallConfidence:    overallConf,
 			RequiresHumanConfirm: requiresHuman,
-			MissingFields:        getStringSlice(result, "missing_fields"),
-			Warnings:             getStringSlice(result, "warnings"),
+			MissingFields:        missingFields,
+			Warnings:             warnings,
 		},
 	}, nil
+}
+
+func isExcelContentType(contentType string) bool {
+	return contentType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+		contentType == "application/vnd.ms-excel"
+}
+
+func statusFromReview(requiresHuman bool) string {
+	if requiresHuman {
+		return "needs_review"
+	}
+	return "completed"
 }
 
 // Helper functions for safe type extraction

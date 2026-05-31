@@ -36,6 +36,9 @@ import {
   DownOutlined,
   MessageOutlined,
   ClockCircleOutlined,
+  ToolOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -98,6 +101,21 @@ interface BatchParseSummary {
   warnings: string[];
 }
 
+interface AgentPlanStep {
+  id: string;
+  title: string;
+  status: "pending" | "running" | "completed" | "needs_review" | string;
+}
+
+interface AgentToolCall {
+  tool: string;
+  skill: string;
+  status: "completed" | "failed" | "needs_review" | string;
+  input_summary: string;
+  output_summary: string;
+  requires_review: boolean;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -107,6 +125,9 @@ interface Message {
   attachments?: UploadedFile[];
   model?: string;
   thinking?: string;
+  agentMode?: boolean;
+  agentPlan?: AgentPlanStep[];
+  toolCalls?: AgentToolCall[];
   draftContracts?: ContractDraftItem[];
   batchSummary?: BatchParseSummary;
 }
@@ -268,8 +289,23 @@ function CodeBlock({ code, language, i18nLang }: { code: string; language: strin
 
 // ─── Message Content Renderer ──────────────────────────────────
 
-function MessageContent({ content, sources, model, thinking, i18nLang }: { content: string; sources?: string[]; model?: string; thinking?: string; i18nLang: Language }) {
+function MessageContent({
+  content,
+  sources,
+  model,
+  thinking,
+  i18nLang,
+  role = "assistant",
+}: {
+  content: string;
+  sources?: string[];
+  model?: string;
+  thinking?: string;
+  i18nLang: Language;
+  role?: "user" | "assistant";
+}) {
   const [showThinking, setShowThinking] = useState(false);
+  const textColor = role === "user" ? "#fff" : "#262626";
 
   // Parse markdown-like code blocks
   const parts = useMemo(() => {
@@ -350,7 +386,7 @@ function MessageContent({ content, sources, model, thinking, i18nLang }: { conte
               whiteSpace: "pre-wrap",
               lineHeight: 1.7,
               fontSize: 14,
-              color: "#262626",
+              color: textColor,
             }}
           >
             {part.content}
@@ -416,7 +452,112 @@ function TypewriterMessage({ content, sources, model, thinking, i18nLang }: { co
       model={displayedContent.length === content.length ? model : undefined}
       thinking={thinking}
       i18nLang={i18nLang}
+      role="assistant"
     />
+  );
+}
+
+// ─── Agent Tool Trace ──────────────────────────────────────────
+
+function statusMeta(status: string, language: Language) {
+  if (status === "completed") {
+    return { color: "success", label: t("ai.agent_status_completed", language), icon: <CheckCircleOutlined /> };
+  }
+  if (status === "needs_review") {
+    return { color: "warning", label: t("ai.agent_status_needs_review", language), icon: <ExclamationCircleOutlined /> };
+  }
+  if (status === "failed") {
+    return { color: "error", label: t("ai.agent_status_failed", language), icon: <ExclamationCircleOutlined /> };
+  }
+  if (status === "running") {
+    return { color: "processing", label: t("ai.agent_status_running", language), icon: <ToolOutlined /> };
+  }
+  return { color: "default", label: t("ai.agent_status_pending", language), icon: <ToolOutlined /> };
+}
+
+function AgentTracePanel({
+  plan = [],
+  toolCalls = [],
+  language,
+}: {
+  plan?: AgentPlanStep[];
+  toolCalls?: AgentToolCall[];
+  language: Language;
+}) {
+  if (plan.length === 0 && toolCalls.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        border: "1px solid #E5E5E5",
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "#fff",
+      }}
+    >
+      <div
+        style={{
+          padding: "10px 12px",
+          borderBottom: "1px solid #F0F0F0",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <ToolOutlined style={{ color: "#262626" }} />
+        <Text strong style={{ fontSize: 13 }}>
+          {t("ai.agent_trace_title", language)}
+        </Text>
+      </div>
+
+      {plan.length > 0 && (
+        <div style={{ padding: "10px 12px", borderBottom: toolCalls.length > 0 ? "1px solid #F0F0F0" : "none" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {plan.map((step) => {
+              const meta = statusMeta(step.status, language);
+              return (
+                <Tag key={step.id} color={meta.color as any} icon={meta.icon} style={{ borderRadius: 4, marginInlineEnd: 0 }}>
+                  {step.title}
+                </Tag>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {toolCalls.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {toolCalls.map((call, index) => {
+            const meta = statusMeta(call.status, language);
+            return (
+              <div
+                key={`${call.tool}-${index}`}
+                style={{
+                  padding: "10px 12px",
+                  borderBottom: index === toolCalls.length - 1 ? "none" : "1px solid #F5F5F5",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Text strong style={{ fontSize: 12 }}>
+                    {call.skill}
+                  </Text>
+                  <Tag color={meta.color as any} style={{ borderRadius: 4, fontSize: 11 }}>
+                    {meta.label}
+                  </Tag>
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {call.tool}
+                  </Text>
+                </div>
+                <Text style={{ display: "block", fontSize: 12, color: "#595959", marginTop: 4 }}>
+                  {call.output_summary || call.input_summary}
+                </Text>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1184,6 +1325,9 @@ function AIChatPageContent() {
         sources: data.sources?.map((s: any) => s.title || s.type),
         model: data.model,
         thinking: data.thinking,
+        agentMode: data.agent_mode,
+        agentPlan: data.agent_plan,
+        toolCalls: data.tool_calls,
         draftContracts: data.draft_contracts,
         batchSummary: data.batch_summary,
       };
@@ -1439,6 +1583,15 @@ function AIChatPageContent() {
                             model={msg.model}
                             thinking={msg.thinking}
                             i18nLang={language}
+                            role={msg.role}
+                          />
+                        )}
+
+                        {msg.role === "assistant" && msg.agentMode && (
+                          <AgentTracePanel
+                            plan={msg.agentPlan}
+                            toolCalls={msg.toolCalls}
+                            language={language}
                           />
                         )}
 

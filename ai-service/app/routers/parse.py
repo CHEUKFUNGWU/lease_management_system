@@ -1,11 +1,19 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+from datetime import date, datetime
+import io
 import json
 
 from app.services.llm import llm_client
 from app.services.storage import download_from_minio, get_minio_client
 from app.services.document_extractor import extract_text
+
+try:
+    import openpyxl
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
 
 router = APIRouter()
 
@@ -591,6 +599,488 @@ class ContractBatchDraftResponse(BaseModel):
     requires_human_confirmation: bool
 
 
+def _format_excel_date(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return text
+
+
+def _normalize_payment_timing(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if text in ("prepaid", "advance", "先付", "期初", "预付"):
+        return "prepaid"
+    if text in ("postpaid", "arrears", "后付", "期末"):
+        return "postpaid"
+    return text or "postpaid"
+
+
+def _normalize_asset_type(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if any(keyword in text for keyword in ("店", "铺", "物业", "房", "real")):
+        return "real_estate"
+    if any(keyword in text for keyword in ("车", "vehicle")):
+        return "vehicle"
+    if any(keyword in text for keyword in ("电脑", "it", "服务器", "设备")):
+        return "it_equipment"
+    if any(keyword in text for keyword in ("机器", "machinery")):
+        return "machinery"
+    return "other" if text else "real_estate"
+
+
+def _parse_float(value: Any) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = (
+        str(value)
+        .strip()
+        .replace(",", "")
+        .replace("%", "")
+        .replace("¥", "")
+        .replace("￥", "")
+        .replace("元", "")
+    )
+    if not text or any(keyword in text for keyword in ("缺失", "待确认", "unknown", "null")):
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
+def _coerce_bool(value: Any, default: bool = False) -> bool:
+    if value is None or value == "":
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    text = str(value).strip().lower()
+    if text in ("true", "yes", "y", "1", "是", "有"):
+        return True
+    if text in ("false", "no", "n", "0", "否", "无"):
+        return False
+    if any(keyword in text for keyword in ("不行使", "未行使", "不会行使", "不合理确定")):
+        return False
+    if any(keyword in text for keyword in ("合理确定", "行使")):
+        return True
+    return default
+
+
+def _parse_bool_option(value: Any) -> bool:
+    text = str(value or "").strip().lower()
+    if not text or text in ("无", "否", "false", "no", "n"):
+        return False
+    if any(keyword in text for keyword in ("不行使", "未行使", "不会行使", "不合理确定")):
+        return False
+    return any(keyword in text for keyword in ("有", "合理确定", "行使", "true", "yes", "y"))
+
+
+def _header_index(headers: list[Any]) -> dict[str, int]:
+    aliases = {
+        "contract_number": ["合同编号", "contract_number", "合同号"],
+        "contract_name": ["合同名称", "contract_name", "合同名"],
+        "lessee": ["承租方", "法人主体", "legal_entity", "lessee"],
+        "lessor": ["出租方", "lessor"],
+        "store_name": ["门店/资产名称", "门店名称", "资产名称", "store_name"],
+        "store_address": ["门店/资产地址", "门店地址", "资产地址", "store_address"],
+        "asset_type": ["资产类型", "资产类别", "asset_type", "asset_category"],
+        "currency": ["币种", "currency"],
+        "signing_date": ["签约日期", "signing_date"],
+        "commencement_date": ["起租日(commencement)", "起租日", "commencement_date", "租赁起始日"],
+        "lease_start_date": ["租赁开始日", "lease_start_date"],
+        "lease_end_date": ["租赁结束日", "租期结束日", "lease_end_date"],
+        "renewal_option": ["续租选择权", "renewal_option"],
+        "termination_option": ["终止选择权判断", "终止选择权", "termination_option"],
+        "fixed_rent_amount": ["月租金", "固定租金", "fixed_rent_amount"],
+        "payment_timing": ["付款时点", "payment_timing"],
+        "discount_rate": ["折现率", "discount_rate"],
+        "discount_rate_type": ["折现率类型", "discount_rate_type"],
+        "lease_scope": ["范围判定(lease_scope)", "lease_scope", "范围判定"],
+        "status": ["合同状态", "status"],
+    }
+    normalized = {str(h or "").strip().lower(): idx for idx, h in enumerate(headers)}
+    result: dict[str, int] = {}
+    for field, names in aliases.items():
+        for name in names:
+            key = name.strip().lower()
+            if key in normalized:
+                result[field] = normalized[key]
+                break
+    return result
+
+
+def _get_cell(row: tuple[Any, ...], indexes: dict[str, int], field: str) -> Any:
+    idx = indexes.get(field)
+    if idx is None or idx >= len(row):
+        return None
+    return row[idx]
+
+
+def _as_list(value: Any) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    return [value]
+
+
+def _is_excel_content_type(content_type: str) -> bool:
+    return content_type in (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+    )
+
+
+def _format_excel_workbook_for_llm(file_data: bytes, max_rows: int = 200, max_cols: int = 60) -> str:
+    """Unfold workbook cells with coordinates so the LLM can infer non-standard layouts."""
+    if not HAS_OPENPYXL:
+        raise RuntimeError("openpyxl not installed")
+
+    wb = openpyxl.load_workbook(io.BytesIO(file_data), data_only=True)
+    try:
+        text_parts = [
+            "Excel workbook cell dump for AI semantic parsing.",
+            "The cell coordinates are source evidence. Infer headers and fields from nearby cells, sheet names, and row context.",
+        ]
+        for ws in wb.worksheets:
+            text_parts.append(f"\n## Sheet: {ws.title}")
+            max_sheet_row = min(ws.max_row or 0, max_rows)
+            max_sheet_col = min(ws.max_column or 0, max_cols)
+            for row in ws.iter_rows(
+                min_row=1,
+                max_row=max_sheet_row,
+                min_col=1,
+                max_col=max_sheet_col,
+            ):
+                cells = []
+                for cell in row:
+                    value = cell.value
+                    if value is None or str(value).strip() == "":
+                        continue
+                    cells.append(f"{cell.coordinate}={_format_excel_date(value)}")
+                if cells:
+                    text_parts.append(f"Row {row[0].row}: " + " | ".join(cells))
+        return "\n".join(text_parts)
+    finally:
+        wb.close()
+
+
+def _apply_excel_evidence_safety_checks(contract: dict, file_content: str) -> dict:
+    """Guard option booleans against common negated Chinese wording in the source row."""
+    contract_number = str(contract.get("contract_number") or "").strip()
+    if not contract_number or not file_content:
+        return contract
+
+    evidence_line = ""
+    for line in file_content.splitlines():
+        if contract_number in line:
+            evidence_line = line
+            break
+    if not evidence_line:
+        return contract
+
+    if "终止" in evidence_line and any(keyword in evidence_line for keyword in ("不行使", "未行使", "不会行使", "不合理确定")):
+        contract["termination_option"] = False
+    if "续租" in evidence_line and any(keyword in evidence_line for keyword in ("不续租", "不行使续租", "未行使续租", "不会续租", "不合理确定续租")):
+        contract["renewal_option"] = False
+    return contract
+
+
+def _parse_contract_batch_from_excel(file_data: bytes, request: ContractBatchDraftRequest) -> Optional[dict]:
+    if not HAS_OPENPYXL:
+        return None
+
+    wb = openpyxl.load_workbook(io.BytesIO(file_data), data_only=True)
+    try:
+        validated_contracts: list[ContractBatchItem] = []
+        all_warnings: list[str] = []
+        all_missing: list[str] = []
+
+        for ws in wb.worksheets:
+            rows = list(ws.iter_rows(values_only=True))
+            if not rows:
+                continue
+
+            header_row_index = None
+            indexes: dict[str, int] = {}
+            for idx, row in enumerate(rows[:20]):
+                candidate = _header_index(list(row))
+                if "contract_number" in candidate and "lessor" in candidate:
+                    header_row_index = idx
+                    indexes = candidate
+                    break
+
+            if header_row_index is None:
+                continue
+
+            for row_number, row in enumerate(rows[header_row_index + 1:], start=header_row_index + 2):
+                contract_number = str(_get_cell(row, indexes, "contract_number") or "").strip()
+                if not contract_number or contract_number.lower() in ("none", "null"):
+                    continue
+
+                lease_scope = str(_get_cell(row, indexes, "lease_scope") or "in_scope").strip() or "in_scope"
+                contract = {
+                    "contract_number": contract_number,
+                    "contract_name": str(_get_cell(row, indexes, "contract_name") or contract_number).strip(),
+                    "lessee": str(_get_cell(row, indexes, "lessee") or "").strip(),
+                    "lessor": str(_get_cell(row, indexes, "lessor") or "").strip(),
+                    "store_name": str(_get_cell(row, indexes, "store_name") or "").strip(),
+                    "store_address": str(_get_cell(row, indexes, "store_address") or "").strip(),
+                    "commencement_date": _format_excel_date(_get_cell(row, indexes, "commencement_date")),
+                    "lease_start_date": _format_excel_date(_get_cell(row, indexes, "lease_start_date") or _get_cell(row, indexes, "commencement_date")),
+                    "lease_end_date": _format_excel_date(_get_cell(row, indexes, "lease_end_date")),
+                    "currency": str(_get_cell(row, indexes, "currency") or "").strip(),
+                    "asset_type": _normalize_asset_type(_get_cell(row, indexes, "asset_type")),
+                    "fixed_rent_amount": _parse_float(_get_cell(row, indexes, "fixed_rent_amount")),
+                    "payment_frequency": "monthly",
+                    "payment_timing": _normalize_payment_timing(_get_cell(row, indexes, "payment_timing")),
+                    "renewal_option": _parse_bool_option(_get_cell(row, indexes, "renewal_option")),
+                    "termination_option": _parse_bool_option(_get_cell(row, indexes, "termination_option")),
+                    "cam_amount": 0.0,
+                    "service_fee": 0.0,
+                    "discount_rate_type": str(_get_cell(row, indexes, "discount_rate_type") or "").strip(),
+                    "discount_rate": _parse_float(_get_cell(row, indexes, "discount_rate")),
+                    "is_lease": lease_scope != "not_a_lease",
+                    "lease_scope": lease_scope,
+                    "suggested_scope": lease_scope,
+                    "exemption_reason": "",
+                    "scope_source": "ledger",
+                    "scope_confidence": 0.9 if lease_scope else 0.0,
+                    "confidence": 0.9,
+                    "warnings": [],
+                }
+
+                if not contract["lessee"]:
+                    contract["warnings"].append(f"第 {row_number} 行缺少承租方/法人主体")
+                if not contract["lessor"]:
+                    contract["warnings"].append(f"第 {row_number} 行缺少出租方")
+
+                dr_missing, dr_warnings = _check_discount_rate_missing(contract)
+                currency_missing, currency_warnings = _check_currency_missing(contract)
+                missing_fields, field_warnings = _check_critical_fields(contract)
+                _, scope_warnings = _normalize_lease_scope(contract)
+
+                row_warnings = contract["warnings"] + dr_warnings + currency_warnings + field_warnings + scope_warnings
+                all_warnings.extend(row_warnings)
+                all_missing.extend(missing_fields)
+                if dr_missing:
+                    all_missing.append("discount_rate")
+                if currency_missing:
+                    all_missing.append("currency")
+
+                confidence = 0.9
+                if missing_fields or dr_missing or currency_missing:
+                    confidence = 0.7
+                if float(contract.get("scope_confidence", 0) or 0) < 0.8:
+                    confidence = min(confidence, 0.7)
+
+                validated_contracts.append(ContractBatchItem(
+                    **{
+                        **contract,
+                        "confidence": confidence,
+                        "missing_fields": missing_fields + (["discount_rate"] if dr_missing else []) + (["currency"] if currency_missing else []),
+                        "warnings": row_warnings,
+                    }
+                ))
+
+        if not validated_contracts:
+            return None
+
+        low_confidence_count = sum(1 for c in validated_contracts if (c.confidence or 1.0) < 0.8)
+        overall_confidence = sum((c.confidence or 0.8) for c in validated_contracts) / len(validated_contracts)
+        unique_missing = sorted(set(all_missing))
+        return {
+            "task_id": "task_batch_" + request.file_id,
+            "file_id": request.file_id,
+            "mode": "assist",
+            "draft_type": "contract_batch_draft",
+            "status": "draft_generated",
+            "contracts": validated_contracts,
+            "total_count": len(validated_contracts),
+            "confidence_scores": {
+                "overall": overall_confidence,
+                "average_item": overall_confidence,
+            },
+            "missing_fields": unique_missing,
+        "warnings": all_warnings + ["LLM 主解析未能稳定提取合同时，系统已启用 Excel 表格读取兜底；合同草稿必须人工逐条确认后入库"],
+            "requires_human_confirmation": overall_confidence < 0.8 or low_confidence_count > 0 or len(unique_missing) > 0,
+        }
+    finally:
+        wb.close()
+
+
+def _model_to_dict(item: Any) -> dict:
+    if hasattr(item, "model_dump"):
+        return item.model_dump()
+    if hasattr(item, "dict"):
+        return item.dict()
+    return dict(item)
+
+
+async def _enrich_excel_contract_batch_with_llm(result: dict) -> dict:
+    """Use deterministic Excel extraction as tool output, then ask LLM to review/enrich semantics.
+
+    The spreadsheet reader is responsible for reliable row extraction. The LLM is responsible
+    for semantic judgment: IFRS 16 scope, option interpretation, missing-field risk, and
+    human-review warnings. If LLM is unavailable, the tool result remains usable.
+    """
+    contracts = [_model_to_dict(c) for c in result.get("contracts", [])]
+    if not contracts:
+        return result
+
+    compact_contracts = [
+        {
+            "contract_number": c.get("contract_number"),
+            "contract_name": c.get("contract_name"),
+            "lessee": c.get("lessee"),
+            "lessor": c.get("lessor"),
+            "store_name": c.get("store_name"),
+            "asset_type": c.get("asset_type"),
+            "commencement_date": c.get("commencement_date"),
+            "lease_start_date": c.get("lease_start_date"),
+            "lease_end_date": c.get("lease_end_date"),
+            "currency": c.get("currency"),
+            "fixed_rent_amount": c.get("fixed_rent_amount"),
+            "payment_timing": c.get("payment_timing"),
+            "renewal_option": c.get("renewal_option"),
+            "termination_option": c.get("termination_option"),
+            "discount_rate_type": c.get("discount_rate_type"),
+            "discount_rate": c.get("discount_rate"),
+            "lease_scope": c.get("lease_scope"),
+            "missing_fields": c.get("missing_fields"),
+            "warnings": c.get("warnings"),
+        }
+        for c in contracts
+    ]
+
+    prompt = f"""
+你是租赁管理平台的 AI 录入复核 Agent。系统工具已经从 Excel 台账稳定读取出以下合同草稿。
+
+请不要重新抽取行，也不要删除合同。请基于这些工具结果做语义复核和 IFRS 16 范围判断增强：
+1. 保留每个 contract_number。
+2. 复核 renewal_option / termination_option 是否被中文表述误判。
+3. 复核 asset_type 和 suggested_scope。
+4. 如果短期、低价值或非租赁，填写 exemption_reason。
+5. 标记缺失字段和人工复核 warning，尤其是折现率缺失、币种缺失、范围判断置信度不足。
+6. 返回 JSON，不要 Markdown。
+
+输入合同草稿 JSON:
+{json.dumps(compact_contracts, ensure_ascii=False)}
+
+输出格式:
+{{
+  "contracts": [
+    {{
+      "contract_number": "LEASE-...",
+      "renewal_option": true,
+      "termination_option": false,
+      "asset_type": "real_estate|vehicle|it_equipment|machinery|other",
+      "suggested_scope": "in_scope|short_term_exempt|low_value_exempt|not_a_lease",
+      "exemption_reason": "",
+      "scope_confidence": 0.0,
+      "confidence": 0.0,
+      "missing_fields": [],
+      "warnings": []
+    }}
+  ],
+  "overall_confidence": 0.0,
+  "warnings": []
+}}
+"""
+
+    try:
+        response = await llm_client.chat_completion(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是租赁管理平台的 AI 录入复核 Agent。工具负责读取表格，你负责语义判断、风险提示和人工复核建议。",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.1,
+            max_tokens=5000,
+            response_format={"type": "json_object"},
+        )
+        content = response["choices"][0]["message"]["content"]
+        parsed = json.loads(content)
+    except Exception as exc:
+        result["warnings"] = result.get("warnings", []) + [
+            f"Excel 台账已由工具稳定解析；LLM 语义复核暂不可用，已保留工具解析结果并要求人工确认。原因: {str(exc)}"
+        ]
+        result["requires_human_confirmation"] = True
+        return result
+
+    enrich_by_number = {
+        str(c.get("contract_number", "")).strip(): c
+        for c in parsed.get("contracts", [])
+        if c.get("contract_number")
+    }
+
+    enriched_contracts: list[ContractBatchItem] = []
+    for base in contracts:
+        contract_number = str(base.get("contract_number", "")).strip()
+        enrichment = enrich_by_number.get(contract_number, {})
+        merged = {**base}
+        for key in (
+            "renewal_option",
+            "termination_option",
+            "asset_type",
+            "suggested_scope",
+            "exemption_reason",
+            "scope_confidence",
+            "confidence",
+        ):
+            if key in enrichment and enrichment[key] not in (None, ""):
+                merged[key] = enrichment[key]
+
+        if enrichment.get("suggested_scope"):
+            merged["lease_scope"] = enrichment["suggested_scope"]
+        merged["scope_source"] = "ai_suggested"
+        merged["missing_fields"] = sorted(set((base.get("missing_fields") or []) + (enrichment.get("missing_fields") or [])))
+        merged["warnings"] = (base.get("warnings") or []) + (enrichment.get("warnings") or [])
+        _, scope_warnings = _normalize_lease_scope(merged)
+        merged["warnings"].extend(scope_warnings)
+        enriched_contracts.append(ContractBatchItem(**merged))
+
+    overall_confidence = float(parsed.get("overall_confidence") or result.get("confidence_scores", {}).get("overall", 0.8))
+    low_confidence_count = sum(1 for c in enriched_contracts if (c.confidence or 1.0) < 0.8)
+    missing_fields = sorted({field for c in enriched_contracts for field in (c.missing_fields or [])})
+
+    result["contracts"] = enriched_contracts
+    result["total_count"] = len(enriched_contracts)
+    result["confidence_scores"] = {
+        "overall": overall_confidence,
+        "average_item": sum((c.confidence or 0.8) for c in enriched_contracts) / max(len(enriched_contracts), 1),
+    }
+    result["missing_fields"] = missing_fields
+    result["warnings"] = (
+        result.get("warnings", [])
+        + parsed.get("warnings", [])
+        + ["Excel 台账由工具读取，LLM 已完成语义复核；AI Assist Mode: 合同台账草稿需人工逐条确认后入库"]
+    )
+    result["requires_human_confirmation"] = (
+        overall_confidence < 0.8
+        or low_confidence_count > 0
+        or len(missing_fields) > 0
+        or any((c.scope_confidence or 0) < 0.8 for c in enriched_contracts)
+    )
+    return result
+
+
 @router.post("/parse/contract-batch", response_model=ContractBatchDraftResponse)
 async def parse_contract_batch(request: ContractBatchDraftRequest):
     """
@@ -610,21 +1100,31 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
             detail="当前仅支持 Assist Mode。Auto-Post Mode 需另行配置"
         )
 
-    # Extract text: use provided file_content or download from MinIO + PaddleOCR
+    # Extract text: use provided file_content or download from MinIO + PaddleOCR.
+    # For Excel, the workbook reader only unfolds sheet/cell content; LLM remains the
+    # primary parser for non-standard layouts.
     file_content = request.file_content
+    file_data: Optional[bytes] = None
+    is_excel = _is_excel_content_type(request.content_type)
     if not file_content:
         try:
             file_data = download_from_minio("lease-uploads", request.object_name)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"文件下载失败: {str(e)}")
 
-        try:
-            file_content = await extract_text(file_data, request.content_type)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"文本提取失败: {str(e)}")
+        if is_excel:
+            try:
+                file_content = _format_excel_workbook_for_llm(file_data)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Excel 文本展开失败: {str(e)}")
+        else:
+            try:
+                file_content = await extract_text(file_data, request.content_type)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"文本提取失败: {str(e)}")
 
-        if len(file_content) > 20000:
-            file_content = file_content[:20000] + "\n... (truncated)"
+        if len(file_content) > 30000:
+            file_content = file_content[:30000] + "\n... (truncated)"
 
     prompt = f"""
     你是一位专业的 IFRS 16 租赁合同台账解析专家。请从以下合同台账内容中提取每一份合同的字段。
@@ -639,6 +1139,9 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
     7. 承租方(lessee)是租赁合同的乙方，即使用物业并支付租金的一方
     8. 出租方(lessor)是租赁合同的甲方，即提供物业并收取租金的一方
     9. 必须做 IFRS 16 范围初判：是否存在已识别资产、承租方是否控制使用、租期是否 ≤12 个月、是否低价值资产。AI 只能建议，不能直接入正式账。
+    10. 如果内容来自 Excel，台账可能是非标准排版、多 sheet、多行标题、合并单元格展开后的文本；请按语义理解 sheet 名、标题行、相邻单元格和字段含义，不要依赖固定列名或固定顺序。
+    11. 如果出现"法人主体"、"租赁主体"、"承租公司"等字段，通常可作为 lessee/承租方；但仍需结合上下文判断。
+    12. 续租/终止选择权必须按否定语义优先判断："不行使"、"未行使"、"不会行使"、"不合理确定"、"无" 均为 false。不要因为文本出现"终止选择权"或"续租选择权"几个字就返回 true。
 
     合同台账内容:
     {file_content}
@@ -685,7 +1188,7 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
-            max_tokens=4000,
+            max_tokens=8000,
             response_format={"type": "json_object"}
         )
 
@@ -703,11 +1206,23 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
             }
 
         contracts_raw = parsed.get("contracts", [])
+        if is_excel and len(contracts_raw) == 0 and file_data is not None:
+            excel_result = _parse_contract_batch_from_excel(file_data, request)
+            if excel_result is not None:
+                excel_result["warnings"] = [
+                    "LLM 主解析未能从该 Excel 台账稳定提取合同，已启用表格读取兜底；这不是正式入库结果，必须人工逐条确认。"
+                ] + excel_result.get("warnings", [])
+                excel_result["requires_human_confirmation"] = True
+                return excel_result
+
         validated_contracts = []
-        all_warnings = parsed.get("warnings", [])
-        all_missing = parsed.get("missing_fields", [])
+        all_warnings = _as_list(parsed.get("warnings", []))
+        all_missing = _as_list(parsed.get("missing_fields", []))
 
         for i, c in enumerate(contracts_raw):
+            if is_excel:
+                c = _apply_excel_evidence_safety_checks(c, file_content)
+
             # Validate required fields
             if not c.get("contract_number") or not c.get("lessee") or not c.get("lessor"):
                 all_warnings.append(f"第 {i+1} 份合同缺少必要字段 (contract_number/lessee/lessor)，已跳过")
@@ -729,10 +1244,10 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
             _, scope_warnings = _normalize_lease_scope(c)
             all_warnings.extend(scope_warnings)
 
-            contract_confidence = c.get("confidence", 0.8)
+            contract_confidence = _parse_float(c.get("confidence")) if c.get("confidence") not in (None, "") else 0.8
             if missing_fields:
                 contract_confidence = min(contract_confidence, 0.7)
-            if float(c.get("scope_confidence", 0) or 0) < 0.8:
+            if _parse_float(c.get("scope_confidence")) < 0.8:
                 contract_confidence = min(contract_confidence, 0.7)
 
             validated_contracts.append(ContractBatchItem(
@@ -746,28 +1261,28 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
                 lease_start_date=c.get("lease_start_date", ""),
                 lease_end_date=c.get("lease_end_date", ""),
                 currency=c.get("currency", ""),
-                asset_type=c.get("asset_type", "real_estate"),
-                fixed_rent_amount=float(c.get("fixed_rent_amount", 0) or 0),
+                asset_type=_normalize_asset_type(c.get("asset_type", "real_estate")),
+                fixed_rent_amount=_parse_float(c.get("fixed_rent_amount")),
                 payment_frequency=c.get("payment_frequency", "monthly"),
-                payment_timing=c.get("payment_timing", "postpaid"),
-                renewal_option=bool(c.get("renewal_option", False)),
-                termination_option=bool(c.get("termination_option", False)),
-                cam_amount=float(c.get("cam_amount", 0) or 0),
-                service_fee=float(c.get("service_fee", 0) or 0),
+                payment_timing=_normalize_payment_timing(c.get("payment_timing", "postpaid")),
+                renewal_option=_coerce_bool(c.get("renewal_option"), False),
+                termination_option=_coerce_bool(c.get("termination_option"), False),
+                cam_amount=_parse_float(c.get("cam_amount")),
+                service_fee=_parse_float(c.get("service_fee")),
                 discount_rate_type=c.get("discount_rate_type", ""),
-                discount_rate=float(c.get("discount_rate", 0) or 0),
-                is_lease=bool(c.get("is_lease", c.get("lease_scope") != "not_a_lease")),
+                discount_rate=_parse_float(c.get("discount_rate")),
+                is_lease=_coerce_bool(c.get("is_lease"), c.get("lease_scope") != "not_a_lease"),
                 lease_scope=c.get("lease_scope", "in_scope"),
                 suggested_scope=c.get("suggested_scope", c.get("lease_scope", "in_scope")),
                 exemption_reason=c.get("exemption_reason", ""),
                 scope_source=c.get("scope_source", "ai_suggested"),
-                scope_confidence=float(c.get("scope_confidence", 0) or 0),
+                scope_confidence=_parse_float(c.get("scope_confidence")),
                 confidence=contract_confidence,
                 missing_fields=missing_fields + (["discount_rate"] if dr_missing else []) + (["currency"] if currency_missing else []),
-                warnings=dr_warnings + currency_warnings + field_warnings + scope_warnings + c.get("warnings", [])
+                warnings=dr_warnings + currency_warnings + field_warnings + scope_warnings + _as_list(c.get("warnings", []))
             ))
 
-        overall_confidence = parsed.get("overall_confidence", 0.8)
+        overall_confidence = _parse_float(parsed.get("overall_confidence")) if parsed.get("overall_confidence") not in (None, "") else 0.8
         low_confidence_count = sum(1 for c in validated_contracts if (c.confidence or 1.0) < 0.8)
 
         requires_human = (
@@ -794,4 +1309,12 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
             "requires_human_confirmation": requires_human,
         }
     except Exception as e:
+        if is_excel and file_data is not None:
+            excel_result = _parse_contract_batch_from_excel(file_data, request)
+            if excel_result is not None:
+                excel_result["warnings"] = [
+                    f"LLM 主解析暂不可用或返回异常，已启用 Excel 表格读取兜底；合同草稿必须人工逐条确认。原因: {str(e)}"
+                ] + excel_result.get("warnings", [])
+                excel_result["requires_human_confirmation"] = True
+                return excel_result
         raise HTTPException(status_code=500, detail=f"批量解析失败: {str(e)}")

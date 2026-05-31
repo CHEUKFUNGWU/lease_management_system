@@ -133,7 +133,8 @@ leg.column_dimensions["A"].width = 26
 leg.column_dimensions["B"].width = 60
 for row in leg.iter_rows():
     for cell in row:
-        cell.font = cell.font if cell.font.bold else Font(name=FONT, size=10)
+        if not (cell.font and cell.font.bold):
+            cell.font = Font(name=FONT, size=10)
         cell.alignment = Alignment(vertical="center", wrap_text=True)
 
 wb.save("合同台账_测试数据.xlsx")

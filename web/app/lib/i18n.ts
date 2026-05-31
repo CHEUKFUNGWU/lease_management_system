@@ -26,9 +26,9 @@ const dict: TranslationDict = {
     en: "Upload",
   },
   "nav.ai_chat": {
-    "zh-CN": "AI 助手",
-    "zh-HK": "AI 助手",
-    en: "AI Assistant",
+    "zh-CN": "AI Agent",
+    "zh-HK": "AI Agent",
+    en: "AI Agent",
   },
   "nav.reports": {
     "zh-CN": "报表查询",
@@ -93,9 +93,9 @@ const dict: TranslationDict = {
 
   // AI Chat
   "ai.welcome": {
-    "zh-CN": "你好！我是租赁管理 AI 助手。我可以帮你：\n\n1. 查询合同台账信息\n2. 查看 IFRS 16 计量结果\n3. 了解审批状态\n4. 回答 IFRS 16 会计问题\n\n你还可以上传合同文件或租金表，我会帮你解析其中的关键信息。",
-    "zh-HK": "你好！我是租賃管理 AI 助手。我可以幫你：\n\n1. 查詢合同台賬信息\n2. 查看 IFRS 16 計量結果\n3. 了解審批狀態\n4. 回答 IFRS 16 會計問題\n\n你還可以上傳合同文件或租金表，我會幫你解析其中的關鍵信息。",
-    en: "Hello! I am the Lease Management AI Assistant. I can help you:\n\n1. Query contract ledger information\n2. View IFRS 16 measurement results\n3. Check approval status\n4. Answer IFRS 16 accounting questions\n\nYou can also upload contract files or rent schedules, and I will help you parse the key information.",
+    "zh-CN": "你好！我是租赁管理 AI Agent。我可以把文件和数据作为工作入口，调用内置 skill 帮你完成任务：\n\n1. 读取非标准 Excel 台账、租金表和付款流水\n2. 解析 PDF/Word/图片合同并生成草稿\n3. 查询合同台账、计量结果、分录和审批状态\n4. 生成需要人工确认的缺失字段和风险提示\n\n上传合同文件或台账后，我会先生成草稿和工具执行轨迹，确认后才创建 draft 合同并进入审批流程。",
+    "zh-HK": "你好！我是租賃管理 AI Agent。我可以把文件和數據作為工作入口，調用內置 skill 幫你完成任務：\n\n1. 讀取非標準 Excel 台賬、租金表和付款流水\n2. 解析 PDF/Word/圖片合同並生成草稿\n3. 查詢合同台賬、計量結果、分錄和審批狀態\n4. 生成需要人工確認的缺失字段和風險提示\n\n上傳合同文件或台賬後，我會先生成草稿和工具執行軌跡，確認後才創建 draft 合同並進入審批流程。",
+    en: "Hello! I am the Lease Management AI Agent. I use files and system data as the working entrypoint and call built-in skills to complete tasks:\n\n1. Read non-standard Excel ledgers, rent schedules, and payment files\n2. Parse PDF/Word/image contracts and generate drafts\n3. Query contracts, measurements, journal entries, and approval status\n4. Surface missing fields and risk prompts for human review\n\nAfter you upload a contract or ledger, I will generate drafts and a tool execution trace first. Only confirmed items are created as draft contracts for approval.",
   },
   "ai.context": {
     "zh-CN": "当前上下文：",
@@ -108,9 +108,9 @@ const dict: TranslationDict = {
     en: "Quick Questions:",
   },
   "ai.placeholder": {
-    "zh-CN": "输入问题，按 Enter 发送，Shift+Enter 换行...",
-    "zh-HK": "輸入問題，按 Enter 發送，Shift+Enter 換行...",
-    en: "Type a question, press Enter to send, Shift+Enter for new line...",
+    "zh-CN": "告诉 Agent 你的目标，或上传合同/台账文件...",
+    "zh-HK": "告訴 Agent 你的目標，或上傳合同/台賬文件...",
+    en: "Tell the Agent your goal, or upload a contract/ledger file...",
   },
   "ai.send": {
     "zh-CN": "发送",
@@ -3820,9 +3820,39 @@ const dict: TranslationDict = {
     en: "Cancel",
   },
   "ai.assistant_name": {
-    "zh-CN": "AI 助手",
-    "zh-HK": "AI 助手",
-    en: "AI Assistant",
+    "zh-CN": "租赁管理 AI Agent",
+    "zh-HK": "租賃管理 AI Agent",
+    en: "Lease Management AI Agent",
+  },
+  "ai.agent_trace_title": {
+    "zh-CN": "Agent 技能执行轨迹",
+    "zh-HK": "Agent 技能執行軌跡",
+    en: "Agent Skill Trace",
+  },
+  "ai.agent_status_completed": {
+    "zh-CN": "已完成",
+    "zh-HK": "已完成",
+    en: "Completed",
+  },
+  "ai.agent_status_needs_review": {
+    "zh-CN": "需人工确认",
+    "zh-HK": "需人工確認",
+    en: "Needs Review",
+  },
+  "ai.agent_status_failed": {
+    "zh-CN": "失败",
+    "zh-HK": "失敗",
+    en: "Failed",
+  },
+  "ai.agent_status_running": {
+    "zh-CN": "执行中",
+    "zh-HK": "執行中",
+    en: "Running",
+  },
+  "ai.agent_status_pending": {
+    "zh-CN": "等待中",
+    "zh-HK": "等待中",
+    en: "Pending",
   },
   "ai.batch_create_result": {
     "zh-CN": "批量创建完成：成功 {success} 份，失败 {failed} 份。{details}",

@@ -78,6 +78,117 @@ func NewContractRepository(db *pgxpool.Pool) *ContractRepository {
 	return &ContractRepository{db: db}
 }
 
+func autoCode(prefix string) string {
+	return fmt.Sprintf("%s-%s", prefix, uuid.New().String()[:8])
+}
+
+func (r *ContractRepository) ResolveLegalEntityID(ctx context.Context, nameOrCode, currency string) (*string, error) {
+	var id string
+	if nameOrCode != "" {
+		err := r.db.QueryRow(ctx, `
+			SELECT id
+			FROM legal_entities
+			WHERE is_active = true AND (name = $1 OR code = $1)
+			LIMIT 1
+		`, nameOrCode).Scan(&id)
+		if err == nil {
+			return &id, nil
+		}
+		if err != pgx.ErrNoRows {
+			return nil, fmt.Errorf("failed to resolve legal entity: %w", err)
+		}
+
+		if currency == "" {
+			currency = "CNY"
+		}
+		err = r.db.QueryRow(ctx, `
+			INSERT INTO legal_entities (code, name, country, currency, is_active)
+			VALUES ($1, $2, $3, $4, true)
+			RETURNING id
+		`, autoCode("LE"), nameOrCode, "CN", currency).Scan(&id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create legal entity: %w", err)
+		}
+		return &id, nil
+	}
+
+	err := r.db.QueryRow(ctx, `
+		SELECT id
+		FROM legal_entities
+		WHERE is_active = true
+		ORDER BY code
+		LIMIT 1
+	`).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve default legal entity: %w", err)
+	}
+	return &id, nil
+}
+
+func (r *ContractRepository) ResolveOrCreateStoreID(ctx context.Context, name, address string, legalEntityID *string) (*string, error) {
+	if legalEntityID == nil || *legalEntityID == "" {
+		return nil, fmt.Errorf("legal_entity_id is required before resolving store")
+	}
+
+	if name == "" {
+		name = "未命名门店-" + uuid.New().String()[:8]
+	}
+
+	var id string
+	err := r.db.QueryRow(ctx, `
+		SELECT id
+		FROM stores
+		WHERE is_active = true AND name = $1 AND legal_entity_id = $2
+		LIMIT 1
+	`, name, *legalEntityID).Scan(&id)
+	if err == nil {
+		return &id, nil
+	}
+	if err != pgx.ErrNoRows {
+		return nil, fmt.Errorf("failed to resolve store: %w", err)
+	}
+
+	err = r.db.QueryRow(ctx, `
+		INSERT INTO stores (code, name, legal_entity_id, address, is_active)
+		VALUES ($1, $2, $3, $4, true)
+		RETURNING id
+	`, autoCode("ST"), name, *legalEntityID, address).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create store: %w", err)
+	}
+	return &id, nil
+}
+
+func (r *ContractRepository) ResolveOrCreateLandlordID(ctx context.Context, name string) (*string, error) {
+	if name == "" {
+		name = "未命名出租方-" + uuid.New().String()[:8]
+	}
+
+	var id string
+	err := r.db.QueryRow(ctx, `
+		SELECT id
+		FROM landlords
+		WHERE is_active = true AND name = $1
+		LIMIT 1
+	`, name).Scan(&id)
+	if err == nil {
+		return &id, nil
+	}
+	if err != pgx.ErrNoRows {
+		return nil, fmt.Errorf("failed to resolve landlord: %w", err)
+	}
+
+	err = r.db.QueryRow(ctx, `
+		INSERT INTO landlords (code, name, is_active)
+		VALUES ($1, $2, true)
+		RETURNING id
+	`, autoCode("LL"), name).Scan(&id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create landlord: %w", err)
+	}
+	return &id, nil
+}
+
 func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*Contract, error) {
 	contract.ID = uuid.New().String()
 	contract.Status = "draft"

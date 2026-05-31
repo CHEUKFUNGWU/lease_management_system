@@ -137,6 +137,34 @@ func normalizeAssetType(assetType string) string {
 	}
 }
 
+func (h *ContractHandler) resolveContractMasterData(c *gin.Context, contract *repository.Contract, legalEntityHint string) error {
+	if contract.LegalEntityID == nil || *contract.LegalEntityID == "" {
+		resolved, err := h.contractRepo.ResolveLegalEntityID(c.Request.Context(), strings.TrimSpace(legalEntityHint), contract.Currency)
+		if err != nil {
+			return err
+		}
+		contract.LegalEntityID = resolved
+	}
+
+	if contract.StoreID == nil || *contract.StoreID == "" {
+		resolved, err := h.contractRepo.ResolveOrCreateStoreID(c.Request.Context(), strings.TrimSpace(contract.StoreName), strings.TrimSpace(contract.StoreAddress), contract.LegalEntityID)
+		if err != nil {
+			return err
+		}
+		contract.StoreID = resolved
+	}
+
+	if contract.LandlordID == nil || *contract.LandlordID == "" {
+		resolved, err := h.contractRepo.ResolveOrCreateLandlordID(c.Request.Context(), strings.TrimSpace(contract.LessorName))
+		if err != nil {
+			return err
+		}
+		contract.LandlordID = resolved
+	}
+
+	return nil
+}
+
 func (h *ContractHandler) Create(c *gin.Context) {
 	var req ContractRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -213,6 +241,10 @@ func (h *ContractHandler) Create(c *gin.Context) {
 	}
 	if req.LandlordID != nil && *req.LandlordID != "" {
 		contract.LandlordID = req.LandlordID
+	}
+	if err := h.resolveContractMasterData(c, contract, req.LesseeName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to resolve master data: " + err.Error()})
+		return
 	}
 
 	created, err := h.contractRepo.Create(c.Request.Context(), contract)
@@ -340,6 +372,14 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 		}
 		if contractReq.LandlordID != nil && *contractReq.LandlordID != "" {
 			contract.LandlordID = contractReq.LandlordID
+		}
+		if err := h.resolveContractMasterData(c, contract, contractReq.LesseeName); err != nil {
+			failedContracts = append(failedContracts, map[string]interface{}{
+				"index":  i,
+				"number": contractReq.ContractNumber,
+				"error":  "failed to resolve master data: " + err.Error(),
+			})
+			continue
 		}
 
 		created, err := h.contractRepo.Create(c.Request.Context(), contract)

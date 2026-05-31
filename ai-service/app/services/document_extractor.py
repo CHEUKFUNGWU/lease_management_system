@@ -235,7 +235,7 @@ async def extract_text(data: bytes, content_type: str, file_url: Optional[str] =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel",
     ):
-        # Excel 用 openpyxl，不走 OCR
+        # Excel 用 openpyxl 展开 workbook 文本，字段语义仍由 LLM 判断。
         return extract_text_from_excel(data)
 
     else:

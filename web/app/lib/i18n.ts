@@ -3829,6 +3829,71 @@ const dict: TranslationDict = {
     "zh-HK": "Agent 技能執行軌跡",
     en: "Agent Skill Trace",
   },
+  "ai.agent_skills": {
+    "zh-CN": "Agent skills:",
+    "zh-HK": "Agent skills:",
+    en: "Agent skills:",
+  },
+  "ai.skill_excel_ledger": {
+    "zh-CN": "Excel 台账",
+    "zh-HK": "Excel 台賬",
+    en: "Excel Ledger",
+  },
+  "ai.skill_excel_ledger_prompt": {
+    "zh-CN": "请解析这个 Excel 台账并生成合同草稿卡片。请按非标准台账处理，先做字段理解、缺失字段和范围判断提示，等待我确认后再创建 draft 合同。",
+    "zh-HK": "請解析這個 Excel 台賬並生成合同草稿卡片。請按非標準台賬處理，先做字段理解、缺失字段和範圍判斷提示，等待我確認後再創建 draft 合同。",
+    en: "Parse this Excel ledger and generate contract draft cards. Treat it as a non-standard ledger, identify fields semantically, surface missing fields and scope judgments, and wait for my confirmation before creating draft contracts.",
+  },
+  "ai.skill_contract_review": {
+    "zh-CN": "合同复核",
+    "zh-HK": "合同覆核",
+    en: "Contract Review",
+  },
+  "ai.skill_contract_review_prompt": {
+    "zh-CN": "请复核这份租赁合同，提取关键条款、租期、租金、续租/终止选择权、非租赁成分和 IFRS 16 范围判断，并列出需要人工确认的问题。",
+    "zh-HK": "請覆核這份租賃合同，提取關鍵條款、租期、租金、續租/終止選擇權、非租賃成分和 IFRS 16 範圍判斷，並列出需要人工確認的問題。",
+    en: "Review this lease contract, extract key terms, lease term, rent, renewal/termination options, non-lease components, IFRS 16 scope judgment, and list questions requiring human confirmation.",
+  },
+  "ai.skill_payment_schedule": {
+    "zh-CN": "租金表",
+    "zh-HK": "租金表",
+    en: "Rent Schedule",
+  },
+  "ai.skill_payment_schedule_prompt": {
+    "zh-CN": "请解析这个租金表，识别付款期间、应付日期、金额、先付/后付、固定/变量租金和非租赁成分，生成付款计划草稿并等待我确认。",
+    "zh-HK": "請解析這個租金表，識別付款期間、應付日期、金額、先付/後付、固定/變量租金和非租賃成分，生成付款計劃草稿並等待我確認。",
+    en: "Parse this rent schedule, identify covered periods, due dates, amounts, prepaid/postpaid timing, fixed/variable rent, non-lease components, and generate payment schedule drafts for confirmation.",
+  },
+  "ai.skill_audit_pack": {
+    "zh-CN": "审计包",
+    "zh-HK": "審計包",
+    en: "Audit Pack",
+  },
+  "ai.skill_audit_pack_prompt": {
+    "zh-CN": "请为当前合同、法人或期间整理审计包清单，包含原始文件、AI 提取字段、人工确认事项、计量结果、分录和审批留痕。",
+    "zh-HK": "請為當前合同、法人或期間整理審計包清單，包含原始文件、AI 提取字段、人工確認事項、計量結果、分錄和審批留痕。",
+    en: "Prepare an audit pack checklist for the current contract, legal entity, or period, including source files, AI extracted fields, human confirmations, measurement results, journal entries, and approval trail.",
+  },
+  "ai.agent_review_title": {
+    "zh-CN": "需要你确认的问题",
+    "zh-HK": "需要你確認的問題",
+    en: "Questions Requiring Review",
+  },
+  "ai.agent_severity_critical": {
+    "zh-CN": "关键",
+    "zh-HK": "關鍵",
+    en: "Critical",
+  },
+  "ai.agent_severity_warning": {
+    "zh-CN": "需确认",
+    "zh-HK": "需確認",
+    en: "Review",
+  },
+  "ai.agent_severity_info": {
+    "zh-CN": "提示",
+    "zh-HK": "提示",
+    en: "Info",
+  },
   "ai.agent_status_completed": {
     "zh-CN": "已完成",
     "zh-HK": "已完成",
@@ -3854,6 +3919,41 @@ const dict: TranslationDict = {
     "zh-HK": "等待中",
     en: "Pending",
   },
+  "ai.agent_step_human_review_done": {
+    "zh-CN": "人工已确认草稿",
+    "zh-HK": "人工已確認草稿",
+    en: "Human Review Confirmed",
+  },
+  "ai.agent_step_create_draft": {
+    "zh-CN": "创建 draft 合同",
+    "zh-HK": "創建 draft 合同",
+    en: "Create Draft Contracts",
+  },
+  "ai.agent_create_input": {
+    "zh-CN": "提交 {count} 份已确认草稿到 Core Service",
+    "zh-HK": "提交 {count} 份已確認草稿到 Core Service",
+    en: "Submit {count} confirmed drafts to Core Service",
+  },
+  "ai.agent_create_output": {
+    "zh-CN": "创建完成：成功 {success} 份，失败 {failed} 份",
+    "zh-HK": "創建完成：成功 {success} 份，失敗 {failed} 份",
+    en: "Creation completed: {success} succeeded, {failed} failed",
+  },
+  "ai.agent_create_failed_title": {
+    "zh-CN": "处理失败合同",
+    "zh-HK": "處理失敗合同",
+    en: "Resolve Failed Contracts",
+  },
+  "ai.agent_create_failed_description": {
+    "zh-CN": "{count} 份合同未能创建为 draft，需要检查错误详情。",
+    "zh-HK": "{count} 份合同未能創建為 draft，需要檢查錯誤詳情。",
+    en: "{count} contracts could not be created as drafts. Review the failure details.",
+  },
+  "ai.agent_create_failed_action": {
+    "zh-CN": "根据失败详情修正草稿字段、主数据或重复合同编号后重新确认。",
+    "zh-HK": "根據失敗詳情修正草稿字段、主數據或重複合同編號後重新確認。",
+    en: "Fix draft fields, master data, or duplicate contract numbers based on the failure details, then confirm again.",
+  },
   "ai.batch_create_result": {
     "zh-CN": "批量创建完成：成功 {success} 份，失败 {failed} 份。{details}",
     "zh-HK": "批量創建完成：成功 {success} 份，失敗 {failed} 份。{details}",
@@ -3878,6 +3978,101 @@ const dict: TranslationDict = {
     "zh-CN": "已跳过本次合同入库。您可以修改文件后重新上传，或手动录入合同。",
     "zh-HK": "已跳過本次合同入庫。您可以修改文件後重新上傳，或手動錄入合同。",
     en: "Import skipped. You can modify the file and re-upload, or manually enter the contract.",
+  },
+  "ai.schedule_panel_title": {
+    "zh-CN": "付款计划草稿",
+    "zh-HK": "付款計劃草稿",
+    en: "Payment Schedule Drafts",
+  },
+  "ai.schedule_bind_contract_first": {
+    "zh-CN": "请先绑定目标合同。付款计划必须挂到具体合同后才能导入。",
+    "zh-HK": "請先綁定目標合同。付款計劃必須掛到具體合同後才能導入。",
+    en: "Bind a target contract first. Payment schedules must be attached to a specific contract before import.",
+  },
+  "ai.schedule_review_warning": {
+    "zh-CN": "需要人工核对付款期间、应付日、金额、先付/后付、变量租金和非租赁成分。",
+    "zh-HK": "需要人工核對付款期間、應付日、金額、先付/後付、變量租金和非租賃成分。",
+    en: "Review covered periods, due dates, amounts, prepaid/postpaid timing, variable rent, and non-lease components.",
+  },
+  "ai.schedule_period_start": {
+    "zh-CN": "期间开始",
+    "zh-HK": "期間開始",
+    en: "Period Start",
+  },
+  "ai.schedule_period_end": {
+    "zh-CN": "期间结束",
+    "zh-HK": "期間結束",
+    en: "Period End",
+  },
+  "ai.schedule_due_date": {
+    "zh-CN": "应付日",
+    "zh-HK": "應付日",
+    en: "Due Date",
+  },
+  "ai.schedule_amount": {
+    "zh-CN": "金额",
+    "zh-HK": "金額",
+    en: "Amount",
+  },
+  "ai.schedule_amount_type": {
+    "zh-CN": "金额类型",
+    "zh-HK": "金額類型",
+    en: "Amount Type",
+  },
+  "ai.schedule_is_fixed": {
+    "zh-CN": "固定租金",
+    "zh-HK": "固定租金",
+    en: "Fixed Rent",
+  },
+  "ai.schedule_is_lease_component": {
+    "zh-CN": "租赁成分",
+    "zh-HK": "租賃成分",
+    en: "Lease Component",
+  },
+  "ai.schedule_variable_rent": {
+    "zh-CN": "变量租金",
+    "zh-HK": "變量租金",
+    en: "Variable Rent",
+  },
+  "ai.schedule_non_lease_component": {
+    "zh-CN": "非租赁成分",
+    "zh-HK": "非租賃成分",
+    en: "Non-lease Component",
+  },
+  "ai.schedule_confirm_import": {
+    "zh-CN": "导入付款计划",
+    "zh-HK": "導入付款計劃",
+    en: "Import Payment Schedules",
+  },
+  "ai.schedule_step_import": {
+    "zh-CN": "导入付款计划",
+    "zh-HK": "導入付款計劃",
+    en: "Import Payment Schedules",
+  },
+  "ai.schedule_import_input": {
+    "zh-CN": "提交 {count} 笔已确认付款计划到 Core Service",
+    "zh-HK": "提交 {count} 筆已確認付款計劃到 Core Service",
+    en: "Submit {count} confirmed payment schedules to Core Service",
+  },
+  "ai.schedule_import_output": {
+    "zh-CN": "付款计划导入完成：成功 {count} 笔",
+    "zh-HK": "付款計劃導入完成：成功 {count} 筆",
+    en: "Payment schedule import completed: {count} succeeded",
+  },
+  "ai.schedule_import_result": {
+    "zh-CN": "付款计划导入完成：已向合同 {contract} 写入 {count} 笔付款计划。",
+    "zh-HK": "付款計劃導入完成：已向合同 {contract} 寫入 {count} 筆付款計劃。",
+    en: "Payment schedule import completed: wrote {count} schedules to contract {contract}.",
+  },
+  "ai.schedule_import_success": {
+    "zh-CN": "成功导入 {count} 笔付款计划",
+    "zh-HK": "成功導入 {count} 筆付款計劃",
+    en: "Successfully imported {count} payment schedules",
+  },
+  "ai.schedule_import_failed": {
+    "zh-CN": "付款计划导入失败: {error}",
+    "zh-HK": "付款計劃導入失敗: {error}",
+    en: "Payment schedule import failed: {error}",
   },
   "ai.upload_file_tooltip": {
     "zh-CN": "上传文件",

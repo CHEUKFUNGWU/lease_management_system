@@ -55,16 +55,19 @@ type ChatMessage struct {
 }
 
 type AIChatResponse struct {
-	Answer         string              `json:"answer"`
-	Sources        []Source            `json:"sources"`
-	Confidence     float64             `json:"confidence"`
-	IsOfficial     bool                `json:"is_official"`
-	Model          string              `json:"model,omitempty"`
-	AgentMode      bool                `json:"agent_mode,omitempty"`
-	AgentPlan      []AgentPlanStep     `json:"agent_plan,omitempty"`
-	ToolCalls      []AgentToolCall     `json:"tool_calls,omitempty"`
-	DraftContracts []ContractDraftItem `json:"draft_contracts,omitempty"`
-	BatchSummary   *BatchParseSummary  `json:"batch_summary,omitempty"`
+	Answer                 string                       `json:"answer"`
+	Sources                []Source                     `json:"sources"`
+	Confidence             float64                      `json:"confidence"`
+	IsOfficial             bool                         `json:"is_official"`
+	Model                  string                       `json:"model,omitempty"`
+	AgentMode              bool                         `json:"agent_mode,omitempty"`
+	AgentPlan              []AgentPlanStep              `json:"agent_plan,omitempty"`
+	ToolCalls              []AgentToolCall              `json:"tool_calls,omitempty"`
+	ReviewPrompts          []AgentReviewPrompt          `json:"review_prompts,omitempty"`
+	DraftContracts         []ContractDraftItem          `json:"draft_contracts,omitempty"`
+	BatchSummary           *BatchParseSummary           `json:"batch_summary,omitempty"`
+	DraftPaymentSchedules  []PaymentScheduleDraftItem   `json:"draft_payment_schedules,omitempty"`
+	PaymentScheduleSummary *PaymentScheduleParseSummary `json:"payment_schedule_summary,omitempty"`
 }
 
 type AgentPlanStep struct {
@@ -80,6 +83,26 @@ type AgentToolCall struct {
 	InputSummary   string `json:"input_summary"`
 	OutputSummary  string `json:"output_summary"`
 	RequiresReview bool   `json:"requires_review"`
+}
+
+type AgentReviewPrompt struct {
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	Description     string   `json:"description"`
+	Severity        string   `json:"severity"` // info | warning | critical
+	Action          string   `json:"action"`
+	ContractNumbers []string `json:"contract_numbers,omitempty"`
+}
+
+type AgentRunbook struct {
+	SkillID               string
+	SkillName             string
+	RequiresEvidenceInput bool
+	NeedsPortfolioContext bool
+	AnswerPrefix          string
+	AgentPlan             []AgentPlanStep
+	ToolCalls             []AgentToolCall
+	ReviewPrompts         []AgentReviewPrompt
 }
 
 type ContractDraftItem struct {
@@ -122,6 +145,29 @@ type BatchParseSummary struct {
 	Warnings             []string `json:"warnings"`
 }
 
+type PaymentScheduleDraftItem struct {
+	PeriodStart      string  `json:"period_start"`
+	PeriodEnd        string  `json:"period_end"`
+	DueDate          string  `json:"due_date"`
+	Amount           float64 `json:"amount"`
+	PaymentTiming    string  `json:"payment_timing"`
+	IsFixed          bool    `json:"is_fixed"`
+	IsLeaseComponent bool    `json:"is_lease_component"`
+	AmountType       string  `json:"amount_type"`
+	Currency         string  `json:"currency"`
+	Confidence       float64 `json:"confidence"`
+}
+
+type PaymentScheduleParseSummary struct {
+	TotalCount           int      `json:"total_count"`
+	OverallConfidence    float64  `json:"overall_confidence"`
+	RequiresHumanConfirm bool     `json:"requires_human_confirmation"`
+	MissingFields        []string `json:"missing_fields"`
+	Warnings             []string `json:"warnings"`
+	CanImport            bool     `json:"can_import"`
+	ContractID           string   `json:"contract_id,omitempty"`
+}
+
 type Source struct {
 	Type    string `json:"type"`
 	ID      string `json:"id"`
@@ -156,12 +202,42 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	if effectiveContractID == "" && req.PageContext != nil && req.PageContext.ContractID != "" {
 		effectiveContractID = req.PageContext.ContractID
 	}
+	agentRunbook := h.buildAgentRunbook(req, effectiveContractID)
 
 	// 1. Handle file upload if present — keep existing parse behavior
 	if req.FileID != "" && req.ObjectName != "" {
 		// Check intent: batch contract import from ledger file
 		msgLower := strings.ToLower(req.Message)
+		isPaymentScheduleIntent := containsAny(msgLower, []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"})
 		isBatchImportIntent := containsAny(msgLower, []string{"录入", "导入", "录入台账", "批量创建", "创建合同", "导入台账", "import", "batch create", "create contracts", "ledger"})
+
+		if isPaymentScheduleIntent {
+			scheduleResult, err := h.parsePaymentSchedule(c, req.FileID, req.ObjectName, req.ContentType, effectiveContractID)
+			if err != nil {
+				c.JSON(http.StatusOK, AIChatResponse{
+					Answer:     fmt.Sprintf("租金表解析失败: %s", err.Error()),
+					Sources:    sources,
+					Confidence: 0.5,
+					IsOfficial: false,
+					Model:      "fallback",
+				})
+				return
+			}
+			c.JSON(http.StatusOK, AIChatResponse{
+				Answer:                 scheduleResult.SummaryText,
+				Sources:                scheduleResult.Sources,
+				Confidence:             scheduleResult.Confidence,
+				IsOfficial:             false,
+				Model:                  "lease-agent",
+				AgentMode:              true,
+				AgentPlan:              scheduleResult.AgentPlan,
+				ToolCalls:              scheduleResult.ToolCalls,
+				ReviewPrompts:          scheduleResult.ReviewPrompts,
+				DraftPaymentSchedules:  scheduleResult.Schedules,
+				PaymentScheduleSummary: scheduleResult.Summary,
+			})
+			return
+		}
 
 		if isBatchImportIntent {
 			// Call batch contract parsing endpoint
@@ -187,6 +263,7 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 				AgentMode:      true,
 				AgentPlan:      batchResult.AgentPlan,
 				ToolCalls:      batchResult.ToolCalls,
+				ReviewPrompts:  batchResult.ReviewPrompts,
 				DraftContracts: batchResult.Contracts,
 				BatchSummary:   batchResult.Summary,
 			})
@@ -209,6 +286,10 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 				Snippet: req.ObjectName,
 			})
 		}
+	}
+
+	if agentRunbook != nil && agentRunbook.NeedsPortfolioContext {
+		h.appendAgentPortfolioContext(ctx, legalEntityID, &contextData, &sources)
 	}
 
 	// 2. Page-context-aware data retrieval
@@ -330,6 +411,21 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 `)
 	}
 
+	if agentRunbook != nil && agentRunbook.RequiresEvidenceInput && req.FileID == "" && effectiveContractID == "" {
+		c.JSON(http.StatusOK, AIChatResponse{
+			Answer:        agentRunbook.AnswerPrefix,
+			Sources:       sources,
+			Confidence:    0.85,
+			IsOfficial:    false,
+			Model:         "lease-agent",
+			AgentMode:     true,
+			AgentPlan:     agentRunbook.AgentPlan,
+			ToolCalls:     agentRunbook.ToolCalls,
+			ReviewPrompts: agentRunbook.ReviewPrompts,
+		})
+		return
+	}
+
 	// 5. Build system prompt
 	isWorkingData := false
 	if req.PageContext != nil && (req.PageContext.ReportView == "working" || req.PageContext.Page == "monthly-closing") {
@@ -342,12 +438,19 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	if err != nil {
 		// Fallback: return context data without LLM if AI Service is unavailable
 		fallbackAnswer := fmt.Sprintf("（AI 服务暂不可用，以下为系统数据摘要）\n\n%s", contextData.String())
+		if agentRunbook != nil {
+			fallbackAnswer = agentRunbook.AnswerPrefix + "\n\n" + fallbackAnswer
+		}
 		c.JSON(http.StatusOK, AIChatResponse{
-			Answer:     fallbackAnswer,
-			Sources:    sources,
-			Confidence: 0.5,
-			IsOfficial: false,
-			Model:      "fallback",
+			Answer:        fallbackAnswer,
+			Sources:       sources,
+			Confidence:    0.5,
+			IsOfficial:    false,
+			Model:         "fallback",
+			AgentMode:     agentRunbook != nil,
+			AgentPlan:     agentPlanFromRunbook(agentRunbook),
+			ToolCalls:     toolCallsFromRunbook(agentRunbook),
+			ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
 		})
 		return
 	}
@@ -356,13 +459,215 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	// If no source citations found in the answer, fall back to all known sources.
 	extractedSources := extractSourcesFromAnswer(answer, sources)
 
+	if agentRunbook != nil && agentRunbook.AnswerPrefix != "" {
+		answer = agentRunbook.AnswerPrefix + "\n\n" + answer
+	}
+
 	c.JSON(http.StatusOK, AIChatResponse{
-		Answer:     answer,
-		Sources:    extractedSources,
-		Confidence: 0.9,
-		IsOfficial: false,
-		Model:      modelName,
+		Answer:        answer,
+		Sources:       extractedSources,
+		Confidence:    0.9,
+		IsOfficial:    false,
+		Model:         modelName,
+		AgentMode:     agentRunbook != nil,
+		AgentPlan:     agentPlanFromRunbook(agentRunbook),
+		ToolCalls:     toolCallsFromRunbook(agentRunbook),
+		ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
 	})
+}
+
+func (h *AIChatHandler) buildAgentRunbook(req AIChatRequest, effectiveContractID string) *AgentRunbook {
+	message := strings.ToLower(req.Message)
+	hasFile := req.FileID != "" && req.ObjectName != ""
+	hasContractContext := effectiveContractID != ""
+
+	switch {
+	case containsAny(message, []string{"审计包", "审计底稿", "审计工作底稿", "披露核对", "抽样", "audit pack", "audit package", "disclosure checklist"}):
+		return buildAuditPackRunbook()
+	case containsAny(message, []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"}):
+		return buildPaymentScheduleRunbook(hasFile, hasContractContext)
+	case containsAny(message, []string{"合同复核", "合同审阅", "合同审核", "关键条款", "contract review", "review contract", "lease review"}):
+		return buildContractReviewRunbook(hasFile, hasContractContext)
+	case containsAny(message, []string{"excel 台账", "excel台账", "合同台账", "批量导入", "批量创建", "ledger import", "contract ledger"}):
+		return buildContractLedgerRunbook(hasFile)
+	default:
+		return nil
+	}
+}
+
+func buildContractLedgerRunbook(hasFile bool) *AgentRunbook {
+	evidenceStatus := "needs_review"
+	parserStatus := "pending"
+	prefix := "Agent 已准备执行 Excel 台账导入技能。请上传合同台账文件后，我会先用 Office skill 展开工作簿，再由 AI Agent 进行语义理解并生成合同草稿；不会直接写入正式台账。"
+	reviewPrompts := []AgentReviewPrompt{
+		{ID: "upload_ledger", Title: "上传合同台账", Description: "需要 Excel、CSV 或可解析的台账文件作为证据输入。", Severity: "info", Action: "上传文件后再次发送导入指令。"},
+	}
+	if hasFile {
+		evidenceStatus = "completed"
+		parserStatus = "needs_review"
+		prefix = "Agent 正在按 Excel 台账导入技能处理上传文件。"
+		reviewPrompts = []AgentReviewPrompt{
+			{ID: "ledger_review", Title: "复核台账草稿", Description: "上传文件已作为证据输入。下一步需要核对草稿字段、折现率和租赁范围判断。", Severity: "warning", Action: "确认字段无误后再创建 draft 合同。"},
+		}
+	}
+	return &AgentRunbook{
+		SkillID:               "excel_ledger",
+		SkillName:             "Office Excel Ledger Skill",
+		RequiresEvidenceInput: !hasFile,
+		AnswerPrefix:          prefix,
+		AgentPlan: []AgentPlanStep{
+			{ID: "read_workbook", Title: "读取并展开 Office 工作簿", Status: evidenceStatus},
+			{ID: "understand_columns", Title: "理解非标准字段、表头和合并单元格", Status: parserStatus},
+			{ID: "human_review", Title: "人工确认缺失字段、折现率和租赁范围", Status: "needs_review"},
+			{ID: "create_drafts", Title: "确认后创建 draft 合同", Status: "pending"},
+		},
+		ToolCalls: []AgentToolCall{
+			{Tool: "office.excel_reader", Skill: "Office Excel Skill", Status: evidenceStatus, InputSummary: "等待或读取上传的 Excel 台账", OutputSummary: "将工作簿展开为带 sheet、行列坐标和单元格值的证据文本", RequiresReview: !hasFile},
+			{Tool: "lease.contract_batch_parser", Skill: "Lease Intake Skill", Status: parserStatus, InputSummary: "从非标准台账中抽取合同、门店、出租方、日期、租金和范围判断", OutputSummary: "生成合同草稿和字段级复核清单", RequiresReview: true},
+			{Tool: "lease.draft_contract_creator", Skill: "Core Service Draft Skill", Status: "pending", InputSummary: "等待用户确认草稿", OutputSummary: "只创建 draft 合同，正式入库仍走审批", RequiresReview: true},
+		},
+		ReviewPrompts: reviewPrompts,
+	}
+}
+
+func buildContractReviewRunbook(hasFile, hasContractContext bool) *AgentRunbook {
+	hasEvidence := hasFile || hasContractContext
+	evidenceStatus := statusFromReview(!hasEvidence)
+	reviewPrompts := []AgentReviewPrompt{
+		{ID: "contract_evidence", Title: "提供合同证据", Description: "合同复核需要上传合同文件，或在合同详情页指定当前合同。", Severity: "info", Action: "上传 PDF/Word/Excel 合同文件，或进入某份合同详情后提问。"},
+	}
+	if hasEvidence {
+		reviewPrompts = []AgentReviewPrompt{
+			{ID: "contract_judgement", Title: "复核关键会计判断", Description: "已具备合同证据。请重点确认续租/终止选择权、非租赁成分、折现率来源和租赁范围。", Severity: "warning", Action: "根据 Agent 提取结果逐项确认判断依据。"},
+		}
+	}
+	return &AgentRunbook{
+		SkillID:               "contract_review",
+		SkillName:             "Office Contract Review Skill",
+		RequiresEvidenceInput: !hasEvidence,
+		AnswerPrefix:          "Agent 已切换到合同复核技能。我会提取关键条款、识别 IFRS 16 风险点，并把需要人工判断的事项列为复核提示。",
+		AgentPlan: []AgentPlanStep{
+			{ID: "collect_evidence", Title: "读取合同文件或当前合同上下文", Status: evidenceStatus},
+			{ID: "extract_terms", Title: "抽取租赁期限、付款、选择权和非租赁成分", Status: statusFromReview(!hasEvidence)},
+			{ID: "accounting_review", Title: "生成 IFRS 16 复核事项", Status: "needs_review"},
+			{ID: "prepare_notes", Title: "形成可追溯复核结论", Status: "pending"},
+		},
+		ToolCalls: []AgentToolCall{
+			{Tool: "office.document_reader", Skill: "Office/PDF Document Skill", Status: evidenceStatus, InputSummary: "读取合同文件或当前合同详情", OutputSummary: "提取条款证据文本和可引用来源", RequiresReview: !hasEvidence},
+			{Tool: "lease.term_reviewer", Skill: "Lease Review Skill", Status: statusFromReview(!hasEvidence), InputSummary: "识别期限、付款、续租/终止选择权、CAM/服务费、折现率线索", OutputSummary: "输出字段级风险和人工复核点", RequiresReview: true},
+		},
+		ReviewPrompts: reviewPrompts,
+	}
+}
+
+func buildPaymentScheduleRunbook(hasFile, hasContractContext bool) *AgentRunbook {
+	hasEvidence := hasFile || hasContractContext
+	evidenceStatus := statusFromReview(!hasEvidence)
+	reviewPrompts := []AgentReviewPrompt{
+		{ID: "schedule_evidence", Title: "提供租金表证据", Description: "付款计划导入需要租金表、合同付款页或当前合同上下文。", Severity: "info", Action: "上传 Excel/PDF 租金表，或进入合同详情后提问。"},
+	}
+	if hasEvidence {
+		reviewPrompts = []AgentReviewPrompt{
+			{ID: "schedule_review", Title: "复核付款计划判断", Description: "已具备付款证据。请重点确认先付/后付、变量租金、非租赁成分和缺失期间。", Severity: "warning", Action: "确认后再导入付款计划草稿。"},
+		}
+	}
+	return &AgentRunbook{
+		SkillID:               "payment_schedule",
+		SkillName:             "Office Rent Schedule Skill",
+		RequiresEvidenceInput: !hasEvidence,
+		AnswerPrefix:          "Agent 已切换到租金表技能。我会先理解付款表结构，再区分先付/后付、固定租金、变量租金和非租赁成分。",
+		AgentPlan: []AgentPlanStep{
+			{ID: "read_schedule", Title: "读取租金表或合同付款上下文", Status: evidenceStatus},
+			{ID: "classify_payments", Title: "分类付款时点和会计属性", Status: statusFromReview(!hasEvidence)},
+			{ID: "human_review", Title: "人工确认异常金额、缺失期间和变量租金", Status: "needs_review"},
+			{ID: "import_schedule", Title: "确认后导入付款计划草稿", Status: "pending"},
+		},
+		ToolCalls: []AgentToolCall{
+			{Tool: "office.sheet_reader", Skill: "Office Excel Skill", Status: evidenceStatus, InputSummary: "读取上传的租金表或合同付款上下文", OutputSummary: "展开期间、金额、币种、税额和备注字段", RequiresReview: !hasEvidence},
+			{Tool: "lease.payment_schedule_parser", Skill: "Payment Schedule Skill", Status: statusFromReview(!hasEvidence), InputSummary: "抽取付款计划并判断资本化属性", OutputSummary: "生成付款计划草稿和异常清单", RequiresReview: true},
+		},
+		ReviewPrompts: reviewPrompts,
+	}
+}
+
+func buildAuditPackRunbook() *AgentRunbook {
+	return &AgentRunbook{
+		SkillID:               "audit_pack",
+		SkillName:             "Lease Audit Pack Skill",
+		NeedsPortfolioContext: true,
+		AnswerPrefix:          "Agent 已切换到审计包技能。我会基于权限范围内的系统数据生成审计资料清单、抽样建议和数据质量提示；正式审计结论仍需人工复核。",
+		AgentPlan: []AgentPlanStep{
+			{ID: "define_scope", Title: "确认审计期间、法人和报表口径", Status: "needs_review"},
+			{ID: "collect_system_data", Title: "检索合同、计量、分录和审批状态", Status: "completed"},
+			{ID: "quality_checks", Title: "识别缺失字段、未审批和口径差异", Status: "needs_review"},
+			{ID: "prepare_pack", Title: "生成审计包目录和导出建议", Status: "pending"},
+		},
+		ToolCalls: []AgentToolCall{
+			{Tool: "core.contract_repository", Skill: "Lease Data Retrieval Skill", Status: "completed", InputSummary: "读取当前用户权限范围内的合同组合", OutputSummary: "形成审计包覆盖范围和抽样基础", RequiresReview: false},
+			{Tool: "lease.audit_pack_builder", Skill: "Audit Pack Skill", Status: "needs_review", InputSummary: "整理合同清单、计量结果、分录、审批和附件需求", OutputSummary: "等待用户确认审计期间和 Official/Working 口径", RequiresReview: true},
+		},
+		ReviewPrompts: []AgentReviewPrompt{
+			{ID: "audit_scope", Title: "确认审计范围", Description: "生成审计包前需要确认法人、期间、Official/Working 口径和抽样规则。", Severity: "warning", Action: "指定期间和口径，例如：生成 2024-01 至 2024-12 Official 审计包。"},
+		},
+	}
+}
+
+func (h *AIChatHandler) appendAgentPortfolioContext(ctx context.Context, legalEntityID string, contextData *strings.Builder, sources *[]Source) {
+	contracts, err := h.contractRepo.GetAll(ctx, legalEntityID)
+	if err != nil || len(contracts) == 0 {
+		contextData.WriteString("\n## Agent 组合数据\n当前权限范围内未检索到合同组合数据。\n")
+		return
+	}
+
+	statusCounts := make(map[string]int)
+	showCount := len(contracts)
+	if showCount > 20 {
+		showCount = 20
+	}
+	for _, contract := range contracts {
+		statusCounts[contract.ApprovalStatus]++
+	}
+
+	contextData.WriteString(fmt.Sprintf("\n## Agent 组合数据（共 %d 份合同，显示前 %d 份）\n", len(contracts), showCount))
+	contextData.WriteString("- 审批状态分布:")
+	for status, count := range statusCounts {
+		contextData.WriteString(fmt.Sprintf(" %s=%d", status, count))
+	}
+	contextData.WriteString("\n")
+	for i, contract := range contracts {
+		if i >= showCount {
+			break
+		}
+		contextData.WriteString(fmt.Sprintf("- ID: %s, 编号: %s, 名称: %s, 审批状态: %s, 承租方: %s, 出租方: %s, 门店: %s\n",
+			contract.ID, contract.ContractNumber, contract.ContractName, contract.ApprovalStatus, contract.LesseeName, contract.LessorName, contract.StoreName))
+		*sources = append(*sources, Source{
+			Type:    "contract",
+			ID:      contract.ID,
+			Title:   contract.ContractName,
+			Snippet: fmt.Sprintf("编号: %s, 状态: %s", contract.ContractNumber, contract.ApprovalStatus),
+		})
+	}
+}
+
+func agentPlanFromRunbook(runbook *AgentRunbook) []AgentPlanStep {
+	if runbook == nil {
+		return nil
+	}
+	return runbook.AgentPlan
+}
+
+func toolCallsFromRunbook(runbook *AgentRunbook) []AgentToolCall {
+	if runbook == nil {
+		return nil
+	}
+	return runbook.ToolCalls
+}
+
+func reviewPromptsFromRunbook(runbook *AgentRunbook) []AgentReviewPrompt {
+	if runbook == nil {
+		return nil
+	}
+	return runbook.ReviewPrompts
 }
 
 // retrieveContractDetail fetches and appends contract basic info, latest measurements,
@@ -796,14 +1101,180 @@ func (h *AIChatHandler) parseFile(c *gin.Context, fileID, objectName, contentTyp
 	return result, nil
 }
 
+type PaymentScheduleParseResult struct {
+	SummaryText   string
+	Sources       []Source
+	Confidence    float64
+	AgentPlan     []AgentPlanStep
+	ToolCalls     []AgentToolCall
+	ReviewPrompts []AgentReviewPrompt
+	Schedules     []PaymentScheduleDraftItem
+	Summary       *PaymentScheduleParseSummary
+}
+
+func (h *AIChatHandler) parsePaymentSchedule(c *gin.Context, fileID, objectName, contentType, contractID string) (*PaymentScheduleParseResult, error) {
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		aiServiceURL = "http://ai-service:8000"
+	}
+
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"file_id":      fileID,
+		"object_name":  objectName,
+		"content_type": contentType,
+		"mode":         "assist",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", aiServiceURL+"/api/v1/parse/payment-schedule", bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", c.GetHeader("Authorization"))
+
+	client := &http.Client{Timeout: 180 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	schedulesRaw, _ := result["schedules"].([]interface{})
+	schedules := make([]PaymentScheduleDraftItem, 0, len(schedulesRaw))
+	for _, sr := range schedulesRaw {
+		smap, ok := sr.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		item := PaymentScheduleDraftItem{
+			PeriodStart:      getString(smap, "period_start"),
+			PeriodEnd:        getString(smap, "period_end"),
+			DueDate:          getString(smap, "due_date"),
+			Amount:           getFloat64(smap, "amount"),
+			PaymentTiming:    getString(smap, "payment_timing"),
+			IsFixed:          getBoolDefault(smap, "is_fixed", true),
+			IsLeaseComponent: getBoolDefault(smap, "is_lease_component", true),
+			AmountType:       getString(smap, "amount_type"),
+			Currency:         getString(smap, "currency"),
+			Confidence:       getFloat64(smap, "confidence"),
+		}
+		if item.PaymentTiming == "" {
+			item.PaymentTiming = "postpaid"
+		}
+		if item.AmountType == "" {
+			item.AmountType = "fixed_rent"
+		}
+		if item.Confidence == 0 {
+			item.Confidence = 0.8
+		}
+		schedules = append(schedules, item)
+	}
+
+	confidenceScores, _ := result["confidence_scores"].(map[string]interface{})
+	overallConf := getFloat64(confidenceScores, "overall")
+	if overallConf == 0 {
+		overallConf = 0.8
+	}
+	requiresHuman := getBool(result, "requires_human_confirmation")
+	missingFields := getStringSlice(result, "missing_fields")
+	warnings := getStringSlice(result, "warnings")
+	canImport := contractID != "" && len(schedules) > 0
+
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("Agent 已完成租金表理解和付款计划草稿生成：识别出 **%d** 笔付款计划。\n\n", len(schedules)))
+	if contractID == "" {
+		summary.WriteString("⚠️ **尚未绑定合同**：付款计划必须挂到具体合同后才能入库。请在合同详情页进入 AI Chat，或在 URL 中带上 `contract_id` 后再确认导入。\n\n")
+	}
+	if requiresHuman || len(warnings) > 0 || len(missingFields) > 0 {
+		summary.WriteString("⚠️ **需要人工确认**：请重点核对覆盖期间、应付日、金额、先付/后付、变量租金和非租赁成分。\n\n")
+	} else {
+		summary.WriteString("识别结果总体良好，仍需人工快速核对后才能导入。\n\n")
+	}
+	summary.WriteString("下方付款计划草稿只处于 Assist Mode。确认导入后也只写入当前合同付款计划，不会绕过合同审批、计量重算和月结控制。")
+
+	planStatus := statusFromReview(requiresHuman || len(warnings) > 0 || len(missingFields) > 0)
+	importStatus := "pending"
+	if !canImport {
+		importStatus = "needs_review"
+	}
+	toolCalls := []AgentToolCall{
+		{
+			Tool:           "office.sheet_reader",
+			Skill:          "Office Excel/PDF Skill",
+			Status:         "completed",
+			InputSummary:   fmt.Sprintf("读取上传租金表 %s", objectName),
+			OutputSummary:  "已将租金表展开为可供 LLM 理解的付款证据",
+			RequiresReview: false,
+		},
+		{
+			Tool:           "lease.payment_schedule_parser",
+			Skill:          "Payment Schedule Skill",
+			Status:         planStatus,
+			InputSummary:   "识别覆盖期间、应付日、金额、先付/后付和会计属性",
+			OutputSummary:  fmt.Sprintf("生成 %d 笔付款计划草稿，缺失字段 %d 类，警告 %d 条", len(schedules), len(missingFields), len(warnings)),
+			RequiresReview: planStatus == "needs_review",
+		},
+		{
+			Tool:           "lease.payment_schedule_importer",
+			Skill:          "Core Service Payment Schedule Skill",
+			Status:         importStatus,
+			InputSummary:   "等待用户确认付款计划草稿",
+			OutputSummary:  "确认后写入指定合同的付款计划",
+			RequiresReview: true,
+		},
+	}
+	agentPlan := []AgentPlanStep{
+		{ID: "read_schedule", Title: "读取租金表并保留证据", Status: "completed"},
+		{ID: "classify_payments", Title: "理解付款期间、金额和会计属性", Status: planStatus},
+		{ID: "human_review", Title: "人工确认异常金额、缺失期间和变量租金", Status: "needs_review"},
+		{ID: "import_schedule", Title: "确认后导入付款计划", Status: importStatus},
+	}
+
+	return &PaymentScheduleParseResult{
+		SummaryText:   summary.String(),
+		Sources:       []Source{{Type: "file", ID: fileID, Title: "租金表文件", Snippet: objectName}},
+		Confidence:    overallConf,
+		AgentPlan:     agentPlan,
+		ToolCalls:     toolCalls,
+		ReviewPrompts: buildPaymentScheduleReviewPrompts(schedules, missingFields, warnings, contractID),
+		Schedules:     schedules,
+		Summary: &PaymentScheduleParseSummary{
+			TotalCount:           len(schedules),
+			OverallConfidence:    overallConf,
+			RequiresHumanConfirm: requiresHuman,
+			MissingFields:        missingFields,
+			Warnings:             warnings,
+			CanImport:            canImport,
+			ContractID:           contractID,
+		},
+	}, nil
+}
+
 type BatchParseResult struct {
-	SummaryText string
-	Sources     []Source
-	Confidence  float64
-	AgentPlan   []AgentPlanStep
-	ToolCalls   []AgentToolCall
-	Contracts   []ContractDraftItem
-	Summary     *BatchParseSummary
+	SummaryText   string
+	Sources       []Source
+	Confidence    float64
+	AgentPlan     []AgentPlanStep
+	ToolCalls     []AgentToolCall
+	ReviewPrompts []AgentReviewPrompt
+	Contracts     []ContractDraftItem
+	Summary       *BatchParseSummary
 }
 
 func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, contentType string) (*BatchParseResult, error) {
@@ -973,14 +1444,16 @@ func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, c
 		{ID: "human_review", Title: "人工确认缺失字段和会计判断", Status: "needs_review"},
 		{ID: "create_draft", Title: "确认后创建 draft 合同并进入审批", Status: "pending"},
 	}
+	reviewPrompts := buildReviewPrompts(contracts, missingFields, warnings)
 
 	return &BatchParseResult{
-		SummaryText: summary.String(),
-		Sources:     sources,
-		Confidence:  overallConf,
-		AgentPlan:   agentPlan,
-		ToolCalls:   toolCalls,
-		Contracts:   contracts,
+		SummaryText:   summary.String(),
+		Sources:       sources,
+		Confidence:    overallConf,
+		AgentPlan:     agentPlan,
+		ToolCalls:     toolCalls,
+		ReviewPrompts: reviewPrompts,
+		Contracts:     contracts,
 		Summary: &BatchParseSummary{
 			TotalCount:           totalCount,
 			OverallConfidence:    overallConf,
@@ -996,11 +1469,175 @@ func isExcelContentType(contentType string) bool {
 		contentType == "application/vnd.ms-excel"
 }
 
+func buildReviewPrompts(contracts []ContractDraftItem, missingFields []string, warnings []string) []AgentReviewPrompt {
+	var prompts []AgentReviewPrompt
+
+	if len(missingFields) > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "missing_fields",
+			Title:       "补齐全局缺失字段",
+			Description: fmt.Sprintf("本次解析发现 %d 类缺失字段：%s。缺失字段会影响正式台账完整性。", len(missingFields), strings.Join(missingFields, ", ")),
+			Severity:    "warning",
+			Action:      "在下方草稿表格中补齐字段，或明确跳过不适用字段后再确认入库。",
+		})
+	}
+
+	discountRateContracts := make([]string, 0)
+	lowConfidenceContracts := make([]string, 0)
+	scopeReviewContracts := make([]string, 0)
+	for _, contract := range contracts {
+		if contract.DiscountRate == 0 || containsString(contract.MissingFields, "discount_rate") {
+			discountRateContracts = append(discountRateContracts, contract.ContractNumber)
+		}
+		if contract.Confidence < 0.8 || contract.ScopeConfidence < 0.8 {
+			lowConfidenceContracts = append(lowConfidenceContracts, contract.ContractNumber)
+		}
+		if contract.LeaseScope == "" || contract.LeaseScope != "in_scope" || contract.ScopeConfidence < 0.8 {
+			scopeReviewContracts = append(scopeReviewContracts, contract.ContractNumber)
+		}
+	}
+
+	if len(discountRateContracts) > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:              "discount_rate",
+			Title:           "确认折现率",
+			Description:     fmt.Sprintf("%d 份合同缺少折现率或折现率为 0。AI 不得猜测折现率。", len(discountRateContracts)),
+			Severity:        "critical",
+			Action:          "检查合同文本、系统利率政策或请人工选择适用 IBR 后再确认。",
+			ContractNumbers: firstStrings(discountRateContracts, 8),
+		})
+	}
+
+	if len(scopeReviewContracts) > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:              "lease_scope",
+			Title:           "复核租赁范围判断",
+			Description:     fmt.Sprintf("%d 份合同需要确认是否资本化、短期/低价值豁免或非租赁。", len(scopeReviewContracts)),
+			Severity:        "warning",
+			Action:          "复核 lease_scope、scope confidence 和豁免/排除原因，确认后才进入 draft 合同。",
+			ContractNumbers: firstStrings(scopeReviewContracts, 8),
+		})
+	}
+
+	if len(lowConfidenceContracts) > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:              "low_confidence",
+			Title:           "核对低置信度草稿",
+			Description:     fmt.Sprintf("%d 份合同存在整体或范围判断低置信度。", len(lowConfidenceContracts)),
+			Severity:        "warning",
+			Action:          "优先核对这些合同的日期、主体、租金、付款时点和范围判断。",
+			ContractNumbers: firstStrings(lowConfidenceContracts, 8),
+		})
+	}
+
+	if len(prompts) == 0 && len(warnings) == 0 && len(contracts) > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "quick_review",
+			Title:       "快速核对后确认",
+			Description: "未发现全局缺失字段或低置信度草稿，但 AI 结果仍需人工确认。",
+			Severity:    "info",
+			Action:      "抽查关键字段和原始文件证据，确认后创建 draft 合同。",
+		})
+	}
+
+	return prompts
+}
+
+func buildPaymentScheduleReviewPrompts(schedules []PaymentScheduleDraftItem, missingFields []string, warnings []string, contractID string) []AgentReviewPrompt {
+	var prompts []AgentReviewPrompt
+	if contractID == "" {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "bind_contract",
+			Title:       "绑定目标合同",
+			Description: "付款计划必须挂到具体合同后才能入库，当前 AI Chat 请求没有合同上下文。",
+			Severity:    "critical",
+			Action:      "进入合同详情页后上传租金表，或在 AI Chat URL 中带上 contract_id。",
+		})
+	}
+	if len(missingFields) > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "schedule_missing_fields",
+			Title:       "补齐付款计划缺失字段",
+			Description: fmt.Sprintf("本次解析发现 %d 类缺失字段：%s。", len(missingFields), strings.Join(missingFields, ", ")),
+			Severity:    "warning",
+			Action:      "核对租金表原文，补齐覆盖期间、应付日、金额或币种后再导入。",
+		})
+	}
+
+	lowConfidence := 0
+	variableOrNonLease := 0
+	emptyCurrency := 0
+	for _, schedule := range schedules {
+		if schedule.Confidence < 0.8 {
+			lowConfidence++
+		}
+		if !schedule.IsFixed || !schedule.IsLeaseComponent || schedule.AmountType == "turnover_rent" || schedule.AmountType == "cam" || schedule.AmountType == "service_fee" {
+			variableOrNonLease++
+		}
+		if schedule.Currency == "" {
+			emptyCurrency++
+		}
+	}
+	if lowConfidence > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "schedule_low_confidence",
+			Title:       "核对低置信度付款行",
+			Description: fmt.Sprintf("%d 笔付款计划置信度低于 0.8。", lowConfidence),
+			Severity:    "warning",
+			Action:      "优先核对这些行的期间、金额、付款时点和会计属性。",
+		})
+	}
+	if variableOrNonLease > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "schedule_accounting_attribute",
+			Title:       "确认变量租金和非租赁成分",
+			Description: fmt.Sprintf("%d 笔付款可能涉及变量租金或非租赁成分。", variableOrNonLease),
+			Severity:    "warning",
+			Action:      "确认 turnover rent、CAM、服务费等不得错误资本化计入租赁负债。",
+		})
+	}
+	if emptyCurrency > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "schedule_currency",
+			Title:       "确认币种",
+			Description: fmt.Sprintf("%d 笔付款缺少币种。AI 不应猜测文件中未出现的币种。", emptyCurrency),
+			Severity:    "warning",
+			Action:      "根据合同或租金表原文确认币种后再导入。",
+		})
+	}
+	if len(prompts) == 0 && len(warnings) == 0 && len(schedules) > 0 {
+		prompts = append(prompts, AgentReviewPrompt{
+			ID:          "schedule_quick_review",
+			Title:       "快速核对后导入",
+			Description: "未发现明显缺失字段或低置信度付款行，但付款计划仍需人工确认。",
+			Severity:    "info",
+			Action:      "抽查期间、金额、付款时点和会计属性，确认后导入付款计划。",
+		})
+	}
+	return prompts
+}
+
 func statusFromReview(requiresHuman bool) string {
 	if requiresHuman {
 		return "needs_review"
 	}
 	return "completed"
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func firstStrings(values []string, limit int) []string {
+	if len(values) <= limit {
+		return values
+	}
+	return values[:limit]
 }
 
 // Helper functions for safe type extraction

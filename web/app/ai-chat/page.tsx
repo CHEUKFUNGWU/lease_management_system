@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useMemo, Suspense, useCallback } from "rea
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Card,
   Input,
   Button,
   Avatar,
@@ -44,7 +43,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { aiChatApi, contractApi } from "../lib/api";
+import { aiChatApi, contractApi, paymentScheduleApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -101,6 +100,29 @@ interface BatchParseSummary {
   warnings: string[];
 }
 
+interface PaymentScheduleDraftItem {
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  amount: number;
+  payment_timing: string;
+  is_fixed: boolean;
+  is_lease_component: boolean;
+  amount_type: string;
+  currency: string;
+  confidence: number;
+}
+
+interface PaymentScheduleParseSummary {
+  total_count: number;
+  overall_confidence: number;
+  requires_human_confirmation: boolean;
+  missing_fields: string[];
+  warnings: string[];
+  can_import: boolean;
+  contract_id?: string;
+}
+
 interface AgentPlanStep {
   id: string;
   title: string;
@@ -116,6 +138,15 @@ interface AgentToolCall {
   requires_review: boolean;
 }
 
+interface AgentReviewPrompt {
+  id: string;
+  title: string;
+  description: string;
+  severity: "info" | "warning" | "critical" | string;
+  action: string;
+  contract_numbers?: string[];
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -128,8 +159,11 @@ interface Message {
   agentMode?: boolean;
   agentPlan?: AgentPlanStep[];
   toolCalls?: AgentToolCall[];
+  reviewPrompts?: AgentReviewPrompt[];
   draftContracts?: ContractDraftItem[];
   batchSummary?: BatchParseSummary;
+  draftPaymentSchedules?: PaymentScheduleDraftItem[];
+  paymentScheduleSummary?: PaymentScheduleParseSummary;
 }
 
 interface ChatSession {
@@ -174,6 +208,33 @@ const defaultChips = [
   "ai.chip_missing_dr",
   "ai.chip_pending",
   "ai.chip_expiring",
+];
+
+const agentSkillStarters = [
+  {
+    key: "excel-ledger",
+    labelKey: "ai.skill_excel_ledger",
+    promptKey: "ai.skill_excel_ledger_prompt",
+    icon: "excel",
+  },
+  {
+    key: "contract-review",
+    labelKey: "ai.skill_contract_review",
+    promptKey: "ai.skill_contract_review_prompt",
+    icon: "pdf",
+  },
+  {
+    key: "payment-schedule",
+    labelKey: "ai.skill_payment_schedule",
+    promptKey: "ai.skill_payment_schedule_prompt",
+    icon: "file",
+  },
+  {
+    key: "audit-pack",
+    labelKey: "ai.skill_audit_pack",
+    promptKey: "ai.skill_audit_pack_prompt",
+    icon: "tool",
+  },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -557,6 +618,93 @@ function AgentTracePanel({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function reviewSeverityMeta(severity: string) {
+  if (severity === "critical") {
+    return { color: "#CF1322", background: "#FFF1F0", border: "#FFA39E" };
+  }
+  if (severity === "warning") {
+    return { color: "#D46B08", background: "#FFF7E6", border: "#FFD591" };
+  }
+  return { color: "#0958D9", background: "#E6F4FF", border: "#91CAFF" };
+}
+
+function AgentReviewPanel({
+  prompts = [],
+  language,
+}: {
+  prompts?: AgentReviewPrompt[];
+  language: Language;
+}) {
+  if (prompts.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        border: "1px solid #E5E5E5",
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "#fff",
+      }}
+    >
+      <div
+        style={{
+          padding: "10px 12px",
+          borderBottom: "1px solid #F0F0F0",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <ExclamationCircleOutlined style={{ color: "#D46B08" }} />
+        <Text strong style={{ fontSize: 13 }}>
+          {t("ai.agent_review_title", language)}
+        </Text>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {prompts.map((prompt, index) => {
+          const meta = reviewSeverityMeta(prompt.severity);
+          return (
+            <div
+              key={prompt.id || index}
+              style={{
+                padding: "10px 12px",
+                borderBottom: index === prompts.length - 1 ? "none" : "1px solid #F5F5F5",
+                background: meta.background,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <Text strong style={{ fontSize: 12, color: meta.color }}>
+                  {prompt.title}
+                </Text>
+                <Tag style={{ borderRadius: 4, color: meta.color, borderColor: meta.border, background: "#fff", fontSize: 11 }}>
+                  {prompt.severity === "critical" ? t("ai.agent_severity_critical", language) : prompt.severity === "warning" ? t("ai.agent_severity_warning", language) : t("ai.agent_severity_info", language)}
+                </Tag>
+              </div>
+              <Text style={{ display: "block", fontSize: 12, color: "#595959", marginTop: 4 }}>
+                {prompt.description}
+              </Text>
+              <Text style={{ display: "block", fontSize: 12, color: "#262626", marginTop: 4 }}>
+                {prompt.action}
+              </Text>
+              {prompt.contract_numbers && prompt.contract_numbers.length > 0 && (
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                  {prompt.contract_numbers.map((contractNumber) => (
+                    <Tag key={contractNumber} style={{ borderRadius: 4, marginInlineEnd: 0, fontSize: 11 }}>
+                      {contractNumber}
+                    </Tag>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1073,6 +1221,198 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
   );
 }
 
+// ─── Payment Schedule Draft Panel ─────────────────────────────
+
+interface PaymentScheduleDraftPanelProps {
+  schedules: PaymentScheduleDraftItem[];
+  summary: PaymentScheduleParseSummary;
+  onConfirm: (selectedSchedules: PaymentScheduleDraftItem[]) => void;
+  onSkip: () => void;
+  language: Language;
+}
+
+function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, language }: PaymentScheduleDraftPanelProps) {
+  const [editedSchedules, setEditedSchedules] = useState<PaymentScheduleDraftItem[]>(
+    schedules.map((s) => ({ ...s }))
+  );
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
+    new Set(schedules.map((_, i) => i))
+  );
+  const [creating, setCreating] = useState(false);
+
+  const toggleSelect = (index: number) => {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIndices.size === editedSchedules.length) {
+      setSelectedIndices(new Set());
+    } else {
+      setSelectedIndices(new Set(editedSchedules.map((_, i) => i)));
+    }
+  };
+
+  const updateSchedule = (index: number, field: keyof PaymentScheduleDraftItem, value: any) => {
+    setEditedSchedules((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleConfirm = async () => {
+    const selected = Array.from(selectedIndices).map((i) => editedSchedules[i]);
+    if (selected.length === 0) {
+      message.warning(t("ai.draft_select_at_least_one", language));
+      return;
+    }
+    if (!summary.can_import || !summary.contract_id) {
+      message.warning(t("ai.schedule_bind_contract_first", language));
+      return;
+    }
+    setCreating(true);
+    try {
+      await onConfirm(selected);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 12, border: "1px solid #E5E5E5", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px", background: "#FAFAFA", borderBottom: "1px solid #E5E5E5" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <Text strong style={{ fontSize: 14 }}>
+              {t("ai.schedule_panel_title", language)}
+            </Text>
+            <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+              {t("ai.draft_panel_subtitle", language, { total: String(summary.total_count), confidence: String((summary.overall_confidence * 100).toFixed(0)) })}
+            </Text>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button size="small" onClick={toggleSelectAll}>
+              {selectedIndices.size === editedSchedules.length ? t("ai.deselect_all", language) : t("ai.select_all", language)}
+            </Button>
+            <Button size="small" danger onClick={onSkip}>
+              {t("ai.skip", language)}
+            </Button>
+          </div>
+        </div>
+        {!summary.can_import && (
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "#FFF1F0", borderRadius: 6, border: "1px solid #FFA39E" }}>
+            <Text style={{ fontSize: 12, color: "#CF1322" }}>
+              {t("ai.schedule_bind_contract_first", language)}
+            </Text>
+          </div>
+        )}
+        {(summary.requires_human_confirmation || summary.warnings.length > 0) && (
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "#FFF7E6", borderRadius: 6, border: "1px solid #FFD591" }}>
+            <Text style={{ fontSize: 12, color: "#D46B08" }}>
+              {t("ai.schedule_review_warning", language)}
+            </Text>
+          </div>
+        )}
+      </div>
+
+      <div style={{ maxHeight: 360, overflowY: "auto" }}>
+        {editedSchedules.map((schedule, index) => (
+          <div
+            key={index}
+            style={{
+              padding: "12px 16px",
+              borderBottom: "1px solid #F0F0F0",
+              background: selectedIndices.has(index) ? "#F6FFED" : "#fff",
+              opacity: selectedIndices.has(index) ? 1 : 0.6,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+              <input
+                type="checkbox"
+                checked={selectedIndices.has(index)}
+                onChange={() => toggleSelect(index)}
+                style={{ marginTop: 4 }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                  <div style={{ flex: "1 1 120px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_period_start", language)}</Text>
+                    <Input size="small" value={schedule.period_start} onChange={(e) => updateSchedule(index, "period_start", e.target.value)} />
+                  </div>
+                  <div style={{ flex: "1 1 120px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_period_end", language)}</Text>
+                    <Input size="small" value={schedule.period_end} onChange={(e) => updateSchedule(index, "period_end", e.target.value)} />
+                  </div>
+                  <div style={{ flex: "1 1 120px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_due_date", language)}</Text>
+                    <Input size="small" value={schedule.due_date} onChange={(e) => updateSchedule(index, "due_date", e.target.value)} />
+                  </div>
+                  <div style={{ flex: "1 1 110px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_amount", language)}</Text>
+                    <Input size="small" value={schedule.amount} onChange={(e) => updateSchedule(index, "amount", parseFloat(e.target.value) || 0)} status={schedule.amount <= 0 ? "error" : ""} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                  <div style={{ flex: "1 1 110px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_currency", language)}</Text>
+                    <Input size="small" value={schedule.currency || ""} onChange={(e) => updateSchedule(index, "currency", e.target.value)} status={!schedule.currency ? "warning" : ""} />
+                  </div>
+                  <div style={{ flex: "1 1 120px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_payment_timing", language)}</Text>
+                    <Input size="small" value={schedule.payment_timing} onChange={(e) => updateSchedule(index, "payment_timing", e.target.value)} />
+                  </div>
+                  <div style={{ flex: "1 1 140px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_amount_type", language)}</Text>
+                    <Input size="small" value={schedule.amount_type} onChange={(e) => updateSchedule(index, "amount_type", e.target.value)} />
+                  </div>
+                  <div style={{ flex: "1 1 130px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_is_fixed", language)}</Text>
+                    <Input size="small" value={schedule.is_fixed ? "true" : "false"} onChange={(e) => updateSchedule(index, "is_fixed", e.target.value === "true")} />
+                  </div>
+                  <div style={{ flex: "1 1 150px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_is_lease_component", language)}</Text>
+                    <Input size="small" value={schedule.is_lease_component ? "true" : "false"} onChange={(e) => updateSchedule(index, "is_lease_component", e.target.value === "true")} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Tag color={schedule.confidence < 0.8 ? "warning" : "green"} style={{ fontSize: 11 }}>
+                    {t("ai.draft_confidence", language, { value: String((schedule.confidence * 100).toFixed(0)) })}
+                  </Tag>
+                  {!schedule.is_fixed && <Tag color="orange" style={{ fontSize: 11 }}>{t("ai.schedule_variable_rent", language)}</Tag>}
+                  {!schedule.is_lease_component && <Tag color="orange" style={{ fontSize: 11 }}>{t("ai.schedule_non_lease_component", language)}</Tag>}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: "12px 16px", background: "#FAFAFA", borderTop: "1px solid #E5E5E5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {t("ai.draft_selected_count", language, { selected: String(selectedIndices.size), total: String(editedSchedules.length) })}
+        </Text>
+        <Button
+          type="primary"
+          loading={creating}
+          disabled={selectedIndices.size === 0 || !summary.can_import}
+          onClick={handleConfirm}
+          style={{ background: "#000", borderColor: "#000" }}
+        >
+          {t("ai.schedule_confirm_import", language)}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Chat Page ────────────────────────────────────────────
 
 function AIChatPageContent() {
@@ -1230,6 +1570,13 @@ function AIChatPageContent() {
     return <FileImageOutlined style={{ color: "#666" }} />;
   };
 
+  const getSkillIcon = (icon: string) => {
+    if (icon === "excel") return <FileExcelOutlined />;
+    if (icon === "pdf") return <FilePdfOutlined />;
+    if (icon === "tool") return <ToolOutlined />;
+    return <FileTextOutlined />;
+  };
+
   const handleFileUpload = async (options: any) => {
     const { file, onSuccess, onError } = options;
     const formData = new FormData();
@@ -1260,7 +1607,8 @@ function AIChatPageContent() {
 
       message.success(`${data.original_name} ${t("ai.upload_success", language)}`);
       onSuccess(data, file);
-      await handleSend("请解析这个文件并导入台账：先生成合同草稿卡片，等待我确认后再入库。", uploadedFile);
+      const uploadPrompt = input.trim() || "请解析这个文件并导入台账：先生成合同草稿卡片，等待我确认后再入库。";
+      await handleSend(uploadPrompt, uploadedFile);
     } catch (err: any) {
       onError(err);
       message.error(`${t("ai.upload_failed", language)}: ${err.message}`);
@@ -1328,8 +1676,11 @@ function AIChatPageContent() {
         agentMode: data.agent_mode,
         agentPlan: data.agent_plan,
         toolCalls: data.tool_calls,
+        reviewPrompts: data.review_prompts,
         draftContracts: data.draft_contracts,
         batchSummary: data.batch_summary,
+        draftPaymentSchedules: data.draft_payment_schedules,
+        paymentScheduleSummary: data.payment_schedule_summary,
       };
 
       updateSessionMessages(activeSessionId, (msgs) => [...msgs, aiMessage]);
@@ -1493,6 +1844,42 @@ function AIChatPageContent() {
                 </motion.div>
               )}
 
+              {/* Agent skill starters */}
+              {currentMessages.length <= 1 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginBottom: 12,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>
+                    {t("ai.agent_skills", language)}
+                  </Text>
+                  {agentSkillStarters.map((skill) => (
+                    <Button
+                      key={skill.key}
+                      type="default"
+                      icon={getSkillIcon(skill.icon)}
+                      onClick={() => setInput(t(skill.promptKey, language))}
+                      disabled={loading}
+                      style={{
+                        fontSize: 12,
+                        borderRadius: 6,
+                        borderColor: "#D9D9D9",
+                        color: "#262626",
+                      }}
+                    >
+                      {t(skill.labelKey, language)}
+                    </Button>
+                  ))}
+                </motion.div>
+              )}
+
               {/* Quick chips */}
               {currentMessages.length <= 1 && (
                 <motion.div
@@ -1595,6 +1982,13 @@ function AIChatPageContent() {
                           />
                         )}
 
+                        {msg.role === "assistant" && msg.agentMode && (
+                          <AgentReviewPanel
+                            prompts={msg.reviewPrompts}
+                            language={language}
+                          />
+                        )}
+
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {msg.attachments.map((att, idx) => (
@@ -1645,18 +2039,131 @@ function AIChatPageContent() {
                                 }));
 
                                 const result = await contractApi.batchCreate(payload, token!);
+                                const failedContracts = result.failed_contracts || [];
+                                const createSucceeded = Number(result.failed_count || 0) === 0;
 
                                 // Add result message
                                 const resultMessage: Message = {
                                   id: generateId(),
                                   role: "assistant",
-                                  content: t("ai.batch_create_result", language, { success: String(result.created_count), failed: String(result.failed_count), details: result.failed_count > 0 ? t("ai.batch_create_failed_details", language) + result.failed_contracts.map((f: any) => `- ${f.number}: ${f.error}`).join("\n") : "" }),
+                                  content: t("ai.batch_create_result", language, { success: String(result.created_count), failed: String(result.failed_count), details: result.failed_count > 0 ? t("ai.batch_create_failed_details", language) + failedContracts.map((f: any) => `- ${f.number}: ${f.error}`).join("\n") : "" }),
                                   timestamp: Date.now(),
+                                  agentMode: true,
+                                  agentPlan: [
+                                    {
+                                      id: "human_review",
+                                      title: t("ai.agent_step_human_review_done", language),
+                                      status: "completed",
+                                    },
+                                    {
+                                      id: "create_draft",
+                                      title: t("ai.agent_step_create_draft", language),
+                                      status: createSucceeded ? "completed" : "needs_review",
+                                    },
+                                  ],
+                                  toolCalls: [
+                                    {
+                                      tool: "lease.draft_contract_creator",
+                                      skill: "Core Service Draft Skill",
+                                      status: createSucceeded ? "completed" : "needs_review",
+                                      input_summary: t("ai.agent_create_input", language, { count: String(selectedContracts.length) }),
+                                      output_summary: t("ai.agent_create_output", language, { success: String(result.created_count), failed: String(result.failed_count) }),
+                                      requires_review: !createSucceeded,
+                                    },
+                                  ],
+                                  reviewPrompts: createSucceeded
+                                    ? []
+                                    : [
+                                        {
+                                          id: "batch_create_failed",
+                                          title: t("ai.agent_create_failed_title", language),
+                                          description: t("ai.agent_create_failed_description", language, { count: String(result.failed_count) }),
+                                          severity: "critical",
+                                          action: t("ai.agent_create_failed_action", language),
+                                          contract_numbers: failedContracts.map((f: any) => f.number).filter(Boolean).slice(0, 8),
+                                        },
+                                      ],
                                 };
                                 updateSessionMessages(activeSessionId!, (msgs) => [...msgs, resultMessage]);
-                                message.success(t("ai.batch_create_success", language, { count: String(result.created_count) }));
+                                if (createSucceeded) {
+                                  message.success(t("ai.batch_create_success", language, { count: String(result.created_count) }));
+                                } else {
+                                  message.warning(t("ai.batch_create_result", language, { success: String(result.created_count), failed: String(result.failed_count), details: "" }));
+                                }
                               } catch (error: any) {
                                 message.error(t("ai.batch_create_failed", language, { error: error.message }));
+                              }
+                            }}
+                            onSkip={() => {
+                              const skipMessage: Message = {
+                                id: generateId(),
+                                role: "assistant",
+                                content: t("ai.skip_import", language),
+                                timestamp: Date.now(),
+                              };
+                              updateSessionMessages(activeSessionId!, (msgs) => [...msgs, skipMessage]);
+                            }}
+                          />
+                        )}
+
+                        {msg.draftPaymentSchedules && msg.paymentScheduleSummary && msg.role === "assistant" && (
+                          <PaymentScheduleDraftPanel
+                            schedules={msg.draftPaymentSchedules}
+                            summary={msg.paymentScheduleSummary}
+                            language={language}
+                            onConfirm={async (selectedSchedules) => {
+                              const contractId = msg.paymentScheduleSummary?.contract_id;
+                              if (!contractId) {
+                                message.warning(t("ai.schedule_bind_contract_first", language));
+                                return;
+                              }
+                              try {
+                                let successCount = 0;
+                                for (const schedule of selectedSchedules) {
+                                  await paymentScheduleApi.create(contractId, {
+                                    contract_id: contractId,
+                                    effective_start_date: schedule.period_start || schedule.due_date,
+                                    effective_end_date: schedule.period_end || schedule.due_date,
+                                    coverage_start_date: schedule.period_start || schedule.due_date,
+                                    coverage_end_date: schedule.period_end || schedule.due_date,
+                                    due_date: schedule.due_date,
+                                    payment_timing: schedule.payment_timing || "postpaid",
+                                    amount: schedule.amount,
+                                    currency: schedule.currency || "CNY",
+                                    amount_type: schedule.amount_type || "fixed_rent",
+                                    is_fixed: schedule.is_fixed,
+                                    is_variable: !schedule.is_fixed,
+                                    is_lease_component: schedule.is_lease_component,
+                                    is_non_lease_component: !schedule.is_lease_component,
+                                    included_in_liability_pv: schedule.is_lease_component && schedule.is_fixed,
+                                  }, token!);
+                                  successCount++;
+                                }
+                                const resultMessage: Message = {
+                                  id: generateId(),
+                                  role: "assistant",
+                                  content: t("ai.schedule_import_result", language, { count: String(successCount), contract: contractId }),
+                                  timestamp: Date.now(),
+                                  agentMode: true,
+                                  agentPlan: [
+                                    { id: "human_review", title: t("ai.agent_step_human_review_done", language), status: "completed" },
+                                    { id: "import_schedule", title: t("ai.schedule_step_import", language), status: "completed" },
+                                  ],
+                                  toolCalls: [
+                                    {
+                                      tool: "lease.payment_schedule_importer",
+                                      skill: "Core Service Payment Schedule Skill",
+                                      status: "completed",
+                                      input_summary: t("ai.schedule_import_input", language, { count: String(selectedSchedules.length) }),
+                                      output_summary: t("ai.schedule_import_output", language, { count: String(successCount) }),
+                                      requires_review: false,
+                                    },
+                                  ],
+                                };
+                                updateSessionMessages(activeSessionId!, (msgs) => [...msgs, resultMessage]);
+                                message.success(t("ai.schedule_import_success", language, { count: String(successCount) }));
+                              } catch (error: any) {
+                                message.error(t("ai.schedule_import_failed", language, { error: error.message }));
                               }
                             }}
                             onSkip={() => {

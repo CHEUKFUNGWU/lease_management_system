@@ -233,6 +233,61 @@ export const eventApi = {
     apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/adjustment`, { token }),
 };
 
+// Lease Administration APIs
+export const leaseAdminApi = {
+  listUpcomingCriticalDates: (token: string, params?: { days?: number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.days) qs.append("days", String(params.days));
+    if (params?.limit) qs.append("limit", String(params.limit));
+    const queryString = qs.toString();
+    return apiRequest(`/api/v1/lease-admin/critical-dates/upcoming${queryString ? `?${queryString}` : ""}`, { token });
+  },
+
+  listCriticalDates: (contractId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/critical-dates`, { token }),
+
+  createCriticalDate: (contractId: string, data: any, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/critical-dates`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateCriticalDateStatus: (contractId: string, dateId: string, status: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/critical-dates/${dateId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+      token,
+    }),
+
+  listDocuments: (contractId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/documents`, { token }),
+
+  createDocument: (contractId: string, data: any, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/documents`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  listObligations: (contractId: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/obligations`, { token }),
+
+  createObligation: (contractId: string, data: any, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/obligations`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+  updateObligationStatus: (contractId: string, obligationId: string, status: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${contractId}/obligations/${obligationId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+      token,
+    }),
+};
+
 // Monthly Closing APIs
 export const monthlyClosingApi = {
   generate: (data: any, token: string) =>
@@ -250,6 +305,20 @@ export const monthlyClosingApi = {
     if (params.status) qs.append("status", params.status);
     return apiRequest(`/api/v1/monthly-closing/entries?${qs.toString()}`, { token });
   },
+  exportEntries: async (params: { period?: string; status?: string; template?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    if (params.period) qs.append("period", params.period);
+    if (params.status) qs.append("status", params.status);
+    if (params.template) qs.append("template", params.template);
+    const response = await fetch(`${API_BASE_URL}/api/v1/monthly-closing/entries/export?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+    return response.blob();
+  },
   getMeasurementResults: (contractId: string, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/measurement-results`, { token }),
   approveEntry: (entryId: string, token: string) =>
@@ -264,6 +333,12 @@ export const monthlyClosingApi = {
     apiRequest(`/api/v1/monthly-closing/batches/${batchId}/approve`, { method: "POST", token }),
   postBatch: (batchId: string, token: string) =>
     apiRequest(`/api/v1/monthly-closing/batches/${batchId}/post`, { method: "POST", token }),
+  applyERPWriteback: (items: Array<{ entry_id: string; erp_reference?: string; voucher_number?: string }>, token: string) =>
+    apiRequest("/api/v1/monthly-closing/erp-writeback", {
+      method: "POST",
+      body: JSON.stringify({ items }),
+      token,
+    }),
   lockPeriod: (period: string, token: string) =>
     apiRequest(`/api/v1/monthly-closing/periods/${period}/lock`, { method: "POST", token }),
   unlockPeriod: (period: string, token: string) =>
@@ -306,6 +381,24 @@ export const reportApi = {
 
   contractSummary: (mode: "working" | "official", token: string, language?: string) =>
     apiRequest(`/api/v1/reports/contract-summary?mode=${mode}${language ? `&language=${language}` : ""}`, { token }),
+
+  portfolioSummary: (mode: "working" | "official", token: string) =>
+    apiRequest(`/api/v1/reports/portfolio-summary?mode=${mode}`, { token }),
+
+  sensitivity: (params: { contract_id: string; base_rate?: number; shocks?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    qs.append("contract_id", params.contract_id);
+    if (params.base_rate !== undefined) qs.append("base_rate", String(params.base_rate));
+    if (params.shocks) qs.append("shocks", params.shocks);
+    return apiRequest(`/api/v1/reports/sensitivity?${qs.toString()}`, { token });
+  },
+
+  standardComparison: (params: { contract_id: string; discount_rate?: number }, token: string) => {
+    const qs = new URLSearchParams();
+    qs.append("contract_id", params.contract_id);
+    if (params.discount_rate !== undefined) qs.append("discount_rate", String(params.discount_rate));
+    return apiRequest(`/api/v1/reports/standard-comparison?${qs.toString()}`, { token });
+  },
 
   tags: (token: string) =>
     apiRequest(`/api/v1/reports/tags`, { token }),

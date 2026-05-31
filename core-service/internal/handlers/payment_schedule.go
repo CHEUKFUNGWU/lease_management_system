@@ -5,8 +5,8 @@ import (
 	"time"
 	
 	"github.com/gin-gonic/gin"
-	"github.com/ifrs16/core-service/internal/middleware"
-	"github.com/ifrs16/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/middleware"
+	"github.com/lease-management-system/core-service/internal/repository"
 )
 
 type PaymentScheduleHandler struct {

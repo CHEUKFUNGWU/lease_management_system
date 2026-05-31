@@ -512,7 +512,7 @@ function ReportsPageContent() {
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement("a");
                             a.href = url;
-                            a.download = `IFRS16_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
+                            a.download = `Lease_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
                             a.click();
                             window.URL.revokeObjectURL(url);
                           }}
@@ -699,7 +699,7 @@ function ReportsPageContent() {
                                 exportCSV(
                                   amortData,
                                   amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                                  `IFRS16_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
+                                  `Lease_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
                                 )
                               }
                               disabled={!amortData.length}
@@ -713,7 +713,7 @@ function ReportsPageContent() {
                                 exportExcel(
                                   amortData,
                                   amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                                  `IFRS16_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
+                                  `Lease_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
                                 )
                               }
                               disabled={!amortData.length}

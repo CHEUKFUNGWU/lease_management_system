@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ifrs16/core-service/internal/middleware"
-	"github.com/ifrs16/core-service/internal/repository"
-	"github.com/ifrs16/core-service/internal/services/audit"
-	ifrs16svc "github.com/ifrs16/core-service/internal/services/ifrs16"
+	"github.com/lease-management-system/core-service/internal/middleware"
+	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/audit"
+	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
 type EventHandler struct {

@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 __pycache__/
+.pycache/
 *.pyc
 .env
 
@@ -9,6 +10,8 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+.gocache/
+core-service/.gocache/
 
 # IDE
 .idea/

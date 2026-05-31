@@ -41,6 +41,7 @@ interface Contract {
   store_id: string;
   landlord_id: string;
   currency: string;
+  asset_type: string;
   commencement_date: string;
   lease_start_date: string;
   lease_end_date: string;
@@ -48,6 +49,7 @@ interface Contract {
   approval_status: string;
   is_official_version: boolean;
   discount_rate_missing: boolean;
+  lease_scope: string;
   created_at: string;
 }
 
@@ -59,6 +61,28 @@ const STATUS_COLORS: Record<string, string> = {
   approved: "success",
   rejected: "error",
   returned_to_editor: "orange",
+};
+
+const LEASE_SCOPE_LABELS: Record<string, string> = {
+  in_scope: "资本化",
+  short_term_exempt: "短期豁免",
+  low_value_exempt: "低价值豁免",
+  not_a_lease: "非租赁",
+};
+
+const LEASE_SCOPE_COLORS: Record<string, string> = {
+  in_scope: "blue",
+  short_term_exempt: "gold",
+  low_value_exempt: "purple",
+  not_a_lease: "default",
+};
+
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  real_estate: "不动产",
+  vehicle: "车辆",
+  it_equipment: "IT 设备",
+  machinery: "机器设备",
+  other: "其他",
 };
 
 export default function ContractsPage() {
@@ -267,6 +291,22 @@ export default function ContractsPage() {
           )}
         </span>
       ),
+    },
+    {
+      title: "范围",
+      key: "lease_scope",
+      width: 110,
+      render: (_: any, record: Contract) => (
+        <Tag color={LEASE_SCOPE_COLORS[record.lease_scope || "in_scope"]} style={{ margin: 0 }}>
+          {LEASE_SCOPE_LABELS[record.lease_scope || "in_scope"]}
+        </Tag>
+      ),
+    },
+    {
+      title: "资产",
+      key: "asset_type",
+      width: 100,
+      render: (_: any, record: Contract) => ASSET_TYPE_LABELS[record.asset_type || "real_estate"],
     },
     {
       title: "",

@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/ifrs16/core-service/internal/services/ifrs16"
+	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
 type PaymentSchedule struct {

@@ -80,6 +80,12 @@ CREATE TABLE IF NOT EXISTS lease_contracts (
     legal_entity_id UUID NOT NULL REFERENCES legal_entities(id),
     store_id UUID NOT NULL REFERENCES stores(id),
     landlord_id UUID NOT NULL REFERENCES landlords(id),
+    lessee_name VARCHAR(255),
+    lessor_name VARCHAR(255),
+    store_name VARCHAR(255),
+    store_address TEXT,
+    tags VARCHAR(500),
+    asset_type VARCHAR(50) NOT NULL DEFAULT 'real_estate',
     asset_category VARCHAR(100),
     property_category VARCHAR(100),
     currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
@@ -98,6 +104,7 @@ CREATE TABLE IF NOT EXISTS lease_contracts (
     status VARCHAR(50) NOT NULL DEFAULT 'draft',
     created_by UUID REFERENCES users(id),
     approved_by UUID REFERENCES users(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -112,6 +119,67 @@ CREATE TABLE IF NOT EXISTS lease_contract_attachments (
     minio_object_key VARCHAR(500),
     uploaded_by UUID REFERENCES users(id),
     uploaded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS lease_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    document_type VARCHAR(50) NOT NULL DEFAULT 'main_contract',
+    file_name VARCHAR(255) NOT NULL,
+    file_type VARCHAR(100),
+    file_size BIGINT,
+    minio_bucket VARCHAR(100),
+    minio_object_key VARCHAR(500),
+    document_version VARCHAR(50),
+    file_hash VARCHAR(128),
+    source_page INTEGER,
+    notes TEXT,
+    uploaded_by UUID REFERENCES users(id),
+    uploaded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS critical_dates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    date_type VARCHAR(50) NOT NULL,
+    target_date DATE NOT NULL,
+    reminder_days INTEGER NOT NULL DEFAULT 30,
+    responsible_user_id UUID REFERENCES users(id),
+    status VARCHAR(50) NOT NULL DEFAULT 'open',
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    source VARCHAR(50) NOT NULL DEFAULT 'manual',
+    source_reference_locator JSONB,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    completed_by UUID REFERENCES users(id),
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (date_type IN ('renewal_deadline', 'break_notice', 'rent_review', 'lease_expiry', 'insurance_renewal', 'other')),
+    CHECK (status IN ('open', 'snoozed', 'completed', 'cancelled')),
+    CHECK (source IN ('manual', 'ai_suggested', 'policy_rule', 'system_generated'))
+);
+
+CREATE TABLE IF NOT EXISTS lease_obligations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    obligation_type VARCHAR(50) NOT NULL,
+    responsible_party VARCHAR(50) NOT NULL DEFAULT 'lessee',
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    structured_value JSONB,
+    source_clause TEXT,
+    source_page INTEGER,
+    source_reference_locator JSONB,
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (obligation_type IN ('maintenance', 'cam', 'insurance', 'index_adjustment', 'restoration', 'security_deposit', 'notice', 'other')),
+    CHECK (responsible_party IN ('lessee', 'lessor', 'shared', 'third_party')),
+    CHECK (status IN ('active', 'completed', 'waived', 'cancelled'))
 );
 
 CREATE TABLE IF NOT EXISTS lease_payment_schedules (
@@ -313,6 +381,23 @@ ALTER TABLE lease_contracts
     ADD COLUMN IF NOT EXISTS ai_extracted_discount_rate TEXT,
     ADD COLUMN IF NOT EXISTS ai_suggested_rate_policies JSONB;
 
+-- 5b. Contract table: IFRS 16 scope gate columns
+ALTER TABLE lease_contracts
+    ADD COLUMN IF NOT EXISTS lease_scope VARCHAR(50) NOT NULL DEFAULT 'in_scope'
+        CHECK (lease_scope IN ('in_scope', 'short_term_exempt', 'low_value_exempt', 'not_a_lease')),
+    ADD COLUMN IF NOT EXISTS exemption_reason TEXT,
+    ADD COLUMN IF NOT EXISTS scope_classified_by UUID REFERENCES users(id),
+    ADD COLUMN IF NOT EXISTS scope_classified_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS scope_source VARCHAR(50)
+        CHECK (scope_source IS NULL OR scope_source IN ('ai_suggested', 'manual', 'policy_rule')),
+    ADD COLUMN IF NOT EXISTS scope_confidence DECIMAL(3, 2)
+        CHECK (scope_confidence IS NULL OR (scope_confidence >= 0 AND scope_confidence <= 1));
+
+-- 5c. Contract table: lease administration dimensions
+ALTER TABLE lease_contracts
+    ADD COLUMN IF NOT EXISTS asset_type VARCHAR(50) NOT NULL DEFAULT 'real_estate'
+        CHECK (asset_type IN ('real_estate', 'vehicle', 'it_equipment', 'machinery', 'other'));
+
 -- 6. Payment schedules: approval status
 ALTER TABLE lease_payment_schedules
     ADD COLUMN IF NOT EXISTS approval_status VARCHAR(50) NOT NULL DEFAULT 'approved',
@@ -347,6 +432,14 @@ CREATE INDEX IF NOT EXISTS idx_user_data_scopes_user ON user_data_scopes(user_id
 CREATE INDEX IF NOT EXISTS idx_lease_contracts_approval ON lease_contracts(approval_status);
 CREATE INDEX IF NOT EXISTS idx_lease_contracts_official ON lease_contracts(is_official_version);
 CREATE INDEX IF NOT EXISTS idx_lease_contracts_dr_missing ON lease_contracts(discount_rate_missing);
+CREATE INDEX IF NOT EXISTS idx_lease_contracts_scope ON lease_contracts(lease_scope);
+CREATE INDEX IF NOT EXISTS idx_lease_contracts_asset_type ON lease_contracts(asset_type);
+CREATE INDEX IF NOT EXISTS idx_critical_dates_contract ON critical_dates(contract_id);
+CREATE INDEX IF NOT EXISTS idx_critical_dates_due ON critical_dates(status, target_date);
+CREATE INDEX IF NOT EXISTS idx_lease_documents_contract ON lease_documents(contract_id);
+CREATE INDEX IF NOT EXISTS idx_lease_obligations_contract ON lease_obligations(contract_id);
+CREATE INDEX IF NOT EXISTS idx_lease_obligations_type ON lease_obligations(obligation_type);
+CREATE INDEX IF NOT EXISTS idx_lease_obligations_status ON lease_obligations(status);
 CREATE INDEX IF NOT EXISTS idx_lease_payment_schedules_contract ON lease_payment_schedules(contract_id);
 CREATE INDEX IF NOT EXISTS idx_lease_events_status ON lease_events(approval_status);
 CREATE INDEX IF NOT EXISTS idx_ai_contract_drafts_status ON ai_contract_drafts(approval_status);

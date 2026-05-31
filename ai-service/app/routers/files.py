@@ -54,7 +54,7 @@ async def upload_file(
     # 上传到 MinIO
     try:
         file_url = upload_to_minio(
-            bucket_name="ifrs16-uploads",
+            bucket_name="lease-uploads",
             object_name=object_name,
             data=content,
             content_type=file.content_type

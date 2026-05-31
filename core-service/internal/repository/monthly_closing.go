@@ -4,57 +4,57 @@ import (
 	"context"
 	"fmt"
 	"time"
-	
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type MeasurementResult struct {
-	ID                   string     `json:"id"`
-	ContractID           string     `json:"contract_id"`
-	AccountingPeriod     string     `json:"accounting_period"`
-	PeriodStartDate      time.Time  `json:"period_start_date"`
-	PeriodEndDate        time.Time  `json:"period_end_date"`
-	OpeningLiability     float64    `json:"opening_liability"`
-	InterestExpense      float64    `json:"interest_expense"`
-	PrincipalRepayment   float64    `json:"principal_repayment"`
-	TotalPayment         float64    `json:"total_payment"`
-	ClosingLiability     float64    `json:"closing_liability"`
-	OpeningROUAsset      float64    `json:"opening_rou_asset"`
-	Depreciation         float64    `json:"depreciation"`
-	ClosingROUAsset      float64    `json:"closing_rou_asset"`
-	VariableRentExpense  float64    `json:"variable_rent_expense"`
-	NonLeaseExpense      float64    `json:"non_lease_expense"`
-	DiscountRate         float64    `json:"discount_rate"`
-	IsCalculated         bool       `json:"is_calculated"`
-	CalculationBatchID   *string    `json:"calculation_batch_id"`
-	CalculatedAt         *time.Time `json:"calculated_at"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
+	ID                  string     `json:"id"`
+	ContractID          string     `json:"contract_id"`
+	AccountingPeriod    string     `json:"accounting_period"`
+	PeriodStartDate     time.Time  `json:"period_start_date"`
+	PeriodEndDate       time.Time  `json:"period_end_date"`
+	OpeningLiability    float64    `json:"opening_liability"`
+	InterestExpense     float64    `json:"interest_expense"`
+	PrincipalRepayment  float64    `json:"principal_repayment"`
+	TotalPayment        float64    `json:"total_payment"`
+	ClosingLiability    float64    `json:"closing_liability"`
+	OpeningROUAsset     float64    `json:"opening_rou_asset"`
+	Depreciation        float64    `json:"depreciation"`
+	ClosingROUAsset     float64    `json:"closing_rou_asset"`
+	VariableRentExpense float64    `json:"variable_rent_expense"`
+	NonLeaseExpense     float64    `json:"non_lease_expense"`
+	DiscountRate        float64    `json:"discount_rate"`
+	IsCalculated        bool       `json:"is_calculated"`
+	CalculationBatchID  *string    `json:"calculation_batch_id"`
+	CalculatedAt        *time.Time `json:"calculated_at"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type JournalEntry struct {
-	ID                string     `json:"id"`
-	ContractID        string     `json:"contract_id"`
-	MeasurementResultID *string  `json:"measurement_result_id"`
-	AccountingPeriod  string     `json:"accounting_period"`
-	EntryDate         time.Time  `json:"entry_date"`
-	EntryType         string     `json:"entry_type"`
-	DebitAccount      string     `json:"debit_account"`
-	CreditAccount     string     `json:"credit_account"`
-	Amount            float64    `json:"amount"`
-	Currency          string     `json:"currency"`
-	Description       *string    `json:"description"`
-	VoucherNumber     *string    `json:"voucher_number"`
-	PostingStatus     string     `json:"posting_status"`
-	PostedAt          *time.Time `json:"posted_at"`
-	PostedBy          *string    `json:"posted_by"`
-	ApprovedBy        *string    `json:"approved_by"`
-	ApprovedAt        *time.Time `json:"approved_at"`
-	ERPReference      *string    `json:"erp_reference"`
-	BatchID           *string    `json:"batch_id"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                  string     `json:"id"`
+	ContractID          string     `json:"contract_id"`
+	MeasurementResultID *string    `json:"measurement_result_id"`
+	AccountingPeriod    string     `json:"accounting_period"`
+	EntryDate           time.Time  `json:"entry_date"`
+	EntryType           string     `json:"entry_type"`
+	DebitAccount        string     `json:"debit_account"`
+	CreditAccount       string     `json:"credit_account"`
+	Amount              float64    `json:"amount"`
+	Currency            string     `json:"currency"`
+	Description         *string    `json:"description"`
+	VoucherNumber       *string    `json:"voucher_number"`
+	PostingStatus       string     `json:"posting_status"`
+	PostedAt            *time.Time `json:"posted_at"`
+	PostedBy            *string    `json:"posted_by"`
+	ApprovedBy          *string    `json:"approved_by"`
+	ApprovedAt          *time.Time `json:"approved_at"`
+	ERPReference        *string    `json:"erp_reference"`
+	BatchID             *string    `json:"batch_id"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type MonthlyClosingBatch struct {
@@ -78,23 +78,23 @@ type MonthlyClosingBatch struct {
 }
 
 type EventAdjustment struct {
-	ID                   string     `json:"id"`
-	EventID              string     `json:"event_id"`
-	ContractID           string     `json:"contract_id"`
-	AdjustmentType       string     `json:"adjustment_type"`
-	EffectiveDate        time.Time  `json:"effective_date"`
-	LiabilityBefore      float64    `json:"liability_before"`
-	LiabilityAfter       float64    `json:"liability_after"`
-	LiabilityAdjustment  float64    `json:"liability_adjustment"`
-	ROUBefore            float64    `json:"rou_before"`
-	ROUAfter             float64    `json:"rou_after"`
-	ROUAdjustment        float64    `json:"rou_adjustment"`
-	PnLGain              float64    `json:"pnl_gain"`
-	PnLLoss              float64    `json:"pnl_loss"`
-	RevisedDiscountRate  float64    `json:"revised_discount_rate"`
-	DiscountRateSource   *string    `json:"discount_rate_source"`
-	CalculationBatchID   *string    `json:"calculation_batch_id"`
-	CreatedAt            time.Time  `json:"created_at"`
+	ID                  string    `json:"id"`
+	EventID             string    `json:"event_id"`
+	ContractID          string    `json:"contract_id"`
+	AdjustmentType      string    `json:"adjustment_type"`
+	EffectiveDate       time.Time `json:"effective_date"`
+	LiabilityBefore     float64   `json:"liability_before"`
+	LiabilityAfter      float64   `json:"liability_after"`
+	LiabilityAdjustment float64   `json:"liability_adjustment"`
+	ROUBefore           float64   `json:"rou_before"`
+	ROUAfter            float64   `json:"rou_after"`
+	ROUAdjustment       float64   `json:"rou_adjustment"`
+	PnLGain             float64   `json:"pnl_gain"`
+	PnLLoss             float64   `json:"pnl_loss"`
+	RevisedDiscountRate float64   `json:"revised_discount_rate"`
+	DiscountRateSource  *string   `json:"discount_rate_source"`
+	CalculationBatchID  *string   `json:"calculation_batch_id"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 type MonthlyClosingRepository struct {
@@ -110,14 +110,14 @@ func (r *MonthlyClosingRepository) CreateBatch(ctx context.Context, batch *Month
 	batch.Status = "draft"
 	batch.CreatedAt = time.Now()
 	batch.UpdatedAt = time.Now()
-	
+
 	query := `
 		INSERT INTO monthly_closing_batches (
 			id, batch_number, accounting_period, legal_entity_id, region, brand,
 			status, total_contracts, created_by, created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
-	
+
 	_, err := r.db.Exec(ctx, query,
 		batch.ID, batch.BatchNumber, batch.AccountingPeriod,
 		batch.LegalEntityID, batch.Region, batch.Brand,
@@ -181,7 +181,7 @@ func (r *MonthlyClosingRepository) SaveMeasurementResult(ctx context.Context, mr
 	mr.ID = uuid.New().String()
 	mr.CreatedAt = time.Now()
 	mr.UpdatedAt = time.Now()
-	
+
 	query := `
 		INSERT INTO measurement_results (
 			id, contract_id, accounting_period, period_start_date, period_end_date,
@@ -207,7 +207,7 @@ func (r *MonthlyClosingRepository) SaveMeasurementResult(ctx context.Context, mr
 			calculated_at = EXCLUDED.calculated_at,
 			updated_at = NOW()
 	`
-	
+
 	_, err := r.db.Exec(ctx, query,
 		mr.ID, mr.ContractID, mr.AccountingPeriod, mr.PeriodStartDate, mr.PeriodEndDate,
 		mr.OpeningLiability, mr.InterestExpense, mr.PrincipalRepayment, mr.TotalPayment,
@@ -237,13 +237,13 @@ func (r *MonthlyClosingRepository) GetMeasurementResults(ctx context.Context, co
 		args = append(args, period)
 	}
 	query += " ORDER BY accounting_period ASC"
-	
+
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list results: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var results []*MeasurementResult
 	for rows.Next() {
 		mr := &MeasurementResult{}
@@ -266,7 +266,7 @@ func (r *MonthlyClosingRepository) CreateJournalEntry(ctx context.Context, entry
 	entry.ID = uuid.New().String()
 	entry.CreatedAt = time.Now()
 	entry.UpdatedAt = time.Now()
-	
+
 	query := `
 		INSERT INTO journal_entries (
 			id, contract_id, measurement_result_id, accounting_period, entry_date,
@@ -274,7 +274,7 @@ func (r *MonthlyClosingRepository) CreateJournalEntry(ctx context.Context, entry
 			description, voucher_number, posting_status, batch_id, created_at, updated_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 	`
-	
+
 	_, err := r.db.Exec(ctx, query,
 		entry.ID, entry.ContractID, entry.MeasurementResultID, entry.AccountingPeriod, entry.EntryDate,
 		entry.EntryType, entry.DebitAccount, entry.CreditAccount, entry.Amount, entry.Currency,
@@ -297,7 +297,7 @@ func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contra
 	`
 	var args []interface{}
 	argIdx := 1
-	
+
 	if contractID != "" {
 		query += fmt.Sprintf(" AND contract_id = $%d", argIdx)
 		args = append(args, contractID)
@@ -314,13 +314,13 @@ func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contra
 		argIdx++
 	}
 	query += " ORDER BY entry_date ASC, entry_type ASC"
-	
+
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list entries: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var entries []*JournalEntry
 	for rows.Next() {
 		e := &JournalEntry{}
@@ -332,6 +332,59 @@ func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contra
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan entry: %w", err)
+		}
+		entries = append(entries, e)
+	}
+	return entries, nil
+}
+
+func (r *MonthlyClosingRepository) GetJournalEntriesForExport(ctx context.Context, legalEntityID, period, status string) ([]*JournalEntry, error) {
+	query := `
+		SELECT je.id, je.contract_id, je.measurement_result_id, je.accounting_period, je.entry_date,
+			je.entry_type, je.debit_account, je.credit_account, je.amount, je.currency,
+			je.description, je.voucher_number, je.posting_status, je.posted_at, je.posted_by,
+			je.approved_by, je.approved_at, je.erp_reference, je.batch_id, je.created_at, je.updated_at
+		FROM journal_entries je
+		JOIN lease_contracts lc ON lc.id = je.contract_id
+		WHERE 1=1
+	`
+	var args []interface{}
+	argIdx := 1
+
+	if legalEntityID != "" {
+		query += fmt.Sprintf(" AND lc.legal_entity_id = $%d", argIdx)
+		args = append(args, legalEntityID)
+		argIdx++
+	}
+	if period != "" {
+		query += fmt.Sprintf(" AND je.accounting_period = $%d", argIdx)
+		args = append(args, period)
+		argIdx++
+	}
+	if status != "" {
+		query += fmt.Sprintf(" AND je.posting_status = $%d", argIdx)
+		args = append(args, status)
+		argIdx++
+	}
+	query += " ORDER BY je.entry_date ASC, je.entry_type ASC"
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list export entries: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []*JournalEntry
+	for rows.Next() {
+		e := &JournalEntry{}
+		err := rows.Scan(
+			&e.ID, &e.ContractID, &e.MeasurementResultID, &e.AccountingPeriod, &e.EntryDate,
+			&e.EntryType, &e.DebitAccount, &e.CreditAccount, &e.Amount, &e.Currency,
+			&e.Description, &e.VoucherNumber, &e.PostingStatus, &e.PostedAt, &e.PostedBy,
+			&e.ApprovedBy, &e.ApprovedAt, &e.ERPReference, &e.BatchID, &e.CreatedAt, &e.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan export entry: %w", err)
 		}
 		entries = append(entries, e)
 	}
@@ -381,6 +434,39 @@ func (r *MonthlyClosingRepository) PostJournalEntry(ctx context.Context, entryID
 	}
 	if result.RowsAffected() == 0 {
 		return fmt.Errorf("journal entry not found or not in approved status")
+	}
+	return nil
+}
+
+func (r *MonthlyClosingRepository) ApplyERPWriteback(ctx context.Context, entryID, userID, erpReference, voucherNumber string) error {
+	query := `
+		UPDATE journal_entries SET
+			posting_status = 'posted',
+			posted_by = $1,
+			posted_at = NOW(),
+			erp_reference = $2,
+			voucher_number = $3,
+			updated_at = NOW()
+		WHERE id = $4 AND posting_status IN ('approved', 'posted')
+	`
+	var erpRefVal interface{}
+	if erpReference == "" {
+		erpRefVal = nil
+	} else {
+		erpRefVal = erpReference
+	}
+	var voucherVal interface{}
+	if voucherNumber == "" {
+		voucherVal = nil
+	} else {
+		voucherVal = voucherNumber
+	}
+	result, err := r.db.Exec(ctx, query, userID, erpRefVal, voucherVal, entryID)
+	if err != nil {
+		return fmt.Errorf("failed to apply ERP writeback: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("journal entry not found or not approved")
 	}
 	return nil
 }
@@ -514,7 +600,7 @@ func (r *MonthlyClosingRepository) UpdateBatchStatus(ctx context.Context, batchI
 	if status == "completed" || status == "failed" || status == "cancelled" {
 		completedAt = now
 	}
-	
+
 	query := `
 		UPDATE monthly_closing_batches SET
 			status = $1,

@@ -102,6 +102,32 @@ def _check_critical_fields(extracted: dict) -> tuple[list, list]:
     return missing, warnings
 
 
+def _normalize_lease_scope(extracted: dict) -> tuple[str, list]:
+    """Normalize AI suggested IFRS 16 scope and emit review warnings."""
+    warnings = []
+    scope = str(extracted.get("suggested_scope") or extracted.get("lease_scope") or "in_scope").strip()
+    allowed = {"in_scope", "short_term_exempt", "low_value_exempt", "not_a_lease"}
+    if scope not in allowed:
+        warnings.append("【范围判定】AI 未能给出有效 lease_scope，默认按 in_scope 进入人工确认。")
+        scope = "in_scope"
+
+    confidence = extracted.get("scope_confidence")
+    try:
+        confidence_value = float(confidence) if confidence is not None and confidence != "" else None
+    except (TypeError, ValueError):
+        confidence_value = None
+
+    if confidence_value is None or confidence_value < 0.8:
+        warnings.append("【必须确认】租赁范围判定置信度不足，需要人工确认是否资本化、短期/低价值豁免或非租赁。")
+
+    extracted["lease_scope"] = scope
+    extracted["suggested_scope"] = scope
+    extracted["scope_source"] = "ai_suggested"
+    if confidence_value is not None:
+        extracted["scope_confidence"] = confidence_value
+    return scope, warnings
+
+
 def _sanitize_confidence_scores(scores: dict) -> dict[str, float]:
     """将 LLM 返回的置信度统一清洗为 float，None/空值转为 0.0。"""
     sanitized: dict[str, float] = {}
@@ -153,7 +179,7 @@ async def parse_contract(request: ContractDraftRequest):
     if not file_content:
         # Download file from MinIO
         try:
-            file_data = download_from_minio("ifrs16-uploads", request.object_name)
+            file_data = download_from_minio("lease-uploads", request.object_name)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"文件下载失败: {str(e)}")
         
@@ -177,6 +203,7 @@ async def parse_contract(request: ContractDraftRequest):
     5. 识别租赁成分和非租赁成分(CAM、服务费)
     6. 承租方(lessee)是租赁合同的乙方，即使用物业并支付租金的一方
     7. 出租方(lessor)是租赁合同的甲方，即提供物业并收取租金的一方
+    8. 必须做 IFRS 16 范围初判：是否存在已识别资产、承租方是否控制使用、租期是否 ≤12 个月、是否低价值资产。AI 只能建议，不能直接入正式账。
     
     合同文本:
     {file_content}
@@ -192,6 +219,7 @@ async def parse_contract(request: ContractDraftRequest):
     - lease_start_date: 租赁开始日 (YYYY-MM-DD)
     - lease_end_date: 租期结束日 (YYYY-MM-DD)
     - currency: 币种 (CNY/USD/EUR)。如果合同中没有明确提到货币，返回 null 或空字符串，不要猜测
+    - asset_type: 标的资产类型 "real_estate" | "vehicle" | "it_equipment" | "machinery" | "other"
     - fixed_rent_amount: 固定租金金额（仅数字，不含货币单位）
     - payment_frequency: 付款频率 (monthly/quarterly/yearly)
     - payment_timing: 付款时点 (prepaid/postpaid)。如果合同写明"每月X日前支付"则为prepaid；"每月X日后支付"或"月末支付"则为postpaid
@@ -201,6 +229,10 @@ async def parse_contract(request: ContractDraftRequest):
     - service_fee: 服务费 (如有，仅数字)
     - discount_rate_type: 折现率类型 (如合同中提及)
     - discount_rate: 折现率数值 (如合同中提及)
+    - is_lease: 是否构成 IFRS 16 租赁 (true/false)
+    - suggested_scope: "in_scope" | "short_term_exempt" | "low_value_exempt" | "not_a_lease"
+    - exemption_reason: 范围判定依据，如"租期 10 个月且无续租意图"、"未识别特定资产"
+    - scope_confidence: 范围判定置信度 (0-1)
     
     请以 JSON 格式输出，包含:
     - extracted_fields: 提取的字段
@@ -247,14 +279,18 @@ async def parse_contract(request: ContractDraftRequest):
         
         # Check for critical fields
         missing_fields, field_warnings = _check_critical_fields(extracted)
+
+        # IFRS 16 scope gate suggestion
+        _, scope_warnings = _normalize_lease_scope(extracted)
         
-        all_warnings = dr_warnings + currency_warnings + field_warnings + parsed.get("warnings", [])
+        all_warnings = dr_warnings + currency_warnings + field_warnings + scope_warnings + parsed.get("warnings", [])
         
         # Determine if human confirmation is required
         requires_human = (
             dr_missing or
             currency_missing or
             len(missing_fields) > 0 or
+            (extracted.get("scope_confidence") is None or float(extracted.get("scope_confidence", 0)) < 0.8) or
             parsed.get("overall_confidence", 1.0) < 0.8
         )
         
@@ -327,7 +363,7 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
     
     # Download file from MinIO
     try:
-        file_data = download_from_minio("ifrs16-uploads", request.object_name)
+        file_data = download_from_minio("lease-uploads", request.object_name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"文件下载失败: {str(e)}")
     
@@ -520,6 +556,7 @@ class ContractBatchItem(BaseModel):
     lease_start_date: str
     lease_end_date: str
     currency: Optional[str] = ""
+    asset_type: Optional[str] = "real_estate"
     fixed_rent_amount: Optional[float] = 0.0
     payment_frequency: Optional[str] = "monthly"
     payment_timing: Optional[str] = "postpaid"
@@ -529,6 +566,12 @@ class ContractBatchItem(BaseModel):
     service_fee: Optional[float] = 0.0
     discount_rate_type: Optional[str] = ""
     discount_rate: Optional[float] = 0.0
+    is_lease: Optional[bool] = True
+    lease_scope: Optional[str] = "in_scope"
+    suggested_scope: Optional[str] = "in_scope"
+    exemption_reason: Optional[str] = ""
+    scope_source: Optional[str] = "ai_suggested"
+    scope_confidence: Optional[float] = 0.0
     confidence: Optional[float] = 0.8
     missing_fields: Optional[List[str]] = []
     warnings: Optional[List[str]] = []
@@ -571,7 +614,7 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
     file_content = request.file_content
     if not file_content:
         try:
-            file_data = download_from_minio("ifrs16-uploads", request.object_name)
+            file_data = download_from_minio("lease-uploads", request.object_name)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"文件下载失败: {str(e)}")
 
@@ -595,6 +638,7 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
     6. 识别租赁成分和非租赁成分(CAM、服务费)
     7. 承租方(lessee)是租赁合同的乙方，即使用物业并支付租金的一方
     8. 出租方(lessor)是租赁合同的甲方，即提供物业并收取租金的一方
+    9. 必须做 IFRS 16 范围初判：是否存在已识别资产、承租方是否控制使用、租期是否 ≤12 个月、是否低价值资产。AI 只能建议，不能直接入正式账。
 
     合同台账内容:
     {file_content}
@@ -611,6 +655,7 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
       - lease_start_date: 租赁开始日 (YYYY-MM-DD)
       - lease_end_date: 租期结束日 (YYYY-MM-DD)
       - currency: 币种 (CNY/USD/EUR)。如果未明确提到，返回 null 或空字符串，不要猜测
+      - asset_type: 标的资产类型 "real_estate" | "vehicle" | "it_equipment" | "machinery" | "other"
       - fixed_rent_amount: 固定租金金额（仅数字）
       - payment_frequency: 付款频率 (monthly/quarterly/yearly)
       - payment_timing: 付款时点 (prepaid/postpaid)
@@ -620,6 +665,10 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
       - service_fee: 服务费 (如有，仅数字)
       - discount_rate_type: 折现率类型 (如合同中提及)
       - discount_rate: 折现率数值 (如合同中提及)
+      - is_lease: 是否构成 IFRS 16 租赁 (true/false)
+      - suggested_scope: "in_scope" | "short_term_exempt" | "low_value_exempt" | "not_a_lease"
+      - exemption_reason: 范围判定依据，如"租期 10 个月且无续租意图"、"未识别特定资产"
+      - scope_confidence: 范围判定置信度 (0-1)
       - confidence: 该份合同识别的置信度 (0-1)
       - missing_fields: 该份合同缺失的字段列表
       - warnings: 该份合同的警告列表
@@ -676,8 +725,14 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
             missing_fields, field_warnings = _check_critical_fields(c)
             all_warnings.extend(field_warnings)
 
+            # IFRS 16 scope gate suggestion
+            _, scope_warnings = _normalize_lease_scope(c)
+            all_warnings.extend(scope_warnings)
+
             contract_confidence = c.get("confidence", 0.8)
             if missing_fields:
+                contract_confidence = min(contract_confidence, 0.7)
+            if float(c.get("scope_confidence", 0) or 0) < 0.8:
                 contract_confidence = min(contract_confidence, 0.7)
 
             validated_contracts.append(ContractBatchItem(
@@ -691,6 +746,7 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
                 lease_start_date=c.get("lease_start_date", ""),
                 lease_end_date=c.get("lease_end_date", ""),
                 currency=c.get("currency", ""),
+                asset_type=c.get("asset_type", "real_estate"),
                 fixed_rent_amount=float(c.get("fixed_rent_amount", 0) or 0),
                 payment_frequency=c.get("payment_frequency", "monthly"),
                 payment_timing=c.get("payment_timing", "postpaid"),
@@ -700,9 +756,15 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
                 service_fee=float(c.get("service_fee", 0) or 0),
                 discount_rate_type=c.get("discount_rate_type", ""),
                 discount_rate=float(c.get("discount_rate", 0) or 0),
+                is_lease=bool(c.get("is_lease", c.get("lease_scope") != "not_a_lease")),
+                lease_scope=c.get("lease_scope", "in_scope"),
+                suggested_scope=c.get("suggested_scope", c.get("lease_scope", "in_scope")),
+                exemption_reason=c.get("exemption_reason", ""),
+                scope_source=c.get("scope_source", "ai_suggested"),
+                scope_confidence=float(c.get("scope_confidence", 0) or 0),
                 confidence=contract_confidence,
                 missing_fields=missing_fields + (["discount_rate"] if dr_missing else []) + (["currency"] if currency_missing else []),
-                warnings=dr_warnings + currency_warnings + field_warnings + c.get("warnings", [])
+                warnings=dr_warnings + currency_warnings + field_warnings + scope_warnings + c.get("warnings", [])
             ))
 
         overall_confidence = parsed.get("overall_confidence", 0.8)

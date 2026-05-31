@@ -308,7 +308,7 @@ export default function CashflowForecastPage() {
                   exportCSV(
                     data,
                     flatColumns,
-                    `IFRS16_${t("cashflow.title", language)}_${reportMode}_${dayjs().format("YYYY-MM-DD")}`,
+                    `Lease_${t("cashflow.title", language)}_${reportMode}_${dayjs().format("YYYY-MM-DD")}`,
                   )
                 }
                 disabled={!data.length}

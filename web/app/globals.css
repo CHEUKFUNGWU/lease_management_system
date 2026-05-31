@@ -557,6 +557,16 @@ html {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* AI Chat Session Sidebar - show delete button on hover */
+.session-more-btn {
+  opacity: 0 !important;
+}
+
+*:hover > .session-more-btn,
+*:hover .session-more-btn {
+  opacity: 1 !important;
+}
+
 @keyframes pulse-subtle {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }

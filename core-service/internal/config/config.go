@@ -36,15 +36,15 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     dbPort,
-		DBUser:     getEnv("DB_USER", "ifrs16"),
-		DBPassword: getEnv("DB_PASSWORD", "ifrs16_secret"),
-		DBName:     getEnv("DB_NAME", "ifrs16"),
+		DBUser:     getEnv("DB_USER", "lease"),
+		DBPassword: getEnv("DB_PASSWORD", "lease_secret"),
+		DBName:     getEnv("DB_NAME", "lease"),
 		
 		MinioEndpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
 		MinioAccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
 		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
 		
-		JWTSecret: getEnv("JWT_SECRET", "ifrs16_jwt_secret_key"),
+		JWTSecret: getEnv("JWT_SECRET", "lease_jwt_secret_key"),
 		LogLevel:  getEnv("LOG_LEVEL", "info"),
 		Port:      port,
 	}

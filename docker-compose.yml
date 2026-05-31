@@ -1,25 +1,25 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ifrs16-postgres
+    container_name: lease-postgres
     environment:
-      POSTGRES_USER: ${DB_USER:-ifrs16}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ifrs16_secret}
-      POSTGRES_DB: ${DB_NAME:-ifrs16}
+      POSTGRES_USER: ${DB_USER:-lease}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lease_secret}
+      POSTGRES_DB: ${DB_NAME:-lease}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ifrs16} -d ${DB_NAME:-ifrs16}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-lease} -d ${DB_NAME:-lease}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   minio:
     image: minio/minio:latest
-    container_name: ifrs16-minio
+    container_name: lease-minio
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -39,17 +39,17 @@ services:
     build:
       context: ./core-service
       dockerfile: Dockerfile
-    container_name: ifrs16-core
+    container_name: lease-core
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: ${DB_USER:-ifrs16}
-      DB_PASSWORD: ${DB_PASSWORD:-ifrs16_secret}
-      DB_NAME: ${DB_NAME:-ifrs16}
+      DB_USER: ${DB_USER:-lease}
+      DB_PASSWORD: ${DB_PASSWORD:-lease_secret}
+      DB_NAME: ${DB_NAME:-lease}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      JWT_SECRET: ${JWT_SECRET:-ifrs16_jwt_secret_key}
+      JWT_SECRET: ${JWT_SECRET:-lease_jwt_secret_key}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${CORE_PORT:-8080}:8080"
@@ -63,7 +63,7 @@ services:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
-    container_name: ifrs16-ai
+    container_name: lease-ai
     environment:
       LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
@@ -90,7 +90,7 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
-    container_name: ifrs16-web
+    container_name: lease-web
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:${CORE_PORT:-8080}
       NEXT_PUBLIC_AI_URL: http://localhost:${AI_PORT:-8081}

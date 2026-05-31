@@ -53,6 +53,7 @@ export default function NewContractPage() {
         store_id: values.store_id,
         landlord_id: values.landlord_id,
         currency: values.currency || "CNY",
+        asset_type: values.asset_type || "real_estate",
         commencement_date: values.commencement_date?.format("YYYY-MM-DD"),
         lease_start_date: values.lease_start_date?.format("YYYY-MM-DD"),
         lease_end_date: values.lease_end_date?.format("YYYY-MM-DD"),
@@ -61,6 +62,9 @@ export default function NewContractPage() {
         discount_rate_type: values.discount_rate_type,
         discount_rate_version: values.discount_rate_version,
         discount_rate_value: values.discount_rate_value ?? null,
+        lease_scope: values.lease_scope || "in_scope",
+        exemption_reason: values.exemption_reason || null,
+        scope_source: "manual",
         tags: normalizeTagValues(values.tags),
         discount_rate_missing: !values.discount_rate_type,
       };
@@ -103,7 +107,7 @@ export default function NewContractPage() {
             form={form}
             layout="vertical"
             onFinish={handleSubmit}
-            initialValues={{ currency: "CNY" }}
+            initialValues={{ currency: "CNY", asset_type: "real_estate" }}
           >
             <Form.Item
               label={t("contract_new.contract_number", language)}
@@ -175,6 +179,16 @@ export default function NewContractPage() {
                 <Select.Option value="CNY">{t("contract_new.currency_cny", language)}</Select.Option>
                 <Select.Option value="USD">{t("contract_new.currency_usd", language)}</Select.Option>
                 <Select.Option value="EUR">{t("contract_new.currency_eur", language)}</Select.Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="资产类型" name="asset_type" rules={[{ required: true, message: "请选择资产类型" }]}>
+              <Select>
+                <Select.Option value="real_estate">不动产</Select.Option>
+                <Select.Option value="vehicle">车辆</Select.Option>
+                <Select.Option value="it_equipment">IT 设备</Select.Option>
+                <Select.Option value="machinery">机器设备</Select.Option>
+                <Select.Option value="other">其他</Select.Option>
               </Select>
             </Form.Item>
 
@@ -257,6 +271,33 @@ export default function NewContractPage() {
                   name="discount_rate_version"
                 >
                   <Input placeholder={t("contract_new.discount_rate_version_placeholder", language)} />
+                </Form.Item>
+              </Space>
+            </Card>
+
+            <Card title="IFRS 16 范围判定" size="small" style={{ marginBottom: 16 }}>
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Alert
+                  message="范围闸门"
+                  description="先判断合同是否需要资本化。短期租赁、低价值资产和非租赁合同不会生成 ROU 与租赁负债。"
+                  type="info"
+                  showIcon
+                />
+                <Form.Item
+                  label="计量范围"
+                  name="lease_scope"
+                  initialValue="in_scope"
+                  rules={[{ required: true, message: "请选择 IFRS 16 计量范围" }]}
+                >
+                  <Select>
+                    <Select.Option value="in_scope">资本化租赁（ROU + 租赁负债）</Select.Option>
+                    <Select.Option value="short_term_exempt">短期租赁豁免（直线法费用化）</Select.Option>
+                    <Select.Option value="low_value_exempt">低价值资产豁免（直线法费用化）</Select.Option>
+                    <Select.Option value="not_a_lease">非租赁合同（不入 IFRS 16）</Select.Option>
+                  </Select>
+                </Form.Item>
+                <Form.Item label="豁免/排除依据" name="exemption_reason">
+                  <Input.TextArea rows={2} placeholder="例如：租期 10 个月且无续租意图；未识别特定资产；低价值 IT 设备" />
                 </Form.Item>
               </Space>
             </Card>

@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ifrs16/core-service/internal/middleware"
-	"github.com/ifrs16/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/middleware"
+	"github.com/lease-management-system/core-service/internal/repository"
 )
 
 type AIChatHandler struct {
@@ -55,46 +55,53 @@ type ChatMessage struct {
 }
 
 type AIChatResponse struct {
-	Answer          string                   `json:"answer"`
-	Sources         []Source                 `json:"sources"`
-	Confidence      float64                  `json:"confidence"`
-	IsOfficial      bool                     `json:"is_official"`
-	Model           string                   `json:"model,omitempty"`
-	DraftContracts  []ContractDraftItem      `json:"draft_contracts,omitempty"`
-	BatchSummary    *BatchParseSummary       `json:"batch_summary,omitempty"`
+	Answer         string              `json:"answer"`
+	Sources        []Source            `json:"sources"`
+	Confidence     float64             `json:"confidence"`
+	IsOfficial     bool                `json:"is_official"`
+	Model          string              `json:"model,omitempty"`
+	DraftContracts []ContractDraftItem `json:"draft_contracts,omitempty"`
+	BatchSummary   *BatchParseSummary  `json:"batch_summary,omitempty"`
 }
 
 type ContractDraftItem struct {
-	ContractNumber      string   `json:"contract_number"`
-	ContractName        string   `json:"contract_name"`
-	Lessee              string   `json:"lessee"`
-	Lessor              string   `json:"lessor"`
-	StoreName           string   `json:"store_name"`
-	StoreAddress        string   `json:"store_address"`
-	CommencementDate    string   `json:"commencement_date"`
-	LeaseStartDate      string   `json:"lease_start_date"`
-	LeaseEndDate        string   `json:"lease_end_date"`
-	Currency            string   `json:"currency"`
-	FixedRentAmount     float64  `json:"fixed_rent_amount"`
-	PaymentFrequency    string   `json:"payment_frequency"`
-	PaymentTiming       string   `json:"payment_timing"`
-	RenewalOption       bool     `json:"renewal_option"`
-	TerminationOption   bool     `json:"termination_option"`
-	CAMAmount           float64  `json:"cam_amount"`
-	ServiceFee          float64  `json:"service_fee"`
-	DiscountRateType    string   `json:"discount_rate_type"`
-	DiscountRate        float64  `json:"discount_rate"`
-	Confidence          float64  `json:"confidence"`
-	MissingFields       []string `json:"missing_fields"`
-	Warnings            []string `json:"warnings"`
+	ContractNumber    string   `json:"contract_number"`
+	ContractName      string   `json:"contract_name"`
+	Lessee            string   `json:"lessee"`
+	Lessor            string   `json:"lessor"`
+	StoreName         string   `json:"store_name"`
+	StoreAddress      string   `json:"store_address"`
+	CommencementDate  string   `json:"commencement_date"`
+	LeaseStartDate    string   `json:"lease_start_date"`
+	LeaseEndDate      string   `json:"lease_end_date"`
+	Currency          string   `json:"currency"`
+	AssetType         string   `json:"asset_type"`
+	FixedRentAmount   float64  `json:"fixed_rent_amount"`
+	PaymentFrequency  string   `json:"payment_frequency"`
+	PaymentTiming     string   `json:"payment_timing"`
+	RenewalOption     bool     `json:"renewal_option"`
+	TerminationOption bool     `json:"termination_option"`
+	CAMAmount         float64  `json:"cam_amount"`
+	ServiceFee        float64  `json:"service_fee"`
+	DiscountRateType  string   `json:"discount_rate_type"`
+	DiscountRate      float64  `json:"discount_rate"`
+	IsLease           bool     `json:"is_lease"`
+	LeaseScope        string   `json:"lease_scope"`
+	SuggestedScope    string   `json:"suggested_scope"`
+	ExemptionReason   string   `json:"exemption_reason"`
+	ScopeSource       string   `json:"scope_source"`
+	ScopeConfidence   float64  `json:"scope_confidence"`
+	Confidence        float64  `json:"confidence"`
+	MissingFields     []string `json:"missing_fields"`
+	Warnings          []string `json:"warnings"`
 }
 
 type BatchParseSummary struct {
-	TotalCount              int      `json:"total_count"`
-	OverallConfidence       float64  `json:"overall_confidence"`
-	RequiresHumanConfirm    bool     `json:"requires_human_confirmation"`
-	MissingFields           []string `json:"missing_fields"`
-	Warnings                []string `json:"warnings"`
+	TotalCount           int      `json:"total_count"`
+	OverallConfidence    float64  `json:"overall_confidence"`
+	RequiresHumanConfirm bool     `json:"requires_human_confirmation"`
+	MissingFields        []string `json:"missing_fields"`
+	Warnings             []string `json:"warnings"`
 }
 
 type Source struct {
@@ -836,6 +843,7 @@ func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, c
 			LeaseStartDate:    getString(cmap, "lease_start_date"),
 			LeaseEndDate:      getString(cmap, "lease_end_date"),
 			Currency:          getString(cmap, "currency"),
+			AssetType:         getString(cmap, "asset_type"),
 			PaymentFrequency:  getString(cmap, "payment_frequency"),
 			PaymentTiming:     getString(cmap, "payment_timing"),
 			DiscountRateType:  getString(cmap, "discount_rate_type"),
@@ -845,9 +853,30 @@ func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, c
 			CAMAmount:         getFloat64(cmap, "cam_amount"),
 			ServiceFee:        getFloat64(cmap, "service_fee"),
 			DiscountRate:      getFloat64(cmap, "discount_rate"),
+			IsLease:           getBoolDefault(cmap, "is_lease", true),
+			LeaseScope:        getString(cmap, "lease_scope"),
+			SuggestedScope:    getString(cmap, "suggested_scope"),
+			ExemptionReason:   getString(cmap, "exemption_reason"),
+			ScopeSource:       getString(cmap, "scope_source"),
+			ScopeConfidence:   getFloat64(cmap, "scope_confidence"),
 			Confidence:        getFloat64(cmap, "confidence"),
 			MissingFields:     getStringSlice(cmap, "missing_fields"),
 			Warnings:          getStringSlice(cmap, "warnings"),
+		}
+		if item.AssetType == "" {
+			item.AssetType = "real_estate"
+		}
+		if item.LeaseScope == "" {
+			item.LeaseScope = item.SuggestedScope
+		}
+		if item.LeaseScope == "" {
+			item.LeaseScope = "in_scope"
+		}
+		if item.SuggestedScope == "" {
+			item.SuggestedScope = item.LeaseScope
+		}
+		if item.ScopeSource == "" {
+			item.ScopeSource = "ai_suggested"
 		}
 		contracts = append(contracts, item)
 	}
@@ -906,6 +935,13 @@ func getBool(m map[string]interface{}, key string) bool {
 		return v
 	}
 	return false
+}
+
+func getBoolDefault(m map[string]interface{}, key string, fallback bool) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return fallback
 }
 
 func getFloat64(m map[string]interface{}, key string) float64 {

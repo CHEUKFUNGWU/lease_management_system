@@ -20,6 +20,8 @@ import {
   BellOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  DollarOutlined,
+  PieChartOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -38,10 +40,14 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     "": t("nav.home", language as any),
     contracts: t("nav.contracts", language as any),
     upload: t("nav.upload", language as any),
-    "ai-chat": t("nav.ai_chat", language as any),
+    "ai-chat": "AI 录入",
     reports: t("nav.reports", language as any),
+    portfolio: "组合分析",
+    sensitivity: "敏感性分析",
+    standards: "多准则对比",
     "cashflow-forecast": t("nav.cashflow", language as any),
     "monthly-closing": t("nav.monthly_closing", language as any),
+    roi: "ROI 测算",
     "audit-logs": t("nav.audit_logs", language as any),
     settings: t("nav.settings", language as any),
     admin: t("nav.admin", language as any),
@@ -66,19 +72,34 @@ function useMenuItems(language: string) {
         label: <Link href="/contracts">{t("nav.contracts", language as any)}</Link>,
       },
       {
+        key: "/ai-chat",
+        icon: <RobotOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/ai-chat">AI 录入</Link>,
+      },
+      {
         key: "/upload",
         icon: <UploadOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/upload">{t("nav.upload", language as any)}</Link>,
       },
       {
-        key: "/ai-chat",
-        icon: <RobotOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/ai-chat">{t("nav.ai_chat", language as any)}</Link>,
-      },
-      {
         key: "/reports",
         icon: <BarChartOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/reports">{t("nav.reports", language as any)}</Link>,
+      },
+      {
+        key: "/portfolio",
+        icon: <PieChartOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/portfolio">组合分析</Link>,
+      },
+      {
+        key: "/sensitivity",
+        icon: <LineChartOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/sensitivity">敏感性分析</Link>,
+      },
+      {
+        key: "/standards",
+        icon: <SafetyOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/standards">多准则对比</Link>,
       },
       {
         key: "/cashflow-forecast",
@@ -89,6 +110,11 @@ function useMenuItems(language: string) {
         key: "/monthly-closing",
         icon: <CalculatorOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/monthly-closing">{t("nav.monthly_closing", language as any)}</Link>,
+      },
+      {
+        key: "/roi",
+        icon: <DollarOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/roi">ROI 测算</Link>,
       },
       {
         key: "/audit-logs",
@@ -230,7 +256,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 whiteSpace: "nowrap",
               }}
             >
-              IFRS 16
+              {t("app.title", language)}
             </span>
           </div>
 
@@ -439,7 +465,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 lineHeight: 1.5,
               }}
             >
-              <div>IFRS 16 租赁管理系统</div>
+              <div>{t("app.title", language)}</div>
               <div style={{ marginTop: 2 }}>v0.1.0</div>
             </div>
           )}

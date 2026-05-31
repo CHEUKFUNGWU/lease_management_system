@@ -93,9 +93,9 @@ const dict: TranslationDict = {
 
   // AI Chat
   "ai.welcome": {
-    "zh-CN": "你好！我是 IFRS 16 AI 助手。我可以帮你：\n\n1. 查询合同台账信息\n2. 查看 IFRS 16 计量结果\n3. 了解审批状态\n4. 回答 IFRS 16 会计问题\n\n你还可以上传合同文件或租金表，我会帮你解析其中的关键信息。",
-    "zh-HK": "你好！我是 IFRS 16 AI 助手。我可以幫你：\n\n1. 查詢合同台賬信息\n2. 查看 IFRS 16 計量結果\n3. 了解審批狀態\n4. 回答 IFRS 16 會計問題\n\n你還可以上傳合同文件或租金表，我會幫你解析其中的關鍵信息。",
-    en: "Hello! I am the IFRS 16 AI Assistant. I can help you:\n\n1. Query contract ledger information\n2. View IFRS 16 measurement results\n3. Check approval status\n4. Answer IFRS 16 accounting questions\n\nYou can also upload contract files or rent schedules, and I will help you parse the key information.",
+    "zh-CN": "你好！我是租赁管理 AI 助手。我可以帮你：\n\n1. 查询合同台账信息\n2. 查看 IFRS 16 计量结果\n3. 了解审批状态\n4. 回答 IFRS 16 会计问题\n\n你还可以上传合同文件或租金表，我会帮你解析其中的关键信息。",
+    "zh-HK": "你好！我是租賃管理 AI 助手。我可以幫你：\n\n1. 查詢合同台賬信息\n2. 查看 IFRS 16 計量結果\n3. 了解審批狀態\n4. 回答 IFRS 16 會計問題\n\n你還可以上傳合同文件或租金表，我會幫你解析其中的關鍵信息。",
+    en: "Hello! I am the Lease Management AI Assistant. I can help you:\n\n1. Query contract ledger information\n2. View IFRS 16 measurement results\n3. Check approval status\n4. Answer IFRS 16 accounting questions\n\nYou can also upload contract files or rent schedules, and I will help you parse the key information.",
   },
   "ai.context": {
     "zh-CN": "当前上下文：",
@@ -667,6 +667,16 @@ const dict: TranslationDict = {
     "zh-CN": "暂无合同数据",
     "zh-HK": "暫無合同數據",
     en: "No contract data",
+  },
+  "dashboard.no_liability_data": {
+    "zh-CN": "暂无租赁负债数据",
+    "zh-HK": "暫無租賃負債數據",
+    en: "No lease liability data",
+  },
+  "dashboard.no_status_data": {
+    "zh-CN": "暂无合同状态数据",
+    "zh-HK": "暫無合同狀態數據",
+    en: "No contract status data",
   },
   "dashboard.quick_actions": {
     "zh-CN": "快捷操作",
@@ -2042,9 +2052,9 @@ const dict: TranslationDict = {
 
   // Login
   "login.title": {
-    "zh-CN": "IFRS 16 租赁管理系统",
-    "zh-HK": "IFRS 16 租賃管理系統",
-    en: "IFRS 16 Lease Management",
+    "zh-CN": "租赁管理系统",
+    "zh-HK": "租賃管理系統",
+    en: "Lease Management",
   },
   "login.username": {
     "zh-CN": "用户名",
@@ -3608,9 +3618,9 @@ const dict: TranslationDict = {
     en: "Admin Login",
   },
   "admin_login.subtitle": {
-    "zh-CN": "IFRS 16 租赁管理系统 — 管理员通道",
-    "zh-HK": "IFRS 16 租賃管理系統 — 管理員通道",
-    en: "IFRS 16 Lease Management System — Admin Channel",
+    "zh-CN": "租赁管理系统 — 管理员通道",
+    "zh-HK": "租賃管理系統 — 管理員通道",
+    en: "Lease Management System — Admin Channel",
   },
   "admin_login.not_admin": {
     "zh-CN": "非管理员账号，请使用普通登录入口",
@@ -3952,9 +3962,9 @@ const dict: TranslationDict = {
     en: "P&L Adjustment",
   },
   "reports.subtitle": {
-    "zh-CN": "IFRS 16 租赁负债滚动表与摊销报表查询",
-    "zh-HK": "IFRS 16 租賃負債滾動表與攤銷報表查詢",
-    en: "IFRS 16 Lease Liability Roll-forward & Amortization Report Query",
+    "zh-CN": "租赁负债滚动表与摊销报表查询",
+    "zh-HK": "租賃負債滾動表與攤銷報表查詢",
+    en: "Lease Liability Roll-forward & Amortization Report Query",
   },
   "reports.working_hint": {
     "zh-CN": "工作报表：包含 Draft / Pending Approval 数据，用于内部试算",

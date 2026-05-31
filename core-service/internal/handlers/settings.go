@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ifrs16/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/repository"
 )
 
 type SettingsHandler struct {

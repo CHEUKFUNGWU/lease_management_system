@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	
+
 	"github.com/gin-gonic/gin"
-	"github.com/ifrs16/core-service/internal/middleware"
-	"github.com/ifrs16/core-service/internal/repository"
-	"github.com/ifrs16/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/middleware"
+	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/audit"
 )
 
 type ContractHandler struct {
@@ -21,52 +21,62 @@ func NewContractHandler(contractRepo *repository.ContractRepository, auditLogger
 }
 
 type ContractRequest struct {
-	ContractNumber               string  `json:"contract_number" binding:"required"`
-	ContractName                 string  `json:"contract_name" binding:"required"`
-	LegalEntityID                *string `json:"legal_entity_id,omitempty"`
-	StoreID                      *string `json:"store_id,omitempty"`
-	LandlordID                   *string `json:"landlord_id,omitempty"`
-	LesseeName                   string  `json:"lessee_name"`
-	LessorName                   string  `json:"lessor_name"`
-	StoreName                    string  `json:"store_name"`
-	StoreAddress                 string  `json:"store_address"`
-	Tags                         string  `json:"tags"`
-	Currency                     string  `json:"currency" binding:"required"`
-	CommencementDate             string  `json:"commencement_date" binding:"required"`
-	LeaseStartDate               string  `json:"lease_start_date" binding:"required"`
-	LeaseEndDate                 string  `json:"lease_end_date" binding:"required"`
-	AssetCategory                *string `json:"asset_category"`
-	PropertyCategory             *string `json:"property_category"`
-	SigningDate                  *string `json:"signing_date"`
-	RenewalOptionDescription     *string `json:"renewal_option_description"`
-	TerminationOptionDescription *string `json:"termination_option_description"`
-	RenewalAssessment            *bool   `json:"renewal_assessment"`
-	TerminationAssessment        *bool   `json:"termination_assessment"`
-	DiscountRateType             *string `json:"discount_rate_type"`
-	DiscountRateVersion          *string `json:"discount_rate_version"`
+	ContractNumber               string   `json:"contract_number" binding:"required"`
+	ContractName                 string   `json:"contract_name" binding:"required"`
+	LegalEntityID                *string  `json:"legal_entity_id,omitempty"`
+	StoreID                      *string  `json:"store_id,omitempty"`
+	LandlordID                   *string  `json:"landlord_id,omitempty"`
+	LesseeName                   string   `json:"lessee_name"`
+	LessorName                   string   `json:"lessor_name"`
+	StoreName                    string   `json:"store_name"`
+	StoreAddress                 string   `json:"store_address"`
+	Tags                         string   `json:"tags"`
+	Currency                     string   `json:"currency" binding:"required"`
+	AssetType                    string   `json:"asset_type"`
+	CommencementDate             string   `json:"commencement_date" binding:"required"`
+	LeaseStartDate               string   `json:"lease_start_date" binding:"required"`
+	LeaseEndDate                 string   `json:"lease_end_date" binding:"required"`
+	AssetCategory                *string  `json:"asset_category"`
+	PropertyCategory             *string  `json:"property_category"`
+	SigningDate                  *string  `json:"signing_date"`
+	RenewalOptionDescription     *string  `json:"renewal_option_description"`
+	TerminationOptionDescription *string  `json:"termination_option_description"`
+	RenewalAssessment            *bool    `json:"renewal_assessment"`
+	TerminationAssessment        *bool    `json:"termination_assessment"`
+	DiscountRateType             *string  `json:"discount_rate_type"`
+	DiscountRateVersion          *string  `json:"discount_rate_version"`
 	DiscountRateValue            *float64 `json:"discount_rate_value"`
+	LeaseScope                   string   `json:"lease_scope"`
+	ExemptionReason              *string  `json:"exemption_reason"`
+	ScopeSource                  *string  `json:"scope_source"`
+	ScopeConfidence              *float64 `json:"scope_confidence"`
 }
 
 // UpdateContractRequest represents the editable fields for updating a contract.
 type UpdateContractRequest struct {
-	ContractNumber      string  `json:"contract_number"`
-	ContractName        string  `json:"contract_name"`
-	LegalEntityID       *string `json:"legal_entity_id,omitempty"`
-	StoreID             *string `json:"store_id,omitempty"`
-	LandlordID          *string `json:"landlord_id,omitempty"`
-	LesseeName          string  `json:"lessee_name"`
-	LessorName          string  `json:"lessor_name"`
-	StoreName           string  `json:"store_name"`
-	StoreAddress        string  `json:"store_address"`
-	Tags                string  `json:"tags"`
-	Currency            string  `json:"currency"`
-	SigningDate         *string `json:"signing_date"`
-	CommencementDate    string  `json:"commencement_date"`
-	LeaseStartDate      string  `json:"lease_start_date"`
-	LeaseEndDate        string  `json:"lease_end_date"`
-	DiscountRateType    *string `json:"discount_rate_type"`
-	DiscountRateVersion *string `json:"discount_rate_version"`
+	ContractNumber      string   `json:"contract_number"`
+	ContractName        string   `json:"contract_name"`
+	LegalEntityID       *string  `json:"legal_entity_id,omitempty"`
+	StoreID             *string  `json:"store_id,omitempty"`
+	LandlordID          *string  `json:"landlord_id,omitempty"`
+	LesseeName          string   `json:"lessee_name"`
+	LessorName          string   `json:"lessor_name"`
+	StoreName           string   `json:"store_name"`
+	StoreAddress        string   `json:"store_address"`
+	Tags                string   `json:"tags"`
+	Currency            string   `json:"currency"`
+	AssetType           string   `json:"asset_type"`
+	SigningDate         *string  `json:"signing_date"`
+	CommencementDate    string   `json:"commencement_date"`
+	LeaseStartDate      string   `json:"lease_start_date"`
+	LeaseEndDate        string   `json:"lease_end_date"`
+	DiscountRateType    *string  `json:"discount_rate_type"`
+	DiscountRateVersion *string  `json:"discount_rate_version"`
 	DiscountRateValue   *float64 `json:"discount_rate_value"`
+	LeaseScope          string   `json:"lease_scope"`
+	ExemptionReason     *string  `json:"exemption_reason"`
+	ScopeSource         *string  `json:"scope_source"`
+	ScopeConfidence     *float64 `json:"scope_confidence"`
 }
 
 func normalizeTags(raw string) string {
@@ -109,29 +119,48 @@ func normalizeDiscountRateValue(v *float64) *float64 {
 	return &normalized
 }
 
+func normalizeLeaseScope(scope string) string {
+	switch scope {
+	case "in_scope", "short_term_exempt", "low_value_exempt", "not_a_lease":
+		return scope
+	default:
+		return "in_scope"
+	}
+}
+
+func normalizeAssetType(assetType string) string {
+	switch assetType {
+	case "real_estate", "vehicle", "it_equipment", "machinery", "other":
+		return assetType
+	default:
+		return "real_estate"
+	}
+}
+
 func (h *ContractHandler) Create(c *gin.Context) {
 	var req ContractRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	commencementDate, _ := time.Parse("2006-01-02", req.CommencementDate)
 	leaseStartDate, _ := time.Parse("2006-01-02", req.LeaseStartDate)
 	leaseEndDate, _ := time.Parse("2006-01-02", req.LeaseEndDate)
-	
+
 	var signingDate *time.Time
 	if req.SigningDate != nil {
 		sd, _ := time.Parse("2006-01-02", *req.SigningDate)
 		signingDate = &sd
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	var createdBy *string
 	if id, ok := userID.(string); ok {
 		createdBy = &id
 	}
-	
+	now := time.Now()
+
 	contract := &repository.Contract{
 		ContractNumber:               req.ContractNumber,
 		ContractName:                 req.ContractName,
@@ -144,6 +173,7 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		StoreName:                    req.StoreName,
 		StoreAddress:                 req.StoreAddress,
 		Tags:                         normalizeTags(req.Tags),
+		AssetType:                    normalizeAssetType(req.AssetType),
 		AssetCategory:                req.AssetCategory,
 		PropertyCategory:             req.PropertyCategory,
 		SigningDate:                  signingDate,
@@ -154,7 +184,19 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		DiscountRateType:             req.DiscountRateType,
 		DiscountRateVersion:          req.DiscountRateVersion,
 		DiscountRateValue:            normalizeDiscountRateValue(req.DiscountRateValue),
+		LeaseScope:                   normalizeLeaseScope(req.LeaseScope),
+		ExemptionReason:              req.ExemptionReason,
+		ScopeSource:                  req.ScopeSource,
+		ScopeConfidence:              req.ScopeConfidence,
 		CreatedBy:                    createdBy,
+	}
+	if contract.ScopeSource == nil {
+		source := "manual"
+		contract.ScopeSource = &source
+	}
+	if createdBy != nil {
+		contract.ScopeClassifiedBy = createdBy
+		contract.ScopeClassifiedAt = &now
 	}
 
 	// Auto-fill legal_entity_id from JWT tenant context if not provided
@@ -172,7 +214,7 @@ func (h *ContractHandler) Create(c *gin.Context) {
 	if req.LandlordID != nil && *req.LandlordID != "" {
 		contract.LandlordID = req.LandlordID
 	}
-	
+
 	created, err := h.contractRepo.Create(c.Request.Context(), contract)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create contract: " + err.Error()})
@@ -185,7 +227,7 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		uidStr, _ := uid.(string)
 		h.auditLogger.Log(c.Request.Context(), "lease_contracts", created.ID, "create", nil, created, uidStr, c)
 	}
-	
+
 	c.JSON(http.StatusCreated, created)
 }
 
@@ -206,6 +248,7 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 	if id, ok := userID.(string); ok {
 		createdBy = &id
 	}
+	now := time.Now()
 
 	// Auto-fill legal_entity_id from JWT tenant context
 	jwtLegalEntityID := middleware.GetTenantID(c)
@@ -217,27 +260,27 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 		commencementDate, err := time.Parse("2006-01-02", contractReq.CommencementDate)
 		if err != nil {
 			failedContracts = append(failedContracts, map[string]interface{}{
-				"index":   i,
-				"number":  contractReq.ContractNumber,
-				"error":   "invalid commencement_date: " + err.Error(),
+				"index":  i,
+				"number": contractReq.ContractNumber,
+				"error":  "invalid commencement_date: " + err.Error(),
 			})
 			continue
 		}
 		leaseStartDate, err := time.Parse("2006-01-02", contractReq.LeaseStartDate)
 		if err != nil {
 			failedContracts = append(failedContracts, map[string]interface{}{
-				"index":   i,
-				"number":  contractReq.ContractNumber,
-				"error":   "invalid lease_start_date: " + err.Error(),
+				"index":  i,
+				"number": contractReq.ContractNumber,
+				"error":  "invalid lease_start_date: " + err.Error(),
 			})
 			continue
 		}
 		leaseEndDate, err := time.Parse("2006-01-02", contractReq.LeaseEndDate)
 		if err != nil {
 			failedContracts = append(failedContracts, map[string]interface{}{
-				"index":   i,
-				"number":  contractReq.ContractNumber,
-				"error":   "invalid lease_end_date: " + err.Error(),
+				"index":  i,
+				"number": contractReq.ContractNumber,
+				"error":  "invalid lease_end_date: " + err.Error(),
 			})
 			continue
 		}
@@ -260,6 +303,7 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 			StoreName:                    contractReq.StoreName,
 			StoreAddress:                 contractReq.StoreAddress,
 			Tags:                         normalizeTags(contractReq.Tags),
+			AssetType:                    normalizeAssetType(contractReq.AssetType),
 			AssetCategory:                contractReq.AssetCategory,
 			PropertyCategory:             contractReq.PropertyCategory,
 			SigningDate:                  signingDate,
@@ -270,7 +314,19 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 			DiscountRateType:             contractReq.DiscountRateType,
 			DiscountRateVersion:          contractReq.DiscountRateVersion,
 			DiscountRateValue:            normalizeDiscountRateValue(contractReq.DiscountRateValue),
+			LeaseScope:                   normalizeLeaseScope(contractReq.LeaseScope),
+			ExemptionReason:              contractReq.ExemptionReason,
+			ScopeSource:                  contractReq.ScopeSource,
+			ScopeConfidence:              contractReq.ScopeConfidence,
 			CreatedBy:                    createdBy,
+		}
+		if contract.ScopeSource == nil {
+			source := "manual"
+			contract.ScopeSource = &source
+		}
+		if createdBy != nil {
+			contract.ScopeClassifiedBy = createdBy
+			contract.ScopeClassifiedAt = &now
 		}
 
 		// Auto-fill legal_entity_id from JWT tenant context if not provided
@@ -289,9 +345,9 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 		created, err := h.contractRepo.Create(c.Request.Context(), contract)
 		if err != nil {
 			failedContracts = append(failedContracts, map[string]interface{}{
-				"index":   i,
-				"number":  contractReq.ContractNumber,
-				"error":   "failed to create: " + err.Error(),
+				"index":  i,
+				"number": contractReq.ContractNumber,
+				"error":  "failed to create: " + err.Error(),
 			})
 			continue
 		}
@@ -317,20 +373,20 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 
 func (h *ContractHandler) GetAll(c *gin.Context) {
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	filter := repository.ListContractsFilter{
 		Search:    c.Query("search"),
 		Status:    c.Query("status"),
 		SortBy:    c.Query("sort_by"),
 		SortOrder: c.Query("sort_order"),
 	}
-	
+
 	contracts, err := h.contractRepo.List(c.Request.Context(), legalEntityID, filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list contracts: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"data": contracts, "total": len(contracts)})
 }
 
@@ -413,29 +469,51 @@ func (h *ContractHandler) Update(c *gin.Context) {
 	if uid, ok := userID.(string); ok {
 		updatedBy = uid
 	}
+	now := time.Now()
 
 	// Build update contract
+	leaseScope := existing.LeaseScope
+	if req.LeaseScope != "" {
+		leaseScope = normalizeLeaseScope(req.LeaseScope)
+	}
+	assetType := existing.AssetType
+	if req.AssetType != "" {
+		assetType = normalizeAssetType(req.AssetType)
+	}
 	contract := &repository.Contract{
-		ID:                    id,
-		ContractNumber:        req.ContractNumber,
-		ContractName:          req.ContractName,
-		LegalEntityID:         req.LegalEntityID,
-		StoreID:               req.StoreID,
-		LandlordID:            req.LandlordID,
-		LesseeName:            req.LesseeName,
-		LessorName:            req.LessorName,
-		StoreName:             req.StoreName,
-		StoreAddress:          req.StoreAddress,
-		Tags:                  normalizeTags(req.Tags),
-		Currency:              req.Currency,
-		SigningDate:           signingDate,
-		CommencementDate:      commencementDate,
-		LeaseStartDate:        leaseStartDate,
-		LeaseEndDate:          leaseEndDate,
-		DiscountRateType:      req.DiscountRateType,
-		DiscountRateVersion:   req.DiscountRateVersion,
-		DiscountRateValue:     normalizeDiscountRateValue(req.DiscountRateValue),
-		Status:                existing.Status,
+		ID:                  id,
+		ContractNumber:      req.ContractNumber,
+		ContractName:        req.ContractName,
+		LegalEntityID:       req.LegalEntityID,
+		StoreID:             req.StoreID,
+		LandlordID:          req.LandlordID,
+		LesseeName:          req.LesseeName,
+		LessorName:          req.LessorName,
+		StoreName:           req.StoreName,
+		StoreAddress:        req.StoreAddress,
+		Tags:                normalizeTags(req.Tags),
+		Currency:            req.Currency,
+		AssetType:           assetType,
+		SigningDate:         signingDate,
+		CommencementDate:    commencementDate,
+		LeaseStartDate:      leaseStartDate,
+		LeaseEndDate:        leaseEndDate,
+		DiscountRateType:    req.DiscountRateType,
+		DiscountRateVersion: req.DiscountRateVersion,
+		DiscountRateValue:   normalizeDiscountRateValue(req.DiscountRateValue),
+		LeaseScope:          leaseScope,
+		ExemptionReason:     req.ExemptionReason,
+		ScopeSource:         req.ScopeSource,
+		ScopeConfidence:     req.ScopeConfidence,
+		Status:              existing.Status,
+	}
+	if contract.ScopeSource == nil {
+		source := "manual"
+		contract.ScopeSource = &source
+	}
+	if updatedBy != "" {
+		contract.ScopeClassifiedBy = &updatedBy
+		contract.ScopeClassifiedAt = &now
 	}
 
 	if err := h.contractRepo.Update(c.Request.Context(), contract, legalEntityID, updatedBy); err != nil {

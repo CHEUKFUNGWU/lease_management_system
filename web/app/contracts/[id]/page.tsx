@@ -45,7 +45,7 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { contractApi, paymentScheduleApi, eventApi, aiApi } from "../../lib/api";
+import { contractApi, paymentScheduleApi, eventApi, aiApi, leaseAdminApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
@@ -66,6 +66,7 @@ interface ContractDetail {
   store_address: string;
   tags: string;
   currency: string;
+  asset_type: string;
   signing_date?: string;
   commencement_date: string;
   lease_start_date: string;
@@ -74,6 +75,10 @@ interface ContractDetail {
   discount_rate_version?: string;
   discount_rate_value?: number;
   discount_rate_missing: boolean;
+  lease_scope: string;
+  exemption_reason?: string;
+  scope_source?: string;
+  scope_confidence?: number;
   status: string;
   approval_status: string;
   is_official_version: boolean;
@@ -100,7 +105,43 @@ interface PaymentSchedule {
   approval_status: string;
 }
 
+interface CriticalDate {
+  id: string;
+  date_type: string;
+  target_date: string;
+  reminder_days: number;
+  status: string;
+  title: string;
+  description?: string;
+  source: string;
+}
+
+interface LeaseDocument {
+  id: string;
+  document_type: string;
+  file_name: string;
+  file_type?: string;
+  file_size?: number;
+  document_version?: string;
+  notes?: string;
+  uploaded_at: string;
+}
+
+interface LeaseObligation {
+  id: string;
+  obligation_type: string;
+  responsible_party: string;
+  title: string;
+  description?: string;
+  source_clause?: string;
+  source_page?: number;
+  status: string;
+  created_at: string;
+}
+
 interface CalcResult {
+  lease_scope: string;
+  measurement_basis: string;
   initial_liability: number;
   initial_rou_asset: number;
   total_days: number;
@@ -117,6 +158,7 @@ interface MonthlyEntry {
   OpeningROUAsset: number;
   Depreciation: number;
   ClosingROUAsset: number;
+  ExemptLeaseExpense: number;
   VariableRentExpense: number;
   NonLeaseExpense: number;
 }
@@ -164,12 +206,27 @@ export default function ContractDetailPage() {
   const [adjustmentModalData, setAdjustmentModalData] = useState<any>(null);
   const [adjustmentModalTitle, setAdjustmentModalTitle] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [criticalDates, setCriticalDates] = useState<CriticalDate[]>([]);
+  const [documents, setDocuments] = useState<LeaseDocument[]>([]);
+  const [obligations, setObligations] = useState<LeaseObligation[]>([]);
+  const [criticalDateModalOpen, setCriticalDateModalOpen] = useState(false);
+  const [criticalDateForm] = Form.useForm();
+  const [criticalDateLoading, setCriticalDateLoading] = useState(false);
+  const [documentModalOpen, setDocumentModalOpen] = useState(false);
+  const [documentForm] = Form.useForm();
+  const [documentLoading, setDocumentLoading] = useState(false);
+  const [obligationModalOpen, setObligationModalOpen] = useState(false);
+  const [obligationForm] = Form.useForm();
+  const [obligationLoading, setObligationLoading] = useState(false);
 
   useEffect(() => {
     if (token && contractId) {
       loadContract();
       loadSchedules();
       loadEvents();
+      loadCriticalDates();
+      loadDocuments();
+      loadObligations();
     }
   }, [token, contractId]);
 
@@ -200,6 +257,118 @@ export default function ContractDetailPage() {
       setEvents(data.data || []);
     } catch (error: any) {
       message.error(error.message || t("contract_detail.load_events_failed", language));
+    }
+  };
+
+  const loadCriticalDates = async () => {
+    try {
+      const data = await leaseAdminApi.listCriticalDates(contractId, token!);
+      setCriticalDates(data.data || []);
+    } catch (error: any) {
+      message.error(error.message || "关键日期加载失败");
+    }
+  };
+
+  const loadDocuments = async () => {
+    try {
+      const data = await leaseAdminApi.listDocuments(contractId, token!);
+      setDocuments(data.data || []);
+    } catch (error: any) {
+      message.error(error.message || "文档列表加载失败");
+    }
+  };
+
+  const loadObligations = async () => {
+    try {
+      const data = await leaseAdminApi.listObligations(contractId, token!);
+      setObligations(data.data || []);
+    } catch (error: any) {
+      message.error(error.message || "条款义务加载失败");
+    }
+  };
+
+  const handleCreateCriticalDate = async (values: any) => {
+    setCriticalDateLoading(true);
+    try {
+      await leaseAdminApi.createCriticalDate(contractId, {
+        date_type: values.date_type,
+        target_date: values.target_date?.format("YYYY-MM-DD"),
+        reminder_days: values.reminder_days || 30,
+        title: values.title,
+        description: values.description || null,
+        source: "manual",
+      }, token!);
+      message.success("关键日期已创建");
+      setCriticalDateModalOpen(false);
+      criticalDateForm.resetFields();
+      loadCriticalDates();
+    } catch (error: any) {
+      message.error(error.message || "关键日期创建失败");
+    } finally {
+      setCriticalDateLoading(false);
+    }
+  };
+
+  const handleUpdateCriticalDateStatus = async (dateId: string, status: string) => {
+    try {
+      await leaseAdminApi.updateCriticalDateStatus(contractId, dateId, status, token!);
+      message.success("关键日期状态已更新");
+      loadCriticalDates();
+    } catch (error: any) {
+      message.error(error.message || "状态更新失败");
+    }
+  };
+
+  const handleCreateDocument = async (values: any) => {
+    setDocumentLoading(true);
+    try {
+      await leaseAdminApi.createDocument(contractId, {
+        document_type: values.document_type,
+        file_name: values.file_name,
+        file_type: values.file_type || null,
+        document_version: values.document_version || null,
+        notes: values.notes || null,
+      }, token!);
+      message.success("文档记录已创建");
+      setDocumentModalOpen(false);
+      documentForm.resetFields();
+      loadDocuments();
+    } catch (error: any) {
+      message.error(error.message || "文档记录创建失败");
+    } finally {
+      setDocumentLoading(false);
+    }
+  };
+
+  const handleCreateObligation = async (values: any) => {
+    setObligationLoading(true);
+    try {
+      await leaseAdminApi.createObligation(contractId, {
+        obligation_type: values.obligation_type,
+        responsible_party: values.responsible_party,
+        title: values.title,
+        description: values.description || null,
+        source_clause: values.source_clause || null,
+        source_page: values.source_page || null,
+      }, token!);
+      message.success("条款义务已创建");
+      setObligationModalOpen(false);
+      obligationForm.resetFields();
+      loadObligations();
+    } catch (error: any) {
+      message.error(error.message || "条款义务创建失败");
+    } finally {
+      setObligationLoading(false);
+    }
+  };
+
+  const handleUpdateObligationStatus = async (obligationId: string, status: string) => {
+    try {
+      await leaseAdminApi.updateObligationStatus(contractId, obligationId, status, token!);
+      message.success("条款义务状态已更新");
+      loadObligations();
+    } catch (error: any) {
+      message.error(error.message || "状态更新失败");
     }
   };
 
@@ -432,15 +601,21 @@ export default function ContractDetailPage() {
       commencement_date: dayjs(contract.commencement_date),
       lease_start_date: dayjs(contract.lease_start_date),
       lease_end_date: dayjs(contract.lease_end_date),
+      asset_type: contract.asset_type || "real_estate",
       discount_rate_type: contract.discount_rate_type || "",
       discount_rate_version: contract.discount_rate_version || "",
       discount_rate_value: contract.discount_rate_value ?? null,
+      lease_scope: contract.lease_scope || "in_scope",
+      exemption_reason: contract.exemption_reason || "",
       tags: parseTagString(contract.tags || ""),
     });
     setEditModalOpen(true);
   };
 
   const handleUpdate = async (values: any) => {
+    if (!contract) {
+      return;
+    }
     setEditLoading(true);
     try {
       const payload: Record<string, any> = {
@@ -451,12 +626,16 @@ export default function ContractDetailPage() {
         store_name: values.store_name,
         store_address: values.store_address,
         currency: values.currency,
+        asset_type: values.asset_type || contract.asset_type || "real_estate",
         commencement_date: values.commencement_date.format("YYYY-MM-DD"),
         lease_start_date: values.lease_start_date.format("YYYY-MM-DD"),
         lease_end_date: values.lease_end_date.format("YYYY-MM-DD"),
         discount_rate_type: values.discount_rate_type || null,
         discount_rate_version: values.discount_rate_version || null,
         discount_rate_value: values.discount_rate_value ?? null,
+        lease_scope: values.lease_scope || contract.lease_scope || "in_scope",
+        exemption_reason: values.exemption_reason || null,
+        scope_source: "manual",
         tags: normalizeTagValues(values.tags),
       };
       if (values.signing_date) {
@@ -646,6 +825,69 @@ export default function ContractDetailPage() {
     rejected: t("status.rejected", language),
   };
 
+  const leaseScopeLabels: Record<string, string> = {
+    in_scope: "资本化租赁",
+    short_term_exempt: "短期豁免",
+    low_value_exempt: "低价值豁免",
+    not_a_lease: "非租赁",
+  };
+
+  const leaseScopeColors: Record<string, string> = {
+    in_scope: "blue",
+    short_term_exempt: "gold",
+    low_value_exempt: "purple",
+    not_a_lease: "default",
+  };
+
+  const assetTypeLabels: Record<string, string> = {
+    real_estate: "不动产",
+    vehicle: "车辆",
+    it_equipment: "IT 设备",
+    machinery: "机器设备",
+    other: "其他",
+  };
+
+  const criticalDateLabels: Record<string, string> = {
+    renewal_deadline: "续租截止",
+    break_notice: "Break 通知",
+    rent_review: "租金 Review",
+    lease_expiry: "租约到期",
+    insurance_renewal: "保险续保",
+    other: "其他",
+  };
+
+  const criticalStatusColors: Record<string, string> = {
+    open: "processing",
+    snoozed: "warning",
+    completed: "success",
+    cancelled: "default",
+  };
+
+  const obligationTypeLabels: Record<string, string> = {
+    maintenance: "维修维护",
+    cam: "CAM / 管理费",
+    insurance: "保险",
+    index_adjustment: "指数调整",
+    restoration: "复原义务",
+    security_deposit: "押金",
+    notice: "通知义务",
+    other: "其他",
+  };
+
+  const responsiblePartyLabels: Record<string, string> = {
+    lessee: "承租方",
+    lessor: "出租方",
+    shared: "双方共同",
+    third_party: "第三方",
+  };
+
+  const obligationStatusColors: Record<string, string> = {
+    active: "processing",
+    completed: "success",
+    waived: "warning",
+    cancelled: "default",
+  };
+
   const eventTypeLabels: Record<string, string> = {
     area_adjustment: t("contract.event_type.area_adjustment", language),
     rent_change: t("contract.event_type.rent_change", language),
@@ -758,6 +1000,12 @@ export default function ContractDetailPage() {
       title: t("contract.variable_rent", language),
       dataIndex: "VariableRentExpense",
       render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      align: "right" as const,
+    },
+    {
+      title: "豁免费用",
+      dataIndex: "ExemptLeaseExpense",
+      render: (v: number) => `¥${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       align: "right" as const,
     },
     {
@@ -909,6 +1157,9 @@ export default function ContractDetailPage() {
                       <Descriptions.Item label={t("contract.currency", language)}>
                         {contract.currency}
                       </Descriptions.Item>
+                      <Descriptions.Item label="资产类型">
+                        <Tag>{assetTypeLabels[contract.asset_type || "real_estate"]}</Tag>
+                      </Descriptions.Item>
                       <Descriptions.Item label={t("contract.discount_rate", language)}>
                         {contract.discount_rate_value != null ? (
                           <Tag color="success">{(contract.discount_rate_value * 100).toFixed(2)}%</Tag>
@@ -920,6 +1171,11 @@ export default function ContractDetailPage() {
                           </Tag>
                         )}
                       </Descriptions.Item>
+                      <Descriptions.Item label="IFRS 16 范围">
+                        <Tag color={leaseScopeColors[contract.lease_scope || "in_scope"]}>
+                          {leaseScopeLabels[contract.lease_scope || "in_scope"]}
+                        </Tag>
+                      </Descriptions.Item>
                       <Descriptions.Item label={t("contract.commencement_date", language)}>
                         {dayjs(contract.commencement_date).format("YYYY-MM-DD")}
                       </Descriptions.Item>
@@ -929,6 +1185,11 @@ export default function ContractDetailPage() {
                       <Descriptions.Item label={t("contract.lease_end_date", language)}>
                         {dayjs(contract.lease_end_date).format("YYYY-MM-DD")}
                       </Descriptions.Item>
+                      {contract.exemption_reason && (
+                        <Descriptions.Item label="范围依据" span={3}>
+                          {contract.exemption_reason}
+                        </Descriptions.Item>
+                      )}
                     </Descriptions>
                   </Card>
                 </Col>
@@ -1189,6 +1450,184 @@ export default function ContractDetailPage() {
                     ),
                   },
                   {
+                    key: "critical_dates",
+                    label: `关键日期 (${criticalDates.length})`,
+                    children: (
+                      <Card
+                        title={
+                          <Space>
+                            <span>关键日期与提醒</span>
+                            {criticalDates.filter((d) => d.status === "open").length > 0 && (
+                              <Tag color="processing">{criticalDates.filter((d) => d.status === "open").length} 待处理</Tag>
+                            )}
+                          </Space>
+                        }
+                        extra={
+                          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCriticalDateModalOpen(true)}>
+                            新增关键日期
+                          </Button>
+                        }
+                      >
+                        <Table
+                          columns={[
+                            {
+                              title: "类型",
+                              dataIndex: "date_type",
+                              width: 130,
+                              render: (v: string) => criticalDateLabels[v] || v,
+                            },
+                            { title: "标题", dataIndex: "title" },
+                            {
+                              title: "目标日期",
+                              dataIndex: "target_date",
+                              width: 130,
+                              render: (v: string) => dayjs(v).format("YYYY-MM-DD"),
+                            },
+                            { title: "提前提醒", dataIndex: "reminder_days", width: 100, render: (v: number) => `${v} 天` },
+                            {
+                              title: "状态",
+                              dataIndex: "status",
+                              width: 100,
+                              render: (v: string) => <Tag color={criticalStatusColors[v]}>{v}</Tag>,
+                            },
+                            {
+                              title: "操作",
+                              key: "action",
+                              width: 150,
+                              render: (_: any, record: CriticalDate) => (
+                                <Space>
+                                  {record.status !== "completed" && (
+                                    <Button size="small" onClick={() => handleUpdateCriticalDateStatus(record.id, "completed")}>
+                                      完成
+                                    </Button>
+                                  )}
+                                  {record.status !== "cancelled" && (
+                                    <Button size="small" danger onClick={() => handleUpdateCriticalDateStatus(record.id, "cancelled")}>
+                                      取消
+                                    </Button>
+                                  )}
+                                </Space>
+                              ),
+                            },
+                          ]}
+                          dataSource={criticalDates}
+                          rowKey="id"
+                          pagination={{ pageSize: 8 }}
+                          size="small"
+                        />
+                      </Card>
+                    ),
+                  },
+                  {
+                    key: "documents",
+                    label: `文档库 (${documents.length})`,
+                    children: (
+                      <Card
+                        title="集中合同文档库"
+                        extra={
+                          <Button type="primary" icon={<PlusOutlined />} onClick={() => setDocumentModalOpen(true)}>
+                            新增文档记录
+                          </Button>
+                        }
+                      >
+                        <Table
+                          columns={[
+                            { title: "文件名", dataIndex: "file_name" },
+                            { title: "类型", dataIndex: "document_type", width: 130 },
+                            { title: "版本", dataIndex: "document_version", width: 100, render: (v: string) => v || "-" },
+                            {
+                              title: "上传时间",
+                              dataIndex: "uploaded_at",
+                              width: 160,
+                              render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm"),
+                            },
+                            { title: "备注", dataIndex: "notes", render: (v: string) => v || "-" },
+                          ]}
+                          dataSource={documents}
+                          rowKey="id"
+                          pagination={{ pageSize: 8 }}
+                          size="small"
+                        />
+                      </Card>
+                    ),
+                  },
+                  {
+                    key: "obligations",
+                    label: `条款/义务 (${obligations.length})`,
+                    children: (
+                      <Card
+                        title={
+                          <Space>
+                            <span>运营条款与义务</span>
+                            {obligations.filter((item) => item.status === "active").length > 0 && (
+                              <Tag color="processing">{obligations.filter((item) => item.status === "active").length} 生效中</Tag>
+                            )}
+                          </Space>
+                        }
+                        extra={
+                          <Button type="primary" icon={<PlusOutlined />} onClick={() => setObligationModalOpen(true)}>
+                            新增条款义务
+                          </Button>
+                        }
+                      >
+                        <Table
+                          columns={[
+                            {
+                              title: "类型",
+                              dataIndex: "obligation_type",
+                              width: 130,
+                              render: (v: string) => obligationTypeLabels[v] || v,
+                            },
+                            { title: "标题", dataIndex: "title", width: 180 },
+                            {
+                              title: "责任方",
+                              dataIndex: "responsible_party",
+                              width: 110,
+                              render: (v: string) => responsiblePartyLabels[v] || v,
+                            },
+                            {
+                              title: "状态",
+                              dataIndex: "status",
+                              width: 100,
+                              render: (v: string) => <Tag color={obligationStatusColors[v]}>{v}</Tag>,
+                            },
+                            { title: "条款摘录", dataIndex: "source_clause", ellipsis: true, render: (v: string) => v || "-" },
+                            { title: "页码", dataIndex: "source_page", width: 80, render: (v: number) => v || "-" },
+                            {
+                              title: "操作",
+                              key: "action",
+                              width: 210,
+                              render: (_: any, record: LeaseObligation) => (
+                                <Space>
+                                  {record.status !== "completed" && (
+                                    <Button size="small" onClick={() => handleUpdateObligationStatus(record.id, "completed")}>
+                                      完成
+                                    </Button>
+                                  )}
+                                  {record.status !== "waived" && (
+                                    <Button size="small" onClick={() => handleUpdateObligationStatus(record.id, "waived")}>
+                                      豁免
+                                    </Button>
+                                  )}
+                                  {record.status !== "cancelled" && (
+                                    <Button size="small" danger onClick={() => handleUpdateObligationStatus(record.id, "cancelled")}>
+                                      取消
+                                    </Button>
+                                  )}
+                                </Space>
+                              ),
+                            },
+                          ]}
+                          dataSource={obligations}
+                          rowKey="id"
+                          pagination={{ pageSize: 8 }}
+                          size="small"
+                          scroll={{ x: 980 }}
+                        />
+                      </Card>
+                    ),
+                  },
+                  {
                     key: "events",
                     label: `${t("contract.tab_events", language)} (${events.length})`,
                     children: (
@@ -1336,6 +1775,13 @@ export default function ContractDetailPage() {
                     label: t("contract.tab_calculation", language),
                     children: calcResult ? (
                       <>
+                        <Alert
+                          message={`计量路径：${calcResult.measurement_basis === "capitalized" ? "资本化计量" : calcResult.measurement_basis === "straight_line_expense" ? "豁免租赁直线法费用化" : "不进入 IFRS 16 计量"}`}
+                          description={`范围判定：${leaseScopeLabels[calcResult.lease_scope || "in_scope"] || calcResult.lease_scope}`}
+                          type={calcResult.measurement_basis === "capitalized" ? "info" : "warning"}
+                          showIcon
+                          style={{ marginBottom: 16 }}
+                        />
                         <Row gutter={16} style={{ marginBottom: 16 }}>
                           <Col span={8}>
                             <Card>
@@ -1730,6 +2176,16 @@ export default function ContractDetailPage() {
               </Col>
             </Row>
 
+            <Form.Item label="资产类型" name="asset_type">
+              <Select>
+                <Select.Option value="real_estate">不动产</Select.Option>
+                <Select.Option value="vehicle">车辆</Select.Option>
+                <Select.Option value="it_equipment">IT 设备</Select.Option>
+                <Select.Option value="machinery">机器设备</Select.Option>
+                <Select.Option value="other">其他</Select.Option>
+              </Select>
+            </Form.Item>
+
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
@@ -1775,6 +2231,23 @@ export default function ContractDetailPage() {
                 </Form.Item>
               </Col>
               <Col span={12}>
+                <Form.Item label="IFRS 16 范围" name="lease_scope" rules={[{ required: true, message: "请选择 IFRS 16 范围" }]}>
+                  <Select>
+                    <Select.Option value="in_scope">资本化租赁</Select.Option>
+                    <Select.Option value="short_term_exempt">短期租赁豁免</Select.Option>
+                    <Select.Option value="low_value_exempt">低价值资产豁免</Select.Option>
+                    <Select.Option value="not_a_lease">非租赁合同</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item label="豁免/排除依据" name="exemption_reason">
+              <Input.TextArea rows={2} placeholder="例如：租期 10 个月且无续租意图；未识别特定资产；低价值 IT 设备" />
+            </Form.Item>
+
+            <Row gutter={16}>
+              <Col span={24}>
                 <Form.Item
                   label={t("contract.tags", language)}
                   name="tags"
@@ -1789,6 +2262,162 @@ export default function ContractDetailPage() {
                       label: tag,
                     }))}
                   />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Form>
+        </Modal>
+
+        <Modal
+          title="新增关键日期"
+          open={criticalDateModalOpen}
+          onCancel={() => setCriticalDateModalOpen(false)}
+          onOk={() => criticalDateForm.submit()}
+          confirmLoading={criticalDateLoading}
+          width={600}
+        >
+          <Form
+            form={criticalDateForm}
+            layout="vertical"
+            onFinish={handleCreateCriticalDate}
+            initialValues={{ date_type: "renewal_deadline", reminder_days: 30 }}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="类型" name="date_type" rules={[{ required: true, message: "请选择类型" }]}>
+                  <Select>
+                    <Select.Option value="renewal_deadline">续租截止</Select.Option>
+                    <Select.Option value="break_notice">Break 通知</Select.Option>
+                    <Select.Option value="rent_review">租金 Review</Select.Option>
+                    <Select.Option value="lease_expiry">租约到期</Select.Option>
+                    <Select.Option value="insurance_renewal">保险续保</Select.Option>
+                    <Select.Option value="other">其他</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="目标日期" name="target_date" rules={[{ required: true, message: "请选择目标日期" }]}>
+                  <DatePicker style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="提前提醒天数" name="reminder_days">
+                  <InputNumber min={0} max={365} style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="标题" name="title" rules={[{ required: true, message: "请输入标题" }]}>
+                  <Input placeholder="例如：续租通知截止日" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Form.Item label="说明" name="description">
+              <Input.TextArea rows={3} placeholder="记录条款依据、通知期、责任人或操作建议" />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal
+          title="新增文档记录"
+          open={documentModalOpen}
+          onCancel={() => setDocumentModalOpen(false)}
+          onOk={() => documentForm.submit()}
+          confirmLoading={documentLoading}
+          width={600}
+        >
+          <Form
+            form={documentForm}
+            layout="vertical"
+            onFinish={handleCreateDocument}
+            initialValues={{ document_type: "main_contract" }}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="文档类型" name="document_type">
+                  <Select>
+                    <Select.Option value="main_contract">主合同</Select.Option>
+                    <Select.Option value="amendment">补充协议</Select.Option>
+                    <Select.Option value="side_letter">Side Letter</Select.Option>
+                    <Select.Option value="invoice">发票/账单</Select.Option>
+                    <Select.Option value="other">其他</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="版本" name="document_version">
+                  <Input placeholder="例如：v1 / 2024-签署版" />
+                </Form.Item>
+              </Col>
+            </Row>
+            <Form.Item label="文件名" name="file_name" rules={[{ required: true, message: "请输入文件名" }]}>
+              <Input placeholder="例如：LEASE-2024-001 主合同.pdf" />
+            </Form.Item>
+            <Form.Item label="文件类型" name="file_type">
+              <Input placeholder="application/pdf" />
+            </Form.Item>
+            <Form.Item label="备注" name="notes">
+              <Input.TextArea rows={3} placeholder="记录文件来源、关键条款页码或归档说明" />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal
+          title="新增条款义务"
+          open={obligationModalOpen}
+          onCancel={() => setObligationModalOpen(false)}
+          onOk={() => obligationForm.submit()}
+          confirmLoading={obligationLoading}
+          width={720}
+        >
+          <Form
+            form={obligationForm}
+            layout="vertical"
+            onFinish={handleCreateObligation}
+            initialValues={{ obligation_type: "notice", responsible_party: "lessee" }}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item label="义务类型" name="obligation_type" rules={[{ required: true, message: "请选择类型" }]}>
+                  <Select>
+                    <Select.Option value="maintenance">维修维护</Select.Option>
+                    <Select.Option value="cam">CAM / 管理费</Select.Option>
+                    <Select.Option value="insurance">保险</Select.Option>
+                    <Select.Option value="index_adjustment">指数调整</Select.Option>
+                    <Select.Option value="restoration">复原义务</Select.Option>
+                    <Select.Option value="security_deposit">押金</Select.Option>
+                    <Select.Option value="notice">通知义务</Select.Option>
+                    <Select.Option value="other">其他</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="责任方" name="responsible_party" rules={[{ required: true, message: "请选择责任方" }]}>
+                  <Select>
+                    <Select.Option value="lessee">承租方</Select.Option>
+                    <Select.Option value="lessor">出租方</Select.Option>
+                    <Select.Option value="shared">双方共同</Select.Option>
+                    <Select.Option value="third_party">第三方</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+            <Form.Item label="标题" name="title" rules={[{ required: true, message: "请输入标题" }]}>
+              <Input placeholder="例如：提前 6 个月提交续租通知" />
+            </Form.Item>
+            <Form.Item label="说明" name="description">
+              <Input.TextArea rows={3} placeholder="记录义务内容、触发条件、管理动作或财务影响" />
+            </Form.Item>
+            <Row gutter={16}>
+              <Col span={8}>
+                <Form.Item label="来源页码" name="source_page">
+                  <InputNumber min={1} style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+              <Col span={16}>
+                <Form.Item label="原文条款摘录" name="source_clause">
+                  <Input placeholder="粘贴合同条款原文，便于审计追溯" />
                 </Form.Item>
               </Col>
             </Row>

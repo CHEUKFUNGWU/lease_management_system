@@ -69,6 +69,7 @@ interface ContractDraftItem {
   lease_start_date: string;
   lease_end_date: string;
   currency: string;
+  asset_type?: string;
   fixed_rent_amount: number;
   payment_frequency: string;
   payment_timing: string;
@@ -78,6 +79,12 @@ interface ContractDraftItem {
   service_fee: number;
   discount_rate_type: string;
   discount_rate: number;
+  is_lease?: boolean;
+  lease_scope?: string;
+  suggested_scope?: string;
+  exemption_reason?: string;
+  scope_source?: string;
+  scope_confidence?: number;
   confidence: number;
   missing_fields: string[];
   warnings: string[];
@@ -115,8 +122,8 @@ interface ChatSession {
 
 // ─── Constants ─────────────────────────────────────────────────
 
-const SESSIONS_KEY = "ifrs16_chat_sessions";
-const ACTIVE_SESSION_KEY = "ifrs16_chat_active_session";
+const SESSIONS_KEY = "lease_chat_sessions";
+const ACTIVE_SESSION_KEY = "lease_chat_active_session";
 
 const MODEL_OPTIONS = [
   { value: "deepseek-v4-flash", label: "DeepSeek V4 Flash" },
@@ -646,7 +653,8 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
     }
   };
 
-  const hasLowConfidence = (c: ContractDraftItem) => c.confidence < 0.8 || c.missing_fields.length > 0;
+  const hasLowConfidence = (c: ContractDraftItem) =>
+    c.confidence < 0.8 || (c.scope_confidence ?? 1) < 0.8 || c.missing_fields.length > 0;
 
   return (
     <div style={{ marginTop: 12, border: "1px solid #E5E5E5", borderRadius: 12, overflow: "hidden" }}>
@@ -834,11 +842,58 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
                   </div>
                 </div>
 
+                {/* Row 5: Scope gate */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                  <div style={{ flex: "1 1 140px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>资产类型</Text>
+                    <Input
+                      size="small"
+                      value={contract.asset_type || "real_estate"}
+                      onChange={(e) => updateContract(index, "asset_type", e.target.value)}
+                      style={{ fontSize: 13 }}
+                    />
+                  </div>
+                  <div style={{ flex: "1 1 160px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>租赁范围</Text>
+                    <Input
+                      size="small"
+                      value={contract.lease_scope || contract.suggested_scope || "in_scope"}
+                      onChange={(e) => updateContract(index, "lease_scope", e.target.value)}
+                      style={{ fontSize: 13 }}
+                      status={!contract.lease_scope && !contract.suggested_scope ? "warning" : ""}
+                    />
+                  </div>
+                  <div style={{ flex: "1 1 140px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>范围置信度</Text>
+                    <Input
+                      size="small"
+                      value={contract.scope_confidence ?? ""}
+                      onChange={(e) => updateContract(index, "scope_confidence", parseFloat(e.target.value) || 0)}
+                      style={{ fontSize: 13 }}
+                      status={(contract.scope_confidence ?? 1) < 0.8 ? "warning" : ""}
+                    />
+                  </div>
+                  <div style={{ flex: "1 1 180px" }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>豁免/排除原因</Text>
+                    <Input
+                      size="small"
+                      value={contract.exemption_reason || ""}
+                      onChange={(e) => updateContract(index, "exemption_reason", e.target.value)}
+                      style={{ fontSize: 13 }}
+                    />
+                  </div>
+                </div>
+
                 {/* Warnings & Confidence */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   {hasLowConfidence(contract) && (
                     <Tag color="warning" style={{ fontSize: 11 }}>
                       {t("ai.draft_confidence", language, { value: String((contract.confidence * 100).toFixed(0)) })}
+                    </Tag>
+                  )}
+                  {contract.lease_scope && (
+                    <Tag color={contract.lease_scope === "in_scope" ? "blue" : "orange"} style={{ fontSize: 11 }}>
+                      Scope: {contract.lease_scope}
                     </Tag>
                   )}
                   {contract.missing_fields.length > 0 && (
@@ -1062,37 +1117,27 @@ function AIChatPageContent() {
         object_name: data.object_name,
       };
 
-      setLastUploadedFile(uploadedFile);
-
-      const userMessage: Message = {
-        id: generateId(),
-        role: "user",
-        content: `${t("ai.file_uploaded", language)}${data.original_name}`,
-        timestamp: Date.now(),
-        attachments: [uploadedFile],
-      };
-
-      if (activeSessionId) {
-        updateSessionMessages(activeSessionId, (msgs) => [...msgs, userMessage]);
-      }
-
       message.success(`${data.original_name} ${t("ai.upload_success", language)}`);
       onSuccess(data, file);
+      await handleSend("请解析这个文件并导入台账：先生成合同草稿卡片，等待我确认后再入库。", uploadedFile);
     } catch (err: any) {
       onError(err);
       message.error(`${t("ai.upload_failed", language)}: ${err.message}`);
     }
   };
 
-  const handleSend = async (messageOverride?: string) => {
-    const msg = messageOverride ?? input;
-    if (!msg.trim() || !token || !activeSessionId) return;
+  const handleSend = async (messageOverride?: string, fileOverride?: UploadedFile) => {
+    const fileForRequest = fileOverride ?? lastUploadedFile;
+    const msg = (messageOverride ?? input).trim();
+    if ((!msg && !fileForRequest) || !token || !activeSessionId) return;
+    const messageText = msg || "请解析这个文件并导入台账：先生成合同草稿卡片，等待我确认后再入库。";
 
     const userMessage: Message = {
       id: generateId(),
       role: "user",
-      content: msg,
+      content: messageText,
       timestamp: Date.now(),
+      attachments: fileForRequest ? [fileForRequest] : undefined,
     };
 
     // Get history from active session
@@ -1107,11 +1152,11 @@ function AIChatPageContent() {
     setLoading(true);
 
     try {
-      const chatData: any = { message: msg, history, language };
-      if (lastUploadedFile) {
-        chatData.file_id = lastUploadedFile.file_id;
-        chatData.object_name = lastUploadedFile.object_name;
-        chatData.content_type = lastUploadedFile.content_type;
+      const chatData: any = { message: messageText, history, language };
+      if (fileForRequest) {
+        chatData.file_id = fileForRequest.file_id;
+        chatData.object_name = fileForRequest.object_name;
+        chatData.content_type = fileForRequest.content_type;
         setLastUploadedFile(null);
       }
       if (pageContext) {
@@ -1433,11 +1478,16 @@ function AIChatPageContent() {
                                   store_name: c.store_name,
                                   store_address: c.store_address,
                                   currency: c.currency || "CNY",
+                                  asset_type: c.asset_type || "real_estate",
                                   commencement_date: c.commencement_date,
                                   lease_start_date: c.lease_start_date,
                                   lease_end_date: c.lease_end_date,
                                   discount_rate_type: c.discount_rate_type || null,
                                   discount_rate_value: c.discount_rate || null,
+                                  lease_scope: c.lease_scope || c.suggested_scope || "in_scope",
+                                  exemption_reason: c.exemption_reason || null,
+                                  scope_source: c.scope_source || "ai_suggested",
+                                  scope_confidence: c.scope_confidence ?? null,
                                   tags: "",
                                 }));
 
@@ -1528,6 +1578,7 @@ function AIChatPageContent() {
                 <Upload
                   customRequest={handleFileUpload}
                   showUploadList={false}
+                  disabled={loading}
                   beforeUpload={(file) => {
                     const allowedTypes = [
                       "application/pdf",
@@ -1553,6 +1604,7 @@ function AIChatPageContent() {
                     <Button
                       type="text"
                       icon={<PaperClipOutlined style={{ fontSize: 18, color: "#8C8C8C" }} />}
+                      disabled={loading}
                       style={{ height: 36, width: 36, padding: 0 }}
                     />
                   </Tooltip>
@@ -1588,7 +1640,7 @@ function AIChatPageContent() {
                   icon={<SendOutlined />}
                   onClick={() => handleSend()}
                   loading={loading}
-                  disabled={!input.trim()}
+                  disabled={loading || !input.trim()}
                   style={{
                     width: 36,
                     height: 36,

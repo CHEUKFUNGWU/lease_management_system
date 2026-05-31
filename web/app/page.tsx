@@ -13,6 +13,7 @@ import {
   Button,
   Empty,
   Skeleton,
+  Space,
 } from "antd";
 import {
   FileTextOutlined,
@@ -23,6 +24,7 @@ import {
   PlusOutlined,
   UploadOutlined,
   BarChartOutlined,
+  BellOutlined,
 } from "@ant-design/icons";
 import {
   AreaChart,
@@ -41,9 +43,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import { t } from "./lib/i18n";
-import { contractApi } from "./lib/api";
+import { contractApi, leaseAdminApi } from "./lib/api";
 import { useRouter } from "next/navigation";
 import { staggerContainer, staggerItem } from "./design-system/animations";
+import dayjs from "dayjs";
 
 // ─── Mock Chart Data (will be replaced with real API data) ─────
 
@@ -167,36 +170,21 @@ export default function HomePage() {
     draft: 0,
   });
   const [recentContracts, setRecentContracts] = useState<any[]>([]);
+  const [upcomingDates, setUpcomingDates] = useState<any[]>([]);
 
-  // ─── Translated Chart Data ─────────────────────────────────️
+  // ─── Chart Data derived from real stats ────────────────────
 
-  const liabilityData = useMemo(
-    () => [
-      { month: `1${t("dashboard.month_short", language)}`, value: 3255676 },
-      { month: `2${t("dashboard.month_short", language)}`, value: 3210395 },
-      { month: `3${t("dashboard.month_short", language)}`, value: 3164892 },
-      { month: `4${t("dashboard.month_short", language)}`, value: 3119165 },
-      { month: `5${t("dashboard.month_short", language)}`, value: 3073213 },
-      { month: `6${t("dashboard.month_short", language)}`, value: 3027033 },
-      { month: `7${t("dashboard.month_short", language)}`, value: 2980624 },
-      { month: `8${t("dashboard.month_short", language)}`, value: 2933984 },
-      { month: `9${t("dashboard.month_short", language)}`, value: 2887112 },
-      { month: `10${t("dashboard.month_short", language)}`, value: 2840005 },
-      { month: `11${t("dashboard.month_short", language)}`, value: 2792662 },
-      { month: `12${t("dashboard.month_short", language)}`, value: 2745080 },
-    ],
-    [language],
-  );
+  const statusData = useMemo(() => {
+    const items = [
+      { name: t("dashboard.approved", language), value: stats.approved, key: "approved" },
+      { name: t("dashboard.pending", language), value: stats.pending, key: "pending" },
+      { name: t("dashboard.draft", language), value: stats.draft, key: "draft" },
+      { name: t("status.rejected", language), value: stats.total - stats.approved - stats.pending - stats.draft, key: "rejected" },
+    ];
+    return items.filter((i) => i.value > 0);
+  }, [language, stats]);
 
-  const statusData = useMemo(
-    () => [
-      { name: t("dashboard.approved", language), value: 12, key: "approved" },
-      { name: t("dashboard.pending", language), value: 5, key: "pending" },
-      { name: t("dashboard.draft", language), value: 3, key: "draft" },
-      { name: t("status.rejected", language), value: 1, key: "rejected" },
-    ],
-    [language],
-  );
+  const hasStatusData = statusData.length > 0;
 
   // ─── Pie Tooltip defined inside component for language access
 
@@ -248,11 +236,30 @@ export default function HomePage() {
 
       setStats({ total, approved, pending, draft });
       setRecentContracts(contracts.slice(0, 6));
+
+      const reminderData = await leaseAdminApi.listUpcomingCriticalDates(token!, { days: 90, limit: 8 });
+      setUpcomingDates(reminderData.data || []);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const criticalDateLabels: Record<string, string> = {
+    renewal_deadline: "续租截止",
+    break_notice: "Break 通知",
+    rent_review: "租金 Review",
+    lease_expiry: "租约到期",
+    insurance_renewal: "保险续保",
+    other: "其他",
+  };
+
+  const getDateUrgency = (targetDate: string) => {
+    const days = dayjs(targetDate).startOf("day").diff(dayjs().startOf("day"), "day");
+    if (days < 0) return { color: "error", text: `逾期 ${Math.abs(days)} 天` };
+    if (days <= 7) return { color: "warning", text: `${days} 天内` };
+    return { color: "processing", text: `${days} 天` };
   };
 
   const getStatusTag = (status: string) => {
@@ -363,43 +370,11 @@ export default function HomePage() {
                     </Button>
                   }
                 >
-                  <div style={{ height: 280 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={liabilityData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="liabilityGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#000" stopOpacity={0.08} />
-                            <stop offset="95%" stopColor="#000" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
-                        <XAxis
-                          dataKey="month"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: "#8C8C8C" }}
-                          dy={10}
-                        />
-                        <YAxis
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: "#8C8C8C" }}
-                          tickFormatter={(v) => `¥${(v / 10000).toFixed(0)}${t("dashboard.ten_thousand", language)}`}
-                          dx={-10}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Area
-                          type="monotone"
-                          dataKey="value"
-                          name={t("dashboard.lease_liability", language)}
-                          stroke="#000"
-                          strokeWidth={2}
-                          fill="url(#liabilityGradient)"
-                          dot={{ r: 3, fill: "#000", strokeWidth: 0 }}
-                          activeDot={{ r: 5, fill: "#000", strokeWidth: 2, stroke: "#fff" }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  <div style={{ height: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description={t("dashboard.no_liability_data", language)}
+                    />
                   </div>
                 </ChartCard>
               </Col>
@@ -407,52 +382,61 @@ export default function HomePage() {
               <Col xs={24} lg={8}>
                 <ChartCard title={t("dashboard.contract_status", language)}>
                   <div style={{ height: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={statusData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={3}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          {statusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip content={<PieTooltip />} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    {hasStatusData ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={statusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={90}
+                            paddingAngle={3}
+                            dataKey="value"
+                            stroke="none"
+                          >
+                            {statusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<PieTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description={t("dashboard.no_status_data", language)}
+                      />
+                    )}
                   </div>
                   {/* Legend */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: 16,
-                      marginTop: -8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {statusData.map((item, idx) => (
-                      <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: 2,
-                            background: PIE_COLORS[idx],
-                          }}
-                        />
-                        <span style={{ fontSize: 12, color: "#595959" }}>
-                          {item.name} ({item.value})
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  {hasStatusData && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        gap: 16,
+                        marginTop: -8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {statusData.map((item, idx) => (
+                        <div key={item.key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 2,
+                              background: PIE_COLORS[idx],
+                            }}
+                          />
+                          <span style={{ fontSize: 12, color: "#595959" }}>
+                            {item.name} ({item.value})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </ChartCard>
               </Col>
             </Row>
@@ -647,6 +631,58 @@ export default function HomePage() {
                       </motion.div>
                     ))}
                   </div>
+                </Card>
+              </Col>
+            </Row>
+
+            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+              <Col span={24}>
+                <Card
+                  title={
+                    <Space>
+                      <BellOutlined />
+                      <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+                        未来 90 天关键日期提醒
+                      </span>
+                      {upcomingDates.length > 0 && <Tag color="processing">{upcomingDates.length}</Tag>}
+                    </Space>
+                  }
+                  bodyStyle={{ padding: 0 }}
+                  style={{ borderRadius: 10 }}
+                >
+                  {upcomingDates.length === 0 ? (
+                    <div style={{ padding: 32 }}>
+                      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无即将到期提醒" />
+                    </div>
+                  ) : (
+                    <List
+                      dataSource={upcomingDates}
+                      renderItem={(item: any) => {
+                        const urgency = getDateUrgency(item.target_date);
+                        return (
+                          <List.Item
+                            style={{ padding: "14px 24px", cursor: "pointer" }}
+                            onClick={() => router.push(`/contracts/${item.contract_id}`)}
+                            actions={[
+                              <Tag key="type">{criticalDateLabels[item.date_type] || item.date_type}</Tag>,
+                              <Tag key="urgency" color={urgency.color}>{urgency.text}</Tag>,
+                              <ArrowRightOutlined key="arrow" style={{ color: "#BFBFBF", fontSize: 12 }} />,
+                            ]}
+                          >
+                            <List.Item.Meta
+                              title={<span style={{ fontWeight: 600 }}>{item.title}</span>}
+                              description={
+                                <span style={{ color: "#8C8C8C" }}>
+                                  {dayjs(item.target_date).format("YYYY-MM-DD")} · 提前 {item.reminder_days} 天提醒
+                                  {item.description ? ` · ${item.description}` : ""}
+                                </span>
+                              }
+                            />
+                          </List.Item>
+                        );
+                      }}
+                    />
+                  )}
                 </Card>
               </Col>
             </Row>

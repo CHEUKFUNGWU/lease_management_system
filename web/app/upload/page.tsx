@@ -463,6 +463,7 @@ export default function UploadPage() {
         store_name: v("store_name") || undefined,
         store_address: v("store_address") || undefined,
         currency: v("currency"),
+        asset_type: v("asset_type") || "real_estate",
         commencement_date: v("commencement_date")
           ? dayjs.isDayjs(v("commencement_date"))
             ? (v("commencement_date") as Dayjs).format("YYYY-MM-DD")
@@ -480,6 +481,10 @@ export default function UploadPage() {
           : undefined,
         tags: v("tags") || undefined,
         discount_rate_type: v("discount_rate_type") || undefined,
+        lease_scope: v("lease_scope") || v("suggested_scope") || "in_scope",
+        exemption_reason: v("exemption_reason") || undefined,
+        scope_source: v("scope_source") || "ai_suggested",
+        scope_confidence: v("scope_confidence") ?? undefined,
       };
 
       try {
@@ -742,6 +747,19 @@ export default function UploadPage() {
         <Title level={3} style={{ marginBottom: 24 }}>
           {t("upload.title", language)}
         </Title>
+
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 24 }}
+          message="推荐使用 AI 录入主入口"
+          description="上传合同或台账文件后，系统会直接在聊天中生成可编辑的合同草稿卡片；本页继续保留为批量上传和逐步复核备用入口。"
+          action={
+            <Button size="small" type="primary" icon={<ArrowRightOutlined />} onClick={() => router.push("/ai-chat")}>
+              前往 AI 录入
+            </Button>
+          }
+        />
 
         {/* ── Steps indicator ── */}
         <Card style={{ marginBottom: 24 }}>

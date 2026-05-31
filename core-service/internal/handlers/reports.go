@@ -10,11 +10,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	
+
 	"github.com/gin-gonic/gin"
-	"github.com/ifrs16/core-service/internal/middleware"
-	"github.com/ifrs16/core-service/internal/repository"
-	"github.com/ifrs16/core-service/internal/services/ifrs16"
+	"github.com/lease-management-system/core-service/internal/middleware"
+	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
 // AmortizationReportRow is the response row for the amortization report.
@@ -62,7 +62,7 @@ type contractBucketRow struct {
 	sumPayment            float64
 	sumPrepaidPayment     float64
 	lastClosingLiability  float64
-	sumDepreciation        float64
+	sumDepreciation       float64
 	lastClosingROU        float64
 	sumVariableRent       float64
 	sumNonLease           float64
@@ -123,6 +123,47 @@ type TagSummaryRow struct {
 	ContractNames   []string `json:"contract_names"`
 }
 
+// PortfolioSummaryRow summarizes lease population by asset class, IFRS 16 scope, and currency.
+type PortfolioSummaryRow struct {
+	AssetType                string  `json:"asset_type"`
+	LeaseScope               string  `json:"lease_scope"`
+	Currency                 string  `json:"currency"`
+	ContractCount            int     `json:"contract_count"`
+	ApprovedCount            int     `json:"approved_count"`
+	ActiveContractCount      int     `json:"active_contract_count"`
+	MissingDiscountRateCount int     `json:"missing_discount_rate_count"`
+	FixedLeaseCommitment     float64 `json:"fixed_lease_commitment"`
+	VariableRentExposure     float64 `json:"variable_rent_exposure"`
+	NonLeaseComponentAmount  float64 `json:"non_lease_component_amount"`
+	PaymentCount             int     `json:"payment_count"`
+	EarliestCommencementDate string  `json:"earliest_commencement_date,omitempty"`
+	LatestLeaseEndDate       string  `json:"latest_lease_end_date,omitempty"`
+}
+
+type SensitivityScenarioRow struct {
+	ScenarioName          string  `json:"scenario_name"`
+	DiscountRate          float64 `json:"discount_rate"`
+	RateDelta             float64 `json:"rate_delta"`
+	InitialLiability      float64 `json:"initial_liability"`
+	InitialROUAsset       float64 `json:"initial_rou_asset"`
+	LiabilityDelta        float64 `json:"liability_delta"`
+	LiabilityDeltaPercent float64 `json:"liability_delta_percent"`
+}
+
+type StandardComparisonRow struct {
+	Standard              string   `json:"standard"`
+	StandardName          string   `json:"standard_name"`
+	Classification        string   `json:"classification"`
+	MeasurementBasis      string   `json:"measurement_basis"`
+	InitialLiability      float64  `json:"initial_liability"`
+	InitialROUAsset       float64  `json:"initial_rou_asset"`
+	FirstPeriodExpense    float64  `json:"first_period_expense"`
+	TotalRecognizedCost   float64  `json:"total_recognized_cost"`
+	BalanceSheetTreatment string   `json:"balance_sheet_treatment"`
+	PnLPattern            string   `json:"pnl_pattern"`
+	KeyDifferences        []string `json:"key_differences"`
+}
+
 type ReportHandler struct {
 	contractRepo      *repository.ContractRepository
 	psRepo            *repository.PaymentScheduleRepository
@@ -147,7 +188,7 @@ func (h *ReportHandler) LiabilityRolling(c *gin.Context) {
 		mode = "working"
 	}
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Build status filter based on report mode
 	var statuses []string
 	if mode == "official" {
@@ -156,36 +197,36 @@ func (h *ReportHandler) LiabilityRolling(c *gin.Context) {
 		// Working report includes all non-rejected statuses
 		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
 	}
-	
+
 	// Query contracts with status filter and tenant isolation
 	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	var results []gin.H
 	for _, contract := range contracts {
 		results = append(results, gin.H{
-			"contract_id":       contract.ID,
-			"contract_number":   contract.ContractNumber,
-			"contract_name":     contract.ContractName,
-			"approval_status":   contract.ApprovalStatus,
-			"is_official_version": contract.IsOfficialVersion,
-			"report_mode":       contract.ReportMode,
-			"commencement_date": contract.CommencementDate.Format("2006-01-02"),
-			"lease_end_date":    contract.LeaseEndDate.Format("2006-01-02"),
-			"currency":          contract.Currency,
-			"discount_rate_type": contract.DiscountRateType,
+			"contract_id":           contract.ID,
+			"contract_number":       contract.ContractNumber,
+			"contract_name":         contract.ContractName,
+			"approval_status":       contract.ApprovalStatus,
+			"is_official_version":   contract.IsOfficialVersion,
+			"report_mode":           contract.ReportMode,
+			"commencement_date":     contract.CommencementDate.Format("2006-01-02"),
+			"lease_end_date":        contract.LeaseEndDate.Format("2006-01-02"),
+			"currency":              contract.Currency,
+			"discount_rate_type":    contract.DiscountRateType,
 			"discount_rate_missing": contract.DiscountRateMissing,
 		})
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"mode":     mode,
-		"is_official": mode == "official",
-		"data":     results,
-		"total":    len(results),
+		"mode":         mode,
+		"is_official":  mode == "official",
+		"data":         results,
+		"total":        len(results),
 		"generated_at": time.Now(),
 	})
 }
@@ -197,20 +238,20 @@ func (h *ReportHandler) ContractSummary(c *gin.Context) {
 		mode = "working"
 	}
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	var statuses []string
 	if mode == "official" {
 		statuses = []string{"approved"}
 	} else {
 		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
 	}
-	
+
 	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	var totalContracts, approvedContracts, draftContracts int
 	for _, c := range contracts {
 		totalContracts++
@@ -221,14 +262,421 @@ func (h *ReportHandler) ContractSummary(c *gin.Context) {
 			draftContracts++
 		}
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"mode":              mode,
-		"total_contracts":   totalContracts,
-		"approved_count":    approvedContracts,
-		"draft_count":       draftContracts,
-		"pending_count":     totalContracts - approvedContracts - draftContracts,
+		"mode":            mode,
+		"total_contracts": totalContracts,
+		"approved_count":  approvedContracts,
+		"draft_count":     draftContracts,
+		"pending_count":   totalContracts - approvedContracts - draftContracts,
 	})
+}
+
+// PortfolioSummary returns portfolio-level operational and accounting exposure by asset type.
+func (h *ReportHandler) PortfolioSummary(c *gin.Context) {
+	mode := c.Query("mode")
+	if mode == "" {
+		mode = "working"
+	}
+	legalEntityID := middleware.GetTenantID(c)
+
+	var statuses []string
+	if mode == "official" {
+		statuses = []string{"approved"}
+	} else {
+		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
+	}
+
+	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rowsByKey := make(map[string]*PortfolioSummaryRow)
+	now := time.Now()
+	for _, ct := range contracts {
+		assetType := ct.AssetType
+		if assetType == "" {
+			assetType = "real_estate"
+		}
+		leaseScope := ct.LeaseScope
+		if leaseScope == "" {
+			leaseScope = "in_scope"
+		}
+		currency := ct.Currency
+		if currency == "" {
+			currency = "CNY"
+		}
+		key := assetType + "|" + leaseScope + "|" + currency
+		row := rowsByKey[key]
+		if row == nil {
+			row = &PortfolioSummaryRow{
+				AssetType:  assetType,
+				LeaseScope: leaseScope,
+				Currency:   currency,
+			}
+			rowsByKey[key] = row
+		}
+
+		row.ContractCount++
+		if ct.ApprovalStatus == "approved" {
+			row.ApprovedCount++
+		}
+		if !ct.LeaseEndDate.Before(now) {
+			row.ActiveContractCount++
+		}
+		if ct.DiscountRateMissing {
+			row.MissingDiscountRateCount++
+		}
+		if row.EarliestCommencementDate == "" || ct.CommencementDate.Format("2006-01-02") < row.EarliestCommencementDate {
+			row.EarliestCommencementDate = ct.CommencementDate.Format("2006-01-02")
+		}
+		if row.LatestLeaseEndDate == "" || ct.LeaseEndDate.Format("2006-01-02") > row.LatestLeaseEndDate {
+			row.LatestLeaseEndDate = ct.LeaseEndDate.Format("2006-01-02")
+		}
+
+		schedules, err := h.psRepo.GetByContractID(c.Request.Context(), ct.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		for _, ps := range schedules {
+			row.PaymentCount++
+			switch {
+			case ps.IsVariable:
+				row.VariableRentExposure += ps.Amount
+			case ps.IsNonLeaseComponent:
+				row.NonLeaseComponentAmount += ps.Amount
+			case ps.IsLeaseComponent && ps.IsFixed:
+				row.FixedLeaseCommitment += ps.Amount
+			}
+		}
+	}
+
+	rows := make([]*PortfolioSummaryRow, 0, len(rowsByKey))
+	for _, row := range rowsByKey {
+		rows = append(rows, row)
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].AssetType != rows[j].AssetType {
+			return rows[i].AssetType < rows[j].AssetType
+		}
+		if rows[i].LeaseScope != rows[j].LeaseScope {
+			return rows[i].LeaseScope < rows[j].LeaseScope
+		}
+		return rows[i].Currency < rows[j].Currency
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"mode":         mode,
+		"is_official":  mode == "official",
+		"data":         rows,
+		"total":        len(rows),
+		"generated_at": time.Now(),
+	})
+}
+
+// SensitivityAnalysis returns discount-rate impact scenarios for one contract.
+func (h *ReportHandler) SensitivityAnalysis(c *gin.Context) {
+	contractID := c.Query("contract_id")
+	if contractID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id is required"})
+		return
+	}
+	legalEntityID := middleware.GetTenantID(c)
+	contract, err := h.contractRepo.GetByID(c.Request.Context(), contractID, legalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if contract == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
+		return
+	}
+
+	schedules, err := h.psRepo.GetByContractID(c.Request.Context(), contractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if len(schedules) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payment schedules are required for sensitivity analysis"})
+		return
+	}
+
+	baseRate := 0.0
+	if raw := c.Query("base_rate"); raw != "" {
+		baseRate, _ = strconv.ParseFloat(raw, 64)
+	}
+	if baseRate <= 0 {
+		baseRate = resolveGlobalDiscountRate(c.Request.Context(), h.systemSettingRepo)
+	}
+	if baseRate <= 0 && contract.DiscountRateValue != nil {
+		baseRate = *contract.DiscountRateValue
+	}
+	if baseRate <= 0 {
+		baseRate = 0.05
+	}
+
+	shockValues := []float64{-0.01, -0.005, 0, 0.005, 0.01}
+	if raw := c.Query("shocks"); raw != "" {
+		shockValues = []float64{}
+		for _, part := range strings.Split(raw, ",") {
+			value, err := strconv.ParseFloat(strings.TrimSpace(part), 64)
+			if err == nil {
+				shockValues = append(shockValues, value)
+			}
+		}
+		if len(shockValues) == 0 {
+			shockValues = []float64{0}
+		}
+	}
+
+	payments := repository.ToIFRS16Payments(schedules)
+	var baseLiability float64
+	rows := make([]SensitivityScenarioRow, 0, len(shockValues))
+	for _, shock := range shockValues {
+		rate := baseRate + shock
+		if rate < 0 {
+			rate = 0
+		}
+		result, err := ifrs16.Calculate(ifrs16.LeaseCalculation{
+			CommencementDate: contract.CommencementDate,
+			LeaseEndDate:     contract.LeaseEndDate,
+			LeaseScope:       contract.LeaseScope,
+			DiscountRate:     rate,
+			Payments:         payments,
+			PrepaidRent: ifrs16.CalculatePrepaidRent(ifrs16.LeaseCalculation{
+				CommencementDate: contract.CommencementDate,
+				Payments:         payments,
+			}),
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if math.Abs(shock) < 0.0000001 {
+			baseLiability = result.InitialLiability
+		}
+		rows = append(rows, SensitivityScenarioRow{
+			ScenarioName:     fmt.Sprintf("%+.2f%%", shock*100),
+			DiscountRate:     rate,
+			RateDelta:        shock,
+			InitialLiability: result.InitialLiability,
+			InitialROUAsset:  result.InitialROUAsset,
+		})
+	}
+	if baseLiability == 0 && len(rows) > 0 {
+		baseLiability = rows[0].InitialLiability
+	}
+	for i := range rows {
+		rows[i].LiabilityDelta = rows[i].InitialLiability - baseLiability
+		if baseLiability != 0 {
+			rows[i].LiabilityDeltaPercent = rows[i].LiabilityDelta / baseLiability
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"contract_id":     contract.ID,
+		"contract_number": contract.ContractNumber,
+		"contract_name":   contract.ContractName,
+		"base_rate":       baseRate,
+		"lease_scope":     contract.LeaseScope,
+		"currency":        contract.Currency,
+		"generated_at":    time.Now(),
+		"data":            rows,
+		"total":           len(rows),
+	})
+}
+
+// StandardComparison compares the current contract under selected lease accounting standards.
+func (h *ReportHandler) StandardComparison(c *gin.Context) {
+	contractID := c.Query("contract_id")
+	if contractID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id is required"})
+		return
+	}
+	legalEntityID := middleware.GetTenantID(c)
+	contract, err := h.contractRepo.GetByID(c.Request.Context(), contractID, legalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if contract == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
+		return
+	}
+
+	schedules, err := h.psRepo.GetByContractID(c.Request.Context(), contractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if len(schedules) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payment schedules are required for standard comparison"})
+		return
+	}
+
+	discountRate := 0.0
+	if raw := c.Query("discount_rate"); raw != "" {
+		discountRate, _ = strconv.ParseFloat(raw, 64)
+	}
+	if discountRate <= 0 {
+		discountRate = resolveGlobalDiscountRate(c.Request.Context(), h.systemSettingRepo)
+	}
+	if discountRate <= 0 && contract.DiscountRateValue != nil {
+		discountRate = *contract.DiscountRateValue
+	}
+	if discountRate <= 0 {
+		discountRate = 0.05
+	}
+
+	payments := repository.ToIFRS16Payments(schedules)
+	input := ifrs16.LeaseCalculation{
+		CommencementDate: contract.CommencementDate,
+		LeaseEndDate:     contract.LeaseEndDate,
+		LeaseScope:       contract.LeaseScope,
+		DiscountRate:     discountRate,
+		Payments:         payments,
+		PrepaidRent: ifrs16.CalculatePrepaidRent(ifrs16.LeaseCalculation{
+			CommencementDate: contract.CommencementDate,
+			Payments:         payments,
+		}),
+	}
+	result, err := ifrs16.Calculate(input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	financeExpense, totalCapitalizedCost := summarizeCapitalizedCost(result)
+	straightLineExpense, totalFixedCost := summarizeStraightLineCost(result, payments)
+	rows := []StandardComparisonRow{
+		{
+			Standard:              "ifrs16",
+			StandardName:          "IFRS 16",
+			Classification:        "single lessee model",
+			MeasurementBasis:      result.MeasurementBasis,
+			InitialLiability:      result.InitialLiability,
+			InitialROUAsset:       result.InitialROUAsset,
+			FirstPeriodExpense:    financeExpense,
+			TotalRecognizedCost:   totalCapitalizedCost,
+			BalanceSheetTreatment: "Recognize lease liability and right-of-use asset unless exempt or not a lease.",
+			PnLPattern:            "Front-loaded finance cost plus straight-line depreciation for capitalized leases.",
+			KeyDifferences: []string{
+				"Single lessee accounting model for in-scope leases.",
+				"Short-term and low-value exemptions are supported when elected and documented.",
+				"Variable and non-lease components remain outside lease liability measurement.",
+			},
+		},
+		{
+			Standard:              "asc842_finance",
+			StandardName:          "ASC 842 - Finance Lease View",
+			Classification:        "finance lease",
+			MeasurementBasis:      result.MeasurementBasis,
+			InitialLiability:      result.InitialLiability,
+			InitialROUAsset:       result.InitialROUAsset,
+			FirstPeriodExpense:    financeExpense,
+			TotalRecognizedCost:   totalCapitalizedCost,
+			BalanceSheetTreatment: "Recognize lease liability and ROU asset; classification remains finance lease.",
+			PnLPattern:            "Interest and amortization are presented separately; expense pattern is generally front-loaded.",
+			KeyDifferences: []string{
+				"ASC 842 keeps finance and operating lease classification for lessees.",
+				"Finance lease economics are directionally aligned with IFRS 16 in this comparison.",
+				"Presentation and disclosure differ from IFRS 16 even when measurements are close.",
+			},
+		},
+		{
+			Standard:              "asc842_operating",
+			StandardName:          "ASC 842 - Operating Lease View",
+			Classification:        "operating lease",
+			MeasurementBasis:      result.MeasurementBasis,
+			InitialLiability:      result.InitialLiability,
+			InitialROUAsset:       result.InitialROUAsset,
+			FirstPeriodExpense:    straightLineExpense,
+			TotalRecognizedCost:   totalFixedCost,
+			BalanceSheetTreatment: "Recognize lease liability and ROU asset for most operating leases.",
+			PnLPattern:            "Single lease cost is generally recognized on a straight-line basis.",
+			KeyDifferences: []string{
+				"Operating lease P&L pattern differs from IFRS 16 finance-cost plus depreciation pattern.",
+				"ASC 842 does not provide an IFRS-style low-value asset exemption.",
+				"This row is a policy comparison view, not a substitute for a full ASC 842 subledger.",
+			},
+		},
+		{
+			Standard:              "cas21",
+			StandardName:          "中国企业会计准则第21号 - 租赁",
+			Classification:        "new lease standard lessee model",
+			MeasurementBasis:      result.MeasurementBasis,
+			InitialLiability:      result.InitialLiability,
+			InitialROUAsset:       result.InitialROUAsset,
+			FirstPeriodExpense:    financeExpense,
+			TotalRecognizedCost:   totalCapitalizedCost,
+			BalanceSheetTreatment: "Recognize lease liability and right-of-use asset unless exempt or outside lease scope.",
+			PnLPattern:            "Generally aligned with IFRS 16 style lessee accounting for in-scope leases.",
+			KeyDifferences: []string{
+				"Useful for local reporting bridge where company policy maps CAS 21 to IFRS 16 controls.",
+				"Chart of accounts, tax, and statutory presentation may differ from group IFRS reporting.",
+				"Use the IFRS engine result as the controlled baseline, then document local-policy adjustments.",
+			},
+		},
+	}
+	if result.MeasurementBasis == "straight_line_expense" {
+		for i := range rows {
+			rows[i].FirstPeriodExpense = straightLineExpense
+			rows[i].TotalRecognizedCost = totalFixedCost
+			rows[i].InitialLiability = 0
+			rows[i].InitialROUAsset = 0
+		}
+	}
+	if result.MeasurementBasis == "skipped" {
+		for i := range rows {
+			rows[i].FirstPeriodExpense = 0
+			rows[i].TotalRecognizedCost = 0
+			rows[i].InitialLiability = 0
+			rows[i].InitialROUAsset = 0
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"contract_id":     contract.ID,
+		"contract_number": contract.ContractNumber,
+		"contract_name":   contract.ContractName,
+		"lease_scope":     contract.LeaseScope,
+		"discount_rate":   discountRate,
+		"currency":        contract.Currency,
+		"generated_at":    time.Now(),
+		"data":            rows,
+		"total":           len(rows),
+	})
+}
+
+func summarizeCapitalizedCost(result *ifrs16.CalculationResult) (firstPeriodExpense float64, totalCost float64) {
+	for idx, row := range result.MonthlySummary {
+		periodCost := row.InterestExpense + row.Depreciation + row.VariableRentExpense + row.NonLeaseExpense
+		if idx == 0 {
+			firstPeriodExpense = periodCost
+		}
+		totalCost += periodCost
+	}
+	return firstPeriodExpense, totalCost
+}
+
+func summarizeStraightLineCost(result *ifrs16.CalculationResult, payments []ifrs16.LeasePayment) (firstPeriodExpense float64, totalCost float64) {
+	for _, payment := range payments {
+		if payment.Type == "fixed" || payment.Type == "" {
+			totalCost += payment.Amount
+		}
+	}
+	if len(result.MonthlySummary) > 0 {
+		firstPeriodExpense = totalCost / float64(len(result.MonthlySummary))
+	}
+	return roundReport(firstPeriodExpense), roundReport(totalCost)
+}
+
+func roundReport(value float64) float64 {
+	return math.Round(value*100) / 100
 }
 
 // ExportLiabilityRolling exports contract data as CSV
@@ -242,21 +690,21 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 	if lang == "" {
 		lang = "zh-CN"
 	}
-	
+
 	var statuses []string
 	if mode == "official" {
 		statuses = []string{"approved"}
 	} else {
 		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
 	}
-	
+
 	legalEntityID := middleware.GetTenantID(c)
 	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	// Set headers for CSV download
 	marker := ""
 	if mode == "working" {
@@ -264,17 +712,17 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 	} else {
 		marker = "_OFFICIAL"
 	}
-	
+
 	filename := fmt.Sprintf("IFRS16_LiabilityRolling%s_%s.csv", marker, time.Now().Format("20060102_150405"))
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-	
+
 	writer := csv.NewWriter(c.Writer)
 	defer writer.Flush()
-	
+
 	// BOM for Excel UTF-8
 	c.Writer.Write([]byte{0xEF, 0xBB, 0xBF})
-	
+
 	// Header
 	var headers []string
 	switch lang {
@@ -301,7 +749,7 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 		}
 	}
 	writer.Write(headers)
-	
+
 	// Data rows
 	for _, contract := range contracts {
 		writer.Write([]string{
@@ -310,9 +758,24 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 			contract.ApprovalStatus,
 			fmt.Sprintf("%v", contract.IsOfficialVersion),
 			contract.ReportMode,
-			func() string { if contract.LegalEntityID != nil { return *contract.LegalEntityID }; return "" }(),
-			func() string { if contract.StoreID != nil { return *contract.StoreID }; return "" }(),
-			func() string { if contract.LandlordID != nil { return *contract.LandlordID }; return "" }(),
+			func() string {
+				if contract.LegalEntityID != nil {
+					return *contract.LegalEntityID
+				}
+				return ""
+			}(),
+			func() string {
+				if contract.StoreID != nil {
+					return *contract.StoreID
+				}
+				return ""
+			}(),
+			func() string {
+				if contract.LandlordID != nil {
+					return *contract.LandlordID
+				}
+				return ""
+			}(),
 			contract.Currency,
 			contract.CommencementDate.Format("2006-01-02"),
 			contract.LeaseEndDate.Format("2006-01-02"),
@@ -331,17 +794,18 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 // Amortization returns a real-time daily amortization report.
 // GET /api/v1/reports/amortization
 // Query params:
-//   mode=working|official (default working)
-//   view=contract|store|summary|tag (default summary)
-//   granularity=day|month|quarter|half_year|year (default month)
-//   start_date=YYYY-MM-DD (required)
-//   end_date=YYYY-MM-DD (required)
-//   contract_id (optional)
-//   store (optional)
-//   tag (optional)
-//   discount_rate_override (optional, float, e.g. 0.05 or 5)
-//   report_currency (optional, string, e.g. CNY/USD/HKD)
-//   exchange_rate (optional, float > 0)
+//
+//	mode=working|official (default working)
+//	view=contract|store|summary|tag (default summary)
+//	granularity=day|month|quarter|half_year|year (default month)
+//	start_date=YYYY-MM-DD (required)
+//	end_date=YYYY-MM-DD (required)
+//	contract_id (optional)
+//	store (optional)
+//	tag (optional)
+//	discount_rate_override (optional, float, e.g. 0.05 or 5)
+//	report_currency (optional, string, e.g. CNY/USD/HKD)
+//	exchange_rate (optional, float > 0)
 func (h *ReportHandler) Amortization(c *gin.Context) {
 	mode := c.Query("mode")
 	if mode == "" {
@@ -526,9 +990,10 @@ func (h *ReportHandler) Amortization(c *gin.Context) {
 		calcInput := ifrs16.LeaseCalculation{
 			CommencementDate: ct.CommencementDate,
 			LeaseEndDate:     ct.LeaseEndDate,
+			LeaseScope:       ct.LeaseScope,
 			DiscountRate:     discountRate,
 			Payments:         payments,
-			PrepaidRent:      ifrs16.CalculatePrepaidRent(ifrs16.LeaseCalculation{
+			PrepaidRent: ifrs16.CalculatePrepaidRent(ifrs16.LeaseCalculation{
 				CommencementDate: ct.CommencementDate,
 				Payments:         payments,
 			}),
@@ -650,13 +1115,13 @@ func (h *ReportHandler) Amortization(c *gin.Context) {
 			agg, ok := storeMap[aggKey]
 			if !ok {
 				agg = &AmortizationReportRow{
-					GroupKey:   storeName,
-					GroupLabel: storeName,
-					StoreName:  storeName,
-					PeriodKey:  cr.periodKey,
+					GroupKey:    storeName,
+					GroupLabel:  storeName,
+					StoreName:   storeName,
+					PeriodKey:   cr.periodKey,
 					PeriodStart: cr.periodStart.Format("2006-01-02"),
 					PeriodEnd:   cr.periodEnd.Format("2006-01-02"),
-					Currency:   resolveAggCurrency(reportCurrency),
+					Currency:    resolveAggCurrency(reportCurrency),
 				}
 				storeMap[aggKey] = agg
 			}

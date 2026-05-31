@@ -31,6 +31,8 @@ import {
   CheckOutlined,
   SendOutlined,
   RollbackOutlined,
+  DownloadOutlined,
+  ImportOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
@@ -108,6 +110,9 @@ export default function MonthlyClosingPage() {
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [postingEntry, setPostingEntry] = useState<any>(null);
   const [erpReference, setErpReference] = useState("");
+  const [writebackModalOpen, setWritebackModalOpen] = useState(false);
+  const [writebackText, setWritebackText] = useState("");
+  const [writebackLoading, setWritebackLoading] = useState(false);
 
   const role = user?.role || "";
   const isAdmin = role === "admin";
@@ -232,6 +237,64 @@ export default function MonthlyClosingPage() {
     }
   };
 
+  const handleExportEntries = async () => {
+    if (!token || !selectedPeriod) {
+      message.warning("请先选择或生成月结期间");
+      return;
+    }
+    setActionLoading((prev) => ({ ...prev, export_entries: true }));
+    try {
+      const blob = await monthlyClosingApi.exportEntries(
+        { period: selectedPeriod, status: "approved", template: "kingdee" },
+        token
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Lease_GL_${selectedPeriod}_kingdee.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      message.success("ERP 分录文件已导出");
+    } catch (error: any) {
+      message.error(error.message || "ERP 分录导出失败");
+    } finally {
+      setActionLoading((prev) => ({ ...prev, export_entries: false }));
+    }
+  };
+
+  const handleApplyWriteback = async () => {
+    if (!token) return;
+    const items = writebackText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [entry_id, erp_reference, voucher_number] = line.split(",").map((part) => part.trim());
+        return { entry_id, erp_reference, voucher_number };
+      })
+      .filter((item) => item.entry_id && item.entry_id !== "entry_id");
+
+    if (items.length === 0) {
+      message.warning("请粘贴至少一行回写数据");
+      return;
+    }
+
+    setWritebackLoading(true);
+    try {
+      const res = await monthlyClosingApi.applyERPWriteback(items, token);
+      message.success(`已回写 ${res.applied_count || 0} 条，失败 ${res.failed_count || 0} 条`);
+      setWritebackModalOpen(false);
+      setWritebackText("");
+      refresh();
+    } catch (error: any) {
+      message.error(error.message || "凭证回写失败");
+    } finally {
+      setWritebackLoading(false);
+    }
+  };
+
   const handleApproveBatch = async (batchId: string) => {
     if (!token) return;
     setActionLoading((prev) => ({ ...prev, [`batch_${batchId}`]: true }));
@@ -329,6 +392,8 @@ export default function MonthlyClosingPage() {
     },
     { title: t("monthly.col_currency", language), dataIndex: "currency", width: 60 },
     { title: t("monthly.col_description", language), dataIndex: "description", ellipsis: true },
+    { title: "ERP 引用", dataIndex: "erp_reference", width: 130, render: (v: string) => v || "-" },
+    { title: "凭证号", dataIndex: "voucher_number", width: 120, render: (v: string) => v || "-" },
     {
       title: t("monthly.col_status", language),
       dataIndex: "posting_status",
@@ -608,6 +673,21 @@ export default function MonthlyClosingPage() {
               <Space>
                 <Button
                   size="small"
+                  icon={<DownloadOutlined />}
+                  loading={actionLoading.export_entries}
+                  onClick={handleExportEntries}
+                >
+                  导出 ERP CSV
+                </Button>
+                <Button
+                  size="small"
+                  icon={<ImportOutlined />}
+                  onClick={() => setWritebackModalOpen(true)}
+                >
+                  凭证回写
+                </Button>
+                <Button
+                  size="small"
                   icon={<CheckOutlined />}
                   onClick={() => {
                     const draftEntries = entries.filter(
@@ -688,7 +768,7 @@ export default function MonthlyClosingPage() {
                 rowKey="id"
                 pagination={{ pageSize: 20 }}
                 size="small"
-                scroll={{ x: 1100 }}
+                scroll={{ x: 1360 }}
               />
             </Spin>
           )}
@@ -894,6 +974,31 @@ export default function MonthlyClosingPage() {
             }}
             items={tabItems}
           />
+
+          <Modal
+            title="ERP 凭证回写"
+            open={writebackModalOpen}
+            onOk={handleApplyWriteback}
+            onCancel={() => setWritebackModalOpen(false)}
+            confirmLoading={writebackLoading}
+            okText="回写并标记已过账"
+            cancelText={t("monthly.cancel", language)}
+            width={720}
+          >
+            <Alert
+              type="info"
+              showIcon
+              message="粘贴 ERP 返回结果，每行格式：entry_id,erp_reference,voucher_number"
+              description="导出的 CSV 第一列就是 entry_id。回写成功后，系统会记录 ERP 引用与凭证号，并将对应已审批分录标记为已过账。"
+              style={{ marginBottom: 16 }}
+            />
+            <Input.TextArea
+              rows={8}
+              value={writebackText}
+              onChange={(e) => setWritebackText(e.target.value)}
+              placeholder={"entry_id,erp_reference,voucher_number\n550e8400-e29b-41d4-a716-446655440000,KD-2024-001,记-0001"}
+            />
+          </Modal>
 
           <Modal
             title={t("monthly.posting_confirm", language)}

@@ -5,10 +5,31 @@ import (
 	"time"
 )
 
+const (
+	LeaseScopeInScope         = "in_scope"
+	LeaseScopeShortTermExempt = "short_term_exempt"
+	LeaseScopeLowValueExempt  = "low_value_exempt"
+	LeaseScopeNotALease       = "not_a_lease"
+)
+
+func NormalizeLeaseScope(scope string) string {
+	switch scope {
+	case LeaseScopeInScope, LeaseScopeShortTermExempt, LeaseScopeLowValueExempt, LeaseScopeNotALease:
+		return scope
+	default:
+		return LeaseScopeInScope
+	}
+}
+
+func IsCapitalizedScope(scope string) bool {
+	return NormalizeLeaseScope(scope) == LeaseScopeInScope
+}
+
 // LeaseCalculation holds all inputs for IFRS 16 calculation
 type LeaseCalculation struct {
 	CommencementDate  time.Time
 	LeaseEndDate      time.Time
+	LeaseScope        string  // in_scope, short_term_exempt, low_value_exempt, not_a_lease
 	DiscountRate      float64 // Annual discount rate (e.g., 0.05 for 5%)
 	PaymentFrequency  string  // monthly, quarterly, yearly
 	Payments          []LeasePayment
@@ -27,10 +48,12 @@ type LeasePayment struct {
 
 // CalculationResult holds all IFRS 16 outputs
 type CalculationResult struct {
-	InitialLiability    float64
-	InitialROUAsset     float64
-	DailyAmortization   []DailyEntry
-	MonthlySummary      []MonthlyEntry
+	LeaseScope        string
+	MeasurementBasis  string // capitalized, straight_line_expense, skipped
+	InitialLiability  float64
+	InitialROUAsset   float64
+	DailyAmortization []DailyEntry
+	MonthlySummary    []MonthlyEntry
 }
 
 type DailyEntry struct {
@@ -45,6 +68,7 @@ type DailyEntry struct {
 	Depreciation        float64
 	ROUAdjustment       float64 // Rounding adjustment to force ROU to zero at lease end
 	ClosingROUAsset     float64
+	ExemptLeaseExpense  float64
 	VariableRentExpense float64
 	NonLeaseExpense     float64
 }
@@ -62,6 +86,7 @@ type MonthlyEntry struct {
 	Depreciation        float64
 	ROUAdjustment       float64
 	ClosingROUAsset     float64
+	ExemptLeaseExpense  float64
 	VariableRentExpense float64
 	NonLeaseExpense     float64
 }
@@ -105,30 +130,64 @@ func CalculatePrepaidRent(input LeaseCalculation) float64 {
 
 // Calculate performs full IFRS 16 calculation with daily granularity
 func Calculate(input LeaseCalculation) (*CalculationResult, error) {
-	result := &CalculationResult{}
-	
+	scope := NormalizeLeaseScope(input.LeaseScope)
+	switch scope {
+	case LeaseScopeInScope:
+		return calculateCapitalized(input, scope), nil
+	case LeaseScopeShortTermExempt, LeaseScopeLowValueExempt:
+		return calculateStraightLineExpense(input, scope), nil
+	case LeaseScopeNotALease:
+		return skipMeasurement(input, scope), nil
+	default:
+		return calculateCapitalized(input, LeaseScopeInScope), nil
+	}
+}
+
+func calculateCapitalized(input LeaseCalculation, scope string) *CalculationResult {
+	result := &CalculationResult{
+		LeaseScope:       scope,
+		MeasurementBasis: "capitalized",
+	}
+
 	// 1. Calculate initial lease liability (PV of lease payments)
 	result.InitialLiability = calculateInitialLiability(input)
-	
+
 	// 2. Calculate initial ROU asset
 	// If PrepaidRent is not explicitly set, compute it from payments
 	prepaidRent := input.PrepaidRent
 	if prepaidRent == 0 {
 		prepaidRent = CalculatePrepaidRent(input)
 	}
-	result.InitialROUAsset = result.InitialLiability + 
-		input.InitialDirectCost + 
-		prepaidRent - 
+	result.InitialROUAsset = result.InitialLiability +
+		input.InitialDirectCost +
+		prepaidRent -
 		input.IncentiveReceived +
 		input.RestorationCost
-	
+
 	// 3. Generate daily amortization schedule
 	result.DailyAmortization = generateDailySchedule(input, result.InitialLiability, result.InitialROUAsset)
-	
+
 	// 4. Aggregate to monthly
 	result.MonthlySummary = aggregateMonthly(result.DailyAmortization)
-	
-	return result, nil
+
+	return result
+}
+
+func calculateStraightLineExpense(input LeaseCalculation, scope string) *CalculationResult {
+	result := &CalculationResult{
+		LeaseScope:       scope,
+		MeasurementBasis: "straight_line_expense",
+	}
+	result.DailyAmortization = generateStraightLineSchedule(input)
+	result.MonthlySummary = aggregateMonthly(result.DailyAmortization)
+	return result
+}
+
+func skipMeasurement(input LeaseCalculation, scope string) *CalculationResult {
+	return &CalculationResult{
+		LeaseScope:       scope,
+		MeasurementBasis: "skipped",
+	}
 }
 
 // GetCarryingAmount returns the lease liability and ROU asset carrying amounts as of the day before the given date.
@@ -154,31 +213,86 @@ func GetCarryingAmount(input LeaseCalculation, asOfDate time.Time) (liability, r
 // calculateInitialLiability calculates PV of all lease payments
 func calculateInitialLiability(input LeaseCalculation) float64 {
 	var liability float64
-	
+
 	for _, payment := range input.Payments {
 		// Skip variable and non-lease payments for liability calculation
 		if payment.Type == "variable" || payment.Type == "non_lease" {
 			continue
 		}
-		
+
 		// Skip payments before commencement date (prepaid)
 		if !payment.Date.After(input.CommencementDate) && payment.Timing == "prepaid" {
 			continue
 		}
-		
+
 		daysFromCommencement := payment.Date.Sub(input.CommencementDate).Hours() / 24
 		dailyRate := math.Pow(1+input.DiscountRate, 1.0/365.0) - 1
 		discountFactor := math.Pow(1+dailyRate, -daysFromCommencement)
-		
+
 		liability += payment.Amount * discountFactor
 	}
-	
+
 	return round(liability)
 }
 
 // generateDailySchedule creates daily-level amortization
 func generateDailySchedule(input LeaseCalculation, initialLiability, initialROUAsset float64) []DailyEntry {
 	return GenerateForwardSchedule(input.CommencementDate, input.LeaseEndDate, initialLiability, initialROUAsset, input.DiscountRate, input.Payments, input.CommencementDate)
+}
+
+func generateStraightLineSchedule(input LeaseCalculation) []DailyEntry {
+	var schedule []DailyEntry
+
+	leaseTermDays := int(input.LeaseEndDate.Sub(input.CommencementDate).Hours() / 24)
+	if leaseTermDays <= 0 {
+		return schedule
+	}
+
+	totalLeasePayments := 0.0
+	for _, payment := range input.Payments {
+		if payment.Type == "variable" || payment.Type == "non_lease" {
+			continue
+		}
+		totalLeasePayments += payment.Amount
+	}
+	dailyExpense := totalLeasePayments / float64(leaseTermDays)
+
+	for day := 0; day < leaseTermDays; day++ {
+		currentDate := input.CommencementDate.Add(time.Duration(day) * 24 * time.Hour)
+
+		variableRent := 0.0
+		nonLeaseExpense := 0.0
+		payment := 0.0
+		prepaidPayment := 0.0
+		for _, p := range input.Payments {
+			if !isSameDay(p.Date, currentDate) {
+				continue
+			}
+			switch p.Type {
+			case "variable":
+				variableRent += p.Amount
+			case "non_lease":
+				nonLeaseExpense += p.Amount
+			default:
+				if p.Timing == "prepaid" && !p.Date.After(input.CommencementDate) {
+					prepaidPayment += p.Amount
+				} else {
+					payment += p.Amount
+				}
+			}
+		}
+
+		schedule = append(schedule, DailyEntry{
+			Date:                currentDate,
+			Payment:             round(payment),
+			PrepaidPayment:      round(prepaidPayment),
+			ExemptLeaseExpense:  round(dailyExpense),
+			VariableRentExpense: round(variableRent),
+			NonLeaseExpense:     round(nonLeaseExpense),
+		})
+	}
+
+	return schedule
 }
 
 // GenerateForwardSchedule creates a daily amortization schedule from startDate to endDate.
@@ -279,12 +393,12 @@ func aggregateMonthly(dailyEntries []DailyEntry) []MonthlyEntry {
 	if len(dailyEntries) == 0 {
 		return nil
 	}
-	
+
 	monthMap := make(map[string]*MonthlyEntry)
-	
+
 	for _, entry := range dailyEntries {
 		key := entry.Date.Format("2006-01")
-		
+
 		if _, exists := monthMap[key]; !exists {
 			monthMap[key] = &MonthlyEntry{
 				Year:             entry.Date.Year(),
@@ -293,7 +407,7 @@ func aggregateMonthly(dailyEntries []DailyEntry) []MonthlyEntry {
 				OpeningROUAsset:  entry.OpeningROUAsset,
 			}
 		}
-		
+
 		m := monthMap[key]
 		m.InterestExpense += entry.InterestExpense
 		m.TotalPayments += entry.Payment
@@ -303,16 +417,17 @@ func aggregateMonthly(dailyEntries []DailyEntry) []MonthlyEntry {
 		m.ROUAdjustment += entry.ROUAdjustment
 		m.ClosingLiability = entry.ClosingLiability
 		m.ClosingROUAsset = entry.ClosingROUAsset
+		m.ExemptLeaseExpense += entry.ExemptLeaseExpense
 		m.VariableRentExpense += entry.VariableRentExpense
 		m.NonLeaseExpense += entry.NonLeaseExpense
 	}
-	
+
 	// Convert map to sorted slice
 	var result []MonthlyEntry
 	for _, m := range monthMap {
 		result = append(result, *m)
 	}
-	
+
 	return result
 }
 

@@ -1,4 +1,4 @@
-module github.com/ifrs16/core-service
+module github.com/lease-management-system/core-service
 
 go 1.23
 

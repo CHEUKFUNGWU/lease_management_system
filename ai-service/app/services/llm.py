@@ -26,9 +26,11 @@ class LLMClient:
         messages: list[dict[str, str]],
         temperature: float = 0.1,
         max_tokens: Optional[int] = None,
+        tools: Optional[list[dict[str, Any]]] = None,
+        tool_choice: Optional[str | dict[str, Any]] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """调用 LLM 聊天接口"""
+        """调用 LLM 聊天接口，支持 Function Calling"""
         
         if not self.api_key:
             raise ValueError(f"{self.provider.upper()}_API_KEY 未配置")
@@ -47,6 +49,11 @@ class LLMClient:
         
         if max_tokens:
             payload["max_tokens"] = max_tokens
+        
+        if tools:
+            payload["tools"] = tools
+            if tool_choice:
+                payload["tool_choice"] = tool_choice
         
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(

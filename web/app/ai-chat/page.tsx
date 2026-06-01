@@ -38,6 +38,7 @@ import {
   ToolOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  CloseCircleOutlined,
 } from "@ant-design/icons";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -173,6 +174,7 @@ interface ChatSession {
   createdAt: number;
   updatedAt: number;
   model: string;
+  pendingUpload?: UploadedFile;
 }
 
 // ─── Constants ─────────────────────────────────────────────────
@@ -1441,7 +1443,6 @@ function AIChatPageContent() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [lastUploadedFile, setLastUploadedFile] = useState<UploadedFile | null>(null);
   const [selectedModel, setSelectedModel] = useState("deepseek-v4-flash");
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
 
@@ -1483,6 +1484,7 @@ function AIChatPageContent() {
     () => sessions.find((s) => s.id === activeSessionId),
     [sessions, activeSessionId]
   );
+  const activePendingUpload = activeSession?.pendingUpload ?? null;
 
   const chips = useMemo(() => {
     if (!pageContext) return defaultChips;
@@ -1504,11 +1506,11 @@ function AIChatPageContent() {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       model: selectedModel,
+      pendingUpload: undefined,
     };
     setSessions((prev) => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
     setInput("");
-    setLastUploadedFile(null);
   }, [language, selectedModel]);
 
   const deleteSession = useCallback((id: string) => {
@@ -1530,6 +1532,7 @@ function AIChatPageContent() {
           createdAt: Date.now(),
           updatedAt: Date.now(),
           model: selectedModel,
+          pendingUpload: undefined,
         };
         setActiveSessionId(newSession.id);
         return [newSession];
@@ -1562,6 +1565,20 @@ function AIChatPageContent() {
     },
     [language]
   );
+
+  const setSessionPendingUpload = useCallback((sessionId: string, uploadedFile: UploadedFile | null) => {
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              pendingUpload: uploadedFile ?? undefined,
+              updatedAt: Date.now(),
+            }
+          : s
+      )
+    );
+  }, []);
 
   const getFileIcon = (type: string) => {
     if (type.includes("pdf")) return <FilePdfOutlined style={{ color: "#EF4444" }} />;
@@ -1607,8 +1624,9 @@ function AIChatPageContent() {
 
       message.success(`${data.original_name} ${t("ai.upload_success", language)}`);
       onSuccess(data, file);
-      const uploadPrompt = input.trim() || "请解析这个文件并导入台账：先生成合同草稿卡片，等待我确认后再入库。";
-      await handleSend(uploadPrompt, uploadedFile);
+      if (activeSessionId) {
+        setSessionPendingUpload(activeSessionId, uploadedFile);
+      }
     } catch (err: any) {
       onError(err);
       message.error(`${t("ai.upload_failed", language)}: ${err.message}`);
@@ -1616,7 +1634,7 @@ function AIChatPageContent() {
   };
 
   const handleSend = async (messageOverride?: string, fileOverride?: UploadedFile) => {
-    const fileForRequest = fileOverride ?? lastUploadedFile;
+    const fileForRequest = fileOverride ?? activePendingUpload;
     const msg = (messageOverride ?? input).trim();
     if ((!msg && !fileForRequest) || !token || !activeSessionId) return;
     const messageText = msg || "请解析这个文件并导入台账：先生成合同草稿卡片，等待我确认后再入库。";
@@ -1646,7 +1664,7 @@ function AIChatPageContent() {
         chatData.file_id = fileForRequest.file_id;
         chatData.object_name = fileForRequest.object_name;
         chatData.content_type = fileForRequest.content_type;
-        setLastUploadedFile(null);
+        setSessionPendingUpload(activeSessionId, null);
       }
       if (pageContext) {
         chatData.page_context = {
@@ -1710,7 +1728,9 @@ function AIChatPageContent() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      if (input.trim() || activePendingUpload) {
+        handleSend();
+      }
     }
   };
 
@@ -2222,6 +2242,33 @@ function AIChatPageContent() {
                 flexShrink: 0,
               }}
             >
+              {activePendingUpload && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    marginBottom: 8,
+                    padding: "6px 12px",
+                    background: "#F0F0F0",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    color: "#595959",
+                  }}
+                >
+                  <PaperClipOutlined style={{ fontSize: 14 }} />
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {activePendingUpload.original_name}
+                  </span>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<CloseCircleOutlined style={{ fontSize: 14, color: "#8C8C8C" }} />}
+                    onClick={() => activeSessionId && setSessionPendingUpload(activeSessionId, null)}
+                    style={{ padding: 0, height: 22, width: 22 }}
+                  />
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -2300,13 +2347,13 @@ function AIChatPageContent() {
                   icon={<SendOutlined />}
                   onClick={() => handleSend()}
                   loading={loading}
-                  disabled={loading || !input.trim()}
+                  disabled={loading || (!input.trim() && !activePendingUpload)}
                   style={{
                     width: 36,
                     height: 36,
                     flexShrink: 0,
-                    background: input.trim() ? "#000" : "#D9D9D9",
-                    borderColor: input.trim() ? "#000" : "#D9D9D9",
+                    background: input.trim() || activePendingUpload ? "#000" : "#D9D9D9",
+                    borderColor: input.trim() || activePendingUpload ? "#000" : "#D9D9D9",
                   }}
                 />
               </div>

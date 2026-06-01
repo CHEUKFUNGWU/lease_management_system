@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Form,
@@ -18,7 +18,7 @@ import {
 import { ArrowLeftOutlined, SaveOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { contractApi } from "../../lib/api";
+import { contractApi, settingsApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
@@ -32,16 +32,36 @@ export default function NewContractPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
 
+  /* ---- load global discount rate as default ---- */
+  useEffect(() => {
+    if (!token) return;
+    settingsApi
+      .getGlobal(token)
+      .then((res) => {
+        const raw: number = res.global_discount_rate ?? 0.05;
+        const percent = raw > 1 ? raw : raw * 100;
+        form.setFieldsValue({ discount_rate_value: percent });
+      })
+      .catch(() => {
+        // fallback to 5%
+        form.setFieldsValue({ discount_rate_value: 5.0 });
+      });
+  }, [token, form]);
+
   const handleSubmit = async (values: any) => {
     if (!token) {
       message.error(t("contract_new.please_login", language));
       return;
     }
 
-    // Check discount rate
-    if (!values.discount_rate_type) {
+    const hasDiscountRateValue =
+      typeof values.discount_rate_value === "number" && Number.isFinite(values.discount_rate_value) && values.discount_rate_value > 0;
+
+    if (!hasDiscountRateValue) {
       setDrMissing(true);
       message.warning(t("contract_new.discount_rate_empty_warning", language));
+    } else {
+      setDrMissing(false);
     }
 
     setLoading(true);
@@ -66,7 +86,7 @@ export default function NewContractPage() {
         exemption_reason: values.exemption_reason || null,
         scope_source: "manual",
         tags: normalizeTagValues(values.tags),
-        discount_rate_missing: !values.discount_rate_type,
+        discount_rate_missing: !hasDiscountRateValue,
       };
 
       await contractApi.create(data, token);

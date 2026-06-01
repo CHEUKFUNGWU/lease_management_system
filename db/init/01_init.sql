@@ -599,9 +599,6 @@ CREATE TABLE IF NOT EXISTS period_locks (
 );
 CREATE INDEX IF NOT EXISTS idx_period_locks_period ON period_locks(accounting_period);
 
--- +goose Down
-DROP TABLE IF EXISTS period_locks;
-
 -- ============================================================================
 -- Migration 005: IFRS 16 Modification/Reassessment — Event Adjustments
 -- ============================================================================
@@ -635,13 +632,6 @@ CREATE INDEX IF NOT EXISTS idx_event_adjustments_event ON event_adjustments(even
 CREATE INDEX IF NOT EXISTS idx_event_adjustments_contract ON event_adjustments(contract_id);
 CREATE INDEX IF NOT EXISTS idx_event_adjustments_effective ON event_adjustments(effective_date);
 
--- +goose Down
-DROP INDEX IF EXISTS idx_event_adjustments_effective;
-DROP INDEX IF EXISTS idx_event_adjustments_contract;
-DROP INDEX IF EXISTS idx_event_adjustments_event;
-DROP TABLE IF EXISTS event_adjustments;
-ALTER TABLE lease_events DROP COLUMN IF EXISTS ifrs16_treatment;
-
 -- ============================================================================
 -- Migration 006: System Settings
 -- ============================================================================
@@ -659,24 +649,5 @@ INSERT INTO system_settings (setting_key, setting_value, description)
 VALUES ('global_discount_rate', '0.05', '集团默认折现率（年化，小数）')
 ON CONFLICT (setting_key) DO NOTHING;
 
--- +goose Down
-DROP TABLE IF EXISTS system_settings;
-
 -- ============================================================================
--- Migration 003 Down (original)
--- ============================================================================
-
--- +goose Down
--- +goose StatementBegin
-DROP INDEX IF EXISTS idx_monthly_closing_period;
-DROP INDEX IF EXISTS idx_journal_entries_posting;
-DROP INDEX IF EXISTS idx_journal_entries_batch;
-DROP INDEX IF EXISTS idx_journal_entries_period;
-DROP INDEX IF EXISTS idx_journal_entries_contract;
-DROP INDEX IF EXISTS idx_measurement_results_batch;
-DROP INDEX IF EXISTS idx_measurement_results_period;
-DROP INDEX IF EXISTS idx_measurement_results_contract;
-DROP TABLE IF EXISTS monthly_closing_batches;
-DROP TABLE IF EXISTS journal_entries;
-DROP TABLE IF EXISTS measurement_results;
--- +goose StatementEnd
+-- End of init script

@@ -810,11 +810,6 @@ const dict: TranslationDict = {
     "zh-HK": "審批狀態",
     en: "Approval Status",
   },
-  "contracts.col_discount_rate": {
-    "zh-CN": "折现率",
-    "zh-HK": "折現率",
-    en: "Discount Rate",
-  },
   "contracts.official": {
     "zh-CN": "正式",
     "zh-HK": "正式",
@@ -829,11 +824,6 @@ const dict: TranslationDict = {
     "zh-CN": "缺失",
     "zh-HK": "缺失",
     en: "Missing",
-  },
-  "contracts.set": {
-    "zh-CN": "已设置",
-    "zh-HK": "已設置",
-    en: "Set",
   },
   "contracts.total_items": {
     "zh-CN": "共 {total} 条",
@@ -4400,6 +4390,26 @@ const dict: TranslationDict = {
     "zh-CN": "IFRS 16 计算完成",
     "zh-HK": "IFRS 16 計算完成",
     en: "IFRS 16 calculation complete",
+  },
+  "contract_detail.discount_rate_missing_title": {
+    "zh-CN": "折现率未设置",
+    "zh-HK": "折現率未設置",
+    en: "Discount rate not set",
+  },
+  "contract_detail.discount_rate_missing_content": {
+    "zh-CN": "该合同尚未设置折现率，无法生成 IFRS 16 计算表格。请先前往设置页面配置集团默认折现率，或在合同中填写具体折现率。",
+    "zh-HK": "該合同尚未設置折現率，無法生成 IFRS 16 計算表格。請先前往設置頁面配置集團默認折現率，或在合同中填寫具體折現率。",
+    en: "This contract does not have a discount rate set and cannot generate an IFRS 16 calculation table. Please go to Settings to configure the group default discount rate, or enter a specific discount rate for this contract.",
+  },
+  "contract_detail.go_to_settings": {
+    "zh-CN": "前往设置",
+    "zh-HK": "前往設置",
+    en: "Go to Settings",
+  },
+  "contract_detail.cancel": {
+    "zh-CN": "取消",
+    "zh-HK": "取消",
+    en: "Cancel",
   },
   "contract_detail.contract_updated": {
     "zh-CN": "合同更新成功",

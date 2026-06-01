@@ -265,33 +265,7 @@ export default function ContractsPage() {
         );
       },
     },
-    {
-      title: t("contracts.col_discount_rate", language),
-      key: "discount_rate",
-      width: 90,
-      align: "center" as const,
-      render: (_: any, record: Contract) => (
-        <span>
-          {record.discount_rate_missing ? (
-            <Tag color="error" style={{ fontWeight: 500, margin: 0 }}>
-              {t("contracts.missing", language)}
-            </Tag>
-          ) : (
-            <Tag
-              style={{
-                background: "#F0F0F0",
-                border: "none",
-                color: "#595959",
-                fontWeight: 500,
-                margin: 0,
-              }}
-            >
-              {t("contracts.set", language)}
-            </Tag>
-          )}
-        </span>
-      ),
-    },
+
     {
       title: "范围",
       key: "lease_scope",

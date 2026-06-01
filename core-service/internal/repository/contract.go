@@ -192,6 +192,9 @@ func (r *ContractRepository) ResolveOrCreateLandlordID(ctx context.Context, name
 func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*Contract, error) {
 	contract.ID = uuid.New().String()
 	contract.Status = "draft"
+	if contract.ApprovalStatus == "" {
+		contract.ApprovalStatus = "draft"
+	}
 	if contract.LeaseScope == "" {
 		contract.LeaseScope = "in_scope"
 	}

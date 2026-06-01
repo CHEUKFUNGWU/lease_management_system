@@ -85,6 +85,22 @@ type AgentToolCall struct {
 	RequiresReview bool   `json:"requires_review"`
 }
 
+// LLMToolCall represents a tool call returned by the LLM (OpenAI/DeepSeek format).
+type LLMToolCall struct {
+	ID       string                 `json:"id"`
+	Type     string                 `json:"type"`
+	Function map[string]interface{} `json:"function"`
+}
+
+// LLMChatResponse is the raw response from AI Service when using function calling.
+type LLMChatResponse struct {
+	Answer     string        `json:"answer"`
+	Sources    []Source      `json:"sources"`
+	Confidence float64       `json:"confidence"`
+	Model      string        `json:"model"`
+	ToolCalls  []LLMToolCall `json:"tool_calls,omitempty"`
+}
+
 type AgentReviewPrompt struct {
 	ID              string   `json:"id"`
 	Title           string   `json:"title"`
@@ -204,15 +220,66 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	}
 	agentRunbook := h.buildAgentRunbook(req, effectiveContractID)
 
-	// 1. Handle file upload if present — keep existing parse behavior
+	// 1. Handle file upload if present — use Function Calling to let LLM decide which tool to invoke
 	if req.FileID != "" && req.ObjectName != "" {
-		// Check intent: batch contract import from ledger file
-		msgLower := strings.ToLower(req.Message)
-		isPaymentScheduleIntent := containsAny(msgLower, []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"})
-		isBatchImportIntent := containsAny(msgLower, []string{"录入", "导入", "录入台账", "批量创建", "创建合同", "导入台账", "import", "batch create", "create contracts", "ledger"})
+		fileSystemPrompt := fmt.Sprintf(`用户上传了一个文件，文件名: %s，MIME类型: %s。
+请根据用户的意图和文件类型，决定调用哪个解析工具：
+- parse_contract_batch: 当文件是合同台账（Excel/PDF包含多份合同）时使用
+- parse_payment_schedule: 当文件是租金表/付款计划时使用
+- parse_contract: 当文件是单份合同（PDF/Word/图片）时使用
 
-		if isPaymentScheduleIntent {
-			scheduleResult, err := h.parsePaymentSchedule(c, req.FileID, req.ObjectName, req.ContentType, effectiveContractID)
+用户消息: %s`, req.ObjectName, req.ContentType, req.Message)
+
+		_, modelName, toolCalls, err := h.callLLMWithTools(c, fileSystemPrompt, req.Message, req.History, req.Language, fileParseTools)
+		fallbackTool := detectFileParseTool(req.Message)
+		selectedTool := fallbackTool
+		toolExecutionChain := []AgentToolCall{}
+		contractID := effectiveContractID
+
+		if err == nil && len(toolCalls) > 0 && toolCalls[0].Tool != "" {
+			selectedTool = toolCalls[0].Tool
+			toolExecutionChain = toolCalls
+			var funcArgs map[string]interface{}
+			if toolCalls[0].InputSummary != "" {
+				_ = json.Unmarshal([]byte(toolCalls[0].InputSummary), &funcArgs)
+			}
+			if cid, ok := funcArgs["contract_id"].(string); ok && cid != "" {
+				contractID = cid
+			}
+		} else if fallbackTool != "" {
+			modelName = "deterministic-router"
+		}
+
+		switch selectedTool {
+		case "parse_contract_batch":
+			batchResult, err := h.parseContractBatch(c, req.FileID, req.ObjectName, req.ContentType)
+			if err != nil {
+				c.JSON(http.StatusOK, AIChatResponse{
+					Answer:     fmt.Sprintf("文件解析失败: %s", err.Error()),
+					Sources:    sources,
+					Confidence: 0.5,
+					IsOfficial: false,
+					Model:      "fallback",
+				})
+				return
+			}
+			c.JSON(http.StatusOK, AIChatResponse{
+				Answer:         batchResult.SummaryText,
+				Sources:        batchResult.Sources,
+				Confidence:     batchResult.Confidence,
+				IsOfficial:     false,
+				Model:          modelName,
+				AgentMode:      true,
+				AgentPlan:      batchResult.AgentPlan,
+				ToolCalls:      append(toolExecutionChain, batchResult.ToolCalls...),
+				ReviewPrompts:  batchResult.ReviewPrompts,
+				DraftContracts: batchResult.Contracts,
+				BatchSummary:   batchResult.Summary,
+			})
+			return
+
+		case "parse_payment_schedule":
+			scheduleResult, err := h.parsePaymentSchedule(c, req.FileID, req.ObjectName, req.ContentType, contractID)
 			if err != nil {
 				c.JSON(http.StatusOK, AIChatResponse{
 					Answer:     fmt.Sprintf("租金表解析失败: %s", err.Error()),
@@ -228,63 +295,32 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 				Sources:                scheduleResult.Sources,
 				Confidence:             scheduleResult.Confidence,
 				IsOfficial:             false,
-				Model:                  "lease-agent",
+				Model:                  modelName,
 				AgentMode:              true,
 				AgentPlan:              scheduleResult.AgentPlan,
-				ToolCalls:              scheduleResult.ToolCalls,
+				ToolCalls:              append(toolExecutionChain, scheduleResult.ToolCalls...),
 				ReviewPrompts:          scheduleResult.ReviewPrompts,
 				DraftPaymentSchedules:  scheduleResult.Schedules,
 				PaymentScheduleSummary: scheduleResult.Summary,
 			})
 			return
-		}
 
-		if isBatchImportIntent {
-			// Call batch contract parsing endpoint
-			batchResult, err := h.parseContractBatch(c, req.FileID, req.ObjectName, req.ContentType)
+		default:
+			parsed, err := h.parseFile(c, req.FileID, req.ObjectName, req.ContentType)
 			if err != nil {
-				c.JSON(http.StatusOK, AIChatResponse{
-					Answer:     fmt.Sprintf("文件解析失败: %s", err.Error()),
-					Sources:    sources,
-					Confidence: 0.5,
-					IsOfficial: false,
-					Model:      "fallback",
+				contextData.WriteString(fmt.Sprintf("\n## 文件解析失败\n错误: %s\n", err.Error()))
+			} else {
+				contextData.WriteString("\n## 上传文件解析结果\n")
+				for k, v := range parsed {
+					contextData.WriteString(fmt.Sprintf("- %s: %v\n", k, v))
+				}
+				sources = append(sources, Source{
+					Type:    "file",
+					ID:      req.FileID,
+					Title:   "上传文件",
+					Snippet: req.ObjectName,
 				})
-				return
 			}
-
-			// Return structured draft response for frontend to render confirmation panel
-			c.JSON(http.StatusOK, AIChatResponse{
-				Answer:         batchResult.SummaryText,
-				Sources:        batchResult.Sources,
-				Confidence:     batchResult.Confidence,
-				IsOfficial:     false,
-				Model:          "lease-agent",
-				AgentMode:      true,
-				AgentPlan:      batchResult.AgentPlan,
-				ToolCalls:      batchResult.ToolCalls,
-				ReviewPrompts:  batchResult.ReviewPrompts,
-				DraftContracts: batchResult.Contracts,
-				BatchSummary:   batchResult.Summary,
-			})
-			return
-		}
-
-		// Default single-file parse behavior
-		parsed, err := h.parseFile(c, req.FileID, req.ObjectName, req.ContentType)
-		if err != nil {
-			contextData.WriteString(fmt.Sprintf("\n## 文件解析失败\n错误: %s\n", err.Error()))
-		} else {
-			contextData.WriteString("\n## 上传文件解析结果\n")
-			for k, v := range parsed {
-				contextData.WriteString(fmt.Sprintf("- %s: %v\n", k, v))
-			}
-			sources = append(sources, Source{
-				Type:    "file",
-				ID:      req.FileID,
-				Title:   "上传文件",
-				Snippet: req.ObjectName,
-			})
 		}
 	}
 
@@ -938,6 +974,59 @@ func (h *AIChatHandler) buildSystemPrompt(userID, role, legalEntityID, contextDa
 - 如被要求执行误导性、不合规或无依据的操作，必须拒绝并建议合规替代方案`, userID, role, legalEntityID, workingWarning, langInstruction, contextData)
 }
 
+// fileParseTools defines the available tools for LLM function calling when a file is uploaded.
+var fileParseTools = []map[string]interface{}{
+	{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "parse_contract_batch",
+			"description": "解析合同台账文件（Excel/PDF），批量提取多份合同草稿。当用户上传包含多份合同的台账文件，或提到'台账'、'批量'、'导入多份合同'、'ledger'时使用。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"file_id":      map[string]interface{}{"type": "string", "description": "上传文件的ID"},
+					"object_name":  map[string]interface{}{"type": "string", "description": "文件在MinIO中的对象名"},
+					"content_type": map[string]interface{}{"type": "string", "description": "文件MIME类型"},
+				},
+				"required": []string{"file_id", "object_name", "content_type"},
+			},
+		},
+	},
+	{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "parse_payment_schedule",
+			"description": "解析租金表/付款计划文件。当用户上传租金表、付款计划、rent schedule，或提到'租金'、'付款'、'payment schedule'时使用。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"file_id":      map[string]interface{}{"type": "string", "description": "上传文件的ID"},
+					"object_name":  map[string]interface{}{"type": "string", "description": "文件在MinIO中的对象名"},
+					"content_type": map[string]interface{}{"type": "string", "description": "文件MIME类型"},
+					"contract_id":  map[string]interface{}{"type": "string", "description": "关联的合同ID（可选）"},
+				},
+				"required": []string{"file_id", "object_name", "content_type"},
+			},
+		},
+	},
+	{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "parse_contract",
+			"description": "解析单个合同文件（PDF/Word/图片），提取合同字段生成草稿。当用户上传单份合同文件，且未明确提到'台账'或'批量'时使用。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"file_id":      map[string]interface{}{"type": "string", "description": "上传文件的ID"},
+					"object_name":  map[string]interface{}{"type": "string", "description": "文件在MinIO中的对象名"},
+					"content_type": map[string]interface{}{"type": "string", "description": "文件MIME类型"},
+				},
+				"required": []string{"file_id", "object_name", "content_type"},
+			},
+		},
+	},
+}
+
 // callLLM sends the prompt and message history to the AI Service chat endpoint.
 func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
@@ -992,6 +1081,90 @@ func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string
 	}
 
 	return result.Answer, result.Model, nil
+}
+
+// callLLMWithTools sends the prompt and message history to the AI Service chat endpoint with function calling support.
+// It returns the LLM answer, model name, and any tool_calls if the LLM decided to invoke tools.
+func (h *AIChatHandler) callLLMWithTools(c *gin.Context, systemPrompt, userMessage string, history []ChatMessage, language string, tools []map[string]interface{}) (string, string, []AgentToolCall, error) {
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		aiServiceURL = "http://ai-service:8000"
+	}
+
+	// Build messages from history + current message
+	messages := []map[string]string{}
+	for _, h := range history {
+		messages = append(messages, map[string]string{"role": h.Role, "content": h.Content})
+	}
+	messages = append(messages, map[string]string{"role": "user", "content": userMessage})
+
+	reqBody, err := json.Marshal(map[string]interface{}{
+		"messages":      messages,
+		"system_prompt": systemPrompt,
+		"temperature":   0.1,
+		"max_tokens":    2000,
+		"language":      language,
+		"tools":         tools,
+		"tool_choice":   "auto",
+	})
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("POST", aiServiceURL+"/api/v1/chat", bytes.NewReader(reqBody))
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", c.GetHeader("Authorization"))
+
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("AI service unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result LLMChatResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", "", nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Convert tool_calls to AgentToolCall format
+	var agentToolCalls []AgentToolCall
+	if result.ToolCalls != nil {
+		for _, tc := range result.ToolCalls {
+			funcName := ""
+			funcArgs := ""
+			if tc.Function != nil {
+				if name, ok := tc.Function["name"].(string); ok {
+					funcName = name
+				}
+				if args, ok := tc.Function["arguments"].(string); ok {
+					funcArgs = args
+				}
+			}
+			agentToolCalls = append(agentToolCalls, AgentToolCall{
+				Tool:           funcName,
+				Skill:          "LLM Function Calling",
+				Status:         "completed",
+				InputSummary:   funcArgs,
+				OutputSummary:  "等待执行",
+				RequiresReview: false,
+			})
+		}
+	}
+
+	return result.Answer, result.Model, agentToolCalls, nil
 }
 
 // extractSourcesFromAnswer parses the LLM answer for source citations and matches them
@@ -1712,4 +1885,16 @@ func containsAny(msg string, targets []string) bool {
 		}
 	}
 	return false
+}
+
+func detectFileParseTool(message string) string {
+	msgLower := strings.ToLower(message)
+	switch {
+	case containsAny(msgLower, []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"}):
+		return "parse_payment_schedule"
+	case containsAny(msgLower, []string{"录入", "导入", "录入台账", "批量创建", "创建合同", "导入台账", "import", "batch create", "create contracts", "ledger"}):
+		return "parse_contract_batch"
+	default:
+		return "parse_contract"
+	}
 }

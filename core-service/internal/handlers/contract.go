@@ -188,6 +188,7 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		createdBy = &id
 	}
 	now := time.Now()
+	normalizedDiscountRateValue := normalizeDiscountRateValue(req.DiscountRateValue)
 
 	contract := &repository.Contract{
 		ContractNumber:               req.ContractNumber,
@@ -211,7 +212,8 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		TerminationAssessment:        req.TerminationAssessment,
 		DiscountRateType:             req.DiscountRateType,
 		DiscountRateVersion:          req.DiscountRateVersion,
-		DiscountRateValue:            normalizeDiscountRateValue(req.DiscountRateValue),
+		DiscountRateValue:            normalizedDiscountRateValue,
+		DiscountRateMissing:          normalizedDiscountRateValue == nil,
 		LeaseScope:                   normalizeLeaseScope(req.LeaseScope),
 		ExemptionReason:              req.ExemptionReason,
 		ScopeSource:                  req.ScopeSource,
@@ -322,6 +324,7 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 			sd, _ := time.Parse("2006-01-02", *contractReq.SigningDate)
 			signingDate = &sd
 		}
+		normalizedDiscountRateValue := normalizeDiscountRateValue(contractReq.DiscountRateValue)
 
 		contract := &repository.Contract{
 			ContractNumber:               contractReq.ContractNumber,
@@ -345,7 +348,8 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 			TerminationAssessment:        contractReq.TerminationAssessment,
 			DiscountRateType:             contractReq.DiscountRateType,
 			DiscountRateVersion:          contractReq.DiscountRateVersion,
-			DiscountRateValue:            normalizeDiscountRateValue(contractReq.DiscountRateValue),
+			DiscountRateValue:            normalizedDiscountRateValue,
+			DiscountRateMissing:          normalizedDiscountRateValue == nil,
 			LeaseScope:                   normalizeLeaseScope(contractReq.LeaseScope),
 			ExemptionReason:              contractReq.ExemptionReason,
 			ScopeSource:                  contractReq.ScopeSource,
@@ -510,6 +514,7 @@ func (h *ContractHandler) Update(c *gin.Context) {
 		updatedBy = uid
 	}
 	now := time.Now()
+	normalizedDiscountRateValue := normalizeDiscountRateValue(req.DiscountRateValue)
 
 	// Build update contract
 	leaseScope := existing.LeaseScope
@@ -540,7 +545,8 @@ func (h *ContractHandler) Update(c *gin.Context) {
 		LeaseEndDate:        leaseEndDate,
 		DiscountRateType:    req.DiscountRateType,
 		DiscountRateVersion: req.DiscountRateVersion,
-		DiscountRateValue:   normalizeDiscountRateValue(req.DiscountRateValue),
+		DiscountRateValue:   normalizedDiscountRateValue,
+		DiscountRateMissing: normalizedDiscountRateValue == nil,
 		LeaseScope:          leaseScope,
 		ExemptionReason:     req.ExemptionReason,
 		ScopeSource:         req.ScopeSource,

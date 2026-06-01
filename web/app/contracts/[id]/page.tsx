@@ -571,7 +571,7 @@ export default function ContractDetailPage() {
   const handleCalculate = async () => {
     setCalcLoading(true);
     try {
-      const discountRate = contract?.discount_rate_value ?? 0.05;
+      const discountRate = contract?.discount_rate_value;
       const data = await contractApi.calculate(
         contractId,
         discountRate,

@@ -133,10 +133,13 @@ export const contractApi = {
       token,
     }),
     
-  calculate: (id: string, discountRate: number, token: string) =>
+  calculate: (id: string, discountRate: number | null | undefined, token: string) =>
     apiRequest(`/api/v1/contracts/${id}/calculate`, {
       method: "POST",
-      body: JSON.stringify({ contract_id: id, discount_rate: discountRate }),
+      body: JSON.stringify({
+        contract_id: id,
+        ...(discountRate != null ? { discount_rate: discountRate } : {}),
+      }),
       token,
     }),
     

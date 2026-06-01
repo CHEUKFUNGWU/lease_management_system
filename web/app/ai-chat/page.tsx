@@ -1594,11 +1594,34 @@ function AIChatPageContent() {
     return <FileTextOutlined />;
   };
 
+  const inferUploadTaskType = (prompt: string) => {
+    const normalized = prompt.toLowerCase();
+    if (
+      normalized.includes("租金表") ||
+      normalized.includes("付款计划") ||
+      normalized.includes("付款表") ||
+      normalized.includes("rent schedule") ||
+      normalized.includes("payment schedule")
+    ) {
+      return "payment_schedule";
+    }
+    if (
+      normalized.includes("事件") ||
+      normalized.includes("变更") ||
+      normalized.includes("modification") ||
+      normalized.includes("reassessment")
+    ) {
+      return "event";
+    }
+    return "contract";
+  };
+
   const handleFileUpload = async (options: any) => {
     const { file, onSuccess, onError } = options;
     const formData = new FormData();
+    const taskType = inferUploadTaskType(input);
     formData.append("file", file);
-    formData.append("file_type", "contract");
+    formData.append("task_type", taskType);
 
     try {
       const response = await fetch(`${window.location.origin}/api/ai/files/upload`, {

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 import os
 import uuid
@@ -14,7 +14,7 @@ router = APIRouter()
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    task_type: str = "contract"
+    task_type: str = Form("contract")
 ):
     """
     上传文件到 MinIO
@@ -39,6 +39,13 @@ async def upload_file(
             detail=f"不支持的文件类型: {file.content_type}. 支持: PDF, Excel, JPG, PNG, TIFF"
         )
     
+    allowed_task_types = {"contract", "payment_schedule", "event", "scan_copy"}
+    if task_type not in allowed_task_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的任务类型: {task_type}. 支持: contract, payment_schedule, event, scan_copy"
+        )
+
     # 生成唯一文件名
     file_id = str(uuid.uuid4())
     original_name = file.filename

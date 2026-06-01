@@ -686,6 +686,19 @@ export default function ContractDetailPage() {
     return false; // prevent default upload
   };
 
+  const openPaymentScheduleAgent = () => {
+    const title = contract
+      ? `${contract.contract_number} ${contract.contract_name}`
+      : t("contract.tab_payments", language);
+    const params = new URLSearchParams({
+      page: "contract-detail",
+      contract_id: contractId,
+      title,
+      summary: t("contract_detail.agent_payment_summary", language),
+    });
+    router.push(`/ai-chat?${params.toString()}`);
+  };
+
   const handleImportDrafts = async () => {
     const confirmedDrafts = aiDrafts.filter((d) => d.confirmed && !d.skipped);
     if (confirmedDrafts.length === 0) {
@@ -1280,6 +1293,12 @@ export default function ContractDetailPage() {
                     }
                     extra={
                       <Space>
+                        <Button
+                          icon={<RobotOutlined />}
+                          onClick={openPaymentScheduleAgent}
+                        >
+                          {t("contract.ai_agent_intake", language)}
+                        </Button>
                         <Upload
                           accept=".pdf,.xlsx,.xls"
                           showUploadList={false}

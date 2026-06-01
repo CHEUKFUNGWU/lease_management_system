@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 import io
 import json
+import logging
 
 from app.services.llm import llm_client
 from app.services.storage import download_from_minio, get_minio_client
@@ -16,6 +17,7 @@ except ImportError:
     HAS_OPENPYXL = False
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ParseRequest(BaseModel):
@@ -351,6 +353,113 @@ class PaymentScheduleParseResponse(BaseModel):
     requires_human_confirmation: bool
 
 
+def _normalize_header(value: str) -> str:
+    value = value.strip().lower().replace(" ", "_").replace("-", "_")
+    aliases = {
+        "period_start": "period_start",
+        "覆盖期间起始日": "period_start",
+        "期间开始": "period_start",
+        "period_end": "period_end",
+        "覆盖期间结束日": "period_end",
+        "期间结束": "period_end",
+        "due_date": "due_date",
+        "应付日期": "due_date",
+        "应付日": "due_date",
+        "amount": "amount",
+        "金额": "amount",
+        "payment_timing": "payment_timing",
+        "付款时点": "payment_timing",
+        "amount_type": "amount_type",
+        "金额类型": "amount_type",
+        "currency": "currency",
+        "币种": "currency",
+        "component": "component",
+        "成分": "component",
+        "is_fixed": "is_fixed",
+        "固定租金": "is_fixed",
+        "is_lease_component": "is_lease_component",
+        "租赁成分": "is_lease_component",
+    }
+    return aliases.get(value, value)
+
+
+def _truthy_cell(value: str, default: bool) -> bool:
+    normalized = value.strip().lower()
+    if normalized in ("true", "yes", "y", "1", "是", "租赁", "lease"):
+        return True
+    if normalized in ("false", "no", "n", "0", "否", "非租赁", "non_lease", "non-lease"):
+        return False
+    return default
+
+
+def _fallback_parse_payment_schedule_text(file_content: str, reason: str) -> Dict[str, Any]:
+    """Best-effort Office table fallback used only when LLM parsing is unavailable."""
+    rows: List[List[str]] = []
+    for raw_line in file_content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("###") or set(line.replace("|", "").replace("-", "").strip()) == set():
+            continue
+        if "|" not in line:
+            continue
+        cells = [cell.strip() for cell in line.split("|")]
+        if len(cells) >= 3:
+            rows.append(cells)
+
+    if not rows:
+        return {
+            "schedules": [],
+            "overall_confidence": 0.0,
+            "missing_fields": ["all"],
+            "warnings": [f"LLM 解析不可用，且 Office 表格兜底未找到可读行: {reason}"],
+            "total_schedules": 0,
+        }
+
+    header = [_normalize_header(cell) for cell in rows[0]]
+    required = {"due_date", "amount"}
+    if not required.issubset(set(header)):
+        return {
+            "schedules": [],
+            "overall_confidence": 0.0,
+            "missing_fields": sorted(required - set(header)),
+            "warnings": [f"LLM 解析不可用，Office 表格兜底无法识别必要列: {reason}"],
+            "total_schedules": 0,
+        }
+
+    schedules = []
+    for raw_cells in rows[2:] if len(rows) > 1 and all(cell.replace("-", "").strip() == "" for cell in rows[1]) else rows[1:]:
+        row = {header[i]: raw_cells[i] if i < len(raw_cells) else "" for i in range(len(header))}
+        if not row.get("due_date") or not row.get("amount"):
+            continue
+        try:
+            amount = float(str(row["amount"]).replace(",", ""))
+        except ValueError:
+            continue
+        amount_type = row.get("amount_type") or "fixed_rent"
+        component = row.get("component", "")
+        is_fixed = _truthy_cell(row.get("is_fixed", ""), amount_type not in ("turnover_rent", "variable_rent"))
+        is_lease_component = _truthy_cell(row.get("is_lease_component", ""), component != "non_lease" and amount_type not in ("cam", "service_fee"))
+        schedules.append({
+            "period_start": row.get("period_start") or row["due_date"],
+            "period_end": row.get("period_end") or row["due_date"],
+            "due_date": row["due_date"],
+            "amount": amount,
+            "payment_timing": row.get("payment_timing") or "postpaid",
+            "is_fixed": is_fixed,
+            "is_lease_component": is_lease_component,
+            "amount_type": amount_type,
+            "currency": row.get("currency") or "",
+            "confidence": 0.65,
+        })
+
+    return {
+        "schedules": schedules,
+        "overall_confidence": 0.65 if schedules else 0.0,
+        "missing_fields": [] if schedules else ["all"],
+        "warnings": [f"LLM 解析不可用，已使用 Office 表格兜底读取，必须人工复核: {reason}"],
+        "total_schedules": len(schedules),
+    }
+
+
 @router.post("/parse/payment-schedule", response_model=PaymentScheduleParseResponse)
 async def parse_payment_schedule(request: PaymentScheduleParseRequest):
     """
@@ -542,7 +651,45 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
             "requires_human_confirmation": requires_human,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
+        reason = f"{type(e).__name__}: {str(e) or repr(e)}"
+        logger.exception("LLM payment schedule parsing failed; using Office table fallback")
+        parsed = _fallback_parse_payment_schedule_text(file_content, reason)
+        validated_schedules = []
+        warnings = parsed.get("warnings", [])
+        for i, s in enumerate(parsed.get("schedules", [])):
+            try:
+                amount = float(s["amount"])
+            except (ValueError, TypeError, KeyError):
+                warnings.append(f"兜底读取第 {i+1} 行金额无法解析，已跳过")
+                continue
+            validated_schedules.append(PaymentScheduleItem(
+                period_start=s.get("period_start", s.get("due_date", "")),
+                period_end=s.get("period_end", s.get("due_date", "")),
+                due_date=s.get("due_date", ""),
+                amount=amount,
+                payment_timing=s.get("payment_timing", "postpaid"),
+                is_fixed=s.get("is_fixed", True),
+                is_lease_component=s.get("is_lease_component", True),
+                amount_type=s.get("amount_type", "fixed_rent"),
+                currency=s.get("currency", ""),
+                confidence=s.get("confidence", 0.65),
+            ))
+
+        return {
+            "task_id": "task_ps_" + request.file_id,
+            "file_id": request.file_id,
+            "mode": "assist",
+            "draft_type": "payment_schedule_draft",
+            "status": "draft_generated",
+            "schedules": validated_schedules,
+            "confidence_scores": {
+                "overall": parsed.get("overall_confidence", 0.0),
+                "average_item": sum((s.confidence or 0.65) for s in validated_schedules) / max(len(validated_schedules), 1),
+            },
+            "missing_fields": parsed.get("missing_fields", []),
+            "warnings": warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
+            "requires_human_confirmation": True,
+        }
 
 
 class ContractBatchDraftRequest(BaseModel):

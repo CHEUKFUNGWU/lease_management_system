@@ -987,6 +987,11 @@ const dict: TranslationDict = {
     "zh-HK": "AI 識別租金表",
     en: "AI Parse Rent Schedule",
   },
+  "contract.ai_agent_intake": {
+    "zh-CN": "在 AI Agent 中处理",
+    "zh-HK": "在 AI Agent 中處理",
+    en: "Open in AI Agent",
+  },
   "contract.manual_add": {
     "zh-CN": "手动添加",
     "zh-HK": "手動添加",
@@ -4454,6 +4459,11 @@ const dict: TranslationDict = {
     "zh-CN": "AI 识别完成：{count} 笔付款计划",
     "zh-HK": "AI 識別完成：{count} 筆付款計劃",
     en: "AI recognition complete: {count} payment schedules",
+  },
+  "contract_detail.agent_payment_summary": {
+    "zh-CN": "当前任务：为此合同解析租金表并生成付款计划草稿。",
+    "zh-HK": "當前任務：為此合同解析租金表並生成付款計劃草稿。",
+    en: "Current task: parse a rent schedule for this contract and generate payment schedule drafts.",
   },
   "contract_detail.import_success": {
     "zh-CN": "成功导入 {count} 笔付款计划",

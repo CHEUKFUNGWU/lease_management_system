@@ -44,7 +44,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { aiChatApi, contractApi, paymentScheduleApi } from "../lib/api";
+import { API_BASE_URL, aiChatApi, contractApi, paymentScheduleApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -148,11 +148,22 @@ interface AgentReviewPrompt {
   contract_numbers?: string[];
 }
 
+interface RuntimeReviewAction {
+  id: string;
+  actionType: string;
+  actedAt: number;
+  artifactId?: string;
+  runId?: string;
+  comment?: string;
+  payload?: Record<string, any>;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  runId?: string;
   sources?: string[];
   attachments?: UploadedFile[];
   model?: string;
@@ -161,10 +172,13 @@ interface Message {
   agentPlan?: AgentPlanStep[];
   toolCalls?: AgentToolCall[];
   reviewPrompts?: AgentReviewPrompt[];
+  reviewActions?: RuntimeReviewAction[];
   draftContracts?: ContractDraftItem[];
   batchSummary?: BatchParseSummary;
+  contractDraftArtifactId?: string;
   draftPaymentSchedules?: PaymentScheduleDraftItem[];
   paymentScheduleSummary?: PaymentScheduleParseSummary;
+  paymentScheduleArtifactId?: string;
 }
 
 interface ChatSession {
@@ -175,6 +189,8 @@ interface ChatSession {
   updatedAt: number;
   model: string;
   pendingUpload?: UploadedFile;
+  serverSessionId?: string;
+  currentRunId?: string;
 }
 
 // ─── Constants ─────────────────────────────────────────────────
@@ -294,6 +310,135 @@ function saveActiveSessionId(id: string | null) {
   } else {
     localStorage.removeItem(ACTIVE_SESSION_KEY);
   }
+}
+
+function createWelcomeMessage(language: Language): Message {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: t("ai.welcome", language),
+    timestamp: Date.now(),
+  };
+}
+
+function parseRuntimeField<T>(value: any): T | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return undefined;
+    }
+  }
+  return value as T;
+}
+
+function toTimestamp(value: any): number {
+  if (!value) return Date.now();
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Date.now();
+}
+
+function mapServerMessageToUI(message: any): Message {
+  const runtimeSources = parseRuntimeField<any[]>(message.sources) || [];
+  const runtimeAttachments = parseRuntimeField<UploadedFile[]>(message.attachments);
+  return {
+    id: message.id,
+    role: message.role === "assistant" ? "assistant" : "user",
+    content: message.content || "",
+    timestamp: toTimestamp(message.created_at),
+    runId: message.run_id || undefined,
+    sources: runtimeSources.map((source) => source?.title || source?.id || source?.type).filter(Boolean),
+    attachments: runtimeAttachments,
+    model: message.model || undefined,
+  };
+}
+
+function mapReviewAction(action: any): RuntimeReviewAction {
+  return {
+    id: action.id,
+    actionType: action.action_type || "",
+    actedAt: toTimestamp(action.acted_at),
+    artifactId: action.artifact_id || undefined,
+    runId: action.run_id || undefined,
+    comment: action.comment || undefined,
+    payload: parseRuntimeField<Record<string, any>>(action.action_payload),
+  };
+}
+
+function reviewActionLabel(actionType: string, i18nLang: Language): string {
+  switch (actionType) {
+    case "confirm":
+      return t("ai.review_action_confirm", i18nLang);
+    case "skip":
+      return t("ai.review_action_skip", i18nLang);
+    case "import":
+      return t("ai.review_action_import", i18nLang);
+    case "create_draft":
+      return t("ai.review_action_create_draft", i18nLang);
+    case "reject":
+      return t("ai.review_action_reject", i18nLang);
+    default:
+      return actionType;
+  }
+}
+
+function enrichMessagesWithRuntimeData(messages: Message[], artifacts: any[], reviewActions: any[]): Message[] {
+  if ((!Array.isArray(artifacts) || artifacts.length === 0) && (!Array.isArray(reviewActions) || reviewActions.length === 0)) {
+    return messages.length > 0 ? messages : [];
+  }
+
+  const artifactByRunId = new Map<string, any[]>();
+  (artifacts || []).forEach((artifact) => {
+    if (!artifact?.run_id) return;
+    const current = artifactByRunId.get(artifact.run_id) || [];
+    current.push(artifact);
+    artifactByRunId.set(artifact.run_id, current);
+  });
+
+  const actionsByArtifactId = new Map<string, RuntimeReviewAction[]>();
+  (reviewActions || []).forEach((action) => {
+    const mapped = mapReviewAction(action);
+    if (!mapped.artifactId) return;
+    const current = actionsByArtifactId.get(mapped.artifactId) || [];
+    current.push(mapped);
+    actionsByArtifactId.set(mapped.artifactId, current);
+  });
+
+  return messages.map((message) => {
+    if (!message.runId) return message;
+    const runArtifacts = artifactByRunId.get(message.runId) || [];
+    if (runArtifacts.length === 0) return message;
+
+    const nextMessage = { ...message };
+    runArtifacts.forEach((artifact) => {
+      const artifactData = parseRuntimeField<any>(artifact.data) || {};
+      if (artifact.artifact_type === "contract_draft") {
+        nextMessage.draftContracts = artifactData.contracts;
+        nextMessage.batchSummary = artifactData.summary;
+        nextMessage.contractDraftArtifactId = artifact.id;
+        nextMessage.reviewActions = [
+          ...(nextMessage.reviewActions || []),
+          ...(actionsByArtifactId.get(artifact.id) || []),
+        ];
+      }
+      if (artifact.artifact_type === "payment_schedule_draft") {
+        nextMessage.draftPaymentSchedules = artifactData.schedules;
+        nextMessage.paymentScheduleSummary = artifactData.summary;
+        nextMessage.paymentScheduleArtifactId = artifact.id;
+        nextMessage.reviewActions = [
+          ...(nextMessage.reviewActions || []),
+          ...(actionsByArtifactId.get(artifact.id) || []),
+        ];
+      }
+    });
+    if (nextMessage.reviewActions) {
+      nextMessage.reviewActions = nextMessage.reviewActions
+        .slice()
+        .sort((a, b) => a.actedAt - b.actedAt);
+    }
+    return nextMessage;
+  });
 }
 
 // ─── Code Block Component ──────────────────────────────────────
@@ -706,6 +851,86 @@ function AgentReviewPanel({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ReviewActionHistoryPanel({
+  actions = [],
+  language,
+  onContinue,
+}: {
+  actions?: RuntimeReviewAction[];
+  language: Language;
+  onContinue: (action: RuntimeReviewAction) => void;
+}) {
+  if (actions.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        border: "1px solid #E5E5E5",
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "#fff",
+      }}
+    >
+      <div
+        style={{
+          padding: "10px 12px",
+          borderBottom: "1px solid #F0F0F0",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <ClockCircleOutlined style={{ color: "#595959" }} />
+        <Text strong style={{ fontSize: 13 }}>
+          {t("ai.review_action_history", language)}
+        </Text>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {actions.map((action, index) => (
+          <div
+            key={action.id}
+            style={{
+              padding: "10px 12px",
+              borderBottom: index === actions.length - 1 ? "none" : "1px solid #F5F5F5",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <Tag style={{ borderRadius: 4, marginInlineEnd: 0 }}>
+                {reviewActionLabel(action.actionType, language)}
+              </Tag>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {formatTime(action.actedAt)}
+              </Text>
+              {action.comment && (
+                <Text style={{ fontSize: 12, color: "#595959" }}>
+                  {action.comment}
+                </Text>
+              )}
+            </div>
+
+            <Button
+              type="text"
+              size="small"
+              icon={<MessageOutlined />}
+              onClick={() => onContinue(action)}
+              style={{ paddingInline: 8, color: "#595959" }}
+            >
+              {t("ai.continue_from_action", language)}
+            </Button>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1445,6 +1670,7 @@ function AIChatPageContent() {
   const [loading, setLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState("deepseek-v4-flash");
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const [hydratedServerSessions, setHydratedServerSessions] = useState(false);
 
   // Load sessions from localStorage on mount
   useEffect(() => {
@@ -1462,6 +1688,74 @@ function AIChatPageContent() {
       createNewSession();
     }
   }, []);
+
+  useEffect(() => {
+    if (!token || hydratedServerSessions) return;
+
+    let cancelled = false;
+    aiChatApi
+      .listSessions(token, { limit: 50 })
+      .then((response) => {
+        if (cancelled) return;
+        const serverSessions = Array.isArray(response.sessions) ? response.sessions : [];
+        if (serverSessions.length === 0) {
+          setHydratedServerSessions(true);
+          return;
+        }
+
+        setSessions((prev) => {
+          const runtimeBacked = new Map(
+            prev
+              .filter((session) => session.serverSessionId)
+              .map((session) => [session.serverSessionId!, session])
+          );
+          const localOnly = prev.filter((session) => !session.serverSessionId);
+          const shouldDropPlaceholder =
+            localOnly.length === 1 &&
+            localOnly[0].messages.length === 1 &&
+            localOnly[0].messages[0].id === "welcome";
+          const preservedLocal = shouldDropPlaceholder ? [] : localOnly;
+
+          const merged = serverSessions.map((serverSession: any) => {
+            const existing = runtimeBacked.get(serverSession.id);
+            return {
+              id: existing?.id || `server:${serverSession.id}`,
+              title: serverSession.title || existing?.title || t("ai.new_session", language),
+              messages: existing?.messages || [],
+              createdAt: existing?.createdAt || toTimestamp(serverSession.created_at),
+              updatedAt: toTimestamp(serverSession.updated_at),
+              model: existing?.model || selectedModel,
+              pendingUpload: existing?.pendingUpload,
+              serverSessionId: serverSession.id,
+              currentRunId: existing?.currentRunId,
+            } satisfies ChatSession;
+          });
+
+          return [...preservedLocal, ...merged].sort((a, b) => b.updatedAt - a.updatedAt);
+        });
+
+        setActiveSessionId((current) => {
+          const mergedIds = new Set([
+            ...serverSessions.map((serverSession: any) => `server:${serverSession.id}`),
+            ...sessions.filter((session) => session.serverSessionId).map((session) => session.id),
+          ]);
+          if (current && mergedIds.has(current)) {
+            return current;
+          }
+          return `server:${serverSessions[0].id}`;
+        });
+        setHydratedServerSessions(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHydratedServerSessions(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydratedServerSessions, language, selectedModel, sessions, token]);
 
   // Save sessions when they change
   useEffect(() => {
@@ -1495,14 +1789,7 @@ function AIChatPageContent() {
     const newSession: ChatSession = {
       id: generateId(),
       title: t("ai.new_session", language),
-      messages: [
-        {
-          id: "welcome",
-          role: "assistant",
-          content: t("ai.welcome", language),
-          timestamp: Date.now(),
-        },
-      ],
+      messages: [createWelcomeMessage(language)],
       createdAt: Date.now(),
       updatedAt: Date.now(),
       model: selectedModel,
@@ -1520,15 +1807,8 @@ function AIChatPageContent() {
         // Create a new empty session
         const newSession: ChatSession = {
           id: generateId(),
-      title: t("ai.new_session", language),
-          messages: [
-            {
-              id: "welcome",
-              role: "assistant",
-              content: t("ai.welcome", language),
-              timestamp: Date.now(),
-            },
-          ],
+          title: t("ai.new_session", language),
+          messages: [createWelcomeMessage(language)],
           createdAt: Date.now(),
           updatedAt: Date.now(),
           model: selectedModel,
@@ -1566,6 +1846,20 @@ function AIChatPageContent() {
     [language]
   );
 
+  const updateSessionRuntime = useCallback((sessionId: string, updates: Partial<ChatSession>) => {
+    setSessions((prev) =>
+      prev.map((session) =>
+        session.id === sessionId
+          ? {
+              ...session,
+              ...updates,
+              updatedAt: updates.updatedAt ?? Date.now(),
+            }
+          : session
+      )
+    );
+  }, []);
+
   const setSessionPendingUpload = useCallback((sessionId: string, uploadedFile: UploadedFile | null) => {
     setSessions((prev) =>
       prev.map((s) =>
@@ -1579,6 +1873,77 @@ function AIChatPageContent() {
       )
     );
   }, []);
+
+  const patchAssistantMessage = useCallback(
+    (sessionId: string, messageId: string, patch: Partial<Message>) => {
+      updateSessionMessages(sessionId, (messages) =>
+        messages.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                ...patch,
+              }
+            : message
+        )
+      );
+    },
+    [updateSessionMessages]
+  );
+
+  const appendReviewActionToMessage = useCallback(
+    (sessionId: string, artifactId: string | undefined, action: any) => {
+      if (!artifactId || !action) return;
+      const mapped = mapReviewAction(action);
+      updateSessionMessages(sessionId, (messages) =>
+        messages.map((message) => {
+          const matchesArtifact =
+            message.contractDraftArtifactId === artifactId ||
+            message.paymentScheduleArtifactId === artifactId;
+          if (!matchesArtifact) return message;
+          const existing = message.reviewActions || [];
+          if (existing.some((item) => item.id === mapped.id)) return message;
+          return {
+            ...message,
+            reviewActions: [...existing, mapped].sort((a, b) => a.actedAt - b.actedAt),
+          };
+        })
+      );
+    },
+    [updateSessionMessages]
+  );
+
+  const buildHistoryFromMessages = useCallback((messages: Message[]) => {
+    return messages
+      .filter((message) => message.id !== "welcome")
+      .slice(-10)
+      .map((message) => ({ role: message.role, content: message.content }));
+  }, []);
+
+  const hydrateServerSession = useCallback(async (sessionId: string, serverSessionId: string) => {
+    if (!token) return;
+    const response = await aiChatApi.getSession(serverSessionId, token);
+    const runtimeMessages = Array.isArray(response.messages) ? response.messages.map(mapServerMessageToUI) : [];
+    const hydratedMessages = enrichMessagesWithRuntimeData(
+      runtimeMessages,
+      response.artifacts || [],
+      response.review_actions || []
+    );
+    updateSessionRuntime(sessionId, {
+      title: response.session?.title || t("ai.new_session", language),
+      messages: hydratedMessages.length > 0 ? hydratedMessages : [createWelcomeMessage(language)],
+      updatedAt: toTimestamp(response.session?.updated_at),
+      createdAt: toTimestamp(response.session?.created_at),
+    });
+  }, [language, token, updateSessionRuntime]);
+
+  useEffect(() => {
+    if (!activeSessionId || !activeSession?.serverSessionId || !token) return;
+    if (activeSession.messages.length > 0) return;
+
+    hydrateServerSession(activeSessionId, activeSession.serverSessionId).catch(() => {
+      // Best-effort hydration. Keep local session shell if backend fetch fails.
+    });
+  }, [activeSession, activeSessionId, hydrateServerSession, token]);
 
   const getFileIcon = (type: string) => {
     if (type.includes("pdf")) return <FilePdfOutlined style={{ color: "#EF4444" }} />;
@@ -1656,6 +2021,269 @@ function AIChatPageContent() {
     }
   };
 
+  const consumeRunStream = useCallback(
+    async (sessionId: string, runId: string, assistantMessageId: string) => {
+      const response = await fetch(`${API_BASE_URL}/api/v1/ai/chat/runs/${runId}/stream`, {
+        headers: {
+          Accept: "text/event-stream",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let terminalSeen = false;
+
+      const applyRuntimeEvent = (runtimeEvent: any) => {
+        const payload = runtimeEvent?.payload || {};
+        switch (runtimeEvent?.event_type) {
+          case "message_end":
+            patchAssistantMessage(sessionId, assistantMessageId, {
+              content: payload.content || "",
+              model: payload.model,
+              sources: Array.isArray(payload.sources)
+                ? payload.sources.map((source: any) => source.title || source.id || source.type).filter(Boolean)
+                : undefined,
+            });
+            setTypingMessageId(assistantMessageId);
+            setTimeout(() => {
+              setTypingMessageId((current) => (current === assistantMessageId ? null : current));
+            }, Math.min(String(payload.content || "").length * 15 + 500, 3000));
+            break;
+          case "tool_end":
+            patchAssistantMessage(sessionId, assistantMessageId, {
+              toolCalls: Array.isArray(payload) ? payload : undefined,
+            });
+            break;
+          case "review_prompt":
+            patchAssistantMessage(sessionId, assistantMessageId, {
+              reviewPrompts: Array.isArray(payload) ? payload : undefined,
+            });
+            break;
+          case "artifact_ready":
+            if (payload?.artifact_type === "contract_draft") {
+              patchAssistantMessage(sessionId, assistantMessageId, {
+                draftContracts: payload?.data?.contracts,
+                batchSummary: payload?.data?.summary,
+                contractDraftArtifactId: payload?.artifact_id,
+              });
+            }
+            if (payload?.artifact_type === "payment_schedule_draft") {
+              patchAssistantMessage(sessionId, assistantMessageId, {
+                draftPaymentSchedules: payload?.data?.schedules,
+                paymentScheduleSummary: payload?.data?.summary,
+                paymentScheduleArtifactId: payload?.artifact_id,
+              });
+            }
+            break;
+          case "run_error":
+            patchAssistantMessage(sessionId, assistantMessageId, {
+              content: payload?.error || t("ai.request_failed", language, { error: t("ai.unknown_error", language) }),
+              model: payload?.model,
+            });
+            break;
+          case "run_end":
+            terminalSeen = true;
+            setLoading(false);
+            updateSessionRuntime(sessionId, { currentRunId: undefined });
+            break;
+          default:
+            break;
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop() || "";
+
+        for (const chunk of chunks) {
+          const lines = chunk.split("\n");
+          let eventName = "message";
+          const dataLines: string[] = [];
+
+          for (const line of lines) {
+            if (line.startsWith("event:")) {
+              eventName = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+              dataLines.push(line.slice(5).trim());
+            }
+          }
+
+          if (dataLines.length === 0) continue;
+
+          try {
+            const payload = JSON.parse(dataLines.join("\n"));
+            if (eventName === "run_event" && payload?.event) {
+              applyRuntimeEvent(payload.event);
+            } else if (eventName === "complete") {
+              terminalSeen = true;
+              setLoading(false);
+              updateSessionRuntime(sessionId, { currentRunId: undefined });
+            }
+          } catch {
+            // Ignore malformed SSE chunks.
+          }
+        }
+      }
+
+      if (!terminalSeen) {
+        setLoading(false);
+        updateSessionRuntime(sessionId, { currentRunId: undefined });
+      }
+    },
+    [language, patchAssistantMessage, token, updateSessionRuntime]
+  );
+
+  const startStreamedAssistantRun = useCallback(
+    async (
+      localSessionId: string,
+      serverSessionId: string,
+      runResponse: any,
+      assistantSeed: Partial<Message>
+    ) => {
+      const run = runResponse.run;
+      const assistantMessageId = generateId();
+      const aiMessage: Message = {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        runId: run?.id,
+        agentMode: true,
+        agentPlan: runResponse.agent_plan,
+        toolCalls: runResponse.tool_calls,
+        reviewPrompts: runResponse.review_prompts,
+        ...assistantSeed,
+      };
+      updateSessionMessages(localSessionId, (messages) => [...messages, aiMessage]);
+      updateSessionRuntime(localSessionId, {
+        serverSessionId,
+        currentRunId: run?.id,
+      });
+
+      if (!run?.id) {
+        throw new Error("missing run id");
+      }
+
+      await consumeRunStream(localSessionId, run.id, assistantMessageId);
+      return runResponse;
+    },
+    [consumeRunStream, updateSessionMessages, updateSessionRuntime]
+  );
+
+  const createAndStartAssistantRun = useCallback(
+    async (
+      localSessionId: string,
+      serverSessionId: string,
+      runRequest: {
+        message: string;
+        parent_run_id?: string;
+        contract_id?: string;
+        history?: any[];
+        file_id?: string;
+        object_name?: string;
+        content_type?: string;
+        language?: string;
+        page_context?: {
+          page?: string;
+          title?: string;
+          contract_id?: string;
+          period?: string;
+          report_view?: string;
+          filters?: Record<string, string>;
+          summary?: string;
+        };
+      },
+      assistantSeed: Partial<Message>
+    ) => {
+      const runResp = await aiChatApi.createRun(serverSessionId, runRequest, token!);
+      return startStreamedAssistantRun(localSessionId, serverSessionId, runResp, assistantSeed);
+    },
+    [startStreamedAssistantRun, token]
+  );
+
+  const continueFromRuntimeTarget = useCallback(
+    async (
+      localSessionId: string,
+      serverSessionId: string,
+      target: { type: "run" | "message" | "artifact" | "action"; id: string },
+      options?: {
+        instruction?: string;
+        contractId?: string;
+        pageContext?: {
+          page?: string;
+          title?: string;
+          contract_id?: string;
+          period?: string;
+          report_view?: string;
+          filters?: Record<string, string>;
+          summary?: string;
+        };
+      },
+      assistantSeed: Partial<Message> = {}
+    ) => {
+      const continuationResp = await aiChatApi.createContinuation(
+        {
+          target,
+          instruction: options?.instruction,
+          contract_id: options?.contractId,
+          language,
+          page_context: options?.pageContext,
+        },
+        token!
+      );
+      return startStreamedAssistantRun(localSessionId, serverSessionId, continuationResp, assistantSeed);
+    },
+    [language, startStreamedAssistantRun, token]
+  );
+
+  const triggerRuntimeContinuation = useCallback(
+    async (
+      target: { type: "run" | "message" | "artifact" | "action"; id: string },
+      options?: {
+        instruction?: string;
+        contractId?: string;
+        pageContext?: {
+          page?: string;
+          title?: string;
+          contract_id?: string;
+          period?: string;
+          report_view?: string;
+          filters?: Record<string, string>;
+          summary?: string;
+        };
+      }
+    ) => {
+      if (!activeSessionId || !activeSession?.serverSessionId) {
+        message.warning(t("ai.request_failed", language, { error: t("ai.unknown_error", language) }));
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await continueFromRuntimeTarget(
+          activeSessionId,
+          activeSession.serverSessionId,
+          target,
+          options
+        );
+      } catch (error: any) {
+        setLoading(false);
+        message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+      }
+    },
+    [activeSession, activeSessionId, continueFromRuntimeTarget, language]
+  );
+
   const handleSend = async (messageOverride?: string, fileOverride?: UploadedFile) => {
     const fileForRequest = fileOverride ?? activePendingUpload;
     const msg = (messageOverride ?? input).trim();
@@ -1672,16 +2300,35 @@ function AIChatPageContent() {
 
     // Get history from active session
     const currentSession = sessions.find((s) => s.id === activeSessionId);
-    const history = (currentSession?.messages || [])
-      .filter((m) => m.id !== "welcome")
-      .slice(-10)
-      .map((m) => ({ role: m.role, content: m.content }));
+    const history = buildHistoryFromMessages(currentSession?.messages || []);
 
     updateSessionMessages(activeSessionId, (msgs) => [...msgs, userMessage]);
     setInput("");
     setLoading(true);
 
     try {
+      let serverSessionId = currentSession?.serverSessionId;
+      if (!serverSessionId) {
+        const sessionResp = await aiChatApi.createSession({
+          title: currentSession?.title || getSessionTitle([userMessage], language),
+          bound_contract_id: searchParams.get("contract_id") || undefined,
+          context_snapshot: pageContext
+            ? {
+                page: pageContext.page,
+                title: pageContext.title,
+                contract_id: pageContext.contract_id,
+                period: pageContext.period,
+                report_view: pageContext.report_view,
+                summary: pageContext.summary,
+              }
+            : undefined,
+        }, token);
+        serverSessionId = sessionResp.session?.id;
+        if (serverSessionId) {
+          updateSessionRuntime(activeSessionId, { serverSessionId });
+        }
+      }
+
       const chatData: any = { message: messageText, history, language };
       if (fileForRequest) {
         chatData.file_id = fileForRequest.file_id;
@@ -1704,33 +2351,11 @@ function AIChatPageContent() {
         chatData.contract_id = contractIdFromUrl;
       }
 
-      const data = await aiChatApi.chat(chatData, token);
+      if (!serverSessionId) {
+        throw new Error("missing server session id");
+      }
 
-      const aiMessage: Message = {
-        id: generateId(),
-        role: "assistant",
-        content: data.answer || t("ai.could_not_understand", language),
-        timestamp: Date.now(),
-        sources: data.sources?.map((s: any) => s.title || s.type),
-        model: data.model,
-        thinking: data.thinking,
-        agentMode: data.agent_mode,
-        agentPlan: data.agent_plan,
-        toolCalls: data.tool_calls,
-        reviewPrompts: data.review_prompts,
-        draftContracts: data.draft_contracts,
-        batchSummary: data.batch_summary,
-        draftPaymentSchedules: data.draft_payment_schedules,
-        paymentScheduleSummary: data.payment_schedule_summary,
-      };
-
-      updateSessionMessages(activeSessionId, (msgs) => [...msgs, aiMessage]);
-      setTypingMessageId(aiMessage.id);
-
-      // Clear typing indicator after animation
-      setTimeout(() => {
-        setTypingMessageId((current) => (current === aiMessage.id ? null : current));
-      }, Math.min(aiMessage.content.length * 15 + 500, 3000));
+      await createAndStartAssistantRun(activeSessionId, serverSessionId, chatData, {});
     } catch (error: any) {
       const errorMessage: Message = {
         id: generateId(),
@@ -1739,6 +2364,7 @@ function AIChatPageContent() {
         timestamp: Date.now(),
       };
       updateSessionMessages(activeSessionId, (msgs) => [...msgs, errorMessage]);
+      updateSessionRuntime(activeSessionId, { currentRunId: undefined });
     } finally {
       setLoading(false);
     }
@@ -2032,6 +2658,24 @@ function AIChatPageContent() {
                           />
                         )}
 
+                        {msg.role === "assistant" && (
+                          <ReviewActionHistoryPanel
+                            actions={msg.reviewActions}
+                            language={language}
+                            onContinue={(action) =>
+                              triggerRuntimeContinuation(
+                                { type: "action", id: action.id },
+                                {
+                                  contractId:
+                                    msg.paymentScheduleSummary?.contract_id ||
+                                    searchParams.get("contract_id") ||
+                                    undefined,
+                                }
+                              )
+                            }
+                          />
+                        )}
+
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {msg.attachments.map((att, idx) => (
@@ -2060,6 +2704,20 @@ function AIChatPageContent() {
                             language={language}
                             onConfirm={async (selectedContracts) => {
                               try {
+                                if (msg.contractDraftArtifactId) {
+                                  const confirmActionResponse = await aiChatApi.createReviewAction(
+                                    msg.contractDraftArtifactId,
+                                    {
+                                      action_type: "confirm",
+                                      action_payload: {
+                                        selected_count: selectedContracts.length,
+                                        contract_numbers: selectedContracts.map((contract) => contract.contract_number),
+                                      },
+                                    },
+                                    token!
+                                  );
+                                  appendReviewActionToMessage(activeSessionId!, msg.contractDraftArtifactId, confirmActionResponse.action);
+                                }
                                 const payload = selectedContracts.map((c) => ({
                                   contract_number: c.contract_number,
                                   contract_name: c.contract_name || c.contract_number,
@@ -2084,67 +2742,81 @@ function AIChatPageContent() {
                                 const result = await contractApi.batchCreate(payload, token!);
                                 const failedContracts = result.failed_contracts || [];
                                 const createSucceeded = Number(result.failed_count || 0) === 0;
-
-                                // Add result message
-                                const resultMessage: Message = {
-                                  id: generateId(),
-                                  role: "assistant",
-                                  content: t("ai.batch_create_result", language, { success: String(result.created_count), failed: String(result.failed_count), details: result.failed_count > 0 ? t("ai.batch_create_failed_details", language) + failedContracts.map((f: any) => `- ${f.number}: ${f.error}`).join("\n") : "" }),
-                                  timestamp: Date.now(),
-                                  agentMode: true,
-                                  agentPlan: [
+                                let createDraftActionResponse: any = null;
+                                if (msg.contractDraftArtifactId) {
+                                  createDraftActionResponse = await aiChatApi.createReviewAction(
+                                    msg.contractDraftArtifactId,
                                     {
-                                      id: "human_review",
-                                      title: t("ai.agent_step_human_review_done", language),
-                                      status: "completed",
+                                      action_type: "create_draft",
+                                      action_payload: {
+                                        selected_count: selectedContracts.length,
+                                        created_count: result.created_count,
+                                        failed_count: result.failed_count,
+                                        failed_contracts: failedContracts,
+                                      },
                                     },
-                                    {
-                                      id: "create_draft",
-                                      title: t("ai.agent_step_create_draft", language),
-                                      status: createSucceeded ? "completed" : "needs_review",
-                                    },
-                                  ],
-                                  toolCalls: [
-                                    {
-                                      tool: "lease.draft_contract_creator",
-                                      skill: "Core Service Draft Skill",
-                                      status: createSucceeded ? "completed" : "needs_review",
-                                      input_summary: t("ai.agent_create_input", language, { count: String(selectedContracts.length) }),
-                                      output_summary: t("ai.agent_create_output", language, { success: String(result.created_count), failed: String(result.failed_count) }),
-                                      requires_review: !createSucceeded,
-                                    },
-                                  ],
-                                  reviewPrompts: createSucceeded
-                                    ? []
-                                    : [
-                                        {
-                                          id: "batch_create_failed",
-                                          title: t("ai.agent_create_failed_title", language),
-                                          description: t("ai.agent_create_failed_description", language, { count: String(result.failed_count) }),
-                                          severity: "critical",
-                                          action: t("ai.agent_create_failed_action", language),
-                                          contract_numbers: failedContracts.map((f: any) => f.number).filter(Boolean).slice(0, 8),
-                                        },
-                                      ],
-                                };
-                                updateSessionMessages(activeSessionId!, (msgs) => [...msgs, resultMessage]);
+                                    token!
+                                  );
+                                  appendReviewActionToMessage(activeSessionId!, msg.contractDraftArtifactId, createDraftActionResponse.action);
+                                }
                                 if (createSucceeded) {
                                   message.success(t("ai.batch_create_success", language, { count: String(result.created_count) }));
                                 } else {
                                   message.warning(t("ai.batch_create_result", language, { success: String(result.created_count), failed: String(result.failed_count), details: "" }));
+                                }
+                                if (activeSession?.serverSessionId && createDraftActionResponse?.action?.id) {
+                                  setLoading(true);
+                                  try {
+                                    await continueFromRuntimeTarget(
+                                      activeSessionId!,
+                                      activeSession.serverSessionId,
+                                      { type: "action", id: createDraftActionResponse.action.id },
+                                      { contractId: searchParams.get("contract_id") || undefined }
+                                    );
+                                  } catch (error: any) {
+                                    setLoading(false);
+                                    message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                  }
                                 }
                               } catch (error: any) {
                                 message.error(t("ai.batch_create_failed", language, { error: error.message }));
                               }
                             }}
                             onSkip={() => {
-                              const skipMessage: Message = {
-                                id: generateId(),
-                                role: "assistant",
-                                content: t("ai.skip_import", language),
-                                timestamp: Date.now(),
-                              };
-                              updateSessionMessages(activeSessionId!, (msgs) => [...msgs, skipMessage]);
+                              (async () => {
+                                try {
+                                  let skipActionResponse: any = null;
+                                  if (msg.contractDraftArtifactId) {
+                                    skipActionResponse = await aiChatApi.createReviewAction(
+                                      msg.contractDraftArtifactId,
+                                      {
+                                        action_type: "skip",
+                                        action_payload: {
+                                          reason: "user_skipped_contract_draft_import",
+                                        },
+                                      },
+                                      token!
+                                    );
+                                    appendReviewActionToMessage(activeSessionId!, msg.contractDraftArtifactId, skipActionResponse.action);
+                                  }
+                                  if (activeSession?.serverSessionId && skipActionResponse?.action?.id) {
+                                    setLoading(true);
+                                    try {
+                                      await continueFromRuntimeTarget(
+                                        activeSessionId!,
+                                        activeSession.serverSessionId,
+                                        { type: "action", id: skipActionResponse.action.id },
+                                        { contractId: searchParams.get("contract_id") || undefined }
+                                      );
+                                    } catch (error: any) {
+                                      setLoading(false);
+                                      message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                    }
+                                  }
+                                } catch (error: any) {
+                                  message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                }
+                              })();
                             }}
                           />
                         )}
@@ -2161,6 +2833,21 @@ function AIChatPageContent() {
                                 return;
                               }
                               try {
+                                let importActionResponse: any = null;
+                                if (msg.paymentScheduleArtifactId) {
+                                  const confirmActionResponse = await aiChatApi.createReviewAction(
+                                    msg.paymentScheduleArtifactId,
+                                    {
+                                      action_type: "confirm",
+                                      action_payload: {
+                                        selected_count: selectedSchedules.length,
+                                        contract_id: contractId,
+                                      },
+                                    },
+                                    token!
+                                  );
+                                  appendReviewActionToMessage(activeSessionId!, msg.paymentScheduleArtifactId, confirmActionResponse.action);
+                                }
                                 let successCount = 0;
                                 for (const schedule of selectedSchedules) {
                                   await paymentScheduleApi.create(contractId, {
@@ -2182,43 +2869,142 @@ function AIChatPageContent() {
                                   }, token!);
                                   successCount++;
                                 }
-                                const resultMessage: Message = {
-                                  id: generateId(),
-                                  role: "assistant",
-                                  content: t("ai.schedule_import_result", language, { count: String(successCount), contract: contractId }),
-                                  timestamp: Date.now(),
-                                  agentMode: true,
-                                  agentPlan: [
-                                    { id: "human_review", title: t("ai.agent_step_human_review_done", language), status: "completed" },
-                                    { id: "import_schedule", title: t("ai.schedule_step_import", language), status: "completed" },
-                                  ],
-                                  toolCalls: [
+                                if (msg.paymentScheduleArtifactId) {
+                                  importActionResponse = await aiChatApi.createReviewAction(
+                                    msg.paymentScheduleArtifactId,
                                     {
-                                      tool: "lease.payment_schedule_importer",
-                                      skill: "Core Service Payment Schedule Skill",
-                                      status: "completed",
-                                      input_summary: t("ai.schedule_import_input", language, { count: String(selectedSchedules.length) }),
-                                      output_summary: t("ai.schedule_import_output", language, { count: String(successCount) }),
-                                      requires_review: false,
+                                      action_type: "import",
+                                      action_payload: {
+                                        imported_count: successCount,
+                                        selected_count: selectedSchedules.length,
+                                        contract_id: contractId,
+                                      },
                                     },
-                                  ],
-                                };
-                                updateSessionMessages(activeSessionId!, (msgs) => [...msgs, resultMessage]);
+                                    token!
+                                  );
+                                  appendReviewActionToMessage(activeSessionId!, msg.paymentScheduleArtifactId, importActionResponse.action);
+                                }
                                 message.success(t("ai.schedule_import_success", language, { count: String(successCount) }));
+                                if (activeSession?.serverSessionId && importActionResponse?.action?.id) {
+                                  setLoading(true);
+                                  try {
+                                    await continueFromRuntimeTarget(
+                                      activeSessionId!,
+                                      activeSession.serverSessionId,
+                                      { type: "action", id: importActionResponse.action.id },
+                                      { contractId }
+                                    );
+                                  } catch (error: any) {
+                                    setLoading(false);
+                                    message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                  }
+                                }
                               } catch (error: any) {
                                 message.error(t("ai.schedule_import_failed", language, { error: error.message }));
                               }
                             }}
                             onSkip={() => {
-                              const skipMessage: Message = {
-                                id: generateId(),
-                                role: "assistant",
-                                content: t("ai.skip_import", language),
-                                timestamp: Date.now(),
-                              };
-                              updateSessionMessages(activeSessionId!, (msgs) => [...msgs, skipMessage]);
+                              (async () => {
+                                try {
+                                  let skipActionResponse: any = null;
+                                  if (msg.paymentScheduleArtifactId) {
+                                    skipActionResponse = await aiChatApi.createReviewAction(
+                                      msg.paymentScheduleArtifactId,
+                                      {
+                                        action_type: "skip",
+                                        action_payload: {
+                                          reason: "user_skipped_payment_schedule_import",
+                                          contract_id: msg.paymentScheduleSummary?.contract_id,
+                                        },
+                                      },
+                                      token!
+                                    );
+                                    appendReviewActionToMessage(activeSessionId!, msg.paymentScheduleArtifactId, skipActionResponse.action);
+                                  }
+                                  if (activeSession?.serverSessionId && skipActionResponse?.action?.id) {
+                                    setLoading(true);
+                                    try {
+                                      await continueFromRuntimeTarget(
+                                        activeSessionId!,
+                                        activeSession.serverSessionId,
+                                        { type: "action", id: skipActionResponse.action.id },
+                                        { contractId: msg.paymentScheduleSummary?.contract_id }
+                                      );
+                                    } catch (error: any) {
+                                      setLoading(false);
+                                      message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                    }
+                                  }
+                                } catch (error: any) {
+                                  message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                }
+                              })();
                             }}
                           />
+                        )}
+
+                        {msg.id !== "welcome" && activeSession?.serverSessionId && (
+                          <div
+                            style={{
+                              marginTop: 12,
+                              paddingTop: 10,
+                              borderTop: msg.role === "user" ? "1px solid rgba(255,255,255,0.15)" : "1px solid #EAEAEA",
+                              display: "flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<MessageOutlined />}
+                              disabled={loading}
+                              onClick={() => triggerRuntimeContinuation({ type: "message", id: msg.id })}
+                              style={{
+                                paddingInline: 8,
+                                color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                              }}
+                            >
+                              {t("ai.continue_from_message", language)}
+                            </Button>
+
+                            {msg.runId && (
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={<ToolOutlined />}
+                                disabled={loading}
+                                onClick={() => triggerRuntimeContinuation({ type: "run", id: msg.runId! })}
+                                style={{
+                                  paddingInline: 8,
+                                  color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                }}
+                              >
+                                {t("ai.continue_from_run", language)}
+                              </Button>
+                            )}
+
+                            {(msg.contractDraftArtifactId || msg.paymentScheduleArtifactId) && (
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={<FileTextOutlined />}
+                                disabled={loading}
+                                onClick={() =>
+                                  triggerRuntimeContinuation({
+                                    type: "artifact",
+                                    id: msg.contractDraftArtifactId || msg.paymentScheduleArtifactId!,
+                                  })
+                                }
+                                style={{
+                                  paddingInline: 8,
+                                  color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                }}
+                              >
+                                {t("ai.continue_from_artifact", language)}
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </Space>

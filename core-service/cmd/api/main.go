@@ -43,6 +43,7 @@ func main() {
 	auditRepo := repository.NewAuditRepository(database.Pool)
 	systemSettingRepo := repository.NewSystemSettingRepository(database.Pool)
 	leaseAdminRepo := repository.NewLeaseAdminRepository(database.Pool)
+	aiChatRuntimeRepo := repository.NewAIChatRuntimeRepository(database.Pool)
 
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
@@ -56,7 +57,7 @@ func main() {
 	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo)
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, auditLogger)
 	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger)
-	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo)
+	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
@@ -215,6 +216,15 @@ func main() {
 
 		// AI Chat
 		api.POST("/ai/chat", aiChatHandler.Chat)
+		api.POST("/ai/chat/sessions", aiChatHandler.CreateSession)
+		api.GET("/ai/chat/sessions", aiChatHandler.ListSessions)
+		api.GET("/ai/chat/sessions/:id", aiChatHandler.GetSession)
+		api.POST("/ai/chat/sessions/:id/runs", aiChatHandler.CreateRun)
+		api.GET("/ai/chat/sessions/:id/runs", aiChatHandler.ListRuns)
+		api.POST("/ai/chat/continuations", aiChatHandler.CreateContinuation)
+		api.GET("/ai/chat/runs/:id/events", aiChatHandler.ListRunEvents)
+		api.GET("/ai/chat/runs/:id/stream", aiChatHandler.StreamRunEvents)
+		api.POST("/ai/chat/artifacts/:id/actions", aiChatHandler.CreateReviewAction)
 
 		// Audit Logs
 		api.GET("/audit-logs", auditHandler.List)

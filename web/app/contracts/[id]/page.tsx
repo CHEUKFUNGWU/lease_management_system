@@ -23,7 +23,6 @@ import {
   Statistic,
   Tabs,
   Timeline,
-  Upload,
   Alert,
 } from "antd";
 import {
@@ -34,7 +33,6 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
-  UploadOutlined,
   RobotOutlined,
   WarningOutlined,
   EditOutlined,
@@ -45,7 +43,7 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { contractApi, paymentScheduleApi, eventApi, aiApi, leaseAdminApi } from "../../lib/api";
+import { contractApi, paymentScheduleApi, eventApi, leaseAdminApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
@@ -178,7 +176,6 @@ export default function ContractDetailPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState("info");
-  const [uploadLoading, setUploadLoading] = useState(false);
   const [aiDrafts, setAiDrafts] = useState<any[]>([]);
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [showDraftPanel, setShowDraftPanel] = useState(false);
@@ -652,38 +649,6 @@ export default function ContractDetailPage() {
     } finally {
       setEditLoading(false);
     }
-  };
-
-  const handleAiUpload = async (file: File) => {
-    setUploadLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("task_type", "payment_schedule");
-
-      const uploadRes = await aiApi.upload(formData);
-
-      const parseRes = await aiApi.parsePaymentSchedule({
-        file_id: uploadRes.file_id,
-        object_name: uploadRes.object_name,
-        content_type: uploadRes.content_type,
-      });
-
-      setAiDrafts(parseRes.schedules || []);
-      setAiWarnings(parseRes.warnings || []);
-      setShowDraftPanel(true);
-
-      if (parseRes.requires_human_confirmation) {
-        message.warning(t("contract_detail.ai_parse_warning", language));
-      } else {
-        message.success(t("contract_detail.ai_parse_success", language, { count: String(parseRes.schedules?.length || 0) }));
-      }
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.ai_parse_failed", language));
-    } finally {
-      setUploadLoading(false);
-    }
-    return false; // prevent default upload
   };
 
   const openPaymentScheduleAgent = () => {
@@ -1299,19 +1264,6 @@ export default function ContractDetailPage() {
                         >
                           {t("contract.ai_agent_intake", language)}
                         </Button>
-                        <Upload
-                          accept=".pdf,.xlsx,.xls"
-                          showUploadList={false}
-                          beforeUpload={handleAiUpload}
-                          disabled={uploadLoading}
-                        >
-                          <Button
-                            icon={<RobotOutlined />}
-                            loading={uploadLoading}
-                          >
-                            {t("contract.ai_parse", language)}
-                          </Button>
-                        </Upload>
                         <Button
                           type="primary"
                           icon={<PlusOutlined />}

@@ -20,15 +20,10 @@ const dict: TranslationDict = {
     "zh-HK": "合同台賬",
     en: "Contracts",
   },
-  "nav.upload": {
-    "zh-CN": "文件上传",
-    "zh-HK": "文件上傳",
-    en: "Upload",
-  },
   "nav.ai_chat": {
-    "zh-CN": "AI Agent",
-    "zh-HK": "AI Agent",
-    en: "AI Agent",
+    "zh-CN": "AI Chat",
+    "zh-HK": "AI Chat",
+    en: "AI Chat",
   },
   "nav.reports": {
     "zh-CN": "报表查询",
@@ -694,14 +689,14 @@ const dict: TranslationDict = {
     en: "Manually enter a new lease contract",
   },
   "dashboard.upload_file": {
-    "zh-CN": "上传文件",
-    "zh-HK": "上傳文件",
-    en: "Upload File",
+    "zh-CN": "在 AI Chat 上传文件",
+    "zh-HK": "在 AI Chat 上傳文件",
+    en: "Upload Files in AI Chat",
   },
   "dashboard.upload_file_desc": {
-    "zh-CN": "AI 解析合同或付款计划",
-    "zh-HK": "AI 解析合同或付款計劃",
-    en: "AI parses contracts or payment schedules",
+    "zh-CN": "统一通过 AI Chat 上传合同、台账和租金表",
+    "zh-HK": "統一通過 AI Chat 上傳合同、台賬和租金表",
+    en: "Upload contracts, ledgers, and rent schedules only through AI Chat",
   },
   "dashboard.view_report": {
     "zh-CN": "查看报表",
@@ -4070,9 +4065,59 @@ const dict: TranslationDict = {
     en: "Payment schedule import failed: {error}",
   },
   "ai.upload_file_tooltip": {
-    "zh-CN": "上传文件",
-    "zh-HK": "上傳文件",
-    en: "Upload File",
+    "zh-CN": "在 AI Chat 上传文件",
+    "zh-HK": "在 AI Chat 上傳文件",
+    en: "Upload Files in AI Chat",
+  },
+  "ai.continue_from_message": {
+    "zh-CN": "继续此消息",
+    "zh-HK": "繼續此訊息",
+    en: "Continue from Message",
+  },
+  "ai.continue_from_run": {
+    "zh-CN": "继续此运行",
+    "zh-HK": "繼續此運行",
+    en: "Continue from Run",
+  },
+  "ai.continue_from_artifact": {
+    "zh-CN": "继续此草稿",
+    "zh-HK": "繼續此草稿",
+    en: "Continue from Artifact",
+  },
+  "ai.continue_from_action": {
+    "zh-CN": "继续此动作",
+    "zh-HK": "繼續此動作",
+    en: "Continue from Action",
+  },
+  "ai.review_action_history": {
+    "zh-CN": "人工动作历史",
+    "zh-HK": "人工動作歷史",
+    en: "Review Action History",
+  },
+  "ai.review_action_confirm": {
+    "zh-CN": "已确认",
+    "zh-HK": "已確認",
+    en: "Confirmed",
+  },
+  "ai.review_action_skip": {
+    "zh-CN": "已跳过",
+    "zh-HK": "已跳過",
+    en: "Skipped",
+  },
+  "ai.review_action_import": {
+    "zh-CN": "已导入",
+    "zh-HK": "已導入",
+    en: "Imported",
+  },
+  "ai.review_action_create_draft": {
+    "zh-CN": "已创建草稿",
+    "zh-HK": "已建立草稿",
+    en: "Draft Created",
+  },
+  "ai.review_action_reject": {
+    "zh-CN": "已驳回",
+    "zh-HK": "已駁回",
+    en: "Rejected",
   },
   "ai.disclaimer": {
     "zh-CN": "AI 生成内容仅供参考，请以系统正式数据为准",

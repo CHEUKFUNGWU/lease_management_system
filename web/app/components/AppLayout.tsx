@@ -5,7 +5,6 @@ import { Layout, Menu, Avatar, Dropdown, Breadcrumb, Input, Badge } from "antd";
 import {
   HomeOutlined,
   FileTextOutlined,
-  UploadOutlined,
   RobotOutlined,
   SettingOutlined,
   LogoutOutlined,
@@ -39,8 +38,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
   return {
     "": t("nav.home", language as any),
     contracts: t("nav.contracts", language as any),
-    upload: t("nav.upload", language as any),
-    "ai-chat": "AI 录入",
+    "ai-chat": t("nav.ai_chat", language as any),
     reports: t("nav.reports", language as any),
     portfolio: "组合分析",
     sensitivity: "敏感性分析",
@@ -74,12 +72,7 @@ function useMenuItems(language: string) {
       {
         key: "/ai-chat",
         icon: <RobotOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/ai-chat">AI 录入</Link>,
-      },
-      {
-        key: "/upload",
-        icon: <UploadOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/upload">{t("nav.upload", language as any)}</Link>,
+        label: <Link href="/ai-chat">{t("nav.ai_chat", language as any)}</Link>,
       },
       {
         key: "/reports",

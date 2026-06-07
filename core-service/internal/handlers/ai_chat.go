@@ -18,14 +18,42 @@ import (
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
+type aiChatRuntimeStore interface {
+	CreateSession(ctx context.Context, session *repository.AIChatSession) error
+	GetSessionByID(ctx context.Context, sessionID, userID string) (*repository.AIChatSession, error)
+	ListSessions(ctx context.Context, filter repository.AIChatSessionFilter) ([]*repository.AIChatSession, error)
+	CreateRun(ctx context.Context, run *repository.AIChatRun) error
+	LinkRunTriggerMessage(ctx context.Context, runID, triggerMessageID string) error
+	UpdateRunStatus(ctx context.Context, runID, status string, reviewRequired bool, summaryText, errorMessage *string, startedAt, completedAt *time.Time) error
+	UpdateRunParent(ctx context.Context, runID, parentRunID string) error
+	GetRunByID(ctx context.Context, runID, userID string) (*repository.AIChatRun, error)
+	ListRunsBySession(ctx context.Context, sessionID string, limit, offset int) ([]*repository.AIChatRun, error)
+	CreateMessage(ctx context.Context, message *repository.AIChatMessage) error
+	GetNextMessageSequence(ctx context.Context, sessionID string) (int, error)
+	ListMessagesBySession(ctx context.Context, sessionID string, limit int) ([]*repository.AIChatMessage, error)
+	GetMessageByID(ctx context.Context, messageID, userID string) (*repository.AIChatMessage, error)
+	AppendRunEvent(ctx context.Context, event *repository.AIChatRunEvent) error
+	ListRunEvents(ctx context.Context, runID string, afterSequence, limit int) ([]*repository.AIChatRunEvent, error)
+	GetNextRunEventSequence(ctx context.Context, runID string) (int, error)
+	CreateArtifact(ctx context.Context, artifact *repository.AIChatArtifact) error
+	GetArtifactByID(ctx context.Context, artifactID, userID string) (*repository.AIChatArtifact, error)
+	ListArtifactsBySession(ctx context.Context, sessionID string, limit int) ([]*repository.AIChatArtifact, error)
+	UpdateArtifactStatus(ctx context.Context, artifactID, status string) error
+	RecordReviewAction(ctx context.Context, action *repository.AIChatReviewAction) error
+	GetReviewActionByID(ctx context.Context, actionID, userID string) (*repository.AIChatReviewAction, error)
+	ListReviewActionsBySession(ctx context.Context, sessionID string, limit int) ([]*repository.AIChatReviewAction, error)
+	CreateAttachment(ctx context.Context, attachment *repository.AIChatAttachment) error
+}
+
 type AIChatHandler struct {
 	contractRepo *repository.ContractRepository
 	mcRepo       *repository.MonthlyClosingRepository
 	eventRepo    *repository.EventRepository
+	runtimeRepo  aiChatRuntimeStore
 }
 
-func NewAIChatHandler(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository) *AIChatHandler {
-	return &AIChatHandler{contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo}
+func NewAIChatHandler(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, runtimeRepo aiChatRuntimeStore) *AIChatHandler {
+	return &AIChatHandler{contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo, runtimeRepo: runtimeRepo}
 }
 
 type PageContext struct {
@@ -39,6 +67,8 @@ type PageContext struct {
 }
 
 type AIChatRequest struct {
+	SessionID   string        `json:"session_id,omitempty"`
+	RunID       string        `json:"run_id,omitempty"`
 	Message     string        `json:"message" binding:"required"`
 	ContractID  string        `json:"contract_id,omitempty"`
 	History     []ChatMessage `json:"history,omitempty"`
@@ -55,6 +85,8 @@ type ChatMessage struct {
 }
 
 type AIChatResponse struct {
+	SessionID              string                       `json:"session_id,omitempty"`
+	RunID                  string                       `json:"run_id,omitempty"`
 	Answer                 string                       `json:"answer"`
 	Sources                []Source                     `json:"sources"`
 	Confidence             float64                      `json:"confidence"`
@@ -191,34 +223,364 @@ type Source struct {
 	Snippet string `json:"snippet"`
 }
 
-func (h *AIChatHandler) Chat(c *gin.Context) {
-	var req AIChatRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+type aiChatRuntimeState struct {
+	session     *repository.AIChatSession
+	run         *repository.AIChatRun
+	userMessage *repository.AIChatMessage
+	userID      string
+}
+
+func marshalRuntimeJSON(v interface{}) json.RawMessage {
+	if v == nil {
+		return nil
+	}
+	data, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	return data
+}
+
+func (h *AIChatHandler) beginRuntimeStateForSession(ctx context.Context, session *repository.AIChatSession, req *AIChatRequest, userID, effectiveContractID string, runbook *AgentRunbook) (*aiChatRuntimeState, error) {
+	if h.runtimeRepo == nil || session == nil {
+		return nil, nil
 	}
 
-	// Default language to zh-CN if not specified
-	if req.Language == "" {
-		req.Language = "zh-CN"
+	run := &repository.AIChatRun{
+		SessionID:      session.ID,
+		Status:         "running",
+		PageContext:    marshalRuntimeJSON(req.PageContext),
+		ReviewRequired: runbook != nil && len(runbook.ReviewPrompts) > 0,
+		CreatedBy:      &userID,
+		AgentMode:      runbook != nil,
+	}
+	if req.RunID != "" {
+		run.ID = req.RunID
+	}
+	if runbook != nil {
+		run.SkillID = &runbook.SkillID
+	}
+	now := time.Now()
+	run.StartedAt = &now
+	if err := h.runtimeRepo.CreateRun(ctx, run); err != nil {
+		return nil, fmt.Errorf("failed to create ai chat run: %w", err)
+	}
+
+	nextSeq, err := h.runtimeRepo.GetNextMessageSequence(ctx, session.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to allocate ai chat message sequence: %w", err)
+	}
+	userMessage := &repository.AIChatMessage{
+		SessionID:   session.ID,
+		RunID:       &run.ID,
+		Role:        "user",
+		MessageType: "text",
+		SequenceNo:  nextSeq,
+		Content:     req.Message,
+		CreatedBy:   &userID,
+		Attachments: marshalRuntimeJSON(buildRuntimeAttachmentRefs(req)),
+	}
+	if err := h.runtimeRepo.CreateMessage(ctx, userMessage); err != nil {
+		return nil, fmt.Errorf("failed to persist ai chat user message: %w", err)
+	}
+	if err := h.runtimeRepo.LinkRunTriggerMessage(ctx, run.ID, userMessage.ID); err != nil {
+		return nil, fmt.Errorf("failed to link ai chat run trigger message: %w", err)
+	}
+
+	if req.FileID != "" {
+		attachment := &repository.AIChatAttachment{
+			SessionID:      session.ID,
+			MessageID:      &userMessage.ID,
+			RunID:          &run.ID,
+			FileID:         req.FileID,
+			OriginalName:   req.ObjectName,
+			ContentType:    req.ContentType,
+			CreatedBy:      &userID,
+			MinioObjectKey: &req.ObjectName,
+			ParseStatus:    "processing",
+		}
+		if err := h.runtimeRepo.CreateAttachment(ctx, attachment); err != nil {
+			return nil, fmt.Errorf("failed to persist ai chat attachment: %w", err)
+		}
+	}
+
+	state := &aiChatRuntimeState{
+		session:     session,
+		run:         run,
+		userMessage: userMessage,
+		userID:      userID,
+	}
+
+	if err := h.appendRuntimeEvent(ctx, state, "message_start", map[string]interface{}{
+		"message_id":   userMessage.ID,
+		"role":         "user",
+		"content":      req.Message,
+		"has_file":     req.FileID != "",
+		"contract_id":  effectiveContractID,
+		"page_context": req.PageContext,
+	}, false); err != nil {
+		return nil, err
+	}
+	if err := h.appendRuntimeEvent(ctx, state, "run_status", map[string]interface{}{
+		"status":          "running",
+		"skill_id":        run.SkillID,
+		"agent_mode":      run.AgentMode,
+		"review_required": run.ReviewRequired,
+	}, false); err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
+func (h *AIChatHandler) beginRuntimeState(c *gin.Context, req *AIChatRequest, legalEntityID, userID, effectiveContractID string, runbook *AgentRunbook) (*aiChatRuntimeState, error) {
+	if h.runtimeRepo == nil {
+		return nil, nil
 	}
 
 	ctx := c.Request.Context()
-	legalEntityID := middleware.GetTenantID(c)
-	userID, _ := c.Get("user_id")
-	userIDStr, _ := userID.(string)
-	role, _ := c.Get("role")
-	roleStr, _ := role.(string)
+	var session *repository.AIChatSession
+	var err error
 
-	var sources []Source
-	var contextData strings.Builder
+	if req.SessionID != "" {
+		session, err = h.runtimeRepo.GetSessionByID(ctx, req.SessionID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load ai chat session: %w", err)
+		}
+	} else {
+		session = &repository.AIChatSession{
+			UserID:          userID,
+			Title:           summarizeSessionTitle(req.Message),
+			ContextSnapshot: marshalRuntimeJSON(req.PageContext),
+		}
+		if legalEntityID != "" {
+			session.LegalEntityID = &legalEntityID
+		}
+		if effectiveContractID != "" {
+			session.BoundContractID = &effectiveContractID
+		}
+		if err := h.runtimeRepo.CreateSession(ctx, session); err != nil {
+			return nil, fmt.Errorf("failed to create ai chat session: %w", err)
+		}
+	}
 
-	// Resolve effective contract ID: explicit req.ContractID takes priority over page context
+	return h.beginRuntimeStateForSession(ctx, session, req, userID, effectiveContractID, runbook)
+}
+
+func (h *AIChatHandler) appendRuntimeEvent(ctx context.Context, state *aiChatRuntimeState, eventType string, payload interface{}, isTerminal bool) error {
+	if h.runtimeRepo == nil || state == nil || state.run == nil || state.session == nil {
+		return nil
+	}
+	seq, err := h.runtimeRepo.GetNextRunEventSequence(ctx, state.run.ID)
+	if err != nil {
+		return err
+	}
+	return h.runtimeRepo.AppendRunEvent(ctx, &repository.AIChatRunEvent{
+		RunID:      state.run.ID,
+		SessionID:  state.session.ID,
+		SequenceNo: seq,
+		EventType:  eventType,
+		Payload:    marshalRuntimeJSON(payload),
+		IsTerminal: isTerminal,
+	})
+}
+
+func (h *AIChatHandler) finalizeRuntimeSuccess(ctx context.Context, state *aiChatRuntimeState, resp *AIChatResponse) {
+	if h.runtimeRepo == nil || state == nil || resp == nil {
+		return
+	}
+
+	resp.SessionID = state.session.ID
+	resp.RunID = state.run.ID
+
+	nextSeq, err := h.runtimeRepo.GetNextMessageSequence(ctx, state.session.ID)
+	if err == nil {
+		model := resp.Model
+		assistantMessage := &repository.AIChatMessage{
+			SessionID:   state.session.ID,
+			RunID:       &state.run.ID,
+			Role:        "assistant",
+			MessageType: "text",
+			SequenceNo:  nextSeq,
+			Content:     resp.Answer,
+			Model:       &model,
+			CreatedBy:   &state.userID,
+			Sources:     marshalRuntimeJSON(resp.Sources),
+		}
+		_ = h.runtimeRepo.CreateMessage(ctx, assistantMessage)
+		_ = h.appendRuntimeEvent(ctx, state, "message_end", map[string]interface{}{
+			"message_id": assistantMessage.ID,
+			"role":       "assistant",
+			"content":    resp.Answer,
+			"model":      resp.Model,
+			"sources":    resp.Sources,
+		}, false)
+	}
+
+	if len(resp.ToolCalls) > 0 {
+		_ = h.appendRuntimeEvent(ctx, state, "tool_end", resp.ToolCalls, false)
+	}
+	if len(resp.ReviewPrompts) > 0 {
+		_ = h.appendRuntimeEvent(ctx, state, "review_prompt", resp.ReviewPrompts, false)
+	}
+
+	h.persistRuntimeArtifacts(ctx, state, resp)
+
+	now := time.Now()
+	summary := resp.Answer
+	_ = h.runtimeRepo.UpdateRunStatus(ctx, state.run.ID, statusForResponse(resp), len(resp.ReviewPrompts) > 0, &summary, nil, nil, &now)
+	_ = h.appendRuntimeEvent(ctx, state, "run_end", map[string]interface{}{
+		"status":           statusForResponse(resp),
+		"review_required":  len(resp.ReviewPrompts) > 0,
+		"artifact_present": resp.DraftContracts != nil || resp.DraftPaymentSchedules != nil,
+	}, true)
+}
+
+func (h *AIChatHandler) finalizeRuntimeFailure(ctx context.Context, state *aiChatRuntimeState, answer, model string, reviewPrompts []AgentReviewPrompt, err error) {
+	if h.runtimeRepo == nil || state == nil {
+		return
+	}
+
+	nextSeq, seqErr := h.runtimeRepo.GetNextMessageSequence(ctx, state.session.ID)
+	if seqErr == nil {
+		assistantMessage := &repository.AIChatMessage{
+			SessionID:   state.session.ID,
+			RunID:       &state.run.ID,
+			Role:        "assistant",
+			MessageType: "text",
+			SequenceNo:  nextSeq,
+			Content:     answer,
+			Model:       &model,
+			CreatedBy:   &state.userID,
+		}
+		_ = h.runtimeRepo.CreateMessage(ctx, assistantMessage)
+		_ = h.appendRuntimeEvent(ctx, state, "message_end", map[string]interface{}{
+			"message_id": assistantMessage.ID,
+			"role":       "assistant",
+			"content":    answer,
+			"model":      model,
+		}, false)
+	}
+
+	errText := ""
+	if err != nil {
+		errText = err.Error()
+	}
+	now := time.Now()
+	_ = h.runtimeRepo.UpdateRunStatus(ctx, state.run.ID, "failed", len(reviewPrompts) > 0, &answer, &errText, nil, &now)
+	_ = h.appendRuntimeEvent(ctx, state, "run_error", map[string]interface{}{
+		"error": errText,
+		"model": model,
+	}, true)
+}
+
+func (h *AIChatHandler) persistRuntimeArtifacts(ctx context.Context, state *aiChatRuntimeState, resp *AIChatResponse) {
+	if h.runtimeRepo == nil || state == nil || resp == nil {
+		return
+	}
+
+	if len(resp.DraftContracts) > 0 {
+		artifact := &repository.AIChatArtifact{
+			SessionID:      state.session.ID,
+			RunID:          state.run.ID,
+			ArtifactType:   "contract_draft",
+			Title:          "合同草稿",
+			Status:         "ready",
+			Data:           marshalRuntimeJSON(map[string]interface{}{"contracts": resp.DraftContracts, "summary": resp.BatchSummary}),
+			ReviewRequired: true,
+			CreatedBy:      &state.userID,
+		}
+		if err := h.runtimeRepo.CreateArtifact(ctx, artifact); err == nil {
+			_ = h.appendRuntimeEvent(ctx, state, "artifact_ready", map[string]interface{}{
+				"artifact_id":   artifact.ID,
+				"artifact_type": artifact.ArtifactType,
+				"title":         artifact.Title,
+				"data": map[string]interface{}{
+					"contracts": resp.DraftContracts,
+					"summary":   resp.BatchSummary,
+				},
+			}, false)
+		}
+	}
+
+	if len(resp.DraftPaymentSchedules) > 0 {
+		artifact := &repository.AIChatArtifact{
+			SessionID:      state.session.ID,
+			RunID:          state.run.ID,
+			ArtifactType:   "payment_schedule_draft",
+			Title:          "付款计划草稿",
+			Status:         "ready",
+			Data:           marshalRuntimeJSON(map[string]interface{}{"schedules": resp.DraftPaymentSchedules, "summary": resp.PaymentScheduleSummary}),
+			ReviewRequired: true,
+			CreatedBy:      &state.userID,
+		}
+		if err := h.runtimeRepo.CreateArtifact(ctx, artifact); err == nil {
+			_ = h.appendRuntimeEvent(ctx, state, "artifact_ready", map[string]interface{}{
+				"artifact_id":   artifact.ID,
+				"artifact_type": artifact.ArtifactType,
+				"title":         artifact.Title,
+				"data": map[string]interface{}{
+					"schedules": resp.DraftPaymentSchedules,
+					"summary":   resp.PaymentScheduleSummary,
+				},
+			}, false)
+		}
+	}
+}
+
+func buildRuntimeAttachmentRefs(req *AIChatRequest) []map[string]string {
+	if req == nil || req.FileID == "" {
+		return nil
+	}
+	return []map[string]string{{
+		"file_id":      req.FileID,
+		"object_name":  req.ObjectName,
+		"content_type": req.ContentType,
+	}}
+}
+
+func summarizeSessionTitle(message string) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return "新会话"
+	}
+	runes := []rune(message)
+	if len(runes) > 20 {
+		return string(runes[:20]) + "..."
+	}
+	return message
+}
+
+func statusForResponse(resp *AIChatResponse) string {
+	if resp == nil {
+		return "completed"
+	}
+	if len(resp.ReviewPrompts) > 0 {
+		return "waiting_review"
+	}
+	return "completed"
+}
+
+func attachRuntimeIDs(resp *AIChatResponse, state *aiChatRuntimeState) {
+	if resp == nil || state == nil || state.session == nil || state.run == nil {
+		return
+	}
+	resp.SessionID = state.session.ID
+	resp.RunID = state.run.ID
+}
+
+func effectiveContractIDFromRequest(req AIChatRequest) string {
 	effectiveContractID := req.ContractID
 	if effectiveContractID == "" && req.PageContext != nil && req.PageContext.ContractID != "" {
 		effectiveContractID = req.PageContext.ContractID
 	}
-	agentRunbook := h.buildAgentRunbook(req, effectiveContractID)
+	return effectiveContractID
+}
+
+func (h *AIChatHandler) executeChatRequest(ctx context.Context, authHeader string, req AIChatRequest, legalEntityID, userIDStr, roleStr string, runtimeState *aiChatRuntimeState, agentRunbook *AgentRunbook) AIChatResponse {
+	var sources []Source
+	var contextData strings.Builder
+	effectiveContractID := effectiveContractIDFromRequest(req)
 
 	// 1. Handle file upload if present — use Function Calling to let LLM decide which tool to invoke
 	if req.FileID != "" && req.ObjectName != "" {
@@ -230,7 +592,7 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 
 用户消息: %s`, req.ObjectName, req.ContentType, req.Message)
 
-		_, modelName, toolCalls, err := h.callLLMWithTools(c, fileSystemPrompt, req.Message, req.History, req.Language, fileParseTools)
+		_, modelName, toolCalls, err := h.callLLMWithTools(ctx, authHeader, fileSystemPrompt, req.Message, req.History, req.Language, fileParseTools)
 		fallbackTool := detectFileParseTool(req.Message)
 		selectedTool := fallbackTool
 		toolExecutionChain := []AgentToolCall{}
@@ -250,20 +612,32 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 			modelName = "deterministic-router"
 		}
 
+		if selectedTool != "" {
+			_ = h.appendRuntimeEvent(ctx, runtimeState, "tool_start", map[string]interface{}{
+				"tool":        selectedTool,
+				"status":      "running",
+				"file_id":     req.FileID,
+				"file_name":   req.ObjectName,
+				"contract_id": contractID,
+			}, false)
+		}
+
 		switch selectedTool {
 		case "parse_contract_batch":
-			batchResult, err := h.parseContractBatch(c, req.FileID, req.ObjectName, req.ContentType)
+			batchResult, err := h.parseContractBatch(ctx, authHeader, req.FileID, req.ObjectName, req.ContentType)
 			if err != nil {
-				c.JSON(http.StatusOK, AIChatResponse{
+				resp := AIChatResponse{
 					Answer:     fmt.Sprintf("文件解析失败: %s", err.Error()),
 					Sources:    sources,
 					Confidence: 0.5,
 					IsOfficial: false,
 					Model:      "fallback",
-				})
-				return
+				}
+				attachRuntimeIDs(&resp, runtimeState)
+				h.finalizeRuntimeFailure(ctx, runtimeState, resp.Answer, resp.Model, nil, err)
+				return resp
 			}
-			c.JSON(http.StatusOK, AIChatResponse{
+			resp := AIChatResponse{
 				Answer:         batchResult.SummaryText,
 				Sources:        batchResult.Sources,
 				Confidence:     batchResult.Confidence,
@@ -275,22 +649,25 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 				ReviewPrompts:  batchResult.ReviewPrompts,
 				DraftContracts: batchResult.Contracts,
 				BatchSummary:   batchResult.Summary,
-			})
-			return
+			}
+			h.finalizeRuntimeSuccess(ctx, runtimeState, &resp)
+			return resp
 
 		case "parse_payment_schedule":
-			scheduleResult, err := h.parsePaymentSchedule(c, req.FileID, req.ObjectName, req.ContentType, contractID)
+			scheduleResult, err := h.parsePaymentSchedule(ctx, authHeader, req.FileID, req.ObjectName, req.ContentType, contractID)
 			if err != nil {
-				c.JSON(http.StatusOK, AIChatResponse{
+				resp := AIChatResponse{
 					Answer:     fmt.Sprintf("租金表解析失败: %s", err.Error()),
 					Sources:    sources,
 					Confidence: 0.5,
 					IsOfficial: false,
 					Model:      "fallback",
-				})
-				return
+				}
+				attachRuntimeIDs(&resp, runtimeState)
+				h.finalizeRuntimeFailure(ctx, runtimeState, resp.Answer, resp.Model, nil, err)
+				return resp
 			}
-			c.JSON(http.StatusOK, AIChatResponse{
+			resp := AIChatResponse{
 				Answer:                 scheduleResult.SummaryText,
 				Sources:                scheduleResult.Sources,
 				Confidence:             scheduleResult.Confidence,
@@ -302,11 +679,12 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 				ReviewPrompts:          scheduleResult.ReviewPrompts,
 				DraftPaymentSchedules:  scheduleResult.Schedules,
 				PaymentScheduleSummary: scheduleResult.Summary,
-			})
-			return
+			}
+			h.finalizeRuntimeSuccess(ctx, runtimeState, &resp)
+			return resp
 
 		default:
-			parsed, err := h.parseFile(c, req.FileID, req.ObjectName, req.ContentType)
+			parsed, err := h.parseFile(ctx, authHeader, req.FileID, req.ObjectName, req.ContentType)
 			if err != nil {
 				contextData.WriteString(fmt.Sprintf("\n## 文件解析失败\n错误: %s\n", err.Error()))
 			} else {
@@ -448,7 +826,7 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	}
 
 	if agentRunbook != nil && agentRunbook.RequiresEvidenceInput && req.FileID == "" && effectiveContractID == "" {
-		c.JSON(http.StatusOK, AIChatResponse{
+		resp := AIChatResponse{
 			Answer:        agentRunbook.AnswerPrefix,
 			Sources:       sources,
 			Confidence:    0.85,
@@ -458,8 +836,9 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 			AgentPlan:     agentRunbook.AgentPlan,
 			ToolCalls:     agentRunbook.ToolCalls,
 			ReviewPrompts: agentRunbook.ReviewPrompts,
-		})
-		return
+		}
+		h.finalizeRuntimeSuccess(ctx, runtimeState, &resp)
+		return resp
 	}
 
 	// 5. Build system prompt
@@ -470,14 +849,19 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	systemPrompt := h.buildSystemPrompt(userIDStr, roleStr, legalEntityID, contextData.String(), isWorkingData, req.Language)
 
 	// 6. Call AI Service
-	answer, modelName, err := h.callLLM(c, systemPrompt, req.Message, req.History, req.Language)
+	_ = h.appendRuntimeEvent(ctx, runtimeState, "tool_start", map[string]interface{}{
+		"tool":   "llm.chat_completion",
+		"status": "running",
+		"model":  "auto",
+	}, false)
+	answer, modelName, err := h.callLLM(ctx, authHeader, systemPrompt, req.Message, req.History, req.Language)
 	if err != nil {
 		// Fallback: return context data without LLM if AI Service is unavailable
 		fallbackAnswer := fmt.Sprintf("（AI 服务暂不可用，以下为系统数据摘要）\n\n%s", contextData.String())
 		if agentRunbook != nil {
 			fallbackAnswer = agentRunbook.AnswerPrefix + "\n\n" + fallbackAnswer
 		}
-		c.JSON(http.StatusOK, AIChatResponse{
+		resp := AIChatResponse{
 			Answer:        fallbackAnswer,
 			Sources:       sources,
 			Confidence:    0.5,
@@ -487,9 +871,18 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 			AgentPlan:     agentPlanFromRunbook(agentRunbook),
 			ToolCalls:     toolCallsFromRunbook(agentRunbook),
 			ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
-		})
-		return
+		}
+		attachRuntimeIDs(&resp, runtimeState)
+		h.finalizeRuntimeFailure(ctx, runtimeState, resp.Answer, resp.Model, resp.ReviewPrompts, err)
+		return resp
 	}
+	_ = h.appendRuntimeEvent(ctx, runtimeState, "tool_end", []map[string]interface{}{
+		{
+			"tool":   "llm.chat_completion",
+			"status": "completed",
+			"model":  modelName,
+		},
+	}, false)
 
 	// 7. Extract sources from answer and merge with context sources.
 	// If no source citations found in the answer, fall back to all known sources.
@@ -499,7 +892,7 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		answer = agentRunbook.AnswerPrefix + "\n\n" + answer
 	}
 
-	c.JSON(http.StatusOK, AIChatResponse{
+	resp := AIChatResponse{
 		Answer:        answer,
 		Sources:       extractedSources,
 		Confidence:    0.9,
@@ -509,7 +902,38 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		AgentPlan:     agentPlanFromRunbook(agentRunbook),
 		ToolCalls:     toolCallsFromRunbook(agentRunbook),
 		ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
-	})
+	}
+	h.finalizeRuntimeSuccess(ctx, runtimeState, &resp)
+	return resp
+}
+
+func (h *AIChatHandler) Chat(c *gin.Context) {
+	var req AIChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Language == "" {
+		req.Language = "zh-CN"
+	}
+
+	ctx := c.Request.Context()
+	legalEntityID := middleware.GetTenantID(c)
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+	role, _ := c.Get("role")
+	roleStr, _ := role.(string)
+	effectiveContractID := effectiveContractIDFromRequest(req)
+	agentRunbook := h.buildAgentRunbook(req, effectiveContractID)
+	runtimeState, err := h.beginRuntimeState(c, &req, legalEntityID, userIDStr, effectiveContractID, agentRunbook)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to initialize ai chat runtime: " + err.Error()})
+		return
+	}
+
+	resp := h.executeChatRequest(ctx, c.GetHeader("Authorization"), req, legalEntityID, userIDStr, roleStr, runtimeState, agentRunbook)
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *AIChatHandler) buildAgentRunbook(req AIChatRequest, effectiveContractID string) *AgentRunbook {
@@ -1028,7 +1452,7 @@ var fileParseTools = []map[string]interface{}{
 }
 
 // callLLM sends the prompt and message history to the AI Service chat endpoint.
-func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, error) {
+func (h *AIChatHandler) callLLM(ctx context.Context, authHeader, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
 		aiServiceURL = "http://ai-service:8000"
@@ -1056,8 +1480,9 @@ func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create request: %w", err)
 	}
+	httpReq = httpReq.WithContext(ctx)
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", c.GetHeader("Authorization"))
+	httpReq.Header.Set("Authorization", authHeader)
 
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(httpReq)
@@ -1085,7 +1510,7 @@ func (h *AIChatHandler) callLLM(c *gin.Context, systemPrompt, userMessage string
 
 // callLLMWithTools sends the prompt and message history to the AI Service chat endpoint with function calling support.
 // It returns the LLM answer, model name, and any tool_calls if the LLM decided to invoke tools.
-func (h *AIChatHandler) callLLMWithTools(c *gin.Context, systemPrompt, userMessage string, history []ChatMessage, language string, tools []map[string]interface{}) (string, string, []AgentToolCall, error) {
+func (h *AIChatHandler) callLLMWithTools(ctx context.Context, authHeader, systemPrompt, userMessage string, history []ChatMessage, language string, tools []map[string]interface{}) (string, string, []AgentToolCall, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
 		aiServiceURL = "http://ai-service:8000"
@@ -1115,8 +1540,9 @@ func (h *AIChatHandler) callLLMWithTools(c *gin.Context, systemPrompt, userMessa
 	if err != nil {
 		return "", "", nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	httpReq = httpReq.WithContext(ctx)
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", c.GetHeader("Authorization"))
+	httpReq.Header.Set("Authorization", authHeader)
 
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(httpReq)
@@ -1222,7 +1648,7 @@ func extractSourcesFromAnswer(answer string, knownSources []Source) []Source {
 	return cited
 }
 
-func (h *AIChatHandler) parseFile(c *gin.Context, fileID, objectName, contentType string) (map[string]interface{}, error) {
+func (h *AIChatHandler) parseFile(ctx context.Context, authHeader, fileID, objectName, contentType string) (map[string]interface{}, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
 		aiServiceURL = "http://ai-service:8000"
@@ -1242,8 +1668,9 @@ func (h *AIChatHandler) parseFile(c *gin.Context, fileID, objectName, contentTyp
 	if err != nil {
 		return nil, err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", c.GetHeader("Authorization"))
+	req.Header.Set("Authorization", authHeader)
 
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(req)
@@ -1285,7 +1712,7 @@ type PaymentScheduleParseResult struct {
 	Summary       *PaymentScheduleParseSummary
 }
 
-func (h *AIChatHandler) parsePaymentSchedule(c *gin.Context, fileID, objectName, contentType, contractID string) (*PaymentScheduleParseResult, error) {
+func (h *AIChatHandler) parsePaymentSchedule(ctx context.Context, authHeader, fileID, objectName, contentType, contractID string) (*PaymentScheduleParseResult, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
 		aiServiceURL = "http://ai-service:8000"
@@ -1305,8 +1732,9 @@ func (h *AIChatHandler) parsePaymentSchedule(c *gin.Context, fileID, objectName,
 	if err != nil {
 		return nil, err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", c.GetHeader("Authorization"))
+	req.Header.Set("Authorization", authHeader)
 
 	client := &http.Client{Timeout: 180 * time.Second}
 	resp, err := client.Do(req)
@@ -1450,7 +1878,7 @@ type BatchParseResult struct {
 	Summary       *BatchParseSummary
 }
 
-func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, contentType string) (*BatchParseResult, error) {
+func (h *AIChatHandler) parseContractBatch(ctx context.Context, authHeader, fileID, objectName, contentType string) (*BatchParseResult, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
 		aiServiceURL = "http://ai-service:8000"
@@ -1470,8 +1898,9 @@ func (h *AIChatHandler) parseContractBatch(c *gin.Context, fileID, objectName, c
 	if err != nil {
 		return nil, err
 	}
+	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", c.GetHeader("Authorization"))
+	req.Header.Set("Authorization", authHeader)
 
 	client := &http.Client{Timeout: 180 * time.Second}
 	resp, err := client.Do(req)

@@ -22,7 +22,6 @@ import {
   RobotOutlined,
   ArrowRightOutlined,
   PlusOutlined,
-  UploadOutlined,
   BarChartOutlined,
   BellOutlined,
 } from "@ant-design/icons";
@@ -304,8 +303,8 @@ export default function HomePage() {
               {t("dashboard.add_contract", language)}
             </Button>
             <Button
-              icon={<UploadOutlined />}
-              onClick={() => router.push("/upload")}
+              icon={<RobotOutlined />}
+              onClick={() => router.push("/ai-chat")}
               style={{ borderRadius: 9999, fontWeight: 500 }}
             >
               {t("dashboard.upload_file", language)}
@@ -546,22 +545,16 @@ export default function HomePage() {
                         action: () => router.push("/contracts/new"),
                       },
                       {
-                        icon: <UploadOutlined />,
+                        icon: <RobotOutlined />,
                         label: t("dashboard.upload_file", language),
                         desc: t("dashboard.upload_file_desc", language),
-                        action: () => router.push("/upload"),
+                        action: () => router.push("/ai-chat"),
                       },
                       {
                         icon: <BarChartOutlined />,
                         label: t("dashboard.view_reports", language),
                         desc: t("dashboard.view_report_desc", language),
                         action: () => router.push("/reports"),
-                      },
-                      {
-                        icon: <RobotOutlined />,
-                        label: t("dashboard.ai_assistant", language),
-                        desc: t("dashboard.ai_assistant_desc", language),
-                        action: () => router.push("/ai-chat"),
                       },
                     ].map((item, idx) => (
                       <motion.div

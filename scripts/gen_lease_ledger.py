@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -137,5 +139,7 @@ for row in leg.iter_rows():
             cell.font = Font(name=FONT, size=10)
         cell.alignment = Alignment(vertical="center", wrap_text=True)
 
-wb.save("合同台账_测试数据.xlsx")
-print("saved")
+output_path = Path(__file__).resolve().parent / "testdata" / "合同台账_测试数据.xlsx"
+output_path.parent.mkdir(parents=True, exist_ok=True)
+wb.save(output_path)
+print(f"saved {output_path}")

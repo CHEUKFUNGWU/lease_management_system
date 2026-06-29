@@ -12,6 +12,8 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { AmortizationControls } from "./components/AmortizationControls";
+import { ReportModeSelector } from "./components/ReportModeSelector";
 import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -24,8 +26,6 @@ import { fadeInUp, staggerContainer, staggerItem } from "../design-system/animat
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
-
-/* ──────────────── shared helpers ──────────────── */
 
 const statusColor: Record<string, string> = {
   draft: "default",
@@ -44,8 +44,6 @@ const getStatusText = (lang: string): Record<string, string> => ({
   approved: t("status.approved", lang as any),
   rejected: t("status.rejected", lang as any),
 });
-
-/* ──────────────── amortisation column builder ──────────────── */
 
 const buildAmortColumns = (view: string, granularity: string, lang: string) => {
   const idCols: any[] = [];
@@ -117,8 +115,6 @@ const buildAmortColumns = (view: string, granularity: string, lang: string) => {
 };
 
 
-/* ──────────────── KPI stat card ──────────────── */
-
 function KPIStatCard({ title, value, loading }: { title: string; value: number; loading: boolean }) {
   return (
     <motion.div variants={staggerItem}>
@@ -158,8 +154,6 @@ function KPIStatCard({ title, value, loading }: { title: string; value: number; 
 }
 
 
-/* ──────────────── page component (Suspense wrapper) ──────────────── */
-
 export default function ReportsPage() {
   return (
     <Suspense fallback={<Spin size="large" style={{ display: "block", padding: 120, textAlign: "center" }} />}>
@@ -167,8 +161,6 @@ export default function ReportsPage() {
     </Suspense>
   );
 }
-
-/* ──────────────── inner page (uses useSearchParams) ──────────────── */
 
 function ReportsPageContent() {
   const { token } = useAuth();
@@ -362,7 +354,6 @@ function ReportsPageContent() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         >
-          {/* ─── Page Header ─── */}
           <div style={{ marginBottom: 24 }}>
             <h1
               style={{
@@ -379,66 +370,12 @@ function ReportsPageContent() {
             </p>
           </div>
 
-          {/* ─── Report mode selector ─── */}
-          <Card style={{ marginBottom: 16 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: 12,
-              }}
-            >
-              <Space>
-                <span
-                  style={{
-                    fontWeight: 600,
-                    fontSize: 14,
-                    color: "#000",
-                  }}
-                >
-                  {t("reports.mode", language)}
-                </span>
-                <Radio.Group
-                  value={reportMode}
-                  onChange={(e) => setReportMode(e.target.value)}
-                  buttonStyle="solid"
-                >
-                  <Radio.Button value="working">
-                    <FileTextOutlined /> {t("reports.working", language)}
-                  </Radio.Button>
-                  <Radio.Button value="official">
-                    <SafetyOutlined /> {t("reports.official", language)}
-                  </Radio.Button>
-                </Radio.Group>
-              </Space>
+          <ReportModeSelector
+            reportMode={reportMode}
+            language={language}
+            onChange={setReportMode}
+          />
 
-              <span
-                style={{
-                  fontSize: 12,
-                  color: "#8C8C8C",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                {reportMode === "working" ? (
-                  <>
-                    <span style={{ opacity: 0.5 }}>⚠</span>
-                    {t("reports.working_hint", language)}
-                  </>
-                ) : (
-                  <>
-                    <span style={{ opacity: 0.5 }}>✓</span>
-                    {t("reports.official_hint", language)}
-                  </>
-                )}
-              </span>
-            </div>
-          </Card>
-
-          {/* ─── tabs ─── */}
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
@@ -610,305 +547,101 @@ function ReportsPageContent() {
                       </div>
                     )}
 
-                    {/* controls */}
-                    <Card style={{ marginBottom: 16 }}>
-                      <Row gutter={[12, 10]} align="middle" style={{ marginBottom: showFilters ? 8 : 0 }}>
-                        <Col>
-                          <Space size={4}>
-                            <span style={{ fontSize: 13, color: "#595959" }}>
-                              {t("reports.view_dimension", language)}
-                            </span>
-                            <Select
-                              value={amortView}
-                              onChange={(v) => { setAmortView(v as any); setAmortFetched(false); }}
-                              style={{ width: 110 }}
-                              size="small"
-                              options={[
-                                { value: "contract", label: t("reports.contract_view", language) },
-                                { value: "store", label: t("reports.store_view", language) },
-                                { value: "tag", label: t("reports.tag_view", language) },
-                                { value: "summary", label: t("reports.summary_view", language) },
-                              ]}
-                            />
-                          </Space>
-                        </Col>
-                        <Col>
-                          <Space size={4}>
-                            <span style={{ fontSize: 13, color: "#595959" }}>
-                              {t("reports.granularity", language)}
-                            </span>
-                            <Select
-                              value={amortGranularity}
-                              onChange={(v) => { setAmortGranularity(v as any); setAmortFetched(false); }}
-                              style={{ width: 90 }}
-                              size="small"
-                              options={[
-                                { value: "day", label: t("reports.day", language) },
-                                { value: "month", label: t("reports.month", language) },
-                                { value: "quarter", label: t("reports.quarter", language) },
-                                { value: "half_year", label: t("reports.half_year", language) },
-                                { value: "year", label: t("reports.year", language) },
-                              ]}
-                            />
-                          </Space>
-                        </Col>
-                        <Col>
-                          <Space size={4}>
-                            <span style={{ fontSize: 13, color: "#595959" }}>
-                              {t("reports.date_range", language)}
-                            </span>
-                            <RangePicker
-                              value={amortDateRange}
-                              onChange={(dates) => { setAmortDateRange(dates as any); setAmortFetched(false); }}
-                              allowClear={false}
-                              size="small"
-                              style={{ width: 220 }}
-                            />
-                          </Space>
-                        </Col>
-                        <Col>
-                          <Space size={6}>
-                            <Button
-                              type="primary"
-                              size="small"
-                              icon={<SearchOutlined />}
-                              onClick={fetchAmort}
-                              loading={amortLoading}
-                            >
-                              {t("reports.search", language)}
-                            </Button>
-                            <Button
-                              size="small"
-                              icon={<ClearOutlined />}
-                              onClick={handleAmortReset}
-                              disabled={amortLoading}
-                            >
-                              {t("reports.reset", language)}
-                            </Button>
-                          </Space>
-                        </Col>
-
-                        {/* export + AI buttons row */}
-                        <Col flex="auto" />
-                        <Col>
-                          <Space size={6}>
-                            <Button
-                              size="small"
-                              icon={<DownloadOutlined />}
-                              onClick={() =>
-                                exportCSV(
-                                  amortData,
-                                  amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                                  `Lease_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
-                                )
-                              }
-                              disabled={!amortData.length}
-                            >
-                              CSV
-                            </Button>
-                            <Button
-                              size="small"
-                              icon={<DownloadOutlined />}
-                              onClick={() =>
-                                exportExcel(
-                                  amortData,
-                                  amortCols.flatMap((c: any) => (c.children ? c.children : [c])),
-                                  `Lease_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`,
-                                )
-                              }
-                              disabled={!amortData.length}
-                            >
-                              Excel
-                            </Button>
-                            <Button
-                              type="primary"
-                              size="small"
-                              icon={<RobotOutlined />}
-                              onClick={() => {
-                                const parts: string[] = [];
-                                parts.push(`${t("reports.ai_chat_mode", language)}: ${reportMode === 'working' ? t("reports.ai_chat_working", language) : t("reports.ai_chat_official", language)}`);
-                                parts.push(`${t("reports.ai_chat_view", language)}: ${amortView}`);
-                                parts.push(`${t("reports.ai_chat_granularity", language)}: ${amortGranularity}`);
-                                if (amortDateRange) {
-                                  parts.push(`${t("reports.ai_chat_period", language)}: ${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`);
-                                }
-                                if (amortSummary) {
-                                  parts.push(`${t("reports.ai_chat_closing_liability", language)}: ¥${fmtNum(amortSummary.closingLiability)}`);
-                                  parts.push(`${t("reports.ai_chat_closing_rou", language)}: ¥${fmtNum(amortSummary.closingROU)}`);
-                                  parts.push(`${t("reports.ai_chat_interest", language)}: ¥${fmtNum(amortSummary.totalInterest)}`);
-                                  parts.push(`${t("reports.ai_chat_depreciation", language)}: ¥${fmtNum(amortSummary.totalDepreciation)}`);
-                                }
-                                const summary = parts.join('; ');
-                                let url = `/ai-chat?page=reports&title=${encodeURIComponent(t("reports.ai_chat_report_title", language))}&report_view=${amortView}&summary=${encodeURIComponent(summary)}`;
-                                if (amortDateRange) {
-                                  url += `&period=${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`;
-                                }
-                                if (selectedTags.length > 0) {
-                                  url += selectedTags.map(t => `&tags=${encodeURIComponent(t)}`).join('');
-                                }
-                                router.push(url);
-                              }}
-                            >
-                              {t("reports.ai_analysis", language)}
-                            </Button>
-                          </Space>
-                        </Col>
-                      </Row>
-
-                      {/* advanced filters toggle */}
-                      <Button
-                        type="link"
-                        onClick={() => setShowFilters(!showFilters)}
-                        style={{ padding: 0, fontSize: 12 }}
-                      >
-                        {showFilters
-                          ? t("reports.collapse_filters", language)
-                          : t("reports.expand_filters", language)}
-                      </Button>
-
-                      {showFilters && (
-                        <>
-                          <Row gutter={[12, 10]} style={{ marginTop: 8 }}>
-                            {amortView !== "contract" && (
-                              <Col xs={24} sm={8}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
-                                    {t("reports.contract_id", language)}
-                                  </span>
-                                  <Input
-                                    size="small"
-                                    value={amortContractId}
-                                    onChange={(e) => { setAmortContractId(e.target.value); setAmortFetched(false); }}
-                                    placeholder={t("reports.filter_contract_id", language)}
-                                     allowClear
-                                  />
-                                </div>
-                              </Col>
-                            )}
-                            {amortView !== "store" && (
-                              <Col xs={24} sm={8}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
-                                    {t("reports.store", language)}
-                                  </span>
-                                  <Input
-                                    size="small"
-                                    value={amortStore}
-                                    onChange={(e) => { setAmortStore(e.target.value); setAmortFetched(false); }}
-                                    placeholder={t("reports.filter_store", language)}
-                                     allowClear
-                                  />
-                                </div>
-                              </Col>
-                            )}
-                            <Col xs={24} sm={8}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
-                                  {t("reports.tags", language)}
-                                </span>
-                                <Select
-                                  mode="tags"
-                                  size="small"
-                                  value={selectedTags}
-                                  onChange={(v) => { setSelectedTags(v); setAmortFetched(false); }}
-                                  style={{ width: "100%" }}
-                                  placeholder={t("reports.filter_tags", language)}
-                                  loading={tagLoading}
-                                  options={availableTags.map((tg) => ({ value: tg, label: tg }))}
-                                />
-                              </div>
-                            </Col>
-                          </Row>
-
-                          {/* discount rate & currency override */}
-                          <div
-                            style={{
-                              marginTop: 12,
-                              padding: "10px 14px",
-                              borderRadius: 8,
-                              background: "#F7F7F7",
-                              border: "1px solid #E5E5E5",
-                              fontSize: 12,
-                              color: "#8C8C8C",
-                            }}
-                          >
-                            <span style={{ fontWeight: 600, color: "#595959" }}>
-                              {t("reports.override_title", language)}
-                            </span>
-                            <span style={{ marginLeft: 8 }}>
-                              {t("reports.override_desc", language)}
-                            </span>
-                          </div>
-                          <Row gutter={[12, 10]} style={{ marginTop: 10 }}>
-                            <Col xs={24} sm={8}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
-                                  {t("reports.discount_rate_override", language)}
-                                </span>
-                                <Input
-                                  size="small"
-                                  value={discountRateOverride}
-                                  onChange={(e) => { setDiscountRateOverride(e.target.value); setAmortFetched(false); }}
-                                  placeholder={t("reports.override_placeholder", language)}
-                                   allowClear
-                                 />
-                               </div>
-                             </Col>
-                             <Col xs={24} sm={8}>
-                               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                 <span style={{ fontSize: 12, color: "#8C8C8C" }}>
-                                   {t("reports.report_currency", language)}
-                                 </span>
-                                 <Select
-                                   size="small"
-                                   value={reportCurrency || undefined}
-                                   onChange={(v) => { setReportCurrency(v || ""); setAmortFetched(false); }}
-                                   style={{ width: "100%" }}
-                                   placeholder={t("reports.select_currency", language)}
-                                  allowClear
-                                   options={[
-                                    { value: "CNY", label: t("reports.option.currency_cny", language) },
-                                    { value: "USD", label: t("reports.option.currency_usd", language) },
-                                    { value: "HKD", label: t("reports.option.currency_hkd", language) },
-                                    { value: "EUR", label: t("reports.option.currency_eur", language) },
-                                  ]}
-                                />
-                              </div>
-                            </Col>
-                            <Col xs={24} sm={8}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
-                                  {t("reports.exchange_rate", language)}
-                                </span>
-                                <Input
-                                  size="small"
-                                  value={exchangeRate}
-                                  onChange={(e) => { setExchangeRate(e.target.value); setAmortFetched(false); }}
-                                  placeholder={t("reports.exchange_rate_placeholder", language)}
-                                   allowClear
-                                />
-                              </div>
-                            </Col>
-                          </Row>
-                        </>
-                      )}
-                    </Card>
-
-                    {/* override summary tags */}
-                    {(discountRateOverride || reportCurrency) && amortFetched && (
-                      <div style={{ marginBottom: 16 }}>
-                        {discountRateOverride && (
-                          <Tag style={{ fontSize: 12, padding: "2px 10px" }}>
-                            {t("reports.discount_rate_override", language)}: {Number(discountRateOverride).toFixed(2)}%
-                          </Tag>
-                        )}
-                        {reportCurrency && (
-                          <Tag style={{ fontSize: 12, padding: "2px 10px" }}>
-                            {t("reports.report_currency", language)}: {reportCurrency}{exchangeRate ? ` @ ${Number(exchangeRate).toFixed(2)}` : ""}
-                          </Tag>
-                        )}
-                      </div>
-                    )}
+                    <AmortizationControls
+                      reportMode={reportMode}
+                      amortView={amortView}
+                      amortGranularity={amortGranularity}
+                      amortDateRange={amortDateRange}
+                      amortContractId={amortContractId}
+                      amortStore={amortStore}
+                      selectedTags={selectedTags}
+                      tagLoading={tagLoading}
+                      availableTags={availableTags}
+                      discountRateOverride={discountRateOverride}
+                      reportCurrency={reportCurrency}
+                      exchangeRate={exchangeRate}
+                      showFilters={showFilters}
+                      amortLoading={amortLoading}
+                      amortDataLength={amortData.length}
+                      language={language}
+                      onViewChange={(value) => {
+                        setAmortView(value);
+                        setAmortFetched(false);
+                      }}
+                      onGranularityChange={(value) => {
+                        setAmortGranularity(value);
+                        setAmortFetched(false);
+                      }}
+                      onDateRangeChange={(value) => {
+                        setAmortDateRange(value);
+                        setAmortFetched(false);
+                      }}
+                      onSearch={fetchAmort}
+                      onReset={handleAmortReset}
+                      onExportCsv={() =>
+                        exportCSV(
+                          amortData,
+                          amortCols.flatMap((column: any) => (column.children ? column.children : [column])),
+                          `Lease_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`
+                        )
+                      }
+                      onExportExcel={() =>
+                        exportExcel(
+                          amortData,
+                          amortCols.flatMap((column: any) => (column.children ? column.children : [column])),
+                          `Lease_${t("reports.csv_filename", language)}_${reportMode}_${new Date().toISOString().slice(0, 10)}`
+                        )
+                      }
+                      onAiAnalysis={() => {
+                        const parts: string[] = [];
+                        parts.push(`${t("reports.ai_chat_mode", language)}: ${reportMode === "working" ? t("reports.ai_chat_working", language) : t("reports.ai_chat_official", language)}`);
+                        parts.push(`${t("reports.ai_chat_view", language)}: ${amortView}`);
+                        parts.push(`${t("reports.ai_chat_granularity", language)}: ${amortGranularity}`);
+                        if (amortDateRange) {
+                          parts.push(`${t("reports.ai_chat_period", language)}: ${amortDateRange[0].format("YYYY-MM-DD")}~${amortDateRange[1].format("YYYY-MM-DD")}`);
+                        }
+                        if (amortSummary) {
+                          parts.push(`${t("reports.ai_chat_closing_liability", language)}: ¥${fmtNum(amortSummary.closingLiability)}`);
+                          parts.push(`${t("reports.ai_chat_closing_rou", language)}: ¥${fmtNum(amortSummary.closingROU)}`);
+                          parts.push(`${t("reports.ai_chat_interest", language)}: ¥${fmtNum(amortSummary.totalInterest)}`);
+                          parts.push(`${t("reports.ai_chat_depreciation", language)}: ¥${fmtNum(amortSummary.totalDepreciation)}`);
+                        }
+                        const summary = parts.join("; ");
+                        let url = `/ai-chat?page=reports&title=${encodeURIComponent(t("reports.ai_chat_report_title", language))}&report_view=${amortView}&summary=${encodeURIComponent(summary)}`;
+                        if (amortDateRange) {
+                          url += `&period=${amortDateRange[0].format("YYYY-MM-DD")}~${amortDateRange[1].format("YYYY-MM-DD")}`;
+                        }
+                        if (selectedTags.length > 0) {
+                          url += selectedTags.map((tag) => `&tags=${encodeURIComponent(tag)}`).join("");
+                        }
+                        router.push(url);
+                      }}
+                      onToggleFilters={() => setShowFilters(!showFilters)}
+                      onContractIdChange={(value) => {
+                        setAmortContractId(value);
+                        setAmortFetched(false);
+                      }}
+                      onStoreChange={(value) => {
+                        setAmortStore(value);
+                        setAmortFetched(false);
+                      }}
+                      onSelectedTagsChange={(value) => {
+                        setSelectedTags(value);
+                        setAmortFetched(false);
+                      }}
+                      onDiscountRateOverrideChange={(value) => {
+                        setDiscountRateOverride(value);
+                        setAmortFetched(false);
+                      }}
+                      onReportCurrencyChange={(value) => {
+                        setReportCurrency(value);
+                        setAmortFetched(false);
+                      }}
+                      onExchangeRateChange={(value) => {
+                        setExchangeRate(value);
+                        setAmortFetched(false);
+                      }}
+                    />
 
                     {/* tag view caveat */}
                     {amortView === "tag" && amortFetched && amortData.length > 0 && (

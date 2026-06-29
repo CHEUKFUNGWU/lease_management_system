@@ -1,13 +1,13 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
 import os
 import uuid
 from datetime import datetime
+from typing import Any
 
-from app.config import get_settings
-from app.services.storage import upload_to_minio, get_minio_client
+from app.services.storage import upload_to_minio
 
 router = APIRouter()
+FILE_STATUS_REGISTRY: dict[str, dict[str, Any]] = {}
 
 
 @router.post("/files/upload")
@@ -21,8 +21,6 @@ async def upload_file(
     
     - task_type: contract, payment_schedule, event, scan_copy
     """
-    settings = get_settings()
-    
     # 验证文件类型
     allowed_types = {
         "application/pdf": ".pdf",
@@ -68,8 +66,8 @@ async def upload_file(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
-    
-    return {
+
+    result = {
         "file_id": file_id,
         "original_name": original_name,
         "object_name": object_name,
@@ -79,14 +77,19 @@ async def upload_file(
         "task_type": task_type,
         "uploaded_at": datetime.now().isoformat()
     }
+    FILE_STATUS_REGISTRY[file_id] = {
+        **result,
+        "status": "uploaded",
+        "progress": 100,
+    }
+
+    return result
 
 
 @router.get("/files/{file_id}/status")
 async def get_file_status(file_id: str):
     """获取文件处理状态"""
-    # TODO: 查询数据库获取任务状态
-    return {
-        "file_id": file_id,
-        "status": "pending",
-        "progress": 0
-    }
+    status = FILE_STATUS_REGISTRY.get(file_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="文件不存在或状态已过期")
+    return status

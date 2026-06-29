@@ -22,6 +22,7 @@ import { auditApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
+import type { AuditLogListParams, AuditLogRecord } from "../lib/types/audit";
 
 const { RangePicker } = DatePicker;
 
@@ -45,7 +46,7 @@ export default function AuditLogsPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
   const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLogRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 50 });
 
@@ -112,7 +113,7 @@ export default function AuditLogsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const params: any = {
+      const params: AuditLogListParams = {
         limit: pageSize,
         offset: (page - 1) * pageSize,
       };
@@ -148,9 +149,13 @@ export default function AuditLogsPage() {
     setDateRange(null);
   };
 
-  const handleTableChange = (pag: any) => {
-    setPagination(pag);
-    fetchLogs(pag.current, pag.pageSize);
+  const handleTableChange = (pag: { current?: number; pageSize?: number }) => {
+    const nextPagination = {
+      current: pag.current ?? 1,
+      pageSize: pag.pageSize ?? pagination.pageSize,
+    };
+    setPagination(nextPagination);
+    fetchLogs(nextPagination.current, nextPagination.pageSize);
   };
 
   const formatJsonContent = (jsonStr: string | null | undefined) => {
@@ -176,7 +181,7 @@ export default function AuditLogsPage() {
       dataIndex: "changed_by_name",
       key: "changed_by_name",
       width: 120,
-      render: (val: string, record: any) => val || (record.changed_by ? record.changed_by.substring(0, 8) : "-"),
+      render: (val: string, record: AuditLogRecord) => val || (record.changed_by ? record.changed_by.substring(0, 8) : "-"),
     },
     {
       title: t("audit.col_action", language),

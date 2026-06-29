@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -409,15 +410,7 @@ func (h *ReportHandler) SensitivityAnalysis(c *gin.Context) {
 	if raw := c.Query("base_rate"); raw != "" {
 		baseRate, _ = strconv.ParseFloat(raw, 64)
 	}
-	if baseRate <= 0 {
-		baseRate = resolveGlobalDiscountRate(c.Request.Context(), h.systemSettingRepo)
-	}
-	if baseRate <= 0 && contract.DiscountRateValue != nil {
-		baseRate = *contract.DiscountRateValue
-	}
-	if baseRate <= 0 {
-		baseRate = 0.05
-	}
+	baseRate = contractsvc.ResolveDiscountRate(c.Request.Context(), baseRate, h.systemSettingRepo, contract, nil, false)
 
 	shockValues := []float64{-0.01, -0.005, 0, 0.005, 0.01}
 	if raw := c.Query("shocks"); raw != "" {
@@ -522,15 +515,7 @@ func (h *ReportHandler) StandardComparison(c *gin.Context) {
 	if raw := c.Query("discount_rate"); raw != "" {
 		discountRate, _ = strconv.ParseFloat(raw, 64)
 	}
-	if discountRate <= 0 {
-		discountRate = resolveGlobalDiscountRate(c.Request.Context(), h.systemSettingRepo)
-	}
-	if discountRate <= 0 && contract.DiscountRateValue != nil {
-		discountRate = *contract.DiscountRateValue
-	}
-	if discountRate <= 0 {
-		discountRate = 0.05
-	}
+	discountRate = contractsvc.ResolveDiscountRate(c.Request.Context(), discountRate, h.systemSettingRepo, contract, nil, false)
 
 	payments := repository.ToIFRS16Payments(schedules)
 	input := ifrs16.LeaseCalculation{
@@ -1585,29 +1570,7 @@ func fallbackStoreName(name string) string {
 }
 
 func getDiscountRate(ctx context.Context, mcRepo *repository.MonthlyClosingRepository, systemSettingRepo *repository.SystemSettingRepository, contract *repository.Contract) float64 {
-	globalRate := resolveGlobalDiscountRate(ctx, systemSettingRepo)
-	if globalRate > 0 {
-		return globalRate
-	}
-	if contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-		return *contract.DiscountRateValue
-	}
-	results, err := mcRepo.GetMeasurementResults(ctx, contract.ID, "")
-	if err != nil || len(results) == 0 {
-		return 0.05
-	}
-	latest := results[len(results)-1]
-	if latest.DiscountRate == 0 {
-		return 0.05
-	}
-	return latest.DiscountRate
-}
-
-func resolveGlobalDiscountRate(ctx context.Context, repo *repository.SystemSettingRepository) float64 {
-	if repo == nil {
-		return 0.0
-	}
-	return repo.GetFloat64(ctx, "global_discount_rate", 0.0)
+	return contractsvc.ResolveDiscountRate(ctx, 0, systemSettingRepo, contract, mcRepo, true)
 }
 
 // bucketKey returns the grouping key for a given date and granularity.

@@ -38,6 +38,10 @@ import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { BatchHistoryCard } from "./components/BatchHistoryCard";
+import { EntriesPreviewCard } from "./components/EntriesPreviewCard";
+import { GenerateClosingCard } from "./components/GenerateClosingCard";
+import { LockControlCard } from "./components/LockControlCard";
 import { monthlyClosingApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -115,9 +119,10 @@ export default function MonthlyClosingPage() {
   const [writebackLoading, setWritebackLoading] = useState(false);
 
   const role = user?.role || "";
-  const isAdmin = role === "admin";
-  const isApprover = role === "approver" || isAdmin;
-  const isReviewer = role === "reviewer" || isApprover;
+  const hasRole = (candidate: string) => user?.roles?.includes(candidate as any) || role === candidate;
+  const isAdmin = hasRole("admin");
+  const isApprover = hasRole("approver") || isAdmin;
+  const isReviewer = hasRole("reviewer") || isApprover;
   const canManage = isReviewer;
 
   const checkLockStatus = useCallback(
@@ -588,359 +593,102 @@ export default function MonthlyClosingPage() {
       key: "generate",
       label: t("monthly.tab_generate", language),
       children: (
-        <Card
-          title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
-              {t("monthly.generate_closing", language)}
-            </span>
-          }
-        >
-          <Form layout="vertical" onFinish={handleGenerate}>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("monthly.accounting_period", language)}
-                  name="period"
-                  rules={[{ required: true, message: t("monthly.select_period", language) }]}
-                >
-                  <DatePicker.MonthPicker
-                    style={{ width: "100%" }}
-                    placeholder="YYYY-MM"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("monthly.discount_rate", language)} name="discount_rate" initialValue={0.05}>
-                  <Input type="number" step={0.001} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Button
-              type="primary"
-              icon={<CalculatorOutlined />}
-              htmlType="submit"
-              loading={loading}
-              size="large"
-            >
-              {t("monthly.generate_btn", language)}
-            </Button>
-          </Form>
-
-          {result && (
-            <Alert
-              message={t("monthly.result_title", language)}
-              description={
-                <Space direction="vertical">
-                  <span>
-                    {t("monthly.batch_number", language)}:{" "}
-                    <strong style={{ color: "var(--fg-primary)" }}>
-                      {result.batch_number}
-                    </strong>
-                  </span>
-                  <span>
-                    {t("monthly.status", language)}:{" "}
-                    <Tag color={result.status === "completed" ? "processing" : "warning"}>
-                      {result.status}
-                    </Tag>
-                  </span>
-                  <span>
-                    {t("monthly.processed_contracts", language)}: {result.processed_contracts} / {result.total_contracts}
-                  </span>
-                  <span>{t("monthly.failed_contracts", language)}: {result.failed_contracts}</span>
-                  <span>{t("monthly.total_entries", language)}: {result.total_entries} 笔</span>
-                </Space>
-              }
-              type="info"
-              showIcon
-              style={{ marginTop: 24 }}
-            />
-          )}
-        </Card>
+        <GenerateClosingCard
+          language={language}
+          loading={loading}
+          result={result}
+          onGenerate={handleGenerate}
+        />
       ),
     },
     {
       key: "entries",
       label: t("monthly.tab_entries", language),
       children: (
-        <Card
-          title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
-              {t("monthly.entries_preview", language)}
-            </span>
-          }
-          extra={
-            canManage && entries.length > 0 ? (
-              <Space>
-                <Button
-                  size="small"
-                  icon={<DownloadOutlined />}
-                  loading={actionLoading.export_entries}
-                  onClick={handleExportEntries}
-                >
-                  导出 ERP CSV
-                </Button>
-                <Button
-                  size="small"
-                  icon={<ImportOutlined />}
-                  onClick={() => setWritebackModalOpen(true)}
-                >
-                  凭证回写
-                </Button>
-                <Button
-                  size="small"
-                  icon={<CheckOutlined />}
-                  onClick={() => {
-                    const draftEntries = entries.filter(
-                      (e: any) => e.posting_status === "draft"
-                    );
-                    if (draftEntries.length === 0) {
-                      message.info(t("monthly.no_draft_entries", language));
-                      return;
-                    }
-                    Promise.all(
-                      draftEntries.map((e: any) =>
-                        monthlyClosingApi
-                          .approveEntry(e.id, token!)
-                          .catch((err) => ({ error: err }))
-                      )
-                    ).then((results) => {
-                      const succeeded = results.filter((r: any) => !r.error).length;
-                      message.success(t("monthly.batch_approve_success_msg", language, { count: String(succeeded) }));
-                      refresh();
-                    });
-                  }}
-                >
-                  {t("monthly.batch_approve", language)}
-                </Button>
-                <Button
-                  size="small"
-                  icon={<SendOutlined />}
-                  onClick={() => {
-                    const approvedEntries = entries.filter(
-                      (e: any) => e.posting_status === "approved"
-                    );
-                    if (approvedEntries.length === 0) {
-                      message.info(t("monthly.no_approved_entries", language));
-                      return;
-                    }
-                    Promise.all(
-                      approvedEntries.map((e: any) =>
-                        monthlyClosingApi
-                          .postEntry(e.id, "", token!)
-                          .catch((err) => ({ error: err }))
-                      )
-                    ).then((results) => {
-                      const succeeded = results.filter((r: any) => !r.error).length;
-                      message.success(t("monthly.batch_post_success_msg", language, { count: String(succeeded) }));
-                      refresh();
-                    });
-                  }}
-                >
-                  {t("monthly.batch_post", language)}
-                </Button>
-                <Button size="small" onClick={() => refresh()}>
-                  {t("monthly.refresh", language)}
-                </Button>
-              </Space>
-            ) : undefined
-          }
-        >
-          {isLocked && (
-            <Alert
-              message={t("monthly.locked_warning", language, { period: selectedPeriod })}
-              type="warning"
-              showIcon
-              style={{ marginBottom: 16 }}
-            />
-          )}
-          {entriesLoading && !entriesLoaded ? (
-            <EntrySkeleton />
-          ) : entries.length === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("monthly.no_entries", language)}
-            />
-          ) : (
-            <Spin spinning={entriesLoading && entriesLoaded}>
-              <Table
-                columns={entryColumns}
-                dataSource={entries}
-                rowKey="id"
-                pagination={{ pageSize: 20 }}
-                size="small"
-                scroll={{ x: 1360 }}
-              />
-            </Spin>
-          )}
-        </Card>
+        <EntriesPreviewCard
+          language={language}
+          canManage={canManage}
+          entries={entries}
+          entriesLoading={entriesLoading}
+          entriesLoaded={entriesLoaded}
+          isLocked={isLocked}
+          selectedPeriod={selectedPeriod}
+          actionLoading={actionLoading}
+          entryColumns={entryColumns}
+          onExportEntries={handleExportEntries}
+          onOpenWritebackModal={() => setWritebackModalOpen(true)}
+          onBatchApprove={() => {
+            const draftEntries = entries.filter((entry: any) => entry.posting_status === "draft");
+            if (draftEntries.length === 0) {
+              message.info(t("monthly.no_draft_entries", language));
+              return;
+            }
+            Promise.all(
+              draftEntries.map((entry: any) =>
+                monthlyClosingApi.approveEntry(entry.id, token!).catch((error) => ({ error }))
+              )
+            ).then((results) => {
+              const succeeded = results.filter((result: any) => !result.error).length;
+              message.success(
+                t("monthly.batch_approve_success_msg", language, { count: String(succeeded) })
+              );
+              refresh();
+            });
+          }}
+          onBatchPost={() => {
+            const approvedEntries = entries.filter((entry: any) => entry.posting_status === "approved");
+            if (approvedEntries.length === 0) {
+              message.info(t("monthly.no_approved_entries", language));
+              return;
+            }
+            Promise.all(
+              approvedEntries.map((entry: any) =>
+                monthlyClosingApi.postEntry(entry.id, "", token!).catch((error) => ({ error }))
+              )
+            ).then((results) => {
+              const succeeded = results.filter((result: any) => !result.error).length;
+              message.success(
+                t("monthly.batch_post_success_msg", language, { count: String(succeeded) })
+              );
+              refresh();
+            });
+          }}
+          onRefresh={() => refresh()}
+          entrySkeleton={<EntrySkeleton />}
+        />
       ),
     },
     {
       key: "batches",
       label: t("monthly.tab_batches", language),
       children: (
-        <Card
-          title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
-              {t("monthly.batch_history", language)}
-            </span>
-          }
-          extra={
-            <Button size="small" onClick={() => refresh()}>
-              {t("monthly.refresh", language)}
-            </Button>
-          }
-        >
-          {batchesLoading && !batchesLoaded ? (
-            <BatchSkeleton />
-          ) : batches.length === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("monthly.no_batches", language)}
-            />
-          ) : (
-            <Spin spinning={batchesLoading && batchesLoaded}>
-              <Table
-                columns={batchColumns}
-                dataSource={batches}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-                size="small"
-                scroll={{ x: 1200 }}
-              />
-            </Spin>
-          )}
-        </Card>
+        <BatchHistoryCard
+          language={language}
+          batchesLoading={batchesLoading}
+          batchesLoaded={batchesLoaded}
+          batches={batches}
+          batchColumns={batchColumns}
+          batchSkeleton={<BatchSkeleton />}
+          onRefresh={() => refresh()}
+        />
       ),
     },
     {
       key: "lock",
       label: t("monthly.tab_lock", language),
       children: (
-        <Card
-          title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
-              {t("monthly.lock_control", language)}
-            </span>
-          }
-        >
-          {!selectedPeriod ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("monthly.lock_first", language)}
-            />
-          ) : lockStatusLoading ? (
-            <div style={{ padding: "24px 0" }}>
-              <Skeleton active paragraph={{ rows: 2 }} />
-            </div>
-          ) : (
-            <>
-              {/* Lock Status Indicator */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 20,
-                  padding: "24px 28px",
-                  borderRadius: 10,
-                  marginBottom: 24,
-                  border: `1px solid ${
-                    isLocked ? "var(--border-strong)" : "var(--border-default)"
-                  }`,
-                  background: isLocked
-                    ? "var(--bg-inset)"
-                    : "var(--bg-page)",
-                }}
-              >
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                    background: isLocked
-                      ? "var(--fg-primary)"
-                      : "var(--bg-inset)",
-                    color: isLocked ? "var(--fg-inverse)" : "var(--fg-tertiary)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {isLocked ? <LockOutlined /> : <UnlockOutlined />}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 2 }}>
-                    {t("monthly.accounting_period_label", language)} {selectedPeriod}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "var(--fg-muted)",
-                    }}
-                  >
-                    {isLocked
-                      ? t("monthly.lock_desc_locked", language)
-                      : t("monthly.lock_desc_unlocked", language)}
-                  </div>
-                </div>
-                <div style={{ flexShrink: 0 }}>
-                  {isLocked ? (
-                    <Tag color="error" style={{ margin: 0, fontSize: 13 }}>
-                      <LockOutlined style={{ marginRight: 4 }} />
-                      {t("monthly.locked", language)}
-                    </Tag>
-                  ) : (
-                    <Tag color="success" style={{ margin: 0, fontSize: 13 }}>
-                      <UnlockOutlined style={{ marginRight: 4 }} />
-                      {t("monthly.unlocked", language)}
-                    </Tag>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <Space>
-                {!isLocked ? (
-                  <Button
-                    type="primary"
-                    icon={<LockOutlined />}
-                    loading={lockLoading}
-                    disabled={!isApprover}
-                    onClick={handleLockPeriod}
-                  >
-                    {isApprover ? t("monthly.lock_btn", language) : t("monthly.lock_btn_disabled", language)}
-                  </Button>
-                ) : (
-                  <Button
-                    icon={<UnlockOutlined />}
-                    loading={lockLoading}
-                    disabled={!isAdmin}
-                    onClick={handleUnlockPeriod}
-                  >
-                    {isAdmin ? t("monthly.unlock_btn", language) : t("monthly.unlock_btn_disabled", language)}
-                  </Button>
-                )}
-                <Button
-                  onClick={() => checkLockStatus(selectedPeriod)}
-                  loading={lockStatusLoading}
-                >
-                  {t("monthly.refresh_status", language)}
-                </Button>
-              </Space>
-
-              {!isAdmin && isLocked && (
-                <Alert
-                  message={t("monthly.contact_admin", language)}
-                  type="info"
-                  showIcon
-                  style={{ marginTop: 16 }}
-                />
-              )}
-            </>
-          )}
-        </Card>
+        <LockControlCard
+          language={language}
+          selectedPeriod={selectedPeriod}
+          isLocked={isLocked}
+          lockLoading={lockLoading}
+          lockStatusLoading={lockStatusLoading}
+          isApprover={isApprover}
+          isAdmin={isAdmin}
+          onLock={handleLockPeriod}
+          onUnlock={handleUnlockPeriod}
+          onRefreshStatus={() => checkLockStatus(selectedPeriod)}
+        />
       ),
     },
   ];

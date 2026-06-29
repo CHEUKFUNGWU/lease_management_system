@@ -11,6 +11,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -98,6 +99,7 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 	failed := 0
 	totalEntries := 0
 	batchID := batch.ID
+	failures := make([]map[string]string, 0)
 
 	// Parse period to get start/end dates
 	periodStart, _ := time.Parse("2006-01", req.AccountingPeriod)
@@ -113,32 +115,25 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 		schedules, err := h.psRepo.GetByContractID(ctx, contract.ID)
 		if err != nil {
 			failed++
+			failures = append(failures, map[string]string{
+				"contract_id":     contract.ID,
+				"contract_number": contract.ContractNumber,
+				"reason":          "failed to load payment schedules: " + err.Error(),
+			})
 			continue
 		}
-
-		var payments []ifrs16svc.LeasePayment
 		if len(schedules) == 0 {
-			// Fallback mock payments
-			payments = generateMockPayments(contract)
-		} else {
-			payments = repository.ToIFRS16Payments(schedules)
+			failed++
+			failures = append(failures, map[string]string{
+				"contract_id":     contract.ID,
+				"contract_number": contract.ContractNumber,
+				"reason":          "payment schedules are required for monthly closing generation",
+			})
+			continue
 		}
+		payments := repository.ToIFRS16Payments(schedules)
 
-		// Determine discount rate priority:
-		// 1) request override
-		// 2) global system setting
-		// 3) contract value
-		// 4) fallback 0.05
-		discountRate := req.DiscountRate
-		if discountRate <= 0 {
-			discountRate = resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
-		}
-		if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-			discountRate = *contract.DiscountRateValue
-		}
-		if discountRate <= 0 {
-			discountRate = 0.05
-		}
+		discountRate := contractsvc.ResolveDiscountRate(ctx, req.DiscountRate, h.systemSettingRepo, contract, nil, false)
 
 		// Run IFRS 16 calculation
 		calculation := ifrs16svc.LeaseCalculation{
@@ -156,6 +151,11 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 		result, err := ifrs16svc.Calculate(calculation)
 		if err != nil {
 			failed++
+			failures = append(failures, map[string]string{
+				"contract_id":     contract.ID,
+				"contract_number": contract.ContractNumber,
+				"reason":          "calculation failed: " + err.Error(),
+			})
 			continue
 		}
 		if result.MeasurementBasis == "skipped" {
@@ -203,6 +203,11 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 
 		if err := h.mcRepo.SaveMeasurementResult(ctx, mr); err != nil {
 			failed++
+			failures = append(failures, map[string]string{
+				"contract_id":     contract.ID,
+				"contract_number": contract.ContractNumber,
+				"reason":          "failed to save measurement result: " + err.Error(),
+			})
 			continue
 		}
 
@@ -262,6 +267,7 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 		"total_contracts":     len(contracts),
 		"processed_contracts": processed,
 		"failed_contracts":    failed,
+		"failures":            failures,
 		"total_entries":       totalEntries,
 	})
 
@@ -274,30 +280,11 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 			"accounting_period": req.AccountingPeriod,
 			"status":            status,
 			"processed":         processed,
+			"failed":            failed,
 			"total_entries":     totalEntries,
+			"failures":          failures,
 		}, uidStr, c)
 	}
-}
-
-func generateMockPayments(contract *repository.Contract) []ifrs16svc.LeasePayment {
-	var payments []ifrs16svc.LeasePayment
-	payments = append(payments, ifrs16svc.LeasePayment{
-		Date:   contract.CommencementDate,
-		Amount: 100000,
-		Timing: "postpaid",
-		Type:   "fixed",
-	})
-	currentDate := contract.CommencementDate.AddDate(0, 1, 0)
-	for currentDate.Before(contract.LeaseEndDate) {
-		payments = append(payments, ifrs16svc.LeasePayment{
-			Date:   currentDate,
-			Amount: 100000,
-			Timing: "postpaid",
-			Type:   "fixed",
-		})
-		currentDate = currentDate.AddDate(0, 1, 0)
-	}
-	return payments
 }
 
 func generateJournalEntries(contractID, period string, entryDate time.Time, monthly *ifrs16svc.MonthlyEntry, batchID string, measurementBasis string) []*repository.JournalEntry {
@@ -454,7 +441,7 @@ func (h *MonthlyClosingHandler) ApproveEntry(c *gin.Context) {
 	}
 	// Audit log
 	if h.auditLogger != nil {
-		h.auditLogger.Log(c.Request.Context(), "journal_entries", entryID, "approve", nil, nil, userIDStr, c)
+		h.auditLogger.Log(c.Request.Context(), "journal_entries", entryID, "approve", nil, approvalAuditValues(c, nil), userIDStr, c)
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "分录审批成功", "entry_id": entryID})
 }
@@ -491,6 +478,9 @@ func (h *MonthlyClosingHandler) ApproveBatch(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c.Request.Context(), "monthly_closing_batches", batchID, "approve", nil, approvalAuditValues(c, map[string]interface{}{"approved_count": count}), userIDStr, c)
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "批次审批成功", "approved_count": count})
 }

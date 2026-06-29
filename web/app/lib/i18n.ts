@@ -743,6 +743,36 @@ const dict: TranslationDict = {
     "zh-HK": "份",
     en: "",
   },
+  "dashboard.upcoming_critical_dates": {
+    "zh-CN": "未来 90 天关键日期提醒",
+    "zh-HK": "未來 90 天關鍵日期提醒",
+    en: "Critical Date Alerts in the Next 90 Days",
+  },
+  "dashboard.no_upcoming_dates": {
+    "zh-CN": "暂无即将到期提醒",
+    "zh-HK": "暫無即將到期提醒",
+    en: "No upcoming reminders",
+  },
+  "dashboard.reminder_days": {
+    "zh-CN": "提前 {days} 天提醒",
+    "zh-HK": "提前 {days} 天提醒",
+    en: "Reminder {days} days in advance",
+  },
+  "dashboard.overdue_days": {
+    "zh-CN": "逾期 {days} 天",
+    "zh-HK": "逾期 {days} 天",
+    en: "{days} days overdue",
+  },
+  "dashboard.within_days": {
+    "zh-CN": "{days} 天内",
+    "zh-HK": "{days} 天內",
+    en: "Within {days} days",
+  },
+  "dashboard.remaining_days": {
+    "zh-CN": "{days} 天",
+    "zh-HK": "{days} 天",
+    en: "{days} days",
+  },
 
   // Contract List
   "contracts.title": {
@@ -3505,6 +3535,11 @@ const dict: TranslationDict = {
     "zh-HK": "管理員",
     en: "Admin",
   },
+  "admin_users.role_editor": {
+    "zh-CN": "编辑员",
+    "zh-HK": "編輯員",
+    en: "Editor",
+  },
   "admin_users.role_reviewer": {
     "zh-CN": "复核员",
     "zh-HK": "複核員",
@@ -3514,6 +3549,16 @@ const dict: TranslationDict = {
     "zh-CN": "审批员",
     "zh-HK": "審批員",
     en: "Approver",
+  },
+  "admin_users.role_auditor": {
+    "zh-CN": "审计只读",
+    "zh-HK": "審計只讀",
+    en: "Auditor",
+  },
+  "admin_users.role_readonly": {
+    "zh-CN": "业务只读",
+    "zh-HK": "業務只讀",
+    en: "Readonly",
   },
   "admin_users.role_user": {
     "zh-CN": "普通用户",

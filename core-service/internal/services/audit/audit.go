@@ -31,7 +31,13 @@ func (l *Logger) Log(ctx context.Context, tableName, recordID, action string, ol
 	}
 
 	var ipAddr, userAgent *string
+	var legalEntityID *string
 	if c != nil {
+		if value, exists := c.Get("legal_entity_id"); exists {
+			if id, ok := value.(string); ok && id != "" {
+				legalEntityID = &id
+			}
+		}
 		if ip := c.ClientIP(); ip != "" {
 			ipAddr = &ip
 		}
@@ -46,15 +52,16 @@ func (l *Logger) Log(ctx context.Context, tableName, recordID, action string, ol
 	}
 
 	log := &repository.AuditLog{
-		TableName: tableName,
-		RecordID:  recordID,
-		Action:    action,
-		OldValues: oldJSON,
-		NewValues: newJSON,
-		ChangedBy: cb,
-		ChangedAt: time.Now(),
-		IPAddress: ipAddr,
-		UserAgent: userAgent,
+		TableName:     tableName,
+		RecordID:      recordID,
+		LegalEntityID: legalEntityID,
+		Action:        action,
+		OldValues:     oldJSON,
+		NewValues:     newJSON,
+		ChangedBy:     cb,
+		ChangedAt:     time.Now(),
+		IPAddress:     ipAddr,
+		UserAgent:     userAgent,
 	}
 
 	return l.repo.Create(ctx, log)

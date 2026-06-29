@@ -8,20 +8,22 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 type AuditLog struct {
-	ID             string     `json:"id"`
-	TableName      string     `json:"table_name"`
-	RecordID       string     `json:"record_id"`
-	Action         string     `json:"action"`
-	OldValues      *string    `json:"old_values"`
-	NewValues      *string    `json:"new_values"`
-	ChangedBy      *string    `json:"changed_by"`
-	ChangedByName  *string    `json:"changed_by_name"`
-	ChangedAt      time.Time  `json:"changed_at"`
-	IPAddress      *string    `json:"ip_address"`
-	UserAgent      *string    `json:"user_agent"`
+	ID            string    `json:"id"`
+	TableName     string    `json:"table_name"`
+	RecordID      string    `json:"record_id"`
+	LegalEntityID *string   `json:"legal_entity_id"`
+	Action        string    `json:"action"`
+	OldValues     *string   `json:"old_values"`
+	NewValues     *string   `json:"new_values"`
+	ChangedBy     *string   `json:"changed_by"`
+	ChangedByName *string   `json:"changed_by_name"`
+	ChangedAt     time.Time `json:"changed_at"`
+	IPAddress     *string   `json:"ip_address"`
+	UserAgent     *string   `json:"user_agent"`
 }
 
 type AuditRepository struct {
@@ -42,13 +44,14 @@ func (r *AuditRepository) Create(ctx context.Context, log *AuditLog) error {
 	}
 
 	query := `
-		INSERT INTO audit_logs (id, table_name, record_id, action, old_values, new_values, changed_by, changed_at, ip_address, user_agent)
-		VALUES ($1, $2, $3::uuid, $4, $5::jsonb, $6::jsonb, $7::uuid, $8, $9::inet, $10)
+		INSERT INTO audit_logs (id, table_name, record_id, legal_entity_id, action, old_values, new_values, changed_by, changed_at, ip_address, user_agent)
+		VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6::jsonb, $7::jsonb, $8::uuid, $9, $10::inet, $11)
 	`
 	_, err := r.db.Exec(ctx, query,
 		log.ID,
 		log.TableName,
 		log.RecordID,
+		log.LegalEntityID,
 		log.Action,
 		log.OldValues,
 		log.NewValues,
@@ -75,6 +78,15 @@ func (r *AuditRepository) List(ctx context.Context, filter AuditLogFilter) ([]*A
 	conditions := []string{}
 	args := []interface{}{}
 	argIdx := 1
+	if scope, scoped := access.ScopeFromContext(ctx); scoped && !scope.Global {
+		if scope.LegalEntityID == "" {
+			conditions = append(conditions, "FALSE")
+		} else {
+			conditions = append(conditions, fmt.Sprintf("a.legal_entity_id::text = $%d", argIdx))
+			args = append(args, scope.LegalEntityID)
+			argIdx++
+		}
+	}
 
 	if filter.TableName != "" {
 		conditions = append(conditions, fmt.Sprintf("a.table_name = $%d", argIdx))
@@ -125,8 +137,8 @@ func (r *AuditRepository) List(ctx context.Context, filter AuditLogFilter) ([]*A
 		filter.Limit = 50
 	}
 	dataQuery := fmt.Sprintf(`
-		SELECT a.id, a.table_name, a.record_id, a.action, 
-		       COALESCE(a.old_values::text, 'null') as old_values, 
+		SELECT a.id, a.table_name, a.record_id, a.legal_entity_id, a.action,
+		       COALESCE(a.old_values::text, 'null') as old_values,
 		       COALESCE(a.new_values::text, 'null') as new_values,
 		       a.changed_by, u.username as changed_by_name,
 		       a.changed_at, a.ip_address::text, a.user_agent
@@ -150,7 +162,7 @@ func (r *AuditRepository) List(ctx context.Context, filter AuditLogFilter) ([]*A
 		var changedByName *string
 		var ipText, uaText *string
 		if err := rows.Scan(
-			&log.ID, &log.TableName, &log.RecordID, &log.Action,
+			&log.ID, &log.TableName, &log.RecordID, &log.LegalEntityID, &log.Action,
 			&log.OldValues, &log.NewValues,
 			&log.ChangedBy, &changedByName,
 			&log.ChangedAt, &ipText, &uaText,

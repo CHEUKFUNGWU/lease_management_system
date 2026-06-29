@@ -18,19 +18,31 @@ import {
 import { ArrowLeftOutlined, SaveOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { contractApi, settingsApi } from "../../lib/api";
+import { contractApi, legalEntityApi, masterDataApi, settingsApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
 import { normalizeTagValues, DEFAULT_TAG_SUGGESTIONS } from "../../lib/tags";
+import type { CreateContractRequest } from "../../lib/types/contracts";
+import type {
+  LandlordOption,
+  LegalEntityOption,
+  StoreOption,
+} from "../../lib/types/master-data";
 
 export default function NewContractPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [drMissing, setDrMissing] = useState(false);
+  const [legalEntities, setLegalEntities] = useState<LegalEntityOption[]>([]);
+  const [stores, setStores] = useState<StoreOption[]>([]);
+  const [landlords, setLandlords] = useState<LandlordOption[]>([]);
+  const [masterDataLoading, setMasterDataLoading] = useState(false);
+  const [storesLoading, setStoresLoading] = useState(false);
   const router = useRouter();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { language } = useLanguage();
+  const selectedLegalEntityId = Form.useWatch("legal_entity_id", form);
 
   /* ---- load global discount rate as default ---- */
   useEffect(() => {
@@ -47,6 +59,55 @@ export default function NewContractPage() {
         form.setFieldsValue({ discount_rate_value: 5.0 });
       });
   }, [token, form]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    setMasterDataLoading(true);
+    Promise.all([legalEntityApi.list(token), masterDataApi.listLandlords(token)])
+      .then(([entitiesRes, landlordsRes]) => {
+        setLegalEntities(entitiesRes.legal_entities || []);
+        setLandlords(landlordsRes.landlords || []);
+
+        if (user?.legal_entity_id) {
+          form.setFieldsValue({ legal_entity_id: user.legal_entity_id });
+        }
+      })
+      .catch((error: any) => {
+        message.error(error.message || t("contract_new.create_failed", language));
+      })
+      .finally(() => {
+        setMasterDataLoading(false);
+      });
+  }, [token, user?.legal_entity_id, form, language]);
+
+  useEffect(() => {
+    if (!token || !selectedLegalEntityId) {
+      setStores([]);
+      form.setFieldsValue({ store_id: undefined });
+      return;
+    }
+
+    setStoresLoading(true);
+    masterDataApi
+      .listStores(token, selectedLegalEntityId)
+      .then((res) => {
+        const nextStores = res.stores || [];
+        setStores(nextStores);
+
+        const currentStoreId = form.getFieldValue("store_id");
+        if (currentStoreId && !nextStores.some((store) => store.id === currentStoreId)) {
+          form.setFieldsValue({ store_id: undefined });
+        }
+      })
+      .catch((error: any) => {
+        setStores([]);
+        message.error(error.message || t("contract_new.create_failed", language));
+      })
+      .finally(() => {
+        setStoresLoading(false);
+      });
+  }, [token, selectedLegalEntityId, form, language]);
 
   const handleSubmit = async (values: any) => {
     if (!token) {
@@ -66,7 +127,7 @@ export default function NewContractPage() {
 
     setLoading(true);
     try {
-      const data = {
+      const data: CreateContractRequest = {
         contract_number: values.contract_number,
         contract_name: values.contract_name,
         legal_entity_id: values.legal_entity_id,
@@ -150,14 +211,15 @@ export default function NewContractPage() {
               name="legal_entity_id"
               rules={[{ required: true, message: t("contract_new.please_select_entity", language) }]}
             >
-              <Select placeholder={t("contract_new.select_legal_entity", language)}>
-                <Select.Option value="a1b2c3d4-e5f6-7890-abcd-ef1234567890">
-                  {t("contract_new.entity_le001", language)}
-                </Select.Option>
-                <Select.Option value="b2c3d4e5-f6a7-8901-bcde-f12345678901">
-                  {t("contract_new.entity_le002", language)}
-                </Select.Option>
-              </Select>
+              <Select
+                placeholder={t("contract_new.select_legal_entity", language)}
+                loading={masterDataLoading}
+                disabled={masterDataLoading || !!user?.legal_entity_id}
+                options={legalEntities.map((entity) => ({
+                  value: entity.id,
+                  label: `${entity.code} - ${entity.name}`,
+                }))}
+              />
             </Form.Item>
 
             <Form.Item
@@ -165,14 +227,15 @@ export default function NewContractPage() {
               name="store_id"
               rules={[{ required: true, message: t("contract_new.please_select_store", language) }]}
             >
-              <Select placeholder={t("contract_new.select_store", language)}>
-                <Select.Option value="c3d4e5f6-a7b8-9012-cdef-123456789012">
-                  {t("contract_new.store_nanjing", language)}
-                </Select.Option>
-                <Select.Option value="d4e5f6a7-b8c9-0123-def1-234567890123">
-                  {t("contract_new.store_huaihai", language)}
-                </Select.Option>
-              </Select>
+              <Select
+                placeholder={t("contract_new.select_store", language)}
+                loading={storesLoading}
+                disabled={!selectedLegalEntityId}
+                options={stores.map((store) => ({
+                  value: store.id,
+                  label: `${store.code} - ${store.name}`,
+                }))}
+              />
             </Form.Item>
 
             <Form.Item
@@ -180,14 +243,14 @@ export default function NewContractPage() {
               name="landlord_id"
               rules={[{ required: true, message: t("contract_new.please_select_lessor", language) }]}
             >
-              <Select placeholder={t("contract_new.select_lessor", language)}>
-                <Select.Option value="e5f6a7b8-c9d0-1234-ef12-345678901234">
-                  {t("contract_new.lessor_shanghai", language)}
-                </Select.Option>
-                <Select.Option value="f6a7b8c9-d0e1-2345-f123-456789012345">
-                  {t("contract_new.lessor_beijing", language)}
-                </Select.Option>
-              </Select>
+              <Select
+                placeholder={t("contract_new.select_lessor", language)}
+                loading={masterDataLoading}
+                options={landlords.map((landlord) => ({
+                  value: landlord.id,
+                  label: `${landlord.code} - ${landlord.name}`,
+                }))}
+              />
             </Form.Item>
 
             <Form.Item

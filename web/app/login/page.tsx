@@ -19,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { authApi } from "../lib/api";
+import { LoginFormValues, toAuthenticatedUser } from "../lib/types/auth";
 
 const { Title, Text } = Typography;
 
@@ -28,16 +29,11 @@ export default function LoginPage() {
   const { login } = useAuth();
   const { language } = useLanguage();
 
-  const handleLogin = async (values: any) => {
+  const handleLogin = async (values: LoginFormValues) => {
     setLoading(true);
     try {
       const data = await authApi.login(values.username, values.password);
-      login(data.token, {
-        id: data.user_id || "",
-        username: data.username,
-        role: data.role,
-        legal_entity_id: data.legal_entity_id || undefined,
-      });
+      login(data.token, toAuthenticatedUser(data));
       message.success(t("login.success", language));
       router.push("/");
     } catch (error: any) {

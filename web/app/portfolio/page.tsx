@@ -6,6 +6,7 @@ import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { reportApi } from "../lib/api";
+import { getAssetTypeLabel, getLeaseScopeColor, getLeaseScopeLabel } from "../lib/constants/contracts";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 
@@ -24,28 +25,6 @@ interface PortfolioRow {
   earliest_commencement_date?: string;
   latest_lease_end_date?: string;
 }
-
-const assetTypeLabels: Record<string, string> = {
-  real_estate: "不动产",
-  vehicle: "车辆",
-  it_equipment: "IT 设备",
-  machinery: "机器设备",
-  other: "其他",
-};
-
-const leaseScopeLabels: Record<string, string> = {
-  in_scope: "资本化租赁",
-  short_term_exempt: "短期豁免",
-  low_value_exempt: "低价值豁免",
-  not_a_lease: "非租赁",
-};
-
-const scopeColors: Record<string, string> = {
-  in_scope: "blue",
-  short_term_exempt: "gold",
-  low_value_exempt: "purple",
-  not_a_lease: "default",
-};
 
 const fmt = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
@@ -159,14 +138,14 @@ export default function PortfolioPage() {
                     dataIndex: "asset_type",
                     width: 130,
                     fixed: "left",
-                    render: (value: string) => assetTypeLabels[value] || value,
+                    render: (value: string) => getAssetTypeLabel(value),
                   },
                   {
                     title: "范围",
                     dataIndex: "lease_scope",
                     width: 130,
                     fixed: "left",
-                    render: (value: string) => <Tag color={scopeColors[value]}>{leaseScopeLabels[value] || value}</Tag>,
+                    render: (value: string) => <Tag color={getLeaseScopeColor(value)}>{getLeaseScopeLabel(value)}</Tag>,
                   },
                   { title: "币种", dataIndex: "currency", width: 80 },
                   { title: "合同数", dataIndex: "contract_count", width: 90, align: "right" },

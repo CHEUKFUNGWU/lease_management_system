@@ -9,6 +9,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -26,13 +27,13 @@ func NewEventHandler(eventRepo *repository.EventRepository, contractRepo *reposi
 }
 
 type CreateEventRequest struct {
-	ContractID       string  `json:"contract_id" binding:"required,uuid"`
-	EventType        string  `json:"event_type" binding:"required"`
-	EffectiveDate    string  `json:"effective_date" binding:"required"`
-	OriginalValue    *string `json:"original_value"`
-	NewValue         *string `json:"new_value"`
-	ChangeReason     string  `json:"change_reason" binding:"required"`
-	JudgmentBasis    string  `json:"judgment_basis"`
+	ContractID    string  `json:"contract_id" binding:"required,uuid"`
+	EventType     string  `json:"event_type" binding:"required"`
+	EffectiveDate string  `json:"effective_date" binding:"required"`
+	OriginalValue *string `json:"original_value"`
+	NewValue      *string `json:"new_value"`
+	ChangeReason  string  `json:"change_reason" binding:"required"`
+	JudgmentBasis string  `json:"judgment_basis"`
 }
 
 func (h *EventHandler) Create(c *gin.Context) {
@@ -41,9 +42,15 @@ func (h *EventHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	if req.ContractID != c.Param("id") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id must match route contract"})
+		return
+	}
+
 	ed, _ := time.Parse("2006-01-02", req.EffectiveDate)
-	
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+
 	event := &repository.LeaseEvent{
 		ContractID:    req.ContractID,
 		EventType:     req.EventType,
@@ -52,8 +59,9 @@ func (h *EventHandler) Create(c *gin.Context) {
 		NewValue:      req.NewValue,
 		ChangeReason:  &req.ChangeReason,
 		JudgmentBasis: &req.JudgmentBasis,
+		CreatedBy:     &userIDStr,
 	}
-	
+
 	result, err := h.eventRepo.Create(c.Request.Context(), event)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -62,11 +70,9 @@ func (h *EventHandler) Create(c *gin.Context) {
 
 	// Audit log: event created
 	if h.auditLogger != nil {
-		uid, _ := c.Get("user_id")
-		uidStr, _ := uid.(string)
-		h.auditLogger.Log(c.Request.Context(), "lease_events", result.ID, "create", nil, result, uidStr, c)
+		h.auditLogger.Log(c.Request.Context(), "lease_events", result.ID, "create", nil, result, userIDStr, c)
 	}
-	
+
 	c.JSON(http.StatusOK, result)
 }
 
@@ -74,7 +80,7 @@ func (h *EventHandler) ListByContract(c *gin.Context) {
 	contractID := c.Param("id")
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, contractID, legalEntityID)
 	if err != nil {
@@ -85,13 +91,13 @@ func (h *EventHandler) ListByContract(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	events, err := h.eventRepo.GetByContractID(ctx, contractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"data":  events,
 		"total": len(events),
@@ -100,7 +106,7 @@ func (h *EventHandler) ListByContract(c *gin.Context) {
 
 func (h *EventHandler) SubmitForReview(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -111,12 +117,16 @@ func (h *EventHandler) SubmitForReview(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+	if event.ContractID != c.Param("id") {
+		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+		return
+	}
+
 	if err := h.eventRepo.SubmitForReview(ctx, eventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"event_id": eventID,
 		"status":   "submitted",
@@ -131,13 +141,13 @@ type EventReviewRequest struct {
 
 func (h *EventHandler) Review(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	var req EventReviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -148,22 +158,26 @@ func (h *EventHandler) Review(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+	if event.ContractID != c.Param("id") {
+		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+		return
+	}
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.eventRepo.Review(ctx, eventID, userIDStr, req.Approved, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to review: " + err.Error()})
 		return
 	}
-	
+
 	status := "reviewed"
 	message := "复核通过，已送审"
 	if !req.Approved {
 		status = "returned_to_editor"
 		message = "已退回编辑"
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"event_id": eventID,
 		"status":   status,
@@ -173,7 +187,7 @@ func (h *EventHandler) Review(c *gin.Context) {
 
 func (h *EventHandler) Approve(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -184,34 +198,38 @@ func (h *EventHandler) Approve(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+	if event.ContractID != c.Param("id") {
+		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+		return
+	}
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	// Auto-classify event for IFRS 16 treatment
 	treatment := repository.ClassifyEventType(event.EventType)
-	
+
 	if err := h.eventRepo.Approve(ctx, eventID, userIDStr, treatment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to approve: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"event_id": eventID,
-		"status":   "approved",
+		"event_id":  eventID,
+		"status":    "approved",
 		"treatment": treatment,
-		"message":  "事件已审批通过",
+		"message":   "事件已审批通过",
 	})
 
 	// Audit log: event approved
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, "lease_events", eventID, "approve", nil, event, userIDStr, c)
+		h.auditLogger.Log(ctx, "lease_events", eventID, "approve", nil, approvalAuditValues(c, map[string]interface{}{"event": event}), userIDStr, c)
 	}
 }
 
 func (h *EventHandler) Reject(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	var req struct {
 		Reason string `json:"reason"`
 	}
@@ -219,7 +237,7 @@ func (h *EventHandler) Reject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -230,20 +248,27 @@ func (h *EventHandler) Reject(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+	if event.ContractID != c.Param("id") {
+		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+		return
+	}
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.eventRepo.Reject(ctx, eventID, userIDStr, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reject: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"event_id": eventID,
 		"status":   "rejected",
 		"message":  "事件已驳回",
 	})
+	if h.auditLogger != nil {
+		h.auditLogger.Log(ctx, "lease_events", eventID, "reject", nil, approvalAuditValues(c, map[string]interface{}{"reason": req.Reason}), userIDStr, c)
+	}
 }
 
 // RecalculateEvent performs full IFRS 16 recalculation for an approved event.
@@ -302,17 +327,7 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 	}
 	payments := repository.ToIFRS16Payments(schedules)
 
-	// Determine discount rate priority:
-	// 1) global system setting
-	// 2) contract.DiscountRateValue
-	// 3) fallback 0.05
-	discountRate := resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
-	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-		discountRate = *contract.DiscountRateValue
-	}
-	if discountRate <= 0 {
-		discountRate = 0.05
-	}
+	discountRate := contractsvc.ResolveDiscountRate(ctx, 0, h.systemSettingRepo, contract, nil, false)
 
 	// Get lease end date, possibly revised by event
 	leaseEndDate := contract.LeaseEndDate
@@ -333,7 +348,7 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		LeaseEndDate:     leaseEndDate,
 		DiscountRate:     discountRate,
 		Payments:         payments,
-		PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
+		PrepaidRent: ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
 			CommencementDate: contract.CommencementDate,
 			Payments:         payments,
 		}),
@@ -397,21 +412,21 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		periodEnd := periodStart.AddDate(0, 1, -1)
 
 		mr := &repository.MeasurementResult{
-			ContractID:          contractID,
-			AccountingPeriod:    period,
-			PeriodStartDate:     periodStart,
-			PeriodEndDate:       periodEnd,
-			OpeningLiability:    dailyEntry.OpeningLiability,
-			InterestExpense:     dailyEntry.InterestExpense,
-			TotalPayment:        dailyEntry.Payment,
-			ClosingLiability:    dailyEntry.ClosingLiability,
-			OpeningROUAsset:     dailyEntry.OpeningROUAsset,
-			Depreciation:        dailyEntry.Depreciation,
-			ClosingROUAsset:     dailyEntry.ClosingROUAsset,
-			DiscountRate:        discountRate,
-			IsCalculated:        true,
-			CalculationBatchID:  adjustment.CalculationBatchID,
-			CalculatedAt:        &now,
+			ContractID:         contractID,
+			AccountingPeriod:   period,
+			PeriodStartDate:    periodStart,
+			PeriodEndDate:      periodEnd,
+			OpeningLiability:   dailyEntry.OpeningLiability,
+			InterestExpense:    dailyEntry.InterestExpense,
+			TotalPayment:       dailyEntry.Payment,
+			ClosingLiability:   dailyEntry.ClosingLiability,
+			OpeningROUAsset:    dailyEntry.OpeningROUAsset,
+			Depreciation:       dailyEntry.Depreciation,
+			ClosingROUAsset:    dailyEntry.ClosingROUAsset,
+			DiscountRate:       discountRate,
+			IsCalculated:       true,
+			CalculationBatchID: adjustment.CalculationBatchID,
+			CalculatedAt:       &now,
 		}
 		if err := h.mcRepo.SaveMeasurementResult(ctx, mr); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save measurement result for period " + period + ": " + err.Error()})
@@ -614,13 +629,7 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 	}
 	payments := repository.ToIFRS16Payments(schedules)
 
-	discountRate := resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
-	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-		discountRate = *contract.DiscountRateValue
-	}
-	if discountRate <= 0 {
-		discountRate = 0.05
-	}
+	discountRate := contractsvc.ResolveDiscountRate(ctx, 0, h.systemSettingRepo, contract, nil, false)
 	leaseEndDate := contract.LeaseEndDate
 	if event.EventType == "early_termination" && event.NewValue != nil {
 		if parsedDate, err := time.Parse("2006-01-02", *event.NewValue); err == nil {
@@ -638,7 +647,7 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 		LeaseEndDate:     leaseEndDate,
 		DiscountRate:     discountRate,
 		Payments:         payments,
-		PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
+		PrepaidRent: ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
 			CommencementDate: contract.CommencementDate,
 			Payments:         payments,
 		}),

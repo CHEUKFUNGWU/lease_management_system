@@ -1,3 +1,5 @@
+import type { Transition } from "framer-motion";
+
 /**
  * Animation Utilities — Framer Motion variants and CSS animation helpers
  * for the monochrome IFRS 16 system.
@@ -16,8 +18,8 @@ export const pageTransition = {
   exit: { opacity: 0, y: -4 },
   transition: {
     duration: 0.25,
-    ease: [0.4, 0, 0.2, 1],
-  },
+    ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
+  } satisfies Transition,
 };
 
 // ─── Fade Variants ─────────────────────────────────────────────

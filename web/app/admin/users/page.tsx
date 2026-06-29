@@ -22,32 +22,29 @@ import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { adminApi, legalEntityApi } from "../../lib/api";
+import { ROLE_COLOR_MAP, ROLE_I18N_KEYS } from "../../lib/constants/roles";
 import { t } from "../../lib/i18n";
+import {
+  type AdminUser,
+  ASSIGNABLE_USER_ROLES,
+  type CreateUserRequest,
+} from "../../lib/types/auth";
+import type { LegalEntityOption } from "../../lib/types/master-data";
 
 const { Title } = Typography;
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  legal_entity_id?: string;
-  is_active: boolean;
-  created_at: string;
-}
-
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
-  const [legalEntities, setLegalEntities] = useState<any[]>([]);
+  const [legalEntities, setLegalEntities] = useState<LegalEntityOption[]>([]);
   const { user, token } = useAuth();
   const { language } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user || user.role !== "admin") {
+    if (!user || !(user.roles?.includes("admin") || user.role === "admin")) {
       message.error(t("admin_users.need_admin", language));
       router.push("/login");
       return;
@@ -70,15 +67,16 @@ export default function AdminUsersPage() {
   };
 
   const fetchLegalEntities = async () => {
+    if (!token) return;
     try {
-      const data = await legalEntityApi.list();
+      const data = await legalEntityApi.list(token);
       setLegalEntities(data.legal_entities || []);
     } catch {
       setLegalEntities([]);
     }
   };
 
-  const handleCreateUser = async (values: any) => {
+  const handleCreateUser = async (values: CreateUserRequest) => {
     if (!token) return;
     try {
       await adminApi.createUser(
@@ -86,7 +84,7 @@ export default function AdminUsersPage() {
           username: values.username,
           email: values.email,
           password: values.password,
-          role: values.role,
+          roles: values.roles,
           legal_entity_id: values.legal_entity_id || undefined,
         },
         token
@@ -98,20 +96,6 @@ export default function AdminUsersPage() {
     } catch (error: any) {
       message.error(error.message || t("admin_users.create_failed", language));
     }
-  };
-
-  const roleColorMap: Record<string, string> = {
-    admin: "red",
-    reviewer: "blue",
-    approver: "green",
-    user: "default",
-  };
-
-  const roleLabelMap: Record<string, string> = {
-    admin: t("admin_users.role_admin", language),
-    reviewer: t("admin_users.role_reviewer", language),
-    approver: t("admin_users.role_approver", language),
-    user: t("admin_users.role_user", language),
   };
 
   const columns = [
@@ -129,10 +113,14 @@ export default function AdminUsersPage() {
       title: t("admin_users.col_role", language),
       dataIndex: "role",
       key: "role",
-      render: (role: string) => (
-        <Tag color={roleColorMap[role] || "default"}>
-          {roleLabelMap[role] || role}
-        </Tag>
+      render: (role: AdminUser["role"], record: AdminUser) => (
+        <Space size={[4, 4]} wrap>
+          {(record.roles?.length ? record.roles : [role]).map((assignedRole) => (
+            <Tag key={assignedRole} color={ROLE_COLOR_MAP[assignedRole] || "default"}>
+              {t(ROLE_I18N_KEYS[assignedRole] || "admin_users.role_user", language)}
+            </Tag>
+          ))}
+        </Space>
       ),
     },
     {
@@ -243,16 +231,17 @@ export default function AdminUsersPage() {
           </Form.Item>
 
           <Form.Item
-            name="role"
+            name="roles"
             label={t("admin_users.label_role", language)}
-            initialValue="user"
+            initialValue={["readonly"]}
             rules={[{ required: true, message: t("admin_users.role_placeholder", language) }]}
           >
-            <Select placeholder={t("admin_users.role_placeholder", language)}>
-              <Select.Option value="user">{t("admin_users.role_user", language)}</Select.Option>
-              <Select.Option value="reviewer">{t("admin_users.role_reviewer", language)}</Select.Option>
-              <Select.Option value="approver">{t("admin_users.role_approver", language)}</Select.Option>
-              <Select.Option value="admin">{t("admin_users.role_admin", language)}</Select.Option>
+            <Select mode="multiple" placeholder={t("admin_users.role_placeholder", language)}>
+              {ASSIGNABLE_USER_ROLES.map((role) => (
+                <Select.Option key={role} value={role}>
+                  {t(ROLE_I18N_KEYS[role], language)}
+                </Select.Option>
+              ))}
             </Select>
           </Form.Item>
 

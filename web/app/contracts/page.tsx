@@ -28,65 +28,22 @@ import {
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi } from "../lib/api";
+import {
+  buildApprovalStatusOptions,
+  getApprovalStatusColor,
+  getApprovalStatusLabel,
+  getAssetTypeLabel,
+  getLeaseScopeColor,
+  getLeaseScopeLabel,
+} from "../lib/constants/contracts";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
+import type { ContractSummary } from "../lib/types/contracts";
 import { staggerContainer, staggerItem } from "../design-system/animations";
 
-interface Contract {
-  id: string;
-  contract_number: string;
-  contract_name: string;
-  legal_entity_id: string;
-  store_id: string;
-  landlord_id: string;
-  currency: string;
-  asset_type: string;
-  commencement_date: string;
-  lease_start_date: string;
-  lease_end_date: string;
-  status: string;
-  approval_status: string;
-  is_official_version: boolean;
-  discount_rate_missing: boolean;
-  lease_scope: string;
-  created_at: string;
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: "default",
-  submitted: "processing",
-  reviewed: "processing",
-  pending_approval: "warning",
-  approved: "success",
-  rejected: "error",
-  returned_to_editor: "orange",
-};
-
-const LEASE_SCOPE_LABELS: Record<string, string> = {
-  in_scope: "资本化",
-  short_term_exempt: "短期豁免",
-  low_value_exempt: "低价值豁免",
-  not_a_lease: "非租赁",
-};
-
-const LEASE_SCOPE_COLORS: Record<string, string> = {
-  in_scope: "blue",
-  short_term_exempt: "gold",
-  low_value_exempt: "purple",
-  not_a_lease: "default",
-};
-
-const ASSET_TYPE_LABELS: Record<string, string> = {
-  real_estate: "不动产",
-  vehicle: "车辆",
-  it_equipment: "IT 设备",
-  machinery: "机器设备",
-  other: "其他",
-};
-
 export default function ContractsPage() {
-  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [contracts, setContracts] = useState<ContractSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -97,26 +54,7 @@ export default function ContractsPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
 
-  const STATUS_LABELS: Record<string, string> = {
-    draft: t("status.draft", language),
-    submitted: t("status.submitted", language),
-    reviewed: t("status.reviewed", language),
-    pending_approval: t("status.pending_approval", language),
-    approved: t("status.approved", language),
-    rejected: t("status.rejected", language),
-    returned_to_editor: t("status.returned_to_editor", language),
-  };
-
-  const STATUS_OPTIONS = [
-    { value: "", label: t("contracts.all_status", language) },
-    { value: "draft", label: t("status.draft", language) },
-    { value: "submitted", label: t("status.submitted", language) },
-    { value: "reviewed", label: t("status.reviewed", language) },
-    { value: "pending_approval", label: t("status.pending_approval", language) },
-    { value: "approved", label: t("status.approved", language) },
-    { value: "rejected", label: t("status.rejected", language) },
-    { value: "returned_to_editor", label: t("status.returned_to_editor", language) },
-  ];
+  const STATUS_OPTIONS = buildApprovalStatusOptions(language);
 
   const loadContracts = useCallback(async (
     searchVal: string,
@@ -226,14 +164,14 @@ export default function ContractsPage() {
       key: "approval_status",
       sorter: true,
       width: 160,
-      render: (status: string, record: Contract) => {
+      render: (status: string, record: ContractSummary) => {
         return (
           <Space size={4}>
             <Tag
-              color={STATUS_COLORS[status] || "default"}
+              color={getApprovalStatusColor(status)}
               style={{ fontWeight: 500, margin: 0 }}
             >
-              {STATUS_LABELS[status] || status}
+              {getApprovalStatusLabel(status, language)}
             </Tag>
             {record.is_official_version && (
               <Badge
@@ -270,9 +208,9 @@ export default function ContractsPage() {
       title: "范围",
       key: "lease_scope",
       width: 110,
-      render: (_: any, record: Contract) => (
-        <Tag color={LEASE_SCOPE_COLORS[record.lease_scope || "in_scope"]} style={{ margin: 0 }}>
-          {LEASE_SCOPE_LABELS[record.lease_scope || "in_scope"]}
+      render: (_: any, record: ContractSummary) => (
+        <Tag color={getLeaseScopeColor(record.lease_scope || "in_scope")} style={{ margin: 0 }}>
+          {getLeaseScopeLabel(record.lease_scope || "in_scope")}
         </Tag>
       ),
     },
@@ -280,14 +218,14 @@ export default function ContractsPage() {
       title: "资产",
       key: "asset_type",
       width: 100,
-      render: (_: any, record: Contract) => ASSET_TYPE_LABELS[record.asset_type || "real_estate"],
+      render: (_: any, record: ContractSummary) => getAssetTypeLabel(record.asset_type || "real_estate"),
     },
     {
       title: "",
       key: "action",
       width: 80,
       align: "right" as const,
-      render: (_: any, record: Contract) => (
+      render: (_: any, record: ContractSummary) => (
         <Button
           type="text"
           size="small"

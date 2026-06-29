@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-	
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -47,7 +47,7 @@ func (r *ApprovalRepository) Review(ctx context.Context, contractID, reviewedBy 
 	if !approved {
 		status = "returned_to_editor"
 	}
-	
+
 	query := `
 		UPDATE lease_contracts
 		SET approval_status = $3,
@@ -95,7 +95,7 @@ func (r *ApprovalRepository) GetApprovalStatus(ctx context.Context, contractID s
 		       report_mode, reviewed_by, reviewed_at, approved_by, approved_at, rejected_reason
 		FROM lease_contracts WHERE id = $1
 	`
-	
+
 	ca := &ContractApproval{}
 	var id string
 	err := r.db.QueryRow(ctx, query, contractID).Scan(
@@ -109,7 +109,7 @@ func (r *ApprovalRepository) GetApprovalStatus(ctx context.Context, contractID s
 		}
 		return nil, fmt.Errorf("failed to get approval status: %w", err)
 	}
-	
+
 	ca.ContractID = id
 	return ca, nil
 }
@@ -126,13 +126,13 @@ func (r *ApprovalRepository) ListByStatus(ctx context.Context, status string, of
 		  AND ($2 = false OR is_official_version = true)
 		ORDER BY created_at DESC
 	`
-	
+
 	rows, err := r.db.Query(ctx, query, status, officialOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list contracts by status: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var contracts []*Contract
 	for rows.Next() {
 		c := &Contract{}
@@ -152,6 +152,6 @@ func (r *ApprovalRepository) ListByStatus(ctx context.Context, status string, of
 		}
 		contracts = append(contracts, c)
 	}
-	
+
 	return contracts, nil
 }

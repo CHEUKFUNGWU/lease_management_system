@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS roles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -277,6 +278,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     table_name VARCHAR(100) NOT NULL,
     record_id UUID NOT NULL,
+    legal_entity_id UUID REFERENCES legal_entities(id),
     action VARCHAR(50) NOT NULL,
     old_values JSONB,
     new_values JSONB,
@@ -294,6 +296,7 @@ CREATE INDEX idx_events_contract ON lease_events(contract_id);
 CREATE INDEX idx_events_type ON lease_events(event_type);
 CREATE INDEX idx_audit_logs_table_record ON audit_logs(table_name, record_id);
 CREATE INDEX idx_audit_logs_changed_at ON audit_logs(changed_at);
+CREATE INDEX idx_audit_logs_legal_entity ON audit_logs(legal_entity_id);
 
 -- ============================================================================
 -- Migration 002: Seed Data
@@ -630,13 +633,13 @@ CREATE INDEX IF NOT EXISTS idx_lease_events_status ON lease_events(approval_stat
 CREATE INDEX IF NOT EXISTS idx_ai_contract_drafts_status ON ai_contract_drafts(approval_status);
 
 -- 10. Preset system roles
-INSERT INTO roles (id, name, description) VALUES
-    ('11111111-1111-1111-1111-111111111111', 'System Admin', '系统管理员：管理用户、角色、主数据和系统参数'),
-    ('22222222-2222-2222-2222-222222222222', 'Finance Editor', '财务录入员：上传合同、维护草稿、录入台账'),
-    ('33333333-3333-3333-3333-333333333333', 'Finance Reviewer', '财务复核员：复核合同、付款计划和事件草稿'),
-    ('44444444-4444-4444-4444-444444444444', 'Finance Approver', '财务审批员：审批正式入库和关键会计处理'),
-    ('55555555-5555-5555-5555-555555555555', 'Auditor Readonly', '审计只读：只读查看合同、台账、摊销和审计轨迹'),
-    ('66666666-6666-6666-6666-666666666666', 'Business Readonly', '业务只读：查看授权范围内的合同和报表')
+INSERT INTO roles (id, code, name, description) VALUES
+    ('11111111-1111-1111-1111-111111111111', 'admin', 'System Admin', '系统管理员：管理用户、角色、主数据和系统参数'),
+    ('22222222-2222-2222-2222-222222222222', 'editor', 'Finance Editor', '财务录入员：上传合同、维护草稿、录入台账'),
+    ('33333333-3333-3333-3333-333333333333', 'reviewer', 'Finance Reviewer', '财务复核员：复核合同、付款计划和事件草稿'),
+    ('44444444-4444-4444-4444-444444444444', 'approver', 'Finance Approver', '财务审批员：审批正式入库和关键会计处理'),
+    ('55555555-5555-5555-5555-555555555555', 'auditor', 'Auditor Readonly', '审计只读：只读查看合同、台账、摊销和审计轨迹'),
+    ('66666666-6666-6666-6666-666666666666', 'readonly', 'Business Readonly', '业务只读：查看授权范围内的合同和报表')
 ON CONFLICT (name) DO NOTHING;
 
 -- 11. Preset permissions
@@ -677,6 +680,71 @@ INSERT INTO permissions (role_id, resource, action) VALUES
     ('66666666-6666-6666-6666-666666666666', 'contracts', 'read'),
     ('66666666-6666-6666-6666-666666666666', 'reports', 'read')
 ON CONFLICT (role_id, resource, action) DO NOTHING;
+
+-- 12. Expanded access-policy permissions for all protected modules
+INSERT INTO permissions (role_id, resource, action) VALUES
+    ('22222222-2222-2222-2222-222222222222', 'identity', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'calculations', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'reports', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'contracts', 'submit'),
+    ('22222222-2222-2222-2222-222222222222', 'events', 'create'),
+    ('22222222-2222-2222-2222-222222222222', 'events', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'events', 'submit'),
+    ('22222222-2222-2222-2222-222222222222', 'lease_admin', 'create'),
+    ('22222222-2222-2222-2222-222222222222', 'lease_admin', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'lease_admin', 'update'),
+    ('22222222-2222-2222-2222-222222222222', 'ai_chat', 'use'),
+    ('22222222-2222-2222-2222-222222222222', 'ai_drafts', 'confirm'),
+    ('22222222-2222-2222-2222-222222222222', 'master_data', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'settings', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'calculations', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'calculations', 'trigger'),
+    ('33333333-3333-3333-3333-333333333333', 'reports', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'monthly_closing', 'generate'),
+    ('33333333-3333-3333-3333-333333333333', 'monthly_closing', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'ai_chat', 'use'),
+    ('33333333-3333-3333-3333-333333333333', 'master_data', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'settings', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'identity', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'lease_admin', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'monthly_closing', 'approve'),
+    ('44444444-4444-4444-4444-444444444444', 'reports', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'reports', 'export'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'generate'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'approve'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'post'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'export'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'writeback'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'lock'),
+    ('44444444-4444-4444-4444-444444444444', 'ai_chat', 'use'),
+    ('44444444-4444-4444-4444-444444444444', 'master_data', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'settings', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'identity', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'lease_admin', 'read'),
+    ('55555555-5555-5555-5555-555555555555', 'monthly_closing', 'read'),
+    ('55555555-5555-5555-5555-555555555555', 'monthly_closing', 'export'),
+    ('55555555-5555-5555-5555-555555555555', 'master_data', 'read'),
+    ('55555555-5555-5555-5555-555555555555', 'settings', 'read'),
+    ('55555555-5555-5555-5555-555555555555', 'identity', 'read'),
+    ('55555555-5555-5555-5555-555555555555', 'lease_admin', 'read'),
+    ('55555555-5555-5555-5555-555555555555', 'ai_chat', 'use'),
+    ('66666666-6666-6666-6666-666666666666', 'identity', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'payment_schedules', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'events', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'calculations', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'lease_admin', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'ai_chat', 'use'),
+    ('66666666-6666-6666-6666-666666666666', 'master_data', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'settings', 'read')
+ON CONFLICT (role_id, resource, action) DO NOTHING;
+
+-- Backfill authoritative role assignments from the legacy single-role field.
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id
+FROM users u
+JOIN roles r ON r.code = CASE WHEN u.role = 'user' THEN 'readonly' ELSE u.role END
+ON CONFLICT (user_id, role_id) DO NOTHING;
 -- +goose Up
 -- +goose StatementBegin
 

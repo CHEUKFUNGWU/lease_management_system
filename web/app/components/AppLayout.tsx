@@ -27,28 +27,28 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { t } from "../lib/i18n";
+import { t, type Language } from "../lib/i18n";
 import { pageTransition } from "../design-system/animations";
 
 const { Header, Sider, Content } = Layout;
 
 // ─── Breadcrumb Mapping ────────────────────────────────────────
 
-function getBreadcrumbMap(language: string): Record<string, string> {
+function getBreadcrumbMap(language: Language): Record<string, string> {
   return {
-    "": t("nav.home", language as any),
-    contracts: t("nav.contracts", language as any),
-    "ai-chat": t("nav.ai_chat", language as any),
-    reports: t("nav.reports", language as any),
+    "": t("nav.home", language),
+    contracts: t("nav.contracts", language),
+    "ai-chat": t("nav.ai_chat", language),
+    reports: t("nav.reports", language),
     portfolio: "组合分析",
     sensitivity: "敏感性分析",
     standards: "多准则对比",
-    "cashflow-forecast": t("nav.cashflow", language as any),
-    "monthly-closing": t("nav.monthly_closing", language as any),
+    "cashflow-forecast": t("nav.cashflow", language),
+    "monthly-closing": t("nav.monthly_closing", language),
     roi: "ROI 测算",
-    "audit-logs": t("nav.audit_logs", language as any),
-    settings: t("nav.settings", language as any),
-    admin: t("nav.admin", language as any),
+    "audit-logs": t("nav.audit_logs", language),
+    settings: t("nav.settings", language),
+    admin: t("nav.admin", language),
     users: "用户管理",
     new: "新增",
   };
@@ -56,28 +56,28 @@ function getBreadcrumbMap(language: string): Record<string, string> {
 
 // ─── Menu Items ────────────────────────────────────────────────
 
-function useMenuItems(language: string) {
+function useMenuItems(language: Language) {
   return useMemo(
     () => [
       {
         key: "/",
         icon: <HomeOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/">{t("nav.home", language as any)}</Link>,
+        label: <Link href="/">{t("nav.home", language)}</Link>,
       },
       {
         key: "/contracts",
         icon: <FileTextOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/contracts">{t("nav.contracts", language as any)}</Link>,
+        label: <Link href="/contracts">{t("nav.contracts", language)}</Link>,
       },
       {
         key: "/ai-chat",
         icon: <RobotOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/ai-chat">{t("nav.ai_chat", language as any)}</Link>,
+        label: <Link href="/ai-chat">{t("nav.ai_chat", language)}</Link>,
       },
       {
         key: "/reports",
         icon: <BarChartOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/reports">{t("nav.reports", language as any)}</Link>,
+        label: <Link href="/reports">{t("nav.reports", language)}</Link>,
       },
       {
         key: "/portfolio",
@@ -97,12 +97,12 @@ function useMenuItems(language: string) {
       {
         key: "/cashflow-forecast",
         icon: <LineChartOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/cashflow-forecast">{t("nav.cashflow", language as any)}</Link>,
+        label: <Link href="/cashflow-forecast">{t("nav.cashflow", language)}</Link>,
       },
       {
         key: "/monthly-closing",
         icon: <CalculatorOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/monthly-closing">{t("nav.monthly_closing", language as any)}</Link>,
+        label: <Link href="/monthly-closing">{t("nav.monthly_closing", language)}</Link>,
       },
       {
         key: "/roi",
@@ -112,12 +112,12 @@ function useMenuItems(language: string) {
       {
         key: "/audit-logs",
         icon: <AuditOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/audit-logs">{t("nav.audit_logs", language as any)}</Link>,
+        label: <Link href="/audit-logs">{t("nav.audit_logs", language)}</Link>,
       },
       {
         key: "/settings",
         icon: <SettingOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/settings">{t("nav.settings", language as any)}</Link>,
+        label: <Link href="/settings">{t("nav.settings", language)}</Link>,
       },
     ],
     [language]
@@ -161,10 +161,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     let currentPath = "";
     segments.forEach((segment) => {
       currentPath += `/${segment}`;
-      const isId = segment.length > 20 && !breadcrumbMap[segment]; // Likely UUID
-      const label = isId ? "详情" : (breadcrumbMap[segment] || segment);
+      const isDynamicDetailSegment = segment.length > 20 && !breadcrumbMap[segment];
+      const label = isDynamicDetailSegment ? "详情" : (breadcrumbMap[segment] || segment);
       
-      if (isId) {
+      if (isDynamicDetailSegment) {
         items.push({ title: label });
       } else if (segment === "new") {
         items.push({ title: label });
@@ -351,9 +351,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Dropdown
             menu={{
               items: [
-                { key: "zh-CN", label: "简体中文", onClick: () => setLanguage("zh-CN" as any) },
-                { key: "zh-HK", label: "繁體中文", onClick: () => setLanguage("zh-HK" as any) },
-                { key: "en", label: "English", onClick: () => setLanguage("en" as any) },
+                { key: "zh-CN", label: "简体中文", onClick: () => setLanguage("zh-CN") },
+                { key: "zh-HK", label: "繁體中文", onClick: () => setLanguage("zh-HK") },
+                { key: "en", label: "English", onClick: () => setLanguage("en") },
               ],
             }}
             placement="bottomRight"
@@ -480,7 +480,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               initial={pageTransition.initial}
               animate={pageTransition.animate}
               exit={pageTransition.exit}
-              transition={pageTransition.transition as any}
+              transition={pageTransition.transition}
               style={{ maxWidth: 1440, margin: "0 auto" }}
             >
               {children}

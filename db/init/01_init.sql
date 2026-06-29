@@ -737,9 +737,10 @@ CREATE TABLE IF NOT EXISTS monthly_closing_batches (
     batch_number VARCHAR(50) NOT NULL UNIQUE,
     accounting_period VARCHAR(7) NOT NULL,
     legal_entity_id UUID REFERENCES legal_entities(id),
+    scope_contract_id UUID REFERENCES lease_contracts(id),
     region VARCHAR(100),
     brand VARCHAR(100),
-    status VARCHAR(20) NOT NULL DEFAULT 'draft', -- draft, running, completed, failed, cancelled
+    status VARCHAR(32) NOT NULL DEFAULT 'draft', -- draft, running, completed, completed_with_errors, failed, cancelled
     total_contracts INTEGER NOT NULL DEFAULT 0,
     processed_contracts INTEGER NOT NULL DEFAULT 0,
     failed_contracts INTEGER NOT NULL DEFAULT 0,
@@ -761,6 +762,7 @@ CREATE INDEX IF NOT EXISTS idx_journal_entries_period ON journal_entries(account
 CREATE INDEX IF NOT EXISTS idx_journal_entries_batch ON journal_entries(batch_id);
 CREATE INDEX IF NOT EXISTS idx_journal_entries_posting ON journal_entries(posting_status);
 CREATE INDEX IF NOT EXISTS idx_monthly_closing_period ON monthly_closing_batches(accounting_period);
+CREATE INDEX IF NOT EXISTS idx_monthly_closing_scope ON monthly_closing_batches(accounting_period, legal_entity_id, scope_contract_id);
 
 -- +goose StatementEnd
 

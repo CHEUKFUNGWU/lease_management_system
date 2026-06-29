@@ -15,6 +15,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/services/monthend"
 )
 
 func main() {
@@ -48,6 +49,9 @@ func main() {
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
 
+	// Initialize services
+	closeService := monthend.NewService(database.Pool, mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger)
+
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo)
 	contractHandler := handlers.NewContractHandler(contractRepo, auditLogger)
@@ -56,7 +60,7 @@ func main() {
 	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
 	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo)
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, auditLogger)
-	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger)
+	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, auditLogger)
 	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)

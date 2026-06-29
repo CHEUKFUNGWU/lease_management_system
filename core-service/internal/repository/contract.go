@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Contract struct {
@@ -71,11 +70,15 @@ type Contract struct {
 }
 
 type ContractRepository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
-func NewContractRepository(db *pgxpool.Pool) *ContractRepository {
+func NewContractRepository(db DBTX) *ContractRepository {
 	return &ContractRepository{db: db}
+}
+
+func (r *ContractRepository) WithTx(tx DBTX) *ContractRepository {
+	return &ContractRepository{db: tx}
 }
 
 func autoCode(prefix string) string {

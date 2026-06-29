@@ -7,29 +7,35 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type AuditLog struct {
-	ID             string     `json:"id"`
-	TableName      string     `json:"table_name"`
-	RecordID       string     `json:"record_id"`
-	Action         string     `json:"action"`
-	OldValues      *string    `json:"old_values"`
-	NewValues      *string    `json:"new_values"`
-	ChangedBy      *string    `json:"changed_by"`
-	ChangedByName  *string    `json:"changed_by_name"`
-	ChangedAt      time.Time  `json:"changed_at"`
-	IPAddress      *string    `json:"ip_address"`
-	UserAgent      *string    `json:"user_agent"`
+	ID            string    `json:"id"`
+	TableName     string    `json:"table_name"`
+	RecordID      string    `json:"record_id"`
+	Action        string    `json:"action"`
+	OldValues     *string   `json:"old_values"`
+	NewValues     *string   `json:"new_values"`
+	ChangedBy     *string   `json:"changed_by"`
+	ChangedByName *string   `json:"changed_by_name"`
+	ChangedAt     time.Time `json:"changed_at"`
+	IPAddress     *string   `json:"ip_address"`
+	UserAgent     *string   `json:"user_agent"`
 }
 
 type AuditRepository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
-func NewAuditRepository(db *pgxpool.Pool) *AuditRepository {
+func NewAuditRepository(db DBTX) *AuditRepository {
 	return &AuditRepository{db: db}
+}
+
+// WithTx returns a copy of the repository whose writes run on the given
+// transaction, so an audit record can be committed atomically with the change
+// it describes.
+func (r *AuditRepository) WithTx(tx DBTX) *AuditRepository {
+	return &AuditRepository{db: tx}
 }
 
 func (r *AuditRepository) Create(ctx context.Context, log *AuditLog) error {

@@ -17,45 +17,65 @@ func NewLogger(repo *repository.AuditRepository) *Logger {
 	return &Logger{repo: repo}
 }
 
-func (l *Logger) Log(ctx context.Context, tableName, recordID, action string, oldVals, newVals interface{}, changedBy string, c *gin.Context) error {
-	var oldJSON, newJSON *string
-	if oldVals != nil {
-		b, _ := json.Marshal(oldVals)
-		s := string(b)
-		oldJSON = &s
-	}
-	if newVals != nil {
-		b, _ := json.Marshal(newVals)
-		s := string(b)
-		newJSON = &s
-	}
+// WithTx returns a logger that writes through the given transaction, so an audit
+// record commits atomically with the change it describes.
+func (l *Logger) WithTx(tx repository.DBTX) *Logger {
+	return &Logger{repo: l.repo.WithTx(tx)}
+}
 
-	var ipAddr, userAgent *string
+// Metadata carries the request-scoped actor and origin of a change, decoupled
+// from any HTTP framework so services can audit without importing gin.
+type Metadata struct {
+	ChangedBy string
+	IPAddress string
+	UserAgent string
+}
+
+// MetadataFromGin extracts audit metadata from a gin request context.
+func MetadataFromGin(changedBy string, c *gin.Context) Metadata {
+	m := Metadata{ChangedBy: changedBy}
 	if c != nil {
-		if ip := c.ClientIP(); ip != "" {
-			ipAddr = &ip
-		}
-		if ua := c.Request.UserAgent(); ua != "" {
-			userAgent = &ua
-		}
+		m.IPAddress = c.ClientIP()
+		m.UserAgent = c.Request.UserAgent()
 	}
+	return m
+}
 
-	var cb *string
-	if changedBy != "" {
-		cb = &changedBy
-	}
+// Log records an audit entry, taking the actor and request origin from gin.
+func (l *Logger) Log(ctx context.Context, tableName, recordID, action string, oldVals, newVals interface{}, changedBy string, c *gin.Context) error {
+	return l.LogEvent(ctx, tableName, recordID, action, oldVals, newVals, MetadataFromGin(changedBy, c))
+}
 
+// LogEvent records an audit entry from framework-independent metadata. It is the
+// core path used by both the gin-based Log helper and by services that audit
+// inside a transaction.
+func (l *Logger) LogEvent(ctx context.Context, tableName, recordID, action string, oldVals, newVals interface{}, meta Metadata) error {
 	log := &repository.AuditLog{
 		TableName: tableName,
 		RecordID:  recordID,
 		Action:    action,
-		OldValues: oldJSON,
-		NewValues: newJSON,
-		ChangedBy: cb,
+		OldValues: marshalJSON(oldVals),
+		NewValues: marshalJSON(newVals),
+		ChangedBy: strPtrOrNil(meta.ChangedBy),
 		ChangedAt: time.Now(),
-		IPAddress: ipAddr,
-		UserAgent: userAgent,
+		IPAddress: strPtrOrNil(meta.IPAddress),
+		UserAgent: strPtrOrNil(meta.UserAgent),
 	}
-
 	return l.repo.Create(ctx, log)
+}
+
+func marshalJSON(v interface{}) *string {
+	if v == nil {
+		return nil
+	}
+	b, _ := json.Marshal(v)
+	s := string(b)
+	return &s
+}
+
+func strPtrOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

@@ -6,8 +6,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// DBTX is the subset of database operations shared by *pgxpool.Pool and pgx.Tx.
+// Depending on this interface lets a repository run its queries either directly
+// against the pool or inside a transaction supplied via WithTx.
+type DBTX interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 type MeasurementResult struct {
 	ID                  string     `json:"id"`
@@ -98,11 +108,19 @@ type EventAdjustment struct {
 }
 
 type MonthlyClosingRepository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
-func NewMonthlyClosingRepository(db *pgxpool.Pool) *MonthlyClosingRepository {
+func NewMonthlyClosingRepository(db DBTX) *MonthlyClosingRepository {
 	return &MonthlyClosingRepository{db: db}
+}
+
+// WithTx returns a copy of the repository whose queries run on the given
+// transaction. Callers begin a transaction on the pool, pass the resulting
+// pgx.Tx here, and every write made through the returned repository commits or
+// rolls back atomically with that transaction.
+func (r *MonthlyClosingRepository) WithTx(tx DBTX) *MonthlyClosingRepository {
+	return &MonthlyClosingRepository{db: tx}
 }
 
 func (r *MonthlyClosingRepository) CreateBatch(ctx context.Context, batch *MonthlyClosingBatch) (*MonthlyClosingBatch, error) {
@@ -285,6 +303,74 @@ func (r *MonthlyClosingRepository) CreateJournalEntry(ctx context.Context, entry
 		return fmt.Errorf("failed to create journal entry: %w", err)
 	}
 	return nil
+}
+
+// DeleteDraftEntriesByTypes removes draft journal entries of the given types for
+// a contract and period. It is used to make a re-run of the month-end close
+// idempotent: previously generated draft entries are cleared before fresh ones
+// are produced. Entries that have already been approved or posted are never
+// touched, so committed accounting is preserved. When legalEntityID is given the
+// delete is additionally guarded by tenant ownership of the contract, so a
+// foreign contract id can never delete another tenant's entries.
+func (r *MonthlyClosingRepository) DeleteDraftEntriesByTypes(ctx context.Context, contractID, period, legalEntityID string, entryTypes []string) error {
+	if len(entryTypes) == 0 {
+		return nil
+	}
+	query := `
+		DELETE FROM journal_entries
+		WHERE contract_id = $1 AND accounting_period = $2
+		  AND posting_status = 'draft'
+		  AND entry_type = ANY($3)
+	` + tenantOwnsContractClause(legalEntityID, "$4")
+	args := []interface{}{contractID, period, entryTypes}
+	if legalEntityID != "" {
+		args = append(args, legalEntityID)
+	}
+	if _, err := r.db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("failed to delete draft entries: %w", err)
+	}
+	return nil
+}
+
+// LinkDraftEntriesToBatch attaches still-unbatched draft entries of the given
+// types (e.g. event adjustment entries created outside the close) to the close
+// batch. Unlike copying, this update is idempotent: re-running the close links
+// the same entries to the latest batch instead of duplicating them. It returns
+// the number of entries linked. When legalEntityID is given the update is
+// guarded by tenant ownership of the contract.
+func (r *MonthlyClosingRepository) LinkDraftEntriesToBatch(ctx context.Context, contractID, period, batchID, legalEntityID string, entryTypes []string) (int, error) {
+	if len(entryTypes) == 0 {
+		return 0, nil
+	}
+	query := `
+		UPDATE journal_entries SET
+			batch_id = $1,
+			updated_at = NOW()
+		WHERE contract_id = $2 AND accounting_period = $3
+		  AND posting_status = 'draft'
+		  AND batch_id IS NULL
+		  AND entry_type = ANY($4)
+	` + tenantOwnsContractClause(legalEntityID, "$5")
+	args := []interface{}{batchID, contractID, period, entryTypes}
+	if legalEntityID != "" {
+		args = append(args, legalEntityID)
+	}
+	result, err := r.db.Exec(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("failed to link draft entries to batch: %w", err)
+	}
+	return int(result.RowsAffected()), nil
+}
+
+// tenantOwnsContractClause returns a SQL predicate restricting journal_entries to
+// contracts owned by the given legal entity, or an empty string when no tenant
+// scope is supplied. journal_entries has no legal_entity_id column, so ownership
+// is checked through lease_contracts.
+func tenantOwnsContractClause(legalEntityID, placeholder string) string {
+	if legalEntityID == "" {
+		return ""
+	}
+	return fmt.Sprintf(" AND contract_id IN (SELECT id FROM lease_contracts WHERE legal_entity_id = %s)", placeholder)
 }
 
 func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contractID, period, status string) ([]*JournalEntry, error) {

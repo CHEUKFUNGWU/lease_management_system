@@ -29,6 +29,14 @@ import (
 // and may not be regenerated.
 var ErrPeriodLocked = errors.New("accounting period is locked")
 
+// ErrCloseAlreadyFinalized prevents regeneration from creating a second set of
+// entries after any managed entry has entered approval or posting workflow.
+var ErrCloseAlreadyFinalized = errors.New("month-end close already has approved or posted entries")
+
+// ErrContractNotApproved prevents a targeted close from bypassing the same
+// approval eligibility enforced by tenant-wide closes.
+var ErrContractNotApproved = errors.New("contract is not approved for month-end close")
+
 // systemEntryTypes are the journal entry types the close itself produces. They
 // are cleared (when still in draft) before regeneration so a re-run is
 // idempotent.
@@ -42,14 +50,13 @@ var systemEntryTypes = []string{
 // drafts to its batch rather than re-creating them.
 var eventEntryTypes = []string{"modification", "reassessment", "impairment"}
 
+var managedEntryTypes = append(append([]string{}, systemEntryTypes...), eventEntryTypes...)
+
 const fallbackDiscountRate = 0.05
 
 // Read-side dependencies. Each is satisfied by the corresponding concrete
 // repository and by test fakes.
 type (
-	periodLockReader interface {
-		IsPeriodLocked(ctx context.Context, period, legalEntityID string) (bool, error)
-	}
 	contractSource interface {
 		GetByID(ctx context.Context, id, legalEntityID string) (*repository.Contract, error)
 		GetByStatuses(ctx context.Context, statuses []string, legalEntityID string) ([]*repository.Contract, error)
@@ -62,32 +69,23 @@ type (
 	}
 )
 
-// Service performs the month-end close. Reads happen up front through the read
-// dependencies; all writes happen through the unit of work, which owns the
-// transaction.
+// Service performs the month-end close. The unit of work supplies one
+// transaction-scoped store for every accounting input read and every write.
 type Service struct {
-	locks     periodLockReader
-	contracts contractSource
-	schedules scheduleSource
-	rates     rateSource
-	uow       unitOfWork
+	uow unitOfWork
 }
 
 // NewService wires the close service from concrete repositories.
 func NewService(
 	pool *pgxpool.Pool,
 	mcRepo *repository.MonthlyClosingRepository,
-	contractRepo contractSource,
-	psRepo scheduleSource,
-	systemSettingRepo rateSource,
+	contractRepo *repository.ContractRepository,
+	psRepo *repository.PaymentScheduleRepository,
+	systemSettingRepo *repository.SystemSettingRepository,
 	auditLogger *audit.Logger,
 ) *Service {
 	return &Service{
-		locks:     mcRepo,
-		contracts: contractRepo,
-		schedules: psRepo,
-		rates:     systemSettingRepo,
-		uow:       NewUnitOfWork(pool, mcRepo, auditLogger),
+		uow: NewUnitOfWork(pool, mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger),
 	}
 }
 
@@ -119,43 +117,84 @@ type Result struct {
 // measurement failure is counted and skipped without aborting the batch; any
 // database write failure rolls the whole batch back and returns the error.
 func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
-	locked, err := s.locks.IsPeriodLocked(ctx, cmd.AccountingPeriod, cmd.LegalEntityID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check period lock: %w", err)
-	}
-	if locked {
-		return nil, ErrPeriodLocked
-	}
-
-	contracts, err := s.eligibleContracts(ctx, cmd)
-	if err != nil {
-		return nil, err
-	}
-
 	periodStart, err := time.Parse("2006-01", cmd.AccountingPeriod)
 	if err != nil {
 		return nil, fmt.Errorf("invalid accounting period %q: %w", cmd.AccountingPeriod, err)
 	}
 	periodEnd := periodStart.AddDate(0, 1, -1)
 
-	// Resolve the global discount rate fallback once per close (it is the same
-	// for every contract in the batch).
-	globalRate := s.resolveGlobalDiscountRate(ctx)
-
 	var result *Result
-	err = s.uow.Do(ctx, func(w closeWriter, a auditSink) error {
-		var legalEntityID *string
-		if cmd.LegalEntityID != "" {
-			legalEntityID = &cmd.LegalEntityID
-		}
-		batch, err := w.CreateBatch(ctx, &repository.MonthlyClosingBatch{
-			BatchNumber:      fmt.Sprintf("BATCH-%s-%s", cmd.AccountingPeriod, time.Now().Format("20060102-150405")),
-			AccountingPeriod: cmd.AccountingPeriod,
-			LegalEntityID:    legalEntityID,
-			TotalContracts:   len(contracts),
-		})
+	lockKey := closeLockKey(cmd.LegalEntityID, cmd.AccountingPeriod)
+	err = s.uow.Do(ctx, lockKey, func(store closeStore, a auditSink) error {
+		locked, err := store.IsPeriodLocked(ctx, cmd.AccountingPeriod, cmd.LegalEntityID)
 		if err != nil {
-			return fmt.Errorf("failed to create batch: %w", err)
+			return fmt.Errorf("failed to check period lock: %w", err)
+		}
+		if locked {
+			return ErrPeriodLocked
+		}
+
+		contracts, err := eligibleContracts(ctx, store, cmd)
+		if err != nil {
+			return err
+		}
+		globalRate := resolveGlobalDiscountRate(ctx, store)
+		contractIDs := make([]string, 0, len(contracts))
+		for _, contract := range contracts {
+			contractIDs = append(contractIDs, contract.ID)
+		}
+
+		batch, err := store.GetReusableBatch(ctx, cmd.AccountingPeriod, cmd.LegalEntityID, cmd.ContractID)
+		if err != nil {
+			return err
+		}
+		reusedBatch := batch != nil
+		if batch != nil {
+			finalized, err := store.HasFinalizedBatchEntries(ctx, batch.ID, managedEntryTypes)
+			if err != nil {
+				return fmt.Errorf("failed to validate rerun eligibility: %w", err)
+			}
+			if finalized {
+				return ErrCloseAlreadyFinalized
+			}
+			if err := store.ResetBatch(ctx, batch.ID, len(contracts)); err != nil {
+				return err
+			}
+			if err := store.DeleteDraftEntriesFromBatch(ctx, batch.ID, systemEntryTypes); err != nil {
+				return err
+			}
+			if err := store.DetachDraftEntriesFromBatch(ctx, batch.ID, eventEntryTypes); err != nil {
+				return err
+			}
+		} else {
+			finalized, err := store.HasFinalizedEntries(ctx, contractIDs, cmd.AccountingPeriod, cmd.LegalEntityID, managedEntryTypes)
+			if err != nil {
+				return fmt.Errorf("failed to validate rerun eligibility: %w", err)
+			}
+			if finalized {
+				return ErrCloseAlreadyFinalized
+			}
+			var legalEntityID, scopeContractID, createdBy *string
+			if cmd.LegalEntityID != "" {
+				legalEntityID = &cmd.LegalEntityID
+			}
+			if cmd.ContractID != "" {
+				scopeContractID = &cmd.ContractID
+			}
+			if cmd.Actor.ChangedBy != "" {
+				createdBy = &cmd.Actor.ChangedBy
+			}
+			batch, err = store.CreateBatch(ctx, &repository.MonthlyClosingBatch{
+				BatchNumber:      fmt.Sprintf("BATCH-%s-%s", cmd.AccountingPeriod, time.Now().Format("20060102-150405.000000000")),
+				AccountingPeriod: cmd.AccountingPeriod,
+				LegalEntityID:    legalEntityID,
+				ScopeContractID:  scopeContractID,
+				TotalContracts:   len(contracts),
+				CreatedBy:        createdBy,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create batch: %w", err)
+			}
 		}
 
 		processed := 0
@@ -168,7 +207,7 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 				continue
 			}
 
-			monthly, basis, discountRate, soft := s.measureContract(ctx, contract, cmd, globalRate)
+			monthly, basis, discountRate, soft := measureContract(ctx, store, contract, cmd, globalRate)
 			if soft {
 				failed++
 				continue
@@ -183,18 +222,20 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 
 			now := time.Now()
 			mr := measurementResult(contract.ID, cmd.AccountingPeriod, periodStart, periodEnd, monthly, discountRate, batch.ID, now)
-			if err := w.SaveMeasurementResult(ctx, mr); err != nil {
+			if err := store.SaveMeasurementResult(ctx, mr); err != nil {
 				return fmt.Errorf("contract %s: %w", contract.ID, err)
 			}
 
 			// Idempotency: clear our own previously generated draft entries before
 			// producing fresh ones, then write the new set.
-			if err := w.DeleteDraftEntriesByTypes(ctx, contract.ID, cmd.AccountingPeriod, cmd.LegalEntityID, systemEntryTypes); err != nil {
-				return fmt.Errorf("contract %s: %w", contract.ID, err)
+			if !reusedBatch {
+				if err := store.DeleteDraftEntriesByTypes(ctx, contract.ID, cmd.AccountingPeriod, cmd.LegalEntityID, systemEntryTypes); err != nil {
+					return fmt.Errorf("contract %s: %w", contract.ID, err)
+				}
 			}
 			entries := buildJournalEntries(contract.ID, cmd.AccountingPeriod, periodEnd, monthly, batch.ID, basis)
 			for _, entry := range entries {
-				if err := w.CreateJournalEntry(ctx, entry); err != nil {
+				if err := store.CreateJournalEntry(ctx, entry); err != nil {
 					return fmt.Errorf("contract %s: %w", contract.ID, err)
 				}
 				totalEntries++
@@ -207,7 +248,7 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 		// to this batch. Unlike the previous copy approach this update is idempotent,
 		// so re-running the close cannot duplicate event entries.
 		for _, contract := range contracts {
-			linked, err := w.LinkDraftEntriesToBatch(ctx, contract.ID, cmd.AccountingPeriod, batch.ID, cmd.LegalEntityID, eventEntryTypes)
+			linked, err := store.LinkDraftEntriesToBatch(ctx, contract.ID, cmd.AccountingPeriod, batch.ID, cmd.LegalEntityID, eventEntryTypes)
 			if err != nil {
 				return fmt.Errorf("contract %s: %w", contract.ID, err)
 			}
@@ -215,7 +256,7 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 		}
 
 		status := closeStatus(processed, failed)
-		if err := w.UpdateBatchStatus(ctx, batch.ID, status, processed, failed, totalEntries, 0); err != nil {
+		if err := store.UpdateBatchStatus(ctx, batch.ID, status, processed, failed, totalEntries, 0); err != nil {
 			return fmt.Errorf("failed to update batch status: %w", err)
 		}
 
@@ -252,28 +293,38 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 	return result, nil
 }
 
+func closeLockKey(legalEntityID, period string) string {
+	if legalEntityID == "" {
+		legalEntityID = "*"
+	}
+	return fmt.Sprintf("monthend:%s:%s", legalEntityID, period)
+}
+
 // eligibleContracts returns the contracts the close should consider: a single
 // contract when requested, otherwise every approved contract for the tenant.
-func (s *Service) eligibleContracts(ctx context.Context, cmd Command) ([]*repository.Contract, error) {
+func eligibleContracts(ctx context.Context, contracts contractSource, cmd Command) ([]*repository.Contract, error) {
 	if cmd.ContractID != "" {
-		contract, err := s.contracts.GetByID(ctx, cmd.ContractID, cmd.LegalEntityID)
+		contract, err := contracts.GetByID(ctx, cmd.ContractID, cmd.LegalEntityID)
 		if err != nil {
 			return nil, err
 		}
 		if contract == nil {
 			return nil, nil
 		}
+		if contract.ApprovalStatus != "approved" {
+			return nil, ErrContractNotApproved
+		}
 		return []*repository.Contract{contract}, nil
 	}
-	return s.contracts.GetByStatuses(ctx, []string{"approved"}, cmd.LegalEntityID)
+	return contracts.GetByStatuses(ctx, []string{"approved"}, cmd.LegalEntityID)
 }
 
 // measureContract runs the IFRS 16 calculation for one contract and returns the
 // monthly entry for the close period. The soft flag is true when the contract
 // should be counted as failed and skipped (a recoverable, per-contract problem)
 // rather than aborting the whole batch.
-func (s *Service) measureContract(ctx context.Context, contract *repository.Contract, cmd Command, globalRate float64) (monthly *ifrs16svc.MonthlyEntry, basis string, discountRate float64, soft bool) {
-	schedules, err := s.schedules.GetByContractID(ctx, contract.ID)
+func measureContract(ctx context.Context, schedulesSource scheduleSource, contract *repository.Contract, cmd Command, globalRate float64) (monthly *ifrs16svc.MonthlyEntry, basis string, discountRate float64, soft bool) {
+	schedules, err := schedulesSource.GetByContractID(ctx, contract.ID)
 	if err != nil {
 		return nil, "", 0, true
 	}
@@ -317,11 +368,11 @@ func (s *Service) measureContract(ctx context.Context, contract *repository.Cont
 	return nil, result.MeasurementBasis, discountRate, false
 }
 
-func (s *Service) resolveGlobalDiscountRate(ctx context.Context) float64 {
-	if s.rates == nil {
+func resolveGlobalDiscountRate(ctx context.Context, rates rateSource) float64 {
+	if rates == nil {
 		return 0.0
 	}
-	return s.rates.GetFloat64(ctx, "global_discount_rate", 0.0)
+	return rates.GetFloat64(ctx, "global_discount_rate", 0.0)
 }
 
 // resolveDiscountRate applies the rate priority: per-run override, then the

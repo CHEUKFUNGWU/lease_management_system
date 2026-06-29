@@ -58,9 +58,13 @@ func (f fakeRates) GetFloat64(context.Context, string, float64) float64 { return
 
 // fakeWriter records every write in order and can be told to fail a named method.
 type fakeWriter struct {
-	calls    []string
-	failOn   string
-	batchSeq int
+	calls         []string
+	failOn        string
+	batchSeq      int
+	locked        bool
+	lockErr       error
+	finalized     bool
+	reusableBatch *repository.MonthlyClosingBatch
 }
 
 func (w *fakeWriter) record(name string) error {
@@ -69,6 +73,34 @@ func (w *fakeWriter) record(name string) error {
 		return errors.New("write failed: " + name)
 	}
 	return nil
+}
+
+func (w *fakeWriter) IsPeriodLocked(context.Context, string, string) (bool, error) {
+	return w.locked, w.lockErr
+}
+
+func (w *fakeWriter) HasFinalizedEntries(context.Context, []string, string, string, []string) (bool, error) {
+	return w.finalized, nil
+}
+
+func (w *fakeWriter) HasFinalizedBatchEntries(context.Context, string, []string) (bool, error) {
+	return w.finalized, nil
+}
+
+func (w *fakeWriter) GetReusableBatch(context.Context, string, string, string) (*repository.MonthlyClosingBatch, error) {
+	return w.reusableBatch, nil
+}
+
+func (w *fakeWriter) ResetBatch(context.Context, string, int) error {
+	return w.record("ResetBatch")
+}
+
+func (w *fakeWriter) DeleteDraftEntriesFromBatch(context.Context, string, []string) error {
+	return w.record("DeleteDraftEntriesFromBatch")
+}
+
+func (w *fakeWriter) DetachDraftEntriesFromBatch(context.Context, string, []string) error {
+	return w.record("DetachDraftEntriesFromBatch")
 }
 
 func (w *fakeWriter) CreateBatch(_ context.Context, b *repository.MonthlyClosingBatch) (*repository.MonthlyClosingBatch, error) {
@@ -112,13 +144,44 @@ func (a *fakeAudit) LogEvent(context.Context, string, string, string, interface{
 type fakeUOW struct {
 	writer    *fakeWriter
 	audit     *fakeAudit
+	contracts fakeContracts
+	schedules fakeSchedules
+	rates     fakeRates
 	committed bool
 	ran       bool
 }
 
-func (u *fakeUOW) Do(ctx context.Context, body func(w closeWriter, a auditSink) error) error {
+type fakeCloseStore struct {
+	*fakeWriter
+	contracts fakeContracts
+	schedules fakeSchedules
+	rates     fakeRates
+}
+
+func (s *fakeCloseStore) GetByID(ctx context.Context, id, legalEntityID string) (*repository.Contract, error) {
+	return s.contracts.GetByID(ctx, id, legalEntityID)
+}
+
+func (s *fakeCloseStore) GetByStatuses(ctx context.Context, statuses []string, legalEntityID string) ([]*repository.Contract, error) {
+	return s.contracts.GetByStatuses(ctx, statuses, legalEntityID)
+}
+
+func (s *fakeCloseStore) GetByContractID(ctx context.Context, contractID string) ([]*repository.PaymentSchedule, error) {
+	return s.schedules.GetByContractID(ctx, contractID)
+}
+
+func (s *fakeCloseStore) GetFloat64(ctx context.Context, key string, fallback float64) float64 {
+	return s.rates.GetFloat64(ctx, key, fallback)
+}
+
+func (u *fakeUOW) Do(ctx context.Context, _ string, body func(store closeStore, a auditSink) error) error {
 	u.ran = true
-	err := body(u.writer, u.audit)
+	err := body(&fakeCloseStore{
+		fakeWriter: u.writer,
+		contracts:  u.contracts,
+		schedules:  u.schedules,
+		rates:      u.rates,
+	}, u.audit)
 	if err == nil {
 		u.committed = true
 	}
@@ -139,13 +202,12 @@ func inScopeContract(id string) *repository.Contract {
 }
 
 func newService(uow *fakeUOW, locks fakeLocks, contracts fakeContracts, schedules fakeSchedules) *Service {
-	return &Service{
-		locks:     locks,
-		contracts: contracts,
-		schedules: schedules,
-		rates:     fakeRates{value: 0},
-		uow:       uow,
-	}
+	uow.writer.locked = locks.locked
+	uow.writer.lockErr = locks.err
+	uow.contracts = contracts
+	uow.schedules = schedules
+	uow.rates = fakeRates{value: 0}
+	return &Service{uow: uow}
 }
 
 func contains(calls []string, name string) bool {
@@ -236,6 +298,62 @@ func TestClose_IdempotentReplaceBeforeInsert(t *testing.T) {
 	}
 }
 
+func TestClose_RejectsRerunAfterApprovalOrPosting(t *testing.T) {
+	uow := &fakeUOW{writer: &fakeWriter{finalized: true}, audit: &fakeAudit{}}
+	svc := newService(uow, fakeLocks{}, fakeContracts{list: []*repository.Contract{inScopeContract("c1")}}, fakeSchedules{})
+
+	result, err := svc.Close(context.Background(), Command{AccountingPeriod: period, LegalEntityID: "le1"})
+	if !errors.Is(err, ErrCloseAlreadyFinalized) {
+		t.Fatalf("expected ErrCloseAlreadyFinalized, got %v", err)
+	}
+	if result != nil {
+		t.Fatalf("expected no result, got %+v", result)
+	}
+	if contains(uow.writer.calls, "CreateBatch") {
+		t.Fatal("a finalized close must not create another batch")
+	}
+}
+
+func TestClose_ReusesDraftBatchForSameScope(t *testing.T) {
+	existing := &repository.MonthlyClosingBatch{ID: "existing-batch", BatchNumber: "BATCH-EXISTING"}
+	uow := &fakeUOW{writer: &fakeWriter{reusableBatch: existing}, audit: &fakeAudit{}}
+	contract := inScopeContract("c1")
+	contract.ApprovalStatus = "approved"
+	svc := newService(uow, fakeLocks{}, fakeContracts{list: []*repository.Contract{contract}}, fakeSchedules{})
+
+	result, err := svc.Close(context.Background(), Command{AccountingPeriod: period, LegalEntityID: "le1", ContractID: "c1"})
+	if err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+	if result.BatchID != existing.ID {
+		t.Fatalf("batch_id = %q, want %q", result.BatchID, existing.ID)
+	}
+	if contains(uow.writer.calls, "CreateBatch") {
+		t.Fatal("draft rerun must not create a second batch")
+	}
+	if !contains(uow.writer.calls, "ResetBatch") {
+		t.Fatal("draft rerun must reset the reusable batch")
+	}
+}
+
+func TestClose_RejectsNonApprovedSingleContract(t *testing.T) {
+	contract := inScopeContract("c1")
+	contract.ApprovalStatus = "draft"
+	uow := &fakeUOW{writer: &fakeWriter{}, audit: &fakeAudit{}}
+	svc := newService(uow, fakeLocks{}, fakeContracts{list: []*repository.Contract{contract}}, fakeSchedules{})
+
+	result, err := svc.Close(context.Background(), Command{AccountingPeriod: period, LegalEntityID: "le1", ContractID: contract.ID})
+	if !errors.Is(err, ErrContractNotApproved) {
+		t.Fatalf("expected ErrContractNotApproved, got %v", err)
+	}
+	if result != nil {
+		t.Fatalf("expected no result, got %+v", result)
+	}
+	if contains(uow.writer.calls, "CreateBatch") {
+		t.Fatal("non-approved contract must not create a close batch")
+	}
+}
+
 func TestClose_PeriodLocked(t *testing.T) {
 	uow := &fakeUOW{writer: &fakeWriter{}, audit: &fakeAudit{}}
 	svc := newService(uow, fakeLocks{locked: true}, fakeContracts{}, fakeSchedules{})
@@ -244,8 +362,8 @@ func TestClose_PeriodLocked(t *testing.T) {
 	if !errors.Is(err, ErrPeriodLocked) {
 		t.Fatalf("expected ErrPeriodLocked, got %v", err)
 	}
-	if uow.ran {
-		t.Error("no transaction should be opened for a locked period")
+	if !uow.ran {
+		t.Error("lock validation must run inside the serialized close transaction")
 	}
 }
 

@@ -72,6 +72,7 @@ type MonthlyClosingBatch struct {
 	BatchNumber        string     `json:"batch_number"`
 	AccountingPeriod   string     `json:"accounting_period"`
 	LegalEntityID      *string    `json:"legal_entity_id"`
+	ScopeContractID    *string    `json:"scope_contract_id"`
 	Region             *string    `json:"region"`
 	Brand              *string    `json:"brand"`
 	Status             string     `json:"status"`
@@ -131,14 +132,14 @@ func (r *MonthlyClosingRepository) CreateBatch(ctx context.Context, batch *Month
 
 	query := `
 		INSERT INTO monthly_closing_batches (
-			id, batch_number, accounting_period, legal_entity_id, region, brand,
-			status, total_contracts, created_by, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			id, batch_number, accounting_period, legal_entity_id, scope_contract_id,
+			region, brand, status, total_contracts, created_by, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 
 	_, err := r.db.Exec(ctx, query,
 		batch.ID, batch.BatchNumber, batch.AccountingPeriod,
-		batch.LegalEntityID, batch.Region, batch.Brand,
+		batch.LegalEntityID, batch.ScopeContractID, batch.Region, batch.Brand,
 		batch.Status, batch.TotalContracts, batch.CreatedBy,
 		batch.CreatedAt, batch.UpdatedAt,
 	)
@@ -150,7 +151,7 @@ func (r *MonthlyClosingRepository) CreateBatch(ctx context.Context, batch *Month
 
 func (r *MonthlyClosingRepository) GetBatches(ctx context.Context, period, legalEntityID string) ([]*MonthlyClosingBatch, error) {
 	query := `
-		SELECT id, batch_number, accounting_period, legal_entity_id, region, brand,
+		SELECT id, batch_number, accounting_period, legal_entity_id, scope_contract_id, region, brand,
 			status, total_contracts, processed_contracts, failed_contracts,
 			total_entries, posted_entries, started_at, completed_at,
 			created_by, created_at, updated_at
@@ -182,7 +183,7 @@ func (r *MonthlyClosingRepository) GetBatches(ctx context.Context, period, legal
 	for rows.Next() {
 		b := &MonthlyClosingBatch{}
 		err := rows.Scan(
-			&b.ID, &b.BatchNumber, &b.AccountingPeriod, &b.LegalEntityID, &b.Region, &b.Brand,
+			&b.ID, &b.BatchNumber, &b.AccountingPeriod, &b.LegalEntityID, &b.ScopeContractID, &b.Region, &b.Brand,
 			&b.Status, &b.TotalContracts, &b.ProcessedContracts, &b.FailedContracts,
 			&b.TotalEntries, &b.PostedEntries, &b.StartedAt, &b.CompletedAt,
 			&b.CreatedBy, &b.CreatedAt, &b.UpdatedAt,
@@ -193,6 +194,65 @@ func (r *MonthlyClosingRepository) GetBatches(ctx context.Context, period, legal
 		batches = append(batches, b)
 	}
 	return batches, nil
+}
+
+// GetReusableBatch returns the latest unfinalized batch for the exact close
+// scope. A nil scope contract identifies a tenant-wide period close; a non-nil
+// scope identifies a single-contract close.
+func (r *MonthlyClosingRepository) GetReusableBatch(ctx context.Context, period, legalEntityID, contractID string) (*MonthlyClosingBatch, error) {
+	var legalEntityIDVal, contractIDVal interface{}
+	if legalEntityID != "" {
+		legalEntityIDVal = legalEntityID
+	}
+	if contractID != "" {
+		contractIDVal = contractID
+	}
+	query := `
+		SELECT id, batch_number, accounting_period, legal_entity_id, scope_contract_id,
+			region, brand, status, total_contracts, processed_contracts, failed_contracts,
+			total_entries, posted_entries, started_at, completed_at,
+			created_by, created_at, updated_at
+		FROM monthly_closing_batches
+		WHERE accounting_period = $1
+		  AND legal_entity_id IS NOT DISTINCT FROM $2::uuid
+		  AND scope_contract_id IS NOT DISTINCT FROM $3::uuid
+		  AND status IN ('draft', 'completed', 'completed_with_errors', 'failed')
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	b := &MonthlyClosingBatch{}
+	err := r.db.QueryRow(ctx, query, period, legalEntityIDVal, contractIDVal).Scan(
+		&b.ID, &b.BatchNumber, &b.AccountingPeriod, &b.LegalEntityID, &b.ScopeContractID,
+		&b.Region, &b.Brand, &b.Status, &b.TotalContracts, &b.ProcessedContracts,
+		&b.FailedContracts, &b.TotalEntries, &b.PostedEntries, &b.StartedAt,
+		&b.CompletedAt, &b.CreatedBy, &b.CreatedAt, &b.UpdatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reusable batch: %w", err)
+	}
+	return b, nil
+}
+
+func (r *MonthlyClosingRepository) ResetBatch(ctx context.Context, batchID string, totalContracts int) error {
+	query := `
+		UPDATE monthly_closing_batches SET
+			status = 'draft', total_contracts = $2,
+			processed_contracts = 0, failed_contracts = 0,
+			total_entries = 0, posted_entries = 0,
+			started_at = NOW(), completed_at = NULL, updated_at = NOW()
+		WHERE id = $1
+	`
+	result, err := r.db.Exec(ctx, query, batchID, totalContracts)
+	if err != nil {
+		return fmt.Errorf("failed to reset reusable batch: %w", err)
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("reusable batch %s not found", batchID)
+	}
+	return nil
 }
 
 func (r *MonthlyClosingRepository) SaveMeasurementResult(ctx context.Context, mr *MeasurementResult) error {
@@ -332,12 +392,84 @@ func (r *MonthlyClosingRepository) DeleteDraftEntriesByTypes(ctx context.Context
 	return nil
 }
 
-// LinkDraftEntriesToBatch attaches still-unbatched draft entries of the given
-// types (e.g. event adjustment entries created outside the close) to the close
-// batch. Unlike copying, this update is idempotent: re-running the close links
-// the same entries to the latest batch instead of duplicating them. It returns
-// the number of entries linked. When legalEntityID is given the update is
-// guarded by tenant ownership of the contract.
+// HasFinalizedEntries reports whether regeneration would overlap entries that
+// have already entered approval or posting workflow. Such closes must be
+// reversed explicitly rather than silently generating a second draft set.
+func (r *MonthlyClosingRepository) HasFinalizedEntries(ctx context.Context, contractIDs []string, period, legalEntityID string, entryTypes []string) (bool, error) {
+	if len(contractIDs) == 0 || len(entryTypes) == 0 {
+		return false, nil
+	}
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM journal_entries
+			WHERE contract_id::text = ANY($1)
+			  AND accounting_period = $2
+			  AND posting_status <> 'draft'
+			  AND entry_type = ANY($3)
+	` + tenantOwnsContractClause(legalEntityID, "$4") + `
+		)
+	`
+	args := []interface{}{contractIDs, period, entryTypes}
+	if legalEntityID != "" {
+		args = append(args, legalEntityID)
+	}
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, args...).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to check finalized entries: %w", err)
+	}
+	return exists, nil
+}
+
+func (r *MonthlyClosingRepository) HasFinalizedBatchEntries(ctx context.Context, batchID string, entryTypes []string) (bool, error) {
+	if len(entryTypes) == 0 {
+		return false, nil
+	}
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM journal_entries
+			WHERE batch_id = $1 AND posting_status <> 'draft' AND entry_type = ANY($2)
+		)
+	`, batchID, entryTypes).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check finalized batch entries: %w", err)
+	}
+	return exists, nil
+}
+
+func (r *MonthlyClosingRepository) DeleteDraftEntriesFromBatch(ctx context.Context, batchID string, entryTypes []string) error {
+	if len(entryTypes) == 0 {
+		return nil
+	}
+	_, err := r.db.Exec(ctx, `
+		DELETE FROM journal_entries
+		WHERE batch_id = $1 AND posting_status = 'draft' AND entry_type = ANY($2)
+	`, batchID, entryTypes)
+	if err != nil {
+		return fmt.Errorf("failed to clear reusable batch entries: %w", err)
+	}
+	return nil
+}
+
+func (r *MonthlyClosingRepository) DetachDraftEntriesFromBatch(ctx context.Context, batchID string, entryTypes []string) error {
+	if len(entryTypes) == 0 {
+		return nil
+	}
+	_, err := r.db.Exec(ctx, `
+		UPDATE journal_entries SET batch_id = NULL, updated_at = NOW()
+		WHERE batch_id = $1 AND posting_status = 'draft' AND entry_type = ANY($2)
+	`, batchID, entryTypes)
+	if err != nil {
+		return fmt.Errorf("failed to detach reusable batch event entries: %w", err)
+	}
+	return nil
+}
+
+// LinkDraftEntriesToBatch attaches draft event entries to the reusable close
+// batch. Re-running moves any entry left on a historical batch back onto the
+// current scope batch instead of copying it. It returns the number of entries
+// linked. When legalEntityID is given the update is guarded by tenant ownership.
 func (r *MonthlyClosingRepository) LinkDraftEntriesToBatch(ctx context.Context, contractID, period, batchID, legalEntityID string, entryTypes []string) (int, error) {
 	if len(entryTypes) == 0 {
 		return 0, nil
@@ -346,10 +478,9 @@ func (r *MonthlyClosingRepository) LinkDraftEntriesToBatch(ctx context.Context, 
 		UPDATE journal_entries SET
 			batch_id = $1,
 			updated_at = NOW()
-		WHERE contract_id = $2 AND accounting_period = $3
-		  AND posting_status = 'draft'
-		  AND batch_id IS NULL
-		  AND entry_type = ANY($4)
+			WHERE contract_id = $2 AND accounting_period = $3
+			  AND posting_status = 'draft'
+			  AND entry_type = ANY($4)
 	` + tenantOwnsContractClause(legalEntityID, "$5")
 	args := []interface{}{batchID, contractID, period, entryTypes}
 	if legalEntityID != "" {
@@ -610,8 +741,15 @@ func (r *MonthlyClosingRepository) PostBatchEntries(ctx context.Context, batchID
 // LockPeriod locks an accounting period for the given legal entity
 func (r *MonthlyClosingRepository) LockPeriod(ctx context.Context, period, legalEntityID, userID string) error {
 	query := `
+		WITH guard AS (
+			SELECT pg_advisory_xact_lock(hashtextextended(
+				'monthend:' || COALESCE($2::text, '*') || ':' || $1,
+				0
+			))
+		)
 		INSERT INTO period_locks (accounting_period, legal_entity_id, is_locked, locked_by, locked_at, created_at, updated_at)
-		VALUES ($1, $2, true, $3, NOW(), NOW(), NOW())
+		SELECT $1, $2::uuid, true, $3, NOW(), NOW(), NOW()
+		FROM guard
 		ON CONFLICT (accounting_period, legal_entity_id) DO UPDATE SET
 			is_locked = true,
 			locked_by = $3,
@@ -636,12 +774,22 @@ func (r *MonthlyClosingRepository) LockPeriod(ctx context.Context, period, legal
 // UnlockPeriod unlocks an accounting period for the given legal entity
 func (r *MonthlyClosingRepository) UnlockPeriod(ctx context.Context, period, legalEntityID, userID string) error {
 	query := `
-		UPDATE period_locks SET
-			is_locked = false,
-			unlocked_by = $1,
-			unlocked_at = NOW(),
-			updated_at = NOW()
-		WHERE accounting_period = $2 AND (legal_entity_id = $3 OR legal_entity_id IS NULL)
+		WITH guard AS (
+			SELECT pg_advisory_xact_lock(hashtextextended(
+				'monthend:' || COALESCE($3::text, '*') || ':' || $2,
+				0
+			))
+		), updated AS (
+			UPDATE period_locks SET
+				is_locked = false,
+				unlocked_by = $1,
+				unlocked_at = NOW(),
+				updated_at = NOW()
+			FROM guard
+			WHERE accounting_period = $2 AND (legal_entity_id = $3::uuid OR legal_entity_id IS NULL)
+			RETURNING 1
+		)
+		SELECT COUNT(*) FROM updated
 	`
 	var legalEntityIDVal interface{}
 	if legalEntityID == "" {
@@ -649,11 +797,12 @@ func (r *MonthlyClosingRepository) UnlockPeriod(ctx context.Context, period, leg
 	} else {
 		legalEntityIDVal = legalEntityID
 	}
-	result, err := r.db.Exec(ctx, query, userID, period, legalEntityIDVal)
+	var count int
+	err := r.db.QueryRow(ctx, query, userID, period, legalEntityIDVal).Scan(&count)
 	if err != nil {
 		return fmt.Errorf("failed to unlock period: %w", err)
 	}
-	if result.RowsAffected() == 0 {
+	if count == 0 {
 		return fmt.Errorf("period lock not found for period %s", period)
 	}
 	return nil
@@ -662,7 +811,7 @@ func (r *MonthlyClosingRepository) UnlockPeriod(ctx context.Context, period, leg
 // IsPeriodLocked checks if a period is locked
 func (r *MonthlyClosingRepository) IsPeriodLocked(ctx context.Context, period, legalEntityID string) (bool, error) {
 	query := `
-		SELECT is_locked FROM period_locks
+		SELECT COALESCE(bool_or(is_locked), false) FROM period_locks
 		WHERE accounting_period = $1 AND (legal_entity_id = $2 OR legal_entity_id IS NULL)
 	`
 	var legalEntityIDVal interface{}
@@ -674,8 +823,7 @@ func (r *MonthlyClosingRepository) IsPeriodLocked(ctx context.Context, period, l
 	var isLocked bool
 	err := r.db.QueryRow(ctx, query, period, legalEntityIDVal).Scan(&isLocked)
 	if err != nil {
-		// No lock record means not locked
-		return false, nil
+		return false, fmt.Errorf("failed to check period lock: %w", err)
 	}
 	return isLocked, nil
 }
@@ -683,7 +831,7 @@ func (r *MonthlyClosingRepository) IsPeriodLocked(ctx context.Context, period, l
 func (r *MonthlyClosingRepository) UpdateBatchStatus(ctx context.Context, batchID, status string, processed, failed, total, posted int) error {
 	now := time.Now()
 	var completedAt interface{}
-	if status == "completed" || status == "failed" || status == "cancelled" {
+	if isTerminalBatchStatus(status) {
 		completedAt = now
 	}
 
@@ -703,6 +851,15 @@ func (r *MonthlyClosingRepository) UpdateBatchStatus(ctx context.Context, batchI
 		return fmt.Errorf("failed to update batch: %w", err)
 	}
 	return nil
+}
+
+func isTerminalBatchStatus(status string) bool {
+	switch status {
+	case "completed", "completed_with_errors", "failed", "cancelled":
+		return true
+	default:
+		return false
+	}
 }
 
 // CreateEventAdjustment inserts a new event adjustment record.

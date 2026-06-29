@@ -4,8 +4,6 @@ import (
 	"context"
 	"strconv"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type SystemSetting struct {
@@ -17,11 +15,15 @@ type SystemSetting struct {
 }
 
 type SystemSettingRepository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
-func NewSystemSettingRepository(db *pgxpool.Pool) *SystemSettingRepository {
+func NewSystemSettingRepository(db DBTX) *SystemSettingRepository {
 	return &SystemSettingRepository{db: db}
+}
+
+func (r *SystemSettingRepository) WithTx(tx DBTX) *SystemSettingRepository {
+	return &SystemSettingRepository{db: tx}
 }
 
 func (r *SystemSettingRepository) Get(ctx context.Context, key string) (*SystemSetting, error) {

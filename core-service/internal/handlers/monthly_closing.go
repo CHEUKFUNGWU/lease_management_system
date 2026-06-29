@@ -68,6 +68,14 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "期间已锁账，无法重新生成分录"})
 			return
 		}
+		if errors.Is(err, monthend.ErrCloseAlreadyFinalized) {
+			c.JSON(http.StatusConflict, gin.H{"error": "月结分录已进入审批或过账流程，请先执行冲销后再重新生成"})
+			return
+		}
+		if errors.Is(err, monthend.ErrContractNotApproved) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "仅已审批合同可生成月结分录"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

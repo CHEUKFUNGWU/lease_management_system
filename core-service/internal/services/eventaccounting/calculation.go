@@ -3,6 +3,7 @@ package eventaccounting
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
@@ -17,10 +18,13 @@ type Input struct {
 	EffectiveDate    time.Time
 	CommencementDate time.Time
 	LeaseEndDate     time.Time
-	NewValue         *string
-	Currency         string
-	DiscountRate     float64
-	Payments         []ifrs16.LeasePayment
+	// NewValue is event-specific: revised end date for renewal/termination,
+	// recurring fixed rent for rent_change, annual rate for
+	// discount_rate_change, and post-impairment ROU carrying value for impairment.
+	NewValue     *string
+	Currency     string
+	DiscountRate float64
+	Payments     []ifrs16.LeasePayment
 }
 
 type Adjustment struct {
@@ -62,39 +66,51 @@ type Result struct {
 // serialize this result; commit callers persist the same result.
 func Calculate(input Input) (Result, error) {
 	leaseEndDate := revisedLeaseEndDate(input.EventType, input.NewValue, input.LeaseEndDate)
+	revisedRate, err := revisedDiscountRate(input)
+	if err != nil {
+		return Result{}, err
+	}
+	originalPayments := paymentsThrough(input.Payments, input.LeaseEndDate)
 	calculation := ifrs16.LeaseCalculation{
 		CommencementDate: input.CommencementDate,
 		LeaseEndDate:     input.LeaseEndDate,
 		DiscountRate:     input.DiscountRate,
-		Payments:         input.Payments,
+		Payments:         originalPayments,
 		PrepaidRent: ifrs16.CalculatePrepaidRent(ifrs16.LeaseCalculation{
 			CommencementDate: input.CommencementDate,
-			Payments:         input.Payments,
+			Payments:         originalPayments,
 		}),
 	}
 	liabilityBefore, rouBefore, err := ifrs16.GetCarryingAmount(calculation, input.EffectiveDate)
 	if err != nil {
 		return Result{}, fmt.Errorf("calculate carrying amount: %w", err)
 	}
+	treatment := Classify(input.EventType)
+	if treatment == "impairment" {
+		return calculateImpairment(input, liabilityBefore, rouBefore)
+	}
+	revisedPayments, err := paymentsForEvent(input, leaseEndDate)
+	if err != nil {
+		return Result{}, err
+	}
 
 	remeasurement, err := ifrs16.RecalculateFromDate(liabilityBefore, rouBefore, ifrs16.RemeasurementInput{
 		EffectiveDate:       input.EffectiveDate,
 		LeaseEndDate:        leaseEndDate,
-		RevisedDiscountRate: input.DiscountRate,
-		RevisedPayments:     paymentsThrough(input.Payments, leaseEndDate),
+		RevisedDiscountRate: revisedRate,
+		RevisedPayments:     revisedPayments,
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("remeasure lease: %w", err)
 	}
 
-	treatment := Classify(input.EventType)
 	adjustment := Adjustment{
 		EventID: input.EventID, ContractID: input.ContractID, Treatment: treatment,
 		EffectiveDate: input.EffectiveDate, LiabilityBefore: liabilityBefore,
 		LiabilityAfter: remeasurement.NewLiability, LiabilityAdjustment: remeasurement.LiabilityDelta,
 		ROUBefore: rouBefore, ROUAfter: remeasurement.NewROU,
 		ROUAdjustment: remeasurement.ROUAdjustment, PnLGain: remeasurement.PnLGain,
-		PnLLoss: remeasurement.PnLLoss, RevisedDiscountRate: input.DiscountRate,
+		PnLLoss: remeasurement.PnLLoss, RevisedDiscountRate: revisedRate,
 	}
 
 	return Result{
@@ -102,6 +118,67 @@ func Calculate(input Input) (Result, error) {
 		ForwardSchedule: remeasurement.ForwardSchedule,
 		JournalEntries:  buildJournalEntries(input, adjustment),
 	}, nil
+}
+
+func paymentsForEvent(input Input, leaseEndDate time.Time) ([]ifrs16.LeasePayment, error) {
+	payments := paymentsThrough(input.Payments, leaseEndDate)
+	if input.EventType != "rent_change" {
+		return payments, nil
+	}
+	if input.NewValue == nil {
+		return nil, fmt.Errorf("revised rent is required")
+	}
+	revisedRent, err := strconv.ParseFloat(*input.NewValue, 64)
+	if err != nil || revisedRent < 0 {
+		return nil, fmt.Errorf("invalid revised rent %q", *input.NewValue)
+	}
+	for index := range payments {
+		payment := &payments[index]
+		if !payment.Date.Before(input.EffectiveDate) && payment.Type != "variable" && payment.Type != "non_lease" {
+			payment.Amount = revisedRent
+		}
+	}
+	return payments, nil
+}
+
+func calculateImpairment(input Input, liabilityBefore, rouBefore float64) (Result, error) {
+	if input.NewValue == nil {
+		return Result{}, fmt.Errorf("post-impairment ROU value is required")
+	}
+	rouAfter, err := strconv.ParseFloat(*input.NewValue, 64)
+	if err != nil || rouAfter < 0 || rouAfter >= rouBefore {
+		return Result{}, fmt.Errorf("invalid post-impairment ROU value %q", *input.NewValue)
+	}
+	loss := rouBefore - rouAfter
+	adjustment := Adjustment{
+		EventID: input.EventID, ContractID: input.ContractID, Treatment: "impairment",
+		EffectiveDate: input.EffectiveDate, LiabilityBefore: liabilityBefore,
+		LiabilityAfter: liabilityBefore, LiabilityAdjustment: 0,
+		ROUBefore: rouBefore, ROUAfter: rouAfter, ROUAdjustment: -loss,
+		PnLLoss: loss, RevisedDiscountRate: input.DiscountRate,
+	}
+	return Result{
+		Treatment: "impairment", LeaseEndDate: input.LeaseEndDate, Adjustment: adjustment,
+		ForwardSchedule: ifrs16.GenerateForwardSchedule(
+			input.EffectiveDate, input.LeaseEndDate, liabilityBefore, rouAfter,
+			input.DiscountRate, paymentsThrough(input.Payments, input.LeaseEndDate), input.EffectiveDate,
+		),
+		JournalEntries: buildJournalEntries(input, adjustment),
+	}, nil
+}
+
+func revisedDiscountRate(input Input) (float64, error) {
+	if input.EventType != "discount_rate_change" || input.NewValue == nil {
+		return input.DiscountRate, nil
+	}
+	rate, err := strconv.ParseFloat(*input.NewValue, 64)
+	if err != nil || rate <= 0 {
+		return 0, fmt.Errorf("invalid revised discount rate %q", *input.NewValue)
+	}
+	if rate > 1 {
+		rate /= 100
+	}
+	return rate, nil
 }
 
 func paymentsThrough(payments []ifrs16.LeasePayment, leaseEndDate time.Time) []ifrs16.LeasePayment {
@@ -116,9 +193,9 @@ func paymentsThrough(payments []ifrs16.LeasePayment, leaseEndDate time.Time) []i
 
 func Classify(eventType string) string {
 	switch eventType {
-	case "area_adjustment", "rent_change", "index_update", "discount_rate_change":
+	case "area_adjustment", "rent_change":
 		return "modification"
-	case "renewal", "early_termination":
+	case "renewal", "early_termination", "index_update", "discount_rate_change":
 		return "reassessment"
 	case "impairment":
 		return "impairment"
@@ -167,7 +244,11 @@ func buildJournalEntries(input Input, adjustment Adjustment) []JournalEntry {
 		entries = append(entries, entry)
 	} else if adjustment.LiabilityAdjustment < -materialityThreshold {
 		entry := base
-		entry.DebitAccount, entry.CreditAccount, entry.Amount = "2801-租赁负债", "1701-使用权资产", math.Abs(adjustment.LiabilityAdjustment)
+		rouReduction := math.Abs(adjustment.ROUAdjustment)
+		if rouReduction > math.Abs(adjustment.LiabilityAdjustment) {
+			rouReduction = math.Abs(adjustment.LiabilityAdjustment)
+		}
+		entry.DebitAccount, entry.CreditAccount, entry.Amount = "2801-租赁负债", "1701-使用权资产", rouReduction
 		entry.Description += " (负债减少)"
 		entries = append(entries, entry)
 	}

@@ -17,11 +17,24 @@ type EventHandler struct {
 	mcRepo            *repository.MonthlyClosingRepository
 	psRepo            *repository.PaymentScheduleRepository
 	systemSettingRepo *repository.SystemSettingRepository
+	eventPersistence  *eventaccounting.PersistenceService
 	auditLogger       *audit.Logger
 }
 
-func NewEventHandler(eventRepo *repository.EventRepository, contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, psRepo *repository.PaymentScheduleRepository, systemSettingRepo *repository.SystemSettingRepository, auditLogger *audit.Logger) *EventHandler {
-	return &EventHandler{eventRepo: eventRepo, contractRepo: contractRepo, mcRepo: mcRepo, psRepo: psRepo, systemSettingRepo: systemSettingRepo, auditLogger: auditLogger}
+func NewEventHandler(
+	eventRepo *repository.EventRepository,
+	contractRepo *repository.ContractRepository,
+	mcRepo *repository.MonthlyClosingRepository,
+	psRepo *repository.PaymentScheduleRepository,
+	systemSettingRepo *repository.SystemSettingRepository,
+	eventPersistence *eventaccounting.PersistenceService,
+	auditLogger *audit.Logger,
+) *EventHandler {
+	return &EventHandler{
+		eventRepo: eventRepo, contractRepo: contractRepo, mcRepo: mcRepo,
+		psRepo: psRepo, systemSettingRepo: systemSettingRepo,
+		eventPersistence: eventPersistence, auditLogger: auditLogger,
+	}
 }
 
 type CreateEventRequest struct {
@@ -188,7 +201,7 @@ func (h *EventHandler) Approve(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 
 	// Auto-classify event for IFRS 16 treatment
-	treatment := repository.ClassifyEventType(event.EventType)
+	treatment := eventaccounting.Classify(event.EventType)
 
 	if err := h.eventRepo.Approve(ctx, eventID, userIDStr, treatment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to approve: " + err.Error()})
@@ -283,16 +296,6 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		return
 	}
 
-	// Check if already recalculated
-	existingAdjustment, _ := h.mcRepo.GetEventAdjustmentByEventID(ctx, eventID)
-	if existingAdjustment != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"message":    "Event has already been recalculated",
-			"adjustment": existingAdjustment,
-		})
-		return
-	}
-
 	// Get payment schedules
 	schedules, err := h.psRepo.GetByContractID(ctx, contractID)
 	if err != nil {
@@ -320,82 +323,15 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 	}
 	treatment := accountingResult.Treatment
 	accountingAdjustment := accountingResult.Adjustment
-
-	// Create event_adjustments record
-	adjustment := &repository.EventAdjustment{
-		EventID:             eventID,
-		ContractID:          contractID,
-		AdjustmentType:      treatment,
-		EffectiveDate:       event.EffectiveDate,
-		LiabilityBefore:     accountingAdjustment.LiabilityBefore,
-		LiabilityAfter:      accountingAdjustment.LiabilityAfter,
-		LiabilityAdjustment: accountingAdjustment.LiabilityAdjustment,
-		ROUBefore:           accountingAdjustment.ROUBefore,
-		ROUAfter:            accountingAdjustment.ROUAfter,
-		ROUAdjustment:       accountingAdjustment.ROUAdjustment,
-		PnLGain:             accountingAdjustment.PnLGain,
-		PnLLoss:             accountingAdjustment.PnLLoss,
-		RevisedDiscountRate: discountRate,
-	}
-
-	adjustment, err = h.mcRepo.CreateEventAdjustment(ctx, adjustment)
+	uid, _ := c.Get("user_id")
+	uidStr, _ := uid.(string)
+	adjustment, err := h.eventPersistence.Commit(ctx, accountingResult, audit.MetadataFromGin(uidStr, c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create adjustment: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist recalculation: " + err.Error()})
 		return
 	}
 
-	// Generate forward measurement results from effective date
 	effectivePeriod := event.EffectiveDate.Format("2006-01")
-	now := time.Now()
-	for _, dailyEntry := range accountingResult.ForwardSchedule {
-		period := dailyEntry.Date.Format("2006-01")
-		periodStart, _ := time.Parse("2006-01", period)
-		periodEnd := periodStart.AddDate(0, 1, -1)
-
-		mr := &repository.MeasurementResult{
-			ContractID:         contractID,
-			AccountingPeriod:   period,
-			PeriodStartDate:    periodStart,
-			PeriodEndDate:      periodEnd,
-			OpeningLiability:   dailyEntry.OpeningLiability,
-			InterestExpense:    dailyEntry.InterestExpense,
-			TotalPayment:       dailyEntry.Payment,
-			ClosingLiability:   dailyEntry.ClosingLiability,
-			OpeningROUAsset:    dailyEntry.OpeningROUAsset,
-			Depreciation:       dailyEntry.Depreciation,
-			ClosingROUAsset:    dailyEntry.ClosingROUAsset,
-			DiscountRate:       discountRate,
-			IsCalculated:       true,
-			CalculationBatchID: adjustment.CalculationBatchID,
-			CalculatedAt:       &now,
-		}
-		if err := h.mcRepo.SaveMeasurementResult(ctx, mr); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save measurement result for period " + period + ": " + err.Error()})
-			return
-		}
-	}
-
-	for _, plannedEntry := range accountingResult.JournalEntries {
-		description := plannedEntry.Description
-		entry := &repository.JournalEntry{
-			ContractID: contractID, AccountingPeriod: plannedEntry.AccountingPeriod,
-			EntryDate: plannedEntry.EntryDate, EntryType: plannedEntry.EntryType,
-			DebitAccount: plannedEntry.DebitAccount, CreditAccount: plannedEntry.CreditAccount,
-			Amount: plannedEntry.Amount, Currency: plannedEntry.Currency,
-			Description: &description, PostingStatus: "draft",
-		}
-		if err := h.mcRepo.CreateJournalEntry(ctx, entry); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create event journal entry: " + err.Error()})
-			return
-		}
-	}
-
-	// Link recalculation batch to event (use adjustment ID as batch reference)
-	if err := h.eventRepo.LinkRecalculationBatch(ctx, eventID, adjustment.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link batch: " + err.Error()})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "Event recalculated successfully",
 		"event_id":         eventID,
@@ -409,13 +345,6 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		"pnl_loss":         accountingAdjustment.PnLLoss,
 		"forward_periods":  len(accountingResult.ForwardSchedule),
 	})
-
-	// Audit log: event recalculated
-	if h.auditLogger != nil {
-		uid, _ := c.Get("user_id")
-		uidStr, _ := uid.(string)
-		h.auditLogger.Log(ctx, "lease_events", eventID, "recalculate", nil, adjustment, uidStr, c)
-	}
 }
 
 // PreviewEventAdjustment performs calculation without persisting.

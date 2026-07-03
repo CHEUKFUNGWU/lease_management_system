@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/lease-management-system/core-service/internal/access"
 )
 
@@ -42,6 +43,13 @@ func (r *AuditRepository) WithTx(tx DBTX) *AuditRepository {
 
 func (r *AuditRepository) Create(ctx context.Context, log *AuditLog) error {
 	log.ID = uuid.New().String()
+	if log.LegalEntityID == nil {
+		legalEntityID, err := r.resolveRecordLegalEntity(ctx, log.TableName, log.RecordID)
+		if err != nil {
+			return fmt.Errorf("failed to resolve audit legal entity: %w", err)
+		}
+		log.LegalEntityID = legalEntityID
+	}
 
 	// Convert changed_by to UUID if provided
 	var changedBy interface{}
@@ -69,6 +77,39 @@ func (r *AuditRepository) Create(ctx context.Context, log *AuditLog) error {
 	return err
 }
 
+// resolveRecordLegalEntity attributes cross-tenant administrator actions to
+// the affected legal entity instead of leaving the audit row globally scoped.
+func (r *AuditRepository) resolveRecordLegalEntity(ctx context.Context, tableName, recordID string) (*string, error) {
+	var query string
+	switch tableName {
+	case "lease_contracts":
+		query = `SELECT legal_entity_id::text FROM lease_contracts WHERE id = $1 AND legal_entity_id IS NOT NULL`
+	case "lease_events":
+		query = `SELECT c.legal_entity_id::text FROM lease_events e JOIN lease_contracts c ON c.id = e.contract_id WHERE e.id = $1 AND c.legal_entity_id IS NOT NULL`
+	case "journal_entries":
+		query = `SELECT c.legal_entity_id::text FROM journal_entries e JOIN lease_contracts c ON c.id = e.contract_id WHERE e.id = $1 AND c.legal_entity_id IS NOT NULL`
+	case "monthly_closing_batches":
+		query = `SELECT legal_entity_id::text FROM monthly_closing_batches WHERE id = $1 AND legal_entity_id IS NOT NULL`
+	case "critical_dates":
+		query = `SELECT c.legal_entity_id::text FROM critical_dates d JOIN lease_contracts c ON c.id = d.contract_id WHERE d.id = $1 AND c.legal_entity_id IS NOT NULL`
+	case "lease_documents":
+		query = `SELECT c.legal_entity_id::text FROM lease_documents d JOIN lease_contracts c ON c.id = d.contract_id WHERE d.id = $1 AND c.legal_entity_id IS NOT NULL`
+	case "lease_obligations":
+		query = `SELECT c.legal_entity_id::text FROM lease_obligations o JOIN lease_contracts c ON c.id = o.contract_id WHERE o.id = $1 AND c.legal_entity_id IS NOT NULL`
+	default:
+		return nil, nil
+	}
+
+	var legalEntityID string
+	if err := r.db.QueryRow(ctx, query, recordID).Scan(&legalEntityID); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &legalEntityID, nil
+}
+
 type AuditLogFilter struct {
 	TableName string
 	RecordID  string
@@ -78,6 +119,64 @@ type AuditLogFilter struct {
 	EndDate   string
 	Limit     int
 	Offset    int
+}
+
+func appendAuditDimensionScope(scope access.Scope, conditions []string, args []interface{}, argIdx int) ([]string, []interface{}, int) {
+	if len(scope.StoreIDs) == 0 && len(scope.Regions) == 0 && len(scope.Brands) == 0 {
+		return conditions, args, argIdx
+	}
+
+	predicates := make([]string, 0, 3)
+	if len(scope.StoreIDs) > 0 {
+		predicates = append(predicates, fmt.Sprintf("c.store_id::text = ANY($%d)", argIdx))
+		args = append(args, scope.StoreIDs)
+		argIdx++
+	}
+	if len(scope.Regions) > 0 {
+		predicates = append(predicates, fmt.Sprintf("s.region = ANY($%d)", argIdx))
+		args = append(args, scope.Regions)
+		argIdx++
+	}
+	if len(scope.Brands) > 0 {
+		predicates = append(predicates, fmt.Sprintf("s.brand = ANY($%d)", argIdx))
+		args = append(args, scope.Brands)
+		argIdx++
+	}
+	dimensionPredicate := strings.Join(predicates, " AND ")
+	contractTables := "'lease_contracts', 'lease_events', 'journal_entries', 'critical_dates', 'lease_documents', 'lease_obligations', 'monthly_closing_batches'"
+	conditions = append(conditions, fmt.Sprintf(`(
+		(a.table_name = 'lease_contracts' AND EXISTS (
+			SELECT 1 FROM lease_contracts c LEFT JOIN stores s ON s.id = c.store_id
+			WHERE c.id = a.record_id AND %s
+		)) OR
+		(a.table_name = 'lease_events' AND EXISTS (
+			SELECT 1 FROM lease_events e JOIN lease_contracts c ON c.id = e.contract_id LEFT JOIN stores s ON s.id = c.store_id
+			WHERE e.id = a.record_id AND %s
+		)) OR
+		(a.table_name = 'journal_entries' AND EXISTS (
+			SELECT 1 FROM journal_entries e JOIN lease_contracts c ON c.id = e.contract_id LEFT JOIN stores s ON s.id = c.store_id
+			WHERE e.id = a.record_id AND %s
+		)) OR
+		(a.table_name = 'critical_dates' AND EXISTS (
+			SELECT 1 FROM critical_dates d JOIN lease_contracts c ON c.id = d.contract_id LEFT JOIN stores s ON s.id = c.store_id
+			WHERE d.id = a.record_id AND %s
+		)) OR
+		(a.table_name = 'lease_documents' AND EXISTS (
+			SELECT 1 FROM lease_documents d JOIN lease_contracts c ON c.id = d.contract_id LEFT JOIN stores s ON s.id = c.store_id
+			WHERE d.id = a.record_id AND %s
+		)) OR
+		(a.table_name = 'lease_obligations' AND EXISTS (
+			SELECT 1 FROM lease_obligations o JOIN lease_contracts c ON c.id = o.contract_id LEFT JOIN stores s ON s.id = c.store_id
+			WHERE o.id = a.record_id AND %s
+		)) OR
+		(a.table_name = 'monthly_closing_batches' AND NOT EXISTS (
+			SELECT 1 FROM journal_entries e JOIN lease_contracts c ON c.id = e.contract_id LEFT JOIN stores s ON s.id = c.store_id
+			WHERE e.batch_id = a.record_id AND NOT (%s)
+		)) OR
+		a.table_name NOT IN (%s)
+	)`, dimensionPredicate, dimensionPredicate, dimensionPredicate, dimensionPredicate,
+		dimensionPredicate, dimensionPredicate, dimensionPredicate, contractTables))
+	return conditions, args, argIdx
 }
 
 func (r *AuditRepository) List(ctx context.Context, filter AuditLogFilter) ([]*AuditLog, int, error) {
@@ -92,6 +191,7 @@ func (r *AuditRepository) List(ctx context.Context, filter AuditLogFilter) ([]*A
 			args = append(args, scope.LegalEntityID)
 			argIdx++
 		}
+		conditions, args, argIdx = appendAuditDimensionScope(scope, conditions, args, argIdx)
 	}
 
 	if filter.TableName != "" {

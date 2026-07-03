@@ -111,7 +111,7 @@ func (h *LeaseAdminHandler) UpdateCriticalDateStatus(c *gin.Context) {
 	}
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	if err := h.repo.UpdateCriticalDateStatus(c.Request.Context(), c.Param("dateId"), req.Status, userIDStr); err != nil {
+	if err := h.repo.UpdateCriticalDateStatus(c.Request.Context(), c.Param("dateId"), contractID, req.Status, userIDStr); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -250,7 +250,7 @@ func (h *LeaseAdminHandler) UpdateObligationStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := h.repo.UpdateObligationStatus(c.Request.Context(), c.Param("obligationId"), req.Status); err != nil {
+	if err := h.repo.UpdateObligationStatus(c.Request.Context(), c.Param("obligationId"), contractID, req.Status); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

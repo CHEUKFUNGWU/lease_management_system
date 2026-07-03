@@ -109,18 +109,29 @@ func (r *ContractRepository) valuesAttributes(ctx context.Context, legalEntityID
 		return attributes, nil
 	}
 	attributes.StoreID = *storeID
-	err := r.db.QueryRow(ctx, `SELECT COALESCE(region, ''), COALESCE(brand, '') FROM stores WHERE id = $1`, *storeID).Scan(&attributes.Region, &attributes.Brand)
-	return attributes, err
+	var storeLegalEntityID string
+	err := r.db.QueryRow(ctx, `
+		SELECT legal_entity_id::text, COALESCE(region, ''), COALESCE(brand, '')
+		FROM stores
+		WHERE id = $1
+	`, *storeID).Scan(&storeLegalEntityID, &attributes.Region, &attributes.Brand)
+	if err != nil {
+		return access.ContractAttributes{}, err
+	}
+	if attributes.LegalEntityID == "" || storeLegalEntityID != attributes.LegalEntityID {
+		return access.ContractAttributes{}, fmt.Errorf("store does not belong to contract legal entity")
+	}
+	return attributes, nil
 }
 
 func (r *ContractRepository) scopeAllowsValues(ctx context.Context, legalEntityID, storeID *string) (bool, error) {
-	scope, scoped := access.ScopeFromContext(ctx)
-	if !scoped {
-		return true, nil
-	}
 	attributes, err := r.valuesAttributes(ctx, legalEntityID, storeID)
 	if err != nil {
 		return false, err
+	}
+	scope, scoped := access.ScopeFromContext(ctx)
+	if !scoped {
+		return true, nil
 	}
 	return scope.AllowsContract(attributes), nil
 }

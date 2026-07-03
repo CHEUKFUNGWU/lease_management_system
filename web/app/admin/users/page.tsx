@@ -18,7 +18,7 @@ import {
   PlusOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { useAuth } from "../../context/AuthContext";
+import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { adminApi, legalEntityApi } from "../../lib/api";
@@ -48,7 +48,7 @@ export default function AdminUsersPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!user || !(user.roles?.includes("admin") || user.role === "admin")) {
+    if (!hasRole(user, "admin")) {
       message.error(t("admin_users.need_admin", language));
       router.push("/login");
       return;

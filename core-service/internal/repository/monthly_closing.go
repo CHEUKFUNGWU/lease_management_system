@@ -305,6 +305,15 @@ func (r *MonthlyClosingRepository) GetReusableBatch(ctx context.Context, period,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reusable batch: %w", err)
 	}
+	if _, scoped := access.ScopeFromContext(ctx); scoped {
+		allowed, err := r.batchAllowed(ctx, b.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate reusable batch access: %w", err)
+		}
+		if !allowed {
+			return nil, nil
+		}
+	}
 	return b, nil
 }
 

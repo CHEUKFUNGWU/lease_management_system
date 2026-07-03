@@ -101,8 +101,23 @@ func GetAccessScope(c *gin.Context) (access.Scope, bool) {
 	return scope, ok
 }
 
+// RequireLegalEntityWideScope prevents a store/region/brand-scoped actor from
+// applying an operation, such as a period lock, to the entire legal entity.
+func RequireLegalEntityWideScope() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := GetAccessScope(c)
+		if !ok || (!scope.Global && (scope.LegalEntityID == "" || len(scope.StoreIDs) > 0 || len(scope.Regions) > 0 || len(scope.Brands) > 0)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "operation requires legal-entity-wide access"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // LoadUserPermissions loads user's permissions into context
 func LoadUserPermissions(roleRepo interface {
+	GetUserRoleCodes(ctx context.Context, userID string) ([]string, error)
 	GetUserPermissions(ctx context.Context, userID string) ([]*repository.Permission, error)
 	GetUserDataScopes(ctx context.Context, userID string) ([]*repository.DataScope, error)
 }) gin.HandlerFunc {
@@ -118,6 +133,13 @@ func LoadUserPermissions(roleRepo interface {
 			c.Next()
 			return
 		}
+		roles, err := roleRepo.GetUserRoleCodes(c.Request.Context(), userIDStr)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load role assignments"})
+			c.Abort()
+			return
+		}
+		c.Set("roles", roles)
 
 		perms, err := roleRepo.GetUserPermissions(c.Request.Context(), userIDStr)
 		if err != nil {

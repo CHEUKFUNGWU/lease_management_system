@@ -49,3 +49,39 @@ func TestDataScopeMiddlewareBuildsNarrowingScope(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, recorder.Code)
 	}
 }
+
+func TestLegalEntityWideOperationRejectsNarrowingScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("access_scope", access.Scope{LegalEntityID: "le-001", StoreIDs: []string{"store-1"}})
+		c.Next()
+	})
+	router.POST("/lock", RequireLegalEntityWideScope(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/lock", nil))
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("expected narrowed scope to return %d, got %d", http.StatusForbidden, recorder.Code)
+	}
+}
+
+func TestLegalEntityWideOperationAllowsFullEntityScope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("access_scope", access.Scope{LegalEntityID: "le-001"})
+		c.Next()
+	})
+	router.POST("/lock", RequireLegalEntityWideScope(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/lock", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("expected full legal entity scope to return %d, got %d", http.StatusNoContent, recorder.Code)
+	}
+}

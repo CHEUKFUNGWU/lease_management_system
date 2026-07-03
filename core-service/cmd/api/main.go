@@ -202,8 +202,8 @@ func main() {
 		protected.Handle(http.MethodPost, "/monthly-closing/batches/:id/post", permission("monthly_closing", "post"), monthlyClosingHandler.PostBatch)
 
 		// Monthly Closing - Period Locking
-		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/lock", permission("monthly_closing", "lock"), monthlyClosingHandler.LockPeriod)
-		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/unlock", permission("monthly_closing", "unlock"), monthlyClosingHandler.UnlockPeriod)
+		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/lock", permission("monthly_closing", "lock"), middleware.RequireLegalEntityWideScope(), monthlyClosingHandler.LockPeriod)
+		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/unlock", permission("monthly_closing", "unlock"), middleware.RequireLegalEntityWideScope(), monthlyClosingHandler.UnlockPeriod)
 		protected.Handle(http.MethodGet, "/monthly-closing/periods/:period/lock-status", permission("monthly_closing", "read"), monthlyClosingHandler.GetPeriodLockStatus)
 
 		// AI Chat

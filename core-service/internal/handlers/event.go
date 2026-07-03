@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -9,7 +8,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
-	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
+	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 )
 
 type EventHandler struct {
@@ -18,21 +17,34 @@ type EventHandler struct {
 	mcRepo            *repository.MonthlyClosingRepository
 	psRepo            *repository.PaymentScheduleRepository
 	systemSettingRepo *repository.SystemSettingRepository
+	eventPersistence  *eventaccounting.PersistenceService
 	auditLogger       *audit.Logger
 }
 
-func NewEventHandler(eventRepo *repository.EventRepository, contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, psRepo *repository.PaymentScheduleRepository, systemSettingRepo *repository.SystemSettingRepository, auditLogger *audit.Logger) *EventHandler {
-	return &EventHandler{eventRepo: eventRepo, contractRepo: contractRepo, mcRepo: mcRepo, psRepo: psRepo, systemSettingRepo: systemSettingRepo, auditLogger: auditLogger}
+func NewEventHandler(
+	eventRepo *repository.EventRepository,
+	contractRepo *repository.ContractRepository,
+	mcRepo *repository.MonthlyClosingRepository,
+	psRepo *repository.PaymentScheduleRepository,
+	systemSettingRepo *repository.SystemSettingRepository,
+	eventPersistence *eventaccounting.PersistenceService,
+	auditLogger *audit.Logger,
+) *EventHandler {
+	return &EventHandler{
+		eventRepo: eventRepo, contractRepo: contractRepo, mcRepo: mcRepo,
+		psRepo: psRepo, systemSettingRepo: systemSettingRepo,
+		eventPersistence: eventPersistence, auditLogger: auditLogger,
+	}
 }
 
 type CreateEventRequest struct {
-	ContractID       string  `json:"contract_id" binding:"required,uuid"`
-	EventType        string  `json:"event_type" binding:"required"`
-	EffectiveDate    string  `json:"effective_date" binding:"required"`
-	OriginalValue    *string `json:"original_value"`
-	NewValue         *string `json:"new_value"`
-	ChangeReason     string  `json:"change_reason" binding:"required"`
-	JudgmentBasis    string  `json:"judgment_basis"`
+	ContractID    string  `json:"contract_id" binding:"required,uuid"`
+	EventType     string  `json:"event_type" binding:"required"`
+	EffectiveDate string  `json:"effective_date" binding:"required"`
+	OriginalValue *string `json:"original_value"`
+	NewValue      *string `json:"new_value"`
+	ChangeReason  string  `json:"change_reason" binding:"required"`
+	JudgmentBasis string  `json:"judgment_basis"`
 }
 
 func (h *EventHandler) Create(c *gin.Context) {
@@ -41,9 +53,9 @@ func (h *EventHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	ed, _ := time.Parse("2006-01-02", req.EffectiveDate)
-	
+
 	event := &repository.LeaseEvent{
 		ContractID:    req.ContractID,
 		EventType:     req.EventType,
@@ -53,7 +65,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 		ChangeReason:  &req.ChangeReason,
 		JudgmentBasis: &req.JudgmentBasis,
 	}
-	
+
 	result, err := h.eventRepo.Create(c.Request.Context(), event)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -66,7 +78,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 		uidStr, _ := uid.(string)
 		h.auditLogger.Log(c.Request.Context(), "lease_events", result.ID, "create", nil, result, uidStr, c)
 	}
-	
+
 	c.JSON(http.StatusOK, result)
 }
 
@@ -74,7 +86,7 @@ func (h *EventHandler) ListByContract(c *gin.Context) {
 	contractID := c.Param("id")
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, contractID, legalEntityID)
 	if err != nil {
@@ -85,13 +97,13 @@ func (h *EventHandler) ListByContract(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	events, err := h.eventRepo.GetByContractID(ctx, contractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"data":  events,
 		"total": len(events),
@@ -100,7 +112,7 @@ func (h *EventHandler) ListByContract(c *gin.Context) {
 
 func (h *EventHandler) SubmitForReview(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -111,12 +123,12 @@ func (h *EventHandler) SubmitForReview(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+
 	if err := h.eventRepo.SubmitForReview(ctx, eventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"event_id": eventID,
 		"status":   "submitted",
@@ -131,13 +143,13 @@ type EventReviewRequest struct {
 
 func (h *EventHandler) Review(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	var req EventReviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -148,22 +160,22 @@ func (h *EventHandler) Review(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.eventRepo.Review(ctx, eventID, userIDStr, req.Approved, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to review: " + err.Error()})
 		return
 	}
-	
+
 	status := "reviewed"
 	message := "复核通过，已送审"
 	if !req.Approved {
 		status = "returned_to_editor"
 		message = "已退回编辑"
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"event_id": eventID,
 		"status":   status,
@@ -173,7 +185,7 @@ func (h *EventHandler) Review(c *gin.Context) {
 
 func (h *EventHandler) Approve(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -184,23 +196,23 @@ func (h *EventHandler) Approve(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	// Auto-classify event for IFRS 16 treatment
-	treatment := repository.ClassifyEventType(event.EventType)
-	
+	treatment := eventaccounting.Classify(event.EventType)
+
 	if err := h.eventRepo.Approve(ctx, eventID, userIDStr, treatment); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to approve: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"event_id": eventID,
-		"status":   "approved",
+		"event_id":  eventID,
+		"status":    "approved",
 		"treatment": treatment,
-		"message":  "事件已审批通过",
+		"message":   "事件已审批通过",
 	})
 
 	// Audit log: event approved
@@ -211,7 +223,7 @@ func (h *EventHandler) Approve(c *gin.Context) {
 
 func (h *EventHandler) Reject(c *gin.Context) {
 	eventID := c.Param("eventId")
-	
+
 	var req struct {
 		Reason string `json:"reason"`
 	}
@@ -219,7 +231,7 @@ func (h *EventHandler) Reject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	ctx := c.Request.Context()
 	event, err := h.eventRepo.GetByID(ctx, eventID)
 	if err != nil {
@@ -230,15 +242,15 @@ func (h *EventHandler) Reject(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.eventRepo.Reject(ctx, eventID, userIDStr, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reject: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"event_id": eventID,
 		"status":   "rejected",
@@ -284,16 +296,6 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		return
 	}
 
-	// Check if already recalculated
-	existingAdjustment, _ := h.mcRepo.GetEventAdjustmentByEventID(ctx, eventID)
-	if existingAdjustment != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"message":    "Event has already been recalculated",
-			"adjustment": existingAdjustment,
-		})
-		return
-	}
-
 	// Get payment schedules
 	schedules, err := h.psRepo.GetByContractID(ctx, contractID)
 	if err != nil {
@@ -301,11 +303,6 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		return
 	}
 	payments := repository.ToIFRS16Payments(schedules)
-
-	// Determine discount rate priority:
-	// 1) global system setting
-	// 2) contract.DiscountRateValue
-	// 3) fallback 0.05
 	discountRate := resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
 	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
 		discountRate = *contract.DiscountRateValue
@@ -314,245 +311,27 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		discountRate = 0.05
 	}
 
-	// Get lease end date, possibly revised by event
-	leaseEndDate := contract.LeaseEndDate
-	if event.EventType == "early_termination" && event.NewValue != nil {
-		if parsedDate, err := time.Parse("2006-01-02", *event.NewValue); err == nil {
-			leaseEndDate = parsedDate
-		}
-	}
-	if event.EventType == "renewal" && event.NewValue != nil {
-		if parsedDate, err := time.Parse("2006-01-02", *event.NewValue); err == nil {
-			leaseEndDate = parsedDate
-		}
-	}
-
-	// Calculate carrying amounts as of the day before effective date
-	calcInput := ifrs16svc.LeaseCalculation{
-		CommencementDate: contract.CommencementDate,
-		LeaseEndDate:     leaseEndDate,
-		DiscountRate:     discountRate,
-		Payments:         payments,
-		PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
-			CommencementDate: contract.CommencementDate,
-			Payments:         payments,
-		}),
-	}
-
-	carryingLiability, carryingROU, err := ifrs16svc.GetCarryingAmount(calcInput, event.EffectiveDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get carrying amount: " + err.Error()})
-		return
-	}
-
-	// Build revised payments for remeasurement
-	// For MVP: keep existing payments; future enhancement: modify per event type
-	revisedPayments := payments
-
-	// Determine treatment classification
-	treatment := repository.ClassifyEventType(event.EventType)
-
-	// Perform remeasurement
-	remeasurementInput := ifrs16svc.RemeasurementInput{
-		EffectiveDate:       event.EffectiveDate,
-		LeaseEndDate:        leaseEndDate,
-		RevisedDiscountRate: discountRate,
-		RevisedPayments:     revisedPayments,
-	}
-	remeasurementResult, err := ifrs16svc.RecalculateFromDate(carryingLiability, carryingROU, remeasurementInput)
+	accountingResult, err := eventaccounting.Calculate(eventaccounting.Input{
+		EventID: eventID, ContractID: contractID, EventType: event.EventType,
+		EffectiveDate: event.EffectiveDate, CommencementDate: contract.CommencementDate,
+		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue,
+		Currency: contract.Currency, DiscountRate: discountRate, Payments: payments,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "recalculation failed: " + err.Error()})
 		return
 	}
-
-	// Create event_adjustments record
-	adjustment := &repository.EventAdjustment{
-		EventID:             eventID,
-		ContractID:          contractID,
-		AdjustmentType:      treatment,
-		EffectiveDate:       event.EffectiveDate,
-		LiabilityBefore:     carryingLiability,
-		LiabilityAfter:      remeasurementResult.NewLiability,
-		LiabilityAdjustment: remeasurementResult.LiabilityDelta,
-		ROUBefore:           carryingROU,
-		ROUAfter:            remeasurementResult.NewROU,
-		ROUAdjustment:       remeasurementResult.ROUAdjustment,
-		PnLGain:             remeasurementResult.PnLGain,
-		PnLLoss:             remeasurementResult.PnLLoss,
-		RevisedDiscountRate: discountRate,
-	}
-
-	adjustment, err = h.mcRepo.CreateEventAdjustment(ctx, adjustment)
+	treatment := accountingResult.Treatment
+	accountingAdjustment := accountingResult.Adjustment
+	uid, _ := c.Get("user_id")
+	uidStr, _ := uid.(string)
+	adjustment, err := h.eventPersistence.Commit(ctx, accountingResult, audit.MetadataFromGin(uidStr, c))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create adjustment: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist recalculation: " + err.Error()})
 		return
 	}
 
-	// Generate forward measurement results from effective date
 	effectivePeriod := event.EffectiveDate.Format("2006-01")
-	now := time.Now()
-	for _, dailyEntry := range remeasurementResult.ForwardSchedule {
-		period := dailyEntry.Date.Format("2006-01")
-		periodStart, _ := time.Parse("2006-01", period)
-		periodEnd := periodStart.AddDate(0, 1, -1)
-
-		mr := &repository.MeasurementResult{
-			ContractID:          contractID,
-			AccountingPeriod:    period,
-			PeriodStartDate:     periodStart,
-			PeriodEndDate:       periodEnd,
-			OpeningLiability:    dailyEntry.OpeningLiability,
-			InterestExpense:     dailyEntry.InterestExpense,
-			TotalPayment:        dailyEntry.Payment,
-			ClosingLiability:    dailyEntry.ClosingLiability,
-			OpeningROUAsset:     dailyEntry.OpeningROUAsset,
-			Depreciation:        dailyEntry.Depreciation,
-			ClosingROUAsset:     dailyEntry.ClosingROUAsset,
-			DiscountRate:        discountRate,
-			IsCalculated:        true,
-			CalculationBatchID:  adjustment.CalculationBatchID,
-			CalculatedAt:        &now,
-		}
-		if err := h.mcRepo.SaveMeasurementResult(ctx, mr); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save measurement result for period " + period + ": " + err.Error()})
-			return
-		}
-	}
-
-	// Create journal entries for the adjustment
-	// Modification/Reassessment entry: adjust ROU and liability
-	if treatment == "modification" || treatment == "reassessment" {
-		// Entry for liability and ROU adjustment
-		var description string
-		var entryType string
-		if treatment == "modification" {
-			entryType = "modification"
-			description = fmt.Sprintf("租赁修改调整 - 事件 %s", eventID[:8])
-		} else {
-			entryType = "reassessment"
-			description = fmt.Sprintf("租赁重新评估 - 事件 %s", eventID[:8])
-		}
-
-		// Debit/Credit based on whether liability increased or decreased
-		liabilityDelta := remeasurementResult.LiabilityDelta
-
-		effectiveDateEnd := event.EffectiveDate.AddDate(0, 1, -1)
-		effPeriod := event.EffectiveDate.Format("2006-01")
-
-		if liabilityDelta > 0.01 {
-			// Liability increased: Dr ROU, Cr Liability
-			je := &repository.JournalEntry{
-				ContractID:       contractID,
-				AccountingPeriod: effPeriod,
-				EntryDate:        effectiveDateEnd,
-				EntryType:        entryType,
-				DebitAccount:     "1701-使用权资产",
-				CreditAccount:    "2801-租赁负债",
-				Amount:           liabilityDelta,
-				Currency:         contract.Currency,
-				Description:      &description,
-				PostingStatus:    "draft",
-			}
-			if err := h.mcRepo.CreateJournalEntry(ctx, je); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create liability adjustment entry: " + err.Error()})
-				return
-			}
-		} else if liabilityDelta < -0.01 {
-			// Liability decreased: Dr Liability, Cr ROU
-			desc := description + " (负债减少)"
-			je := &repository.JournalEntry{
-				ContractID:       contractID,
-				AccountingPeriod: effPeriod,
-				EntryDate:        effectiveDateEnd,
-				EntryType:        entryType,
-				DebitAccount:     "2801-租赁负债",
-				CreditAccount:    "1701-使用权资产",
-				Amount:           -liabilityDelta,
-				Currency:         contract.Currency,
-				Description:      &desc,
-				PostingStatus:    "draft",
-			}
-			if err := h.mcRepo.CreateJournalEntry(ctx, je); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create liability reduction entry: " + err.Error()})
-				return
-			}
-		}
-
-		// P&L gain entry if ROU reduction exceeds carrying amount
-		if remeasurementResult.PnLGain > 0.01 {
-			desc := description + " (处置收益)"
-			je := &repository.JournalEntry{
-				ContractID:       contractID,
-				AccountingPeriod: effPeriod,
-				EntryDate:        effectiveDateEnd,
-				EntryType:        entryType,
-				DebitAccount:     "2801-租赁负债",
-				CreditAccount:    "6301-资产处置收益",
-				Amount:           remeasurementResult.PnLGain,
-				Currency:         contract.Currency,
-				Description:      &desc,
-				PostingStatus:    "draft",
-			}
-			if err := h.mcRepo.CreateJournalEntry(ctx, je); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create P&L gain entry: " + err.Error()})
-				return
-			}
-		}
-
-		// P&L loss entry if applicable
-		if remeasurementResult.PnLLoss > 0.01 {
-			desc := description + " (处置损失)"
-			je := &repository.JournalEntry{
-				ContractID:       contractID,
-				AccountingPeriod: effPeriod,
-				EntryDate:        effectiveDateEnd,
-				EntryType:        entryType,
-				DebitAccount:     "6711-资产处置损失",
-				CreditAccount:    "2801-租赁负债",
-				Amount:           remeasurementResult.PnLLoss,
-				Currency:         contract.Currency,
-				Description:      &desc,
-				PostingStatus:    "draft",
-			}
-			if err := h.mcRepo.CreateJournalEntry(ctx, je); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create P&L loss entry: " + err.Error()})
-				return
-			}
-		}
-	}
-
-	// Impairment entry
-	if treatment == "impairment" {
-		impairmentAmount := carryingROU - remeasurementResult.NewROU
-		if impairmentAmount > 0.01 {
-			desc := fmt.Sprintf("使用权资产减值 - 事件 %s", eventID[:8])
-			effectiveDateEnd := event.EffectiveDate.AddDate(0, 1, -1)
-			effPeriod := event.EffectiveDate.Format("2006-01")
-			je := &repository.JournalEntry{
-				ContractID:       contractID,
-				AccountingPeriod: effPeriod,
-				EntryDate:        effectiveDateEnd,
-				EntryType:        "impairment",
-				DebitAccount:     "6701-资产减值损失",
-				CreditAccount:    "1702-使用权资产减值准备",
-				Amount:           impairmentAmount,
-				Currency:         contract.Currency,
-				Description:      &desc,
-				PostingStatus:    "draft",
-			}
-			if err := h.mcRepo.CreateJournalEntry(ctx, je); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create impairment entry: " + err.Error()})
-				return
-			}
-		}
-	}
-
-	// Link recalculation batch to event (use adjustment ID as batch reference)
-	if err := h.eventRepo.LinkRecalculationBatch(ctx, eventID, adjustment.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to link batch: " + err.Error()})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"message":          "Event recalculated successfully",
 		"event_id":         eventID,
@@ -560,19 +339,12 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		"effective_date":   event.EffectiveDate.Format("2006-01-02"),
 		"effective_period": effectivePeriod,
 		"treatment":        treatment,
-		"liability_delta":  remeasurementResult.LiabilityDelta,
-		"rou_delta":        remeasurementResult.ROUAdjustment,
-		"pnl_gain":         remeasurementResult.PnLGain,
-		"pnl_loss":         remeasurementResult.PnLLoss,
-		"forward_periods":  len(remeasurementResult.ForwardSchedule),
+		"liability_delta":  accountingAdjustment.LiabilityAdjustment,
+		"rou_delta":        accountingAdjustment.ROUAdjustment,
+		"pnl_gain":         accountingAdjustment.PnLGain,
+		"pnl_loss":         accountingAdjustment.PnLLoss,
+		"forward_periods":  len(accountingResult.ForwardSchedule),
 	})
-
-	// Audit log: event recalculated
-	if h.auditLogger != nil {
-		uid, _ := c.Get("user_id")
-		uidStr, _ := uid.(string)
-		h.auditLogger.Log(ctx, "lease_events", eventID, "recalculate", nil, adjustment, uidStr, c)
-	}
 }
 
 // PreviewEventAdjustment performs calculation without persisting.
@@ -621,61 +393,32 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 	if discountRate <= 0 {
 		discountRate = 0.05
 	}
-	leaseEndDate := contract.LeaseEndDate
-	if event.EventType == "early_termination" && event.NewValue != nil {
-		if parsedDate, err := time.Parse("2006-01-02", *event.NewValue); err == nil {
-			leaseEndDate = parsedDate
-		}
-	}
-	if event.EventType == "renewal" && event.NewValue != nil {
-		if parsedDate, err := time.Parse("2006-01-02", *event.NewValue); err == nil {
-			leaseEndDate = parsedDate
-		}
-	}
-
-	calcInput := ifrs16svc.LeaseCalculation{
-		CommencementDate: contract.CommencementDate,
-		LeaseEndDate:     leaseEndDate,
-		DiscountRate:     discountRate,
-		Payments:         payments,
-		PrepaidRent:      ifrs16svc.CalculatePrepaidRent(ifrs16svc.LeaseCalculation{
-			CommencementDate: contract.CommencementDate,
-			Payments:         payments,
-		}),
-	}
-
-	carryingLiability, carryingROU, err := ifrs16svc.GetCarryingAmount(calcInput, event.EffectiveDate)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get carrying amount: " + err.Error()})
-		return
-	}
-
-	remeasurementInput := ifrs16svc.RemeasurementInput{
-		EffectiveDate:       event.EffectiveDate,
-		LeaseEndDate:        leaseEndDate,
-		RevisedDiscountRate: discountRate,
-		RevisedPayments:     payments,
-	}
-	result, err := ifrs16svc.RecalculateFromDate(carryingLiability, carryingROU, remeasurementInput)
+	result, err := eventaccounting.Calculate(eventaccounting.Input{
+		EventID: eventID, ContractID: contractID, EventType: event.EventType,
+		EffectiveDate: event.EffectiveDate, CommencementDate: contract.CommencementDate,
+		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue,
+		Currency: contract.Currency, DiscountRate: discountRate, Payments: payments,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "preview calculation failed: " + err.Error()})
 		return
 	}
+	adjustment := result.Adjustment
 
 	c.JSON(http.StatusOK, gin.H{
 		"event_id":         eventID,
 		"contract_id":      contractID,
 		"event_type":       event.EventType,
-		"treatment":        repository.ClassifyEventType(event.EventType),
+		"treatment":        result.Treatment,
 		"effective_date":   event.EffectiveDate.Format("2006-01-02"),
-		"liability_before": carryingLiability,
-		"liability_after":  result.NewLiability,
-		"liability_delta":  result.LiabilityDelta,
-		"rou_before":       carryingROU,
-		"rou_after":        result.NewROU,
-		"rou_delta":        result.ROUAdjustment,
-		"pnl_gain":         result.PnLGain,
-		"pnl_loss":         result.PnLLoss,
+		"liability_before": adjustment.LiabilityBefore,
+		"liability_after":  adjustment.LiabilityAfter,
+		"liability_delta":  adjustment.LiabilityAdjustment,
+		"rou_before":       adjustment.ROUBefore,
+		"rou_after":        adjustment.ROUAfter,
+		"rou_delta":        adjustment.ROUAdjustment,
+		"pnl_gain":         adjustment.PnLGain,
+		"pnl_loss":         adjustment.PnLLoss,
 		"forward_periods":  len(result.ForwardSchedule),
 	})
 }

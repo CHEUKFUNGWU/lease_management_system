@@ -15,6 +15,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 	"github.com/lease-management-system/core-service/internal/services/monthend"
 )
 
@@ -51,6 +52,7 @@ func main() {
 
 	// Initialize services
 	closeService := monthend.NewService(database.Pool, mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger)
+	eventPersistence := eventaccounting.NewPersistenceService(database.Pool, mcRepo, eventRepo, auditLogger)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo)
@@ -59,7 +61,7 @@ func main() {
 	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
 	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
 	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo)
-	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, auditLogger)
+	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, eventPersistence, auditLogger)
 	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, auditLogger)
 	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo)
 	auditHandler := handlers.NewAuditHandler(auditRepo)

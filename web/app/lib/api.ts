@@ -93,8 +93,8 @@ export const adminApi = {
 
 // Legal Entity APIs
 export const legalEntityApi = {
-  list: () =>
-    apiRequest("/api/v1/legal-entities"),
+  list: (token: string) =>
+    apiRequest("/api/v1/master-data/legal-entities", { token }),
 };
 
 // Contract APIs

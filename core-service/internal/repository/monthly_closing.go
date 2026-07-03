@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 // DBTX is the subset of database operations shared by *pgxpool.Pool and pgx.Tx.
@@ -124,6 +125,60 @@ func (r *MonthlyClosingRepository) WithTx(tx DBTX) *MonthlyClosingRepository {
 	return &MonthlyClosingRepository{db: tx}
 }
 
+func (r *MonthlyClosingRepository) journalEntryAllowed(ctx context.Context, entryID string) (bool, error) {
+	scope, scoped := access.ScopeFromContext(ctx)
+	if !scoped || scope.Global {
+		return true, nil
+	}
+	var attributes access.ContractAttributes
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(c.legal_entity_id::text, ''), COALESCE(c.store_id::text, ''),
+		       COALESCE(s.region, ''), COALESCE(s.brand, '')
+		FROM journal_entries e
+		JOIN lease_contracts c ON c.id = e.contract_id
+		LEFT JOIN stores s ON s.id = c.store_id
+		WHERE e.id = $1
+	`, entryID).Scan(&attributes.LegalEntityID, &attributes.StoreID, &attributes.Region, &attributes.Brand)
+	if err == pgx.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return scope.AllowsContract(attributes), nil
+}
+
+func (r *MonthlyClosingRepository) batchAllowed(ctx context.Context, batchID string) (bool, error) {
+	scope, scoped := access.ScopeFromContext(ctx)
+	if !scoped || scope.Global {
+		return true, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT COALESCE(c.legal_entity_id::text, ''), COALESCE(c.store_id::text, ''),
+		       COALESCE(s.region, ''), COALESCE(s.brand, '')
+		FROM journal_entries e
+		JOIN lease_contracts c ON c.id = e.contract_id
+		LEFT JOIN stores s ON s.id = c.store_id
+		WHERE e.batch_id = $1
+	`, batchID)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	found := false
+	for rows.Next() {
+		found = true
+		var attributes access.ContractAttributes
+		if err := rows.Scan(&attributes.LegalEntityID, &attributes.StoreID, &attributes.Region, &attributes.Brand); err != nil {
+			return false, err
+		}
+		if !scope.AllowsContract(attributes) {
+			return false, nil
+		}
+	}
+	return found, rows.Err()
+}
+
 func (r *MonthlyClosingRepository) CreateBatch(ctx context.Context, batch *MonthlyClosingBatch) (*MonthlyClosingBatch, error) {
 	batch.ID = uuid.New().String()
 	batch.Status = "draft"
@@ -193,7 +248,24 @@ func (r *MonthlyClosingRepository) GetBatches(ctx context.Context, period, legal
 		}
 		batches = append(batches, b)
 	}
-	return batches, nil
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if _, scoped := access.ScopeFromContext(ctx); !scoped {
+		return batches, nil
+	}
+	filtered := make([]*MonthlyClosingBatch, 0, len(batches))
+	for _, batch := range batches {
+		allowed, err := r.batchAllowed(ctx, batch.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate batch access: %w", err)
+		}
+		if allowed {
+			filtered = append(filtered, batch)
+		}
+	}
+	return filtered, nil
 }
 
 // GetReusableBatch returns the latest unfinalized batch for the exact close
@@ -232,6 +304,15 @@ func (r *MonthlyClosingRepository) GetReusableBatch(ctx context.Context, period,
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reusable batch: %w", err)
+	}
+	if _, scoped := access.ScopeFromContext(ctx); scoped {
+		allowed, err := r.batchAllowed(ctx, b.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate reusable batch access: %w", err)
+		}
+		if !allowed {
+			return nil, nil
+		}
 	}
 	return b, nil
 }
@@ -506,31 +587,35 @@ func tenantOwnsContractClause(legalEntityID, placeholder string) string {
 
 func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contractID, period, status string) ([]*JournalEntry, error) {
 	query := `
-		SELECT id, contract_id, measurement_result_id, accounting_period, entry_date,
-			entry_type, debit_account, credit_account, amount, currency,
-			description, voucher_number, posting_status, posted_at, posted_by,
-			approved_by, approved_at, erp_reference, batch_id, created_at, updated_at
-		FROM journal_entries WHERE 1=1
+		SELECT je.id, je.contract_id, je.measurement_result_id, je.accounting_period, je.entry_date,
+			je.entry_type, je.debit_account, je.credit_account, je.amount, je.currency,
+			je.description, je.voucher_number, je.posting_status, je.posted_at, je.posted_by,
+			je.approved_by, je.approved_at, je.erp_reference, je.batch_id, je.created_at, je.updated_at
+		FROM journal_entries je
+		JOIN lease_contracts lc ON lc.id = je.contract_id
+		WHERE 1=1
 	`
 	var args []interface{}
 	argIdx := 1
 
 	if contractID != "" {
-		query += fmt.Sprintf(" AND contract_id = $%d", argIdx)
+		query += fmt.Sprintf(" AND je.contract_id = $%d", argIdx)
 		args = append(args, contractID)
 		argIdx++
 	}
 	if period != "" {
-		query += fmt.Sprintf(" AND accounting_period = $%d", argIdx)
+		query += fmt.Sprintf(" AND je.accounting_period = $%d", argIdx)
 		args = append(args, period)
 		argIdx++
 	}
 	if status != "" {
-		query += fmt.Sprintf(" AND posting_status = $%d", argIdx)
+		query += fmt.Sprintf(" AND je.posting_status = $%d", argIdx)
 		args = append(args, status)
 		argIdx++
 	}
-	query += " ORDER BY entry_date ASC, entry_type ASC"
+	query, args, argIdx = appendContractScopePredicate(ctx, query, args, argIdx, "lc")
+	_ = argIdx
+	query += " ORDER BY je.entry_date ASC, je.entry_type ASC"
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -568,11 +653,12 @@ func (r *MonthlyClosingRepository) GetJournalEntriesForExport(ctx context.Contex
 	var args []interface{}
 	argIdx := 1
 
-	if legalEntityID != "" {
+	if _, scoped := access.ScopeFromContext(ctx); !scoped && legalEntityID != "" {
 		query += fmt.Sprintf(" AND lc.legal_entity_id = $%d", argIdx)
 		args = append(args, legalEntityID)
 		argIdx++
 	}
+	query, args, argIdx = appendContractScopePredicate(ctx, query, args, argIdx, "lc")
 	if period != "" {
 		query += fmt.Sprintf(" AND je.accounting_period = $%d", argIdx)
 		args = append(args, period)
@@ -610,6 +696,13 @@ func (r *MonthlyClosingRepository) GetJournalEntriesForExport(ctx context.Contex
 
 // ApproveJournalEntry approves a single journal entry in draft status
 func (r *MonthlyClosingRepository) ApproveJournalEntry(ctx context.Context, entryID string, userID string) error {
+	allowed, err := r.journalEntryAllowed(ctx, entryID)
+	if err != nil {
+		return fmt.Errorf("failed to validate journal entry access: %w", err)
+	}
+	if !allowed {
+		return fmt.Errorf("journal entry not found or not in draft status")
+	}
 	query := `
 		UPDATE journal_entries SET
 			posting_status = 'approved',
@@ -630,6 +723,13 @@ func (r *MonthlyClosingRepository) ApproveJournalEntry(ctx context.Context, entr
 
 // PostJournalEntry posts an approved journal entry
 func (r *MonthlyClosingRepository) PostJournalEntry(ctx context.Context, entryID string, userID string, erpRef string) error {
+	allowed, err := r.journalEntryAllowed(ctx, entryID)
+	if err != nil {
+		return fmt.Errorf("failed to validate journal entry access: %w", err)
+	}
+	if !allowed {
+		return fmt.Errorf("journal entry not found or not in approved status")
+	}
 	query := `
 		UPDATE journal_entries SET
 			posting_status = 'posted',
@@ -656,6 +756,13 @@ func (r *MonthlyClosingRepository) PostJournalEntry(ctx context.Context, entryID
 }
 
 func (r *MonthlyClosingRepository) ApplyERPWriteback(ctx context.Context, entryID, userID, erpReference, voucherNumber string) error {
+	allowed, err := r.journalEntryAllowed(ctx, entryID)
+	if err != nil {
+		return fmt.Errorf("failed to validate journal entry access: %w", err)
+	}
+	if !allowed {
+		return fmt.Errorf("journal entry not found or not approved")
+	}
 	query := `
 		UPDATE journal_entries SET
 			posting_status = 'posted',
@@ -690,6 +797,13 @@ func (r *MonthlyClosingRepository) ApplyERPWriteback(ctx context.Context, entryI
 
 // ApproveBatchEntries approves all draft journal entries in a batch
 func (r *MonthlyClosingRepository) ApproveBatchEntries(ctx context.Context, batchID string, userID string) (int, error) {
+	allowed, err := r.batchAllowed(ctx, batchID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to validate batch access: %w", err)
+	}
+	if !allowed {
+		return 0, fmt.Errorf("batch not found")
+	}
 	query := `
 		UPDATE journal_entries SET
 			posting_status = 'approved',
@@ -707,6 +821,13 @@ func (r *MonthlyClosingRepository) ApproveBatchEntries(ctx context.Context, batc
 
 // PostBatchEntries posts all approved journal entries in a batch
 func (r *MonthlyClosingRepository) PostBatchEntries(ctx context.Context, batchID string, userID string) (int, error) {
+	allowed, err := r.batchAllowed(ctx, batchID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to validate batch access: %w", err)
+	}
+	if !allowed {
+		return 0, fmt.Errorf("batch not found")
+	}
 	query := `
 		UPDATE journal_entries SET
 			posting_status = 'posted',

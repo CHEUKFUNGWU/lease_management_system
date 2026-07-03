@@ -30,7 +30,7 @@ export default function AdminLoginPage() {
     setLoading(true);
     try {
       const data = await authApi.login(values.username, values.password);
-      if (data.role !== "admin") {
+      if (!(data.roles || [data.role]).includes("admin")) {
         message.error(t("admin_login.not_admin", language));
         setLoading(false);
         return;
@@ -39,6 +39,7 @@ export default function AdminLoginPage() {
         id: data.user_id || "",
         username: data.username,
         role: data.role,
+        roles: data.roles || [data.role],
         legal_entity_id: data.legal_entity_id || undefined,
       });
       message.success(t("admin_login.success", language));

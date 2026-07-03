@@ -95,7 +95,7 @@ func (h *MonthlyClosingHandler) ApproveEntry(c *gin.Context) {
 	}
 	// Audit log
 	if h.auditLogger != nil {
-		h.auditLogger.Log(c.Request.Context(), "journal_entries", entryID, "approve", nil, nil, userIDStr, c)
+		h.auditLogger.Log(c.Request.Context(), "journal_entries", entryID, "approve", nil, approvalAuditValues(c, nil), userIDStr, c)
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "分录审批成功", "entry_id": entryID})
 }
@@ -132,6 +132,9 @@ func (h *MonthlyClosingHandler) ApproveBatch(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c.Request.Context(), "monthly_closing_batches", batchID, "approve", nil, approvalAuditValues(c, map[string]interface{}{"approved_count": count}), userIDStr, c)
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "批次审批成功", "approved_count": count})
 }

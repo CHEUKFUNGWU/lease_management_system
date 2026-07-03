@@ -25,7 +25,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "../context/AuthContext";
+import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { pageTransition } from "../design-system/animations";
@@ -146,7 +146,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     label: <Link href="/admin/users">{t("nav.admin", language)}</Link>,
   };
 
-  const menuItems = user?.role === "admin"
+  const menuItems = hasRole(user, "admin")
     ? [...baseMenuItems, adminMenuItem]
     : baseMenuItems;
 

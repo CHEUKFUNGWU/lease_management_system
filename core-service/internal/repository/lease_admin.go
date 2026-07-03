@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 type CriticalDate struct {
@@ -157,7 +158,32 @@ func (r *LeaseAdminRepository) ListUpcomingCriticalDates(ctx context.Context, le
 	`
 	args := []interface{}{days}
 	argIdx := 2
-	if legalEntityID != "" {
+	if scope, scoped := access.ScopeFromContext(ctx); scoped {
+		if !scope.Global {
+			if scope.LegalEntityID == "" {
+				query += " AND false"
+			} else {
+				query += fmt.Sprintf(" AND lc.legal_entity_id::text = $%d", argIdx)
+				args = append(args, scope.LegalEntityID)
+				argIdx++
+			}
+			if len(scope.StoreIDs) > 0 {
+				query += fmt.Sprintf(" AND lc.store_id::text = ANY($%d)", argIdx)
+				args = append(args, scope.StoreIDs)
+				argIdx++
+			}
+			if len(scope.Regions) > 0 {
+				query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM stores s WHERE s.id = lc.store_id AND s.region = ANY($%d))", argIdx)
+				args = append(args, scope.Regions)
+				argIdx++
+			}
+			if len(scope.Brands) > 0 {
+				query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM stores s WHERE s.id = lc.store_id AND s.brand = ANY($%d))", argIdx)
+				args = append(args, scope.Brands)
+				argIdx++
+			}
+		}
+	} else if legalEntityID != "" {
 		query += fmt.Sprintf(" AND lc.legal_entity_id = $%d", argIdx)
 		args = append(args, legalEntityID)
 		argIdx++
@@ -188,7 +214,7 @@ func (r *LeaseAdminRepository) ListUpcomingCriticalDates(ctx context.Context, le
 	return items, nil
 }
 
-func (r *LeaseAdminRepository) UpdateCriticalDateStatus(ctx context.Context, id, status, userID string) error {
+func (r *LeaseAdminRepository) UpdateCriticalDateStatus(ctx context.Context, id, contractID, status, userID string) error {
 	now := time.Now()
 	query := `
 		UPDATE critical_dates
@@ -196,10 +222,16 @@ func (r *LeaseAdminRepository) UpdateCriticalDateStatus(ctx context.Context, id,
 			completed_at = CASE WHEN $2 = 'completed' THEN $3 ELSE completed_at END,
 			completed_by = CASE WHEN $2 = 'completed' THEN $4 ELSE completed_by END,
 			updated_at = $3
-		WHERE id = $1
+		WHERE id = $1 AND contract_id = $5
 	`
-	_, err := r.db.Exec(ctx, query, id, status, now, userID)
-	return err
+	result, err := r.db.Exec(ctx, query, id, status, now, userID, contractID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("critical date not found")
+	}
+	return nil
 }
 
 func (r *LeaseAdminRepository) CreateDocument(ctx context.Context, doc *LeaseDocument) (*LeaseDocument, error) {
@@ -323,12 +355,18 @@ func (r *LeaseAdminRepository) ListObligations(ctx context.Context, contractID s
 	return items, nil
 }
 
-func (r *LeaseAdminRepository) UpdateObligationStatus(ctx context.Context, id, status string) error {
+func (r *LeaseAdminRepository) UpdateObligationStatus(ctx context.Context, id, contractID, status string) error {
 	query := `
 		UPDATE lease_obligations
 		SET status = $2, updated_at = NOW()
-		WHERE id = $1
+		WHERE id = $1 AND contract_id = $3
 	`
-	_, err := r.db.Exec(ctx, query, id, status)
-	return err
+	result, err := r.db.Exec(ctx, query, id, status, contractID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("lease obligation not found")
+	}
+	return nil
 }

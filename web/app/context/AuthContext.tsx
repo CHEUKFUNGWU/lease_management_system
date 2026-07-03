@@ -2,11 +2,16 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
-interface User {
+export interface User {
   id: string;
   username: string;
   role: string;
+  roles?: string[];
   legal_entity_id?: string;
+}
+
+export function hasRole(user: User | null | undefined, role: string): boolean {
+  return user?.roles?.includes(role) || user?.role === role;
 }
 
 interface AuthContextType {

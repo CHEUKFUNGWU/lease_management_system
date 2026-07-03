@@ -1,0 +1,3 @@
+# Use authoritative role assignments and fail-closed access policy
+
+Users may hold multiple roles, so role assignments are the authority for effective permissions rather than the legacy single-role field on a user. Access is fail-closed at the HTTP seam; a non-administrator's legal entity is the maximum access set, optional store/region/brand scopes only narrow it, and missing narrower scopes allow the full assigned legal entity. Editors and Reviewers may be the same person for MVP operations, but final Approvers must differ from creators and reviewers unless a System Admin supplies a reason that is recorded in the audit trail.

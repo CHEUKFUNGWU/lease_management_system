@@ -44,7 +44,7 @@ import {
 import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { contractApi, paymentScheduleApi, eventApi, leaseAdminApi } from "../../lib/api";
-import { useAuth } from "../../context/AuthContext";
+import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
 import { parseTagString, normalizeTagValues, DEFAULT_TAG_SUGGESTIONS } from "../../lib/tags";
@@ -167,6 +167,9 @@ export default function ContractDetailPage() {
   const { token, user } = useAuth();
   const { language } = useLanguage();
   const contractId = params.id as string;
+  const canEdit = hasRole(user, "editor") || hasRole(user, "admin");
+  const canReview = hasRole(user, "reviewer") || hasRole(user, "admin");
+  const canApprove = hasRole(user, "approver") || hasRole(user, "admin");
 
   const [contract, setContract] = useState<ContractDetail | null>(null);
   const [schedules, setSchedules] = useState<PaymentSchedule[]>([]);
@@ -1051,7 +1054,7 @@ export default function ContractDetailPage() {
                     extra={
                       <Space>
                         {/* Approval workflow buttons */}
-                        {user && contract.approval_status === 'draft' && (user.role === 'editor' || user.role === 'admin') && (
+                        {contract.approval_status === 'draft' && canEdit && (
                           <Button
                             type="primary"
                             onClick={handleSubmitForReview}
@@ -1061,7 +1064,7 @@ export default function ContractDetailPage() {
                           </Button>
                         )}
 
-                        {user && contract.approval_status === 'submitted' && (user.role === 'reviewer' || user.role === 'admin') && (
+                        {contract.approval_status === 'submitted' && canReview && (
                           <>
                             <Button
                               type="primary"
@@ -1079,7 +1082,7 @@ export default function ContractDetailPage() {
                           </>
                         )}
 
-                        {user && (contract.approval_status === 'reviewed' || contract.approval_status === 'pending_approval') && (user.role === 'approver' || user.role === 'admin') && (
+                        {(contract.approval_status === 'reviewed' || contract.approval_status === 'pending_approval') && canApprove && (
                           <>
                             <Button
                               type="primary"
@@ -1097,7 +1100,7 @@ export default function ContractDetailPage() {
                           </>
                         )}
 
-                        {user && contract.approval_status === 'rejected' && (user.role === 'editor' || user.role === 'admin') && (
+                        {contract.approval_status === 'rejected' && canEdit && (
                           <Button
                             type="primary"
                             onClick={handleSubmitForReview}
@@ -1107,7 +1110,7 @@ export default function ContractDetailPage() {
                           </Button>
                         )}
 
-                        {user && (contract.approval_status === 'draft' || contract.approval_status === 'rejected') && (user.role === 'editor' || user.role === 'admin') && (
+                        {(contract.approval_status === 'draft' || contract.approval_status === 'rejected') && canEdit && (
                           <Button
                             icon={<EditOutlined />}
                             onClick={handleEditOpen}
@@ -1665,10 +1668,10 @@ export default function ContractDetailPage() {
                                   {(event.approval_status === "submitted" || event.approval_status === "reviewed") && isModifiable && (
                                     <Button size="small" onClick={() => handlePreviewAdjustment(event.id)} loading={previewLoading}>{t("contract.preview_impact", language)}</Button>
                                   )}
-                                  {event.approval_status === "draft" && isModifiable && (user?.role === "editor" || user?.role === "admin") && (
+                                  {event.approval_status === "draft" && isModifiable && canEdit && (
                                     <Button size="small" onClick={() => handleRecalculateEvent(event.id)}>{t("contract.recalculate", language)}</Button>
                                   )}
-                                  {user && event.approval_status === 'draft' && (user.role === 'editor' || user.role === 'admin') && (
+                                  {event.approval_status === 'draft' && canEdit && (
                                     <Button
                                       size="small"
                                       type="primary"
@@ -1678,7 +1681,7 @@ export default function ContractDetailPage() {
                                       {t("contract.submit_review", language)}
                                     </Button>
                                   )}
-                                  {user && event.approval_status === 'submitted' && (user.role === 'reviewer' || user.role === 'admin') && (
+                                  {event.approval_status === 'submitted' && canReview && (
                                     <>
                                       <Button
                                         size="small"
@@ -1697,7 +1700,7 @@ export default function ContractDetailPage() {
                                       </Button>
                                     </>
                                   )}
-                                  {user && event.approval_status === 'reviewed' && (user.role === 'approver' || user.role === 'admin') && (
+                                  {event.approval_status === 'reviewed' && canApprove && (
                                     <>
                                       <Button
                                         size="small"
@@ -1716,7 +1719,7 @@ export default function ContractDetailPage() {
                                       </Button>
                                     </>
                                   )}
-                                  {user && event.approval_status === 'rejected' && (user.role === 'editor' || user.role === 'admin') && (
+                                  {event.approval_status === 'rejected' && canEdit && (
                                     <Button
                                       size="small"
                                       type="primary"

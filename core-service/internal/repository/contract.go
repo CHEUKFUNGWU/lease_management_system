@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 type Contract struct {
@@ -79,6 +80,60 @@ func NewContractRepository(db DBTX) *ContractRepository {
 
 func (r *ContractRepository) WithTx(tx DBTX) *ContractRepository {
 	return &ContractRepository{db: tx}
+}
+
+func (r *ContractRepository) GetContractAttributes(ctx context.Context, contractID string) (access.ContractAttributes, bool, error) {
+	var attributes access.ContractAttributes
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(c.legal_entity_id::text, ''), COALESCE(c.store_id::text, ''),
+		       COALESCE(s.region, ''), COALESCE(s.brand, '')
+		FROM lease_contracts c
+		LEFT JOIN stores s ON s.id = c.store_id
+		WHERE c.id = $1
+	`, contractID).Scan(&attributes.LegalEntityID, &attributes.StoreID, &attributes.Region, &attributes.Brand)
+	if err == pgx.ErrNoRows {
+		return access.ContractAttributes{}, false, nil
+	}
+	if err != nil {
+		return access.ContractAttributes{}, false, fmt.Errorf("failed to load contract access attributes: %w", err)
+	}
+	return attributes, true, nil
+}
+
+func (r *ContractRepository) valuesAttributes(ctx context.Context, legalEntityID, storeID *string) (access.ContractAttributes, error) {
+	attributes := access.ContractAttributes{}
+	if legalEntityID != nil {
+		attributes.LegalEntityID = *legalEntityID
+	}
+	if storeID == nil || *storeID == "" {
+		return attributes, nil
+	}
+	attributes.StoreID = *storeID
+	var storeLegalEntityID string
+	err := r.db.QueryRow(ctx, `
+		SELECT legal_entity_id::text, COALESCE(region, ''), COALESCE(brand, '')
+		FROM stores
+		WHERE id = $1
+	`, *storeID).Scan(&storeLegalEntityID, &attributes.Region, &attributes.Brand)
+	if err != nil {
+		return access.ContractAttributes{}, err
+	}
+	if attributes.LegalEntityID == "" || storeLegalEntityID != attributes.LegalEntityID {
+		return access.ContractAttributes{}, fmt.Errorf("store does not belong to contract legal entity")
+	}
+	return attributes, nil
+}
+
+func (r *ContractRepository) scopeAllowsValues(ctx context.Context, legalEntityID, storeID *string) (bool, error) {
+	attributes, err := r.valuesAttributes(ctx, legalEntityID, storeID)
+	if err != nil {
+		return false, err
+	}
+	scope, scoped := access.ScopeFromContext(ctx)
+	if !scoped {
+		return true, nil
+	}
+	return scope.AllowsContract(attributes), nil
 }
 
 func autoCode(prefix string) string {
@@ -193,6 +248,13 @@ func (r *ContractRepository) ResolveOrCreateLandlordID(ctx context.Context, name
 }
 
 func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*Contract, error) {
+	allowed, err := r.scopeAllowsValues(ctx, contract.LegalEntityID, contract.StoreID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate contract access: %w", err)
+	}
+	if !allowed {
+		return nil, fmt.Errorf("contract is outside the assigned data scope")
+	}
 	contract.ID = uuid.New().String()
 	contract.Status = "draft"
 	if contract.ApprovalStatus == "" {
@@ -231,7 +293,7 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 			included_in_reporting, report_mode
 	`
 
-	err := r.db.QueryRow(ctx, query,
+	err = r.db.QueryRow(ctx, query,
 		contract.ID, contract.ContractNumber, contract.ContractName,
 		contract.LegalEntityID, contract.StoreID, contract.LandlordID,
 		contract.LesseeName, contract.LessorName, contract.StoreName,
@@ -269,8 +331,46 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 type ListContractsFilter struct {
 	Search    string // search in contract_number, contract_name, lessee_name, lessor_name, store_name
 	Status    string // filter by exact approval_status
+	Statuses  []string
 	SortBy    string // sort column: contract_number, commencement_date, lease_end_date, approval_status, created_at
 	SortOrder string // asc or desc
+}
+
+func appendContractScopeConditions(ctx context.Context, legalEntityID string, conditions []string, args []interface{}, argIdx int) ([]string, []interface{}, int) {
+	scope, scoped := access.ScopeFromContext(ctx)
+	if !scoped {
+		if legalEntityID != "" {
+			conditions = append(conditions, fmt.Sprintf("legal_entity_id = $%d", argIdx))
+			args = append(args, legalEntityID)
+			argIdx++
+		}
+		return conditions, args, argIdx
+	}
+	if scope.Global {
+		return conditions, args, argIdx
+	}
+	if scope.LegalEntityID == "" {
+		return append(conditions, "FALSE"), args, argIdx
+	}
+	conditions = append(conditions, fmt.Sprintf("legal_entity_id::text = $%d", argIdx))
+	args = append(args, scope.LegalEntityID)
+	argIdx++
+	if len(scope.StoreIDs) > 0 {
+		conditions = append(conditions, fmt.Sprintf("store_id::text = ANY($%d)", argIdx))
+		args = append(args, scope.StoreIDs)
+		argIdx++
+	}
+	if len(scope.Regions) > 0 {
+		conditions = append(conditions, fmt.Sprintf("EXISTS (SELECT 1 FROM stores access_store WHERE access_store.id = lease_contracts.store_id AND access_store.region = ANY($%d))", argIdx))
+		args = append(args, scope.Regions)
+		argIdx++
+	}
+	if len(scope.Brands) > 0 {
+		conditions = append(conditions, fmt.Sprintf("EXISTS (SELECT 1 FROM stores access_store WHERE access_store.id = lease_contracts.store_id AND access_store.brand = ANY($%d))", argIdx))
+		args = append(args, scope.Brands)
+		argIdx++
+	}
+	return conditions, args, argIdx
 }
 
 // allowedSortColumns defines the whitelist of columns that can be used for sorting.
@@ -308,17 +408,17 @@ func (r *ContractRepository) List(ctx context.Context, legalEntityID string, fil
 	var args []interface{}
 	argIdx := 1
 
-	// Tenant filter
-	if legalEntityID != "" {
-		conditions = append(conditions, fmt.Sprintf("legal_entity_id = $%d", argIdx))
-		args = append(args, legalEntityID)
-		argIdx++
-	}
+	conditions, args, argIdx = appendContractScopeConditions(ctx, legalEntityID, conditions, args, argIdx)
 
 	// Status filter
 	if filter.Status != "" {
 		conditions = append(conditions, fmt.Sprintf("approval_status = $%d", argIdx))
 		args = append(args, filter.Status)
+		argIdx++
+	}
+	if len(filter.Statuses) > 0 {
+		conditions = append(conditions, fmt.Sprintf("approval_status = ANY($%d)", argIdx))
+		args = append(args, filter.Statuses)
 		argIdx++
 	}
 
@@ -397,6 +497,9 @@ func (r *ContractRepository) GetAll(ctx context.Context, legalEntityID string) (
 func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []string, legalEntityID string) ([]*Contract, error) {
 	if len(statuses) == 0 {
 		return r.GetAll(ctx, legalEntityID)
+	}
+	if _, scoped := access.ScopeFromContext(ctx); scoped {
+		return r.List(ctx, legalEntityID, ListContractsFilter{Statuses: statuses})
 	}
 
 	var query string
@@ -491,6 +594,22 @@ func (r *ContractRepository) Update(ctx context.Context, contract *Contract, leg
 	}
 	if contract.AssetType == "" {
 		contract.AssetType = "real_estate"
+	}
+	if scope, scoped := access.ScopeFromContext(ctx); scoped {
+		current, found, err := r.GetContractAttributes(ctx, contract.ID)
+		if err != nil {
+			return err
+		}
+		if !found || !scope.AllowsContract(current) {
+			return fmt.Errorf("contract not found")
+		}
+		allowed, err := r.scopeAllowsValues(ctx, contract.LegalEntityID, contract.StoreID)
+		if err != nil {
+			return fmt.Errorf("failed to validate updated contract access: %w", err)
+		}
+		if !allowed {
+			return fmt.Errorf("updated contract is outside the assigned data scope")
+		}
 	}
 
 	// Verify contract exists and is editable
@@ -664,6 +783,15 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get contract: %w", err)
+	}
+	if scope, scoped := access.ScopeFromContext(ctx); scoped {
+		attributes, attrErr := r.valuesAttributes(ctx, c.LegalEntityID, c.StoreID)
+		if attrErr != nil {
+			return nil, fmt.Errorf("failed to validate contract access: %w", attrErr)
+		}
+		if !scope.AllowsContract(attributes) {
+			return nil, nil
+		}
 	}
 
 	return c, nil

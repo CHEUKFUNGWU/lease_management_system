@@ -39,7 +39,7 @@ import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { monthlyClosingApi } from "../lib/api";
-import { useAuth } from "../context/AuthContext";
+import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 
@@ -114,10 +114,9 @@ export default function MonthlyClosingPage() {
   const [writebackText, setWritebackText] = useState("");
   const [writebackLoading, setWritebackLoading] = useState(false);
 
-  const role = user?.role || "";
-  const isAdmin = role === "admin";
-  const isApprover = role === "approver" || isAdmin;
-  const isReviewer = role === "reviewer" || isApprover;
+  const isAdmin = hasRole(user, "admin");
+  const isApprover = hasRole(user, "approver") || isAdmin;
+  const isReviewer = hasRole(user, "reviewer") || isApprover;
   const canManage = isReviewer;
 
   const checkLockStatus = useCallback(

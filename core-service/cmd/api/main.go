@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -46,6 +47,8 @@ func main() {
 	systemSettingRepo := repository.NewSystemSettingRepository(database.Pool)
 	leaseAdminRepo := repository.NewLeaseAdminRepository(database.Pool)
 	aiChatRuntimeRepo := repository.NewAIChatRuntimeRepository(database.Pool)
+	masterDataRepo := repository.NewMasterDataRepository(database.Pool)
+	accessPolicyRepo := repository.NewAccessPolicyRepository(database.Pool)
 
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
@@ -55,7 +58,7 @@ func main() {
 	eventPersistence := eventaccounting.NewPersistenceService(database.Pool, mcRepo, eventRepo, auditLogger)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(cfg, userRepo)
+	authHandler := handlers.NewAuthHandler(cfg, userRepo, roleRepo)
 	contractHandler := handlers.NewContractHandler(contractRepo, auditLogger)
 	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo, systemSettingRepo)
 	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
@@ -67,6 +70,7 @@ func main() {
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
+	masterDataHandler := handlers.NewMasterDataHandler(masterDataRepo)
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -100,152 +104,139 @@ func main() {
 	r.POST("/api/v1/auth/register", authHandler.Register)
 	r.POST("/api/v1/auth/login", authHandler.Login)
 
-	// Public: list active legal entities for registration
-	r.GET("/api/v1/legal-entities", func(c *gin.Context) {
-		rows, err := database.Pool.Query(c.Request.Context(),
-			`SELECT id, code, name, country, currency FROM legal_entities WHERE is_active = true ORDER BY code`)
-		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to fetch legal entities"})
-			return
-		}
-		defer rows.Close()
-
-		type LegalEntity struct {
-			ID       string `json:"id"`
-			Code     string `json:"code"`
-			Name     string `json:"name"`
-			Country  string `json:"country"`
-			Currency string `json:"currency"`
-		}
-
-		var entities []LegalEntity
-		for rows.Next() {
-			var e LegalEntity
-			if err := rows.Scan(&e.ID, &e.Code, &e.Name, &e.Country, &e.Currency); err != nil {
-				continue
-			}
-			entities = append(entities, e)
-		}
-		c.JSON(200, gin.H{"legal_entities": entities})
-	})
-
 	// Protected routes
 	api := r.Group("/api/v1")
 	api.Use(middleware.JWTAuth(cfg.JWTSecret))
+	api.Use(middleware.LoadUserPermissions(roleRepo))
+	api.Use(middleware.DataScopeMiddleware())
 	api.Use(middleware.TenantMiddleware())
 	{
-		api.GET("/me", handlers.GetCurrentUser())
+		protected := middleware.NewProtectedRouter(api)
+		permission := func(resource, action string) middleware.Permission {
+			return middleware.Permission{Resource: resource, Action: action}
+		}
+		contractScope := middleware.RequireContractScope(contractRepo, "id")
+		contractApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "contract", "id")
+		eventApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "event", "eventId")
+		entryApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "journal_entry", "id")
+		batchApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "monthly_batch", "id")
+		protected.Handle(http.MethodGet, "/me", permission("identity", "read"), handlers.GetCurrentUser())
 
 		// Contracts
-		api.POST("/contracts", contractHandler.Create)
-		api.POST("/contracts/batch", contractHandler.CreateBatch)
-		api.GET("/contracts", contractHandler.GetAll)
-		api.GET("/contracts/:id", contractHandler.GetByID)
-		api.PUT("/contracts/:id", contractHandler.Update)
+		protected.Handle(http.MethodPost, "/contracts", permission("contracts", "create"), contractHandler.Create)
+		protected.Handle(http.MethodPost, "/contracts/batch", permission("contracts", "create"), contractHandler.CreateBatch)
+		protected.Handle(http.MethodGet, "/contracts", permission("contracts", "read"), contractHandler.GetAll)
+		protected.Handle(http.MethodGet, "/contracts/:id", permission("contracts", "read"), contractScope, contractHandler.GetByID)
+		protected.Handle(http.MethodPut, "/contracts/:id", permission("contracts", "update"), contractScope, contractHandler.Update)
 
 		// Calculations
-		api.POST("/contracts/:id/calculate", calcHandler.Calculate)
-		api.GET("/contracts/:id/schedule", calcHandler.GetAmortizationSchedule)
+		protected.Handle(http.MethodPost, "/contracts/:id/calculate", permission("calculations", "trigger"), contractScope, calcHandler.Calculate)
+		protected.Handle(http.MethodGet, "/contracts/:id/schedule", permission("calculations", "read"), contractScope, calcHandler.GetAmortizationSchedule)
 
 		// Approval workflow
-		api.POST("/contracts/:id/submit", approvalHandler.SubmitForReview)
-		api.POST("/contracts/:id/review", approvalHandler.Review)
-		api.POST("/contracts/:id/approve", approvalHandler.Approve)
-		api.POST("/contracts/:id/reject", approvalHandler.Reject)
-		api.GET("/contracts/:id/approval-status", approvalHandler.GetStatus)
-		api.GET("/contracts-by-status", approvalHandler.ListByStatus)
+		protected.Handle(http.MethodPost, "/contracts/:id/submit", permission("contracts", "submit"), contractScope, approvalHandler.SubmitForReview)
+		protected.Handle(http.MethodPost, "/contracts/:id/review", permission("contracts", "review"), contractScope, approvalHandler.Review)
+		protected.Handle(http.MethodPost, "/contracts/:id/approve", permission("contracts", "approve"), contractScope, contractApprovalSeparation, approvalHandler.Approve)
+		protected.Handle(http.MethodPost, "/contracts/:id/reject", permission("contracts", "approve"), contractScope, contractApprovalSeparation, approvalHandler.Reject)
+		protected.Handle(http.MethodGet, "/contracts/:id/approval-status", permission("contracts", "read"), contractScope, approvalHandler.GetStatus)
+		protected.Handle(http.MethodGet, "/contracts-by-status", permission("contracts", "read"), approvalHandler.ListByStatus)
 
 		// Discount Rate
-		api.GET("/contracts/:id/discount-rate-status", handlers.CheckDiscountRate(contractRepo))
-		api.POST("/contracts/:id/confirm-discount-rate", handlers.ConfirmDiscountRate(contractRepo))
+		protected.Handle(http.MethodGet, "/contracts/:id/discount-rate-status", permission("calculations", "read"), contractScope, handlers.CheckDiscountRate(contractRepo))
+		protected.Handle(http.MethodPost, "/contracts/:id/confirm-discount-rate", permission("calculations", "trigger"), contractScope, handlers.ConfirmDiscountRate(contractRepo))
 
 		// Payment Schedules
-		api.POST("/contracts/:id/payment-schedules", psHandler.Create)
-		api.GET("/contracts/:id/payment-schedules", psHandler.ListByContract)
+		protected.Handle(http.MethodPost, "/contracts/:id/payment-schedules", permission("payment_schedules", "create"), contractScope, psHandler.Create)
+		protected.Handle(http.MethodGet, "/contracts/:id/payment-schedules", permission("payment_schedules", "read"), contractScope, psHandler.ListByContract)
 
 		// Events
-		api.POST("/contracts/:id/events", eventHandler.Create)
-		api.GET("/contracts/:id/events", eventHandler.ListByContract)
+		protected.Handle(http.MethodPost, "/contracts/:id/events", permission("events", "create"), contractScope, eventHandler.Create)
+		protected.Handle(http.MethodGet, "/contracts/:id/events", permission("events", "read"), contractScope, eventHandler.ListByContract)
 
 		// Event approval workflow
-		api.POST("/contracts/:id/events/:eventId/submit", eventHandler.SubmitForReview)
-		api.POST("/contracts/:id/events/:eventId/review", eventHandler.Review)
-		api.POST("/contracts/:id/events/:eventId/approve", eventHandler.Approve)
-		api.POST("/contracts/:id/events/:eventId/reject", eventHandler.Reject)
+		protected.Handle(http.MethodPost, "/contracts/:id/events/:eventId/submit", permission("events", "submit"), contractScope, eventHandler.SubmitForReview)
+		protected.Handle(http.MethodPost, "/contracts/:id/events/:eventId/review", permission("events", "review"), contractScope, eventHandler.Review)
+		protected.Handle(http.MethodPost, "/contracts/:id/events/:eventId/approve", permission("events", "approve"), contractScope, eventApprovalSeparation, eventHandler.Approve)
+		protected.Handle(http.MethodPost, "/contracts/:id/events/:eventId/reject", permission("events", "approve"), contractScope, eventApprovalSeparation, eventHandler.Reject)
 
 		// Event IFRS 16 recalculation
-		api.POST("/contracts/:id/events/:eventId/recalculate", eventHandler.RecalculateEvent)
-		api.POST("/contracts/:id/events/:eventId/preview", eventHandler.PreviewEventAdjustment)
-		api.GET("/contracts/:id/events/:eventId/adjustment", eventHandler.GetEventAdjustment)
+		protected.Handle(http.MethodPost, "/contracts/:id/events/:eventId/recalculate", permission("calculations", "trigger"), contractScope, eventHandler.RecalculateEvent)
+		protected.Handle(http.MethodPost, "/contracts/:id/events/:eventId/preview", permission("calculations", "read"), contractScope, eventHandler.PreviewEventAdjustment)
+		protected.Handle(http.MethodGet, "/contracts/:id/events/:eventId/adjustment", permission("calculations", "read"), contractScope, eventHandler.GetEventAdjustment)
 
 		// Lease administration
-		api.GET("/lease-admin/critical-dates/upcoming", leaseAdminHandler.ListUpcomingCriticalDates)
-		api.POST("/contracts/:id/critical-dates", leaseAdminHandler.CreateCriticalDate)
-		api.GET("/contracts/:id/critical-dates", leaseAdminHandler.ListCriticalDates)
-		api.PATCH("/contracts/:id/critical-dates/:dateId/status", leaseAdminHandler.UpdateCriticalDateStatus)
-		api.POST("/contracts/:id/documents", leaseAdminHandler.CreateDocument)
-		api.GET("/contracts/:id/documents", leaseAdminHandler.ListDocuments)
-		api.POST("/contracts/:id/obligations", leaseAdminHandler.CreateObligation)
-		api.GET("/contracts/:id/obligations", leaseAdminHandler.ListObligations)
-		api.PATCH("/contracts/:id/obligations/:obligationId/status", leaseAdminHandler.UpdateObligationStatus)
+		protected.Handle(http.MethodGet, "/lease-admin/critical-dates/upcoming", permission("lease_admin", "read"), leaseAdminHandler.ListUpcomingCriticalDates)
+		protected.Handle(http.MethodPost, "/contracts/:id/critical-dates", permission("lease_admin", "create"), contractScope, leaseAdminHandler.CreateCriticalDate)
+		protected.Handle(http.MethodGet, "/contracts/:id/critical-dates", permission("lease_admin", "read"), contractScope, leaseAdminHandler.ListCriticalDates)
+		protected.Handle(http.MethodPatch, "/contracts/:id/critical-dates/:dateId/status", permission("lease_admin", "update"), contractScope, leaseAdminHandler.UpdateCriticalDateStatus)
+		protected.Handle(http.MethodPost, "/contracts/:id/documents", permission("lease_admin", "create"), contractScope, leaseAdminHandler.CreateDocument)
+		protected.Handle(http.MethodGet, "/contracts/:id/documents", permission("lease_admin", "read"), contractScope, leaseAdminHandler.ListDocuments)
+		protected.Handle(http.MethodPost, "/contracts/:id/obligations", permission("lease_admin", "create"), contractScope, leaseAdminHandler.CreateObligation)
+		protected.Handle(http.MethodGet, "/contracts/:id/obligations", permission("lease_admin", "read"), contractScope, leaseAdminHandler.ListObligations)
+		protected.Handle(http.MethodPatch, "/contracts/:id/obligations/:obligationId/status", permission("lease_admin", "update"), contractScope, leaseAdminHandler.UpdateObligationStatus)
 
 		// Reports
-		api.GET("/reports/liability-rolling", reportHandler.LiabilityRolling)
-		api.GET("/reports/liability-rolling/export", reportHandler.ExportLiabilityRolling)
-		api.GET("/reports/contract-summary", reportHandler.ContractSummary)
-		api.GET("/reports/portfolio-summary", reportHandler.PortfolioSummary)
-		api.GET("/reports/sensitivity", reportHandler.SensitivityAnalysis)
-		api.GET("/reports/standard-comparison", reportHandler.StandardComparison)
-		api.GET("/reports/amortization", reportHandler.Amortization)
-		api.GET("/reports/tags", reportHandler.Tags)
-		api.GET("/reports/tags/summary", reportHandler.TagSummary)
-		api.GET("/reports/cashflow-forecast", reportHandler.CashflowForecast)
+		protected.Handle(http.MethodGet, "/reports/liability-rolling", permission("reports", "read"), reportHandler.LiabilityRolling)
+		protected.Handle(http.MethodGet, "/reports/liability-rolling/export", permission("reports", "export"), reportHandler.ExportLiabilityRolling)
+		protected.Handle(http.MethodGet, "/reports/contract-summary", permission("reports", "read"), reportHandler.ContractSummary)
+		protected.Handle(http.MethodGet, "/reports/portfolio-summary", permission("reports", "read"), reportHandler.PortfolioSummary)
+		protected.Handle(http.MethodGet, "/reports/sensitivity", permission("reports", "read"), reportHandler.SensitivityAnalysis)
+		protected.Handle(http.MethodGet, "/reports/standard-comparison", permission("reports", "read"), reportHandler.StandardComparison)
+		protected.Handle(http.MethodGet, "/reports/amortization", permission("reports", "read"), reportHandler.Amortization)
+		protected.Handle(http.MethodGet, "/reports/tags", permission("reports", "read"), reportHandler.Tags)
+		protected.Handle(http.MethodGet, "/reports/tags/summary", permission("reports", "read"), reportHandler.TagSummary)
+		protected.Handle(http.MethodGet, "/reports/cashflow-forecast", permission("reports", "read"), reportHandler.CashflowForecast)
 
 		// Monthly Closing
-		api.POST("/monthly-closing/generate", monthlyClosingHandler.Generate)
-		api.GET("/monthly-closing/batches", monthlyClosingHandler.ListBatches)
-		api.GET("/monthly-closing/entries", monthlyClosingHandler.GetJournalEntries)
-		api.GET("/contracts/:id/measurement-results", monthlyClosingHandler.GetMeasurementResults)
+		protected.Handle(http.MethodPost, "/monthly-closing/generate", permission("monthly_closing", "generate"), monthlyClosingHandler.Generate)
+		protected.Handle(http.MethodGet, "/monthly-closing/batches", permission("monthly_closing", "read"), monthlyClosingHandler.ListBatches)
+		protected.Handle(http.MethodGet, "/monthly-closing/entries", permission("monthly_closing", "read"), monthlyClosingHandler.GetJournalEntries)
+		protected.Handle(http.MethodGet, "/contracts/:id/measurement-results", permission("calculations", "read"), contractScope, monthlyClosingHandler.GetMeasurementResults)
 
 		// Monthly Closing - Approval & Posting
-		api.POST("/monthly-closing/entries/:id/approve", monthlyClosingHandler.ApproveEntry)
-		api.POST("/monthly-closing/entries/:id/post", monthlyClosingHandler.PostEntry)
-		api.GET("/monthly-closing/entries/export", monthlyClosingHandler.ExportJournalEntries)
-		api.POST("/monthly-closing/erp-writeback", monthlyClosingHandler.ApplyERPWriteback)
-		api.POST("/monthly-closing/batches/:id/approve", monthlyClosingHandler.ApproveBatch)
-		api.POST("/monthly-closing/batches/:id/post", monthlyClosingHandler.PostBatch)
+		protected.Handle(http.MethodPost, "/monthly-closing/entries/:id/approve", permission("monthly_closing", "approve"), entryApprovalSeparation, monthlyClosingHandler.ApproveEntry)
+		protected.Handle(http.MethodPost, "/monthly-closing/entries/:id/post", permission("monthly_closing", "post"), monthlyClosingHandler.PostEntry)
+		protected.Handle(http.MethodGet, "/monthly-closing/entries/export", permission("monthly_closing", "export"), monthlyClosingHandler.ExportJournalEntries)
+		protected.Handle(http.MethodPost, "/monthly-closing/erp-writeback", permission("monthly_closing", "writeback"), monthlyClosingHandler.ApplyERPWriteback)
+		protected.Handle(http.MethodPost, "/monthly-closing/batches/:id/approve", permission("monthly_closing", "approve"), batchApprovalSeparation, monthlyClosingHandler.ApproveBatch)
+		protected.Handle(http.MethodPost, "/monthly-closing/batches/:id/post", permission("monthly_closing", "post"), monthlyClosingHandler.PostBatch)
 
 		// Monthly Closing - Period Locking
-		api.POST("/monthly-closing/periods/:period/lock", monthlyClosingHandler.LockPeriod)
-		api.POST("/monthly-closing/periods/:period/unlock", monthlyClosingHandler.UnlockPeriod)
-		api.GET("/monthly-closing/periods/:period/lock-status", monthlyClosingHandler.GetPeriodLockStatus)
+		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/lock", permission("monthly_closing", "lock"), monthlyClosingHandler.LockPeriod)
+		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/unlock", permission("monthly_closing", "unlock"), monthlyClosingHandler.UnlockPeriod)
+		protected.Handle(http.MethodGet, "/monthly-closing/periods/:period/lock-status", permission("monthly_closing", "read"), monthlyClosingHandler.GetPeriodLockStatus)
 
 		// AI Chat
-		api.POST("/ai/chat", aiChatHandler.Chat)
-		api.POST("/ai/chat/sessions", aiChatHandler.CreateSession)
-		api.GET("/ai/chat/sessions", aiChatHandler.ListSessions)
-		api.GET("/ai/chat/sessions/:id", aiChatHandler.GetSession)
-		api.POST("/ai/chat/sessions/:id/runs", aiChatHandler.CreateRun)
-		api.GET("/ai/chat/sessions/:id/runs", aiChatHandler.ListRuns)
-		api.POST("/ai/chat/continuations", aiChatHandler.CreateContinuation)
-		api.GET("/ai/chat/runs/:id/events", aiChatHandler.ListRunEvents)
-		api.GET("/ai/chat/runs/:id/stream", aiChatHandler.StreamRunEvents)
-		api.POST("/ai/chat/artifacts/:id/actions", aiChatHandler.CreateReviewAction)
+		protected.Handle(http.MethodPost, "/ai/chat", permission("ai_chat", "use"), aiChatHandler.Chat)
+		protected.Handle(http.MethodPost, "/ai/chat/sessions", permission("ai_chat", "use"), aiChatHandler.CreateSession)
+		protected.Handle(http.MethodGet, "/ai/chat/sessions", permission("ai_chat", "use"), aiChatHandler.ListSessions)
+		protected.Handle(http.MethodGet, "/ai/chat/sessions/:id", permission("ai_chat", "use"), aiChatHandler.GetSession)
+		protected.Handle(http.MethodPost, "/ai/chat/sessions/:id/runs", permission("ai_chat", "use"), aiChatHandler.CreateRun)
+		protected.Handle(http.MethodGet, "/ai/chat/sessions/:id/runs", permission("ai_chat", "use"), aiChatHandler.ListRuns)
+		protected.Handle(http.MethodPost, "/ai/chat/continuations", permission("ai_chat", "use"), aiChatHandler.CreateContinuation)
+		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/events", permission("ai_chat", "use"), aiChatHandler.ListRunEvents)
+		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/stream", permission("ai_chat", "use"), aiChatHandler.StreamRunEvents)
+		protected.Handle(http.MethodPost, "/ai/chat/artifacts/:id/actions", permission("ai_chat", "use"), aiChatHandler.CreateReviewAction)
 
 		// Audit Logs
-		api.GET("/audit-logs", auditHandler.List)
+		protected.Handle(http.MethodGet, "/audit-logs", permission("audit_logs", "read"), auditHandler.List)
 
 		// Admin: user management
-		api.GET("/admin/users", authHandler.AdminListUsers)
-		api.POST("/admin/users", authHandler.AdminCreateUser)
+		protected.Handle(http.MethodGet, "/admin/users", permission("users", "read"), authHandler.AdminListUsers)
+		protected.Handle(http.MethodPost, "/admin/users", permission("users", "create"), authHandler.AdminCreateUser)
 
 		// Roles & Permissions
-		api.GET("/roles", handlers.ListRoles(roleRepo))
-		api.GET("/my-permissions", handlers.GetMyPermissions(roleRepo))
+		protected.Handle(http.MethodGet, "/roles", permission("roles", "read"), handlers.ListRoles(roleRepo))
+		protected.Handle(http.MethodGet, "/my-permissions", permission("identity", "read"), handlers.GetMyPermissions(roleRepo))
+
+		// Master data
+		protected.Handle(http.MethodGet, "/master-data/legal-entities", permission("master_data", "read"), masterDataHandler.ListLegalEntities)
+		protected.Handle(http.MethodGet, "/master-data/stores", permission("master_data", "read"), masterDataHandler.ListStores)
+		protected.Handle(http.MethodGet, "/master-data/landlords", permission("master_data", "read"), masterDataHandler.ListLandlords)
 
 		// Global Settings
-		api.GET("/settings/global", settingsHandler.GetGlobal)
-		api.PUT("/settings/global", settingsHandler.UpdateGlobal)
+		protected.Handle(http.MethodGet, "/settings/global", permission("settings", "read"), settingsHandler.GetGlobal)
+		protected.Handle(http.MethodPut, "/settings/global", permission("settings", "update"), settingsHandler.UpdateGlobal)
 	}
 
 	port := cfg.Port
@@ -281,7 +272,7 @@ func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, X-Admin-Override-Reason, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, PATCH, DELETE")
 
 		if c.Request.Method == "OPTIONS" {

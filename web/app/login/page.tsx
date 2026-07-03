@@ -36,6 +36,7 @@ export default function LoginPage() {
         id: data.user_id || "",
         username: data.username,
         role: data.role,
+        roles: data.roles || [data.role],
         legal_entity_id: data.legal_entity_id || undefined,
       });
       message.success(t("login.success", language));

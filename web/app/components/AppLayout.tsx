@@ -146,7 +146,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     label: <Link href="/admin/users">{t("nav.admin", language)}</Link>,
   };
 
-  const menuItems = user?.role === "admin"
+  const menuItems = user && (user.roles?.includes("admin") || user.role === "admin")
     ? [...baseMenuItems, adminMenuItem]
     : baseMenuItems;
 

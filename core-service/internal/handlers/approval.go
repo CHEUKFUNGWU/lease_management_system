@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	
+
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
@@ -45,10 +45,14 @@ func (h *ApprovalHandler) SubmitForReview(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	if req.ContractID != c.Param("id") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id must match route contract"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, req.ContractID, legalEntityID)
 	if err != nil {
@@ -59,19 +63,19 @@ func (h *ApprovalHandler) SubmitForReview(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.approvalRepo.SubmitForReview(ctx, req.ContractID, userIDStr); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"contract_id": req.ContractID,
-		"status": "submitted",
-		"message": "合同已提交复核",
+		"status":      "submitted",
+		"message":     "合同已提交复核",
 	})
 	// Audit log
 	if h.auditLogger != nil {
@@ -85,10 +89,14 @@ func (h *ApprovalHandler) Review(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	if req.ContractID != c.Param("id") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id must match route contract"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, req.ContractID, legalEntityID)
 	if err != nil {
@@ -99,26 +107,26 @@ func (h *ApprovalHandler) Review(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.approvalRepo.Review(ctx, req.ContractID, userIDStr, req.Approved, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to review: " + err.Error()})
 		return
 	}
-	
+
 	status := "reviewed"
 	message := "复核通过，已送审"
 	if !req.Approved {
 		status = "returned_to_editor"
 		message = "已退回编辑"
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"contract_id": req.ContractID,
-		"status": status,
-		"message": message,
+		"status":      status,
+		"message":     message,
 	})
 	// Audit log
 	if h.auditLogger != nil {
@@ -136,10 +144,14 @@ func (h *ApprovalHandler) Approve(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	if req.ContractID != c.Param("id") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id must match route contract"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, req.ContractID, legalEntityID)
 	if err != nil {
@@ -150,23 +162,23 @@ func (h *ApprovalHandler) Approve(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.approvalRepo.Approve(ctx, req.ContractID, userIDStr); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to approve: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"contract_id": req.ContractID,
-		"status": "approved",
-		"message": "合同已审批通过",
+		"status":      "approved",
+		"message":     "合同已审批通过",
 	})
 	// Audit log
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, "approve", nil, nil, userIDStr, c)
+		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, "approve", nil, approvalAuditValues(c, nil), userIDStr, c)
 	}
 }
 
@@ -176,10 +188,14 @@ func (h *ApprovalHandler) Reject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	if req.ContractID != c.Param("id") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id must match route contract"})
+		return
+	}
+
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, req.ContractID, legalEntityID)
 	if err != nil {
@@ -190,23 +206,23 @@ func (h *ApprovalHandler) Reject(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
-	
+
 	if err := h.approvalRepo.Reject(ctx, req.ContractID, userIDStr, req.Reason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reject: " + err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"contract_id": req.ContractID,
-		"status": "rejected",
-		"message": "合同已驳回",
+		"status":      "rejected",
+		"message":     "合同已驳回",
 	})
 	// Audit log
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, "reject", nil, nil, userIDStr, c)
+		h.auditLogger.Log(ctx, "lease_contracts", req.ContractID, "reject", nil, approvalAuditValues(c, map[string]interface{}{"reason": req.Reason}), userIDStr, c)
 	}
 }
 
@@ -214,7 +230,7 @@ func (h *ApprovalHandler) GetStatus(c *gin.Context) {
 	id := c.Param("id")
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, id, legalEntityID)
 	if err != nil {
@@ -225,7 +241,7 @@ func (h *ApprovalHandler) GetStatus(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	status, err := h.approvalRepo.GetApprovalStatus(ctx, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get status: " + err.Error()})
@@ -235,7 +251,7 @@ func (h *ApprovalHandler) GetStatus(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, status)
 }
 
@@ -243,23 +259,24 @@ func (h *ApprovalHandler) ListByStatus(c *gin.Context) {
 	status := c.Query("status")
 	officialOnly := c.Query("official_only") == "true"
 	legalEntityID := middleware.GetTenantID(c)
-	
-	contracts, err := h.approvalRepo.ListByStatus(c.Request.Context(), status, officialOnly)
+	statuses := []string{}
+	if status != "" {
+		statuses = append(statuses, status)
+	}
+	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list: " + err.Error()})
 		return
 	}
-	
-	// Filter by tenant if legalEntityID is set (admin users have empty string = cross-tenant)
-	if legalEntityID != "" {
+	if officialOnly {
 		var filtered []*repository.Contract
-		for _, c := range contracts {
-			if c.LegalEntityID != nil && *c.LegalEntityID == legalEntityID {
-				filtered = append(filtered, c)
+		for _, contract := range contracts {
+			if contract.IsOfficialVersion {
+				filtered = append(filtered, contract)
 			}
 		}
 		contracts = filtered
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"data": contracts, "total": len(contracts)})
 }

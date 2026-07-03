@@ -26,15 +26,19 @@ func (l *Logger) WithTx(tx repository.DBTX) *Logger {
 // Metadata carries the request-scoped actor and origin of a change, decoupled
 // from any HTTP framework so services can audit without importing gin.
 type Metadata struct {
-	ChangedBy string
-	IPAddress string
-	UserAgent string
+	ChangedBy     string
+	LegalEntityID string
+	IPAddress     string
+	UserAgent     string
 }
 
 // MetadataFromGin extracts audit metadata from a gin request context.
 func MetadataFromGin(changedBy string, c *gin.Context) Metadata {
 	m := Metadata{ChangedBy: changedBy}
 	if c != nil {
+		if value, exists := c.Get("legal_entity_id"); exists {
+			m.LegalEntityID, _ = value.(string)
+		}
 		m.IPAddress = c.ClientIP()
 		m.UserAgent = c.Request.UserAgent()
 	}
@@ -51,15 +55,16 @@ func (l *Logger) Log(ctx context.Context, tableName, recordID, action string, ol
 // inside a transaction.
 func (l *Logger) LogEvent(ctx context.Context, tableName, recordID, action string, oldVals, newVals interface{}, meta Metadata) error {
 	log := &repository.AuditLog{
-		TableName: tableName,
-		RecordID:  recordID,
-		Action:    action,
-		OldValues: marshalJSON(oldVals),
-		NewValues: marshalJSON(newVals),
-		ChangedBy: strPtrOrNil(meta.ChangedBy),
-		ChangedAt: time.Now(),
-		IPAddress: strPtrOrNil(meta.IPAddress),
-		UserAgent: strPtrOrNil(meta.UserAgent),
+		TableName:     tableName,
+		RecordID:      recordID,
+		LegalEntityID: strPtrOrNil(meta.LegalEntityID),
+		Action:        action,
+		OldValues:     marshalJSON(oldVals),
+		NewValues:     marshalJSON(newVals),
+		ChangedBy:     strPtrOrNil(meta.ChangedBy),
+		ChangedAt:     time.Now(),
+		IPAddress:     strPtrOrNil(meta.IPAddress),
+		UserAgent:     strPtrOrNil(meta.UserAgent),
 	}
 	return l.repo.Create(ctx, log)
 }

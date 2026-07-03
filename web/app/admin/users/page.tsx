@@ -31,6 +31,7 @@ interface User {
   username: string;
   email: string;
   role: string;
+  roles?: string[];
   legal_entity_id?: string;
   is_active: boolean;
   created_at: string;
@@ -47,7 +48,7 @@ export default function AdminUsersPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!user || user.role !== "admin") {
+    if (!user || !(user.roles?.includes("admin") || user.role === "admin")) {
       message.error(t("admin_users.need_admin", language));
       router.push("/login");
       return;
@@ -70,8 +71,9 @@ export default function AdminUsersPage() {
   };
 
   const fetchLegalEntities = async () => {
+    if (!token) return;
     try {
-      const data = await legalEntityApi.list();
+      const data = await legalEntityApi.list(token);
       setLegalEntities(data.legal_entities || []);
     } catch {
       setLegalEntities([]);
@@ -86,7 +88,7 @@ export default function AdminUsersPage() {
           username: values.username,
           email: values.email,
           password: values.password,
-          role: values.role,
+          roles: values.roles,
           legal_entity_id: values.legal_entity_id || undefined,
         },
         token
@@ -102,15 +104,21 @@ export default function AdminUsersPage() {
 
   const roleColorMap: Record<string, string> = {
     admin: "red",
+    editor: "gold",
     reviewer: "blue",
     approver: "green",
+    auditor: "cyan",
+    readonly: "default",
     user: "default",
   };
 
   const roleLabelMap: Record<string, string> = {
     admin: t("admin_users.role_admin", language),
+    editor: "Finance Editor",
     reviewer: t("admin_users.role_reviewer", language),
     approver: t("admin_users.role_approver", language),
+    auditor: "Auditor Readonly",
+    readonly: "Business Readonly",
     user: t("admin_users.role_user", language),
   };
 
@@ -129,10 +137,14 @@ export default function AdminUsersPage() {
       title: t("admin_users.col_role", language),
       dataIndex: "role",
       key: "role",
-      render: (role: string) => (
-        <Tag color={roleColorMap[role] || "default"}>
-          {roleLabelMap[role] || role}
-        </Tag>
+      render: (role: string, record: User) => (
+        <Space size={[4, 4]} wrap>
+          {(record.roles?.length ? record.roles : [role]).map((assignedRole) => (
+            <Tag key={assignedRole} color={roleColorMap[assignedRole] || "default"}>
+              {roleLabelMap[assignedRole] || assignedRole}
+            </Tag>
+          ))}
+        </Space>
       ),
     },
     {
@@ -243,15 +255,17 @@ export default function AdminUsersPage() {
           </Form.Item>
 
           <Form.Item
-            name="role"
+            name="roles"
             label={t("admin_users.label_role", language)}
-            initialValue="user"
+            initialValue={["readonly"]}
             rules={[{ required: true, message: t("admin_users.role_placeholder", language) }]}
           >
-            <Select placeholder={t("admin_users.role_placeholder", language)}>
-              <Select.Option value="user">{t("admin_users.role_user", language)}</Select.Option>
+            <Select mode="multiple" placeholder={t("admin_users.role_placeholder", language)}>
+              <Select.Option value="editor">Finance Editor</Select.Option>
               <Select.Option value="reviewer">{t("admin_users.role_reviewer", language)}</Select.Option>
               <Select.Option value="approver">{t("admin_users.role_approver", language)}</Select.Option>
+              <Select.Option value="auditor">Auditor Readonly</Select.Option>
+              <Select.Option value="readonly">Business Readonly</Select.Option>
               <Select.Option value="admin">{t("admin_users.role_admin", language)}</Select.Option>
             </Select>
           </Form.Item>

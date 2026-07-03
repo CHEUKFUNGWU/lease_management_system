@@ -53,8 +53,14 @@ func (h *EventHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if req.ContractID != c.Param("id") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "contract_id must match route contract"})
+		return
+	}
 
 	ed, _ := time.Parse("2006-01-02", req.EffectiveDate)
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
 
 	event := &repository.LeaseEvent{
 		ContractID:    req.ContractID,
@@ -64,6 +70,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 		NewValue:      req.NewValue,
 		ChangeReason:  &req.ChangeReason,
 		JudgmentBasis: &req.JudgmentBasis,
+		CreatedBy:     &userIDStr,
 	}
 
 	result, err := h.eventRepo.Create(c.Request.Context(), event)
@@ -74,9 +81,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 
 	// Audit log: event created
 	if h.auditLogger != nil {
-		uid, _ := c.Get("user_id")
-		uidStr, _ := uid.(string)
-		h.auditLogger.Log(c.Request.Context(), "lease_events", result.ID, "create", nil, result, uidStr, c)
+		h.auditLogger.Log(c.Request.Context(), "lease_events", result.ID, "create", nil, result, userIDStr, c)
 	}
 
 	c.JSON(http.StatusOK, result)
@@ -123,6 +128,9 @@ func (h *EventHandler) SubmitForReview(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
+	if !requireEventOnRouteContract(c, event) {
+		return
+	}
 
 	if err := h.eventRepo.SubmitForReview(ctx, eventID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit: " + err.Error()})
@@ -139,6 +147,14 @@ func (h *EventHandler) SubmitForReview(c *gin.Context) {
 type EventReviewRequest struct {
 	Approved bool   `json:"approved"`
 	Reason   string `json:"reason"`
+}
+
+func requireEventOnRouteContract(c *gin.Context, event *repository.LeaseEvent) bool {
+	if event.ContractID == c.Param("id") {
+		return true
+	}
+	c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+	return false
 }
 
 func (h *EventHandler) Review(c *gin.Context) {
@@ -158,6 +174,9 @@ func (h *EventHandler) Review(c *gin.Context) {
 	}
 	if event == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+		return
+	}
+	if !requireEventOnRouteContract(c, event) {
 		return
 	}
 
@@ -196,6 +215,9 @@ func (h *EventHandler) Approve(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
+	if !requireEventOnRouteContract(c, event) {
+		return
+	}
 
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
@@ -217,7 +239,7 @@ func (h *EventHandler) Approve(c *gin.Context) {
 
 	// Audit log: event approved
 	if h.auditLogger != nil {
-		h.auditLogger.Log(ctx, "lease_events", eventID, "approve", nil, event, userIDStr, c)
+		h.auditLogger.Log(ctx, "lease_events", eventID, "approve", nil, approvalAuditValues(c, map[string]interface{}{"event": event}), userIDStr, c)
 	}
 }
 
@@ -242,6 +264,9 @@ func (h *EventHandler) Reject(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
 		return
 	}
+	if !requireEventOnRouteContract(c, event) {
+		return
+	}
 
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
@@ -256,6 +281,9 @@ func (h *EventHandler) Reject(c *gin.Context) {
 		"status":   "rejected",
 		"message":  "事件已驳回",
 	})
+	if h.auditLogger != nil {
+		h.auditLogger.Log(ctx, "lease_events", eventID, "reject", nil, approvalAuditValues(c, map[string]interface{}{"reason": req.Reason}), userIDStr, c)
+	}
 }
 
 // RecalculateEvent performs full IFRS 16 recalculation for an approved event.

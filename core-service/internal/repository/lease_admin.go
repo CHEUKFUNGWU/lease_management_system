@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 type CriticalDate struct {
@@ -157,7 +158,32 @@ func (r *LeaseAdminRepository) ListUpcomingCriticalDates(ctx context.Context, le
 	`
 	args := []interface{}{days}
 	argIdx := 2
-	if legalEntityID != "" {
+	if scope, scoped := access.ScopeFromContext(ctx); scoped {
+		if !scope.Global {
+			if scope.LegalEntityID == "" {
+				query += " AND false"
+			} else {
+				query += fmt.Sprintf(" AND lc.legal_entity_id::text = $%d", argIdx)
+				args = append(args, scope.LegalEntityID)
+				argIdx++
+			}
+			if len(scope.StoreIDs) > 0 {
+				query += fmt.Sprintf(" AND lc.store_id::text = ANY($%d)", argIdx)
+				args = append(args, scope.StoreIDs)
+				argIdx++
+			}
+			if len(scope.Regions) > 0 {
+				query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM stores s WHERE s.id = lc.store_id AND s.region = ANY($%d))", argIdx)
+				args = append(args, scope.Regions)
+				argIdx++
+			}
+			if len(scope.Brands) > 0 {
+				query += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM stores s WHERE s.id = lc.store_id AND s.brand = ANY($%d))", argIdx)
+				args = append(args, scope.Brands)
+				argIdx++
+			}
+		}
+	} else if legalEntityID != "" {
 		query += fmt.Sprintf(" AND lc.legal_entity_id = $%d", argIdx)
 		args = append(args, legalEntityID)
 		argIdx++

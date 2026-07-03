@@ -15,6 +15,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
+	"github.com/lease-management-system/core-service/internal/services/reporting"
 )
 
 // AmortizationReportRow is the response row for the amortization report.
@@ -169,6 +170,7 @@ type ReportHandler struct {
 	psRepo            *repository.PaymentScheduleRepository
 	mcRepo            *repository.MonthlyClosingRepository
 	systemSettingRepo *repository.SystemSettingRepository
+	snapshotBuilder   *reporting.SnapshotBuilder
 }
 
 func NewReportHandler(contractRepo *repository.ContractRepository, psRepo *repository.PaymentScheduleRepository, mcRepo *repository.MonthlyClosingRepository, systemSettingRepo *repository.SystemSettingRepository) *ReportHandler {
@@ -177,36 +179,25 @@ func NewReportHandler(contractRepo *repository.ContractRepository, psRepo *repos
 		psRepo:            psRepo,
 		mcRepo:            mcRepo,
 		systemSettingRepo: systemSettingRepo,
+		snapshotBuilder:   reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo),
 	}
 }
 
 // LiabilityRolling returns lease liability rolling schedule
 // Query param: mode=working|official
 func (h *ReportHandler) LiabilityRolling(c *gin.Context) {
-	mode := c.Query("mode")
-	if mode == "" {
-		mode = "working"
-	}
-	legalEntityID := middleware.GetTenantID(c)
-
-	// Build status filter based on report mode
-	var statuses []string
-	if mode == "official" {
-		statuses = []string{"approved"}
-	} else {
-		// Working report includes all non-rejected statuses
-		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-	}
-
-	// Query contracts with status filter and tenant isolation
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.NormalizeMode(c.Query("mode")),
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	var results []gin.H
-	for _, contract := range contracts {
+	for _, fact := range snapshot.Contracts {
+		contract := fact.Contract
 		results = append(results, gin.H{
 			"contract_id":           contract.ID,
 			"contract_number":       contract.ContractNumber,
@@ -223,37 +214,30 @@ func (h *ReportHandler) LiabilityRolling(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"mode":         mode,
-		"is_official":  mode == "official",
-		"data":         results,
-		"total":        len(results),
-		"generated_at": time.Now(),
+		"snapshot_id":    snapshot.ID,
+		"policy_version": snapshot.PolicyVersion,
+		"mode":           snapshot.Mode,
+		"is_official":    snapshot.IsOfficial,
+		"data":           results,
+		"total":          len(results),
+		"generated_at":   snapshot.GeneratedAt,
 	})
 }
 
 // ContractSummary returns summary statistics for the dashboard
 func (h *ReportHandler) ContractSummary(c *gin.Context) {
-	mode := c.Query("mode")
-	if mode == "" {
-		mode = "working"
-	}
-	legalEntityID := middleware.GetTenantID(c)
-
-	var statuses []string
-	if mode == "official" {
-		statuses = []string{"approved"}
-	} else {
-		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-	}
-
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.NormalizeMode(c.Query("mode")),
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	var totalContracts, approvedContracts, draftContracts int
-	for _, c := range contracts {
+	for _, fact := range snapshot.Contracts {
+		c := fact.Contract
 		totalContracts++
 		switch c.ApprovalStatus {
 		case "approved":
@@ -264,7 +248,11 @@ func (h *ReportHandler) ContractSummary(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"mode":            mode,
+		"snapshot_id":     snapshot.ID,
+		"policy_version":  snapshot.PolicyVersion,
+		"mode":            snapshot.Mode,
+		"is_official":     snapshot.IsOfficial,
+		"generated_at":    snapshot.GeneratedAt,
 		"total_contracts": totalContracts,
 		"approved_count":  approvedContracts,
 		"draft_count":     draftContracts,
@@ -274,20 +262,10 @@ func (h *ReportHandler) ContractSummary(c *gin.Context) {
 
 // PortfolioSummary returns portfolio-level operational and accounting exposure by asset type.
 func (h *ReportHandler) PortfolioSummary(c *gin.Context) {
-	mode := c.Query("mode")
-	if mode == "" {
-		mode = "working"
-	}
-	legalEntityID := middleware.GetTenantID(c)
-
-	var statuses []string
-	if mode == "official" {
-		statuses = []string{"approved"}
-	} else {
-		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-	}
-
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.NormalizeMode(c.Query("mode")),
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -295,7 +273,8 @@ func (h *ReportHandler) PortfolioSummary(c *gin.Context) {
 
 	rowsByKey := make(map[string]*PortfolioSummaryRow)
 	now := time.Now()
-	for _, ct := range contracts {
+	for _, fact := range snapshot.Contracts {
+		ct := fact.Contract
 		assetType := ct.AssetType
 		if assetType == "" {
 			assetType = "real_estate"
@@ -336,12 +315,7 @@ func (h *ReportHandler) PortfolioSummary(c *gin.Context) {
 			row.LatestLeaseEndDate = ct.LeaseEndDate.Format("2006-01-02")
 		}
 
-		schedules, err := h.psRepo.GetByContractID(c.Request.Context(), ct.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		for _, ps := range schedules {
+		for _, ps := range fact.PaymentSchedules {
 			row.PaymentCount++
 			switch {
 			case ps.IsVariable:
@@ -369,11 +343,13 @@ func (h *ReportHandler) PortfolioSummary(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{
-		"mode":         mode,
-		"is_official":  mode == "official",
-		"data":         rows,
-		"total":        len(rows),
-		"generated_at": time.Now(),
+		"snapshot_id":    snapshot.ID,
+		"policy_version": snapshot.PolicyVersion,
+		"mode":           snapshot.Mode,
+		"is_official":    snapshot.IsOfficial,
+		"data":           rows,
+		"total":          len(rows),
+		"generated_at":   snapshot.GeneratedAt,
 	})
 }
 

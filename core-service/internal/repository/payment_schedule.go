@@ -131,6 +131,47 @@ func (r *PaymentScheduleRepository) GetByContractID(ctx context.Context, contrac
 	return schedules, nil
 }
 
+// GetByContractIDs loads payment schedules for a report population in one
+// query, eliminating per-contract reads while preserving due-date order.
+func (r *PaymentScheduleRepository) GetByContractIDs(ctx context.Context, contractIDs []string) (map[string][]*PaymentSchedule, error) {
+	result := make(map[string][]*PaymentSchedule, len(contractIDs))
+	if len(contractIDs) == 0 {
+		return result, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT id, contract_id, effective_start_date, effective_end_date,
+			coverage_start_date, coverage_end_date, due_date, actual_payment_date,
+			payment_timing, amount, currency, tax_amount, amount_type,
+			is_fixed, is_variable, is_index_adjusted, is_lease_component,
+			is_non_lease_component, included_in_liability_pv,
+			approval_status, is_official_version, reviewed_by, approved_by,
+			created_at, updated_at
+		FROM lease_payment_schedules
+		WHERE contract_id::text = ANY($1)
+		ORDER BY contract_id, due_date
+	`, contractIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to batch load payment schedules: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		schedule := &PaymentSchedule{}
+		if err := rows.Scan(
+			&schedule.ID, &schedule.ContractID, &schedule.EffectiveStartDate, &schedule.EffectiveEndDate,
+			&schedule.CoverageStartDate, &schedule.CoverageEndDate, &schedule.DueDate, &schedule.ActualPaymentDate,
+			&schedule.PaymentTiming, &schedule.Amount, &schedule.Currency, &schedule.TaxAmount, &schedule.AmountType,
+			&schedule.IsFixed, &schedule.IsVariable, &schedule.IsIndexAdjusted, &schedule.IsLeaseComponent,
+			&schedule.IsNonLeaseComponent, &schedule.IncludedInLiabilityPV,
+			&schedule.ApprovalStatus, &schedule.IsOfficialVersion, &schedule.ReviewedBy, &schedule.ApprovedBy,
+			&schedule.CreatedAt, &schedule.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan payment schedule: %w", err)
+		}
+		result[schedule.ContractID] = append(result[schedule.ContractID], schedule)
+	}
+	return result, rows.Err()
+}
+
 func (r *PaymentScheduleRepository) GetByID(ctx context.Context, id string) (*PaymentSchedule, error) {
 	query := `
 		SELECT id, contract_id, effective_start_date, effective_end_date,

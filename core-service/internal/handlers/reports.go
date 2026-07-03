@@ -657,25 +657,15 @@ func roundReport(value float64) float64 {
 
 // ExportLiabilityRolling exports contract data as CSV
 func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
-	mode := c.Query("mode")
-	if mode == "" {
-		mode = "working"
-	}
-
 	lang := c.Query("language")
 	if lang == "" {
 		lang = "zh-CN"
 	}
 
-	var statuses []string
-	if mode == "official" {
-		statuses = []string{"approved"}
-	} else {
-		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-	}
-
-	legalEntityID := middleware.GetTenantID(c)
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.NormalizeMode(c.Query("mode")),
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -683,7 +673,7 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 
 	// Set headers for CSV download
 	marker := ""
-	if mode == "working" {
+	if snapshot.Mode == reporting.Working {
 		marker = "_WORKING_DRAFT"
 	} else {
 		marker = "_OFFICIAL"
@@ -692,6 +682,9 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 	filename := fmt.Sprintf("IFRS16_LiabilityRolling%s_%s.csv", marker, time.Now().Format("20060102_150405"))
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Header("X-Report-Snapshot-ID", snapshot.ID)
+	c.Header("X-Report-Policy-Version", snapshot.PolicyVersion)
+	c.Header("X-Report-Mode", string(snapshot.Mode))
 
 	writer := csv.NewWriter(c.Writer)
 	defer writer.Flush()
@@ -727,7 +720,8 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 	writer.Write(headers)
 
 	// Data rows
-	for _, contract := range contracts {
+	for _, fact := range snapshot.Contracts {
+		contract := fact.Contract
 		writer.Write([]string{
 			contract.ContractNumber,
 			contract.ContractName,
@@ -783,10 +777,6 @@ func (h *ReportHandler) ExportLiabilityRolling(c *gin.Context) {
 //	report_currency (optional, string, e.g. CNY/USD/HKD)
 //	exchange_rate (optional, float > 0)
 func (h *ReportHandler) Amortization(c *gin.Context) {
-	mode := c.Query("mode")
-	if mode == "" {
-		mode = "working"
-	}
 	view := c.Query("view")
 	if view == "" {
 		view = "summary"
@@ -884,25 +874,19 @@ func (h *ReportHandler) Amortization(c *gin.Context) {
 		}
 	}
 
-	legalEntityID := middleware.GetTenantID(c)
-
-	// Build status filter
-	var statuses []string
-	if mode == "official" {
-		statuses = []string{"approved"}
-	} else {
-		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-	}
-
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.NormalizeMode(c.Query("mode")),
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Filter contracts in-memory
-	var filtered []*repository.Contract
-	for _, ct := range contracts {
+	var filtered []reporting.ContractFact
+	for _, fact := range snapshot.Contracts {
+		ct := fact.Contract
 		if contractIDFilter != "" && ct.ID != contractIDFilter {
 			continue
 		}
@@ -933,34 +917,29 @@ func (h *ReportHandler) Amortization(c *gin.Context) {
 				continue
 			}
 		}
-		filtered = append(filtered, ct)
+		filtered = append(filtered, fact)
 	}
 
 	// Build contractID -> tags map for tag view aggregation
 	contractTags := make(map[string][]string)
-	for _, ct := range filtered {
+	for _, fact := range filtered {
+		ct := fact.Contract
 		contractTags[ct.ID] = splitTags(ct.Tags)
 	}
 
 	// Build contract-level bucket rows
 	var allContractRows []contractBucketRow
 
-	for _, ct := range filtered {
+	for _, fact := range filtered {
+		ct := fact.Contract
 		// 1) Determine discount rate
-		var discountRate float64
+		discountRate := fact.DiscountRate
 		if discountRateOverride != nil {
 			discountRate = *discountRateOverride
-		} else {
-			discountRate = getDiscountRate(c.Request.Context(), h.mcRepo, h.systemSettingRepo, ct)
 		}
 
-		// 2) Load payment schedules and convert to IFRS16 payments
-		schedules, err := h.psRepo.GetByContractID(c.Request.Context(), ct.ID)
-		if err != nil {
-			// Skip contracts with errors loading schedules
-			continue
-		}
-		payments := repository.ToIFRS16Payments(schedules)
+		// 2) Convert the controlled payment facts to IFRS16 payments.
+		payments := repository.ToIFRS16Payments(fact.PaymentSchedules)
 
 		// 3) Calculate daily amortization
 		calcInput := ifrs16.LeaseCalculation{
@@ -1174,7 +1153,11 @@ func (h *ReportHandler) Amortization(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"mode":                   mode,
+		"snapshot_id":            snapshot.ID,
+		"policy_version":         snapshot.PolicyVersion,
+		"mode":                   snapshot.Mode,
+		"is_official":            snapshot.IsOfficial,
+		"generated_at":           snapshot.GeneratedAt,
 		"view":                   view,
 		"granularity":            granularity,
 		"start_date":             startDateStr,
@@ -1190,17 +1173,18 @@ func (h *ReportHandler) Amortization(c *gin.Context) {
 // Tags returns all unique normalized tags across tenant-scoped working-mode contracts.
 // GET /api/v1/reports/tags
 func (h *ReportHandler) Tags(c *gin.Context) {
-	legalEntityID := middleware.GetTenantID(c)
-	statuses := []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.Working,
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	tagSet := make(map[string]bool)
-	for _, ct := range contracts {
+	for _, fact := range snapshot.Contracts {
+		ct := fact.Contract
 		for _, tag := range splitTags(ct.Tags) {
 			if tag != "未打标签" {
 				tagSet[tag] = true
@@ -1215,18 +1199,23 @@ func (h *ReportHandler) Tags(c *gin.Context) {
 	sort.Strings(tags)
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":  tags,
-		"total": len(tags),
+		"snapshot_id":    snapshot.ID,
+		"policy_version": snapshot.PolicyVersion,
+		"mode":           snapshot.Mode,
+		"is_official":    snapshot.IsOfficial,
+		"generated_at":   snapshot.GeneratedAt,
+		"data":           tags,
+		"total":          len(tags),
 	})
 }
 
 // TagSummary returns per-tag contract counts and details for the tag manager settings page.
 // GET /api/v1/reports/tags/summary
 func (h *ReportHandler) TagSummary(c *gin.Context) {
-	legalEntityID := middleware.GetTenantID(c)
-	statuses := []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.Working,
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1234,7 +1223,8 @@ func (h *ReportHandler) TagSummary(c *gin.Context) {
 
 	// tag -> set of contract IDs
 	tagContracts := make(map[string]map[string]*repository.Contract)
-	for _, ct := range contracts {
+	for _, fact := range snapshot.Contracts {
+		ct := fact.Contract
 		for _, tag := range splitTags(ct.Tags) {
 			if tag == "未打标签" {
 				continue
@@ -1277,8 +1267,13 @@ func (h *ReportHandler) TagSummary(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":  rows,
-		"total": len(rows),
+		"snapshot_id":    snapshot.ID,
+		"policy_version": snapshot.PolicyVersion,
+		"mode":           snapshot.Mode,
+		"is_official":    snapshot.IsOfficial,
+		"generated_at":   snapshot.GeneratedAt,
+		"data":           rows,
+		"total":          len(rows),
 	})
 }
 
@@ -1296,10 +1291,6 @@ func (h *ReportHandler) TagSummary(c *gin.Context) {
 //	tag (optional single string, backward compatible)
 //	tags (optional repeated query params for multi-tag any-match)
 func (h *ReportHandler) CashflowForecast(c *gin.Context) {
-	mode := c.Query("mode")
-	if mode == "" {
-		mode = "working"
-	}
 	view := c.Query("view")
 	if view == "" {
 		view = "summary"
@@ -1348,25 +1339,19 @@ func (h *ReportHandler) CashflowForecast(c *gin.Context) {
 	}
 	normalizedTagFilters := normalizeTokens(tagFilters)
 
-	legalEntityID := middleware.GetTenantID(c)
-
-	// Build status filter based on report mode
-	var statuses []string
-	if mode == "official" {
-		statuses = []string{"approved"}
-	} else {
-		statuses = []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
-	}
-
-	contracts, err := h.contractRepo.GetByStatuses(c.Request.Context(), statuses, legalEntityID)
+	snapshot, err := h.snapshotBuilder.Build(c.Request.Context(), reporting.Request{
+		Mode:          reporting.NormalizeMode(c.Query("mode")),
+		LegalEntityID: middleware.GetTenantID(c),
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	// Filter contracts in-memory
-	var filtered []*repository.Contract
-	for _, ct := range contracts {
+	var filtered []reporting.ContractFact
+	for _, fact := range snapshot.Contracts {
+		ct := fact.Contract
 		if contractIDFilter != "" && ct.ID != contractIDFilter {
 			continue
 		}
@@ -1397,7 +1382,7 @@ func (h *ReportHandler) CashflowForecast(c *gin.Context) {
 				continue
 			}
 		}
-		filtered = append(filtered, ct)
+		filtered = append(filtered, fact)
 	}
 
 	// Validate granularity
@@ -1419,14 +1404,14 @@ func (h *ReportHandler) CashflowForecast(c *gin.Context) {
 	// Build bucketed cashflow rows
 	var allBucketRows []cashflowBucketRow
 
-	for _, ct := range filtered {
-		schedules, err := h.psRepo.GetByContractID(c.Request.Context(), ct.ID)
-		if err != nil || len(schedules) == 0 {
+	for _, fact := range filtered {
+		ct := fact.Contract
+		if len(fact.PaymentSchedules) == 0 {
 			continue
 		}
 
 		// Filter schedules by due_date range
-		for _, s := range schedules {
+		for _, s := range fact.PaymentSchedules {
 			if s.DueDate.Before(startDate) || s.DueDate.After(endDate) {
 				continue
 			}
@@ -1543,13 +1528,17 @@ func (h *ReportHandler) CashflowForecast(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{
-		"mode":        mode,
-		"view":        view,
-		"granularity": granularity,
-		"start_date":  startDateStr,
-		"end_date":    endDateStr,
-		"data":        responseRows,
-		"total":       len(responseRows),
+		"snapshot_id":    snapshot.ID,
+		"policy_version": snapshot.PolicyVersion,
+		"mode":           snapshot.Mode,
+		"is_official":    snapshot.IsOfficial,
+		"generated_at":   snapshot.GeneratedAt,
+		"view":           view,
+		"granularity":    granularity,
+		"start_date":     startDateStr,
+		"end_date":       endDateStr,
+		"data":           responseRows,
+		"total":          len(responseRows),
 	})
 }
 
@@ -1558,25 +1547,6 @@ func fallbackStoreName(name string) string {
 		return name
 	}
 	return "未分配门店"
-}
-
-func getDiscountRate(ctx context.Context, mcRepo *repository.MonthlyClosingRepository, systemSettingRepo *repository.SystemSettingRepository, contract *repository.Contract) float64 {
-	globalRate := resolveGlobalDiscountRate(ctx, systemSettingRepo)
-	if globalRate > 0 {
-		return globalRate
-	}
-	if contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-		return *contract.DiscountRateValue
-	}
-	results, err := mcRepo.GetMeasurementResults(ctx, contract.ID, "")
-	if err != nil || len(results) == 0 {
-		return 0.05
-	}
-	latest := results[len(results)-1]
-	if latest.DiscountRate == 0 {
-		return 0.05
-	}
-	return latest.DiscountRate
 }
 
 func resolveGlobalDiscountRate(ctx context.Context, repo *repository.SystemSettingRepository) float64 {

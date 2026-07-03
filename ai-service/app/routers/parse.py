@@ -9,6 +9,11 @@ import logging
 from app.services.llm import llm_client
 from app.services.storage import download_from_minio, get_minio_client
 from app.services.document_extractor import extract_text
+from app.intake.models import (
+    PaymentScheduleIntakeResponse,
+    PaymentScheduleItem,
+    build_payment_schedule_intake,
+)
 
 try:
     import openpyxl
@@ -327,32 +332,6 @@ class PaymentScheduleParseRequest(BaseModel):
     mode: str = "assist"
 
 
-class PaymentScheduleItem(BaseModel):
-    period_start: str
-    period_end: str
-    due_date: str
-    amount: float
-    payment_timing: str
-    is_fixed: bool
-    is_lease_component: bool
-    amount_type: Optional[str] = "fixed_rent"
-    currency: Optional[str] = "CNY"
-    confidence: Optional[float] = 0.9
-
-
-class PaymentScheduleParseResponse(BaseModel):
-    task_id: str
-    file_id: str
-    mode: str
-    draft_type: str
-    status: str
-    schedules: List[PaymentScheduleItem]
-    confidence_scores: Dict[str, float]
-    missing_fields: List[str]
-    warnings: List[str]
-    requires_human_confirmation: bool
-
-
 def _normalize_header(value: str) -> str:
     value = value.strip().lower().replace(" ", "_").replace("-", "_")
     aliases = {
@@ -460,7 +439,7 @@ def _fallback_parse_payment_schedule_text(file_content: str, reason: str) -> Dic
     }
 
 
-@router.post("/parse/payment-schedule", response_model=PaymentScheduleParseResponse)
+@router.post("/parse/payment-schedule", response_model=PaymentScheduleIntakeResponse)
 async def parse_payment_schedule(request: PaymentScheduleParseRequest):
     """
     解析租金表文件，提取付款计划草稿
@@ -613,13 +592,13 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
                 payment_timing=s.get("payment_timing", "postpaid"),
                 is_fixed=s.get("is_fixed", True),
                 is_lease_component=s.get("is_lease_component", True),
-                amount_type=s.get("amount_type", "fixed_rent"),
-                currency=s.get("currency", "CNY"),
+                amount_type=s.get("amount_type") or "fixed_rent",
+                currency=s.get("currency") or "",
                 confidence=s.get("confidence", 0.8),
             ))
         
         # Check for low confidence items
-        low_confidence_count = sum(1 for s in validated_schedules if (s.confidence or 1.0) < 0.8)
+        low_confidence_count = sum(1 for s in validated_schedules if s.confidence < 0.8)
         if low_confidence_count > 0:
             warnings.append(f"有 {low_confidence_count} 笔付款的置信度低于 0.8，建议人工复核")
         
@@ -629,27 +608,18 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
             warnings.append("租金表中同时出现先付和后付，请确认是否正确")
         
         overall_confidence = parsed.get("overall_confidence", 0.8)
-        requires_human = (
-            overall_confidence < 0.8 or
-            len(validated_schedules) == 0 or
-            low_confidence_count > len(validated_schedules) / 2
-        )
-        
-        return {
-            "task_id": "task_ps_" + request.file_id,
-            "file_id": request.file_id,
-            "mode": "assist",
-            "draft_type": "payment_schedule_draft",
-            "status": "draft_generated",
-            "schedules": validated_schedules,
-            "confidence_scores": {
+        return build_payment_schedule_intake(
+            file_id=request.file_id,
+            object_name=request.object_name,
+            content_type=request.content_type,
+            schedules=validated_schedules,
+            confidence_scores={
                 "overall": overall_confidence,
-                "average_item": sum((s.confidence or 0.8) for s in validated_schedules) / max(len(validated_schedules), 1),
+                "average_item": sum(s.confidence for s in validated_schedules) / max(len(validated_schedules), 1),
             },
-            "missing_fields": parsed.get("missing_fields", []),
-            "warnings": warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
-            "requires_human_confirmation": requires_human,
-        }
+            missing_fields=parsed.get("missing_fields", []),
+            warnings=warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
+        )
     except Exception as e:
         reason = f"{type(e).__name__}: {str(e) or repr(e)}"
         logger.exception("LLM payment schedule parsing failed; using Office table fallback")
@@ -675,21 +645,18 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
                 confidence=s.get("confidence", 0.65),
             ))
 
-        return {
-            "task_id": "task_ps_" + request.file_id,
-            "file_id": request.file_id,
-            "mode": "assist",
-            "draft_type": "payment_schedule_draft",
-            "status": "draft_generated",
-            "schedules": validated_schedules,
-            "confidence_scores": {
+        return build_payment_schedule_intake(
+            file_id=request.file_id,
+            object_name=request.object_name,
+            content_type=request.content_type,
+            schedules=validated_schedules,
+            confidence_scores={
                 "overall": parsed.get("overall_confidence", 0.0),
-                "average_item": sum((s.confidence or 0.65) for s in validated_schedules) / max(len(validated_schedules), 1),
+                "average_item": sum(s.confidence for s in validated_schedules) / max(len(validated_schedules), 1),
             },
-            "missing_fields": parsed.get("missing_fields", []),
-            "warnings": warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
-            "requires_human_confirmation": True,
-        }
+            missing_fields=parsed.get("missing_fields", []),
+            warnings=warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
+        )
 
 
 class ContractBatchDraftRequest(BaseModel):

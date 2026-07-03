@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/aiintake"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
@@ -214,6 +215,10 @@ type PaymentScheduleParseSummary struct {
 	Warnings             []string `json:"warnings"`
 	CanImport            bool     `json:"can_import"`
 	ContractID           string   `json:"contract_id,omitempty"`
+	SchemaVersion        string   `json:"schema_version"`
+	IntakeID             string   `json:"intake_id"`
+	EvidenceComplete     bool     `json:"evidence_complete"`
+	ReviewReasons        []string `json:"review_reasons"`
 }
 
 type Source struct {
@@ -1743,58 +1748,43 @@ func (h *AIChatHandler) parsePaymentSchedule(ctx context.Context, authHeader, fi
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 	if resp.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	intake, err := aiintake.DecodePaymentSchedule(resp.Body)
+	if err != nil {
 		return nil, err
 	}
+	if intake.FileID != fileID || intake.Evidence.ObjectName != objectName || intake.Evidence.ContentType != contentType {
+		return nil, fmt.Errorf("AI intake response does not match the requested source")
+	}
 
-	schedulesRaw, _ := result["schedules"].([]interface{})
-	schedules := make([]PaymentScheduleDraftItem, 0, len(schedulesRaw))
-	for _, sr := range schedulesRaw {
-		smap, ok := sr.(map[string]interface{})
-		if !ok {
-			continue
-		}
+	schedules := make([]PaymentScheduleDraftItem, 0, len(intake.Schedules))
+	for _, schedule := range intake.Schedules {
 		item := PaymentScheduleDraftItem{
-			PeriodStart:      getString(smap, "period_start"),
-			PeriodEnd:        getString(smap, "period_end"),
-			DueDate:          getString(smap, "due_date"),
-			Amount:           getFloat64(smap, "amount"),
-			PaymentTiming:    getString(smap, "payment_timing"),
-			IsFixed:          getBoolDefault(smap, "is_fixed", true),
-			IsLeaseComponent: getBoolDefault(smap, "is_lease_component", true),
-			AmountType:       getString(smap, "amount_type"),
-			Currency:         getString(smap, "currency"),
-			Confidence:       getFloat64(smap, "confidence"),
-		}
-		if item.PaymentTiming == "" {
-			item.PaymentTiming = "postpaid"
-		}
-		if item.AmountType == "" {
-			item.AmountType = "fixed_rent"
-		}
-		if item.Confidence == 0 {
-			item.Confidence = 0.8
+			PeriodStart:      schedule.PeriodStart,
+			PeriodEnd:        schedule.PeriodEnd,
+			DueDate:          schedule.DueDate,
+			Amount:           schedule.Amount,
+			PaymentTiming:    schedule.PaymentTiming,
+			IsFixed:          schedule.IsFixed,
+			IsLeaseComponent: schedule.IsLeaseComponent,
+			AmountType:       schedule.AmountType,
+			Currency:         schedule.Currency,
+			Confidence:       schedule.Confidence,
 		}
 		schedules = append(schedules, item)
 	}
 
-	confidenceScores, _ := result["confidence_scores"].(map[string]interface{})
-	overallConf := getFloat64(confidenceScores, "overall")
-	if overallConf == 0 {
-		overallConf = 0.8
-	}
-	requiresHuman := getBool(result, "requires_human_confirmation")
-	missingFields := getStringSlice(result, "missing_fields")
-	warnings := getStringSlice(result, "warnings")
+	overallConf := intake.ConfidenceScores["overall"]
+	requiresHuman := intake.ReviewGate.Required || intake.RequiresHumanConfirmation
+	missingFields := intake.MissingFields
+	warnings := intake.Warnings
 	canImport := contractID != "" && len(schedules) > 0
 
 	var summary strings.Builder
@@ -1849,7 +1839,7 @@ func (h *AIChatHandler) parsePaymentSchedule(ctx context.Context, authHeader, fi
 
 	return &PaymentScheduleParseResult{
 		SummaryText:   summary.String(),
-		Sources:       []Source{{Type: "file", ID: fileID, Title: "租金表文件", Snippet: objectName}},
+		Sources:       []Source{{Type: "file", ID: intake.Evidence.SourceFileID, Title: "租金表文件", Snippet: intake.Evidence.ObjectName}},
 		Confidence:    overallConf,
 		AgentPlan:     agentPlan,
 		ToolCalls:     toolCalls,
@@ -1863,6 +1853,10 @@ func (h *AIChatHandler) parsePaymentSchedule(ctx context.Context, authHeader, fi
 			Warnings:             warnings,
 			CanImport:            canImport,
 			ContractID:           contractID,
+			SchemaVersion:        intake.SchemaVersion,
+			IntakeID:             intake.IntakeID,
+			EvidenceComplete:     intake.Evidence.Complete,
+			ReviewReasons:        intake.ReviewGate.Reasons,
 		},
 	}, nil
 }

@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/aiintake"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
@@ -153,37 +153,7 @@ type AgentRunbook struct {
 	ReviewPrompts         []AgentReviewPrompt
 }
 
-type ContractDraftItem struct {
-	ContractNumber    string   `json:"contract_number"`
-	ContractName      string   `json:"contract_name"`
-	Lessee            string   `json:"lessee"`
-	Lessor            string   `json:"lessor"`
-	StoreName         string   `json:"store_name"`
-	StoreAddress      string   `json:"store_address"`
-	CommencementDate  string   `json:"commencement_date"`
-	LeaseStartDate    string   `json:"lease_start_date"`
-	LeaseEndDate      string   `json:"lease_end_date"`
-	Currency          string   `json:"currency"`
-	AssetType         string   `json:"asset_type"`
-	FixedRentAmount   float64  `json:"fixed_rent_amount"`
-	PaymentFrequency  string   `json:"payment_frequency"`
-	PaymentTiming     string   `json:"payment_timing"`
-	RenewalOption     bool     `json:"renewal_option"`
-	TerminationOption bool     `json:"termination_option"`
-	CAMAmount         float64  `json:"cam_amount"`
-	ServiceFee        float64  `json:"service_fee"`
-	DiscountRateType  string   `json:"discount_rate_type"`
-	DiscountRate      float64  `json:"discount_rate"`
-	IsLease           bool     `json:"is_lease"`
-	LeaseScope        string   `json:"lease_scope"`
-	SuggestedScope    string   `json:"suggested_scope"`
-	ExemptionReason   string   `json:"exemption_reason"`
-	ScopeSource       string   `json:"scope_source"`
-	ScopeConfidence   float64  `json:"scope_confidence"`
-	Confidence        float64  `json:"confidence"`
-	MissingFields     []string `json:"missing_fields"`
-	Warnings          []string `json:"warnings"`
-}
+type ContractDraftItem = aiintake.ContractDraftData
 
 type BatchParseSummary struct {
 	TotalCount           int      `json:"total_count"`
@@ -191,6 +161,10 @@ type BatchParseSummary struct {
 	RequiresHumanConfirm bool     `json:"requires_human_confirmation"`
 	MissingFields        []string `json:"missing_fields"`
 	Warnings             []string `json:"warnings"`
+	SchemaVersion        string   `json:"schema_version"`
+	IntakeID             string   `json:"intake_id"`
+	EvidenceComplete     bool     `json:"evidence_complete"`
+	ReviewReasons        []string `json:"review_reasons"`
 }
 
 type PaymentScheduleDraftItem struct {
@@ -214,6 +188,10 @@ type PaymentScheduleParseSummary struct {
 	Warnings             []string `json:"warnings"`
 	CanImport            bool     `json:"can_import"`
 	ContractID           string   `json:"contract_id,omitempty"`
+	SchemaVersion        string   `json:"schema_version"`
+	IntakeID             string   `json:"intake_id"`
+	EvidenceComplete     bool     `json:"evidence_complete"`
+	ReviewReasons        []string `json:"review_reasons"`
 }
 
 type Source struct {
@@ -689,14 +667,16 @@ func (h *AIChatHandler) executeChatRequest(ctx context.Context, authHeader strin
 				contextData.WriteString(fmt.Sprintf("\n## 文件解析失败\n错误: %s\n", err.Error()))
 			} else {
 				contextData.WriteString("\n## 上传文件解析结果\n")
-				for k, v := range parsed {
-					contextData.WriteString(fmt.Sprintf("- %s: %v\n", k, v))
+				contractJSON, marshalErr := json.MarshalIndent(parsed.ExtractedData, "", "  ")
+				if marshalErr == nil {
+					contextData.Write(contractJSON)
+					contextData.WriteString("\n")
 				}
 				sources = append(sources, Source{
 					Type:    "file",
-					ID:      req.FileID,
+					ID:      parsed.Evidence.SourceFileID,
 					Title:   "上传文件",
-					Snippet: req.ObjectName,
+					Snippet: parsed.Evidence.ObjectName,
 				})
 			}
 		}
@@ -1648,7 +1628,7 @@ func extractSourcesFromAnswer(answer string, knownSources []Source) []Source {
 	return cited
 }
 
-func (h *AIChatHandler) parseFile(ctx context.Context, authHeader, fileID, objectName, contentType string) (map[string]interface{}, error) {
+func (h *AIChatHandler) parseFile(ctx context.Context, authHeader, fileID, objectName, contentType string) (*aiintake.ContractDraft, error) {
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
 		aiServiceURL = "http://ai-service:8000"
@@ -1679,26 +1659,29 @@ func (h *AIChatHandler) parseFile(ctx context.Context, authHeader, fileID, objec
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	if resp.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	draft, err := aiintake.DecodeContract(resp.Body)
+	if err != nil {
 		return nil, err
 	}
-
-	// Extract the extracted_data field
-	if data, ok := result["extracted_data"].(map[string]interface{}); ok {
-		return data, nil
+	if err := validateAIIntakeSource(draft.IntakeMetadata, fileID, objectName, contentType); err != nil {
+		return nil, err
 	}
+	return draft, nil
+}
 
-	return result, nil
+func validateAIIntakeSource(metadata aiintake.IntakeMetadata, fileID, objectName, contentType string) error {
+	if metadata.FileID != fileID || metadata.Evidence.ObjectName != objectName || metadata.Evidence.ContentType != contentType {
+		return fmt.Errorf("AI intake response does not match the requested source")
+	}
+	return nil
 }
 
 type PaymentScheduleParseResult struct {
@@ -1743,58 +1726,43 @@ func (h *AIChatHandler) parsePaymentSchedule(ctx context.Context, authHeader, fi
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 	if resp.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	intake, err := aiintake.DecodePaymentSchedule(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateAIIntakeSource(intake.IntakeMetadata, fileID, objectName, contentType); err != nil {
 		return nil, err
 	}
 
-	schedulesRaw, _ := result["schedules"].([]interface{})
-	schedules := make([]PaymentScheduleDraftItem, 0, len(schedulesRaw))
-	for _, sr := range schedulesRaw {
-		smap, ok := sr.(map[string]interface{})
-		if !ok {
-			continue
-		}
+	schedules := make([]PaymentScheduleDraftItem, 0, len(intake.Schedules))
+	for _, schedule := range intake.Schedules {
 		item := PaymentScheduleDraftItem{
-			PeriodStart:      getString(smap, "period_start"),
-			PeriodEnd:        getString(smap, "period_end"),
-			DueDate:          getString(smap, "due_date"),
-			Amount:           getFloat64(smap, "amount"),
-			PaymentTiming:    getString(smap, "payment_timing"),
-			IsFixed:          getBoolDefault(smap, "is_fixed", true),
-			IsLeaseComponent: getBoolDefault(smap, "is_lease_component", true),
-			AmountType:       getString(smap, "amount_type"),
-			Currency:         getString(smap, "currency"),
-			Confidence:       getFloat64(smap, "confidence"),
-		}
-		if item.PaymentTiming == "" {
-			item.PaymentTiming = "postpaid"
-		}
-		if item.AmountType == "" {
-			item.AmountType = "fixed_rent"
-		}
-		if item.Confidence == 0 {
-			item.Confidence = 0.8
+			PeriodStart:      schedule.PeriodStart,
+			PeriodEnd:        schedule.PeriodEnd,
+			DueDate:          schedule.DueDate,
+			Amount:           schedule.Amount,
+			PaymentTiming:    schedule.PaymentTiming,
+			IsFixed:          schedule.IsFixed,
+			IsLeaseComponent: schedule.IsLeaseComponent,
+			AmountType:       schedule.AmountType,
+			Currency:         schedule.Currency,
+			Confidence:       schedule.Confidence,
 		}
 		schedules = append(schedules, item)
 	}
 
-	confidenceScores, _ := result["confidence_scores"].(map[string]interface{})
-	overallConf := getFloat64(confidenceScores, "overall")
-	if overallConf == 0 {
-		overallConf = 0.8
-	}
-	requiresHuman := getBool(result, "requires_human_confirmation")
-	missingFields := getStringSlice(result, "missing_fields")
-	warnings := getStringSlice(result, "warnings")
+	overallConf := intake.ConfidenceScores["overall"]
+	requiresHuman := intake.ReviewGate.Required || intake.RequiresHumanConfirmation
+	missingFields := intake.MissingFields
+	warnings := intake.Warnings
 	canImport := contractID != "" && len(schedules) > 0
 
 	var summary strings.Builder
@@ -1849,7 +1817,7 @@ func (h *AIChatHandler) parsePaymentSchedule(ctx context.Context, authHeader, fi
 
 	return &PaymentScheduleParseResult{
 		SummaryText:   summary.String(),
-		Sources:       []Source{{Type: "file", ID: fileID, Title: "租金表文件", Snippet: objectName}},
+		Sources:       []Source{{Type: "file", ID: intake.Evidence.SourceFileID, Title: "租金表文件", Snippet: intake.Evidence.ObjectName}},
 		Confidence:    overallConf,
 		AgentPlan:     agentPlan,
 		ToolCalls:     toolCalls,
@@ -1863,6 +1831,10 @@ func (h *AIChatHandler) parsePaymentSchedule(ctx context.Context, authHeader, fi
 			Warnings:             warnings,
 			CanImport:            canImport,
 			ContractID:           contractID,
+			SchemaVersion:        intake.SchemaVersion,
+			IntakeID:             intake.IntakeID,
+			EvidenceComplete:     intake.Evidence.Complete,
+			ReviewReasons:        intake.ReviewGate.Reasons,
 		},
 	}, nil
 }
@@ -1909,86 +1881,28 @@ func (h *AIChatHandler) parseContractBatch(ctx context.Context, authHeader, file
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	if resp.StatusCode != http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
+	intake, err := aiintake.DecodeContractBatch(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateAIIntakeSource(intake.IntakeMetadata, fileID, objectName, contentType); err != nil {
 		return nil, err
 	}
 
-	contractsRaw, _ := result["contracts"].([]interface{})
-	contracts := make([]ContractDraftItem, 0, len(contractsRaw))
-	for _, cr := range contractsRaw {
-		cmap, ok := cr.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		item := ContractDraftItem{
-			ContractNumber:    getString(cmap, "contract_number"),
-			ContractName:      getString(cmap, "contract_name"),
-			Lessee:            getString(cmap, "lessee"),
-			Lessor:            getString(cmap, "lessor"),
-			StoreName:         getString(cmap, "store_name"),
-			StoreAddress:      getString(cmap, "store_address"),
-			CommencementDate:  getString(cmap, "commencement_date"),
-			LeaseStartDate:    getString(cmap, "lease_start_date"),
-			LeaseEndDate:      getString(cmap, "lease_end_date"),
-			Currency:          getString(cmap, "currency"),
-			AssetType:         getString(cmap, "asset_type"),
-			PaymentFrequency:  getString(cmap, "payment_frequency"),
-			PaymentTiming:     getString(cmap, "payment_timing"),
-			DiscountRateType:  getString(cmap, "discount_rate_type"),
-			RenewalOption:     getBool(cmap, "renewal_option"),
-			TerminationOption: getBool(cmap, "termination_option"),
-			FixedRentAmount:   getFloat64(cmap, "fixed_rent_amount"),
-			CAMAmount:         getFloat64(cmap, "cam_amount"),
-			ServiceFee:        getFloat64(cmap, "service_fee"),
-			DiscountRate:      getFloat64(cmap, "discount_rate"),
-			IsLease:           getBoolDefault(cmap, "is_lease", true),
-			LeaseScope:        getString(cmap, "lease_scope"),
-			SuggestedScope:    getString(cmap, "suggested_scope"),
-			ExemptionReason:   getString(cmap, "exemption_reason"),
-			ScopeSource:       getString(cmap, "scope_source"),
-			ScopeConfidence:   getFloat64(cmap, "scope_confidence"),
-			Confidence:        getFloat64(cmap, "confidence"),
-			MissingFields:     getStringSlice(cmap, "missing_fields"),
-			Warnings:          getStringSlice(cmap, "warnings"),
-		}
-		if item.AssetType == "" {
-			item.AssetType = "real_estate"
-		}
-		if item.LeaseScope == "" {
-			item.LeaseScope = item.SuggestedScope
-		}
-		if item.LeaseScope == "" {
-			item.LeaseScope = "in_scope"
-		}
-		if item.SuggestedScope == "" {
-			item.SuggestedScope = item.LeaseScope
-		}
-		if item.ScopeSource == "" {
-			item.ScopeSource = "ai_suggested"
-		}
-		contracts = append(contracts, item)
-	}
-
-	totalCount := getInt(result, "total_count")
-	overallConf := getFloat64(result, "overall_confidence")
-	if overallConf == 0 {
-		if scores, ok := result["confidence_scores"].(map[string]interface{}); ok {
-			overallConf = getFloat64(scores, "overall")
-		}
-	}
-	requiresHuman := getBool(result, "requires_human_confirmation")
-	warnings := getStringSlice(result, "warnings")
-	missingFields := getStringSlice(result, "missing_fields")
+	contracts := intake.Contracts
+	totalCount := intake.TotalCount
+	overallConf := intake.ConfidenceScores["overall"]
+	requiresHuman := intake.ReviewGate.Required || intake.RequiresHumanConfirmation
+	warnings := intake.Warnings
+	missingFields := intake.MissingFields
 
 	// Build summary text
 	var summary strings.Builder
@@ -2005,9 +1919,9 @@ func (h *AIChatHandler) parseContractBatch(ctx context.Context, authHeader, file
 
 	sources := []Source{{
 		Type:    "file",
-		ID:      fileID,
+		ID:      intake.Evidence.SourceFileID,
 		Title:   "合同台账文件",
-		Snippet: objectName,
+		Snippet: intake.Evidence.ObjectName,
 	}}
 
 	officeSkill := "Office Excel Skill"
@@ -2062,6 +1976,10 @@ func (h *AIChatHandler) parseContractBatch(ctx context.Context, authHeader, file
 			RequiresHumanConfirm: requiresHuman,
 			MissingFields:        missingFields,
 			Warnings:             warnings,
+			SchemaVersion:        intake.SchemaVersion,
+			IntakeID:             intake.IntakeID,
+			EvidenceComplete:     intake.Evidence.Complete,
+			ReviewReasons:        intake.ReviewGate.Reasons,
 		},
 	}, nil
 }
@@ -2240,71 +2158,6 @@ func firstStrings(values []string, limit int) []string {
 		return values
 	}
 	return values[:limit]
-}
-
-// Helper functions for safe type extraction
-func getString(m map[string]interface{}, key string) string {
-	if v, ok := m[key].(string); ok {
-		return v
-	}
-	return ""
-}
-
-func getBool(m map[string]interface{}, key string) bool {
-	if v, ok := m[key].(bool); ok {
-		return v
-	}
-	return false
-}
-
-func getBoolDefault(m map[string]interface{}, key string, fallback bool) bool {
-	if v, ok := m[key].(bool); ok {
-		return v
-	}
-	return fallback
-}
-
-func getFloat64(m map[string]interface{}, key string) float64 {
-	switch v := m[key].(type) {
-	case float64:
-		return v
-	case float32:
-		return float64(v)
-	case int:
-		return float64(v)
-	case int64:
-		return float64(v)
-	case string:
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return f
-		}
-	}
-	return 0
-}
-
-func getInt(m map[string]interface{}, key string) int {
-	switch v := m[key].(type) {
-	case int:
-		return v
-	case float64:
-		return int(v)
-	case int64:
-		return int(v)
-	}
-	return 0
-}
-
-func getStringSlice(m map[string]interface{}, key string) []string {
-	if arr, ok := m[key].([]interface{}); ok {
-		result := make([]string, 0, len(arr))
-		for _, v := range arr {
-			if s, ok := v.(string); ok {
-				result = append(result, s)
-			}
-		}
-		return result
-	}
-	return []string{}
 }
 
 func containsAny(msg string, targets []string) bool {

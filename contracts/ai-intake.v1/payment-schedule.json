@@ -1,0 +1,55 @@
+{
+  "schema_version": "ai-intake.v1",
+  "intake_id": "intake-fixture-001",
+  "task_id": "task_ps_file-001",
+  "file_id": "file-001",
+  "mode": "assist",
+  "draft_type": "payment_schedule_draft",
+  "status": "draft_generated",
+  "schedules": [
+    {
+      "period_start": "2026-01-01",
+      "period_end": "2026-01-31",
+      "due_date": "2026-01-15",
+      "amount": 1000.0,
+      "payment_timing": "postpaid",
+      "is_fixed": true,
+      "is_lease_component": true,
+      "amount_type": "fixed_rent",
+      "currency": "CNY",
+      "confidence": 0.92
+    }
+  ],
+  "confidence_scores": {
+    "overall": 0.92,
+    "average_item": 0.92
+  },
+  "missing_fields": [],
+  "warnings": [
+    "AI Assist Mode: 付款计划草稿需人工确认后入库"
+  ],
+  "requires_human_confirmation": true,
+  "evidence": {
+    "source_file_id": "file-001",
+    "object_name": "rent-schedule.xlsx",
+    "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "locators": [
+      {
+        "field": "schedules[0]",
+        "source": "Sheet1!A2:J2",
+        "page": null,
+        "coordinates": null,
+        "quote": "2026-01-01 | 2026-01-31 | 2026-01-15 | 1000.00 | postpaid | CNY"
+      }
+    ],
+    "complete": true,
+    "missing_reason": null
+  },
+  "review_gate": {
+    "required": true,
+    "reasons": [
+      "assist_mode"
+    ],
+    "confidence_threshold": 0.8
+  }
+}

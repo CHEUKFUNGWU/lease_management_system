@@ -1,0 +1,49 @@
+import { API_BASE_URL, aiChatApi } from "../../lib/api";
+import { consumeSSEStream } from "./stream";
+import type { PageContext, RunRequest, RuntimeTarget } from "./types";
+
+export interface RuntimeTransport {
+  listSessions(): Promise<any>;
+  getSession(sessionId: string): Promise<any>;
+  createSession(data: {
+    title?: string;
+    bound_contract_id?: string;
+    context_snapshot?: Record<string, any>;
+  }): Promise<any>;
+  createRun(sessionId: string, request: RunRequest): Promise<any>;
+  createContinuation(data: {
+    target: RuntimeTarget;
+    instruction?: string;
+    contract_id?: string;
+    language?: string;
+    page_context?: PageContext;
+  }): Promise<any>;
+  createReviewAction(
+    artifactId: string,
+    data: {
+      action_type: string;
+      action_payload?: Record<string, unknown>;
+      comment?: string;
+    },
+  ): Promise<any>;
+  consumeRun(runId: string, onFrame: (event: string, data: any) => void): Promise<void>;
+}
+
+export function createHTTPRuntimeTransport(token: string): RuntimeTransport {
+  return {
+    listSessions: () => aiChatApi.listSessions(token, { limit: 50 }),
+    getSession: (sessionId) => aiChatApi.getSession(sessionId, token),
+    createSession: (data) => aiChatApi.createSession(data, token),
+    createRun: (sessionId, request) => aiChatApi.createRun(sessionId, request, token),
+    createContinuation: (data) => aiChatApi.createContinuation(data, token),
+    createReviewAction: (artifactId, data) =>
+      aiChatApi.createReviewAction(artifactId, data, token),
+    async consumeRun(runId, onFrame) {
+      const response = await fetch(`${API_BASE_URL}/api/v1/ai/chat/runs/${runId}/stream`, {
+        headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+      await consumeSSEStream(response.body, onFrame);
+    },
+  };
+}

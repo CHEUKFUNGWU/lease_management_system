@@ -23,7 +23,7 @@ func TestDecodePaymentScheduleV1Contract(t *testing.T) {
 	if len(draft.Schedules) != 1 || draft.Schedules[0].Amount != 1000 || draft.Schedules[0].PaymentTiming != "postpaid" {
 		t.Fatalf("payment schedules = %#v", draft.Schedules)
 	}
-	if !draft.Evidence.Complete || len(draft.Evidence.Locators) != 1 || draft.Evidence.Locators[0].Source != "Sheet1!D2" {
+	if !draft.Evidence.Complete || len(draft.Evidence.Locators) != 1 || draft.Evidence.Locators[0].Source != "Sheet1!A2:J2" {
 		t.Fatalf("evidence = %#v", draft.Evidence)
 	}
 	if !draft.ReviewGate.Required || len(draft.ReviewGate.Reasons) == 0 {
@@ -74,6 +74,11 @@ func TestDecodePaymentScheduleRejectsUnsafePolicyMetadata(t *testing.T) {
 			name:        "overall confidence absent",
 			payload:     strings.Replace(string(fixture), `"overall": 0.92,`, ``, 1),
 			errorSubstr: "must include overall",
+		},
+		{
+			name:        "complete evidence does not cover schedule",
+			payload:     strings.Replace(string(fixture), `"field": "schedules[0]"`, `"field": "unrelated_field"`, 1),
+			errorSubstr: "does not cover schedules[0]",
 		},
 	}
 

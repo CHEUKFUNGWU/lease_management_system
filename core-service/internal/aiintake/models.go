@@ -28,6 +28,22 @@ type ReviewGate struct {
 	ConfidenceThreshold float64  `json:"confidence_threshold"`
 }
 
+type IntakeMetadata struct {
+	SchemaVersion             string             `json:"schema_version"`
+	IntakeID                  string             `json:"intake_id"`
+	TaskID                    string             `json:"task_id"`
+	FileID                    string             `json:"file_id"`
+	Mode                      string             `json:"mode"`
+	DraftType                 string             `json:"draft_type"`
+	Status                    string             `json:"status"`
+	ConfidenceScores          map[string]float64 `json:"confidence_scores"`
+	MissingFields             []string           `json:"missing_fields"`
+	Warnings                  []string           `json:"warnings"`
+	RequiresHumanConfirmation bool               `json:"requires_human_confirmation"`
+	Evidence                  Evidence           `json:"evidence"`
+	ReviewGate                ReviewGate         `json:"review_gate"`
+}
+
 type PaymentSchedule struct {
 	PeriodStart      string  `json:"period_start"`
 	PeriodEnd        string  `json:"period_end"`
@@ -42,18 +58,49 @@ type PaymentSchedule struct {
 }
 
 type PaymentScheduleDraft struct {
-	SchemaVersion             string             `json:"schema_version"`
-	IntakeID                  string             `json:"intake_id"`
-	TaskID                    string             `json:"task_id"`
-	FileID                    string             `json:"file_id"`
-	Mode                      string             `json:"mode"`
-	DraftType                 string             `json:"draft_type"`
-	Status                    string             `json:"status"`
-	Schedules                 []PaymentSchedule  `json:"schedules"`
-	ConfidenceScores          map[string]float64 `json:"confidence_scores"`
-	MissingFields             []string           `json:"missing_fields"`
-	Warnings                  []string           `json:"warnings"`
-	RequiresHumanConfirmation bool               `json:"requires_human_confirmation"`
-	Evidence                  Evidence           `json:"evidence"`
-	ReviewGate                ReviewGate         `json:"review_gate"`
+	IntakeMetadata
+	Schedules []PaymentSchedule `json:"schedules"`
+}
+
+type ContractDraftData struct {
+	ContractNumber    string   `json:"contract_number"`
+	ContractName      string   `json:"contract_name"`
+	Lessee            string   `json:"lessee"`
+	Lessor            string   `json:"lessor"`
+	StoreName         string   `json:"store_name"`
+	StoreAddress      string   `json:"store_address"`
+	CommencementDate  string   `json:"commencement_date"`
+	LeaseStartDate    string   `json:"lease_start_date"`
+	LeaseEndDate      string   `json:"lease_end_date"`
+	Currency          string   `json:"currency"`
+	AssetType         string   `json:"asset_type"`
+	FixedRentAmount   float64  `json:"fixed_rent_amount"`
+	PaymentFrequency  string   `json:"payment_frequency"`
+	PaymentTiming     string   `json:"payment_timing"`
+	RenewalOption     bool     `json:"renewal_option"`
+	TerminationOption bool     `json:"termination_option"`
+	CAMAmount         float64  `json:"cam_amount"`
+	ServiceFee        float64  `json:"service_fee"`
+	DiscountRateType  string   `json:"discount_rate_type"`
+	DiscountRate      float64  `json:"discount_rate"`
+	IsLease           bool     `json:"is_lease"`
+	LeaseScope        string   `json:"lease_scope"`
+	SuggestedScope    string   `json:"suggested_scope"`
+	ExemptionReason   string   `json:"exemption_reason"`
+	ScopeSource       string   `json:"scope_source"`
+	ScopeConfidence   float64  `json:"scope_confidence"`
+	Confidence        float64  `json:"confidence"`
+	MissingFields     []string `json:"missing_fields"`
+	Warnings          []string `json:"warnings"`
+}
+
+type ContractDraft struct {
+	IntakeMetadata
+	ExtractedData ContractDraftData `json:"extracted_data"`
+}
+
+type ContractBatchDraft struct {
+	IntakeMetadata
+	Contracts  []ContractDraftData `json:"contracts"`
+	TotalCount int                 `json:"total_count"`
 }

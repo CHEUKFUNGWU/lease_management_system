@@ -10,13 +10,20 @@ from app.services.llm import llm_client
 from app.services.storage import download_from_minio, get_minio_client
 from app.services.document_extractor import extract_text
 from app.intake.models import (
+    ContractBatchIntakeResponse,
+    ContractDraftData,
+    ContractIntakeResponse,
+    EvidenceLocator,
     PaymentScheduleIntakeResponse,
     PaymentScheduleItem,
+    build_contract_batch_intake,
+    build_contract_intake,
     build_payment_schedule_intake,
 )
 
 try:
     import openpyxl
+    from openpyxl.utils import get_column_letter
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
@@ -46,19 +53,6 @@ class ContractDraftRequest(BaseModel):
     content_type: str = "application/pdf"  # MIME type for text extraction
     file_content: Optional[str] = None  # Optional: pre-extracted text (if provided, skip extraction)
     mode: str = "assist"  # "assist" or "auto-post"
-
-
-class ContractDraftResponse(BaseModel):
-    task_id: str
-    file_id: str
-    mode: str
-    draft_type: str = "contract_draft"
-    status: str
-    extracted_data: Dict[str, Any]
-    confidence_scores: Dict[str, float]
-    missing_fields: List[str]
-    warnings: List[str]
-    requires_human_confirmation: bool
 
 
 def _check_discount_rate_missing(extracted: dict) -> tuple[bool, list]:
@@ -172,7 +166,7 @@ async def parse_document(request: ParseRequest):
     }
 
 
-@router.post("/parse/contract", response_model=ContractDraftResponse)
+@router.post("/parse/contract", response_model=ContractIntakeResponse)
 async def parse_contract(request: ContractDraftRequest):
     """
     解析合同文件，生成合同草稿
@@ -285,6 +279,8 @@ async def parse_contract(request: ContractDraftRequest):
         
         extracted = parsed.get("extracted_fields", {})
         confidence = _sanitize_confidence_scores(parsed.get("confidence_scores", {}))
+        overall_confidence = _parse_float(parsed.get("overall_confidence"))
+        confidence["overall"] = overall_confidence
         
         # Check for discount rate missing
         dr_missing, dr_warnings = _check_discount_rate_missing(extracted)
@@ -297,30 +293,27 @@ async def parse_contract(request: ContractDraftRequest):
 
         # IFRS 16 scope gate suggestion
         _, scope_warnings = _normalize_lease_scope(extracted)
+        extracted["asset_type"] = _normalize_asset_type(extracted.get("asset_type"))
+        extracted["payment_timing"] = _normalize_payment_timing(extracted.get("payment_timing")) if extracted.get("payment_timing") else ""
         
-        all_warnings = dr_warnings + currency_warnings + field_warnings + scope_warnings + parsed.get("warnings", [])
-        
-        # Determine if human confirmation is required
-        requires_human = (
-            dr_missing or
-            currency_missing or
-            len(missing_fields) > 0 or
-            (extracted.get("scope_confidence") is None or float(extracted.get("scope_confidence", 0)) < 0.8) or
-            parsed.get("overall_confidence", 1.0) < 0.8
+        all_warnings = dr_warnings + currency_warnings + field_warnings + scope_warnings + _as_list(parsed.get("warnings", []))
+        all_missing = sorted(set(
+            missing_fields
+            + _as_list(parsed.get("missing_fields", []))
+            + (["discount_rate"] if dr_missing else [])
+            + (["currency"] if currency_missing else [])
+        ))
+
+        return build_contract_intake(
+            file_id=request.file_id,
+            object_name=request.object_name,
+            content_type=request.content_type,
+            extracted_data=extracted,
+            confidence_scores=confidence,
+            missing_fields=all_missing,
+            warnings=all_warnings + ["AI Assist Mode: 合同草稿需人工确认后入库"],
+            evidence_missing_reason="field_locators_not_produced_by_document_adapter",
         )
-        
-        return {
-            "task_id": "task_" + request.file_id,
-            "file_id": request.file_id,
-            "mode": "assist",
-            "draft_type": "contract_draft",
-            "status": "draft_generated",
-            "extracted_data": extracted,
-            "confidence_scores": confidence,
-            "missing_fields": missing_fields + (["discount_rate"] if dr_missing else []) + (["currency"] if currency_missing else []),
-            "warnings": all_warnings,
-            "requires_human_confirmation": requires_human
-        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
 
@@ -422,7 +415,7 @@ def _fallback_parse_payment_schedule_text(file_content: str, reason: str) -> Dic
             "period_end": row.get("period_end") or row["due_date"],
             "due_date": row["due_date"],
             "amount": amount,
-            "payment_timing": row.get("payment_timing") or "postpaid",
+            "payment_timing": _normalize_payment_timing(row.get("payment_timing")),
             "is_fixed": is_fixed,
             "is_lease_component": is_lease_component,
             "amount_type": amount_type,
@@ -561,7 +554,8 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
         
         # Validate and normalize schedules
         validated_schedules = []
-        warnings = parsed.get("warnings", [])
+        warnings = _as_list(parsed.get("warnings", []))
+        missing_fields = _as_list(parsed.get("missing_fields", []))
         
         for i, s in enumerate(schedules):
             # Validate required fields
@@ -583,18 +577,24 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
             except (ValueError, TypeError):
                 warnings.append(f"第 {i+1} 行金额无法解析为数字: {s.get('amount')}")
                 continue
+
+            payment_timing = _normalize_payment_timing(s.get("payment_timing"))
+            if not payment_timing:
+                warnings.append(f"第 {i+1} 行缺少有效付款时点 (prepaid/postpaid)，已跳过")
+                missing_fields.append("payment_timing")
+                continue
             
             validated_schedules.append(PaymentScheduleItem(
                 period_start=s.get("period_start", s.get("due_date", "")),
                 period_end=s.get("period_end", s.get("due_date", "")),
                 due_date=s["due_date"],
                 amount=amount,
-                payment_timing=s.get("payment_timing", "postpaid"),
+                payment_timing=payment_timing,
                 is_fixed=s.get("is_fixed", True),
                 is_lease_component=s.get("is_lease_component", True),
                 amount_type=s.get("amount_type") or "fixed_rent",
                 currency=s.get("currency") or "",
-                confidence=s.get("confidence", 0.8),
+                confidence=_parse_float(s.get("confidence")),
             ))
         
         # Check for low confidence items
@@ -607,7 +607,7 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
         if len(timings) > 1:
             warnings.append("租金表中同时出现先付和后付，请确认是否正确")
         
-        overall_confidence = parsed.get("overall_confidence", 0.8)
+        overall_confidence = _parse_float(parsed.get("overall_confidence"))
         return build_payment_schedule_intake(
             file_id=request.file_id,
             object_name=request.object_name,
@@ -617,7 +617,7 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
                 "overall": overall_confidence,
                 "average_item": sum(s.confidence for s in validated_schedules) / max(len(validated_schedules), 1),
             },
-            missing_fields=parsed.get("missing_fields", []),
+            missing_fields=sorted(set(missing_fields)),
             warnings=warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
         )
     except Exception as e:
@@ -625,19 +625,25 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
         logger.exception("LLM payment schedule parsing failed; using Office table fallback")
         parsed = _fallback_parse_payment_schedule_text(file_content, reason)
         validated_schedules = []
-        warnings = parsed.get("warnings", [])
+        warnings = _as_list(parsed.get("warnings", []))
+        missing_fields = _as_list(parsed.get("missing_fields", []))
         for i, s in enumerate(parsed.get("schedules", [])):
             try:
                 amount = float(s["amount"])
             except (ValueError, TypeError, KeyError):
                 warnings.append(f"兜底读取第 {i+1} 行金额无法解析，已跳过")
                 continue
+            payment_timing = _normalize_payment_timing(s.get("payment_timing"))
+            if not payment_timing:
+                warnings.append(f"兜底读取第 {i+1} 行缺少有效付款时点，已跳过")
+                missing_fields.append("payment_timing")
+                continue
             validated_schedules.append(PaymentScheduleItem(
                 period_start=s.get("period_start", s.get("due_date", "")),
                 period_end=s.get("period_end", s.get("due_date", "")),
                 due_date=s.get("due_date", ""),
                 amount=amount,
-                payment_timing=s.get("payment_timing", "postpaid"),
+                payment_timing=payment_timing,
                 is_fixed=s.get("is_fixed", True),
                 is_lease_component=s.get("is_lease_component", True),
                 amount_type=s.get("amount_type", "fixed_rent"),
@@ -654,7 +660,7 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
                 "overall": parsed.get("overall_confidence", 0.0),
                 "average_item": sum(s.confidence for s in validated_schedules) / max(len(validated_schedules), 1),
             },
-            missing_fields=parsed.get("missing_fields", []),
+            missing_fields=sorted(set(missing_fields)),
             warnings=warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
         )
 
@@ -665,52 +671,6 @@ class ContractBatchDraftRequest(BaseModel):
     content_type: str = "application/pdf"
     file_content: Optional[str] = None
     mode: str = "assist"
-
-
-class ContractBatchItem(BaseModel):
-    contract_number: str
-    contract_name: str
-    lessee: str
-    lessor: str
-    store_name: Optional[str] = ""
-    store_address: Optional[str] = ""
-    commencement_date: str
-    lease_start_date: str
-    lease_end_date: str
-    currency: Optional[str] = ""
-    asset_type: Optional[str] = "real_estate"
-    fixed_rent_amount: Optional[float] = 0.0
-    payment_frequency: Optional[str] = "monthly"
-    payment_timing: Optional[str] = "postpaid"
-    renewal_option: Optional[bool] = False
-    termination_option: Optional[bool] = False
-    cam_amount: Optional[float] = 0.0
-    service_fee: Optional[float] = 0.0
-    discount_rate_type: Optional[str] = ""
-    discount_rate: Optional[float] = 0.0
-    is_lease: Optional[bool] = True
-    lease_scope: Optional[str] = "in_scope"
-    suggested_scope: Optional[str] = "in_scope"
-    exemption_reason: Optional[str] = ""
-    scope_source: Optional[str] = "ai_suggested"
-    scope_confidence: Optional[float] = 0.0
-    confidence: Optional[float] = 0.8
-    missing_fields: Optional[List[str]] = []
-    warnings: Optional[List[str]] = []
-
-
-class ContractBatchDraftResponse(BaseModel):
-    task_id: str
-    file_id: str
-    mode: str
-    draft_type: str = "contract_batch_draft"
-    status: str
-    contracts: List[ContractBatchItem]
-    total_count: int
-    confidence_scores: Dict[str, float]
-    missing_fields: List[str]
-    warnings: List[str]
-    requires_human_confirmation: bool
 
 
 def _format_excel_date(value: Any) -> str:
@@ -737,7 +697,7 @@ def _normalize_payment_timing(value: Any) -> str:
         return "prepaid"
     if text in ("postpaid", "arrears", "后付", "期末"):
         return "postpaid"
-    return text or "postpaid"
+    return ""
 
 
 def _normalize_asset_type(value: Any) -> str:
@@ -920,7 +880,8 @@ def _parse_contract_batch_from_excel(file_data: bytes, request: ContractBatchDra
 
     wb = openpyxl.load_workbook(io.BytesIO(file_data), data_only=True)
     try:
-        validated_contracts: list[ContractBatchItem] = []
+        validated_contracts: list[ContractDraftData] = []
+        evidence_locators: list[EvidenceLocator] = []
         all_warnings: list[str] = []
         all_missing: list[str] = []
 
@@ -1002,7 +963,8 @@ def _parse_contract_batch_from_excel(file_data: bytes, request: ContractBatchDra
                 if float(contract.get("scope_confidence", 0) or 0) < 0.8:
                     confidence = min(confidence, 0.7)
 
-                validated_contracts.append(ContractBatchItem(
+                contract_index = len(validated_contracts)
+                validated_contracts.append(ContractDraftData(
                     **{
                         **contract,
                         "confidence": confidence,
@@ -1010,12 +972,17 @@ def _parse_contract_batch_from_excel(file_data: bytes, request: ContractBatchDra
                         "warnings": row_warnings,
                     }
                 ))
+                evidence_locators.append(EvidenceLocator(
+                    field=f"contracts[{contract_index}]",
+                    source=f"{ws.title}!A{row_number}:{get_column_letter(len(row))}{row_number}",
+                    quote=contract_number,
+                ))
 
         if not validated_contracts:
             return None
 
-        low_confidence_count = sum(1 for c in validated_contracts if (c.confidence or 1.0) < 0.8)
-        overall_confidence = sum((c.confidence or 0.8) for c in validated_contracts) / len(validated_contracts)
+        low_confidence_count = sum(1 for c in validated_contracts if c.confidence < 0.8)
+        overall_confidence = sum(c.confidence for c in validated_contracts) / len(validated_contracts)
         unique_missing = sorted(set(all_missing))
         return {
             "task_id": "task_batch_" + request.file_id,
@@ -1030,8 +997,10 @@ def _parse_contract_batch_from_excel(file_data: bytes, request: ContractBatchDra
                 "average_item": overall_confidence,
             },
             "missing_fields": unique_missing,
-        "warnings": all_warnings + ["LLM 主解析未能稳定提取合同时，系统已启用 Excel 表格读取兜底；合同草稿必须人工逐条确认后入库"],
+            "warnings": all_warnings + ["LLM 主解析未能稳定提取合同时，系统已启用 Excel 表格读取兜底；合同草稿必须人工逐条确认后入库"],
             "requires_human_confirmation": overall_confidence < 0.8 or low_confidence_count > 0 or len(unique_missing) > 0,
+            "_evidence_locators": evidence_locators,
+            "_evidence_complete": True,
         }
     finally:
         wb.close()
@@ -1043,6 +1012,30 @@ def _model_to_dict(item: Any) -> dict:
     if hasattr(item, "dict"):
         return item.dict()
     return dict(item)
+
+
+def _finalize_contract_batch_intake(
+    request: ContractBatchDraftRequest, result: dict
+) -> ContractBatchIntakeResponse:
+    evidence_locators = result.get("_evidence_locators", [])
+    evidence_complete = bool(result.get("_evidence_complete", False))
+    missing_reason = (
+        "field_locators_not_produced_by_llm_adapter"
+        if _is_excel_content_type(request.content_type)
+        else "field_locators_not_produced_by_document_adapter"
+    )
+    return build_contract_batch_intake(
+        file_id=request.file_id,
+        object_name=request.object_name,
+        content_type=request.content_type,
+        contracts=result.get("contracts", []),
+        confidence_scores=result.get("confidence_scores", {"overall": 0.0}),
+        missing_fields=sorted(set(result.get("missing_fields", []))),
+        warnings=result.get("warnings", []),
+        evidence_locators=evidence_locators,
+        evidence_complete=evidence_complete,
+        evidence_missing_reason=missing_reason,
+    )
 
 
 async def _enrich_excel_contract_batch_with_llm(result: dict) -> dict:
@@ -1144,7 +1137,7 @@ async def _enrich_excel_contract_batch_with_llm(result: dict) -> dict:
         if c.get("contract_number")
     }
 
-    enriched_contracts: list[ContractBatchItem] = []
+    enriched_contracts: list[ContractDraftData] = []
     for base in contracts:
         contract_number = str(base.get("contract_number", "")).strip()
         enrichment = enrich_by_number.get(contract_number, {})
@@ -1168,17 +1161,17 @@ async def _enrich_excel_contract_batch_with_llm(result: dict) -> dict:
         merged["warnings"] = (base.get("warnings") or []) + (enrichment.get("warnings") or [])
         _, scope_warnings = _normalize_lease_scope(merged)
         merged["warnings"].extend(scope_warnings)
-        enriched_contracts.append(ContractBatchItem(**merged))
+        enriched_contracts.append(ContractDraftData(**merged))
 
     overall_confidence = float(parsed.get("overall_confidence") or result.get("confidence_scores", {}).get("overall", 0.8))
-    low_confidence_count = sum(1 for c in enriched_contracts if (c.confidence or 1.0) < 0.8)
+    low_confidence_count = sum(1 for c in enriched_contracts if c.confidence < 0.8)
     missing_fields = sorted({field for c in enriched_contracts for field in (c.missing_fields or [])})
 
     result["contracts"] = enriched_contracts
     result["total_count"] = len(enriched_contracts)
     result["confidence_scores"] = {
         "overall": overall_confidence,
-        "average_item": sum((c.confidence or 0.8) for c in enriched_contracts) / max(len(enriched_contracts), 1),
+        "average_item": sum(c.confidence for c in enriched_contracts) / max(len(enriched_contracts), 1),
     }
     result["missing_fields"] = missing_fields
     result["warnings"] = (
@@ -1195,7 +1188,7 @@ async def _enrich_excel_contract_batch_with_llm(result: dict) -> dict:
     return result
 
 
-@router.post("/parse/contract-batch", response_model=ContractBatchDraftResponse)
+@router.post("/parse/contract-batch", response_model=ContractBatchIntakeResponse)
 async def parse_contract_batch(request: ContractBatchDraftRequest):
     """
     解析合同台账文件，批量提取多份合同草稿
@@ -1327,7 +1320,7 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
                     "LLM 主解析未能从该 Excel 台账稳定提取合同，已启用表格读取兜底；这不是正式入库结果，必须人工逐条确认。"
                 ] + excel_result.get("warnings", [])
                 excel_result["requires_human_confirmation"] = True
-                return excel_result
+                return _finalize_contract_batch_intake(request, excel_result)
 
         validated_contracts = []
         all_warnings = _as_list(parsed.get("warnings", []))
@@ -1358,55 +1351,46 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
             _, scope_warnings = _normalize_lease_scope(c)
             all_warnings.extend(scope_warnings)
 
-            contract_confidence = _parse_float(c.get("confidence")) if c.get("confidence") not in (None, "") else 0.8
+            contract_confidence = _parse_float(c.get("confidence"))
             if missing_fields:
                 contract_confidence = min(contract_confidence, 0.7)
             if _parse_float(c.get("scope_confidence")) < 0.8:
                 contract_confidence = min(contract_confidence, 0.7)
 
-            validated_contracts.append(ContractBatchItem(
-                contract_number=c.get("contract_number", ""),
-                contract_name=c.get("contract_name", ""),
-                lessee=c.get("lessee", ""),
-                lessor=c.get("lessor", ""),
-                store_name=c.get("store_name", ""),
-                store_address=c.get("store_address", ""),
-                commencement_date=c.get("commencement_date", ""),
-                lease_start_date=c.get("lease_start_date", ""),
-                lease_end_date=c.get("lease_end_date", ""),
-                currency=c.get("currency", ""),
+            validated_contracts.append(ContractDraftData(
+                contract_number=c.get("contract_number") or "",
+                contract_name=c.get("contract_name") or "",
+                lessee=c.get("lessee") or "",
+                lessor=c.get("lessor") or "",
+                store_name=c.get("store_name") or "",
+                store_address=c.get("store_address") or "",
+                commencement_date=c.get("commencement_date") or "",
+                lease_start_date=c.get("lease_start_date") or "",
+                lease_end_date=c.get("lease_end_date") or "",
+                currency=c.get("currency") or "",
                 asset_type=_normalize_asset_type(c.get("asset_type", "real_estate")),
                 fixed_rent_amount=_parse_float(c.get("fixed_rent_amount")),
-                payment_frequency=c.get("payment_frequency", "monthly"),
-                payment_timing=_normalize_payment_timing(c.get("payment_timing", "postpaid")),
+                payment_frequency=c.get("payment_frequency") or "monthly",
+                payment_timing=_normalize_payment_timing(c.get("payment_timing")),
                 renewal_option=_coerce_bool(c.get("renewal_option"), False),
                 termination_option=_coerce_bool(c.get("termination_option"), False),
                 cam_amount=_parse_float(c.get("cam_amount")),
                 service_fee=_parse_float(c.get("service_fee")),
-                discount_rate_type=c.get("discount_rate_type", ""),
+                discount_rate_type=c.get("discount_rate_type") or "",
                 discount_rate=_parse_float(c.get("discount_rate")),
                 is_lease=_coerce_bool(c.get("is_lease"), c.get("lease_scope") != "not_a_lease"),
-                lease_scope=c.get("lease_scope", "in_scope"),
-                suggested_scope=c.get("suggested_scope", c.get("lease_scope", "in_scope")),
-                exemption_reason=c.get("exemption_reason", ""),
-                scope_source=c.get("scope_source", "ai_suggested"),
+                lease_scope=c.get("lease_scope") or "in_scope",
+                suggested_scope=c.get("suggested_scope") or c.get("lease_scope") or "in_scope",
+                exemption_reason=c.get("exemption_reason") or "",
+                scope_source=c.get("scope_source") or "ai_suggested",
                 scope_confidence=_parse_float(c.get("scope_confidence")),
                 confidence=contract_confidence,
                 missing_fields=missing_fields + (["discount_rate"] if dr_missing else []) + (["currency"] if currency_missing else []),
                 warnings=dr_warnings + currency_warnings + field_warnings + scope_warnings + _as_list(c.get("warnings", []))
             ))
 
-        overall_confidence = _parse_float(parsed.get("overall_confidence")) if parsed.get("overall_confidence") not in (None, "") else 0.8
-        low_confidence_count = sum(1 for c in validated_contracts if (c.confidence or 1.0) < 0.8)
-
-        requires_human = (
-            overall_confidence < 0.8 or
-            len(validated_contracts) == 0 or
-            low_confidence_count > len(validated_contracts) / 2 or
-            len(all_missing) > 0
-        )
-
-        return {
+        overall_confidence = _parse_float(parsed.get("overall_confidence"))
+        return _finalize_contract_batch_intake(request, {
             "task_id": "task_batch_" + request.file_id,
             "file_id": request.file_id,
             "mode": "assist",
@@ -1416,12 +1400,12 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
             "total_count": len(validated_contracts),
             "confidence_scores": {
                 "overall": overall_confidence,
-                "average_item": sum((c.confidence or 0.8) for c in validated_contracts) / max(len(validated_contracts), 1),
+                "average_item": sum(c.confidence for c in validated_contracts) / max(len(validated_contracts), 1),
             },
             "missing_fields": all_missing,
             "warnings": all_warnings + ["AI Assist Mode: 合同台账草稿需人工逐条确认后入库"],
-            "requires_human_confirmation": requires_human,
-        }
+            "requires_human_confirmation": True,
+        })
     except Exception as e:
         if is_excel and file_data is not None:
             excel_result = _parse_contract_batch_from_excel(file_data, request)
@@ -1430,5 +1414,5 @@ async def parse_contract_batch(request: ContractBatchDraftRequest):
                     f"LLM 主解析暂不可用或返回异常，已启用 Excel 表格读取兜底；合同草稿必须人工逐条确认。原因: {str(e)}"
                 ] + excel_result.get("warnings", [])
                 excel_result["requires_human_confirmation"] = True
-                return excel_result
+                return _finalize_contract_batch_intake(request, excel_result)
         raise HTTPException(status_code=500, detail=f"批量解析失败: {str(e)}")

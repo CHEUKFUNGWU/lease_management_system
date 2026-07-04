@@ -89,3 +89,78 @@ func TestParsePaymentScheduleRejectsMismatchedSourceIdentity(t *testing.T) {
 		t.Fatal("expected mismatched source identity to be rejected")
 	}
 }
+
+func TestParseFileUsesVersionedContractIntake(t *testing.T) {
+	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "contract.json")
+	fixture, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read shared contract intake fixture: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/v1/parse/contract" {
+			t.Errorf("unexpected AI service path %q", request.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(fixture)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("AI_SERVICE_URL", server.URL)
+
+	handler := &AIChatHandler{}
+	draft, err := handler.parseFile(
+		context.Background(),
+		"Bearer test-token",
+		"file-contract-001",
+		"lease-contract.pdf",
+		"application/pdf",
+	)
+	if err != nil {
+		t.Fatalf("parse contract: %v", err)
+	}
+	if draft.ExtractedData.ContractNumber != "LEASE-001" {
+		t.Fatalf("contract draft = %#v", draft.ExtractedData)
+	}
+	if draft.Evidence.Complete || !draft.ReviewGate.Required {
+		t.Fatalf("unsafe intake metadata: %#v", draft.IntakeMetadata)
+	}
+}
+
+func TestParseContractBatchUsesVersionedIntakeContract(t *testing.T) {
+	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "contract-batch.json")
+	fixture, err := os.ReadFile(fixturePath)
+	if err != nil {
+		t.Fatalf("read shared contract batch fixture: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/v1/parse/contract-batch" {
+			t.Errorf("unexpected AI service path %q", request.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(fixture)
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("AI_SERVICE_URL", server.URL)
+
+	handler := &AIChatHandler{}
+	result, err := handler.parseContractBatch(
+		context.Background(),
+		"Bearer test-token",
+		"file-batch-001",
+		"lease-ledger.xlsx",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	)
+	if err != nil {
+		t.Fatalf("parse contract batch: %v", err)
+	}
+	if len(result.Contracts) != 1 || result.Contracts[0].ContractNumber != "LEASE-BATCH-001" {
+		t.Fatalf("contracts = %#v", result.Contracts)
+	}
+	if result.Summary.SchemaVersion != "ai-intake.v1" || result.Summary.IntakeID != "intake-batch-fixture-001" {
+		t.Fatalf("intake trace = %#v", result.Summary)
+	}
+	if !result.Summary.EvidenceComplete || !result.Summary.RequiresHumanConfirm {
+		t.Fatalf("unsafe batch metadata = %#v", result.Summary)
+	}
+}

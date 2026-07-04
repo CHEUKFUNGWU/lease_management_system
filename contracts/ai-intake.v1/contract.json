@@ -1,0 +1,61 @@
+{
+  "schema_version": "ai-intake.v1",
+  "intake_id": "intake-contract-fixture-001",
+  "task_id": "task_file-contract-001",
+  "file_id": "file-contract-001",
+  "mode": "assist",
+  "draft_type": "contract_draft",
+  "status": "draft_generated",
+  "extracted_data": {
+    "contract_number": "LEASE-001",
+    "contract_name": "旗舰店租赁合同",
+    "lessee": "零售集团总公司",
+    "lessor": "示例物业有限公司",
+    "store_name": "旗舰店",
+    "store_address": "上海市示例路1号",
+    "commencement_date": "2026-01-01",
+    "lease_start_date": "2026-01-01",
+    "lease_end_date": "2028-12-31",
+    "currency": "CNY",
+    "asset_type": "real_estate",
+    "fixed_rent_amount": 100000.0,
+    "payment_frequency": "monthly",
+    "payment_timing": "prepaid",
+    "renewal_option": false,
+    "termination_option": false,
+    "cam_amount": 0.0,
+    "service_fee": 0.0,
+    "discount_rate_type": "",
+    "discount_rate": 0.0,
+    "is_lease": true,
+    "lease_scope": "in_scope",
+    "suggested_scope": "in_scope",
+    "exemption_reason": "",
+    "scope_source": "ai_suggested",
+    "scope_confidence": 0.91,
+    "confidence": 0.9,
+    "missing_fields": ["discount_rate"],
+    "warnings": ["折现率需人工确认"]
+  },
+  "confidence_scores": {
+    "overall": 0.9,
+    "contract_number": 0.99,
+    "lease_scope": 0.91
+  },
+  "missing_fields": ["discount_rate"],
+  "warnings": ["AI Assist Mode: 合同草稿需人工确认后入库"],
+  "requires_human_confirmation": true,
+  "evidence": {
+    "source_file_id": "file-contract-001",
+    "object_name": "lease-contract.pdf",
+    "content_type": "application/pdf",
+    "locators": [],
+    "complete": false,
+    "missing_reason": "field_locators_not_produced_by_document_adapter"
+  },
+  "review_gate": {
+    "required": true,
+    "reasons": ["assist_mode", "missing_fields", "evidence_incomplete"],
+    "confidence_threshold": 0.8
+  }
+}

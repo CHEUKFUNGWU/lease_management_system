@@ -35,11 +35,11 @@
     "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "locators": [
       {
-        "field": "schedules[0].amount",
-        "source": "Sheet1!D2",
+        "field": "schedules[0]",
+        "source": "Sheet1!A2:J2",
         "page": null,
         "coordinates": null,
-        "quote": "1000.00"
+        "quote": "2026-01-01 | 2026-01-31 | 2026-01-15 | 1000.00 | postpaid | CNY"
       }
     ],
     "complete": true,

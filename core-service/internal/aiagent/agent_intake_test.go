@@ -1,4 +1,4 @@
-package handlers
+package aiagent
 
 import (
 	"context"
@@ -26,8 +26,8 @@ func TestParsePaymentScheduleUsesVersionedIntakeContract(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("AI_SERVICE_URL", server.URL)
 
-	handler := &AIChatHandler{}
-	result, err := handler.parsePaymentSchedule(
+	agent := &Agent{}
+	result, err := agent.parsePaymentSchedule(
 		context.Background(),
 		"Bearer test-token",
 		"file-001",
@@ -76,8 +76,8 @@ func TestParsePaymentScheduleRejectsMismatchedSourceIdentity(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("AI_SERVICE_URL", server.URL)
 
-	handler := &AIChatHandler{}
-	_, err := handler.parsePaymentSchedule(
+	agent := &Agent{}
+	_, err := agent.parsePaymentSchedule(
 		context.Background(),
 		"Bearer test-token",
 		"file-001",
@@ -107,8 +107,8 @@ func TestParseFileUsesVersionedContractIntake(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("AI_SERVICE_URL", server.URL)
 
-	handler := &AIChatHandler{}
-	draft, err := handler.parseFile(
+	agent := &Agent{}
+	draft, err := agent.parseFile(
 		context.Background(),
 		"Bearer test-token",
 		"file-contract-001",
@@ -143,8 +143,8 @@ func TestParseContractBatchUsesVersionedIntakeContract(t *testing.T) {
 	t.Cleanup(server.Close)
 	t.Setenv("AI_SERVICE_URL", server.URL)
 
-	handler := &AIChatHandler{}
-	result, err := handler.parseContractBatch(
+	agent := &Agent{}
+	result, err := agent.parseContractBatch(
 		context.Background(),
 		"Bearer test-token",
 		"file-batch-001",

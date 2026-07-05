@@ -1,6 +1,6 @@
-// Package reporting owns the controlled source snapshot consumed by report
-// views. Mode policy, access-scoped contracts, payment facts, and discount-rate
-// precedence are resolved once behind SnapshotBuilder.Build.
+// Package reporting owns controlled report snapshots and the deterministic
+// projections derived from them. Source policy is resolved by SnapshotBuilder;
+// calculation, aggregation, currency, bucket, and export policy is resolved by Project.
 package reporting
 
 import (
@@ -30,6 +30,7 @@ type Request struct {
 type ContractFact struct {
 	Contract         *repository.Contract
 	PaymentSchedules []*repository.PaymentSchedule
+	EventAdjustments []*repository.EventAdjustment
 	DiscountRate     float64
 }
 
@@ -54,14 +55,23 @@ type rateSource interface {
 	GetFloat64(ctx context.Context, key string, fallback float64) float64
 }
 
-type SnapshotBuilder struct {
-	contracts contractSource
-	payments  paymentSource
-	rates     rateSource
+type adjustmentSource interface {
+	GetEventAdjustmentsForContracts(ctx context.Context, contractIDs []string) (map[string][]*repository.EventAdjustment, error)
 }
 
-func NewSnapshotBuilder(contracts contractSource, payments paymentSource, rates rateSource) *SnapshotBuilder {
-	return &SnapshotBuilder{contracts: contracts, payments: payments, rates: rates}
+type SnapshotBuilder struct {
+	contracts   contractSource
+	payments    paymentSource
+	rates       rateSource
+	adjustments adjustmentSource
+}
+
+func NewSnapshotBuilder(contracts contractSource, payments paymentSource, rates rateSource, adjustments ...adjustmentSource) *SnapshotBuilder {
+	builder := &SnapshotBuilder{contracts: contracts, payments: payments, rates: rates}
+	if len(adjustments) > 0 {
+		builder.adjustments = adjustments[0]
+	}
+	return builder
 }
 
 func NormalizeMode(mode string) Mode {
@@ -93,6 +103,13 @@ func (b *SnapshotBuilder) Build(ctx context.Context, request Request) (*Snapshot
 	if err != nil {
 		return nil, fmt.Errorf("load report payment schedules: %w", err)
 	}
+	adjustmentMap := make(map[string][]*repository.EventAdjustment)
+	if b.adjustments != nil {
+		adjustmentMap, err = b.adjustments.GetEventAdjustmentsForContracts(ctx, contractIDs)
+		if err != nil {
+			return nil, fmt.Errorf("load report event adjustments: %w", err)
+		}
+	}
 	globalRate := b.rates.GetFloat64(ctx, "global_discount_rate", fallbackDiscountRate)
 	facts := make([]ContractFact, 0, len(eligible))
 	for _, contract := range eligible {
@@ -102,7 +119,7 @@ func (b *SnapshotBuilder) Build(ctx context.Context, request Request) (*Snapshot
 		}
 		facts = append(facts, ContractFact{
 			Contract: contract, PaymentSchedules: filterPayments(mode, paymentMap[contract.ID]),
-			DiscountRate: rate,
+			EventAdjustments: adjustmentMap[contract.ID], DiscountRate: rate,
 		})
 	}
 	return &Snapshot{

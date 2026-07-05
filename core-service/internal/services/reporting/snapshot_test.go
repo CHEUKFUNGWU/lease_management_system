@@ -29,6 +29,16 @@ type fakeRateSource struct{ rate float64 }
 
 func (s fakeRateSource) GetFloat64(context.Context, string, float64) float64 { return s.rate }
 
+type fakeAdjustmentSource struct {
+	adjustments map[string][]*repository.EventAdjustment
+	loaded      []string
+}
+
+func (s *fakeAdjustmentSource) GetEventAdjustmentsForContracts(_ context.Context, contractIDs []string) (map[string][]*repository.EventAdjustment, error) {
+	s.loaded = append([]string(nil), contractIDs...)
+	return s.adjustments, nil
+}
+
 func TestOfficialSnapshotContainsOnlyApprovedFactsLoadedInOneBatch(t *testing.T) {
 	contractRate := 0.06
 	contracts := fakeContractSource{contracts: []*repository.Contract{
@@ -41,7 +51,10 @@ func TestOfficialSnapshotContainsOnlyApprovedFactsLoadedInOneBatch(t *testing.T)
 			{ID: "draft-payment", ContractID: "approved", ApprovalStatus: "draft"},
 		},
 	}}
-	builder := NewSnapshotBuilder(contracts, payments, fakeRateSource{rate: 0.05})
+	adjustments := &fakeAdjustmentSource{adjustments: map[string][]*repository.EventAdjustment{
+		"approved": {{ID: "adjustment-1", ContractID: "approved"}},
+	}}
+	builder := NewSnapshotBuilder(contracts, payments, fakeRateSource{rate: 0.05}, adjustments)
 
 	snapshot, err := builder.Build(context.Background(), Request{Mode: Official, LegalEntityID: "le-1"})
 	if err != nil {
@@ -59,11 +72,17 @@ func TestOfficialSnapshotContainsOnlyApprovedFactsLoadedInOneBatch(t *testing.T)
 	if len(payments.loaded) != 1 || payments.loaded[0] != "approved" {
 		t.Fatalf("batched contract IDs = %#v", payments.loaded)
 	}
+	if len(adjustments.loaded) != 1 || adjustments.loaded[0] != "approved" {
+		t.Fatalf("batched adjustment contract IDs = %#v", adjustments.loaded)
+	}
 	fact := snapshot.Contracts[0]
 	if fact.DiscountRate != contractRate {
 		t.Fatalf("discount rate = %v, want %v", fact.DiscountRate, contractRate)
 	}
 	if len(fact.PaymentSchedules) != 1 || fact.PaymentSchedules[0].ID != "official-payment" {
 		t.Fatalf("official payments = %#v", fact.PaymentSchedules)
+	}
+	if len(fact.EventAdjustments) != 1 || fact.EventAdjustments[0].ID != "adjustment-1" {
+		t.Fatalf("event adjustments = %#v", fact.EventAdjustments)
 	}
 }

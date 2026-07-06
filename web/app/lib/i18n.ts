@@ -4659,6 +4659,61 @@ const dict: TranslationDict = {
     "zh-HK": "變更後的值",
     en: "Value after change",
   },
+  "contract_detail.load_critical_dates_failed": {
+    "zh-CN": "关键日期加载失败",
+    "zh-HK": "關鍵日期載入失敗",
+    en: "Failed to load critical dates",
+  },
+  "contract_detail.load_documents_failed": {
+    "zh-CN": "文档列表加载失败",
+    "zh-HK": "文件列表載入失敗",
+    en: "Failed to load documents",
+  },
+  "contract_detail.load_obligations_failed": {
+    "zh-CN": "条款义务加载失败",
+    "zh-HK": "條款義務載入失敗",
+    en: "Failed to load obligations",
+  },
+  "contract_detail.critical_date_created": {
+    "zh-CN": "关键日期已创建",
+    "zh-HK": "關鍵日期已建立",
+    en: "Critical date created",
+  },
+  "contract_detail.create_critical_date_failed": {
+    "zh-CN": "关键日期创建失败",
+    "zh-HK": "關鍵日期建立失敗",
+    en: "Failed to create critical date",
+  },
+  "contract_detail.document_created": {
+    "zh-CN": "文档记录已创建",
+    "zh-HK": "文件記錄已建立",
+    en: "Document record created",
+  },
+  "contract_detail.create_document_failed": {
+    "zh-CN": "文档记录创建失败",
+    "zh-HK": "文件記錄建立失敗",
+    en: "Failed to create document record",
+  },
+  "contract_detail.obligation_created": {
+    "zh-CN": "条款义务已创建",
+    "zh-HK": "條款義務已建立",
+    en: "Obligation created",
+  },
+  "contract_detail.create_obligation_failed": {
+    "zh-CN": "条款义务创建失败",
+    "zh-HK": "條款義務建立失敗",
+    en: "Failed to create obligation",
+  },
+  "contract_detail.status_updated": {
+    "zh-CN": "状态已更新",
+    "zh-HK": "狀態已更新",
+    en: "Status updated",
+  },
+  "contract_detail.update_status_failed": {
+    "zh-CN": "状态更新失败",
+    "zh-HK": "狀態更新失敗",
+    en: "Failed to update status",
+  },
 };
 
 export function t(key: string, lang: Language, replacements?: Record<string, string>): string {

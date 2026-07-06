@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -8,13 +7,7 @@ import {
   Tag,
   Button,
   Table,
-  Modal,
   Form,
-  Input,
-  InputNumber,
-  DatePicker,
-  Select,
-  message,
   Spin,
   Divider,
   Space,
@@ -34,132 +27,24 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   RobotOutlined,
-  WarningOutlined,
   EditOutlined,
-  ImportOutlined,
-  CheckOutlined,
-  StopOutlined,
-  UndoOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
 import ProtectedRoute from "../../components/ProtectedRoute";
-import { contractApi, paymentScheduleApi, eventApi, leaseAdminApi } from "../../lib/api";
 import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
-import { parseTagString, normalizeTagValues, DEFAULT_TAG_SUGGESTIONS } from "../../lib/tags";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
-
-interface ContractDetail {
-  id: string;
-  contract_number: string;
-  contract_name: string;
-  legal_entity_id: string;
-  store_id: string;
-  landlord_id: string;
-  lessee_name: string;
-  lessor_name: string;
-  store_name: string;
-  store_address: string;
-  tags: string;
-  currency: string;
-  asset_type: string;
-  signing_date?: string;
-  commencement_date: string;
-  lease_start_date: string;
-  lease_end_date: string;
-  discount_rate_type?: string;
-  discount_rate_version?: string;
-  discount_rate_value?: number;
-  discount_rate_missing: boolean;
-  lease_scope: string;
-  exemption_reason?: string;
-  scope_source?: string;
-  scope_confidence?: number;
-  status: string;
-  approval_status: string;
-  is_official_version: boolean;
-  reviewed_by?: string;
-  reviewed_at?: string;
-  approved_by?: string;
-  approved_at?: string;
-  submitted_at?: string;
-  rejected_reason?: string;
-  created_at: string;
-}
-
-interface PaymentSchedule {
-  id: string;
-  due_date: string;
-  amount: number;
-  currency: string;
-  payment_timing: string;
-  amount_type: string;
-  is_fixed: boolean;
-  is_variable: boolean;
-  is_lease_component: boolean;
-  included_in_liability_pv: boolean;
-  approval_status: string;
-}
-
-interface CriticalDate {
-  id: string;
-  date_type: string;
-  target_date: string;
-  reminder_days: number;
-  status: string;
-  title: string;
-  description?: string;
-  source: string;
-}
-
-interface LeaseDocument {
-  id: string;
-  document_type: string;
-  file_name: string;
-  file_type?: string;
-  file_size?: number;
-  document_version?: string;
-  notes?: string;
-  uploaded_at: string;
-}
-
-interface LeaseObligation {
-  id: string;
-  obligation_type: string;
-  responsible_party: string;
-  title: string;
-  description?: string;
-  source_clause?: string;
-  source_page?: number;
-  status: string;
-  created_at: string;
-}
-
-interface CalcResult {
-  lease_scope: string;
-  measurement_basis: string;
-  initial_liability: number;
-  initial_rou_asset: number;
-  total_days: number;
-  monthly_summary: MonthlyEntry[];
-}
-
-interface MonthlyEntry {
-  Year: number;
-  Month: number;
-  OpeningLiability: number;
-  InterestExpense: number;
-  TotalPayments: number;
-  ClosingLiability: number;
-  OpeningROUAsset: number;
-  Depreciation: number;
-  ClosingROUAsset: number;
-  ExemptLeaseExpense: number;
-  VariableRentExpense: number;
-  NonLeaseExpense: number;
-}
+import { buildContractEditValues } from "./workspace/forms";
+import { ContractWorkspaceDialogs } from "./workspace/ContractWorkspaceDialogs";
+import type {
+  CriticalDate,
+  LeaseObligation,
+  MonthlyEntry,
+  PaymentSchedule,
+} from "./workspace/types";
+import { useContractWorkspace } from "./workspace/useContractWorkspace";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -171,621 +56,87 @@ export default function ContractDetailPage() {
   const canReview = hasRole(user, "reviewer") || hasRole(user, "admin");
   const canApprove = hasRole(user, "approver") || hasRole(user, "admin");
 
-  const [contract, setContract] = useState<ContractDetail | null>(null);
-  const [schedules, setSchedules] = useState<PaymentSchedule[]>([]);
-  const [calcResult, setCalcResult] = useState<CalcResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [calcLoading, setCalcLoading] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
   const [form] = Form.useForm();
-  const [activeTab, setActiveTab] = useState("info");
-  const [aiDrafts, setAiDrafts] = useState<any[]>([]);
-  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
-  const [showDraftPanel, setShowDraftPanel] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [events, setEvents] = useState<any[]>([]);
-  const [eventModalOpen, setEventModalOpen] = useState(false);
   const [eventForm] = Form.useForm();
-  const [eventLoading, setEventLoading] = useState(false);
-  const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [rejectModalType, setRejectModalType] = useState<'review' | 'approve'>('review');
-  const [rejectReason, setRejectReason] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm] = Form.useForm();
-  const [editLoading, setEditLoading] = useState(false);
-  const [eventRejectModalOpen, setEventRejectModalOpen] = useState(false);
-  const [eventRejectReason, setEventRejectReason] = useState('');
-  const [eventRejectEventId, setEventRejectEventId] = useState<string | null>(null);
-  const [eventRejectType, setEventRejectType] = useState<'review' | 'approve'>('review');
-  const [eventActionLoading, setEventActionLoading] = useState<string | null>(null);
-  const [editDraftModalOpen, setEditDraftModalOpen] = useState(false);
-  const [editDraftIndex, setEditDraftIndex] = useState<number>(-1);
-  const [editDraftForm] = Form.useForm();
-  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
-  const [adjustmentModalData, setAdjustmentModalData] = useState<any>(null);
-  const [adjustmentModalTitle, setAdjustmentModalTitle] = useState("");
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [criticalDates, setCriticalDates] = useState<CriticalDate[]>([]);
-  const [documents, setDocuments] = useState<LeaseDocument[]>([]);
-  const [obligations, setObligations] = useState<LeaseObligation[]>([]);
-  const [criticalDateModalOpen, setCriticalDateModalOpen] = useState(false);
   const [criticalDateForm] = Form.useForm();
-  const [criticalDateLoading, setCriticalDateLoading] = useState(false);
-  const [documentModalOpen, setDocumentModalOpen] = useState(false);
   const [documentForm] = Form.useForm();
-  const [documentLoading, setDocumentLoading] = useState(false);
-  const [obligationModalOpen, setObligationModalOpen] = useState(false);
   const [obligationForm] = Form.useForm();
-  const [obligationLoading, setObligationLoading] = useState(false);
 
-  useEffect(() => {
-    if (token && contractId) {
-      loadContract();
-      loadSchedules();
-      loadEvents();
-      loadCriticalDates();
-      loadDocuments();
-      loadObligations();
-    }
-  }, [token, contractId]);
+  const { state, dispatch, execute } = useContractWorkspace({
+    contractId,
+    token,
+    language,
+  });
+  const {
+    contract,
+    schedules,
+    calculation: calcResult,
+    events,
+    criticalDates,
+    documents,
+    obligations,
+    activeTab,
+    loading: workspaceLoading,
+  } = state;
 
-  const loadContract = async () => {
-    setLoading(true);
-    try {
-      const data = await contractApi.get(contractId, token!);
-      setContract(data);
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.load_contract_failed", language));
-    } finally {
-      setLoading(false);
-    }
+  const loading = workspaceLoading.initial;
+  const calcLoading = workspaceLoading.calculation;
+  const eventActionLoading = workspaceLoading.eventCommand;
+  const previewLoading = workspaceLoading.adjustment;
+  const actionLoadingAliases: Record<string, string> = {
+    "contract.submit": "submit",
+    "contract.review.approve": "review_approve",
+    "contract.approve": "approve",
   };
+  const actionLoading = workspaceLoading.command
+    ? actionLoadingAliases[workspaceLoading.command] || workspaceLoading.command
+    : null;
+  const setActiveTab = (tab: string) => dispatch({ type: "tab.select", tab });
 
-  const loadSchedules = async () => {
-    try {
-      const data = await paymentScheduleApi.list(contractId, token!);
-      setSchedules(data.data || []);
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.load_schedules_failed", language));
-    }
-  };
+  const handleUpdateCriticalDateStatus = (dateId: string, status: string) =>
+    execute({ type: "criticalDate.status", dateId, status });
 
-  const loadEvents = async () => {
-    try {
-      const data = await eventApi.list(contractId, token!);
-      setEvents(data.data || []);
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.load_events_failed", language));
-    }
-  };
+  const handleUpdateObligationStatus = (obligationId: string, status: string) =>
+    execute({ type: "obligation.status", obligationId, status });
 
-  const loadCriticalDates = async () => {
-    try {
-      const data = await leaseAdminApi.listCriticalDates(contractId, token!);
-      setCriticalDates(data.data || []);
-    } catch (error: any) {
-      message.error(error.message || "关键日期加载失败");
-    }
-  };
+  const handleEventSubmitForReview = (eventId: string) =>
+    execute({ type: "event.submit", eventId });
+  const handleEventReviewApprove = (eventId: string) =>
+    execute({ type: "event.review.approve", eventId });
+  const handleEventApprove = (eventId: string) =>
+    execute({ type: "event.approve", eventId });
+  const handleEventRejectOpen = (eventId: string, stage: "review" | "approve") =>
+    dispatch({ type: "event.reject.open", eventId, stage });
+  const handlePreviewAdjustment = (eventId: string) =>
+    execute({ type: "event.adjustment.preview", eventId });
+  const handleViewAdjustment = (eventId: string) =>
+    execute({ type: "event.adjustment.view", eventId });
+  const handleRecalculateEvent = (eventId: string) =>
+    execute({ type: "event.recalculate", eventId });
 
-  const loadDocuments = async () => {
-    try {
-      const data = await leaseAdminApi.listDocuments(contractId, token!);
-      setDocuments(data.data || []);
-    } catch (error: any) {
-      message.error(error.message || "文档列表加载失败");
-    }
-  };
-
-  const loadObligations = async () => {
-    try {
-      const data = await leaseAdminApi.listObligations(contractId, token!);
-      setObligations(data.data || []);
-    } catch (error: any) {
-      message.error(error.message || "条款义务加载失败");
-    }
-  };
-
-  const handleCreateCriticalDate = async (values: any) => {
-    setCriticalDateLoading(true);
-    try {
-      await leaseAdminApi.createCriticalDate(contractId, {
-        date_type: values.date_type,
-        target_date: values.target_date?.format("YYYY-MM-DD"),
-        reminder_days: values.reminder_days || 30,
-        title: values.title,
-        description: values.description || null,
-        source: "manual",
-      }, token!);
-      message.success("关键日期已创建");
-      setCriticalDateModalOpen(false);
-      criticalDateForm.resetFields();
-      loadCriticalDates();
-    } catch (error: any) {
-      message.error(error.message || "关键日期创建失败");
-    } finally {
-      setCriticalDateLoading(false);
-    }
-  };
-
-  const handleUpdateCriticalDateStatus = async (dateId: string, status: string) => {
-    try {
-      await leaseAdminApi.updateCriticalDateStatus(contractId, dateId, status, token!);
-      message.success("关键日期状态已更新");
-      loadCriticalDates();
-    } catch (error: any) {
-      message.error(error.message || "状态更新失败");
-    }
-  };
-
-  const handleCreateDocument = async (values: any) => {
-    setDocumentLoading(true);
-    try {
-      await leaseAdminApi.createDocument(contractId, {
-        document_type: values.document_type,
-        file_name: values.file_name,
-        file_type: values.file_type || null,
-        document_version: values.document_version || null,
-        notes: values.notes || null,
-      }, token!);
-      message.success("文档记录已创建");
-      setDocumentModalOpen(false);
-      documentForm.resetFields();
-      loadDocuments();
-    } catch (error: any) {
-      message.error(error.message || "文档记录创建失败");
-    } finally {
-      setDocumentLoading(false);
-    }
-  };
-
-  const handleCreateObligation = async (values: any) => {
-    setObligationLoading(true);
-    try {
-      await leaseAdminApi.createObligation(contractId, {
-        obligation_type: values.obligation_type,
-        responsible_party: values.responsible_party,
-        title: values.title,
-        description: values.description || null,
-        source_clause: values.source_clause || null,
-        source_page: values.source_page || null,
-      }, token!);
-      message.success("条款义务已创建");
-      setObligationModalOpen(false);
-      obligationForm.resetFields();
-      loadObligations();
-    } catch (error: any) {
-      message.error(error.message || "条款义务创建失败");
-    } finally {
-      setObligationLoading(false);
-    }
-  };
-
-  const handleUpdateObligationStatus = async (obligationId: string, status: string) => {
-    try {
-      await leaseAdminApi.updateObligationStatus(contractId, obligationId, status, token!);
-      message.success("条款义务状态已更新");
-      loadObligations();
-    } catch (error: any) {
-      message.error(error.message || "状态更新失败");
-    }
-  };
-
-  const handleCreateEvent = async (values: any) => {
-    setEventLoading(true);
-    try {
-      await eventApi.create(contractId, {
-        contract_id: contractId,
-        event_type: values.event_type,
-        effective_date: values.effective_date?.format("YYYY-MM-DD"),
-        original_value: values.original_value,
-        new_value: values.new_value,
-        change_reason: values.change_reason,
-        judgment_basis: values.judgment_basis,
-      }, token!);
-      message.success(t("contract_detail.event_created", language));
-      setEventModalOpen(false);
-      eventForm.resetFields();
-      loadEvents();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.create_event_failed", language));
-    } finally {
-      setEventLoading(false);
-    }
-  };
-
-  const handleEventSubmitForReview = async (eventId: string) => {
-    setEventActionLoading(eventId + '_submit');
-    try {
-      await eventApi.submitForReview(contractId, eventId, token!);
-      message.success(t("contract_detail.event_submitted", language));
-      loadEvents();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.submit_failed", language));
-    } finally {
-      setEventActionLoading(null);
-    }
-  };
-
-  const handleEventReviewApprove = async (eventId: string) => {
-    setEventActionLoading(eventId + '_review');
-    try {
-      await eventApi.review(contractId, eventId, true, '', token!);
-      message.success(t("contract_detail.review_passed", language));
-      loadEvents();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.review_failed", language));
-    } finally {
-      setEventActionLoading(null);
-    }
-  };
-
-  const handleEventApprove = async (eventId: string) => {
-    setEventActionLoading(eventId + '_approve');
-    try {
-      await eventApi.approve(contractId, eventId, token!);
-      message.success(t("contract_detail.approval_passed", language));
-      loadEvents();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.approve_failed", language));
-    } finally {
-      setEventActionLoading(null);
-    }
-  };
-
-  const handleEventRejectOpen = (eventId: string, type: 'review' | 'approve') => {
-    setEventRejectEventId(eventId);
-    setEventRejectType(type);
-    setEventRejectReason('');
-    setEventRejectModalOpen(true);
-  };
-
-  const handleEventRejectSubmit = async () => {
-    if (!eventRejectReason.trim()) {
-      message.warning(t("contract_detail.please_enter_reason", language));
-      return;
-    }
-    if (!eventRejectEventId) return;
-
-    setEventActionLoading(eventRejectEventId + '_reject');
-    try {
-      if (eventRejectType === 'review') {
-        await eventApi.review(contractId, eventRejectEventId, false, eventRejectReason, token!);
-        message.success(t("contract_detail.returned_to_editor", language));
-      } else {
-        await eventApi.reject(contractId, eventRejectEventId, eventRejectReason, token!);
-        message.success(t("contract_detail.rejected", language));
-      }
-      setEventRejectModalOpen(false);
-      setEventRejectReason('');
-      setEventRejectEventId(null);
-      loadEvents();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.operation_failed", language));
-    } finally {
-      setEventActionLoading(null);
-    }
-  };
-
-  const handlePreviewAdjustment = async (eventId: string) => {
-    setPreviewLoading(true);
-    try {
-      const data = await eventApi.previewAdjustment(contractId, eventId, token!);
-      setAdjustmentModalTitle(t("contract_detail.adjustment_event_impact_preview", language));
-      setAdjustmentModalData(data);
-      setAdjustmentModalOpen(true);
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.preview_failed", language));
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
-
-  const handleViewAdjustment = async (eventId: string) => {
-    try {
-      const data = await eventApi.getAdjustment(contractId, eventId, token!);
-      setAdjustmentModalTitle(t("contract_detail.adjustment_event_detail", language));
-      setAdjustmentModalData(data);
-      setAdjustmentModalOpen(true);
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.get_adjustment_failed", language));
-    }
-  };
-
-  const handleRecalculateEvent = async (eventId: string) => {
-    try {
-      await eventApi.recalculate(contractId, eventId, token!);
-      message.success(t("contract_detail.event_recalculated", language));
-      loadEvents();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.recalculate_failed", language));
-    }
-  };
-
-  const handleSubmitForReview = async () => {
-    setActionLoading('submit');
-    try {
-      await contractApi.submitForReview(contractId, token!);
-      message.success(t("contract_detail.submit_review_success", language));
-      loadContract();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.submit_failed", language));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleReviewApprove = async () => {
-    setActionLoading('review_approve');
-    try {
-      await contractApi.review(contractId, true, '', token!);
-      message.success(t("contract_detail.review_passed", language));
-      loadContract();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.review_failed", language));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleApprove = async () => {
-    setActionLoading('approve');
-    try {
-      await contractApi.approve(contractId, token!);
-      message.success(t("contract_detail.approval_passed", language));
-      loadContract();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.approve_failed", language));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleRejectSubmit = async () => {
-    if (!rejectReason.trim()) {
-      message.warning(t("contract_detail.please_enter_reason", language));
-      return;
-    }
-
-    const loadingKey = rejectModalType === 'review' ? 'review_reject' : 'approve_reject';
-    setActionLoading(loadingKey);
-    try {
-      if (rejectModalType === 'review') {
-        await contractApi.review(contractId, false, rejectReason, token!);
-        message.success(t("contract_detail.returned_to_editor", language));
-      } else {
-        await contractApi.reject(contractId, rejectReason, token!);
-        message.success(t("contract_detail.rejected", language));
-      }
-      setRejectModalOpen(false);
-      setRejectReason('');
-      loadContract();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.operation_failed", language));
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleCalculate = async () => {
-    setCalcLoading(true);
-    try {
-      const discountRate = contract?.discount_rate_value;
-      const data = await contractApi.calculate(
-        contractId,
-        discountRate,
-        token!
-      );
-      setCalcResult(data);
-      message.success(t("contract_detail.ifrs16_calculated", language));
-      setActiveTab("calculation");
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.calculate_failed", language));
-    } finally {
-      setCalcLoading(false);
-    }
-  };
+  const handleSubmitForReview = () => execute({ type: "contract.submit" });
+  const handleReviewApprove = () => execute({ type: "contract.review.approve" });
+  const handleApprove = () => execute({ type: "contract.approve" });
+  const handleCalculate = () => execute({ type: "contract.calculate" });
 
   const handleEditOpen = () => {
     if (!contract) return;
-    editForm.setFieldsValue({
-      contract_number: contract.contract_number,
-      contract_name: contract.contract_name,
-      lessee_name: contract.lessee_name,
-      lessor_name: contract.lessor_name,
-      store_name: contract.store_name,
-      store_address: contract.store_address,
-      currency: contract.currency,
-      signing_date: contract.signing_date ? dayjs(contract.signing_date) : null,
-      commencement_date: dayjs(contract.commencement_date),
-      lease_start_date: dayjs(contract.lease_start_date),
-      lease_end_date: dayjs(contract.lease_end_date),
-      asset_type: contract.asset_type || "real_estate",
-      discount_rate_type: contract.discount_rate_type || "",
-      discount_rate_version: contract.discount_rate_version || "",
-      discount_rate_value: contract.discount_rate_value ?? null,
-      lease_scope: contract.lease_scope || "in_scope",
-      exemption_reason: contract.exemption_reason || "",
-      tags: parseTagString(contract.tags || ""),
-    });
-    setEditModalOpen(true);
-  };
-
-  const handleUpdate = async (values: any) => {
-    if (!contract) {
-      return;
-    }
-    setEditLoading(true);
-    try {
-      const payload: Record<string, any> = {
-        contract_number: values.contract_number,
-        contract_name: values.contract_name,
-        lessee_name: values.lessee_name,
-        lessor_name: values.lessor_name,
-        store_name: values.store_name,
-        store_address: values.store_address,
-        currency: values.currency,
-        asset_type: values.asset_type || contract.asset_type || "real_estate",
-        commencement_date: values.commencement_date.format("YYYY-MM-DD"),
-        lease_start_date: values.lease_start_date.format("YYYY-MM-DD"),
-        lease_end_date: values.lease_end_date.format("YYYY-MM-DD"),
-        discount_rate_type: values.discount_rate_type || null,
-        discount_rate_version: values.discount_rate_version || null,
-        discount_rate_value: values.discount_rate_value ?? null,
-        lease_scope: values.lease_scope || contract.lease_scope || "in_scope",
-        exemption_reason: values.exemption_reason || null,
-        scope_source: "manual",
-        tags: normalizeTagValues(values.tags),
-      };
-      if (values.signing_date) {
-        payload.signing_date = values.signing_date.format("YYYY-MM-DD");
-      } else {
-        payload.signing_date = null;
-      }
-      await contractApi.update(contractId, payload, token!);
-      message.success(t("contract_detail.contract_updated", language));
-      setEditModalOpen(false);
-      loadContract();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.update_failed", language));
-    } finally {
-      setEditLoading(false);
-    }
+    editForm.setFieldsValue(buildContractEditValues(contract));
+    dispatch({ type: "dialog.open", dialog: "contractEdit" });
   };
 
   const openPaymentScheduleAgent = () => {
     const title = contract
       ? `${contract.contract_number} ${contract.contract_name}`
       : t("contract.tab_payments", language);
-    const params = new URLSearchParams({
+    const search = new URLSearchParams({
       page: "contract-detail",
       contract_id: contractId,
       title,
       summary: t("contract_detail.agent_payment_summary", language),
     });
-    router.push(`/ai-chat?${params.toString()}`);
-  };
-
-  const handleImportDrafts = async () => {
-    const confirmedDrafts = aiDrafts.filter((d) => d.confirmed && !d.skipped);
-    if (confirmedDrafts.length === 0) {
-      message.warning(t("contract_detail.no_confirmed_drafts", language));
-      return;
-    }
-    setImportLoading(true);
-    try {
-      let successCount = 0;
-      for (const draft of confirmedDrafts) {
-        await paymentScheduleApi.create(contractId, {
-          contract_id: contractId,
-          effective_start_date: draft.period_start || draft.due_date,
-          effective_end_date: draft.period_end || draft.due_date,
-          coverage_start_date: draft.period_start || draft.due_date,
-          coverage_end_date: draft.period_end || draft.due_date,
-          due_date: draft.due_date,
-          payment_timing: draft.payment_timing,
-          amount: draft.amount,
-          currency: draft.currency || "CNY",
-          amount_type: draft.amount_type || "fixed_rent",
-          is_fixed: draft.is_fixed,
-          is_lease_component: draft.is_lease_component,
-          included_in_liability_pv: draft.is_lease_component,
-        }, token!);
-        successCount++;
-      }
-      message.success(t("contract_detail.import_success", language, { count: String(successCount) }));
-      setShowDraftPanel(false);
-      setAiDrafts([]);
-      loadSchedules();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.import_failed", language));
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
-  const handleOpenEditDraft = (index: number) => {
-    const draft = aiDrafts[index];
-    editDraftForm.setFieldsValue({
-      due_date: draft.due_date ? dayjs(draft.due_date) : null,
-      amount: draft.amount,
-      payment_timing: draft.payment_timing || "postpaid",
-      amount_type: draft.amount_type || "",
-      is_fixed: draft.is_fixed ?? true,
-      is_lease_component: draft.is_lease_component ?? true,
-    });
-    setEditDraftIndex(index);
-    setEditDraftModalOpen(true);
-  };
-
-  const handleSaveEditDraft = (values: any) => {
-    const updated = [...aiDrafts];
-    updated[editDraftIndex] = {
-      ...updated[editDraftIndex],
-      due_date: values.due_date?.format("YYYY-MM-DD"),
-      amount: values.amount,
-      payment_timing: values.payment_timing,
-      amount_type: values.amount_type,
-      is_fixed: values.is_fixed,
-      is_lease_component: values.is_lease_component,
-    };
-    setAiDrafts(updated);
-    setEditDraftModalOpen(false);
-    message.success(t("contract_detail.draft_updated", language));
-  };
-
-  const handleConfirmDraft = (index: number) => {
-    const updated = [...aiDrafts];
-    updated[index] = { ...updated[index], confirmed: true };
-    setAiDrafts(updated);
-  };
-
-  const handleSkipDraft = (index: number) => {
-    const updated = [...aiDrafts];
-    updated[index] = { ...updated[index], skipped: true, confirmed: false };
-    setAiDrafts(updated);
-  };
-
-  const handleRestoreDraft = (index: number) => {
-    const updated = [...aiDrafts];
-    updated[index] = { ...updated[index], skipped: false };
-    setAiDrafts(updated);
-  };
-
-  const handleConfirmAll = () => {
-    const updated = aiDrafts.map((d) =>
-      d.skipped ? d : { ...d, confirmed: true }
-    );
-    setAiDrafts(updated);
-    message.success(t("contract_detail.confirmed_all", language));
-  };
-
-  const handleCreateSchedule = async (values: any) => {
-    try {
-      const payload = {
-        contract_id: contractId,
-        effective_start_date: values.effective_start_date?.format("YYYY-MM-DD"),
-        effective_end_date: values.effective_end_date?.format("YYYY-MM-DD"),
-        coverage_start_date: values.coverage_start_date?.format("YYYY-MM-DD"),
-        coverage_end_date: values.coverage_end_date?.format("YYYY-MM-DD"),
-        due_date: values.due_date?.format("YYYY-MM-DD"),
-        payment_timing: values.payment_timing,
-        amount: values.amount,
-        currency: values.currency || "CNY",
-        amount_type: values.amount_type,
-        is_fixed: values.is_fixed ?? true,
-        is_lease_component: values.is_lease_component ?? true,
-        included_in_liability_pv: values.included_in_liability_pv ?? true,
-      };
-      await paymentScheduleApi.create(contractId, payload, token!);
-      message.success(t("contract_detail.schedule_created", language));
-      setModalOpen(false);
-      form.resetFields();
-      loadSchedules();
-    } catch (error: any) {
-      message.error(error.message || t("contract_detail.create_schedule_failed", language));
-    }
+    router.push(`/ai-chat?${search.toString()}`);
   };
 
   const statusColors: Record<string, string> = {
@@ -1075,7 +426,7 @@ export default function ContractDetailPage() {
                             </Button>
                             <Button
                               danger
-                              onClick={() => { setRejectModalType('review'); setRejectReason(''); setRejectModalOpen(true); }}
+                              onClick={() => dispatch({ type: "contract.reject.open", stage: "review" })}
                             >
                               {t("contract.return_editor", language)}
                             </Button>
@@ -1093,7 +444,7 @@ export default function ContractDetailPage() {
                             </Button>
                             <Button
                               danger
-                              onClick={() => { setRejectModalType('approve'); setRejectReason(''); setRejectModalOpen(true); }}
+                              onClick={() => dispatch({ type: "contract.reject.open", stage: "approve" })}
                             >
                               {t("contract.reject", language)}
                             </Button>
@@ -1270,147 +621,13 @@ export default function ContractDetailPage() {
                         <Button
                           type="primary"
                           icon={<PlusOutlined />}
-                          onClick={() => setModalOpen(true)}
+                          onClick={() => dispatch({ type: "dialog.open", dialog: "schedule" })}
                         >
                           {t("contract.manual_add", language)}
                         </Button>
                       </Space>
                     }
                   >
-                    {/* AI Draft Preview */}
-                    {showDraftPanel && aiDrafts.length > 0 && (
-                      <div style={{ marginBottom: 16, padding: 16, background: "#F7F7F7", border: "1px solid #EAEAEA", borderRadius: 12 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-                          <Space>
-                            <RobotOutlined style={{ color: "#000" }} />
-                            <span style={{ fontWeight: "bold" }}>{t("contract.ai_draft_title", language)}</span>
-                            <Tag color="success">
-                              {t("contract_detail.ai_draft_count", language, { confirmed: String(aiDrafts.filter((d) => d.confirmed && !d.skipped).length), total: String(aiDrafts.length) })}
-                            </Tag>
-                          </Space>
-                          <Space>
-                            <Button size="small" onClick={handleConfirmAll}>
-                              {t("contract.confirm_all", language)}
-                            </Button>
-                            <Button size="small" onClick={() => { setShowDraftPanel(false); setAiDrafts([]); }}>
-                              {t("contract.cancel", language)}
-                            </Button>
-                            <Button
-                              type="primary"
-                              size="small"
-                              icon={<ImportOutlined />}
-                              onClick={handleImportDrafts}
-                              loading={importLoading}
-                            >
-                              {t("contract.import_confirmed", language)}
-                            </Button>
-                          </Space>
-                        </div>
-
-                        {aiWarnings.length > 0 && (
-                          <Alert
-                            message={t("contract.ai_warning", language)}
-                            description={
-                              <ul style={{ margin: 0, paddingLeft: 16 }}>
-                                {aiWarnings.slice(0, 5).map((w, i) => (
-                                  <li key={i}><WarningOutlined style={{ color: "#8C8C8C" }} /> {w}</li>
-                                ))}
-                                {aiWarnings.length > 5 && <li>{t("contract_detail.ai_warning_more", language, { count: String(aiWarnings.length - 5) })}</li>}
-                              </ul>
-                            }
-                            type="warning"
-                            showIcon
-                            style={{ marginBottom: 12 }}
-                          />
-                        )}
-
-                        <Table
-                          columns={[
-                            { title: t("contract.payment_date", language), dataIndex: "due_date", width: 110 },
-                            { title: t("contract.amount", language), dataIndex: "amount", width: 100, render: (v: number) => `¥${v.toLocaleString()}` },
-                            { title: t("contract.payment_timing", language), dataIndex: "payment_timing", width: 80, render: (v: string) => v === "prepaid" ? <Tag color="processing">{t("contract.prepaid", language)}</Tag> : <Tag color="success">{t("contract.postpaid", language)}</Tag> },
-                            { title: t("contract.amount_type", language), dataIndex: "amount_type", width: 100 },
-                            { title: t("contract.fixed", language), dataIndex: "is_fixed", width: 60, render: (v: boolean) => v ? t("contract.yes", language) : t("contract.no", language) },
-                            { title: t("contract.lease_component", language), dataIndex: "is_lease_component", width: 60, render: (v: boolean) => v ? t("contract.yes", language) : t("contract.no", language) },
-                            {
-                              title: t("contract.confidence", language),
-                              dataIndex: "confidence",
-                              width: 80,
-                              render: (v: number) => (
-                                <Tag color={v >= 0.9 ? "success" : v >= 0.8 ? "warning" : "error"}>
-                                  {(v * 100).toFixed(0)}%
-                                </Tag>
-                              ),
-                            },
-                            {
-                              title: t("contract.action", language),
-                              key: "action",
-                              width: 210,
-                              render: (_: any, record: any, index: number) => (
-                                <Space size="small">
-                                  <Button
-                                    size="small"
-                                    icon={<EditOutlined />}
-                                    onClick={() => handleOpenEditDraft(index)}
-                                  >
-                                    {t("contract.edit", language)}
-                                  </Button>
-                                  {!record.skipped && !record.confirmed && (
-                                    <>
-                                      <Button
-                                        size="small"
-                                        icon={<CheckOutlined />}
-                                        style={{ color: "#000", borderColor: "#000" }}
-                                        onClick={() => handleConfirmDraft(index)}
-                                      >
-                                        {t("contract.ok", language)}
-                                      </Button>
-                                      <Button
-                                        size="small"
-                                        icon={<StopOutlined />}
-                                        danger
-                                        onClick={() => handleSkipDraft(index)}
-                                      >
-                                        {t("contract.skip", language)}
-                                      </Button>
-                                    </>
-                                  )}
-                                  {record.confirmed && (
-                                    <Tag color="success" icon={<CheckCircleOutlined />}>{t("contract.confirmed", language)}</Tag>
-                                  )}
-                                  {record.skipped && (
-                                    <Button
-                                      size="small"
-                                      icon={<UndoOutlined />}
-                                      onClick={() => handleRestoreDraft(index)}
-                                    >
-                                      {t("contract.restore", language)}
-                                    </Button>
-                                  )}
-                                </Space>
-                              ),
-                            },
-                          ]}
-                          dataSource={aiDrafts}
-                          rowKey={(r, i) => `draft-${i}`}
-                          pagination={false}
-                          size="small"
-                          scroll={{ x: 850 }}
-                          onRow={(record: any) => ({
-                            style: {
-                              backgroundColor: record.confirmed
-                                ? "#F7F7F7"
-                                : record.skipped
-                                ? "#F7F7F7"
-                                : undefined,
-                              textDecoration: record.skipped ? "line-through" : undefined,
-                              opacity: record.skipped ? 0.6 : undefined,
-                            },
-                          })}
-                        />
-                      </div>
-                    )}
-
                     <Table
                       columns={scheduleColumns}
                       dataSource={schedules}
@@ -1437,7 +654,7 @@ export default function ContractDetailPage() {
                           </Space>
                         }
                         extra={
-                          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCriticalDateModalOpen(true)}>
+                          <Button type="primary" icon={<PlusOutlined />} onClick={() => dispatch({ type: "dialog.open", dialog: "criticalDate" })}>
                             新增关键日期
                           </Button>
                         }
@@ -1499,7 +716,7 @@ export default function ContractDetailPage() {
                       <Card
                         title="集中合同文档库"
                         extra={
-                          <Button type="primary" icon={<PlusOutlined />} onClick={() => setDocumentModalOpen(true)}>
+                          <Button type="primary" icon={<PlusOutlined />} onClick={() => dispatch({ type: "dialog.open", dialog: "document" })}>
                             新增文档记录
                           </Button>
                         }
@@ -1539,7 +756,7 @@ export default function ContractDetailPage() {
                           </Space>
                         }
                         extra={
-                          <Button type="primary" icon={<PlusOutlined />} onClick={() => setObligationModalOpen(true)}>
+                          <Button type="primary" icon={<PlusOutlined />} onClick={() => dispatch({ type: "dialog.open", dialog: "obligation" })}>
                             新增条款义务
                           </Button>
                         }
@@ -1613,7 +830,7 @@ export default function ContractDetailPage() {
                           </Space>
                         }
                         extra={
-                          <Button type="primary" icon={<PlusOutlined />} onClick={() => setEventModalOpen(true)}>
+                          <Button type="primary" icon={<PlusOutlined />} onClick={() => dispatch({ type: "dialog.open", dialog: "event" })}>
                             {t("contract.register_event", language)}
                           </Button>
                         }
@@ -1816,762 +1033,20 @@ export default function ContractDetailPage() {
         </Spin>
         </motion.div>
 
-        <Modal
-          title={t("contract.add_payment", language)}
-          open={modalOpen}
-          onCancel={() => setModalOpen(false)}
-          onOk={() => form.submit()}
-          width={700}
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleCreateSchedule}
-            initialValues={{
-              currency: "CNY",
-              payment_timing: "postpaid",
-              amount_type: "fixed_rent",
-              is_fixed: true,
-              is_lease_component: true,
-              included_in_liability_pv: true,
-            }}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.payment_date", language)}
-                  name="due_date"
-                  rules={[{ required: true, message: t("contract_detail.validation.payment_date", language) }]}
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.amount", language)}
-                  name="amount"
-                  rules={[{ required: true, message: t("contract_detail.validation.amount", language) }]}
-                >
-                  <InputNumber
-                    style={{ width: "100%" }}
-                    min={0}
-                    precision={2}
-                    prefix="¥"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t("contract.currency", language)} name="currency">
-                  <Select>
-                    <Select.Option value="CNY">{t("contract.currency_cny", language)}</Select.Option>
-                    <Select.Option value="USD">{t("contract.currency_usd", language)}</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.payment_timing_label", language)}
-                  name="payment_timing"
-                  rules={[{ required: true }]}
-                >
-                  <Select>
-                    <Select.Option value="prepaid">
-                      {t("contract.prepaid_label", language)}
-                    </Select.Option>
-                    <Select.Option value="postpaid">
-                      {t("contract.postpaid_label", language)}
-                    </Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.effective_start_date", language)}
-                  name="effective_start_date"
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.effective_end_date", language)}
-                  name="effective_end_date"
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t("contract.lease_end_date_label", language)}
-                  name="lease_end_date"
-                  rules={[{ required: true, message: t("contract_detail.validation.lease_end_date", language) }]}
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.discount_rate_type", language)} name="discount_rate_type">
-                  <Input placeholder={t("contract.discount_rate_type_placeholder", language)} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.discount_rate_value", language)}
-                  name="discount_rate_value"
-                  help={t("contract.discount_rate_help", language)}
-                >
-                  <InputNumber style={{ width: "100%" }} min={0} step={0.01} placeholder={t("contract_detail.discount_rate_placeholder", language)} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.discount_rate_version", language)} name="discount_rate_version">
-                  <Input placeholder={t("contract.discount_rate_version_placeholder", language)} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.tags", language)}
-                  name="tags"
-                  tooltip={t("contract.tags_tooltip", language)}
-                >
-                  <Select
-                    mode="tags"
-                    tokenSeparators={[",", "，", ";", "；", " ", "|"]}
-                    placeholder={t("contract.tags_placeholder", language)}
-                    options={DEFAULT_TAG_SUGGESTIONS.map((tag) => ({
-                      value: tag,
-                      label: tag,
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Form.Item label={t("contract.amount_type", language)} name="amount_type">
-              <Input placeholder={t("contract.amount_type_placeholder", language)} />
-            </Form.Item>
-
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  label={t("contract.is_fixed", language)}
-                  name="is_fixed"
-                  valuePropName="checked"
-                >
-                  <Select>
-                    <Select.Option value={true}>{t("contract.yes", language)}</Select.Option>
-                    <Select.Option value={false}>{t("contract.no", language)}</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t("contract.is_lease_component", language)}
-                  name="is_lease_component"
-                  valuePropName="checked"
-                >
-                  <Select>
-                    <Select.Option value={true}>{t("contract.yes", language)}</Select.Option>
-                    <Select.Option value={false}>{t("contract.no", language)}</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={t("contract.included_in_liability_pv", language)}
-                  name="included_in_liability_pv"
-                  valuePropName="checked"
-                >
-                  <Select>
-                    <Select.Option value={true}>{t("contract.yes", language)}</Select.Option>
-                    <Select.Option value={false}>{t("contract.no", language)}</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </Modal>
-
-        <Modal
-          title={t("contract.register_event", language)}
-          open={eventModalOpen}
-          onCancel={() => setEventModalOpen(false)}
-          onOk={() => eventForm.submit()}
-          confirmLoading={eventLoading}
-          width={600}
-        >
-          <Form
-            form={eventForm}
-            layout="vertical"
-            onFinish={handleCreateEvent}
-          >
-            <Form.Item
-              label={t("contract.tab_events", language)}
-              name="event_type"
-              rules={[{ required: true, message: t("contract_detail.validation.event_type", language) }]}
-            >
-              <Select placeholder={t("contract.select_event_type", language)}>
-                <Select.Option value="area_adjustment">{t("contract.event_type.area_adjustment", language)}</Select.Option>
-                <Select.Option value="rent_change">{t("contract.event_type.rent_change", language)}</Select.Option>
-                <Select.Option value="renewal">{t("contract.event_type.renewal", language)}</Select.Option>
-                <Select.Option value="early_termination">{t("contract.event_type.early_termination", language)}</Select.Option>
-                <Select.Option value="index_update">{t("contract.event_type.index_update", language)}</Select.Option>
-                <Select.Option value="discount_rate_change">{t("contract.event_type.discount_rate_change", language)}</Select.Option>
-                <Select.Option value="impairment">{t("contract.event_type.impairment", language)}</Select.Option>
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              label={t("contract.effective_date", language)}
-              name="effective_date"
-              rules={[{ required: true, message: t("contract_detail.validation.effective_date", language) }]}
-            >
-              <DatePicker style={{ width: "100%" }} />
-            </Form.Item>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t("contract.original_value", language)} name="original_value">
-                  <Input placeholder={t("contract_detail.original_value_placeholder", language)} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.new_value", language)} name="new_value">
-                  <Input placeholder={t("contract_detail.new_value_placeholder", language)} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Form.Item
-              label={t("contract.change_reason", language)}
-              name="change_reason"
-              rules={[{ required: true, message: t("contract_detail.validation.change_reason", language) }]}
-            >
-              <Input.TextArea rows={2} placeholder={t("contract.change_reason_placeholder", language)} />
-            </Form.Item>
-
-            <Form.Item label={t("contract.judgment_basis", language)} name="judgment_basis">
-              <Input.TextArea rows={2} placeholder={t("contract.judgment_basis_placeholder", language)} />
-            </Form.Item>
-          </Form>
-        </Modal>
-
-        <Modal
-          title={t("contract.edit_contract", language)}
-          open={editModalOpen}
-          onCancel={() => setEditModalOpen(false)}
-          onOk={() => editForm.submit()}
-          confirmLoading={editLoading}
-          width={700}
-        >
-          <Form
-            form={editForm}
-            layout="vertical"
-            onFinish={handleUpdate}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.contract_number", language)}
-                  name="contract_number"
-                  rules={[{ required: true, message: t("contract_detail.validation.contract_number", language) }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contracts.col_name", language)}
-                  name="contract_name"
-                  rules={[{ required: true, message: t("contract_detail.validation.contract_name", language) }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t("contract.lessee", language)} name="lessee_name">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.lessor", language)} name="lessor_name">
-                  <Input />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t("contract.store_name", language)} name="store_name">
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.store_address", language)} name="store_address">
-                  <Input />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.currency", language)}
-                  name="currency"
-                  rules={[{ required: true, message: t("contract_detail.validation.currency", language) }]}
-                >
-                  <Select>
-                    <Select.Option value="CNY">{t("contract.currency_cny", language)}</Select.Option>
-                    <Select.Option value="USD">{t("contract.currency_usd", language)}</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.signing_date", language)} name="signing_date">
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Form.Item label="资产类型" name="asset_type">
-              <Select>
-                <Select.Option value="real_estate">不动产</Select.Option>
-                <Select.Option value="vehicle">车辆</Select.Option>
-                <Select.Option value="it_equipment">IT 设备</Select.Option>
-                <Select.Option value="machinery">机器设备</Select.Option>
-                <Select.Option value="other">其他</Select.Option>
-              </Select>
-            </Form.Item>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.commencement_date", language)}
-                  name="commencement_date"
-                  rules={[{ required: true, message: t("contract_detail.validation.commencement_date", language) }]}
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.lease_start_date", language)}
-                  name="lease_start_date"
-                  rules={[{ required: true, message: t("contract_detail.validation.lease_start_date", language) }]}
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.lease_end_date_label", language)}
-                  name="lease_end_date"
-                  rules={[{ required: true, message: t("contract_detail.validation.lease_end_date", language) }]}
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.discount_rate_type", language)} name="discount_rate_type">
-                  <Input placeholder={t("contract.discount_rate_type_placeholder", language)} />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t("contract.discount_rate_version", language)} name="discount_rate_version">
-                  <Input placeholder={t("contract.discount_rate_version_placeholder", language)} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="IFRS 16 范围" name="lease_scope" rules={[{ required: true, message: "请选择 IFRS 16 范围" }]}>
-                  <Select>
-                    <Select.Option value="in_scope">资本化租赁</Select.Option>
-                    <Select.Option value="short_term_exempt">短期租赁豁免</Select.Option>
-                    <Select.Option value="low_value_exempt">低价值资产豁免</Select.Option>
-                    <Select.Option value="not_a_lease">非租赁合同</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Form.Item label="豁免/排除依据" name="exemption_reason">
-              <Input.TextArea rows={2} placeholder="例如：租期 10 个月且无续租意图；未识别特定资产；低价值 IT 设备" />
-            </Form.Item>
-
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item
-                  label={t("contract.tags", language)}
-                  name="tags"
-                  tooltip={t("contract.tags_tooltip", language)}
-                >
-                  <Select
-                    mode="tags"
-                    tokenSeparators={[",", "，", ";", "；", " ", "|"]}
-                    placeholder={t("contract.tags_placeholder", language)}
-                    options={DEFAULT_TAG_SUGGESTIONS.map((tag) => ({
-                      value: tag,
-                      label: tag,
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </Modal>
-
-        <Modal
-          title="新增关键日期"
-          open={criticalDateModalOpen}
-          onCancel={() => setCriticalDateModalOpen(false)}
-          onOk={() => criticalDateForm.submit()}
-          confirmLoading={criticalDateLoading}
-          width={600}
-        >
-          <Form
-            form={criticalDateForm}
-            layout="vertical"
-            onFinish={handleCreateCriticalDate}
-            initialValues={{ date_type: "renewal_deadline", reminder_days: 30 }}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label="类型" name="date_type" rules={[{ required: true, message: "请选择类型" }]}>
-                  <Select>
-                    <Select.Option value="renewal_deadline">续租截止</Select.Option>
-                    <Select.Option value="break_notice">Break 通知</Select.Option>
-                    <Select.Option value="rent_review">租金 Review</Select.Option>
-                    <Select.Option value="lease_expiry">租约到期</Select.Option>
-                    <Select.Option value="insurance_renewal">保险续保</Select.Option>
-                    <Select.Option value="other">其他</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="目标日期" name="target_date" rules={[{ required: true, message: "请选择目标日期" }]}>
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label="提前提醒天数" name="reminder_days">
-                  <InputNumber min={0} max={365} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="标题" name="title" rules={[{ required: true, message: "请输入标题" }]}>
-                  <Input placeholder="例如：续租通知截止日" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Form.Item label="说明" name="description">
-              <Input.TextArea rows={3} placeholder="记录条款依据、通知期、责任人或操作建议" />
-            </Form.Item>
-          </Form>
-        </Modal>
-
-        <Modal
-          title="新增文档记录"
-          open={documentModalOpen}
-          onCancel={() => setDocumentModalOpen(false)}
-          onOk={() => documentForm.submit()}
-          confirmLoading={documentLoading}
-          width={600}
-        >
-          <Form
-            form={documentForm}
-            layout="vertical"
-            onFinish={handleCreateDocument}
-            initialValues={{ document_type: "main_contract" }}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label="文档类型" name="document_type">
-                  <Select>
-                    <Select.Option value="main_contract">主合同</Select.Option>
-                    <Select.Option value="amendment">补充协议</Select.Option>
-                    <Select.Option value="side_letter">Side Letter</Select.Option>
-                    <Select.Option value="invoice">发票/账单</Select.Option>
-                    <Select.Option value="other">其他</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="版本" name="document_version">
-                  <Input placeholder="例如：v1 / 2024-签署版" />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Form.Item label="文件名" name="file_name" rules={[{ required: true, message: "请输入文件名" }]}>
-              <Input placeholder="例如：LEASE-2024-001 主合同.pdf" />
-            </Form.Item>
-            <Form.Item label="文件类型" name="file_type">
-              <Input placeholder="application/pdf" />
-            </Form.Item>
-            <Form.Item label="备注" name="notes">
-              <Input.TextArea rows={3} placeholder="记录文件来源、关键条款页码或归档说明" />
-            </Form.Item>
-          </Form>
-        </Modal>
-
-        <Modal
-          title="新增条款义务"
-          open={obligationModalOpen}
-          onCancel={() => setObligationModalOpen(false)}
-          onOk={() => obligationForm.submit()}
-          confirmLoading={obligationLoading}
-          width={720}
-        >
-          <Form
-            form={obligationForm}
-            layout="vertical"
-            onFinish={handleCreateObligation}
-            initialValues={{ obligation_type: "notice", responsible_party: "lessee" }}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label="义务类型" name="obligation_type" rules={[{ required: true, message: "请选择类型" }]}>
-                  <Select>
-                    <Select.Option value="maintenance">维修维护</Select.Option>
-                    <Select.Option value="cam">CAM / 管理费</Select.Option>
-                    <Select.Option value="insurance">保险</Select.Option>
-                    <Select.Option value="index_adjustment">指数调整</Select.Option>
-                    <Select.Option value="restoration">复原义务</Select.Option>
-                    <Select.Option value="security_deposit">押金</Select.Option>
-                    <Select.Option value="notice">通知义务</Select.Option>
-                    <Select.Option value="other">其他</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="责任方" name="responsible_party" rules={[{ required: true, message: "请选择责任方" }]}>
-                  <Select>
-                    <Select.Option value="lessee">承租方</Select.Option>
-                    <Select.Option value="lessor">出租方</Select.Option>
-                    <Select.Option value="shared">双方共同</Select.Option>
-                    <Select.Option value="third_party">第三方</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-            <Form.Item label="标题" name="title" rules={[{ required: true, message: "请输入标题" }]}>
-              <Input placeholder="例如：提前 6 个月提交续租通知" />
-            </Form.Item>
-            <Form.Item label="说明" name="description">
-              <Input.TextArea rows={3} placeholder="记录义务内容、触发条件、管理动作或财务影响" />
-            </Form.Item>
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item label="来源页码" name="source_page">
-                  <InputNumber min={1} style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={16}>
-                <Form.Item label="原文条款摘录" name="source_clause">
-                  <Input placeholder="粘贴合同条款原文，便于审计追溯" />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </Modal>
-
-        <Modal
-          title={rejectModalType === 'review' ? t("contract.review_reject_title", language) : t("contract.approve_reject_title", language)}
-          open={rejectModalOpen}
-          onCancel={() => setRejectModalOpen(false)}
-          onOk={handleRejectSubmit}
-          confirmLoading={actionLoading === (rejectModalType === 'review' ? 'review_reject' : 'approve_reject')}
-          okText={t("contract.ok", language)}
-          cancelText={t("contract.cancel", language)}
-        >
-          <p style={{ marginBottom: 8 }}>
-            {rejectModalType === 'review' ? t("contract.review_reject_reason", language) : t("contract.approve_reject_reason", language)}
-          </p>
-          <Input.TextArea
-            rows={4}
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            placeholder={t("contract.reason_placeholder", language)}
-          />
-        </Modal>
-
-        <Modal
-          title={eventRejectType === 'review' ? t("contract.review_reject_title", language) : t("contract.approve_reject_title", language)}
-          open={eventRejectModalOpen}
-          onCancel={() => setEventRejectModalOpen(false)}
-          onOk={handleEventRejectSubmit}
-          confirmLoading={eventRejectEventId ? eventActionLoading === eventRejectEventId + '_reject' : false}
-          okText={t("contract.ok", language)}
-          cancelText={t("contract.cancel", language)}
-        >
-          <p style={{ marginBottom: 8 }}>
-            {eventRejectType === 'review' ? t("contract.review_reject_reason", language) : t("contract.approve_reject_reason", language)}
-          </p>
-          <Input.TextArea
-            rows={4}
-            value={eventRejectReason}
-            onChange={(e) => setEventRejectReason(e.target.value)}
-            placeholder={t("contract.reason_placeholder", language)}
-          />
-        </Modal>
-
-        <Modal
-          title={t("contract.edit_draft", language)}
-          open={editDraftModalOpen}
-          onCancel={() => setEditDraftModalOpen(false)}
-          onOk={() => editDraftForm.submit()}
-          width={500}
-        >
-          <Form
-            form={editDraftForm}
-            layout="vertical"
-            onFinish={handleSaveEditDraft}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.payment_date", language)}
-                  name="due_date"
-                  rules={[{ required: true, message: t("contract_detail.validation.payment_date", language) }]}
-                >
-                  <DatePicker style={{ width: "100%" }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={t("contract.amount", language)}
-                  name="amount"
-                  rules={[{ required: true, message: t("contract_detail.validation.amount", language) }]}
-                >
-                  <InputNumber
-                    style={{ width: "100%" }}
-                    min={0}
-                    precision={2}
-                    prefix="¥"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Form.Item
-              label={t("contract.payment_timing_label", language)}
-              name="payment_timing"
-              rules={[{ required: true }]}
-            >
-              <Select>
-                <Select.Option value="prepaid">{t("contract.prepaid_label", language)}</Select.Option>
-                <Select.Option value="postpaid">{t("contract.postpaid_label", language)}</Select.Option>
-              </Select>
-            </Form.Item>
-
-            <Form.Item label={t("contract.amount_type", language)} name="amount_type">
-              <Input placeholder={t("contract.amount_type_placeholder", language)} />
-            </Form.Item>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label={t("contract.is_fixed", language)} name="is_fixed">
-                  <Select>
-                    <Select.Option value={true}>{t("contract.yes", language)}</Select.Option>
-                    <Select.Option value={false}>{t("contract.no", language)}</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label={t("contract.is_lease_component", language)} name="is_lease_component">
-                  <Select>
-                    <Select.Option value={true}>{t("contract.yes", language)}</Select.Option>
-                    <Select.Option value={false}>{t("contract.no", language)}</Select.Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </Modal>
-
-        <Modal
-          title={adjustmentModalTitle}
-          open={adjustmentModalOpen}
-          onCancel={() => setAdjustmentModalOpen(false)}
-          footer={[
-            <Button key="close" onClick={() => setAdjustmentModalOpen(false)}>{t("contract.close", language)}</Button>,
-          ]}
-          width={700}
-        >
-          {adjustmentModalData && (
-            <Descriptions column={1} bordered size="small">
-              <Descriptions.Item label={t("contract_detail.adjustment_type_label", language)}>
-                <Tag color="processing">{adjustmentModalData.adjustment_type || "-"}</Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract.effective_date", language)}>
-                {adjustmentModalData.effective_date ? dayjs(adjustmentModalData.effective_date).format("YYYY-MM-DD") : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract.discount_rate", language)}>
-                {adjustmentModalData.discount_rate != null ? `${(adjustmentModalData.discount_rate * 100).toFixed(2)}%` : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract_detail.liability_before", language)}>
-                {adjustmentModalData.liability_before != null ? `¥${adjustmentModalData.liability_before.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract_detail.liability_after", language)}>
-                {adjustmentModalData.liability_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "#000" }}>¥{adjustmentModalData.liability_after.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                ) : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract_detail.liability_change", language)}>
-                {adjustmentModalData.liability_change != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.liability_change >= 0 ? "#000" : "#000" }}>
-                    {adjustmentModalData.liability_change >= 0 ? "+" : ""}¥{adjustmentModalData.liability_change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                ) : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract_detail.asset_before", language)}>
-                {adjustmentModalData.asset_before != null ? `¥${adjustmentModalData.asset_before.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract_detail.asset_after", language)}>
-                {adjustmentModalData.asset_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "#000" }}>¥{adjustmentModalData.asset_after.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                ) : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract_detail.asset_change", language)}>
-                {adjustmentModalData.asset_change != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.asset_change >= 0 ? "#000" : "#000" }}>
-                    {adjustmentModalData.asset_change >= 0 ? "+" : ""}¥{adjustmentModalData.asset_change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                ) : "-"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contract_detail.pnl_impact", language)}>
-                {adjustmentModalData.pnl_impact != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.pnl_impact >= 0 ? "#000" : "#000" }}>
-                    {adjustmentModalData.pnl_impact >= 0 ? "+" : ""}¥{adjustmentModalData.pnl_impact.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                ) : "-"}
-              </Descriptions.Item>
-            </Descriptions>
-          )}
-        </Modal>
+        <ContractWorkspaceDialogs
+          language={language}
+          state={state}
+          dispatch={dispatch}
+          execute={execute}
+          forms={{
+            schedule: form,
+            event: eventForm,
+            edit: editForm,
+            criticalDate: criticalDateForm,
+            document: documentForm,
+            obligation: obligationForm,
+          }}
+        />
       </AppLayout>
     </ProtectedRoute>
   );

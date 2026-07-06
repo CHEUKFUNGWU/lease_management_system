@@ -32,6 +32,7 @@ func TestOfficialSnapshotPostgresHonorsAccessAndApprovalScope(t *testing.T) {
 		repository.NewContractRepository(pool),
 		repository.NewPaymentScheduleRepository(pool),
 		repository.NewSystemSettingRepository(pool),
+		repository.NewMonthlyClosingRepository(pool),
 	)
 
 	snapshot, err := builder.Build(scoped, Request{Mode: Official, LegalEntityID: fixture.legalEntityID})

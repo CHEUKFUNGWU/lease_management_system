@@ -142,3 +142,44 @@ func TestCashflowForecastOfficialUsesControlledSnapshotFacts(t *testing.T) {
 		t.Fatalf("official cashflow rows = %#v", response.Data)
 	}
 }
+
+func TestSensitivityAnalysisProjectsFromControlledSnapshot(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	commencement := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	contract := &repository.Contract{
+		ID: "contract-1", ContractNumber: "LC-001", ContractName: "Flagship",
+		ApprovalStatus: "approved", LeaseScope: "in_scope", Currency: "CNY",
+		CommencementDate: commencement, LeaseEndDate: time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC),
+	}
+	builder := reporting.NewSnapshotBuilder(
+		reportContractSource{contracts: []*repository.Contract{contract}},
+		reportPaymentSource{payments: map[string][]*repository.PaymentSchedule{
+			contract.ID: {{
+				ContractID: contract.ID, DueDate: contract.LeaseEndDate, Amount: 1200,
+				IsFixed: true, IsLeaseComponent: true, IncludedInLiabilityPV: true,
+				PaymentTiming: "postpaid", ApprovalStatus: "approved",
+			}},
+		}},
+		reportRateSource{},
+	)
+	handler := &ReportHandler{snapshotBuilder: builder}
+	router := gin.New()
+	router.GET("/reports/sensitivity", handler.SensitivityAnalysis)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/reports/sensitivity?contract_id=contract-1&shocks=0,0.01", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		SnapshotID string                     `json:"snapshot_id"`
+		BaseRate   float64                    `json:"base_rate"`
+		Data       []reporting.SensitivityRow `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.SnapshotID == "" || response.BaseRate != 0.05 || len(response.Data) != 2 || response.Data[1].InitialLiability >= response.Data[0].InitialLiability {
+		t.Fatalf("sensitivity response = %#v", response)
+	}
+}

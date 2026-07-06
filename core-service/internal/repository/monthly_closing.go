@@ -1048,6 +1048,42 @@ func (r *MonthlyClosingRepository) GetEventAdjustmentsForContract(ctx context.Co
 	return adjustments, nil
 }
 
+// GetEventAdjustmentsForContracts loads event adjustments for a report snapshot in one query.
+func (r *MonthlyClosingRepository) GetEventAdjustmentsForContracts(ctx context.Context, contractIDs []string) (map[string][]*EventAdjustment, error) {
+	result := make(map[string][]*EventAdjustment, len(contractIDs))
+	if len(contractIDs) == 0 {
+		return result, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT id, event_id, contract_id, adjustment_type, effective_date,
+			liability_before, liability_after, liability_adjustment,
+			rou_before, rou_after, rou_adjustment,
+			pnl_gain, pnl_loss, revised_discount_rate, discount_rate_source,
+			calculation_batch_id, created_at
+		FROM event_adjustments
+		WHERE contract_id::text = ANY($1)
+		ORDER BY contract_id, effective_date ASC
+	`, contractIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to batch list event adjustments: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		adjustment := &EventAdjustment{}
+		if err := rows.Scan(
+			&adjustment.ID, &adjustment.EventID, &adjustment.ContractID, &adjustment.AdjustmentType, &adjustment.EffectiveDate,
+			&adjustment.LiabilityBefore, &adjustment.LiabilityAfter, &adjustment.LiabilityAdjustment,
+			&adjustment.ROUBefore, &adjustment.ROUAfter, &adjustment.ROUAdjustment,
+			&adjustment.PnLGain, &adjustment.PnLLoss, &adjustment.RevisedDiscountRate, &adjustment.DiscountRateSource,
+			&adjustment.CalculationBatchID, &adjustment.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan event adjustment: %w", err)
+		}
+		result[adjustment.ContractID] = append(result[adjustment.ContractID], adjustment)
+	}
+	return result, rows.Err()
+}
+
 // GetEventAdjustmentByEventID returns the event adjustment record for a specific event.
 func (r *MonthlyClosingRepository) GetEventAdjustmentByEventID(ctx context.Context, eventID string) (*EventAdjustment, error) {
 	query := `

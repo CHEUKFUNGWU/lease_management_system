@@ -133,7 +133,7 @@ func (h *EventHandler) SubmitForReview(c *gin.Context) {
 	}
 
 	if err := h.eventRepo.SubmitForReview(ctx, eventID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit: " + err.Error()})
+		writeWorkflowMutationError(c, "submit event", err)
 		return
 	}
 
@@ -184,7 +184,7 @@ func (h *EventHandler) Review(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 
 	if err := h.eventRepo.Review(ctx, eventID, userIDStr, req.Approved, req.Reason); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to review: " + err.Error()})
+		writeWorkflowMutationError(c, "review event", err)
 		return
 	}
 
@@ -226,7 +226,7 @@ func (h *EventHandler) Approve(c *gin.Context) {
 	treatment := eventaccounting.Classify(event.EventType)
 
 	if err := h.eventRepo.Approve(ctx, eventID, userIDStr, treatment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to approve: " + err.Error()})
+		writeWorkflowMutationError(c, "approve event", err)
 		return
 	}
 
@@ -272,7 +272,7 @@ func (h *EventHandler) Reject(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 
 	if err := h.eventRepo.Reject(ctx, eventID, userIDStr, req.Reason); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reject: " + err.Error()})
+		writeWorkflowMutationError(c, "reject event", err)
 		return
 	}
 

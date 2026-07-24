@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
-	
+
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type ContractApproval struct {
@@ -23,10 +22,10 @@ type ContractApproval struct {
 }
 
 type ApprovalRepository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
-func NewApprovalRepository(db *pgxpool.Pool) *ApprovalRepository {
+func NewApprovalRepository(db DBTX) *ApprovalRepository {
 	return &ApprovalRepository{db: db}
 }
 
@@ -34,12 +33,19 @@ func (r *ApprovalRepository) SubmitForReview(ctx context.Context, contractID, su
 	query := `
 		UPDATE lease_contracts
 		SET approval_status = 'submitted',
+		    is_official_version = false,
+		    reviewed_by = NULL,
+		    reviewed_at = NULL,
+		    approved_by = NULL,
+		    approved_at = NULL,
+		    rejected_reason = NULL,
 		    submitted_at = $2,
 		    updated_at = $2
 		WHERE id = $1
+		  AND approval_status IN ('draft', 'returned_to_editor', 'rejected')
 	`
-	_, err := r.db.Exec(ctx, query, contractID, time.Now())
-	return err
+	result, err := r.db.Exec(ctx, query, contractID, time.Now())
+	return requireWorkflowTransition(result, err, "contract", contractID)
 }
 
 func (r *ApprovalRepository) Review(ctx context.Context, contractID, reviewedBy string, approved bool, reason string) error {
@@ -47,18 +53,19 @@ func (r *ApprovalRepository) Review(ctx context.Context, contractID, reviewedBy 
 	if !approved {
 		status = "returned_to_editor"
 	}
-	
+
 	query := `
 		UPDATE lease_contracts
 		SET approval_status = $3,
 		    reviewed_by = $2,
 		    reviewed_at = $4,
-		    rejected_reason = $5,
+		    rejected_reason = CASE WHEN $3 = 'returned_to_editor' THEN NULLIF($5, '') ELSE NULL END,
 		    updated_at = $4
 		WHERE id = $1
+		  AND approval_status = 'submitted'
 	`
-	_, err := r.db.Exec(ctx, query, contractID, reviewedBy, status, time.Now(), reason)
-	return err
+	result, err := r.db.Exec(ctx, query, contractID, reviewedBy, status, time.Now(), reason)
+	return requireWorkflowTransition(result, err, "contract", contractID)
 }
 
 func (r *ApprovalRepository) Approve(ctx context.Context, contractID, approvedBy string) error {
@@ -68,25 +75,29 @@ func (r *ApprovalRepository) Approve(ctx context.Context, contractID, approvedBy
 		    is_official_version = true,
 		    approved_by = $2,
 		    approved_at = $3,
+		    rejected_reason = NULL,
 		    updated_at = $3
 		WHERE id = $1
+		  AND approval_status = 'reviewed'
 	`
-	_, err := r.db.Exec(ctx, query, contractID, approvedBy, time.Now())
-	return err
+	result, err := r.db.Exec(ctx, query, contractID, approvedBy, time.Now())
+	return requireWorkflowTransition(result, err, "contract", contractID)
 }
 
 func (r *ApprovalRepository) Reject(ctx context.Context, contractID, rejectedBy, reason string) error {
 	query := `
 		UPDATE lease_contracts
 		SET approval_status = 'rejected',
+		    is_official_version = false,
 		    approved_by = $2,
 		    approved_at = $3,
 		    rejected_reason = $4,
 		    updated_at = $3
 		WHERE id = $1
+		  AND approval_status = 'reviewed'
 	`
-	_, err := r.db.Exec(ctx, query, contractID, rejectedBy, time.Now(), reason)
-	return err
+	result, err := r.db.Exec(ctx, query, contractID, rejectedBy, time.Now(), reason)
+	return requireWorkflowTransition(result, err, "contract", contractID)
 }
 
 func (r *ApprovalRepository) GetApprovalStatus(ctx context.Context, contractID string) (*ContractApproval, error) {
@@ -95,7 +106,7 @@ func (r *ApprovalRepository) GetApprovalStatus(ctx context.Context, contractID s
 		       report_mode, reviewed_by, reviewed_at, approved_by, approved_at, rejected_reason
 		FROM lease_contracts WHERE id = $1
 	`
-	
+
 	ca := &ContractApproval{}
 	var id string
 	err := r.db.QueryRow(ctx, query, contractID).Scan(
@@ -109,7 +120,7 @@ func (r *ApprovalRepository) GetApprovalStatus(ctx context.Context, contractID s
 		}
 		return nil, fmt.Errorf("failed to get approval status: %w", err)
 	}
-	
+
 	ca.ContractID = id
 	return ca, nil
 }
@@ -126,13 +137,13 @@ func (r *ApprovalRepository) ListByStatus(ctx context.Context, status string, of
 		  AND ($2 = false OR is_official_version = true)
 		ORDER BY created_at DESC
 	`
-	
+
 	rows, err := r.db.Query(ctx, query, status, officialOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list contracts by status: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var contracts []*Contract
 	for rows.Next() {
 		c := &Contract{}
@@ -152,6 +163,6 @@ func (r *ApprovalRepository) ListByStatus(ctx context.Context, status string, of
 		}
 		contracts = append(contracts, c)
 	}
-	
+
 	return contracts, nil
 }

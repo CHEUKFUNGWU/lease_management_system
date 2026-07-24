@@ -152,11 +152,18 @@ func (r *EventRepository) SubmitForReview(ctx context.Context, eventID string) e
 	query := `
 		UPDATE lease_events
 		SET approval_status = 'submitted',
+		    is_official_version = false,
+		    reviewed_by = NULL,
+		    reviewed_at = NULL,
+		    approved_by = NULL,
+		    approval_date = NULL,
+		    rejected_reason = NULL,
 		    updated_at = $2
 		WHERE id = $1
+		  AND approval_status IN ('draft', 'returned_to_editor', 'rejected')
 	`
-	_, err := r.db.Exec(ctx, query, eventID, time.Now())
-	return err
+	result, err := r.db.Exec(ctx, query, eventID, time.Now())
+	return requireWorkflowTransition(result, err, "event", eventID)
 }
 
 func (r *EventRepository) Review(ctx context.Context, eventID, userID string, approved bool, reason string) error {
@@ -171,12 +178,13 @@ func (r *EventRepository) Review(ctx context.Context, eventID, userID string, ap
 		SET approval_status = $3,
 		    reviewed_by = $2,
 		    reviewed_at = $4,
-		    rejected_reason = $5,
+		    rejected_reason = CASE WHEN $3 = 'returned_to_editor' THEN NULLIF($5, '') ELSE NULL END,
 		    updated_at = $4
 		WHERE id = $1
+		  AND approval_status = 'submitted'
 	`
-	_, err := r.db.Exec(ctx, query, eventID, userID, status, now, reason)
-	return err
+	result, err := r.db.Exec(ctx, query, eventID, userID, status, now, reason)
+	return requireWorkflowTransition(result, err, "event", eventID)
 }
 
 func (r *EventRepository) Approve(ctx context.Context, eventID, userID, ifrs16Treatment string) error {
@@ -189,11 +197,13 @@ func (r *EventRepository) Approve(ctx context.Context, eventID, userID, ifrs16Tr
 		    approval_date = $3,
 		    ifrs16_treatment = $4,
 		    status = 'active',
+		    rejected_reason = NULL,
 		    updated_at = $3
 		WHERE id = $1
+		  AND approval_status = 'reviewed'
 	`
-	_, err := r.db.Exec(ctx, query, eventID, userID, now, ifrs16Treatment)
-	return err
+	result, err := r.db.Exec(ctx, query, eventID, userID, now, ifrs16Treatment)
+	return requireWorkflowTransition(result, err, "event", eventID)
 }
 
 // GetApprovedEventsForContract returns all approved events for a contract ordered by effective date.
@@ -254,12 +264,14 @@ func (r *EventRepository) Reject(ctx context.Context, eventID, userID, reason st
 	query := `
 		UPDATE lease_events
 		SET approval_status = 'rejected',
+		    is_official_version = false,
 		    rejected_reason = $3,
-		    reviewed_by = $2,
-		    reviewed_at = $4,
+		    approved_by = $2,
+		    approval_date = $4,
 		    updated_at = $4
 		WHERE id = $1
+		  AND approval_status = 'reviewed'
 	`
-	_, err := r.db.Exec(ctx, query, eventID, userID, reason, now)
-	return err
+	result, err := r.db.Exec(ctx, query, eventID, userID, reason, now)
+	return requireWorkflowTransition(result, err, "event", eventID)
 }

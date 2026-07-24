@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -39,6 +40,17 @@ type CreateAIChatReviewActionRequest struct {
 	ActionPayload map[string]interface{} `json:"action_payload,omitempty"`
 	Comment       string                 `json:"comment,omitempty"`
 	FollowUp      *AIChatFollowUpRequest `json:"follow_up,omitempty"`
+}
+
+func aiReviewActionPermission(actionType string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(actionType)) {
+	case "confirm", "import", "create_draft":
+		return "confirm", true
+	case "reject", "skip":
+		return "review", true
+	default:
+		return "", false
+	}
 }
 
 type AIChatContinuationTarget struct {
@@ -402,6 +414,20 @@ func (h *AIChatHandler) CreateReviewAction(c *gin.Context) {
 	var req CreateAIChatReviewActionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	requiredAction, supported := aiReviewActionPermission(req.ActionType)
+	if !supported {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported AI draft review action"})
+		return
+	}
+	permissionValue, _ := c.Get("permissions")
+	permissions, _ := permissionValue.([]string)
+	if !middleware.HasPermission(permissions, "ai_drafts", requiredAction) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":    "insufficient permissions",
+			"required": "ai_drafts:" + requiredAction,
+		})
 		return
 	}
 

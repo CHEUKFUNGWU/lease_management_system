@@ -68,7 +68,7 @@ func (h *ApprovalHandler) SubmitForReview(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 
 	if err := h.approvalRepo.SubmitForReview(ctx, req.ContractID, userIDStr); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit: " + err.Error()})
+		writeWorkflowMutationError(c, "submit contract", err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (h *ApprovalHandler) Review(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 
 	if err := h.approvalRepo.Review(ctx, req.ContractID, userIDStr, req.Approved, req.Reason); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to review: " + err.Error()})
+		writeWorkflowMutationError(c, "review contract", err)
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *ApprovalHandler) Approve(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 
 	if err := h.approvalRepo.Approve(ctx, req.ContractID, userIDStr); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to approve: " + err.Error()})
+		writeWorkflowMutationError(c, "approve contract", err)
 		return
 	}
 
@@ -211,7 +211,7 @@ func (h *ApprovalHandler) Reject(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 
 	if err := h.approvalRepo.Reject(ctx, req.ContractID, userIDStr, req.Reason); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reject: " + err.Error()})
+		writeWorkflowMutationError(c, "reject contract", err)
 		return
 	}
 

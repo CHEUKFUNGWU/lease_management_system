@@ -13,6 +13,10 @@ build/
 *.egg-info/
 .gocache/
 core-service/.gocache/
+.gomodcache/
+core-service/.gomodcache/
+*.tsbuildinfo
+/core-service/api
 
 # IDE
 .idea/

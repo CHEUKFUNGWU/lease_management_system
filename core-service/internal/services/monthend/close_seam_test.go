@@ -49,7 +49,20 @@ func (f fakeSchedules) GetByContractID(_ context.Context, contractID string) ([]
 	if f.failFor[contractID] {
 		return nil, errors.New("schedule read failed")
 	}
-	return nil, nil // empty -> mockPayments path
+	return []*repository.PaymentSchedule{{
+		ContractID:            contractID,
+		EffectiveStartDate:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		EffectiveEndDate:      time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC),
+		CoverageStartDate:     time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		CoverageEndDate:       time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC),
+		DueDate:               time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC),
+		Amount:                100000,
+		PaymentTiming:         "postpaid",
+		AmountType:            "fixed",
+		IsFixed:               true,
+		IsLeaseComponent:      true,
+		IncludedInLiabilityPV: true,
+	}}, nil
 }
 
 type fakeRates struct{ value float64 }

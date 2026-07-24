@@ -26,9 +26,9 @@ type UpdateGlobalSettingsRequest struct {
 
 // GET /api/v1/settings/global
 func (h *SettingsHandler) GetGlobal(c *gin.Context) {
-	rate := 0.05
+	rate := 0.0
 	if h.systemSettingRepo != nil {
-		rate = h.systemSettingRepo.GetFloat64(c.Request.Context(), "global_discount_rate", 0.05)
+		rate = h.systemSettingRepo.GetFloat64(c.Request.Context(), "global_discount_rate", 0)
 	}
 	c.JSON(http.StatusOK, GlobalSettingsResponse{
 		GlobalDiscountRate: rate,

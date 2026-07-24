@@ -8,6 +8,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 )
 
@@ -331,12 +332,10 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		return
 	}
 	payments := repository.ToIFRS16Payments(schedules)
-	discountRate := resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
-	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-		discountRate = *contract.DiscountRateValue
-	}
-	if discountRate <= 0 {
-		discountRate = 0.05
+	discountRate, _, err := contractsvc.ResolveDiscountRate(ctx, 0, h.systemSettingRepo, contract)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "discount_rate_missing": true})
+		return
 	}
 
 	accountingResult, err := eventaccounting.Calculate(eventaccounting.Input{
@@ -414,12 +413,10 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 	}
 	payments := repository.ToIFRS16Payments(schedules)
 
-	discountRate := resolveGlobalDiscountRate(ctx, h.systemSettingRepo)
-	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-		discountRate = *contract.DiscountRateValue
-	}
-	if discountRate <= 0 {
-		discountRate = 0.05
+	discountRate, _, err := contractsvc.ResolveDiscountRate(ctx, 0, h.systemSettingRepo, contract)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "discount_rate_missing": true})
+		return
 	}
 	result, err := eventaccounting.Calculate(eventaccounting.Input{
 		EventID: eventID, ContractID: contractID, EventType: event.EventType,

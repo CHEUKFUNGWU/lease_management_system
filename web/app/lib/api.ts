@@ -97,6 +97,17 @@ export const legalEntityApi = {
     apiRequest("/api/v1/master-data/legal-entities", { token }),
 };
 
+export const masterDataApi = {
+  listStores: (token: string, legalEntityId?: string) => {
+    const query = legalEntityId
+      ? `?legal_entity_id=${encodeURIComponent(legalEntityId)}`
+      : "";
+    return apiRequest(`/api/v1/master-data/stores${query}`, { token });
+  },
+  listLandlords: (token: string) =>
+    apiRequest("/api/v1/master-data/landlords", { token }),
+};
+
 // Contract APIs
 export const contractApi = {
   list: (token: string, params?: { search?: string; status?: string; sort_by?: string; sort_order?: string }) => {

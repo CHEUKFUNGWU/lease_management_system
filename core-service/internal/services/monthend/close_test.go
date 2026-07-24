@@ -4,29 +4,30 @@ import (
 	"testing"
 	"time"
 
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
 func TestResolveDiscountRate(t *testing.T) {
 	contractRate := 0.07
-	zeroRate := 0.0
 	tests := []struct {
 		name         string
 		override     float64
 		globalRate   float64
 		contractRate *float64
 		want         float64
+		wantErr      bool
 	}{
-		{"override wins", 0.03, 0.04, &contractRate, 0.03},
-		{"global when no override", 0, 0.04, &contractRate, 0.04},
-		{"contract when no override or global", 0, 0, &contractRate, 0.07},
-		{"fallback when nothing", 0, 0, nil, fallbackDiscountRate},
-		{"fallback when contract rate zero", 0, 0, &zeroRate, fallbackDiscountRate},
+		{"override wins", 0.03, 0.04, &contractRate, 0.03, false},
+		{"contract before global", 0, 0.04, &contractRate, 0.07, false},
+		{"contract when no override or global", 0, 0, &contractRate, 0.07, false},
+		{"missing input fails", 0, 0, nil, 0, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := resolveDiscountRate(tc.override, tc.globalRate, tc.contractRate); got != tc.want {
-				t.Fatalf("resolveDiscountRate = %v, want %v", got, tc.want)
+			got, _, err := contractsvc.ResolveDiscountRateValues(tc.override, tc.globalRate, tc.contractRate, "in_scope")
+			if got != tc.want || (err != nil) != tc.wantErr {
+				t.Fatalf("ResolveDiscountRateValues = (%v, %v), want (%v, error=%t)", got, err, tc.want, tc.wantErr)
 			}
 		})
 	}

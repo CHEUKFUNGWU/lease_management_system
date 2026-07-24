@@ -143,7 +143,7 @@ func main() {
 
 		// Discount Rate
 		protected.Handle(http.MethodGet, "/contracts/:id/discount-rate-status", permission("calculations", "read"), contractScope, handlers.CheckDiscountRate(contractRepo))
-		protected.Handle(http.MethodPost, "/contracts/:id/confirm-discount-rate", permission("calculations", "trigger"), contractScope, handlers.ConfirmDiscountRate(contractRepo))
+		protected.Handle(http.MethodPost, "/contracts/:id/confirm-discount-rate", permission("calculations", "trigger"), contractScope, handlers.ConfirmDiscountRate(contractRepo, auditLogger))
 
 		// Payment Schedules
 		protected.Handle(http.MethodPost, "/contracts/:id/payment-schedules", permission("payment_schedules", "create"), contractScope, psHandler.Create)

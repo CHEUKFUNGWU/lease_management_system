@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -62,45 +63,16 @@ func (h *CalculationHandler) Calculate(c *gin.Context) {
 		return
 	}
 
-	var payments []ifrs16svc.LeasePayment
 	if len(schedules) == 0 {
-		// Fallback: generate monthly payments if no schedules exist
-		payments = []ifrs16svc.LeasePayment{
-			{
-				Date:   contract.CommencementDate,
-				Amount: 100000,
-				Timing: "postpaid",
-				Type:   "fixed",
-			},
-		}
-		currentDate := contract.CommencementDate.AddDate(0, 1, 0)
-		for currentDate.Before(contract.LeaseEndDate) {
-			payments = append(payments, ifrs16svc.LeasePayment{
-				Date:   currentDate,
-				Amount: 100000,
-				Timing: "postpaid",
-				Type:   "fixed",
-			})
-			currentDate = currentDate.AddDate(0, 1, 0)
-		}
-	} else {
-		payments = repository.ToIFRS16Payments(schedules)
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "payment schedules are required for calculation"})
+		return
 	}
+	payments := repository.ToIFRS16Payments(schedules)
 
-	// Determine discount rate priority:
-	// 1) explicit request override
-	// 2) global system setting
-	// 3) contract.DiscountRateValue
-	// 4) fallback 0.05
-	discountRate := req.DiscountRate
-	if discountRate <= 0 {
-		discountRate = resolveGlobalDiscountRate(c.Request.Context(), h.systemSettingRepo)
-	}
-	if discountRate <= 0 && contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-		discountRate = *contract.DiscountRateValue
-	}
-	if discountRate <= 0 {
-		discountRate = 0.05
+	discountRate, _, err := contractsvc.ResolveDiscountRate(ctx, req.DiscountRate, h.systemSettingRepo, contract)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "discount_rate_missing": true})
+		return
 	}
 
 	calculation := ifrs16svc.LeaseCalculation{

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lease-management-system/core-service/internal/repository"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 )
 
 type Mode string
@@ -19,7 +20,6 @@ const (
 	Official Mode = "official"
 )
 
-const fallbackDiscountRate = 0.05
 const policyVersion = "report-snapshot-v1"
 
 type Request struct {
@@ -110,12 +110,15 @@ func (b *SnapshotBuilder) Build(ctx context.Context, request Request) (*Snapshot
 			return nil, fmt.Errorf("load report event adjustments: %w", err)
 		}
 	}
-	globalRate := b.rates.GetFloat64(ctx, "global_discount_rate", fallbackDiscountRate)
+	globalRate := 0.0
+	if b.rates != nil {
+		globalRate = b.rates.GetFloat64(ctx, "global_discount_rate", 0)
+	}
 	facts := make([]ContractFact, 0, len(eligible))
 	for _, contract := range eligible {
-		rate := globalRate
-		if contract.DiscountRateValue != nil && *contract.DiscountRateValue > 0 {
-			rate = *contract.DiscountRateValue
+		rate, _, err := contractsvc.ResolveDiscountRateValues(0, globalRate, contract.DiscountRateValue, contract.LeaseScope)
+		if err != nil {
+			return nil, fmt.Errorf("contract %s: %w", contract.ID, err)
 		}
 		facts = append(facts, ContractFact{
 			Contract: contract, PaymentSchedules: filterPayments(mode, paymentMap[contract.ID]),

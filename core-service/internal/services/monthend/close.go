@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -51,8 +52,6 @@ var systemEntryTypes = []string{
 var eventEntryTypes = []string{"modification", "reassessment", "impairment"}
 
 var managedEntryTypes = append(append([]string{}, systemEntryTypes...), eventEntryTypes...)
-
-const fallbackDiscountRate = 0.05
 
 // Read-side dependencies. Each is satisfied by the corresponding concrete
 // repository and by test fakes.
@@ -329,14 +328,17 @@ func measureContract(ctx context.Context, schedulesSource scheduleSource, contra
 		return nil, "", 0, true
 	}
 
-	var payments []ifrs16svc.LeasePayment
 	if len(schedules) == 0 {
-		payments = mockPayments(contract)
-	} else {
-		payments = repository.ToIFRS16Payments(schedules)
+		return nil, "", 0, true
 	}
+	payments := repository.ToIFRS16Payments(schedules)
 
-	discountRate = resolveDiscountRate(cmd.DiscountRateOverride, globalRate, contract.DiscountRateValue)
+	discountRate, _, err = contractsvc.ResolveDiscountRateValues(
+		cmd.DiscountRateOverride, globalRate, contract.DiscountRateValue, contract.LeaseScope,
+	)
+	if err != nil {
+		return nil, "", 0, true
+	}
 
 	calculation := ifrs16svc.LeaseCalculation{
 		CommencementDate: contract.CommencementDate,
@@ -373,22 +375,6 @@ func resolveGlobalDiscountRate(ctx context.Context, rates rateSource) float64 {
 		return 0.0
 	}
 	return rates.GetFloat64(ctx, "global_discount_rate", 0.0)
-}
-
-// resolveDiscountRate applies the rate priority: per-run override, then the
-// global system setting, then the contract's own rate, then a 5% fallback.
-func resolveDiscountRate(override, globalRate float64, contractRate *float64) float64 {
-	rate := override
-	if rate <= 0 {
-		rate = globalRate
-	}
-	if rate <= 0 && contractRate != nil && *contractRate > 0 {
-		rate = *contractRate
-	}
-	if rate <= 0 {
-		rate = fallbackDiscountRate
-	}
-	return rate
 }
 
 // closeStatus derives the batch status from per-contract outcomes.

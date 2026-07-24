@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
 )
 
@@ -222,6 +223,8 @@ func writeProjectionError(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, reporting.ErrPaymentSchedulesRequired):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, contractsvc.ErrDiscountRateRequired):
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "discount_rate_missing": true})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}

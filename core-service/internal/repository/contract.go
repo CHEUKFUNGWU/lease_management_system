@@ -796,3 +796,39 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 
 	return c, nil
 }
+
+func (r *ContractRepository) ConfirmDiscountRate(
+	ctx context.Context,
+	contractID, legalEntityID, discountRateType, discountRateVersion string,
+	discountRateValue float64,
+	source string,
+	policyID *string,
+	confirmedBy string,
+	confirmedAt time.Time,
+) error {
+	query := `
+		UPDATE lease_contracts
+		SET discount_rate_type = $1,
+		    discount_rate_version = $2,
+		    discount_rate_value = $3,
+		    discount_rate_missing = false,
+		    discount_rate_source = $4,
+		    discount_rate_policy_id = $5,
+		    discount_rate_confirmed_by = $6,
+		    discount_rate_confirmed_at = $7,
+		    updated_by = $6,
+		    updated_at = NOW()
+		WHERE id = $8
+		  AND approval_status IN ('draft', 'returned_to_editor', 'rejected')
+	`
+	args := []any{
+		discountRateType, discountRateVersion, discountRateValue, source,
+		policyID, confirmedBy, confirmedAt, contractID,
+	}
+	if legalEntityID != "" {
+		query += ` AND legal_entity_id = $9`
+		args = append(args, legalEntityID)
+	}
+	result, err := r.db.Exec(ctx, query, args...)
+	return requireWorkflowTransition(result, err, "contract discount rate", contractID)
+}

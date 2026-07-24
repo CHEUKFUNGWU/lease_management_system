@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -274,7 +275,7 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		discountRate = *request.Rate
 	}
 	if discountRate <= 0 {
-		discountRate = fallbackDiscountRate
+		return ProjectionResult{}, contractsvc.ErrDiscountRateRequired
 	}
 	payments := repository.ToIFRS16Payments(fact.PaymentSchedules)
 	calculation, err := calculateContract(fact, payments, discountRate)
@@ -404,7 +405,7 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 		baseRate = *request.Rate
 	}
 	if baseRate <= 0 {
-		baseRate = fallbackDiscountRate
+		return ProjectionResult{}, contractsvc.ErrDiscountRateRequired
 	}
 	shocks := request.Shocks
 	if len(shocks) == 0 {

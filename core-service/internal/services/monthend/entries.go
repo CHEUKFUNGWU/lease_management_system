@@ -76,27 +76,4 @@ func buildJournalEntries(contractID, period string, entryDate time.Time, monthly
 	return entries
 }
 
-// mockPayments produces fallback monthly fixed payments for contracts that have
-// no payment schedule rows, preserving the previous closing behavior.
-func mockPayments(contract *repository.Contract) []ifrs16svc.LeasePayment {
-	var payments []ifrs16svc.LeasePayment
-	payments = append(payments, ifrs16svc.LeasePayment{
-		Date:   contract.CommencementDate,
-		Amount: 100000,
-		Timing: "postpaid",
-		Type:   "fixed",
-	})
-	currentDate := contract.CommencementDate.AddDate(0, 1, 0)
-	for currentDate.Before(contract.LeaseEndDate) {
-		payments = append(payments, ifrs16svc.LeasePayment{
-			Date:   currentDate,
-			Amount: 100000,
-			Timing: "postpaid",
-			Type:   "fixed",
-		})
-		currentDate = currentDate.AddDate(0, 1, 0)
-	}
-	return payments
-}
-
 func strPtr(s string) *string { return &s }

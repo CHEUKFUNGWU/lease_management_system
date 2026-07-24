@@ -1,0 +1,3 @@
+# Use Trial Balance as required GL evidence
+
+MVP reconciliation requires a versioned, content-identified Trial Balance and optionally accepts GL Line Items for voucher-level drill-down. Reconciliation conclusions use Functional Currency as the mandatory basis; Transaction Currency Coverage is performed only when the supplied evidence supports it and the reduced or enhanced Reconciliation Scope is disclosed. Customer-specific Lease Account Mappings are a prerequisite, and categories sharing indistinguishable GL accounts are compared as a Reconciliation Group rather than presented with false category-level precision.

@@ -1,0 +1,3 @@
+# Separate exception severity from gate effect
+
+Each Close Control Rule independently defines exception severity and Gate Effect. Preflight failures prevent affected subjects from formal calculation, projection failures prevent affected outputs from becoming approvable journals, journal-control failures prevent approval or posting, and GL or ERP failures prevent period lock. Every unresolved Blocking Exception ultimately prevents lock, while Warning Exceptions require authorized acknowledgement before lock. Failed outputs remain as Diagnostic Results and evidence rather than being deleted. Agent components cannot alter either severity or Gate Effect.

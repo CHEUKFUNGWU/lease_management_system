@@ -1,0 +1,3 @@
+# Govern close control profiles without weakening core controls
+
+Core Control Rule classification is system-governed and cannot be changed through a Close Control Profile. Policy Control Rules use effective-dated group defaults with permitted Legal Entity overrides, but no override may exceed the Group Control Ceiling; weakening a control requires stronger approval than tightening it. Finance Editor proposes, Finance Reviewer reviews, and a different Finance Approver approves, while System Admin has no unilateral accounting-policy authority. Emergency Control Changes remain approved, time-limited, and non-bypassable. Period lock archives the Frozen Control Profile with the Frozen Projection and Close Snapshot so later policy changes cannot alter historical conclusions.

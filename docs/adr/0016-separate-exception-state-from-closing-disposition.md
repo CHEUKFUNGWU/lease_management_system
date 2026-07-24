@@ -1,0 +1,3 @@
+# Separate exception state from closing disposition
+
+Closed is the sole terminal workflow state for a Close Exception, while Verified Resolution, Accounting Conclusion, Period Waiver, and Standing Waiver are mutually exclusive closing dispositions. Automatically verifiable issues close only after an Explicitly Evaluated passing event; judgmental issues close through an approved Accounting Conclusion or waiver. A recurring Exception Fingerprint reopens the existing exception and preserves its earlier disposition and evidence chain. Exceptions cannot be closed by deletion, dismissal, or an unsupported false-positive label.

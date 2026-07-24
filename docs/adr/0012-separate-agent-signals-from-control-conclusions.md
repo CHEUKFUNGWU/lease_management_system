@@ -1,0 +1,3 @@
+# Separate Agent Signals from control conclusions
+
+Only the versioned Close Control Rule Engine may author Detection Events, Control Conclusions, severities, Close Exceptions, and automatic resolution transitions. Agent components write only to a physically separate signal and suggestion boundary and have read-only access to control state. A judgmental Close Exception is minted by a deterministic Close Control Rule responding to an unresolved Agent Signal, never directly by the Agent. Signals retain their evidence location, type, confidence, model version, and generation time and are visibly distinguished from findings. Agent output cannot supply accounting amounts or conclusions, and every Detection Event records the rule version that produced it.

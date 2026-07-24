@@ -1,0 +1,3 @@
+# Govern close by Legal Entity and accounting period
+
+The Close Period, uniquely identified by Legal Entity and accounting period, is the boundary for exception governance, Close Readiness, and period lock. Close Batches may execute partial contract, region, or brand scopes but cannot independently declare the period clean or lock it. A non-weakening core control must prove Evaluation Coverage of the entire Close Population against the candidate Projection Version and applicable Close Control Profile before lock. Partial reruns update their subjects and then require regeneration and revalidation of the Legal Entity period aggregate. Group close is an oversight view across independently governed Legal Entity Close Periods.

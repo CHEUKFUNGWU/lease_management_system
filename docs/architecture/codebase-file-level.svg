@@ -1,0 +1,304 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1400" width="100%" style="background:#f8fafc;font-family:system-ui,-apple-system,sans-serif;">
+  <defs>
+    <linearGradient id="gWeb" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#e0f2fe"/><stop offset="100%" style="stop-color:#bae6fd"/></linearGradient>
+    <linearGradient id="gCore" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#dcfce7"/><stop offset="100%" style="stop-color:#bbf7d0"/></linearGradient>
+    <linearGradient id="gAI" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#f3e8ff"/><stop offset="100%" style="stop-color:#e9d5ff"/></linearGradient>
+    <linearGradient id="gDB" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#ffedd5"/><stop offset="100%" style="stop-color:#fed7aa"/></linearGradient>
+    <linearGradient id="gInfra" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#f1f5f9"/><stop offset="100%" style="stop-color:#e2e8f0"/></linearGradient>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L0,8 L7,4 z" fill="#64748b"/></marker>
+    <marker id="arrWeb" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L0,8 L7,4 z" fill="#0284c7"/></marker>
+    <marker id="arrCore" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L0,8 L7,4 z" fill="#16a34a"/></marker>
+    <marker id="arrAI" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L0,8 L7,4 z" fill="#9333ea"/></marker>
+    <marker id="arrDB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L0,8 L7,4 z" fill="#ea580c"/></marker>
+  </defs>
+
+  <!-- Title -->
+  <rect x="20" y="15" width="2360" height="42" rx="8" fill="#0f172a"/>
+  <text x="1200" y="43" text-anchor="middle" fill="#f8fafc" font-size="18" font-weight="700">租赁管理系统 — File-Level 架构图 (文件级依赖链路)</text>
+
+  <!-- ===================== WEB FRONTEND ===================== -->
+  <rect x="20" y="70" width="380" height="1060" rx="10" fill="url(#gWeb)" stroke="#38bdf8" stroke-width="2"/>
+  <text x="40" y="95" fill="#0369a1" font-size="13" font-weight="700">Web Frontend (Next.js 14 + TS + AntD)</text>
+  <text x="40" y="112" fill="#0284c7" font-size="10">Port 3000</text>
+
+  <!-- Web Pages -->
+  <rect x="30" y="120" width="360" height="280" rx="6" fill="#fff" stroke="#7dd3fc" stroke-width="1.5"/>
+  <text x="210" y="137" text-anchor="middle" fill="#0c4a6e" font-size="11" font-weight="700">Pages (路由页面)</text>
+  <line x1="38" y1="145" x2="382" y2="145" stroke="#bae6fd" stroke-width="1"/>
+  <text x="38" y="160" fill="#0369a1" font-size="9">page.tsx — 仪表板 Dashboard</text>
+  <text x="38" y="175" fill="#0369a1" font-size="9">login/page.tsx — 用户登录</text>
+  <text x="38" y="190" fill="#0369a1" font-size="9">admin/login/page.tsx — Admin登录(深色主题)</text>
+  <text x="38" y="205" fill="#0369a1" font-size="9">admin/users/page.tsx — 用户CRUD</text>
+  <text x="38" y="220" fill="#0369a1" font-size="9">contracts/page.tsx — 合同列表(搜索/筛选/排序)</text>
+  <text x="38" y="235" fill="#0369a1" font-size="9">contracts/[id]/page.tsx — 合同详情(7个Tab)</text>
+  <text x="38" y="250" fill="#0369a1" font-size="9">contracts/new/page.tsx — 新增合同</text>
+  <text x="38" y="265" fill="#0369a1" font-size="9">ai-chat/page.tsx — AI录入主入口</text>
+  <text x="38" y="280" fill="#0369a1" font-size="9">upload/page.tsx — 传统批量上传(备用)</text>
+  <text x="38" y="295" fill="#0369a1" font-size="9">monthly-closing/page.tsx — 月结跑批(4Tab)</text>
+  <text x="38" y="310" fill="#0369a1" font-size="9">reports/page.tsx — 报表查询(Working/Official)</text>
+  <text x="38" y="325" fill="#0369a1" font-size="9">portfolio/page.tsx — 组合分析</text>
+  <text x="38" y="340" fill="#0369a1" font-size="9">sensitivity/page.tsx — 敏感性分析</text>
+  <text x="38" y="355" fill="#0369a1" font-size="9">standards/page.tsx — 多准则对比</text>
+  <text x="38" y="370" fill="#0369a1" font-size="9">roi/page.tsx — ROI测算</text>
+  <text x="38" y="385" fill="#0369a1" font-size="9">cashflow-forecast/page.tsx — 现金流预测</text>
+  <text x="38" y="400" fill="#0369a1" font-size="9">settings/page.tsx — 系统设置</text>
+  <text x="38" y="415" fill="#0369a1" font-size="9">audit-logs/page.tsx — 审计日志查询</text>
+  <text x="38" y="430" fill="#0369a1" font-size="9">admin/layout.tsx — Admin布局(深色主题)</text>
+  <text x="38" y="445" fill="#0369a1" font-size="9">layout.tsx — 根布局(ThemeProvider)</text>
+
+  <!-- Web Components -->
+  <rect x="30" y="410" width="360" height="75" rx="6" fill="#fff" stroke="#7dd3fc" stroke-width="1.5"/>
+  <text x="210" y="427" text-anchor="middle" fill="#0c4a6e" font-size="11" font-weight="700">Components</text>
+  <line x1="38" y1="435" x2="382" y2="435" stroke="#bae6fd" stroke-width="1"/>
+  <text x="38" y="450" fill="#0369a1" font-size="9">AppLayout.tsx — 侧边栏+导航布局</text>
+  <text x="38" y="465" fill="#0369a1" font-size="9">ProtectedRoute.tsx — 路由权限守卫</text>
+  <text x="38" y="480" fill="#0369a1" font-size="9">ThemeProvider.tsx — 主题/深色模式</text>
+
+  <!-- Web Context -->
+  <rect x="30" y="495" width="360" height="60" rx="6" fill="#fff" stroke="#7dd3fc" stroke-width="1.5"/>
+  <text x="210" y="512" text-anchor="middle" fill="#0c4a6e" font-size="11" font-weight="700">Context</text>
+  <line x1="38" y1="520" x2="382" y2="520" stroke="#bae6fd" stroke-width="1"/>
+  <text x="38" y="535" fill="#0369a1" font-size="9">AuthContext.tsx — JWT+legal_entity_id+角色</text>
+  <text x="38" y="550" fill="#0369a1" font-size="9">LanguageContext.tsx — 国际化状态</text>
+
+  <!-- Web Lib -->
+  <rect x="30" y="565" width="360" height="200" rx="6" fill="#fff" stroke="#7dd3fc" stroke-width="1.5"/>
+  <text x="210" y="582" text-anchor="middle" fill="#0c4a6e" font-size="11" font-weight="700">Lib (API / Types / Utils)</text>
+  <line x1="38" y1="590" x2="382" y2="590" stroke="#bae6fd" stroke-width="1"/>
+  <text x="38" y="605" fill="#0369a1" font-size="9">api-client.ts — fetch封装: apiRequest() / aiRequest()</text>
+  <text x="38" y="620" fill="#0369a1" font-size="9">api.ts — 业务API: authApi / contractApi / adminApi / ...</text>
+  <text x="38" y="635" fill="#0369a1" font-size="9">master-data-api.ts — 主数据API: legalEntityApi / masterDataApi</text>
+  <text x="38" y="650" fill="#0369a1" font-size="9">types/auth.ts — 认证类型: AuthResponse / UserRole / LegalEntity</text>
+  <text x="38" y="665" fill="#0369a1" font-size="9">types/master-data.ts — 主数据类型</text>
+  <text x="38" y="680" fill="#0369a1" font-size="9">constants/roles.ts — 6角色常量定义</text>
+  <text x="38" y="695" fill="#0369a1" font-size="9">i18n.ts — 国际化配置</text>
+  <text x="38" y="710" fill="#0369a1" font-size="9">tags.ts / export.ts / format.ts — 工具函数</text>
+  <text x="38" y="725" fill="#0369a1" font-size="9">design-system/theme.ts / tokens.ts / animations.ts</text>
+  <text x="38" y="740" fill="#0369a1" font-size="9">next.config.js / tailwind.config.js / postcss.config.js</text>
+  <text x="38" y="755" fill="#0369a1" font-size="9">tsconfig.json / package.json</text>
+
+  <!-- Web Legend -->
+  <rect x="30" y="775" width="360" height="50" rx="6" fill="#f0f9ff" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="210" y="795" text-anchor="middle" fill="#0369a1" font-size="9">依赖链: Pages → Components/Context → Lib(api.ts) → api-client.ts</text>
+  <text x="210" y="810" text-anchor="middle" fill="#0369a1" font-size="9">AuthContext 提供 token + legal_entity_id 给所有 API 请求</text>
+
+  <!-- ===================== CORE SERVICE ===================== -->
+  <rect x="420" y="70" width="720" height="1060" rx="10" fill="url(#gCore)" stroke="#4ade80" stroke-width="2"/>
+  <text x="440" y="95" fill="#166534" font-size="13" font-weight="700">Core Service (Go 1.23 + Gin)</text>
+  <text x="440" y="112" fill="#16a34a" font-size="10">Port 8080</text>
+
+  <!-- Core Entry -->
+  <rect x="430" y="120" width="340" height="55" rx="6" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="600" y="137" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">Entry</text>
+  <line x1="438" y1="145" x2="762" y2="145" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="438" y="160" fill="#15803d" font-size="9">cmd/api/main.go — 初始化全部组件(config/db/repo/handler)，注册路由，启动Gin服务</text>
+
+  <!-- Core Config + DB -->
+  <rect x="430" y="185" width="165" height="70" rx="6" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="512" y="202" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">Config</text>
+  <line x1="438" y1="210" x2="587" y2="210" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="438" y="225" fill="#15803d" font-size="9">internal/config/config.go</text>
+  <text x="438" y="240" fill="#15803d" font-size="9">环境变量加载，DatabaseURL()</text>
+
+  <rect x="605" y="185" width="165" height="70" rx="6" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="687" y="202" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">Database</text>
+  <line x1="613" y1="210" x2="762" y2="210" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="613" y="225" fill="#15803d" font-size="9">internal/db/db.go</text>
+  <text x="613" y="240" fill="#15803d" font-size="9">pgxpool连接池(MaxConns=25)</text>
+
+  <!-- Core Middleware -->
+  <rect x="430" y="265" width="340" height="85" rx="6" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="600" y="282" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">Middleware (请求处理链)</text>
+  <line x1="438" y1="290" x2="762" y2="290" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="438" y="305" fill="#15803d" font-size="9">auth.go — JWT验证(JWTAuth): 解析token，注入user_id/role/legal_entity_id</text>
+  <text x="438" y="320" fill="#15803d" font-size="9">tenant.go — 多租户过滤(TenantMiddleware): 自动注入legal_entity_id到查询</text>
+  <text x="438" y="335" fill="#15803d" font-size="9">rbac.go — 角色权限控制: admin/editor/reviewer/approver/auditor/readonly</text>
+  <text x="438" y="350" fill="#15803d" font-size="9">cors.go — 跨域处理(在main.go中内联)</text>
+
+  <!-- Core Handlers -->
+  <rect x="430" y="360" width="340" height="280" rx="6" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="600" y="377" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">Handlers (18个HTTP处理器)</text>
+  <line x1="438" y1="385" x2="762" y2="385" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="438" y="400" fill="#15803d" font-size="9">auth.go — POST /auth/login, /auth/register, /admin/users (CRUD)</text>
+  <text x="438" y="415" fill="#15803d" font-size="9">user.go — GET /me (当前用户信息)</text>
+  <text x="438" y="430" fill="#15803d" font-size="9">contract.go — /contracts (CRUD+批量), /contracts/:id (详情+更新)</text>
+  <text x="438" y="445" fill="#15803d" font-size="9">calculation.go — POST /contracts/:id/calculate, GET /schedule (摊销表)</text>
+  <text x="438" y="460" fill="#15803d" font-size="9">approval.go — /contracts/:id/submit|review|approve|reject (审批流)</text>
+  <text x="438" y="475" fill="#15803d" font-size="9">payment_schedule.go — /contracts/:id/payment-schedules (CRUD)</text>
+  <text x="438" y="490" fill="#15803d" font-size="9">event.go — /contracts/:id/events (CRUD), /events/:id/submit|review|approve|reject</text>
+  <text x="438" y="505" fill="#15803d" font-size="9">monthly_closing.go — /monthly-closing/* (生成/审批/过账/锁账/导出/ERP回写)</text>
+  <text x="438" y="520" fill="#15803d" font-size="9">reports.go — /reports/* (8种报表: 负债滚动/合同汇总/组合/敏感/准则/摊销/标签/现金流)</text>
+  <text x="438" y="535" fill="#15803d" font-size="9">lease_admin.go — /contracts/:id/critical-dates|documents|obligations (租赁管理)</text>
+  <text x="438" y="550" fill="#15803d" font-size="9">ai_chat.go — /ai/chat/* (会话/消息/运行/流式事件)</text>
+  <text x="438" y="565" fill="#15803d" font-size="9">ai_chat_runtime.go — AI Chat Runtime 管理</text>
+  <text x="438" y="580" fill="#15803d" font-size="9">audit.go — GET /audit-logs (审计查询)</text>
+  <text x="438" y="595" fill="#15803d" font-size="9">settings.go — /settings/global (系统设置读写)</text>
+  <text x="438" y="610" fill="#15803d" font-size="9">discount_rate.go — /contracts/:id/discount-rate-status|confirm-discount-rate</text>
+  <text x="438" y="625" fill="#15803d" font-size="9">role.go — /roles, /my-permissions (角色权限查询)</text>
+  <text x="438" y="640" fill="#15803d" font-size="9">master_data.go — /master-data/* (法人/门店/出租方)</text>
+
+  <!-- Core Services -->
+  <rect x="790" y="120" width="340" height="200" rx="6" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="960" y="137" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">Services (业务逻辑层)</text>
+  <line x1="798" y1="145" x2="1122" y2="145" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="798" y="160" fill="#15803d" font-size="9">audit/audit.go — 审计日志写入服务: 记录所有关键操作</text>
+  <text x="798" y="175" fill="#15803d" font-size="9">ifrs16/calculation.go — IFRS16计量引擎核心:</text>
+  <text x="798" y="190" fill="#15803d" font-size="9">  · 租赁负债现值计算 · 使用权资产/折旧 · 利息摊销</text>
+  <text x="798" y="205" fill="#15803d" font-size="9">  · 先付/后付处理 · 变量租金费用化 · 非租赁成分拆分</text>
+  <text x="798" y="220" fill="#15803d" font-size="9">  · 范围闸门分流(in_scope/short_term/low_value/not_a_lease)</text>
+  <text x="798" y="235" fill="#15803d" font-size="9">  · 事件重算(Modification/Reassessment/Impairment)</text>
+  <text x="798" y="250" fill="#15803d" font-size="9">  · 月结跑批逻辑 · 会计分录生成 · 报表数据计算</text>
+  <text x="798" y="265" fill="#15803d" font-size="9">ifrs16/regression.go — 回归测试框架(20用例/133断言)</text>
+  <text x="798" y="280" fill="#15803d" font-size="9">ifrs16/regression_test.go — 测试用例执行</text>
+  <text x="798" y="295" fill="#15803d" font-size="9">contracts/discount_rate.go — 折现率服务</text>
+  <text x="798" y="310" fill="#15803d" font-size="9">contracts/normalization.go — 合同标准化处理</text>
+
+  <!-- Core Repositories -->
+  <rect x="790" y="330" width="340" height="310" rx="6" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="960" y="347" text-anchor="middle" fill="#14532d" font-size="11" font-weight="700">Repositories (12个数据访问层)</text>
+  <line x1="798" y1="355" x2="1122" y2="355" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="798" y="370" fill="#15803d" font-size="9">user.go — 用户CRUD + JWT生成/验证 + Bcrypt密码哈希</text>
+  <text x="798" y="385" fill="#15803d" font-size="9">contract.go — 合同CRUD + 搜索筛选排序 + 批量创建 + 状态管理</text>
+  <text x="798" y="400" fill="#15803d" font-size="9">payment_schedule.go — 付款计划CRUD + 关联IFRS16计算</text>
+  <text x="798" y="415" fill="#15803d" font-size="9">event.go — 事件CRUD + 关联合同/计量结果</text>
+  <text x="798" y="430" fill="#15803d" font-size="9">approval.go — 审批记录 + 关联合同/用户</text>
+  <text x="798" y="445" fill="#15803d" font-size="9">monthly_closing.go — 月结批次/分录/锁账 + 关联合同/付款</text>
+  <text x="798" y="460" fill="#15803d" font-size="9">audit.go — 审计日志写入/查询(全表操作记录)</text>
+  <text x="798" y="475" fill="#15803d" font-size="9">system_setting.go — 系统设置KV存储</text>
+  <text x="798" y="490" fill="#15803d" font-size="9">role.go — 角色/权限映射</text>
+  <text x="798" y="505" fill="#15803d" font-size="9">lease_admin.go — 关键日期/文档/义务管理</text>
+  <text x="798" y="520" fill="#15803d" font-size="9">ai_chat_runtime.go — AI聊天会话/消息/运行记录</text>
+  <text x="798" y="535" fill="#15803d" font-size="9">master_data.go — 法人/门店/出租方主数据查询</text>
+  <text x="798" y="550" fill="#15803d" font-size="9">testdata/ifrs16_regression_cases.json — 回归测试数据</text>
+  <text x="798" y="565" fill="#15803d" font-size="9">cmd/ifrs16-regression/main.go — 回归报告生成命令</text>
+  <text x="798" y="580" fill="#15803d" font-size="9">所有Repository通过pgx执行SQL，自动注入legal_entity_id过滤</text>
+  <text x="798" y="595" fill="#15803d" font-size="9">多租户隔离: admin空legal_entity_id不过滤，其他角色强制过滤</text>
+  <text x="798" y="610" fill="#15803d" font-size="9">合同状态机: draft → pending_review → pending_approval → approved</text>
+  <text x="798" y="625" fill="#15803d" font-size="9">事件驱动: 批准后自动触发services/ifrs16重算，生成adjustments</text>
+  <text x="798" y="640" fill="#15803d" font-size="9">审计追踪: 所有写操作通过audit/audit.go记录，支持JSON diff</text>
+
+  <!-- Core Legend -->
+  <rect x="430" y="655" width="700" height="55" rx="6" fill="#f0fdf4" stroke="#22c55e" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="780" y="675" text-anchor="middle" fill="#166534" font-size="9">依赖链: main.go → NewHandler(repo, auditLogger) → Handler调用Service → Service调用Repository → Repository调用pgx → db.go</text>
+  <text x="780" y="690" text-anchor="middle" fill="#166534" font-size="9">请求流: HTTP → Middleware(JWTAuth→TenantMiddleware→CORS) → Handler → Service → Repository → PostgreSQL</text>
+  <text x="780" y="705" text-anchor="middle" fill="#166534" font-size="9">审批流: Handler(approval.go) → Repository(approval.go) → 状态变更 → audit.go记录 → 触发reports数据更新</text>
+
+  <!-- ===================== AI SERVICE ===================== -->
+  <rect x="1160" y="70" width="380" height="380" rx="10" fill="url(#gAI)" stroke="#a855f7" stroke-width="2"/>
+  <text x="1180" y="95" fill="#6b21a8" font-size="13" font-weight="700">AI Service (Python 3.11 + FastAPI)</text>
+  <text x="1180" y="112" fill="#9333ea" font-size="10">Port 8081</text>
+
+  <!-- AI Entry -->
+  <rect x="1170" y="120" width="360" height="45" rx="6" fill="#fff" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="1350" y="137" text-anchor="middle" fill="#581c87" font-size="11" font-weight="700">Entry</text>
+  <line x1="1178" y1="145" x2="1522" y2="145" stroke="#e9d5ff" stroke-width="1"/>
+  <text x="1178" y="160" fill="#7e22ce" font-size="9">main.py — FastAPI应用，lifespan管理，注册3个router，CORS中间件</text>
+
+  <!-- AI Config -->
+  <rect x="1170" y="175" width="360" height="35" rx="6" fill="#fff" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="1350" y="192" text-anchor="middle" fill="#581c87" font-size="11" font-weight="700">Config</text>
+  <line x1="1178" y1="200" x2="1522" y2="200" stroke="#e9d5ff" stroke-width="1"/>
+  <text x="1178" y="213" fill="#7e22ce" font-size="9">app/config.py — Pydantic Settings: LLM_PROVIDER, DEEPSEEK_API_KEY, PADDLEOCR_ACCESS_TOKEN, MINIO_...</text>
+
+  <!-- AI Routers -->
+  <rect x="1170" y="220" width="360" height="85" rx="6" fill="#fff" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="1350" y="237" text-anchor="middle" fill="#581c87" font-size="11" font-weight="700">Routers (3个)</text>
+  <line x1="1178" y1="245" x2="1522" y2="245" stroke="#e9d5ff" stroke-width="1"/>
+  <text x="1178" y="260" fill="#7e22ce" font-size="9">files.py — POST /api/v1/files/upload → 保存到MinIO → 返回file_id</text>
+  <text x="1178" y="275" fill="#7e22ce" font-size="9">parse.py — POST /api/v1/parse/contract|payment-schedule → 调用OCR+LLM → 返回草稿JSON</text>
+  <text x="1178" y="290" fill="#7e22ce" font-size="9">chat.py — POST /api/v1/chat → 调用LLM → 返回带引用来源的回答</text>
+  <text x="1178" y="305" fill="#7e22ce" font-size="9">所有router通过app.include_router注册，prefix=/api/v1</text>
+
+  <!-- AI Services -->
+  <rect x="1170" y="315" width="360" height="120" rx="6" fill="#fff" stroke="#c084fc" stroke-width="1.5"/>
+  <text x="1350" y="332" text-anchor="middle" fill="#581c87" font-size="11" font-weight="700">Services (4个)</text>
+  <line x1="1178" y1="340" x2="1522" y2="340" stroke="#e9d5ff" stroke-width="1"/>
+  <text x="1178" y="355" fill="#7e22ce" font-size="9">llm.py — DeepSeek/OpenAI客户端: chat_completion(), get_model_name()</text>
+  <text x="1178" y="370" fill="#7e22ce" font-size="9">storage.py — MinIO客户端: upload_to_minio(), download_from_minio(), get_minio_client()</text>
+  <text x="1178" y="385" fill="#7e22ce" font-size="9">paddleocr.py — PaddleOCR API客户端: submit_job(), get_result(), 全局单例</text>
+  <text x="1178" y="400" fill="#7e22ce" font-size="9">document_extractor.py — 文档提取: extract_text() → PaddleOCR优先 → PyMuPDF fallback</text>
+  <text x="1178" y="415" fill="#7e22ce" font-size="9">所有service依赖config.py获取环境变量配置</text>
+  <text x="1178" y="430" fill="#7e22ce" font-size="9">llm.py依赖httpx进行异步HTTP调用</text>
+
+  <!-- AI Legend -->
+  <rect x="1170" y="445" width="360" height="50" rx="6" fill="#faf5ff" stroke="#a855f7" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="1350" y="465" text-anchor="middle" fill="#6b21a8" font-size="9">AI流水线: files.py上传 → MinIO → parse.py调用paddleocr.py+llm.py → 草稿确认</text>
+  <text x="1350" y="480" text-anchor="middle" fill="#6b21a8" font-size="9">→ 回调Core Service POST /contracts/batch 批量创建草稿合同</text>
+  <text x="1350" y="495" text-anchor="middle" fill="#6b21a8" font-size="9">chat.py → llm.py → DeepSeek API → 返回引用来源(区分正式数据vs AI建议)</text>
+
+  <!-- ===================== DATABASE &amp; INFRA ===================== -->
+  <rect x="1160" y="470" width="380" height="280" rx="10" fill="url(#gDB)" stroke="#f97316" stroke-width="2"/>
+  <text x="1180" y="495" fill="#9a3412" font-size="13" font-weight="700">Database &amp; Infrastructure</text>
+
+  <!-- DB Schema -->
+  <rect x="1170" y="505" width="360" height="80" rx="6" fill="#fff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="1350" y="522" text-anchor="middle" fill="#7c2d12" font-size="11" font-weight="700">Database Schema (PostgreSQL 16)</text>
+  <line x1="1178" y1="530" x2="1522" y2="530" stroke="#fed7aa" stroke-width="1"/>
+  <text x="1178" y="545" fill="#c2410c" font-size="9">db/init/01_init.sql — 26张表 + 种子数据(法人/用户/角色)</text>
+  <text x="1178" y="560" fill="#c2410c" font-size="9">db/migrations/001-008.sql — 增量迁移:</text>
+  <text x="1178" y="575" fill="#c2410c" font-size="9">  初始schema → 种子数据 → 更新 → 月结 → 范围闸门 → 租赁管理 → 义务/组合 → AI Chat</text>
+
+  <!-- Docker -->
+  <rect x="1170" y="595" width="360" height="70" rx="6" fill="#fff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="1350" y="612" text-anchor="middle" fill="#7c2d12" font-size="11" font-weight="700">Docker Compose (5容器)</text>
+  <line x1="1178" y1="620" x2="1522" y2="620" stroke="#fed7aa" stroke-width="1"/>
+  <text x="1178" y="635" fill="#c2410c" font-size="9">lease-postgres:5432 | lease-minio:9000/9001 | lease-core:8080</text>
+  <text x="1178" y="650" fill="#c2410c" font-size="9">lease-ai:8081 | lease-web:3000</text>
+  <text x="1178" y="665" fill="#c2410c" font-size="9">depends_on链: web→core+ai, ai→core+minio, core→postgres+minio</text>
+
+  <!-- External APIs -->
+  <rect x="1170" y="675" width="360" height="60" rx="6" fill="#fff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="1350" y="692" text-anchor="middle" fill="#7c2d12" font-size="11" font-weight="700">External APIs</text>
+  <line x1="1178" y1="700" x2="1522" y2="700" stroke="#fed7aa" stroke-width="1"/>
+  <text x="1178" y="715" fill="#c2410c" font-size="9">PaddleOCR-VL-1.5 (AI Studio) — multipart form data提交，返回jsonUrl</text>
+  <text x="1178" y="730" fill="#c2410c" font-size="9">DeepSeek API (deepseek-v4-flash) — 主LLM | OpenAI API (gpt-4o) — 备用</text>
+
+  <!-- ===================== CROSS-SERVICE ARROWS ===================== -->
+  <!-- Web → Core (HTTP) -->
+  <line x1="400" y1="400" x2="430" y2="400" stroke="#0284c7" stroke-width="2" marker-end="url(#arrWeb)" stroke-dasharray="5,3"/>
+  <text x="415" y="390" fill="#0284c7" font-size="8">HTTP/JSON</text>
+
+  <!-- Web → AI (HTTP) -->
+  <line x1="400" y1="500" x2="1160" y2="250" stroke="#9333ea" stroke-width="2" marker-end="url(#arrAI)" stroke-dasharray="5,3"/>
+  <text x="750" y="360" fill="#9333ea" font-size="8">HTTP/JSON (文件上传/AI聊天)</text>
+
+  <!-- Core → DB (pgx) -->
+  <line x1="780" y1="500" x2="1350" y2="545" stroke="#ea580c" stroke-width="2" marker-end="url(#arrDB)" stroke-dasharray="5,3"/>
+  <text x="1050" y="520" fill="#ea580c" font-size="8">pgx SQL → PostgreSQL 16</text>
+
+  <!-- Core → MinIO -->
+  <line x1="1140" y1="400" x2="1350" y2="635" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrDB)" stroke-dasharray="4,2"/>
+  <text x="1220" y="520" fill="#ea580c" font-size="8">文件存取</text>
+
+  <!-- AI → MinIO -->
+  <line x1="1350" y1="350" x2="1350" y2="635" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrAI)" stroke-dasharray="4,2"/>
+  <text x="1360" y="500" fill="#9333ea" font-size="8">上传/下载</text>
+
+  <!-- AI → External APIs -->
+  <line x1="1530" y1="370" x2="1650" y2="370" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrAI)" stroke-dasharray="5,3"/>
+  <text x="1570" y="360" fill="#9333ea" font-size="8">DeepSeek/OpenAI API</text>
+
+  <!-- AI → Core (callback) -->
+  <line x1="1160" y1="280" x2="1140" y2="350" stroke="#9333ea" stroke-width="1.5" marker-end="url(#arrAI)" stroke-dasharray="5,3"/>
+  <text x="1140" y="310" fill="#9333ea" font-size="8">回调 /contracts/batch</text>
+
+  <!-- ===================== DATA FLOW EXAMPLES ===================== -->
+  <rect x="20" y="1150" width="1520" height="230" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="40" y="1175" fill="#0f172a" font-size="13" font-weight="700">8条核心数据流 (File-Level 链路追踪)</text>
+
+  <text x="40" y="1200" fill="#334155" font-size="9">1. 用户登录: login/page.tsx → api.ts(authApi.login) → api-client.ts(apiRequest) → Core auth.go → repository/user.go(JWT生成) → PostgreSQL → 返回JWT → AuthContext存储</text>
+  <text x="40" y="1220" fill="#334155" font-size="9">2. 合同创建: contracts/new/page.tsx → api.ts(contractApi.create) → api-client.ts → Core contract.go → repository/contract.go(INSERT) → PostgreSQL + audit/audit.go(写日志)</text>
+  <text x="40" y="1240" fill="#334155" font-size="9">3. IFRS16计算: contracts/[id]/page.tsx → api.ts(contractApi.calculate) → Core calculation.go → services/ifrs16/calculation.go(现值/摊销/折旧) → 返回摊销表JSON</text>
+  <text x="40" y="1260" fill="#334155" font-size="9">4. AI录入: ai-chat/page.tsx → aiRequest → AI chat.py/parse.py → services/llm.py(DeepSeek) + paddleocr.py → 草稿JSON → 人工确认 → api.ts(batchCreate) → Core contract.go批量创建</text>
+  <text x="40" y="1280" fill="#334155" font-size="9">5. 月结跑批: monthly-closing/page.tsx → api.ts → Core monthly_closing.go → services/ifrs16(计算) → repository/monthly_closing.go(INSERT journal_entries) → PostgreSQL</text>
+  <text x="40" y="1300" fill="#334155" font-size="9">6. 审批流程: contracts/[id]/page.tsx → api.ts(approvalApi.submit) → Core approval.go → repository/approval.go(UPDATE status) → audit.go记录 → 触发reports数据更新</text>
+  <text x="40" y="1320" fill="#334155" font-size="9">7. 事件驱动: contracts/[id]/page.tsx → api.ts(eventApi.create) → Core event.go → repository/event.go(INSERT) → 批准后 → services/ifrs16(重算) → 生成event_adjustments → 更新计量结果</text>
+  <text x="40" y="1340" fill="#334155" font-size="9">8. 报表查询: reports/page.tsx → api.ts → Core reports.go → repository + services/ifrs16(计算) → 返回Working/Official数据 → 前端切换模式 + CSV导出</text>
+
+  <!-- ===================== LEGEND ===================== -->
+  <rect x="20" y="1400" width="1520" height="40" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="40" y="1425" fill="#64748b" font-size="9">
+    实线箭头 = 直接代码依赖(import/use) | 虚线箭头 = 运行时/网络调用(HTTP/JSON, pgx SQL) | 颜色对应服务边界: 蓝=Web, 绿=Core, 紫=AI, 橙=DB/Infra
+  </text>
+
+</svg>

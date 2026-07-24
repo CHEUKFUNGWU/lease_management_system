@@ -1,0 +1,3 @@
+# Persist exception cases and detection events separately
+
+A Close Exception is the continuing investigation case, while each control evaluation produces an immutable Detection Event against one Projection Version. Stable Exception Fingerprints exclude changing amounts, severities, and projection versions. A rule's Resolution Mode is fixed: an automatically verifiable exception resolves only after an Explicitly Evaluated passing event, never because it was Not Evaluated or merely absent; judgmental exceptions require a human conclusion or Approved Waiver. Resolved exceptions reopen when the same condition recurs, Period Waivers do not carry forward, and only an explicitly authorized Standing Waiver may be reused under its defined conditions.

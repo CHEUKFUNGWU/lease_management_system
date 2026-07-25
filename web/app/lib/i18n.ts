@@ -2325,6 +2325,141 @@ const dict: TranslationDict = {
     "zh-HK": "幣種",
     en: "Currency",
   },
+  "reports.tab_budget": {
+    "zh-CN": "预算对比",
+    "zh-HK": "預算對比",
+    en: "Budget vs Actual",
+  },
+  "budget.version": {
+    "zh-CN": "预算版本",
+    "zh-HK": "預算版本",
+    en: "Budget Version",
+  },
+  "budget.pick_version": {
+    "zh-CN": "请选择预算版本",
+    "zh-HK": "請選擇預算版本",
+    en: "Select a budget version",
+  },
+  "budget.compare": {
+    "zh-CN": "对比",
+    "zh-HK": "對比",
+    en: "Compare",
+  },
+  "budget.freeze": {
+    "zh-CN": "固化当前计量为预算",
+    "zh-HK": "固化當前計量為預算",
+    en: "Freeze Current Measurement",
+  },
+  "budget.freeze_hint": {
+    "zh-CN": "以当前已审批合同的计量前瞻表作为本年度预算基线",
+    "zh-HK": "以當前已審批合同的計量前瞻表作為本年度預算基線",
+    en: "Freezes today's projected schedule for approved contracts as this year's baseline",
+  },
+  "budget.new_name_placeholder": {
+    "zh-CN": "预算版本名称,如 2026 年度预算",
+    "zh-HK": "預算版本名稱,如 2026 年度預算",
+    en: "Version name, e.g. FY2026 budget",
+  },
+  "budget.name_required": {
+    "zh-CN": "请填写预算版本名称",
+    "zh-HK": "請填寫預算版本名稱",
+    en: "A version name is required",
+  },
+  "budget.created": {
+    "zh-CN": "预算版本已固化:{contracts} 份合同 / {lines} 行",
+    "zh-HK": "預算版本已固化:{contracts} 份合同 / {lines} 行",
+    en: "Budget frozen: {contracts} contracts / {lines} lines",
+  },
+  "budget.create_failed": {
+    "zh-CN": "预算版本固化失败",
+    "zh-HK": "預算版本固化失敗",
+    en: "Failed to freeze the budget",
+  },
+  "budget.load_failed": {
+    "zh-CN": "预算数据加载失败",
+    "zh-HK": "預算數據載入失敗",
+    en: "Failed to load budget data",
+  },
+  "budget.budget_total": {
+    "zh-CN": "预算租赁费用",
+    "zh-HK": "預算租賃費用",
+    en: "Budgeted Lease Cost",
+  },
+  "budget.actual_total": {
+    "zh-CN": "实际租赁费用",
+    "zh-HK": "實際租賃費用",
+    en: "Actual Lease Cost",
+  },
+  "budget.variance": {
+    "zh-CN": "差异(实际−预算)",
+    "zh-HK": "差異(實際−預算)",
+    en: "Variance (actual - budget)",
+  },
+  "budget.bridge_title": {
+    "zh-CN": "差异归因桥",
+    "zh-HK": "差異歸因橋",
+    en: "Variance Bridge",
+  },
+  "budget.bridge_desc": {
+    "zh-CN": "归因由事件驱动:新签、续租/终止、租金变更、汇率各成一项,事件无法解释的部分留作「其他」,因此各项之和恒等于总差异。",
+    "zh-HK": "歸因由事件驅動:新簽、續租/終止、租金變更、匯率各成一項,事件無法解釋的部分留作「其他」,因此各項之和恆等於總差異。",
+    en: "Attribution is event-driven: new leases, renewals and terminations, rent changes and exchange movements each get a line, and whatever the events cannot explain stays as a residual, so the lines always sum to the total variance.",
+  },
+  "budget.bridge_broken": {
+    "zh-CN": "归因桥未闭合:各项之和不等于总差异,请勿据此汇报",
+    "zh-HK": "歸因橋未閉合:各項之和不等於總差異,請勿據此匯報",
+    en: "The bridge does not tie out: its lines do not sum to the variance. Do not report from it.",
+  },
+  "budget.by_contract_title": {
+    "zh-CN": "按合同明细",
+    "zh-HK": "按合同明細",
+    en: "By Contract",
+  },
+  "budget.cause": {
+    "zh-CN": "归因",
+    "zh-HK": "歸因",
+    en: "Cause",
+  },
+  "budget.amount": {
+    "zh-CN": "金额",
+    "zh-HK": "金額",
+    en: "Amount",
+  },
+  "budget.contract_count": {
+    "zh-CN": "合同数",
+    "zh-HK": "合同數",
+    en: "Contracts",
+  },
+  "budget.cause_new_lease": {
+    "zh-CN": "新签合同",
+    "zh-HK": "新簽合同",
+    en: "New lease",
+  },
+  "budget.cause_ended": {
+    "zh-CN": "已结束/退出",
+    "zh-HK": "已結束/退出",
+    en: "Ended",
+  },
+  "budget.cause_renewal": {
+    "zh-CN": "续租/终止",
+    "zh-HK": "續租/終止",
+    en: "Renewal or termination",
+  },
+  "budget.cause_rent_change": {
+    "zh-CN": "租金变更",
+    "zh-HK": "租金變更",
+    en: "Rent change",
+  },
+  "budget.cause_exchange_rate": {
+    "zh-CN": "汇率",
+    "zh-HK": "匯率",
+    en: "Exchange rate",
+  },
+  "budget.cause_other": {
+    "zh-CN": "其他(事件未解释)",
+    "zh-HK": "其他(事件未解釋)",
+    en: "Other (unexplained)",
+  },
   "contracts.selected_count": {
     "zh-CN": "已选 {count} 份草稿合同",
     "zh-HK": "已選 {count} 份草稿合同",

@@ -668,6 +668,14 @@ export const auditApi = {
 };
 
 // Settings APIs
+export const budgetApi = {
+  listVersions: (token: string) => apiRequest("/api/v1/budget-versions", { token }),
+  createVersion: (data: { name: string; from_period: string; to_period: string }, token: string) =>
+    apiRequest("/api/v1/budget-versions", { method: "POST", body: JSON.stringify(data), token }),
+  variance: (versionId: string, period: string, token: string) =>
+    apiRequest(`/api/v1/budget-versions/${versionId}/variance?period=${encodeURIComponent(period)}`, { token }),
+};
+
 export const workQueueApi = {
   get: (token: string, criticalDateDays?: number) => {
     const query = criticalDateDays ? `?critical_date_days=${criticalDateDays}` : "";

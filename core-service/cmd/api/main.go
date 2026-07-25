@@ -51,6 +51,7 @@ func main() {
 	accessPolicyRepo := repository.NewAccessPolicyRepository(database.Pool)
 	exchangeRateRepo := repository.NewExchangeRateRepository(database.Pool)
 	workQueueRepo := repository.NewWorkQueueRepository(database.Pool)
+	budgetRepo := repository.NewBudgetRepository(database.Pool)
 
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
@@ -75,6 +76,7 @@ func main() {
 	masterDataHandler := handlers.NewMasterDataHandler(masterDataRepo)
 	exchangeRateHandler := handlers.NewExchangeRateHandler(exchangeRateRepo, auditLogger)
 	workQueueHandler := handlers.NewWorkQueueHandler(workQueueRepo)
+	budgetHandler := handlers.NewBudgetHandler(budgetRepo, contractRepo, psRepo, systemSettingRepo)
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -198,6 +200,12 @@ func main() {
 		// foreign-currency leases into the entity's functional currency.
 		protected.Handle(http.MethodGet, "/exchange-rates", permission("settings", "read"), exchangeRateHandler.List)
 		protected.Handle(http.MethodPost, "/exchange-rates", permission("settings", "update"), exchangeRateHandler.Upsert)
+
+		// Budget versions freeze the measured forward schedule so later actuals
+		// can be explained against a stable plan.
+		protected.Handle(http.MethodGet, "/budget-versions", permission("reports", "read"), budgetHandler.ListVersions)
+		protected.Handle(http.MethodPost, "/budget-versions", permission("reports", "read"), budgetHandler.CreateVersion)
+		protected.Handle(http.MethodGet, "/budget-versions/:id/variance", permission("reports", "read"), budgetHandler.Variance)
 
 		// Monthly Closing
 		protected.Handle(http.MethodPost, "/monthly-closing/generate", permission("monthly_closing", "generate"), monthlyClosingHandler.Generate)

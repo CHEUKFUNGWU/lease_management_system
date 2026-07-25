@@ -915,6 +915,36 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- 预算版本:把某时点的计量前瞻表固化,供后续月份做预算 vs 实际对比
+CREATE TABLE IF NOT EXISTS budget_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    legal_entity_id UUID REFERENCES legal_entities(id),
+    as_of_period VARCHAR(7) NOT NULL,
+    from_period VARCHAR(7) NOT NULL,
+    to_period VARCHAR(7) NOT NULL,
+    contract_count INTEGER NOT NULL DEFAULT 0,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS budget_lines (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    budget_version_id UUID NOT NULL REFERENCES budget_versions(id) ON DELETE CASCADE,
+    contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    accounting_period VARCHAR(7) NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    interest_expense DECIMAL(18, 2) NOT NULL DEFAULT 0,
+    depreciation DECIMAL(18, 2) NOT NULL DEFAULT 0,
+    total_payment DECIMAL(18, 2) NOT NULL DEFAULT 0,
+    closing_liability DECIMAL(18, 2) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE (budget_version_id, contract_id, accounting_period)
+);
+
+CREATE INDEX IF NOT EXISTS idx_budget_lines_period
+    ON budget_lines(budget_version_id, accounting_period);
+
 -- 汇率表:外币租赁折算为法人主体职能货币
 -- closing 用于期末重估货币性项目(租赁负债);average 用于当期流量(利息与付款)
 CREATE TABLE IF NOT EXISTS exchange_rates (

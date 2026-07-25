@@ -12,6 +12,7 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { BudgetVariancePanel } from "./components/BudgetVariancePanel";
 import { DisclosurePanel } from "./components/DisclosurePanel";
 import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -241,6 +242,7 @@ function ReportsPageContent() {
 
     if (tab === "amortization") setActiveTab("amortization");
     if (tab === "disclosure") setActiveTab("disclosure");
+    if (tab === "budget") setActiveTab("budget");
     if (view && ["contract", "store", "tag", "summary"].includes(view)) {
       setAmortView(view as any);
     }
@@ -1043,6 +1045,15 @@ function ReportsPageContent() {
                 children: (
                   <DisclosurePanel reportMode={reportMode} token={token} language={language} />
                 ),
+              },
+
+              /* ================================
+                 Tab 4 — 预算对比
+                 ================================ */
+              {
+                key: "budget",
+                label: t("reports.tab_budget", language),
+                children: <BudgetVariancePanel token={token} language={language} />,
               },
             ]}
           />

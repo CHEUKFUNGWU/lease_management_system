@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core-service:
+    name: 核心服务(含 schema 冒烟)
+    runs-on: ubuntu-latest
+
+    # The database is the point of this job. Two defects — a column the code
+    # wrote but the schema never had, and a parameter used with two conflicting
+    # types — only appear when a real statement meets a real Postgres, so the
+    # schema is built here exactly the way a fresh environment builds it.
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: lease
+          POSTGRES_PASSWORD: lease_secret
+          POSTGRES_DB: lease
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: core-service/go.sum
+
+      - name: 用 init 脚本建库
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/init/01_init.sql
+        env:
+          DATABASE_URL: postgres://lease:lease_secret@localhost:5432/lease
+          PGPASSWORD: lease_secret
+
+      - name: 构建
+        working-directory: core-service
+        run: go build ./...
+
+      - name: go vet
+        working-directory: core-service
+        run: go vet ./...
+
+      # TEST_DATABASE_URL is what turns the schema smoke tests on; without it
+      # they skip, which is why they must be given a database here.
+      - name: 测试(单元 + schema 冒烟)
+        working-directory: core-service
+        run: go test ./...
+        env:
+          TEST_DATABASE_URL: postgres://lease:lease_secret@localhost:5432/lease
+
+  web:
+    name: 前端
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 安装依赖
+        working-directory: web
+        run: npm ci
+
+      - name: 类型检查
+        working-directory: web
+        run: npm run type-check
+
+      - name: 单元测试
+        working-directory: web
+        run: npm test
+
+      - name: 构建
+        working-directory: web
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+
+  ai-service:
+    name: AI 服务
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai-service/requirements.txt
+
+      # pytest is not a runtime dependency, so it is installed here rather than
+      # added to the image the service actually ships with.
+      - name: 安装依赖
+        working-directory: ai-service
+        run: pip install -r requirements.txt pytest
+
+      - name: 测试
+        working-directory: ai-service
+        run: python -m pytest tests -q

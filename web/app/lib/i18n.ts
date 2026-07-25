@@ -1954,10 +1954,70 @@ const dict: TranslationDict = {
     "zh-HK": "確認駁回該分錄？",
     en: "Confirm rejecting this entry?",
   },
-  "monthly.reverse_confirm": {
-    "zh-CN": "冲销功能待实现",
-    "zh-HK": "沖銷功能待實現",
-    en: "Reverse feature coming soon",
+  "monthly.reverse_title": {
+    "zh-CN": "红冲已过账分录",
+    "zh-HK": "紅沖已過賬分錄",
+    en: "Reverse Posted Entry",
+  },
+  "monthly.reverse_desc": {
+    "zh-CN": "红冲不会修改或删除原分录:系统会生成一笔借贷方向相反的分录并与原分录关联,原分录标记为已红冲。已锁定的期间不会被改动。",
+    "zh-HK": "紅沖不會修改或刪除原分錄:系統會生成一筆借貸方向相反的分錄並與原分錄關聯,原分錄標記為已紅沖。已鎖定的期間不會被改動。",
+    en: "Reversal never edits or deletes the original: the system posts an opposite entry linked to it and marks the original reversed. Locked periods stay untouched.",
+  },
+  "monthly.reverse_direction": {
+    "zh-CN": "红冲方向",
+    "zh-HK": "紅沖方向",
+    en: "Reversal Direction",
+  },
+  "monthly.reverse_direction_value": {
+    "zh-CN": "借:{debit} / 贷:{credit}",
+    "zh-HK": "借:{debit} / 貸:{credit}",
+    en: "Dr {debit} / Cr {credit}",
+  },
+  "monthly.reverse_reason": {
+    "zh-CN": "红冲原因",
+    "zh-HK": "紅沖原因",
+    en: "Reversal Reason",
+  },
+  "monthly.reverse_reason_placeholder": {
+    "zh-CN": "例如:科目录错、金额有误、合同条款更正",
+    "zh-HK": "例如:科目錄錯、金額有誤、合同條款更正",
+    en: "e.g. wrong account, incorrect amount, corrected lease terms",
+  },
+  "monthly.reverse_reason_required": {
+    "zh-CN": "请填写红冲原因",
+    "zh-HK": "請填寫紅沖原因",
+    en: "A reversal reason is required",
+  },
+  "monthly.reverse_period": {
+    "zh-CN": "红冲入账期间(可选)",
+    "zh-HK": "紅沖入賬期間(可選)",
+    en: "Reversal Period (optional)",
+  },
+  "monthly.reverse_period_hint": {
+    "zh-CN": "留空则记入原分录所属期间。若该期间已锁账,请填写一个未锁定的期间(YYYY-MM)。",
+    "zh-HK": "留空則記入原分錄所屬期間。若該期間已鎖賬,請填寫一個未鎖定的期間(YYYY-MM)。",
+    en: "Leave blank to use the original entry's period. If that period is locked, enter an open period (YYYY-MM).",
+  },
+  "monthly.reverse_success": {
+    "zh-CN": "红冲成功",
+    "zh-HK": "紅沖成功",
+    en: "Entry reversed",
+  },
+  "monthly.reverse_failed": {
+    "zh-CN": "红冲失败",
+    "zh-HK": "紅沖失敗",
+    en: "Reversal failed",
+  },
+  "monthly.status_reversed": {
+    "zh-CN": "已红冲",
+    "zh-HK": "已紅沖",
+    en: "Reversed",
+  },
+  "monthly.is_reversal_entry": {
+    "zh-CN": "红冲分录",
+    "zh-HK": "紅沖分錄",
+    en: "Reversal",
   },
   "monthly.reject_coming_soon": {
     "zh-CN": "驳回功能待实现",

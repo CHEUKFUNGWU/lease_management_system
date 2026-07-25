@@ -232,7 +232,7 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 					return fmt.Errorf("contract %s: %w", contract.ID, err)
 				}
 			}
-			entries := buildJournalEntries(contract.ID, cmd.AccountingPeriod, periodEnd, monthly, batch.ID, basis)
+			entries := buildJournalEntries(contract.ID, contract.Currency, cmd.AccountingPeriod, periodEnd, monthly, batch.ID, basis)
 			for _, entry := range entries {
 				if err := store.CreateJournalEntry(ctx, entry); err != nil {
 					return fmt.Errorf("contract %s: %w", contract.ID, err)

@@ -197,6 +197,7 @@ func main() {
 		// Monthly Closing - Approval & Posting
 		protected.Handle(http.MethodPost, "/monthly-closing/entries/:id/approve", permission("monthly_closing", "approve"), entryApprovalSeparation, monthlyClosingHandler.ApproveEntry)
 		protected.Handle(http.MethodPost, "/monthly-closing/entries/:id/post", permission("monthly_closing", "post"), monthlyClosingHandler.PostEntry)
+		protected.Handle(http.MethodPost, "/monthly-closing/entries/:id/reverse", permission("monthly_closing", "reverse"), entryApprovalSeparation, monthlyClosingHandler.ReverseEntry)
 		protected.Handle(http.MethodGet, "/monthly-closing/entries/export", permission("monthly_closing", "export"), monthlyClosingHandler.ExportJournalEntries)
 		protected.Handle(http.MethodPost, "/monthly-closing/erp-writeback", permission("monthly_closing", "writeback"), monthlyClosingHandler.ApplyERPWriteback)
 		protected.Handle(http.MethodPost, "/monthly-closing/batches/:id/approve", permission("monthly_closing", "approve"), batchApprovalSeparation, monthlyClosingHandler.ApproveBatch)

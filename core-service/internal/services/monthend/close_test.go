@@ -60,7 +60,7 @@ func TestBuildJournalEntries_Capitalized(t *testing.T) {
 		ExemptLeaseExpense:  999, // must be ignored for capitalized basis
 	}
 	entryDate := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
-	entries := buildJournalEntries("c1", "2026-01", entryDate, monthly, "batch1", "capitalized")
+	entries := buildJournalEntries("c1", "HKD", "2026-01", entryDate, monthly, "batch1", "capitalized")
 
 	byType := map[string]float64{}
 	for _, e := range entries {
@@ -71,8 +71,9 @@ func TestBuildJournalEntries_Capitalized(t *testing.T) {
 		if e.BatchID == nil || *e.BatchID != "batch1" {
 			t.Errorf("entry %s batch id not set to batch1", e.EntryType)
 		}
-		if e.Currency != "CNY" {
-			t.Errorf("entry %s currency = %q, want CNY", e.EntryType, e.Currency)
+		// Entries must carry the contract's own currency, never a hardcoded one.
+		if e.Currency != "HKD" {
+			t.Errorf("entry %s currency = %q, want HKD", e.EntryType, e.Currency)
 		}
 	}
 
@@ -97,7 +98,7 @@ func TestBuildJournalEntries_StraightLine(t *testing.T) {
 		VariableRentExpense: 30,
 		NonLeaseExpense:     20,
 	}
-	entries := buildJournalEntries("c1", "2026-01", time.Now(), monthly, "batch1", "straight_line_expense")
+	entries := buildJournalEntries("c1", "HKD", "2026-01", time.Now(), monthly, "batch1", "straight_line_expense")
 
 	types := map[string]bool{}
 	for _, e := range entries {
@@ -118,7 +119,7 @@ func TestBuildJournalEntries_OmitsTinyAmounts(t *testing.T) {
 		InterestExpense: 0.005, // below the 0.01 threshold
 		Depreciation:    200,
 	}
-	entries := buildJournalEntries("c1", "2026-01", time.Now(), monthly, "batch1", "capitalized")
+	entries := buildJournalEntries("c1", "HKD", "2026-01", time.Now(), monthly, "batch1", "capitalized")
 	for _, e := range entries {
 		if e.EntryType == "interest" {
 			t.Error("sub-threshold interest amount should not produce an entry")

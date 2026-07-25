@@ -343,6 +343,19 @@ export const monthlyClosingApi = {
       body: JSON.stringify({ erp_reference: erpReference }),
       token,
     }),
+  reverseEntry: (
+    entryId: string,
+    params: { reason: string; accounting_period?: string },
+    token: string
+  ) =>
+    apiRequest(`/api/v1/monthly-closing/entries/${entryId}/reverse`, {
+      method: "POST",
+      body: JSON.stringify({
+        reason: params.reason,
+        accounting_period: params.accounting_period || undefined,
+      }),
+      token,
+    }),
   approveBatch: (batchId: string, token: string) =>
     apiRequest(`/api/v1/monthly-closing/batches/${batchId}/approve`, { method: "POST", token }),
   postBatch: (batchId: string, token: string) =>

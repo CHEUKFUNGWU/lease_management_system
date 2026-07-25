@@ -109,6 +109,10 @@ export default function MonthlyClosingPage() {
   const [lockStatusLoading, setLockStatusLoading] = useState(false);
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [postingEntry, setPostingEntry] = useState<any>(null);
+  const [reverseModalOpen, setReverseModalOpen] = useState(false);
+  const [reversingEntry, setReversingEntry] = useState<any>(null);
+  const [reverseReason, setReverseReason] = useState("");
+  const [reversePeriod, setReversePeriod] = useState("");
   const [erpReference, setErpReference] = useState("");
   const [writebackModalOpen, setWritebackModalOpen] = useState(false);
   const [writebackText, setWritebackText] = useState("");
@@ -362,6 +366,45 @@ export default function MonthlyClosingPage() {
     setPostModalOpen(true);
   };
 
+  const openReverseModal = (entry: any) => {
+    setReversingEntry(entry);
+    setReverseReason("");
+    // Blank means "the original entry's own period", which is what the backend
+    // defaults to. It only needs overriding once that period has been locked.
+    setReversePeriod("");
+    setReverseModalOpen(true);
+  };
+
+  const closeReverseModal = () => {
+    setReverseModalOpen(false);
+    setReversingEntry(null);
+    setReverseReason("");
+    setReversePeriod("");
+  };
+
+  const handleReverseEntry = async () => {
+    if (!token || !reversingEntry) return;
+    if (!reverseReason.trim()) {
+      message.warning(t("monthly.reverse_reason_required", language));
+      return;
+    }
+    setActionLoading((prev) => ({ ...prev, [reversingEntry.id]: true }));
+    try {
+      await monthlyClosingApi.reverseEntry(
+        reversingEntry.id,
+        { reason: reverseReason.trim(), accounting_period: reversePeriod.trim() },
+        token
+      );
+      message.success(t("monthly.reverse_success", language));
+      closeReverseModal();
+      refresh();
+    } catch (error: any) {
+      message.error(error?.message || t("monthly.reverse_failed", language));
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [reversingEntry.id]: false }));
+    }
+  };
+
   // ─── entryColumns ────────────────────────────────────────────
 
   const entryColumns = [
@@ -396,21 +439,31 @@ export default function MonthlyClosingPage() {
     {
       title: t("monthly.col_status", language),
       dataIndex: "posting_status",
-      width: 80,
-      render: (v: string) => {
+      width: 110,
+      render: (v: string, record: any) => {
         const statusLabels: Record<string, string> = {
           posted: t("monthly.status_posted", language),
           approved: t("monthly.status_approved", language),
           draft: t("monthly.status_draft", language),
+          reversed: t("monthly.status_reversed", language),
+        };
+        const colors: Record<string, string> = {
+          posted: "success",
+          approved: "processing",
+          reversed: "error",
         };
         return (
-          <Tag
-            color={
-              v === "posted" ? "success" : v === "approved" ? "processing" : "default"
-            }
-          >
-            {statusLabels[v] || t("monthly.status_draft", language)}
-          </Tag>
+          <Space direction="vertical" size={2}>
+            <Tag color={colors[v] || "default"}>
+              {statusLabels[v] || t("monthly.status_draft", language)}
+            </Tag>
+            {/* A reversing entry is only readable next to what it cancels. */}
+            {record.reversal_of_entry_id && (
+              <Tag color="warning" style={{ fontSize: 11 }}>
+                {t("monthly.is_reversal_entry", language)}
+              </Tag>
+            )}
+          </Space>
         );
       },
     },
@@ -464,14 +517,15 @@ export default function MonthlyClosingPage() {
             </Popconfirm>
           );
         }
-        if (status === "posted" && isAdmin) {
+        if (status === "posted" && isApprover) {
           actions.push(
             <Button
               key="reverse"
               type="text"
               size="small"
               icon={<RollbackOutlined />}
-              onClick={() => message.info(t("monthly.reverse_confirm", language))}
+              loading={actionLoading[record.id]}
+              onClick={() => openReverseModal(record)}
             >
               {t("monthly.reverse_entry", language)}
             </Button>
@@ -1036,6 +1090,58 @@ export default function MonthlyClosingPage() {
                 placeholder={t("monthly.erp_placeholder", language)}
                 value={erpReference}
                 onChange={(e) => setErpReference(e.target.value)}
+              />
+            </Form.Item>
+          </Modal>
+
+          <Modal
+            title={t("monthly.reverse_title", language)}
+            open={reverseModalOpen}
+            onOk={handleReverseEntry}
+            onCancel={closeReverseModal}
+            confirmLoading={reversingEntry ? actionLoading[reversingEntry.id] : false}
+            okText={t("monthly.reverse_entry", language)}
+            okButtonProps={{ danger: true }}
+            cancelText={t("monthly.cancel", language)}
+          >
+            <p style={{ marginBottom: 16, color: "var(--fg-secondary)" }}>
+              {t("monthly.reverse_desc", language)}
+            </p>
+            {reversingEntry && (
+              <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+                <Descriptions.Item label={t("monthly.entry_type", language)}>
+                  <Tag color="processing">{reversingEntry.entry_type}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label={t("monthly.amount", language)}>
+                  {reversingEntry.amount?.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}{" "}
+                  {reversingEntry.currency}
+                </Descriptions.Item>
+                <Descriptions.Item label={t("monthly.reverse_direction", language)}>
+                  {t("monthly.reverse_direction_value", language, {
+                    debit: reversingEntry.credit_account,
+                    credit: reversingEntry.debit_account,
+                  })}
+                </Descriptions.Item>
+              </Descriptions>
+            )}
+            <Form.Item label={t("monthly.reverse_reason", language)} required>
+              <Input.TextArea
+                rows={2}
+                placeholder={t("monthly.reverse_reason_placeholder", language)}
+                value={reverseReason}
+                onChange={(e) => setReverseReason(e.target.value)}
+              />
+            </Form.Item>
+            <Form.Item
+              label={t("monthly.reverse_period", language)}
+              extra={t("monthly.reverse_period_hint", language)}
+            >
+              <Input
+                placeholder={reversingEntry?.accounting_period || "YYYY-MM"}
+                value={reversePeriod}
+                onChange={(e) => setReversePeriod(e.target.value)}
               />
             </Form.Item>
           </Modal>

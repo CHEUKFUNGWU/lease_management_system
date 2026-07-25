@@ -717,6 +717,7 @@ INSERT INTO permissions (role_id, resource, action) VALUES
     ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'writeback'),
     ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'lock'),
     ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'unlock'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'reverse'),
     ('44444444-4444-4444-4444-444444444444', 'ai_chat', 'use'),
     ('44444444-4444-4444-4444-444444444444', 'master_data', 'read'),
     ('44444444-4444-4444-4444-444444444444', 'settings', 'read'),
@@ -795,6 +796,11 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     approved_at TIMESTAMP WITH TIME ZONE,
     erp_reference VARCHAR(255),
     batch_id UUID,
+    -- 红冲:关联字段挂在红冲分录上,原分录只记录被红冲的时间与操作人
+    reversal_of_entry_id UUID REFERENCES journal_entries(id),
+    reversal_reason TEXT,
+    reversed_at TIMESTAMP WITH TIME ZONE,
+    reversed_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -829,6 +835,10 @@ CREATE INDEX IF NOT EXISTS idx_journal_entries_contract ON journal_entries(contr
 CREATE INDEX IF NOT EXISTS idx_journal_entries_period ON journal_entries(accounting_period);
 CREATE INDEX IF NOT EXISTS idx_journal_entries_batch ON journal_entries(batch_id);
 CREATE INDEX IF NOT EXISTS idx_journal_entries_posting ON journal_entries(posting_status);
+-- 一笔分录只能被红冲一次,由唯一索引在库层保证
+CREATE UNIQUE INDEX IF NOT EXISTS idx_journal_entries_reversal_of
+    ON journal_entries(reversal_of_entry_id)
+    WHERE reversal_of_entry_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_monthly_closing_period ON monthly_closing_batches(accounting_period);
 CREATE INDEX IF NOT EXISTS idx_monthly_closing_scope ON monthly_closing_batches(accounting_period, legal_entity_id, scope_contract_id);
 

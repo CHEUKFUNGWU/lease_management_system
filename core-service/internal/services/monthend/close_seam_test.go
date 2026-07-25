@@ -3,6 +3,7 @@ package monthend
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -72,12 +73,16 @@ func (f fakeRates) GetFloat64(context.Context, string, float64) float64 { return
 // fakeWriter records every write in order and can be told to fail a named method.
 type fakeWriter struct {
 	calls         []string
+	entries       []*repository.JournalEntry
 	failOn        string
 	batchSeq      int
 	locked        bool
 	lockErr       error
 	finalized     bool
 	reusableBatch *repository.MonthlyClosingBatch
+	existingEntry *repository.JournalEntry
+	reversedID    string
+	reversedBy    string
 }
 
 func (w *fakeWriter) record(name string) error {
@@ -133,8 +138,31 @@ func (w *fakeWriter) DeleteDraftEntriesByTypes(context.Context, string, string, 
 	return w.record("DeleteDraftEntriesByTypes")
 }
 
-func (w *fakeWriter) CreateJournalEntry(context.Context, *repository.JournalEntry) error {
+func (w *fakeWriter) CreateJournalEntry(_ context.Context, entry *repository.JournalEntry) error {
+	if entry.ID == "" {
+		// Mirror the repository, which assigns the id on insert.
+		entry.ID = fmt.Sprintf("entry-%d", len(w.entries)+1)
+	}
+	w.entries = append(w.entries, entry)
 	return w.record("CreateJournalEntry")
+}
+
+// GetJournalEntryByID serves the reversal path: existingEntry is the entry under
+// test, and a nil value stands for "not found or out of scope".
+func (w *fakeWriter) GetJournalEntryByID(_ context.Context, entryID string) (*repository.JournalEntry, error) {
+	if err := w.record("GetJournalEntryByID"); err != nil {
+		return nil, err
+	}
+	if w.existingEntry == nil || w.existingEntry.ID != entryID {
+		return nil, nil
+	}
+	return w.existingEntry, nil
+}
+
+func (w *fakeWriter) MarkJournalEntryReversed(_ context.Context, entryID, userID string) error {
+	w.reversedID = entryID
+	w.reversedBy = userID
+	return w.record("MarkJournalEntryReversed")
 }
 
 func (w *fakeWriter) LinkDraftEntriesToBatch(context.Context, string, string, string, string, []string) (int, error) {
@@ -188,6 +216,20 @@ func (s *fakeCloseStore) GetFloat64(ctx context.Context, key string, fallback fl
 }
 
 func (u *fakeUOW) Do(ctx context.Context, _ string, body func(store closeStore, a auditSink) error) error {
+	u.ran = true
+	err := body(&fakeCloseStore{
+		fakeWriter: u.writer,
+		contracts:  u.contracts,
+		schedules:  u.schedules,
+		rates:      u.rates,
+	}, u.audit)
+	if err == nil {
+		u.committed = true
+	}
+	return err
+}
+
+func (u *fakeUOW) DoReversal(ctx context.Context, _ string, body func(store reversalStore, a auditSink) error) error {
 	u.ran = true
 	err := body(&fakeCloseStore{
 		fakeWriter: u.writer,
@@ -267,6 +309,28 @@ func TestClose_HappyPath_CommitsAndAudits(t *testing.T) {
 	}
 	if res.TotalEntries == 0 {
 		t.Error("expected at least one journal entry for an in-scope contract")
+	}
+}
+
+// A foreign-currency lease must produce entries in its own currency. Posting a
+// USD lease as CNY would silently corrupt the ledger, so the close carries the
+// contract currency all the way through rather than defaulting it.
+func TestClose_EntriesUseContractCurrency(t *testing.T) {
+	contract := inScopeContract("c1")
+	contract.Currency = "USD"
+	uow := &fakeUOW{writer: &fakeWriter{}, audit: &fakeAudit{}}
+	svc := newService(uow, fakeLocks{}, fakeContracts{list: []*repository.Contract{contract}}, fakeSchedules{})
+
+	if _, err := svc.Close(context.Background(), Command{AccountingPeriod: period, LegalEntityID: "le1"}); err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+	if len(uow.writer.entries) == 0 {
+		t.Fatal("expected the close to produce journal entries")
+	}
+	for _, entry := range uow.writer.entries {
+		if entry.Currency != "USD" {
+			t.Errorf("entry %s currency = %q, want USD", entry.EntryType, entry.Currency)
+		}
 	}
 }
 

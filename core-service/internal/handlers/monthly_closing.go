@@ -83,6 +83,52 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+type ReverseEntryRequest struct {
+	Reason string `json:"reason" binding:"required"`
+	// AccountingPeriod places the reversing entry in an open period. It is only
+	// needed when the original entry's own period has since been locked.
+	AccountingPeriod string `json:"accounting_period"`
+}
+
+// ReverseEntry cancels a posted journal entry with an opposite entry.
+func (h *MonthlyClosingHandler) ReverseEntry(c *gin.Context) {
+	var req ReverseEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请填写红冲原因"})
+		return
+	}
+
+	uid, _ := c.Get("user_id")
+	uidStr, _ := uid.(string)
+
+	result, err := h.closeService.Reverse(c.Request.Context(), monthend.ReversalCommand{
+		EntryID:          c.Param("id"),
+		AccountingPeriod: req.AccountingPeriod,
+		Reason:           req.Reason,
+		LegalEntityID:    middleware.GetTenantID(c),
+		Actor:            audit.MetadataFromGin(uidStr, c),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, monthend.ErrEntryNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": "分录不存在"})
+		case errors.Is(err, monthend.ErrEntryAlreadyReversed):
+			c.JSON(http.StatusConflict, gin.H{"error": "该分录已被红冲，不能重复红冲"})
+		case errors.Is(err, monthend.ErrEntryNotPosted):
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "仅已过账分录可红冲；草稿或待审批分录请驳回或重新生成"})
+		case errors.Is(err, monthend.ErrReversalPeriodLocked):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "目标期间已锁账，请指定一个未锁定的期间入账红冲分录"})
+		case errors.Is(err, monthend.ErrReversalReasonRequired):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请填写红冲原因"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "红冲成功", "result": result})
+}
+
 // ApproveEntry approves a single journal entry
 func (h *MonthlyClosingHandler) ApproveEntry(c *gin.Context) {
 	entryID := c.Param("id")

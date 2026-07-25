@@ -64,8 +64,15 @@ type JournalEntry struct {
 	ApprovedAt          *time.Time `json:"approved_at"`
 	ERPReference        *string    `json:"erp_reference"`
 	BatchID             *string    `json:"batch_id"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	// ReversalOfEntryID and ReversalReason are set on a reversing entry and
+	// identify the posted entry it cancels. ReversedAt/ReversedBy are set on the
+	// original entry when it is reversed.
+	ReversalOfEntryID *string    `json:"reversal_of_entry_id"`
+	ReversalReason    *string    `json:"reversal_reason"`
+	ReversedAt        *time.Time `json:"reversed_at"`
+	ReversedBy        *string    `json:"reversed_by"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type MonthlyClosingBatch struct {
@@ -430,14 +437,17 @@ func (r *MonthlyClosingRepository) CreateJournalEntry(ctx context.Context, entry
 		INSERT INTO journal_entries (
 			id, contract_id, measurement_result_id, accounting_period, entry_date,
 			entry_type, debit_account, credit_account, amount, currency,
-			description, voucher_number, posting_status, batch_id, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			description, voucher_number, posting_status, batch_id,
+			posted_at, posted_by, reversal_of_entry_id, reversal_reason,
+			created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
 	`
 
 	_, err := r.db.Exec(ctx, query,
 		entry.ID, entry.ContractID, entry.MeasurementResultID, entry.AccountingPeriod, entry.EntryDate,
 		entry.EntryType, entry.DebitAccount, entry.CreditAccount, entry.Amount, entry.Currency,
 		entry.Description, entry.VoucherNumber, entry.PostingStatus, entry.BatchID,
+		entry.PostedAt, entry.PostedBy, entry.ReversalOfEntryID, entry.ReversalReason,
 		entry.CreatedAt, entry.UpdatedAt,
 	)
 	if err != nil {
@@ -590,7 +600,9 @@ func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contra
 		SELECT je.id, je.contract_id, je.measurement_result_id, je.accounting_period, je.entry_date,
 			je.entry_type, je.debit_account, je.credit_account, je.amount, je.currency,
 			je.description, je.voucher_number, je.posting_status, je.posted_at, je.posted_by,
-			je.approved_by, je.approved_at, je.erp_reference, je.batch_id, je.created_at, je.updated_at
+			je.approved_by, je.approved_at, je.erp_reference, je.batch_id,
+			je.reversal_of_entry_id, je.reversal_reason, je.reversed_at, je.reversed_by,
+			je.created_at, je.updated_at
 		FROM journal_entries je
 		JOIN lease_contracts lc ON lc.id = je.contract_id
 		WHERE 1=1
@@ -630,7 +642,9 @@ func (r *MonthlyClosingRepository) GetJournalEntries(ctx context.Context, contra
 			&e.ID, &e.ContractID, &e.MeasurementResultID, &e.AccountingPeriod, &e.EntryDate,
 			&e.EntryType, &e.DebitAccount, &e.CreditAccount, &e.Amount, &e.Currency,
 			&e.Description, &e.VoucherNumber, &e.PostingStatus, &e.PostedAt, &e.PostedBy,
-			&e.ApprovedBy, &e.ApprovedAt, &e.ERPReference, &e.BatchID, &e.CreatedAt, &e.UpdatedAt,
+			&e.ApprovedBy, &e.ApprovedAt, &e.ERPReference, &e.BatchID,
+			&e.ReversalOfEntryID, &e.ReversalReason, &e.ReversedAt, &e.ReversedBy,
+			&e.CreatedAt, &e.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan entry: %w", err)
@@ -645,7 +659,9 @@ func (r *MonthlyClosingRepository) GetJournalEntriesForExport(ctx context.Contex
 		SELECT je.id, je.contract_id, je.measurement_result_id, je.accounting_period, je.entry_date,
 			je.entry_type, je.debit_account, je.credit_account, je.amount, je.currency,
 			je.description, je.voucher_number, je.posting_status, je.posted_at, je.posted_by,
-			je.approved_by, je.approved_at, je.erp_reference, je.batch_id, je.created_at, je.updated_at
+			je.approved_by, je.approved_at, je.erp_reference, je.batch_id,
+			je.reversal_of_entry_id, je.reversal_reason, je.reversed_at, je.reversed_by,
+			je.created_at, je.updated_at
 		FROM journal_entries je
 		JOIN lease_contracts lc ON lc.id = je.contract_id
 		WHERE 1=1
@@ -684,7 +700,9 @@ func (r *MonthlyClosingRepository) GetJournalEntriesForExport(ctx context.Contex
 			&e.ID, &e.ContractID, &e.MeasurementResultID, &e.AccountingPeriod, &e.EntryDate,
 			&e.EntryType, &e.DebitAccount, &e.CreditAccount, &e.Amount, &e.Currency,
 			&e.Description, &e.VoucherNumber, &e.PostingStatus, &e.PostedAt, &e.PostedBy,
-			&e.ApprovedBy, &e.ApprovedAt, &e.ERPReference, &e.BatchID, &e.CreatedAt, &e.UpdatedAt,
+			&e.ApprovedBy, &e.ApprovedAt, &e.ERPReference, &e.BatchID,
+			&e.ReversalOfEntryID, &e.ReversalReason, &e.ReversedAt, &e.ReversedBy,
+			&e.CreatedAt, &e.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan export entry: %w", err)
@@ -695,6 +713,68 @@ func (r *MonthlyClosingRepository) GetJournalEntriesForExport(ctx context.Contex
 }
 
 // ApproveJournalEntry approves a single journal entry in draft status
+// GetJournalEntryByID returns a single journal entry, or nil when it does not
+// exist or falls outside the caller's data scope.
+func (r *MonthlyClosingRepository) GetJournalEntryByID(ctx context.Context, entryID string) (*JournalEntry, error) {
+	allowed, err := r.journalEntryAllowed(ctx, entryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate journal entry access: %w", err)
+	}
+	if !allowed {
+		return nil, nil
+	}
+
+	e := &JournalEntry{}
+	err = r.db.QueryRow(ctx, `
+		SELECT id, contract_id, measurement_result_id, accounting_period, entry_date,
+			entry_type, debit_account, credit_account, amount, currency,
+			description, voucher_number, posting_status, posted_at, posted_by,
+			approved_by, approved_at, erp_reference, batch_id,
+			reversal_of_entry_id, reversal_reason, reversed_at, reversed_by,
+			created_at, updated_at
+		FROM journal_entries WHERE id = $1
+	`, entryID).Scan(
+		&e.ID, &e.ContractID, &e.MeasurementResultID, &e.AccountingPeriod, &e.EntryDate,
+		&e.EntryType, &e.DebitAccount, &e.CreditAccount, &e.Amount, &e.Currency,
+		&e.Description, &e.VoucherNumber, &e.PostingStatus, &e.PostedAt, &e.PostedBy,
+		&e.ApprovedBy, &e.ApprovedAt, &e.ERPReference, &e.BatchID,
+		&e.ReversalOfEntryID, &e.ReversalReason, &e.ReversedAt, &e.ReversedBy,
+		&e.CreatedAt, &e.UpdatedAt,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load journal entry: %w", err)
+	}
+	return e, nil
+}
+
+// MarkJournalEntryReversed flags a posted entry as reversed. The status guard is
+// part of the statement, so two concurrent reversals cannot both succeed: the
+// second updates no row and is reported as a conflict.
+func (r *MonthlyClosingRepository) MarkJournalEntryReversed(ctx context.Context, entryID, userID string) error {
+	var userIDVal interface{}
+	if userID != "" {
+		userIDVal = userID
+	}
+	tag, err := r.db.Exec(ctx, `
+		UPDATE journal_entries SET
+			posting_status = 'reversed',
+			reversed_by = $1,
+			reversed_at = NOW(),
+			updated_at = NOW()
+		WHERE id = $2 AND posting_status = 'posted'
+	`, userIDVal, entryID)
+	if err != nil {
+		return fmt.Errorf("failed to mark journal entry reversed: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("journal entry is no longer in posted status")
+	}
+	return nil
+}
+
 func (r *MonthlyClosingRepository) ApproveJournalEntry(ctx context.Context, entryID string, userID string) error {
 	allowed, err := r.journalEntryAllowed(ctx, entryID)
 	if err != nil {

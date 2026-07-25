@@ -43,11 +43,23 @@ type auditSink interface {
 	LogEvent(ctx context.Context, tableName, recordID, action string, oldVals, newVals interface{}, meta audit.Metadata) error
 }
 
-// unitOfWork runs the body of a close inside a serialized transaction. The body
-// receives a transaction-scoped store and audit sink; returning a non-nil error
-// rolls the whole transaction back, so a partial batch can never be committed.
+// reversalStore is the transaction-scoped view a reversal needs: read the
+// original entry, check the target period lock, write the opposite entry, and
+// flag the original. It is deliberately much narrower than closeStore.
+type reversalStore interface {
+	GetJournalEntryByID(ctx context.Context, entryID string) (*repository.JournalEntry, error)
+	IsPeriodLocked(ctx context.Context, period, legalEntityID string) (bool, error)
+	CreateJournalEntry(ctx context.Context, entry *repository.JournalEntry) error
+	MarkJournalEntryReversed(ctx context.Context, entryID, userID string) error
+}
+
+// unitOfWork runs the body of a close or a reversal inside a serialized
+// transaction. The body receives a transaction-scoped store and audit sink;
+// returning a non-nil error rolls the whole transaction back, so neither a
+// partial batch nor a half-applied reversal can be committed.
 type unitOfWork interface {
 	Do(ctx context.Context, lockKey string, body func(store closeStore, a auditSink) error) error
+	DoReversal(ctx context.Context, lockKey string, body func(store reversalStore, a auditSink) error) error
 }
 
 // pgxUnitOfWork is the production unit of work backed by a pgx pool.
@@ -76,6 +88,20 @@ func NewUnitOfWork(
 }
 
 func (u *pgxUnitOfWork) Do(ctx context.Context, lockKey string, body func(store closeStore, a auditSink) error) error {
+	return u.inTx(ctx, lockKey, func(store *txCloseStore, a auditSink) error {
+		return body(store, a)
+	})
+}
+
+func (u *pgxUnitOfWork) DoReversal(ctx context.Context, lockKey string, body func(store reversalStore, a auditSink) error) error {
+	return u.inTx(ctx, lockKey, func(store *txCloseStore, a auditSink) error {
+		return body(store, a)
+	})
+}
+
+// inTx runs body inside one serialized transaction, holding an advisory lock on
+// lockKey so concurrent operations on the same scope queue rather than race.
+func (u *pgxUnitOfWork) inTx(ctx context.Context, lockKey string, body func(store *txCloseStore, a auditSink) error) error {
 	tx, err := u.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
 	if err != nil {
 		return fmt.Errorf("failed to begin close transaction: %w", err)

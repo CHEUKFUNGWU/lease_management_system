@@ -54,12 +54,16 @@ func (r *ApprovalRepository) Review(ctx context.Context, contractID, reviewedBy 
 		status = "returned_to_editor"
 	}
 
+	// $3 is annotated because it appears both as an assignment to
+	// approval_status and inside a comparison; without the cast Postgres deduces
+	// two different types for the same parameter and rejects the statement
+	// (SQLSTATE 42P08).
 	query := `
 		UPDATE lease_contracts
-		SET approval_status = $3,
+		SET approval_status = $3::varchar,
 		    reviewed_by = $2,
 		    reviewed_at = $4,
-		    rejected_reason = CASE WHEN $3 = 'returned_to_editor' THEN NULLIF($5, '') ELSE NULL END,
+		    rejected_reason = CASE WHEN $3::varchar = 'returned_to_editor' THEN NULLIF($5, '') ELSE NULL END,
 		    updated_at = $4
 		WHERE id = $1
 		  AND approval_status = 'submitted'

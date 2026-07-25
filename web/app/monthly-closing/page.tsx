@@ -113,6 +113,9 @@ export default function MonthlyClosingPage() {
   const [reversingEntry, setReversingEntry] = useState<any>(null);
   const [reverseReason, setReverseReason] = useState("");
   const [reversePeriod, setReversePeriod] = useState("");
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectingEntry, setRejectingEntry] = useState<any>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const [erpReference, setErpReference] = useState("");
   const [writebackModalOpen, setWritebackModalOpen] = useState(false);
   const [writebackText, setWritebackText] = useState("");
@@ -366,6 +369,37 @@ export default function MonthlyClosingPage() {
     setPostModalOpen(true);
   };
 
+  const openRejectModal = (entry: any) => {
+    setRejectingEntry(entry);
+    setRejectReason("");
+    setRejectModalOpen(true);
+  };
+
+  const closeRejectModal = () => {
+    setRejectModalOpen(false);
+    setRejectingEntry(null);
+    setRejectReason("");
+  };
+
+  const handleRejectEntry = async () => {
+    if (!token || !rejectingEntry) return;
+    if (!rejectReason.trim()) {
+      message.warning(t("monthly.reject_reason_required", language));
+      return;
+    }
+    setActionLoading((prev) => ({ ...prev, [rejectingEntry.id]: true }));
+    try {
+      await monthlyClosingApi.rejectEntry(rejectingEntry.id, rejectReason.trim(), token);
+      message.success(t("monthly.reject_success", language));
+      closeRejectModal();
+      refresh();
+    } catch (error: any) {
+      message.error(error?.message || t("monthly.reject_failed", language));
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [rejectingEntry.id]: false }));
+    }
+  };
+
   const openReverseModal = (entry: any) => {
     setReversingEntry(entry);
     setReverseReason("");
@@ -506,15 +540,16 @@ export default function MonthlyClosingPage() {
             </Button>
           );
           actions.push(
-            <Popconfirm
+            <Button
               key="reject"
-              title={t("monthly.reject_confirm", language)}
-              onConfirm={() => message.info(t("monthly.reject_coming_soon", language))}
+              type="text"
+              size="small"
+              icon={<RollbackOutlined />}
+              loading={actionLoading[record.id]}
+              onClick={() => openRejectModal(record)}
             >
-              <Button type="text" size="small" icon={<RollbackOutlined />}>
-                {t("monthly.reject_entry", language)}
-              </Button>
-            </Popconfirm>
+              {t("monthly.reject_entry", language)}
+            </Button>
           );
         }
         if (status === "posted" && isApprover) {
@@ -1090,6 +1125,42 @@ export default function MonthlyClosingPage() {
                 placeholder={t("monthly.erp_placeholder", language)}
                 value={erpReference}
                 onChange={(e) => setErpReference(e.target.value)}
+              />
+            </Form.Item>
+          </Modal>
+
+          <Modal
+            title={t("monthly.reject_title", language)}
+            open={rejectModalOpen}
+            onOk={handleRejectEntry}
+            onCancel={closeRejectModal}
+            confirmLoading={rejectingEntry ? actionLoading[rejectingEntry.id] : false}
+            okText={t("monthly.reject_entry", language)}
+            okButtonProps={{ danger: true }}
+            cancelText={t("monthly.cancel", language)}
+          >
+            <p style={{ marginBottom: 16, color: "var(--fg-secondary)" }}>
+              {t("monthly.reject_desc", language)}
+            </p>
+            {rejectingEntry && (
+              <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+                <Descriptions.Item label={t("monthly.entry_type", language)}>
+                  <Tag color="processing">{rejectingEntry.entry_type}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label={t("monthly.amount", language)}>
+                  {rejectingEntry.amount?.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                  })}{" "}
+                  {rejectingEntry.currency}
+                </Descriptions.Item>
+              </Descriptions>
+            )}
+            <Form.Item label={t("monthly.reject_reason", language)} required>
+              <Input.TextArea
+                rows={2}
+                placeholder={t("monthly.reject_reason_placeholder", language)}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
               />
             </Form.Item>
           </Modal>

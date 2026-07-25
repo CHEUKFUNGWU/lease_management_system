@@ -343,6 +343,12 @@ export const monthlyClosingApi = {
       body: JSON.stringify({ erp_reference: erpReference }),
       token,
     }),
+  rejectEntry: (entryId: string, reason: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/entries/${entryId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+      token,
+    }),
   reverseEntry: (
     entryId: string,
     params: { reason: string; accounting_period?: string },

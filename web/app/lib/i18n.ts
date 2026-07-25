@@ -1949,11 +1949,6 @@ const dict: TranslationDict = {
     "zh-HK": "確認審批該分錄？",
     en: "Confirm approving this entry?",
   },
-  "monthly.reject_confirm": {
-    "zh-CN": "确认驳回该分录？",
-    "zh-HK": "確認駁回該分錄？",
-    en: "Confirm rejecting this entry?",
-  },
   "monthly.reverse_title": {
     "zh-CN": "红冲已过账分录",
     "zh-HK": "紅沖已過賬分錄",
@@ -2019,10 +2014,40 @@ const dict: TranslationDict = {
     "zh-HK": "紅沖分錄",
     en: "Reversal",
   },
-  "monthly.reject_coming_soon": {
-    "zh-CN": "驳回功能待实现",
-    "zh-HK": "駁回功能待實現",
-    en: "Reject feature coming soon",
+  "monthly.reject_title": {
+    "zh-CN": "驳回已审批分录",
+    "zh-HK": "駁回已審批分錄",
+    en: "Reject Approved Entry",
+  },
+  "monthly.reject_desc": {
+    "zh-CN": "驳回后分录状态回到草稿,原审批痕迹被清除,需重新审批;分录尚未过账,账面不受影响。驳回理由记入审计日志。",
+    "zh-HK": "駁回後分錄狀態回到草稿,原審批痕跡被清除,需重新審批;分錄尚未過賬,賬面不受影響。駁回理由記入審計日誌。",
+    en: "The entry returns to draft and its approval marks are cleared, so it must be approved again. Nothing was posted, so the ledger is unaffected. The reason is recorded in the audit log.",
+  },
+  "monthly.reject_reason": {
+    "zh-CN": "驳回理由",
+    "zh-HK": "駁回理由",
+    en: "Rejection Reason",
+  },
+  "monthly.reject_reason_placeholder": {
+    "zh-CN": "例如:折现率有误、付款计划需更正、待业务确认",
+    "zh-HK": "例如:折現率有誤、付款計劃需更正、待業務確認",
+    en: "e.g. wrong discount rate, payment schedule needs correcting, pending business confirmation",
+  },
+  "monthly.reject_reason_required": {
+    "zh-CN": "请填写驳回理由",
+    "zh-HK": "請填寫駁回理由",
+    en: "A rejection reason is required",
+  },
+  "monthly.reject_success": {
+    "zh-CN": "分录已驳回,状态回到草稿",
+    "zh-HK": "分錄已駁回,狀態回到草稿",
+    en: "Entry rejected and returned to draft",
+  },
+  "monthly.reject_failed": {
+    "zh-CN": "驳回失败",
+    "zh-HK": "駁回失敗",
+    en: "Rejection failed",
   },
   "monthly.approve_all_confirm": {
     "zh-CN": "确认审批批次 {batch} 中所有草稿分录？",

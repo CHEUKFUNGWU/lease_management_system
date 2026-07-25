@@ -21,17 +21,17 @@ func RequireApprovalSeparation(store ApprovalParticipantStore, recordType, param
 		actorID, _ := actor.(string)
 		participants, found, err := store.GetApprovalParticipants(c.Request.Context(), recordType, c.Param(parameterName))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify segregation of duties"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "职责分离校验失败，请稍后重试"})
 			c.Abort()
 			return
 		}
 		if !found {
-			c.JSON(http.StatusNotFound, gin.H{"error": "approval record not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "审批记录不存在"})
 			c.Abort()
 			return
 		}
 		if actorID == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "approver must differ from creator and reviewer"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "审批人不得与制单人或复核人为同一人"})
 			c.Abort()
 			return
 		}
@@ -41,7 +41,7 @@ func RequireApprovalSeparation(store ApprovalParticipantStore, recordType, param
 			permissionStrings, _ := permissions.([]string)
 			reason := strings.TrimSpace(c.GetHeader("X-Admin-Override-Reason"))
 			if !HasPermission(permissionStrings, "*", "*") || reason == "" {
-				c.JSON(http.StatusForbidden, gin.H{"error": "approver must differ from creator and reviewer; admin override requires a reason"})
+				c.JSON(http.StatusForbidden, gin.H{"error": "审批人不得与制单人或复核人为同一人；如确需由管理员强制执行，请提供覆盖理由"})
 				c.Abort()
 				return
 			}

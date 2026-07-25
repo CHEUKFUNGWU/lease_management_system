@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
@@ -81,6 +82,44 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+type RejectEntryRequest struct {
+	Reason string `json:"reason" binding:"required"`
+}
+
+// RejectEntry returns an approved journal entry to draft.
+func (h *MonthlyClosingHandler) RejectEntry(c *gin.Context) {
+	var req RejectEntryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请填写驳回理由"})
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请填写驳回理由"})
+		return
+	}
+
+	entryID := c.Param("id")
+	userID, _ := c.Get("user_id")
+	userIDStr, _ := userID.(string)
+
+	if err := h.mcRepo.RejectJournalEntry(c.Request.Context(), entryID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅已审批且未过账的分录可驳回"})
+		return
+	}
+	// The reason only survives in the audit trail, so it is recorded with the
+	// status change rather than alongside it.
+	if h.auditLogger != nil {
+		h.auditLogger.Log(c.Request.Context(), "journal_entries", entryID, "reject",
+			map[string]interface{}{"posting_status": "approved"},
+			approvalAuditValues(c, map[string]interface{}{
+				"posting_status": "draft",
+				"reason":         reason,
+			}), userIDStr, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "分录已驳回，状态回到草稿", "entry_id": entryID})
 }
 
 type ReverseEntryRequest struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lease-management-system/core-service/internal/access"
 )
@@ -70,6 +71,24 @@ func (r *MasterDataRepository) ListLegalEntities(ctx context.Context, tenantID s
 	}
 
 	return entities, rows.Err()
+}
+
+// FunctionalCurrency returns the legal entity's reporting currency, which is
+// what a foreign-currency lease is translated into. An unknown entity yields an
+// empty string so callers can decide whether that is an error in their context.
+func (r *MasterDataRepository) FunctionalCurrency(ctx context.Context, legalEntityID string) (string, error) {
+	if legalEntityID == "" {
+		return "", nil
+	}
+	var currency string
+	err := r.db.QueryRow(ctx, `SELECT currency FROM legal_entities WHERE id = $1`, legalEntityID).Scan(&currency)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to read functional currency: %w", err)
+	}
+	return currency, nil
 }
 
 func (r *MasterDataRepository) ListStores(ctx context.Context, tenantID, legalEntityID string) ([]StoreOption, error) {

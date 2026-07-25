@@ -32,7 +32,8 @@ func TestClose_PostgresTransactionAndRerunContract(t *testing.T) {
 	scheduleRepo := repository.NewPaymentScheduleRepository(pool)
 	settingRepo := repository.NewSystemSettingRepository(pool)
 	auditLogger := audit.NewLogger(repository.NewAuditRepository(pool))
-	svc := NewService(pool, mcRepo, contractRepo, scheduleRepo, settingRepo, auditLogger)
+	svc := NewService(pool, mcRepo, contractRepo, scheduleRepo, settingRepo,
+		repository.NewExchangeRateRepository(pool), repository.NewMasterDataRepository(pool), auditLogger)
 
 	eventEntry := &repository.JournalEntry{
 		ContractID: fixture.contractID, AccountingPeriod: fixture.period,

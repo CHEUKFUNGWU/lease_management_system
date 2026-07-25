@@ -38,6 +38,22 @@ type RegressionInput struct {
 	IncentiveReceived float64             `json:"incentive_received"`
 	RestorationCost   float64             `json:"restoration_cost"`
 	Payments          []RegressionPayment `json:"payments"`
+
+	// ForeignCurrency is set only by multi-currency cases. When present the
+	// runner also checks the IAS 21 remeasurement of the lease liability.
+	ForeignCurrency *RegressionForeignCurrency `json:"foreign_currency,omitempty"`
+}
+
+// RegressionForeignCurrency describes a lease denominated in a currency other
+// than the reporting entity's functional currency, and the rates that apply to
+// the period under test.
+type RegressionForeignCurrency struct {
+	ContractCurrency   string  `json:"contract_currency"`
+	FunctionalCurrency string  `json:"functional_currency"`
+	Period             string  `json:"period"`
+	OpeningRate        float64 `json:"opening_rate"`
+	ClosingRate        float64 `json:"closing_rate"`
+	AverageRate        float64 `json:"average_rate"`
 }
 
 type RegressionPayment struct {
@@ -51,6 +67,12 @@ type RegressionExpected struct {
 	InitialLiability *float64                    `json:"initial_liability,omitempty"`
 	InitialROUAsset  *float64                    `json:"initial_rou_asset,omitempty"`
 	Monthly          []RegressionMonthlyExpected `json:"monthly,omitempty"`
+
+	// ExchangeDifference is the expected IAS 21 gain or loss on the lease
+	// liability for the period named in Input.ForeignCurrency; positive is a
+	// loss. That the right-of-use asset is *not* retranslated is asserted the
+	// ordinary way, through Monthly.ClosingROUAsset in the contract currency.
+	ExchangeDifference *float64 `json:"exchange_difference,omitempty"`
 }
 
 type RegressionMonthlyExpected struct {
@@ -221,6 +243,37 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 		}
 		if expectedMonth.NonLeaseExpense != nil {
 			addAssert(prefix+"non_lease_expense", *expectedMonth.NonLeaseExpense, round(actualMonth.NonLeaseExpense))
+		}
+	}
+
+	// Multi-currency cases additionally assert the IAS 21 translation of the
+	// lease liability, and that the right-of-use asset is left alone.
+	if fx := tc.Input.ForeignCurrency; fx != nil && tc.Expected.ExchangeDifference != nil {
+		month, ok := monthlyByPeriod[fx.Period]
+		if !ok {
+			caseRun.Passed = false
+			caseRun.Assertions = append(caseRun.Assertions, RegressionAssert{
+				Name: fx.Period + ".exists", Expected: 1, Actual: 0,
+				Delta: 1, Tolerance: tolerance, Passed: false,
+			})
+		} else {
+			difference, err := RemeasureForeignCurrencyLiability(FXRemeasurementInput{
+				ContractCurrency:   fx.ContractCurrency,
+				FunctionalCurrency: fx.FunctionalCurrency,
+				OpeningLiability:   month.OpeningLiability,
+				Interest:           month.InterestExpense,
+				Payments:           month.TotalPayments,
+				ClosingLiability:   month.ClosingLiability,
+				OpeningRate:        fx.OpeningRate,
+				ClosingRate:        fx.ClosingRate,
+				AverageRate:        fx.AverageRate,
+			})
+			if err != nil {
+				caseRun.Passed = false
+				caseRun.Error = err.Error()
+			} else {
+				addAssert(fx.Period+".exchange_difference", *tc.Expected.ExchangeDifference, difference)
+			}
 		}
 	}
 

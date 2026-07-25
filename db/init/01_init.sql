@@ -725,6 +725,7 @@ INSERT INTO permissions (role_id, resource, action) VALUES
     ('44444444-4444-4444-4444-444444444444', 'ai_chat', 'use'),
     ('44444444-4444-4444-4444-444444444444', 'master_data', 'read'),
     ('44444444-4444-4444-4444-444444444444', 'settings', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'settings', 'update'),
     ('44444444-4444-4444-4444-444444444444', 'identity', 'read'),
     ('44444444-4444-4444-4444-444444444444', 'lease_admin', 'read'),
     ('55555555-5555-5555-5555-555555555555', 'monthly_closing', 'read'),
@@ -913,6 +914,28 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_by UUID REFERENCES users(id),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+-- 汇率表:外币租赁折算为法人主体职能货币
+-- closing 用于期末重估货币性项目(租赁负债);average 用于当期流量(利息与付款)
+CREATE TABLE IF NOT EXISTS exchange_rates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    from_currency VARCHAR(10) NOT NULL,
+    to_currency VARCHAR(10) NOT NULL,
+    rate_date DATE NOT NULL,
+    rate_type VARCHAR(20) NOT NULL DEFAULT 'closing',
+    rate DECIMAL(18, 8) NOT NULL,
+    source VARCHAR(100),
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (rate > 0),
+    CHECK (rate_type IN ('closing', 'average')),
+    CHECK (from_currency <> to_currency),
+    UNIQUE (from_currency, to_currency, rate_date, rate_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_lookup
+    ON exchange_rates(from_currency, to_currency, rate_type, rate_date DESC);
 
 INSERT INTO system_settings (setting_key, setting_value, description)
 VALUES ('global_discount_rate', '0.05', '集团默认折现率（年化，小数）')

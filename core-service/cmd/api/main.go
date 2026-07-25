@@ -49,12 +49,13 @@ func main() {
 	aiChatRuntimeRepo := repository.NewAIChatRuntimeRepository(database.Pool)
 	masterDataRepo := repository.NewMasterDataRepository(database.Pool)
 	accessPolicyRepo := repository.NewAccessPolicyRepository(database.Pool)
+	exchangeRateRepo := repository.NewExchangeRateRepository(database.Pool)
 
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
 
 	// Initialize services
-	closeService := monthend.NewService(database.Pool, mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger)
+	closeService := monthend.NewService(database.Pool, mcRepo, contractRepo, psRepo, systemSettingRepo, exchangeRateRepo, masterDataRepo, auditLogger)
 	eventPersistence := eventaccounting.NewPersistenceService(database.Pool, mcRepo, eventRepo, auditLogger)
 
 	// Initialize handlers
@@ -71,6 +72,7 @@ func main() {
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
 	masterDataHandler := handlers.NewMasterDataHandler(masterDataRepo)
+	exchangeRateHandler := handlers.NewExchangeRateHandler(exchangeRateRepo, auditLogger)
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -188,6 +190,11 @@ func main() {
 		protected.Handle(http.MethodGet, "/reports/cashflow-forecast", permission("reports", "read"), reportHandler.CashflowForecast)
 		protected.Handle(http.MethodGet, "/reports/disclosure", permission("reports", "read"), reportHandler.Disclosure)
 		protected.Handle(http.MethodGet, "/reports/unit-price", permission("reports", "read"), reportHandler.UnitPrice)
+
+		// Exchange rates: settings-grade master data used to translate
+		// foreign-currency leases into the entity's functional currency.
+		protected.Handle(http.MethodGet, "/exchange-rates", permission("settings", "read"), exchangeRateHandler.List)
+		protected.Handle(http.MethodPost, "/exchange-rates", permission("settings", "update"), exchangeRateHandler.Upsert)
 
 		// Monthly Closing
 		protected.Handle(http.MethodPost, "/monthly-closing/generate", permission("monthly_closing", "generate"), monthlyClosingHandler.Generate)

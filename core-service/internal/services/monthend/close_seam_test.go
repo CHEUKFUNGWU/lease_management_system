@@ -70,6 +70,25 @@ type fakeRates struct{ value float64 }
 
 func (f fakeRates) GetFloat64(context.Context, string, float64) float64 { return f.value }
 
+// fakeFX serves published rates by type. A rate absent from the map behaves like
+// an unpublished rate: the lookup fails rather than returning a default.
+type fakeFX struct {
+	functional string
+	rates      map[string]float64 // rate_type -> rate
+}
+
+func (f fakeFX) GetRate(_ context.Context, _, _, rateType string, _ time.Time) (float64, error) {
+	rate, published := f.rates[rateType]
+	if !published {
+		return 0, errors.New("no published rate")
+	}
+	return rate, nil
+}
+
+func (f fakeFX) FunctionalCurrency(context.Context, string) (string, error) {
+	return f.functional, nil
+}
+
 // fakeWriter records every write in order and can be told to fail a named method.
 type fakeWriter struct {
 	calls         []string
@@ -188,6 +207,7 @@ type fakeUOW struct {
 	contracts fakeContracts
 	schedules fakeSchedules
 	rates     fakeRates
+	fx        fakeFX
 	committed bool
 	ran       bool
 }
@@ -197,6 +217,15 @@ type fakeCloseStore struct {
 	contracts fakeContracts
 	schedules fakeSchedules
 	rates     fakeRates
+	fx        fakeFX
+}
+
+func (s *fakeCloseStore) GetRate(ctx context.Context, from, to, rateType string, asOf time.Time) (float64, error) {
+	return s.fx.GetRate(ctx, from, to, rateType, asOf)
+}
+
+func (s *fakeCloseStore) FunctionalCurrency(ctx context.Context, legalEntityID string) (string, error) {
+	return s.fx.FunctionalCurrency(ctx, legalEntityID)
 }
 
 func (s *fakeCloseStore) GetByID(ctx context.Context, id, legalEntityID string) (*repository.Contract, error) {
@@ -222,6 +251,7 @@ func (u *fakeUOW) Do(ctx context.Context, _ string, body func(store closeStore, 
 		contracts:  u.contracts,
 		schedules:  u.schedules,
 		rates:      u.rates,
+		fx:         u.fx,
 	}, u.audit)
 	if err == nil {
 		u.committed = true
@@ -236,6 +266,7 @@ func (u *fakeUOW) DoReversal(ctx context.Context, _ string, body func(store reve
 		contracts:  u.contracts,
 		schedules:  u.schedules,
 		rates:      u.rates,
+		fx:         u.fx,
 	}, u.audit)
 	if err == nil {
 		u.committed = true
@@ -262,6 +293,11 @@ func newService(uow *fakeUOW, locks fakeLocks, contracts fakeContracts, schedule
 	uow.contracts = contracts
 	uow.schedules = schedules
 	uow.rates = fakeRates{value: 0}
+	if uow.fx.functional == "" {
+		// By default every lease is already in the functional currency, so the
+		// FX step is a no-op and existing close tests stay unaffected.
+		uow.fx.functional = "CNY"
+	}
 	return &Service{uow: uow}
 }
 
@@ -312,13 +348,17 @@ func TestClose_HappyPath_CommitsAndAudits(t *testing.T) {
 	}
 }
 
-// A foreign-currency lease must produce entries in its own currency. Posting a
-// USD lease as CNY would silently corrupt the ledger, so the close carries the
-// contract currency all the way through rather than defaulting it.
+// A foreign-currency lease must produce its lease entries in its own currency.
+// Posting a USD lease as CNY would silently corrupt the ledger, so the close
+// carries the contract currency all the way through rather than defaulting it.
+// Only the exchange difference belongs in the functional currency.
 func TestClose_EntriesUseContractCurrency(t *testing.T) {
 	contract := inScopeContract("c1")
 	contract.Currency = "USD"
-	uow := &fakeUOW{writer: &fakeWriter{}, audit: &fakeAudit{}}
+	uow := &fakeUOW{
+		writer: &fakeWriter{}, audit: &fakeAudit{},
+		fx: fakeFX{functional: "CNY", rates: map[string]float64{"closing": 7.2, "average": 7.15}},
+	}
 	svc := newService(uow, fakeLocks{}, fakeContracts{list: []*repository.Contract{contract}}, fakeSchedules{})
 
 	if _, err := svc.Close(context.Background(), Command{AccountingPeriod: period, LegalEntityID: "le1"}); err != nil {
@@ -328,8 +368,68 @@ func TestClose_EntriesUseContractCurrency(t *testing.T) {
 		t.Fatal("expected the close to produce journal entries")
 	}
 	for _, entry := range uow.writer.entries {
-		if entry.Currency != "USD" {
-			t.Errorf("entry %s currency = %q, want USD", entry.EntryType, entry.Currency)
+		want := "USD"
+		if entry.EntryType == "fx_remeasurement" {
+			want = "CNY"
+		}
+		if entry.Currency != want {
+			t.Errorf("entry %s currency = %q, want %q", entry.EntryType, entry.Currency, want)
+		}
+	}
+}
+
+// A foreign-currency lease produces an exchange difference on its liability,
+// denominated in the functional currency.
+func TestClose_ForeignCurrencyLeaseProducesExchangeDifference(t *testing.T) {
+	contract := inScopeContract("c1")
+	contract.Currency = "USD"
+	uow := &fakeUOW{
+		writer: &fakeWriter{}, audit: &fakeAudit{},
+		fx: fakeFX{functional: "CNY", rates: map[string]float64{"closing": 7.2, "average": 7.15}},
+	}
+	svc := newService(uow, fakeLocks{}, fakeContracts{list: []*repository.Contract{contract}}, fakeSchedules{})
+
+	if _, err := svc.Close(context.Background(), Command{AccountingPeriod: period, LegalEntityID: "le1"}); err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+	var fxEntry *repository.JournalEntry
+	for _, entry := range uow.writer.entries {
+		if entry.EntryType == "fx_remeasurement" {
+			fxEntry = entry
+		}
+	}
+	if fxEntry == nil {
+		t.Fatal("expected an exchange difference entry for a foreign-currency lease")
+	}
+	if fxEntry.Currency != "CNY" {
+		t.Errorf("exchange difference currency = %q, want the functional CNY", fxEntry.Currency)
+	}
+	if fxEntry.Amount <= 0 {
+		t.Errorf("exchange difference amount = %v, want a positive magnitude", fxEntry.Amount)
+	}
+}
+
+// Rates are data, not assumptions: without them the foreign-currency lease is
+// counted as failed instead of being closed at an invented rate.
+func TestClose_FailsForeignCurrencyLeaseWithoutRates(t *testing.T) {
+	contract := inScopeContract("c1")
+	contract.Currency = "USD"
+	uow := &fakeUOW{
+		writer: &fakeWriter{}, audit: &fakeAudit{},
+		fx: fakeFX{functional: "CNY", rates: map[string]float64{}},
+	}
+	svc := newService(uow, fakeLocks{}, fakeContracts{list: []*repository.Contract{contract}}, fakeSchedules{})
+
+	res, err := svc.Close(context.Background(), Command{AccountingPeriod: period, LegalEntityID: "le1"})
+	if err != nil {
+		t.Fatalf("a missing rate must fail the contract, not the batch: %v", err)
+	}
+	if res.FailedContracts != 1 || res.ProcessedContracts != 0 {
+		t.Errorf("processed=%d failed=%d, want 0/1", res.ProcessedContracts, res.FailedContracts)
+	}
+	for _, entry := range uow.writer.entries {
+		if entry.EntryType == "fx_remeasurement" {
+			t.Error("no exchange difference may be posted without a published rate")
 		}
 	}
 }

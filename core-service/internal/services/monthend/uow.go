@@ -3,6 +3,7 @@ package monthend
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,6 +36,8 @@ type closeStore interface {
 	contractSource
 	scheduleSource
 	rateSource
+	fxSource
+	functionalCurrencySource
 }
 
 // auditSink records the audit result of a close. It is written inside the close
@@ -64,12 +67,14 @@ type unitOfWork interface {
 
 // pgxUnitOfWork is the production unit of work backed by a pgx pool.
 type pgxUnitOfWork struct {
-	pool        *pgxpool.Pool
-	mcRepo      *repository.MonthlyClosingRepository
-	contracts   *repository.ContractRepository
-	schedules   *repository.PaymentScheduleRepository
-	rates       *repository.SystemSettingRepository
-	auditLogger *audit.Logger
+	pool          *pgxpool.Pool
+	mcRepo        *repository.MonthlyClosingRepository
+	contracts     *repository.ContractRepository
+	schedules     *repository.PaymentScheduleRepository
+	rates         *repository.SystemSettingRepository
+	exchangeRates *repository.ExchangeRateRepository
+	masterData    *repository.MasterDataRepository
+	auditLogger   *audit.Logger
 }
 
 // NewUnitOfWork builds the production unit of work.
@@ -79,11 +84,14 @@ func NewUnitOfWork(
 	contracts *repository.ContractRepository,
 	schedules *repository.PaymentScheduleRepository,
 	rates *repository.SystemSettingRepository,
+	exchangeRates *repository.ExchangeRateRepository,
+	masterData *repository.MasterDataRepository,
 	auditLogger *audit.Logger,
 ) unitOfWork {
 	return &pgxUnitOfWork{
 		pool: pool, mcRepo: mcRepo, contracts: contracts,
-		schedules: schedules, rates: rates, auditLogger: auditLogger,
+		schedules: schedules, rates: rates, exchangeRates: exchangeRates,
+		masterData: masterData, auditLogger: auditLogger,
 	}
 }
 
@@ -117,6 +125,8 @@ func (u *pgxUnitOfWork) inTx(ctx context.Context, lockKey string, body func(stor
 		contracts:                u.contracts.WithTx(tx),
 		schedules:                u.schedules.WithTx(tx),
 		rates:                    u.rates.WithTx(tx),
+		exchangeRates:            u.exchangeRates.WithTx(tx),
+		masterData:               u.masterData,
 	}
 	if err := body(store, u.auditLogger.WithTx(tx)); err != nil {
 		return err
@@ -130,9 +140,11 @@ func (u *pgxUnitOfWork) inTx(ctx context.Context, lockKey string, body func(stor
 
 type txCloseStore struct {
 	*repository.MonthlyClosingRepository
-	contracts *repository.ContractRepository
-	schedules *repository.PaymentScheduleRepository
-	rates     *repository.SystemSettingRepository
+	contracts     *repository.ContractRepository
+	schedules     *repository.PaymentScheduleRepository
+	rates         *repository.SystemSettingRepository
+	exchangeRates *repository.ExchangeRateRepository
+	masterData    *repository.MasterDataRepository
 }
 
 func (s *txCloseStore) GetByID(ctx context.Context, id, legalEntityID string) (*repository.Contract, error) {
@@ -149,4 +161,12 @@ func (s *txCloseStore) GetByContractID(ctx context.Context, contractID string) (
 
 func (s *txCloseStore) GetFloat64(ctx context.Context, key string, fallback float64) float64 {
 	return s.rates.GetFloat64(ctx, key, fallback)
+}
+
+func (s *txCloseStore) GetRate(ctx context.Context, fromCurrency, toCurrency, rateType string, asOf time.Time) (float64, error) {
+	return s.exchangeRates.GetRate(ctx, fromCurrency, toCurrency, rateType, asOf)
+}
+
+func (s *txCloseStore) FunctionalCurrency(ctx context.Context, legalEntityID string) (string, error) {
+	return s.masterData.FunctionalCurrency(ctx, legalEntityID)
 }

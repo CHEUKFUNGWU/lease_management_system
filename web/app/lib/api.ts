@@ -656,6 +656,32 @@ export const auditApi = {
 };
 
 // Settings APIs
+export const exchangeRateApi = {
+  list: (token: string, params?: { from_currency?: string; to_currency?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.from_currency) qs.append("from_currency", params.from_currency);
+    if (params?.to_currency) qs.append("to_currency", params.to_currency);
+    const query = qs.toString();
+    return apiRequest(`/api/v1/exchange-rates${query ? `?${query}` : ""}`, { token });
+  },
+  upsert: (
+    data: {
+      from_currency: string;
+      to_currency: string;
+      rate_date: string;
+      rate_type: "closing" | "average";
+      rate: number;
+      source?: string;
+    },
+    token: string
+  ) =>
+    apiRequest("/api/v1/exchange-rates", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
 export const settingsApi = {
   getGlobal: (token: string) =>
     apiRequest(`/api/v1/settings/global`, { token }),

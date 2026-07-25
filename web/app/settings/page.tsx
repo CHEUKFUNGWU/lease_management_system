@@ -11,7 +11,7 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { reportApi, settingsApi } from "../lib/api";
+import { exchangeRateApi, reportApi, settingsApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -44,6 +44,55 @@ export default function SettingsPage() {
   const [discountRatePercent, setDiscountRatePercent] = useState<number | null>(null);
   const [discountRateSaving, setDiscountRateSaving] = useState(false);
   const [effectiveRate, setEffectiveRate] = useState<number | null>(null);
+
+  /* ---- exchange rates ---- */
+  const [rates, setRates] = useState<any[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [rateForm, setRateForm] = useState({
+    from_currency: "USD",
+    to_currency: "CNY",
+    rate_date: "",
+    rate_type: "closing" as "closing" | "average",
+    rate: null as number | null,
+  });
+  const [rateSaving, setRateSaving] = useState(false);
+
+  const loadRates = async () => {
+    if (!token) return;
+    setRatesLoading(true);
+    try {
+      const res = await exchangeRateApi.list(token);
+      setRates(res.data || []);
+    } catch {
+      // Rates are optional master data; a read failure must not block settings.
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const saveRate = async () => {
+    if (!token) return;
+    if (!rateForm.rate_date || !rateForm.rate) {
+      message.warning(t("settings.fx_incomplete", language));
+      return;
+    }
+    setRateSaving(true);
+    try {
+      await exchangeRateApi.upsert({ ...rateForm, rate: rateForm.rate }, token);
+      message.success(t("settings.fx_saved", language));
+      setRateForm({ ...rateForm, rate: null });
+      loadRates();
+    } catch (error: any) {
+      message.error(error?.message || t("settings.fx_save_failed", language));
+    } finally {
+      setRateSaving(false);
+    }
+  };
 
   /* ---- fetch global discount rate ---- */
   useEffect(() => {
@@ -290,6 +339,87 @@ export default function SettingsPage() {
             </Col>
           </Row>
         </Spin>
+
+        {/* exchange rates */}
+        <Card title={t("settings.fx_title", language)} style={{ marginBottom: 16 }}>
+          <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+            {t("settings.fx_desc", language)}
+          </Paragraph>
+          <Space wrap style={{ marginBottom: 16 }}>
+            <Input
+              style={{ width: 90 }}
+              value={rateForm.from_currency}
+              onChange={(e) => setRateForm({ ...rateForm, from_currency: e.target.value.toUpperCase() })}
+              placeholder="USD"
+            />
+            <span>→</span>
+            <Input
+              style={{ width: 90 }}
+              value={rateForm.to_currency}
+              onChange={(e) => setRateForm({ ...rateForm, to_currency: e.target.value.toUpperCase() })}
+              placeholder="CNY"
+            />
+            <Input
+              style={{ width: 140 }}
+              value={rateForm.rate_date}
+              onChange={(e) => setRateForm({ ...rateForm, rate_date: e.target.value })}
+              placeholder="YYYY-MM-DD"
+            />
+            <Select
+              style={{ width: 150 }}
+              value={rateForm.rate_type}
+              onChange={(value) => setRateForm({ ...rateForm, rate_type: value })}
+              options={[
+                { value: "closing", label: t("settings.fx_type_closing", language) },
+                { value: "average", label: t("settings.fx_type_average", language) },
+              ]}
+            />
+            <InputNumber
+              style={{ width: 160 }}
+              min={0}
+              step={0.0001}
+              value={rateForm.rate}
+              onChange={(value) => setRateForm({ ...rateForm, rate: value })}
+              placeholder={t("settings.fx_rate_placeholder", language)}
+            />
+            <Button type="primary" loading={rateSaving} onClick={saveRate}>
+              {t("settings.fx_save", language)}
+            </Button>
+          </Space>
+          <Table
+            loading={ratesLoading}
+            dataSource={rates}
+            rowKey="id"
+            size="small"
+            pagination={{ pageSize: 8 }}
+            locale={{ emptyText: t("settings.fx_empty", language) }}
+            columns={[
+              {
+                title: t("settings.fx_pair", language),
+                key: "pair",
+                render: (_: unknown, row: any) => `${row.from_currency} → ${row.to_currency}`,
+              },
+              {
+                title: t("settings.fx_date", language),
+                dataIndex: "rate_date",
+                render: (value: string) => (value || "").slice(0, 10),
+              },
+              {
+                title: t("settings.fx_type", language),
+                dataIndex: "rate_type",
+                render: (value: string) => (
+                  <Tag color={value === "closing" ? "blue" : "gold"}>
+                    {value === "closing"
+                      ? t("settings.fx_type_closing", language)
+                      : t("settings.fx_type_average", language)}
+                  </Tag>
+                ),
+              },
+              { title: t("settings.fx_rate", language), dataIndex: "rate", align: "right" as const },
+              { title: t("settings.fx_source", language), dataIndex: "source", render: (v: string) => v || "-" },
+            ]}
+          />
+        </Card>
 
         {/* filters */}
         <Card style={{ marginBottom: 16 }}>

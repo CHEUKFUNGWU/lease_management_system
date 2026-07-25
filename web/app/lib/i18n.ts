@@ -2325,6 +2325,81 @@ const dict: TranslationDict = {
     "zh-HK": "幣種",
     en: "Currency",
   },
+  "settings.fx_title": {
+    "zh-CN": "汇率维护",
+    "zh-HK": "匯率維護",
+    en: "Exchange Rates",
+  },
+  "settings.fx_desc": {
+    "zh-CN": "外币租赁按 IAS 21 折算为法人主体职能货币:租赁负债为货币性项目,期末按收盘价重估、差额进汇兑损益;使用权资产为非货币性项目,按历史成本不重估。月结缺少所需汇率时会拒绝该合同,不会自行猜测。",
+    "zh-HK": "外幣租賃按 IAS 21 折算為法人主體職能貨幣:租賃負債為貨幣性項目,期末按收盤價重估、差額進匯兌損益;使用權資產為非貨幣性項目,按歷史成本不重估。月結缺少所需匯率時會拒絕該合同,不會自行猜測。",
+    en: "Foreign-currency leases are translated into the entity's functional currency under IAS 21: the lease liability is monetary and is remeasured at the closing rate with the difference in profit or loss, while the right-of-use asset is non-monetary and stays at historical cost. A close missing a required rate refuses that contract rather than guessing.",
+  },
+  "settings.fx_type_closing": {
+    "zh-CN": "期末收盘价",
+    "zh-HK": "期末收盤價",
+    en: "Closing",
+  },
+  "settings.fx_type_average": {
+    "zh-CN": "当期平均价",
+    "zh-HK": "當期平均價",
+    en: "Average",
+  },
+  "settings.fx_rate_placeholder": {
+    "zh-CN": "1 原币 = ? 目标币",
+    "zh-HK": "1 原幣 = ? 目標幣",
+    en: "1 from-unit = ? to-units",
+  },
+  "settings.fx_save": {
+    "zh-CN": "保存汇率",
+    "zh-HK": "保存匯率",
+    en: "Save Rate",
+  },
+  "settings.fx_saved": {
+    "zh-CN": "汇率已保存",
+    "zh-HK": "匯率已保存",
+    en: "Rate saved",
+  },
+  "settings.fx_save_failed": {
+    "zh-CN": "汇率保存失败",
+    "zh-HK": "匯率保存失敗",
+    en: "Failed to save rate",
+  },
+  "settings.fx_incomplete": {
+    "zh-CN": "请填写汇率日期与汇率值",
+    "zh-HK": "請填寫匯率日期與匯率值",
+    en: "Rate date and rate value are required",
+  },
+  "settings.fx_empty": {
+    "zh-CN": "暂无汇率;外币租赁月结前需先维护期末收盘价",
+    "zh-HK": "暫無匯率;外幣租賃月結前需先維護期末收盤價",
+    en: "No rates yet. A foreign-currency close needs a closing rate first.",
+  },
+  "settings.fx_pair": {
+    "zh-CN": "币种对",
+    "zh-HK": "幣種對",
+    en: "Currency Pair",
+  },
+  "settings.fx_date": {
+    "zh-CN": "汇率日期",
+    "zh-HK": "匯率日期",
+    en: "Rate Date",
+  },
+  "settings.fx_type": {
+    "zh-CN": "类型",
+    "zh-HK": "類型",
+    en: "Type",
+  },
+  "settings.fx_rate": {
+    "zh-CN": "汇率",
+    "zh-HK": "匯率",
+    en: "Rate",
+  },
+  "settings.fx_source": {
+    "zh-CN": "来源",
+    "zh-HK": "來源",
+    en: "Source",
+  },
   "contract_new.area_sqm": {
     "zh-CN": "租赁面积(㎡)",
     "zh-HK": "租賃面積(㎡)",

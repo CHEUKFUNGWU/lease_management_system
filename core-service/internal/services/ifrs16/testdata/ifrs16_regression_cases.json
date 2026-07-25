@@ -14,18 +14,78 @@
         "lease_end_date": "2025-01-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-04-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-05-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-06-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-07-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-08-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-09-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-10-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-11-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-12-31", "amount": 10000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-04-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-05-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-06-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-07-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-08-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-09-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-10-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-11-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-12-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
@@ -61,18 +121,78 @@
         "lease_end_date": "2025-01-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-02-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-03-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-04-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-05-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-06-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-07-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-08-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-09-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-10-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-11-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-12-01", "amount": 10000, "timing": "prepaid", "type": "fixed" }
+          {
+            "date": "2024-01-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-04-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-05-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-06-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-07-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-08-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-09-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-10-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-11-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-12-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
@@ -96,6 +216,110 @@
       }
     },
     {
+      "id": "TC-03",
+      "title": "混合先付和后付固定租金",
+      "scenario": "首期开始日先付，后续月末后付，验证先付额进入 ROU 但不进入初始负债。",
+      "ifrs16_reference": "IFRS 16.24, 26-27",
+      "review_status": "pending_third_party_review",
+      "input": {
+        "commencement_date": "2024-01-01",
+        "lease_end_date": "2025-01-01",
+        "discount_rate": 0.05,
+        "payments": [
+          {
+            "date": "2024-01-01",
+            "amount": 10000,
+            "timing": "prepaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-04-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-05-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-06-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-07-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-08-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-09-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-10-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-11-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-12-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
+        ]
+      },
+      "expected": {
+        "initial_liability": 106935.47,
+        "initial_rou_asset": 116935.47,
+        "monthly": [
+          {
+            "period": "2024-01",
+            "prepaid_payment": 10000,
+            "total_payments": 0,
+            "closing_liability": 107379.51
+          },
+          {
+            "period": "2024-12",
+            "total_payments": 10000,
+            "closing_liability": 0,
+            "closing_rou_asset": 0
+          }
+        ]
+      }
+    },
+    {
       "id": "TC-04",
       "title": "免租期后固定租金",
       "scenario": "前三个月免租、后九个月固定租金，验证负债贴现和 ROU 折旧未漏计免租期。",
@@ -106,15 +330,60 @@
         "lease_end_date": "2025-01-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-04-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-05-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-06-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-07-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-08-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-09-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-10-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-11-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-12-31", "amount": 10000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-04-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-05-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-06-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-07-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-08-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-09-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-10-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-11-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-12-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
@@ -142,6 +411,286 @@
       }
     },
     {
+      "id": "TC-05",
+      "title": "固定递增租金",
+      "scenario": "第二年固定租金上调 3%，验证递增固定付款进入租赁负债。",
+      "ifrs16_reference": "IFRS 16.27, 36-38",
+      "review_status": "pending_third_party_review",
+      "input": {
+        "commencement_date": "2024-01-01",
+        "lease_end_date": "2026-01-01",
+        "discount_rate": 0.05,
+        "payments": [
+          {
+            "date": "2024-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-04-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-05-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-06-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-07-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-08-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-09-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-10-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-11-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-12-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-01-31",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-02-28",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-03-31",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-04-30",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-05-31",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-06-30",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-07-31",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-08-31",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-09-30",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-10-31",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-11-30",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-12-31",
+            "amount": 10300,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
+        ]
+      },
+      "expected": {
+        "initial_liability": 231563,
+        "initial_rou_asset": 231563,
+        "monthly": [
+          {
+            "period": "2024-01",
+            "interest_expense": 961.55,
+            "total_payments": 10000,
+            "closing_liability": 222524.55
+          },
+          {
+            "period": "2025-12",
+            "total_payments": 10300,
+            "closing_liability": 0,
+            "closing_rou_asset": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "TC-06",
+      "title": "续租选择权合理确定行使",
+      "scenario": "5 年年度付款代表续租期纳入租赁期，验证更长租期的初始负债。",
+      "ifrs16_reference": "IFRS 16.18-21",
+      "review_status": "pending_third_party_review",
+      "input": {
+        "commencement_date": "2024-01-01",
+        "lease_end_date": "2029-01-01",
+        "discount_rate": 0.05,
+        "payments": [
+          {
+            "date": "2024-12-31",
+            "amount": 120000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-12-31",
+            "amount": 120000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-12-31",
+            "amount": 120000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-12-31",
+            "amount": 120000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2028-12-31",
+            "amount": 120000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
+        ]
+      },
+      "expected": {
+        "initial_liability": 519524.63,
+        "initial_rou_asset": 519524.63,
+        "monthly": [
+          {
+            "period": "2024-01",
+            "interest_expense": 2157.28,
+            "total_payments": 0
+          },
+          {
+            "period": "2028-12",
+            "total_payments": 120000,
+            "closing_liability": 0,
+            "closing_rou_asset": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "TC-07",
+      "title": "续租选择权不行使",
+      "scenario": "仅不可撤销 2 年年度付款纳入租赁期，验证未纳入续租期付款。",
+      "ifrs16_reference": "IFRS 16.18-21",
+      "review_status": "pending_third_party_review",
+      "input": {
+        "commencement_date": "2024-01-01",
+        "lease_end_date": "2026-01-01",
+        "discount_rate": 0.05,
+        "payments": [
+          {
+            "date": "2024-12-31",
+            "amount": 120000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2025-12-31",
+            "amount": 120000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
+        ]
+      },
+      "expected": {
+        "initial_liability": 223129.25,
+        "initial_rou_asset": 223129.25,
+        "monthly": [
+          {
+            "period": "2024-12",
+            "total_payments": 120000,
+            "closing_liability": 114317.03
+          },
+          {
+            "period": "2025-12",
+            "total_payments": 120000,
+            "closing_liability": 0,
+            "closing_rou_asset": 0
+          }
+        ]
+      }
+    },
+    {
       "id": "TC-12",
       "title": "变量租金费用化",
       "scenario": "销售额抽成租金不进入租赁负债，只在发生月份费用化。",
@@ -152,9 +701,24 @@
         "lease_end_date": "2024-04-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 5000, "timing": "postpaid", "type": "variable" },
-          { "date": "2024-02-29", "amount": 6500, "timing": "postpaid", "type": "variable" },
-          { "date": "2024-03-31", "amount": 7200, "timing": "postpaid", "type": "variable" }
+          {
+            "date": "2024-01-31",
+            "amount": 5000,
+            "timing": "postpaid",
+            "type": "variable"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 6500,
+            "timing": "postpaid",
+            "type": "variable"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 7200,
+            "timing": "postpaid",
+            "type": "variable"
+          }
         ]
       },
       "expected": {
@@ -189,9 +753,24 @@
         "lease_end_date": "2024-04-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 3000, "timing": "postpaid", "type": "non_lease" },
-          { "date": "2024-02-29", "amount": 3000, "timing": "postpaid", "type": "non_lease" },
-          { "date": "2024-03-31", "amount": 3000, "timing": "postpaid", "type": "non_lease" }
+          {
+            "date": "2024-01-31",
+            "amount": 3000,
+            "timing": "postpaid",
+            "type": "non_lease"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 3000,
+            "timing": "postpaid",
+            "type": "non_lease"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 3000,
+            "timing": "postpaid",
+            "type": "non_lease"
+          }
         ]
       },
       "expected": {
@@ -227,16 +806,66 @@
         "lease_scope": "short_term_exempt",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-04-30", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-05-31", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-06-30", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-07-31", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-08-31", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-09-30", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-10-31", "amount": 1000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-04-30",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-05-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-06-30",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-07-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-08-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-09-30",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-10-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
@@ -268,9 +897,24 @@
         "lease_scope": "low_value_exempt",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 1000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 1000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
@@ -302,9 +946,24 @@
         "lease_scope": "not_a_lease",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 3000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 3000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 3000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 3000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 3000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 3000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
@@ -313,134 +972,112 @@
       }
     },
     {
-      "id": "TC-03",
-      "title": "混合先付和后付固定租金",
-      "scenario": "首期开始日先付，后续月末后付，验证先付额进入 ROU 但不进入初始负债。",
-      "ifrs16_reference": "IFRS 16.24, 26-27",
+      "id": "TC-17",
+      "title": "多币种租赁：外币负债期末重估",
+      "scenario": "美元计价租约由人民币记账主体持有，12 期月末付款。验证两点：① 计量本身与币种无关，负债与使用权资产按原币(USD)计算；② 期末按 IAS 21 重估货币性项目——负债按收盘价折算，差额进汇兑损益，而使用权资产为非货币性项目，仍按历史成本列示、不随汇率变动，故 2026-03 的期末使用权资产断言即为原币金额。汇率：期初 7.10、期末 7.20、当期平均 7.15。",
+      "ifrs16_reference": "IFRS 16.26-38; IAS 21.23(a), 21.28",
       "review_status": "pending_third_party_review",
       "input": {
-        "commencement_date": "2024-01-01",
-        "lease_end_date": "2025-01-01",
+        "commencement_date": "2026-01-01",
+        "lease_end_date": "2027-01-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-01", "amount": 10000, "timing": "prepaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-04-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-05-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-06-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-07-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-08-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-09-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-10-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-11-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-12-31", "amount": 10000, "timing": "postpaid", "type": "fixed" }
-        ]
+          {
+            "date": "2026-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-02-28",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-04-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-05-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-06-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-07-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-08-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-09-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-10-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-11-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-12-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
+        ],
+        "foreign_currency": {
+          "contract_currency": "USD",
+          "functional_currency": "CNY",
+          "period": "2026-03",
+          "opening_rate": 7.1,
+          "closing_rate": 7.2,
+          "average_rate": 7.15
+        }
       },
       "expected": {
-        "initial_liability": 106935.47,
-        "initial_rou_asset": 116935.47,
+        "initial_liability": 116909.74,
+        "initial_rou_asset": 116909.74,
         "monthly": [
-          { "period": "2024-01", "prepaid_payment": 10000, "total_payments": 0, "closing_liability": 107379.51 },
-          { "period": "2024-12", "total_payments": 10000, "closing_liability": 0, "closing_rou_asset": 0 }
-        ]
-      }
-    },
-    {
-      "id": "TC-05",
-      "title": "固定递增租金",
-      "scenario": "第二年固定租金上调 3%，验证递增固定付款进入租赁负债。",
-      "ifrs16_reference": "IFRS 16.27, 36-38",
-      "review_status": "pending_third_party_review",
-      "input": {
-        "commencement_date": "2024-01-01",
-        "lease_end_date": "2026-01-01",
-        "discount_rate": 0.05,
-        "payments": [
-          { "date": "2024-01-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-04-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-05-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-06-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-07-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-08-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-09-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-10-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-11-30", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-12-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-01-31", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-02-28", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-03-31", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-04-30", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-05-31", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-06-30", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-07-31", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-08-31", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-09-30", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-10-31", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-11-30", "amount": 10300, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-12-31", "amount": 10300, "timing": "postpaid", "type": "fixed" }
-        ]
-      },
-      "expected": {
-        "initial_liability": 231563,
-        "initial_rou_asset": 231563,
-        "monthly": [
-          { "period": "2024-01", "interest_expense": 961.55, "total_payments": 10000, "closing_liability": 222524.55 },
-          { "period": "2025-12", "total_payments": 10300, "closing_liability": 0, "closing_rou_asset": 0 }
-        ]
-      }
-    },
-    {
-      "id": "TC-06",
-      "title": "续租选择权合理确定行使",
-      "scenario": "5 年年度付款代表续租期纳入租赁期，验证更长租期的初始负债。",
-      "ifrs16_reference": "IFRS 16.18-21",
-      "review_status": "pending_third_party_review",
-      "input": {
-        "commencement_date": "2024-01-01",
-        "lease_end_date": "2029-01-01",
-        "discount_rate": 0.05,
-        "payments": [
-          { "date": "2024-12-31", "amount": 120000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-12-31", "amount": 120000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2026-12-31", "amount": 120000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2027-12-31", "amount": 120000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2028-12-31", "amount": 120000, "timing": "postpaid", "type": "fixed" }
-        ]
-      },
-      "expected": {
-        "initial_liability": 519524.63,
-        "initial_rou_asset": 519524.63,
-        "monthly": [
-          { "period": "2024-01", "interest_expense": 2157.28, "total_payments": 0 },
-          { "period": "2028-12", "total_payments": 120000, "closing_liability": 0, "closing_rou_asset": 0 }
-        ]
-      }
-    },
-    {
-      "id": "TC-07",
-      "title": "续租选择权不行使",
-      "scenario": "仅不可撤销 2 年年度付款纳入租赁期，验证未纳入续租期付款。",
-      "ifrs16_reference": "IFRS 16.18-21",
-      "review_status": "pending_third_party_review",
-      "input": {
-        "commencement_date": "2024-01-01",
-        "lease_end_date": "2026-01-01",
-        "discount_rate": 0.05,
-        "payments": [
-          { "date": "2024-12-31", "amount": 120000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2025-12-31", "amount": 120000, "timing": "postpaid", "type": "fixed" }
-        ]
-      },
-      "expected": {
-        "initial_liability": 223129.25,
-        "initial_rou_asset": 223129.25,
-        "monthly": [
-          { "period": "2024-12", "total_payments": 120000, "closing_liability": 114317.03 },
-          { "period": "2025-12", "total_payments": 120000, "closing_liability": 0, "closing_rou_asset": 0 }
-        ]
+          {
+            "period": "2026-03",
+            "opening_liability": 97797.91,
+            "interest_expense": 406.1,
+            "total_payments": 10000,
+            "closing_liability": 88204.01,
+            "closing_rou_asset": 88082.68
+          }
+        ],
+        "exchange_difference": 9300.1
       }
     },
     {
@@ -454,17 +1091,42 @@
         "lease_end_date": "2024-04-15",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-02-14", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-14", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-04-14", "amount": 10000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-02-14",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-14",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-04-14",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
         "initial_liability": 29761.84,
         "initial_rou_asset": 29761.84,
         "monthly": [
-          { "period": "2024-01", "interest_expense": 67.70, "total_payments": 0, "depreciation": 5559.85 },
-          { "period": "2024-04", "total_payments": 10000, "closing_liability": 0, "closing_rou_asset": 0 }
+          {
+            "period": "2024-01",
+            "interest_expense": 67.7,
+            "total_payments": 0,
+            "depreciation": 5559.85
+          },
+          {
+            "period": "2024-04",
+            "total_payments": 10000,
+            "closing_liability": 0,
+            "closing_rou_asset": 0
+          }
         ]
       }
     },
@@ -479,14 +1141,25 @@
         "lease_end_date": "2024-02-01",
         "discount_rate": 0.1234,
         "payments": [
-          { "date": "2024-01-31", "amount": 999.99, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 999.99,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
         "initial_liability": 990.47,
         "initial_rou_asset": 990.47,
         "monthly": [
-          { "period": "2024-01", "interest_expense": 9.92, "total_payments": 999.99, "closing_liability": 0, "closing_rou_asset": 0 }
+          {
+            "period": "2024-01",
+            "interest_expense": 9.92,
+            "total_payments": 999.99,
+            "closing_liability": 0,
+            "closing_rou_asset": 0
+          }
         ]
       }
     },
@@ -501,18 +1174,47 @@
         "lease_end_date": "2025-01-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-03-31", "amount": 30000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-06-30", "amount": 30000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-09-30", "amount": 30000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-12-31", "amount": 30000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-03-31",
+            "amount": 30000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-06-30",
+            "amount": 30000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-09-30",
+            "amount": 30000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-12-31",
+            "amount": 30000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
         "initial_liability": 116420.51,
         "initial_rou_asset": 116420.51,
         "monthly": [
-          { "period": "2024-03", "total_payments": 30000, "closing_liability": 87845.31 },
-          { "period": "2024-12", "total_payments": 30000, "closing_liability": 0, "closing_rou_asset": 0 }
+          {
+            "period": "2024-03",
+            "total_payments": 30000,
+            "closing_liability": 87845.31
+          },
+          {
+            "period": "2024-12",
+            "total_payments": 30000,
+            "closing_liability": 0,
+            "closing_rou_asset": 0
+          }
         ]
       }
     },
@@ -528,16 +1230,35 @@
         "discount_rate": 0.05,
         "initial_direct_cost": 5000,
         "payments": [
-          { "date": "2024-01-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
         "initial_liability": 29761.84,
         "initial_rou_asset": 34761.84,
         "monthly": [
-          { "period": "2024-01", "depreciation": 11842, "closing_liability": 19885.42 }
+          {
+            "period": "2024-01",
+            "depreciation": 11842,
+            "closing_liability": 19885.42
+          }
         ]
       }
     },
@@ -553,16 +1274,35 @@
         "discount_rate": 0.05,
         "incentive_received": 2000,
         "payments": [
-          { "date": "2024-01-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
         "initial_liability": 29761.84,
         "initial_rou_asset": 27761.84,
         "monthly": [
-          { "period": "2024-01", "depreciation": 9457.48, "closing_rou_asset": 18304.51 }
+          {
+            "period": "2024-01",
+            "depreciation": 9457.48,
+            "closing_rou_asset": 18304.51
+          }
         ]
       }
     },
@@ -578,16 +1318,35 @@
         "discount_rate": 0.05,
         "restoration_cost": 3000,
         "payments": [
-          { "date": "2024-01-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" }
+          {
+            "date": "2024-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
         ]
       },
       "expected": {
         "initial_liability": 29761.84,
         "initial_rou_asset": 32761.84,
         "monthly": [
-          { "period": "2024-01", "depreciation": 11160.62, "closing_rou_asset": 21601.21 }
+          {
+            "period": "2024-01",
+            "depreciation": 11160.62,
+            "closing_rou_asset": 21601.21
+          }
         ]
       }
     },
@@ -602,20 +1361,58 @@
         "lease_end_date": "2024-04-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-01-31", "amount": 1200, "timing": "postpaid", "type": "variable" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 1300, "timing": "postpaid", "type": "variable" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 1400, "timing": "postpaid", "type": "variable" }
+          {
+            "date": "2024-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-01-31",
+            "amount": 1200,
+            "timing": "postpaid",
+            "type": "variable"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 1300,
+            "timing": "postpaid",
+            "type": "variable"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 1400,
+            "timing": "postpaid",
+            "type": "variable"
+          }
         ]
       },
       "expected": {
         "initial_liability": 29761.84,
         "initial_rou_asset": 29761.84,
         "monthly": [
-          { "period": "2024-01", "total_payments": 10000, "variable_rent_expense": 1200 },
-          { "period": "2024-03", "variable_rent_expense": 1400, "closing_liability": 0 }
+          {
+            "period": "2024-01",
+            "total_payments": 10000,
+            "variable_rent_expense": 1200
+          },
+          {
+            "period": "2024-03",
+            "variable_rent_expense": 1400,
+            "closing_liability": 0
+          }
         ]
       }
     },
@@ -630,20 +1427,58 @@
         "lease_end_date": "2024-04-01",
         "discount_rate": 0.05,
         "payments": [
-          { "date": "2024-01-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-01-31", "amount": 800, "timing": "postpaid", "type": "non_lease" },
-          { "date": "2024-02-29", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-02-29", "amount": 900, "timing": "postpaid", "type": "non_lease" },
-          { "date": "2024-03-31", "amount": 10000, "timing": "postpaid", "type": "fixed" },
-          { "date": "2024-03-31", "amount": 1000, "timing": "postpaid", "type": "non_lease" }
+          {
+            "date": "2024-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-01-31",
+            "amount": 800,
+            "timing": "postpaid",
+            "type": "non_lease"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-02-29",
+            "amount": 900,
+            "timing": "postpaid",
+            "type": "non_lease"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2024-03-31",
+            "amount": 1000,
+            "timing": "postpaid",
+            "type": "non_lease"
+          }
         ]
       },
       "expected": {
         "initial_liability": 29761.84,
         "initial_rou_asset": 29761.84,
         "monthly": [
-          { "period": "2024-01", "total_payments": 10000, "non_lease_expense": 800 },
-          { "period": "2024-03", "non_lease_expense": 1000, "closing_liability": 0 }
+          {
+            "period": "2024-01",
+            "total_payments": 10000,
+            "non_lease_expense": 800
+          },
+          {
+            "period": "2024-03",
+            "non_lease_expense": 1000,
+            "closing_liability": 0
+          }
         ]
       }
     }

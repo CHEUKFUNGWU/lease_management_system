@@ -44,6 +44,7 @@ var ErrContractNotApproved = errors.New("contract is not approved for month-end 
 var systemEntryTypes = []string{
 	"interest", "depreciation", "payment",
 	"variable_rent", "non_lease", "lease_expense",
+	"fx_remeasurement",
 }
 
 // eventEntryTypes are entries created by lease events (modification,
@@ -66,6 +67,16 @@ type (
 	rateSource interface {
 		GetFloat64(ctx context.Context, key string, fallback float64) float64
 	}
+	// fxSource supplies published exchange rates. A close that needs a rate it
+	// cannot find fails that contract rather than inventing one.
+	fxSource interface {
+		GetRate(ctx context.Context, fromCurrency, toCurrency, rateType string, asOf time.Time) (float64, error)
+	}
+	// functionalCurrencySource resolves the legal entity's functional currency,
+	// which is what a foreign-currency lease is translated into.
+	functionalCurrencySource interface {
+		FunctionalCurrency(ctx context.Context, legalEntityID string) (string, error)
+	}
 )
 
 // Service performs the month-end close. The unit of work supplies one
@@ -81,10 +92,13 @@ func NewService(
 	contractRepo *repository.ContractRepository,
 	psRepo *repository.PaymentScheduleRepository,
 	systemSettingRepo *repository.SystemSettingRepository,
+	exchangeRateRepo *repository.ExchangeRateRepository,
+	masterDataRepo *repository.MasterDataRepository,
 	auditLogger *audit.Logger,
 ) *Service {
 	return &Service{
-		uow: NewUnitOfWork(pool, mcRepo, contractRepo, psRepo, systemSettingRepo, auditLogger),
+		uow: NewUnitOfWork(pool, mcRepo, contractRepo, psRepo, systemSettingRepo,
+			exchangeRateRepo, masterDataRepo, auditLogger),
 	}
 }
 
@@ -233,6 +247,19 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 				}
 			}
 			entries := buildJournalEntries(contract.ID, contract.Currency, cmd.AccountingPeriod, periodEnd, monthly, batch.ID, basis)
+
+			// A foreign-currency lease also carries an exchange difference on its
+			// liability. A missing rate fails this contract rather than the batch,
+			// and never falls back to a guessed rate.
+			fxEntry, err := buildFXEntry(ctx, store, contract, cmd, monthly, basis, periodEnd, batch.ID)
+			if err != nil {
+				failed++
+				continue
+			}
+			if fxEntry != nil {
+				entries = append(entries, fxEntry)
+			}
+
 			for _, entry := range entries {
 				if err := store.CreateJournalEntry(ctx, entry); err != nil {
 					return fmt.Errorf("contract %s: %w", contract.ID, err)

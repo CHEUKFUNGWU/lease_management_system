@@ -63,7 +63,7 @@ func main() {
 	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo, systemSettingRepo)
 	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
 	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
-	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo)
+	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo, masterDataRepo)
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, eventPersistence, auditLogger)
 	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, auditLogger)
 	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo)
@@ -187,6 +187,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/reports/tags/summary", permission("reports", "read"), reportHandler.TagSummary)
 		protected.Handle(http.MethodGet, "/reports/cashflow-forecast", permission("reports", "read"), reportHandler.CashflowForecast)
 		protected.Handle(http.MethodGet, "/reports/disclosure", permission("reports", "read"), reportHandler.Disclosure)
+		protected.Handle(http.MethodGet, "/reports/unit-price", permission("reports", "read"), reportHandler.UnitPrice)
 
 		// Monthly Closing
 		protected.Handle(http.MethodPost, "/monthly-closing/generate", permission("monthly_closing", "generate"), monthlyClosingHandler.Generate)

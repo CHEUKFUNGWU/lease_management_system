@@ -118,6 +118,7 @@ class AIIntakeProducer:
             missing_fields, field_warnings = _check_critical_fields(extracted)
             _, scope_warnings = _normalize_lease_scope(extracted)
             extracted["asset_type"] = _normalize_asset_type(extracted.get("asset_type"))
+            extracted["area_sqm"] = _parse_float(extracted.get("area_sqm"))
             if extracted.get("payment_timing"):
                 extracted["payment_timing"] = _normalize_payment_timing(
                     extracted.get("payment_timing")
@@ -366,6 +367,7 @@ def _contract_prompt(file_content: str) -> str:
     - lease_end_date: 租期结束日 (YYYY-MM-DD)
     - currency: 币种 (CNY/USD/EUR)。如果合同中没有明确提到货币，返回 null 或空字符串，不要猜测
     - asset_type: 标的资产类型 "real_estate" | "vehicle" | "it_equipment" | "machinery" | "other"
+    - area_sqm: 租赁面积（平方米，仅数字）。合同未写明面积时返回 0 或 null，不要估算
     - fixed_rent_amount: 固定租金金额（仅数字，不含货币单位）
     - payment_frequency: 付款频率 (monthly/quarterly/yearly)
     - payment_timing: 付款时点 (prepaid/postpaid)。如果合同写明"每月X日前支付"则为prepaid；"每月X日后支付"或"月末支付"则为postpaid
@@ -463,6 +465,7 @@ def _contract_batch_prompt(file_content: str) -> str:
       - lease_end_date: 租期结束日 (YYYY-MM-DD)
       - currency: 币种 (CNY/USD/EUR)。如果未明确提到，返回 null 或空字符串，不要猜测
       - asset_type: 标的资产类型 "real_estate" | "vehicle" | "it_equipment" | "machinery" | "other"
+      - area_sqm: 租赁面积（平方米，仅数字）。未写明时返回 0 或 null，不要估算
       - fixed_rent_amount: 固定租金金额（仅数字）
       - payment_frequency: 付款频率 (monthly/quarterly/yearly)
       - payment_timing: 付款时点 (prepaid/postpaid)
@@ -837,6 +840,7 @@ def _normalize_contract_record(
         "lease_end_date": candidate.get("lease_end_date") or "",
         "currency": candidate.get("currency") or "",
         "asset_type": _normalize_asset_type(candidate.get("asset_type")),
+        "area_sqm": _parse_float(candidate.get("area_sqm")),
         "fixed_rent_amount": _parse_float(candidate.get("fixed_rent_amount")),
         "payment_frequency": _normalize_payment_frequency(
             candidate.get("payment_frequency"), default_payment_frequency

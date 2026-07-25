@@ -1949,6 +1949,7 @@ function AIChatPageContent() {
                                   store_address: c.store_address,
                                   currency: c.currency || "CNY",
                                   asset_type: c.asset_type || "real_estate",
+                                  area_sqm: c.area_sqm && c.area_sqm > 0 ? c.area_sqm : null,
                                   commencement_date: c.commencement_date,
                                   lease_start_date: c.lease_start_date,
                                   lease_end_date: c.lease_end_date,

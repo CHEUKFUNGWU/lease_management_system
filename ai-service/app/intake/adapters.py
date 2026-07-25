@@ -203,6 +203,7 @@ def _read_excel_contracts(
                         ),
                         "currency": str(_cell(row, indexes, "currency") or "").strip(),
                         "asset_type": _cell(row, indexes, "asset_type"),
+                        "area_sqm": _cell(row, indexes, "area_sqm"),
                         "fixed_rent_amount": _cell(row, indexes, "fixed_rent_amount"),
                         "payment_frequency": "monthly",
                         "payment_timing": _cell(row, indexes, "payment_timing"),
@@ -262,6 +263,7 @@ def _header_indexes(headers: list[Any]) -> dict[str, int]:
         "store_name": ["门店/资产名称", "门店名称", "资产名称", "store_name"],
         "store_address": ["门店/资产地址", "门店地址", "资产地址", "store_address"],
         "asset_type": ["资产类型", "资产类别", "asset_type", "asset_category"],
+        "area_sqm": ["租赁面积", "建筑面积", "面积", "area_sqm", "area"],
         "currency": ["币种", "currency"],
         "commencement_date": [
             "起租日(commencement)",

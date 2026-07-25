@@ -34,9 +34,11 @@ func NewReportHandler(
 	psRepo *repository.PaymentScheduleRepository,
 	mcRepo *repository.MonthlyClosingRepository,
 	systemSettingRepo *repository.SystemSettingRepository,
+	masterDataRepo *repository.MasterDataRepository,
 ) *ReportHandler {
 	return &ReportHandler{
-		snapshotBuilder: reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo, mcRepo),
+		snapshotBuilder: reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo, mcRepo).
+			WithStores(masterDataRepo),
 	}
 }
 
@@ -190,6 +192,18 @@ func (h *ReportHandler) CashflowForecast(c *gin.Context) {
 		Kind: reporting.KindCashflow, View: view, Granularity: granularity,
 		StartDate: startDate, EndDate: endDate, ContractID: c.Query("contract_id"),
 		Store: c.Query("store"), Tags: reportTags(c),
+	})
+}
+
+// UnitPrice compares rent per square metre across stores, brands or regions.
+func (h *ReportHandler) UnitPrice(c *gin.Context) {
+	groupBy := defaultValue(c.Query("group_by"), reporting.GroupByStore)
+	if !oneOf(groupBy, reporting.GroupByStore, reporting.GroupByBrand, reporting.GroupByRegion) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group_by, must be store|brand|region"})
+		return
+	}
+	h.projectJSON(c, reporting.NormalizeMode(c.Query("mode")), reporting.ProjectionRequest{
+		Kind: reporting.KindUnitPrice, View: groupBy,
 	})
 }
 

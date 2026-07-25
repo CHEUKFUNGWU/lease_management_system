@@ -2325,6 +2325,26 @@ const dict: TranslationDict = {
     "zh-HK": "幣種",
     en: "Currency",
   },
+  "contract_new.area_sqm": {
+    "zh-CN": "租赁面积(㎡)",
+    "zh-HK": "租賃面積(㎡)",
+    en: "Leased Area (sqm)",
+  },
+  "contract_new.area_sqm_help": {
+    "zh-CN": "本合同承租的面积,用于每平米月租对比;车辆、设备等无面积的租赁可留空",
+    "zh-HK": "本合同承租的面積,用於每平米月租對比;車輛、設備等無面積的租賃可留空",
+    en: "The area leased under this contract, used for rent-per-square-metre comparison. Leave blank for vehicles, equipment and other leases without an area.",
+  },
+  "contract_new.area_sqm_placeholder": {
+    "zh-CN": "例如 320",
+    "zh-HK": "例如 320",
+    en: "e.g. 320",
+  },
+  "contract_detail.area_sqm": {
+    "zh-CN": "租赁面积",
+    "zh-HK": "租賃面積",
+    en: "Leased Area",
+  },
   "contract_new.tags": {
     "zh-CN": "标签",
     "zh-HK": "標籤",

@@ -11,20 +11,23 @@ import (
 )
 
 type Contract struct {
-	ID                           string      `json:"id"`
-	ContractNumber               string      `json:"contract_number"`
-	ContractName                 string      `json:"contract_name"`
-	LegalEntityID                *string     `json:"legal_entity_id"`
-	StoreID                      *string     `json:"store_id"`
-	LandlordID                   *string     `json:"landlord_id"`
-	LesseeName                   string      `json:"lessee_name"`
-	LessorName                   string      `json:"lessor_name"`
-	StoreName                    string      `json:"store_name"`
-	StoreAddress                 string      `json:"store_address"`
-	Tags                         string      `json:"tags"`
-	AssetType                    string      `json:"asset_type"`
-	AssetCategory                *string     `json:"asset_category"`
-	PropertyCategory             *string     `json:"property_category"`
+	ID               string  `json:"id"`
+	ContractNumber   string  `json:"contract_number"`
+	ContractName     string  `json:"contract_name"`
+	LegalEntityID    *string `json:"legal_entity_id"`
+	StoreID          *string `json:"store_id"`
+	LandlordID       *string `json:"landlord_id"`
+	LesseeName       string  `json:"lessee_name"`
+	LessorName       string  `json:"lessor_name"`
+	StoreName        string  `json:"store_name"`
+	StoreAddress     string  `json:"store_address"`
+	Tags             string  `json:"tags"`
+	AssetType        string  `json:"asset_type"`
+	AssetCategory    *string `json:"asset_category"`
+	PropertyCategory *string `json:"property_category"`
+	// AreaSqm is the leased area in square metres; nil for leases with no
+	// meaningful area, such as vehicles and equipment.
+	AreaSqm                      *float64    `json:"area_sqm"`
 	Currency                     string      `json:"currency"`
 	SigningDate                  *time.Time  `json:"signing_date"`
 	CommencementDate             time.Time   `json:"commencement_date"`
@@ -287,8 +290,8 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 			ai_extracted_discount_rate, ai_suggested_rate_policies,
 			ai_confidence_score, source_reference_locator, approved_at,
 			lease_scope, exemption_reason, scope_classified_by, scope_classified_at,
-			scope_source, scope_confidence
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57)
+			scope_source, scope_confidence, area_sqm
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58)
 		RETURNING approval_status, is_official_version, draft_version_no,
 			included_in_reporting, report_mode
 	`
@@ -316,6 +319,7 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 		contract.SourceReferenceLocator, contract.ApprovedAt,
 		contract.LeaseScope, contract.ExemptionReason, contract.ScopeClassifiedBy,
 		contract.ScopeClassifiedAt, contract.ScopeSource, contract.ScopeConfidence,
+		contract.AreaSqm,
 	).Scan(
 		&contract.ApprovalStatus, &contract.IsOfficialVersion, &contract.DraftVersionNo,
 		&contract.IncludedInReporting, &contract.ReportMode,
@@ -389,7 +393,7 @@ func (r *ContractRepository) List(ctx context.Context, legalEntityID string, fil
 	sel := `
 		SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
 			COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-			COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, currency, signing_date,
+			COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
 			commencement_date, lease_start_date, lease_end_date, status,
 			created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, draft_version_no,
@@ -467,7 +471,7 @@ func (r *ContractRepository) List(ctx context.Context, legalEntityID string, fil
 			&c.ID, &c.ContractNumber, &c.ContractName,
 			&c.LegalEntityID, &c.StoreID, &c.LandlordID,
 			&c.LesseeName, &c.LessorName, &c.StoreName, &c.StoreAddress, &c.Tags,
-			&c.AssetType, &c.AssetCategory, &c.PropertyCategory, &c.Currency,
+			&c.AssetType, &c.AssetCategory, &c.PropertyCategory, &c.AreaSqm, &c.Currency,
 			&c.SigningDate, &c.CommencementDate, &c.LeaseStartDate,
 			&c.LeaseEndDate, &c.Status,
 			&c.CreatedBy, &c.ApprovedBy, &c.CreatedAt, &c.UpdatedAt,
@@ -509,7 +513,7 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
 				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, currency, signing_date,
+				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
@@ -530,7 +534,7 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
 				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, currency, signing_date,
+				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
@@ -562,7 +566,7 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 			&c.ID, &c.ContractNumber, &c.ContractName,
 			&c.LegalEntityID, &c.StoreID, &c.LandlordID,
 			&c.LesseeName, &c.LessorName, &c.StoreName, &c.StoreAddress, &c.Tags,
-			&c.AssetType, &c.AssetCategory, &c.PropertyCategory, &c.Currency,
+			&c.AssetType, &c.AssetCategory, &c.PropertyCategory, &c.AreaSqm, &c.Currency,
 			&c.SigningDate, &c.CommencementDate, &c.LeaseStartDate,
 			&c.LeaseEndDate, &c.Status,
 			&c.CreatedBy, &c.ApprovedBy, &c.CreatedAt, &c.UpdatedAt,
@@ -663,8 +667,9 @@ func (r *ContractRepository) Update(ctx context.Context, contract *Contract, leg
 			scope_confidence = $28,
 			status = $29,
 			updated_by = $30,
+			area_sqm = $31,
 			updated_at = NOW()
-		WHERE id = $31`
+		WHERE id = $32`
 
 	args := []interface{}{
 		contract.ContractNumber,
@@ -697,11 +702,12 @@ func (r *ContractRepository) Update(ctx context.Context, contract *Contract, leg
 		contract.ScopeConfidence,
 		contract.Status,
 		updatedBy,
+		contract.AreaSqm,
 		contract.ID,
 	}
 
 	if legalEntityID != "" {
-		query += ` AND legal_entity_id = $32`
+		query += ` AND legal_entity_id = $33`
 		args = append(args, legalEntityID)
 	}
 
@@ -723,7 +729,7 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
 				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, currency, signing_date,
+				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
@@ -742,7 +748,7 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 		query = `
 			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
 				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, currency, signing_date,
+				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
 				commencement_date, lease_start_date, lease_end_date, status,
 				created_by, approved_by, created_at, updated_at,
 				approval_status, is_official_version, draft_version_no,
@@ -764,7 +770,7 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 		&c.ID, &c.ContractNumber, &c.ContractName,
 		&c.LegalEntityID, &c.StoreID, &c.LandlordID,
 		&c.LesseeName, &c.LessorName, &c.StoreName, &c.StoreAddress, &c.Tags,
-		&c.AssetType, &c.AssetCategory, &c.PropertyCategory, &c.Currency,
+		&c.AssetType, &c.AssetCategory, &c.PropertyCategory, &c.AreaSqm, &c.Currency,
 		&c.SigningDate, &c.CommencementDate, &c.LeaseStartDate,
 		&c.LeaseEndDate, &c.Status,
 		&c.CreatedBy, &c.ApprovedBy, &c.CreatedAt, &c.UpdatedAt,

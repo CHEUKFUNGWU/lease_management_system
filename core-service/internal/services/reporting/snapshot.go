@@ -32,6 +32,10 @@ type ContractFact struct {
 	PaymentSchedules []*repository.PaymentSchedule
 	EventAdjustments []*repository.EventAdjustment
 	DiscountRate     float64
+	// Brand and Region come from the contract's store. They are carried on the
+	// fact so unit-price projections can group by them without a second read.
+	Brand  string
+	Region string
 }
 
 type Snapshot struct {
@@ -59,11 +63,27 @@ type adjustmentSource interface {
 	GetEventAdjustmentsForContracts(ctx context.Context, contractIDs []string) (map[string][]*repository.EventAdjustment, error)
 }
 
+// storeSource supplies the store master data used to group contracts by brand
+// and region. It is optional: without it those groupings simply report the
+// contracts as unassigned.
+type storeSource interface {
+	ListStores(ctx context.Context, tenantID, legalEntityID string) ([]repository.StoreOption, error)
+}
+
 type SnapshotBuilder struct {
 	contracts   contractSource
 	payments    paymentSource
 	rates       rateSource
 	adjustments adjustmentSource
+	stores      storeSource
+}
+
+// WithStores attaches the store master-data source used by brand and region
+// groupings. Snapshots built without it still work; those groupings just report
+// contracts as unassigned.
+func (b *SnapshotBuilder) WithStores(stores storeSource) *SnapshotBuilder {
+	b.stores = stores
+	return b
 }
 
 func NewSnapshotBuilder(contracts contractSource, payments paymentSource, rates rateSource, adjustments ...adjustmentSource) *SnapshotBuilder {
@@ -114,16 +134,33 @@ func (b *SnapshotBuilder) Build(ctx context.Context, request Request) (*Snapshot
 	if b.rates != nil {
 		globalRate = b.rates.GetFloat64(ctx, "global_discount_rate", 0)
 	}
+	storeAttributes := map[string]repository.StoreOption{}
+	if b.stores != nil {
+		stores, err := b.stores.ListStores(ctx, request.LegalEntityID, request.LegalEntityID)
+		if err != nil {
+			return nil, fmt.Errorf("load report stores: %w", err)
+		}
+		for _, store := range stores {
+			storeAttributes[store.ID] = store
+		}
+	}
 	facts := make([]ContractFact, 0, len(eligible))
 	for _, contract := range eligible {
 		rate, _, err := contractsvc.ResolveDiscountRateValues(0, globalRate, contract.DiscountRateValue, contract.LeaseScope)
 		if err != nil {
 			return nil, fmt.Errorf("contract %s: %w", contract.ID, err)
 		}
-		facts = append(facts, ContractFact{
+		fact := ContractFact{
 			Contract: contract, PaymentSchedules: filterPayments(mode, paymentMap[contract.ID]),
 			EventAdjustments: adjustmentMap[contract.ID], DiscountRate: rate,
-		})
+		}
+		if contract.StoreID != nil {
+			if store, known := storeAttributes[*contract.StoreID]; known {
+				fact.Brand = derefString(store.Brand)
+				fact.Region = derefString(store.Region)
+			}
+		}
+		facts = append(facts, fact)
 	}
 	return &Snapshot{
 		ID: uuid.NewString(), PolicyVersion: policyVersion,
@@ -159,4 +196,11 @@ func filterPayments(mode Mode, schedules []*repository.PaymentSchedule) []*repos
 		filtered = append(filtered, schedule)
 	}
 	return filtered
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

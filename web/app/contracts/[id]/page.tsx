@@ -492,6 +492,9 @@ export default function ContractDetailPage() {
                       <Descriptions.Item label="资产类型">
                         <Tag>{assetTypeLabels[contract.asset_type || "real_estate"]}</Tag>
                       </Descriptions.Item>
+                      <Descriptions.Item label={t("contract_detail.area_sqm", language)}>
+                        {contract.area_sqm != null ? `${Number(contract.area_sqm).toLocaleString()} ㎡` : "-"}
+                      </Descriptions.Item>
                       <Descriptions.Item label={t("contract.discount_rate", language)}>
                         {contract.discount_rate_value != null ? (
                           <Tag color="success">{(contract.discount_rate_value * 100).toFixed(2)}%</Tag>

@@ -47,6 +47,28 @@ const scopeColors: Record<string, string> = {
   not_a_lease: "default",
 };
 
+interface UnitPriceRow {
+  group_key: string;
+  group_label: string;
+  brand?: string;
+  region?: string;
+  currency: string;
+  contract_count: number;
+  area_coverage_count: number;
+  total_area_sqm: number;
+  monthly_fixed_rent: number;
+  monthly_rent_per_sqm: number;
+  annual_fixed_rent: number;
+}
+
+type UnitPriceGrouping = "store" | "brand" | "region";
+
+const groupingLabels: Record<UnitPriceGrouping, string> = {
+  store: "按门店",
+  brand: "按品牌",
+  region: "按区域",
+};
+
 const fmt = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 export default function PortfolioPage() {
@@ -54,6 +76,10 @@ export default function PortfolioPage() {
   const [mode, setMode] = useState<"working" | "official">("working");
   const [rows, setRows] = useState<PortfolioRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [grouping, setGrouping] = useState<UnitPriceGrouping>("store");
+  const [unitPriceRows, setUnitPriceRows] = useState<UnitPriceRow[]>([]);
+  const [contractsWithoutArea, setContractsWithoutArea] = useState(0);
+  const [unitPriceLoading, setUnitPriceLoading] = useState(false);
 
   const totals = useMemo(() => {
     return rows.reduce(
@@ -83,9 +109,27 @@ export default function PortfolioPage() {
     }
   };
 
+  const loadUnitPrice = async () => {
+    if (!token) return;
+    setUnitPriceLoading(true);
+    try {
+      const res = await reportApi.unitPrice({ mode, group_by: grouping }, token);
+      setUnitPriceRows(res.data || []);
+      setContractsWithoutArea(res.contracts_without_area || 0);
+    } catch (error: any) {
+      message.error(error.message || "单价对比加载失败");
+    } finally {
+      setUnitPriceLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, [token, mode]);
+
+  useEffect(() => {
+    loadUnitPrice();
+  }, [token, mode, grouping]);
 
   return (
     <ProtectedRoute>
@@ -144,6 +188,85 @@ export default function PortfolioPage() {
                 </Card>
               </Col>
             </Row>
+
+            <Card
+              title="每平米月租对比"
+              extra={
+                <Segmented
+                  value={grouping}
+                  onChange={(value) => setGrouping(value as UnitPriceGrouping)}
+                  options={(["store", "brand", "region"] as UnitPriceGrouping[]).map((value) => ({
+                    label: groupingLabels[value],
+                    value,
+                  }))}
+                />
+              }
+            >
+              <div style={{ color: "#6B7280", marginBottom: 12, fontSize: 13 }}>
+                月租按全租期固定租金直线化计算，因此免租期与递增条款不影响可比性；单价仅统计已填写租赁面积的合同。
+              </div>
+              {contractsWithoutArea > 0 && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                  message={`有 ${contractsWithoutArea} 份合同未填写租赁面积，未纳入单价计算`}
+                  description="补齐合同的租赁面积后，单价与对比结果才覆盖完整组合。"
+                />
+              )}
+              <Table
+                loading={unitPriceLoading}
+                dataSource={unitPriceRows}
+                rowKey="group_key"
+                pagination={{ pageSize: 10 }}
+                size="small"
+                scroll={{ x: 900 }}
+                locale={{ emptyText: "暂无可比数据：请先为合同填写租赁面积" }}
+                columns={[
+                  { title: groupingLabels[grouping].replace("按", ""), dataIndex: "group_label" },
+                  { title: "币种", dataIndex: "currency", width: 80 },
+                  {
+                    title: "每平米月租",
+                    dataIndex: "monthly_rent_per_sqm",
+                    width: 130,
+                    align: "right" as const,
+                    sorter: (a: UnitPriceRow, b: UnitPriceRow) => a.monthly_rent_per_sqm - b.monthly_rent_per_sqm,
+                    render: (value: number) => <strong>{fmt(value)}</strong>,
+                  },
+                  {
+                    title: "租赁面积 (㎡)",
+                    dataIndex: "total_area_sqm",
+                    width: 120,
+                    align: "right" as const,
+                    render: fmt,
+                  },
+                  {
+                    title: "月均固定租金",
+                    dataIndex: "monthly_fixed_rent",
+                    width: 130,
+                    align: "right" as const,
+                    render: fmt,
+                  },
+                  {
+                    title: "年化固定租金",
+                    dataIndex: "annual_fixed_rent",
+                    width: 130,
+                    align: "right" as const,
+                    render: fmt,
+                  },
+                  {
+                    title: "面积覆盖",
+                    key: "coverage",
+                    width: 110,
+                    render: (_: unknown, row: UnitPriceRow) => (
+                      <Tag color={row.area_coverage_count === row.contract_count ? "success" : "warning"}>
+                        {row.area_coverage_count}/{row.contract_count}
+                      </Tag>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
 
             <Card title="组合明细">
               <Table

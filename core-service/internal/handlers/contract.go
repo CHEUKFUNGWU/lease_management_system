@@ -38,6 +38,7 @@ type ContractRequest struct {
 	LeaseEndDate                 string   `json:"lease_end_date" binding:"required"`
 	AssetCategory                *string  `json:"asset_category"`
 	PropertyCategory             *string  `json:"property_category"`
+	AreaSqm                      *float64 `json:"area_sqm"`
 	SigningDate                  *string  `json:"signing_date"`
 	RenewalOptionDescription     *string  `json:"renewal_option_description"`
 	TerminationOptionDescription *string  `json:"termination_option_description"`
@@ -66,6 +67,7 @@ type UpdateContractRequest struct {
 	Tags                string   `json:"tags"`
 	Currency            string   `json:"currency"`
 	AssetType           string   `json:"asset_type"`
+	AreaSqm             *float64 `json:"area_sqm"`
 	SigningDate         *string  `json:"signing_date"`
 	CommencementDate    string   `json:"commencement_date"`
 	LeaseStartDate      string   `json:"lease_start_date"`
@@ -126,6 +128,15 @@ func normalizeLeaseScope(scope string) string {
 	default:
 		return "in_scope"
 	}
+}
+
+// normalizeAreaSqm drops a non-positive leased area rather than storing it, so a
+// zero or negative value can never reach a per-square-metre calculation.
+func normalizeAreaSqm(area *float64) *float64 {
+	if area == nil || *area <= 0 {
+		return nil
+	}
+	return area
 }
 
 func normalizeAssetType(assetType string) string {
@@ -205,6 +216,7 @@ func (h *ContractHandler) Create(c *gin.Context) {
 		AssetType:                    normalizeAssetType(req.AssetType),
 		AssetCategory:                req.AssetCategory,
 		PropertyCategory:             req.PropertyCategory,
+		AreaSqm:                      normalizeAreaSqm(req.AreaSqm),
 		SigningDate:                  signingDate,
 		RenewalOptionDescription:     req.RenewalOptionDescription,
 		TerminationOptionDescription: req.TerminationOptionDescription,
@@ -341,6 +353,7 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 			AssetType:                    normalizeAssetType(contractReq.AssetType),
 			AssetCategory:                contractReq.AssetCategory,
 			PropertyCategory:             contractReq.PropertyCategory,
+			AreaSqm:                      normalizeAreaSqm(contractReq.AreaSqm),
 			SigningDate:                  signingDate,
 			RenewalOptionDescription:     contractReq.RenewalOptionDescription,
 			TerminationOptionDescription: contractReq.TerminationOptionDescription,
@@ -539,6 +552,7 @@ func (h *ContractHandler) Update(c *gin.Context) {
 		Tags:                normalizeTags(req.Tags),
 		Currency:            req.Currency,
 		AssetType:           assetType,
+		AreaSqm:             normalizeAreaSqm(req.AreaSqm),
 		SigningDate:         signingDate,
 		CommencementDate:    commencementDate,
 		LeaseStartDate:      leaseStartDate,

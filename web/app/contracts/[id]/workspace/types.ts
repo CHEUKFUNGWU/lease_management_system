@@ -12,6 +12,8 @@ export interface ContractDetail {
   tags: string;
   currency: string;
   asset_type: string;
+  /** 租赁面积(㎡);无面积的租赁(车辆、设备等)为 null */
+  area_sqm?: number | null;
   signing_date?: string;
   commencement_date: string;
   lease_start_date: string;

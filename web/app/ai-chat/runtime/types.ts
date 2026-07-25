@@ -17,6 +17,8 @@ export interface ContractDraftItem {
   lease_end_date: string;
   currency: string;
   asset_type?: string;
+  /** 租赁面积(㎡);0 表示合同未写明,不参与每平米单价口径 */
+  area_sqm?: number;
   fixed_rent_amount: number;
   payment_frequency: string;
   payment_timing: string;

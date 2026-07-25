@@ -555,6 +555,13 @@ export const reportApi = {
     return apiRequest(`/api/v1/reports/amortization?${qs.toString()}`, { token });
   },
 
+  unitPrice: (params: { mode: "working" | "official"; group_by?: "store" | "brand" | "region" }, token: string) => {
+    const qs = new URLSearchParams();
+    qs.append("mode", params.mode);
+    if (params.group_by) qs.append("group_by", params.group_by);
+    return apiRequest(`/api/v1/reports/unit-price?${qs.toString()}`, { token });
+  },
+
   disclosure: (params: {
     mode: "working" | "official";
     period_start?: string;

@@ -108,6 +108,8 @@ class ContractDraftData(BaseModel):
     lease_end_date: str = ""
     currency: str = ""
     asset_type: Literal["real_estate", "vehicle", "it_equipment", "machinery", "other"] = "real_estate"
+    # 租赁面积(㎡)。0 表示合同未写明,而不是"面积为零"——下游据此不纳入每平米单价口径
+    area_sqm: float = Field(default=0, ge=0)
     fixed_rent_amount: float = Field(default=0, ge=0)
     payment_frequency: Literal["", "monthly", "quarterly", "yearly"] = ""
     payment_timing: Literal["", "prepaid", "postpaid"] = ""

@@ -140,6 +140,7 @@ export default function NewContractPage() {
         landlord_id: values.landlord_id,
         currency: values.currency || "CNY",
         asset_type: values.asset_type || "real_estate",
+        area_sqm: values.area_sqm ?? null,
         commencement_date: values.commencement_date?.format("YYYY-MM-DD"),
         lease_start_date: values.lease_start_date?.format("YYYY-MM-DD"),
         lease_end_date: values.lease_end_date?.format("YYYY-MM-DD"),
@@ -278,6 +279,20 @@ export default function NewContractPage() {
                 <Select.Option value="machinery">机器设备</Select.Option>
                 <Select.Option value="other">其他</Select.Option>
               </Select>
+            </Form.Item>
+
+            <Form.Item
+              label={t("contract_new.area_sqm", language)}
+              name="area_sqm"
+              tooltip={t("contract_new.area_sqm_help", language)}
+            >
+              <InputNumber
+                min={0}
+                step={10}
+                style={{ width: "100%" }}
+                placeholder={t("contract_new.area_sqm_placeholder", language)}
+                addonAfter="㎡"
+              />
             </Form.Item>
 
             <Form.Item

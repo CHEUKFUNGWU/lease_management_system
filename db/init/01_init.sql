@@ -89,6 +89,8 @@ CREATE TABLE IF NOT EXISTS lease_contracts (
     asset_type VARCHAR(50) NOT NULL DEFAULT 'real_estate',
     asset_category VARCHAR(100),
     property_category VARCHAR(100),
+    -- 租赁面积(㎡):按本合同承租的面积,用于每平米单价对比;设备/车辆租赁留空
+    area_sqm DECIMAL(12, 2) CHECK (area_sqm IS NULL OR area_sqm > 0),
     currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
     signing_date DATE,
     commencement_date DATE NOT NULL,
@@ -106,6 +108,8 @@ CREATE TABLE IF NOT EXISTS lease_contracts (
     created_by UUID REFERENCES users(id),
     approved_by UUID REFERENCES users(id),
     approved_at TIMESTAMP WITH TIME ZONE,
+    -- 最后修改人:合同更新与折现率确认都会写入
+    updated_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );

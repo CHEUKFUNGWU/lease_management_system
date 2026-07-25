@@ -536,6 +536,18 @@ export const reportApi = {
     return apiRequest(`/api/v1/reports/amortization?${qs.toString()}`, { token });
   },
 
+  disclosure: (params: {
+    mode: "working" | "official";
+    period_start?: string;
+    period_end?: string;
+  }, token: string) => {
+    const qs = new URLSearchParams();
+    qs.append("mode", params.mode);
+    if (params.period_start) qs.append("period_start", params.period_start);
+    if (params.period_end) qs.append("period_end", params.period_end);
+    return apiRequest(`/api/v1/reports/disclosure?${qs.toString()}`, { token });
+  },
+
   cashflowForecast: (params: {
     mode: "working" | "official";
     view: "contract" | "store" | "summary";

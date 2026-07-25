@@ -193,6 +193,28 @@ func (h *ReportHandler) CashflowForecast(c *gin.Context) {
 	})
 }
 
+// Disclosure returns the IFRS 16 disclosure note package for a reporting period.
+// The period defaults to the current calendar year; period_end doubles as the
+// as-of date for the maturity analysis.
+func (h *ReportHandler) Disclosure(c *gin.Context) {
+	now := time.Now().UTC()
+	periodStart, ok := parseReportDate(c, "period_start", time.Date(now.Year(), 1, 1, 0, 0, 0, 0, time.UTC))
+	if !ok {
+		return
+	}
+	periodEnd, ok := parseReportDate(c, "period_end", time.Date(now.Year(), 12, 31, 0, 0, 0, 0, time.UTC))
+	if !ok {
+		return
+	}
+	if periodEnd.Before(periodStart) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "period_end must be >= period_start"})
+		return
+	}
+	h.projectJSON(c, reporting.NormalizeMode(c.Query("mode")), reporting.ProjectionRequest{
+		Kind: reporting.KindDisclosure, StartDate: periodStart, EndDate: periodEnd,
+	})
+}
+
 func (h *ReportHandler) projectJSON(c *gin.Context, mode reporting.Mode, request reporting.ProjectionRequest) {
 	snapshot, ok := h.buildSnapshot(c, mode)
 	if !ok {
@@ -251,6 +273,19 @@ func parseDateRange(c *gin.Context) (time.Time, time.Time, bool) {
 		return time.Time{}, time.Time{}, false
 	}
 	return start, end, true
+}
+
+func parseReportDate(c *gin.Context, key string, fallback time.Time) (time.Time, bool) {
+	raw := c.Query(key)
+	if raw == "" {
+		return fallback, true
+	}
+	value, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid %s: %v", key, err)})
+		return time.Time{}, false
+	}
+	return value, true
 }
 
 func parseOptionalRate(c *gin.Context, key string, normalizePercent bool) (*float64, bool) {

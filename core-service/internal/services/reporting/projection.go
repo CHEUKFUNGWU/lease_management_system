@@ -25,6 +25,7 @@ const (
 	KindTags               ProjectionKind = "tags"
 	KindTagSummary         ProjectionKind = "tag_summary"
 	KindCashflow           ProjectionKind = "cashflow"
+	KindDisclosure         ProjectionKind = "disclosure"
 )
 
 var (
@@ -185,6 +186,8 @@ func Project(snapshot *Snapshot, request ProjectionRequest) (ProjectionResult, e
 		return projectTagSummary(snapshot), nil
 	case KindCashflow:
 		return projectCashflow(snapshot, request)
+	case KindDisclosure:
+		return projectDisclosure(snapshot, request)
 	default:
 		return ProjectionResult{}, fmt.Errorf("unsupported report projection %q", request.Kind)
 	}

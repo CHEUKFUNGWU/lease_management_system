@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Layout, Menu, Avatar, Dropdown, Breadcrumb, Input, Badge } from "antd";
+import { Layout, Menu, Avatar, Dropdown, Breadcrumb } from "antd";
 import {
   HomeOutlined,
   FileTextOutlined,
@@ -15,8 +15,6 @@ import {
   AuditOutlined,
   CalculatorOutlined,
   GlobalOutlined,
-  SearchOutlined,
-  BellOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   DollarOutlined,
@@ -29,6 +27,8 @@ import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { pageTransition } from "../design-system/animations";
+import GlobalSearch from "./GlobalSearch";
+import NotificationBell from "./NotificationBell";
 
 const { Header, Sider, Content } = Layout;
 
@@ -132,7 +132,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { language, setLanguage } = useLanguage();
   const [collapsed, setCollapsed] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -287,65 +286,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Right: Search + Notifications + Language + User */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           {/* Global Search */}
-          <div
-            style={{
-              position: "relative",
-              width: searchFocused ? 280 : 200,
-              transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
-          >
-            <Input
-              placeholder="全局搜索..."
-              prefix={<SearchOutlined style={{ color: "#8C8C8C", fontSize: 14 }} />}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              style={{
-                borderRadius: 9999,
-                background: "#F5F5F5",
-                border: "none",
-                fontSize: 13,
-                height: 34,
-                paddingLeft: 14,
-              }}
-            />
-            <kbd
-              style={{
-                position: "absolute",
-                right: 10,
-                top: "50%",
-                transform: "translateY(-50%)",
-                fontSize: 10,
-                color: "#BFBFBF",
-                background: "#fff",
-                border: "1px solid #E5E5E5",
-                borderRadius: 4,
-                padding: "0 5px",
-                lineHeight: "16px",
-                fontFamily: "monospace",
-                pointerEvents: "none",
-              }}
-            >
-              ⌘K
-            </kbd>
-          </div>
+          <GlobalSearch />
 
           {/* Notifications */}
-          <div
-            style={{
-              cursor: "pointer",
-              padding: "8px",
-              borderRadius: 8,
-              transition: "background 0.15s",
-              color: "#595959",
-              position: "relative",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-          >
-            <Badge dot offset={[-2, 2]}>
-              <BellOutlined style={{ fontSize: 16 }} />
-            </Badge>
-          </div>
+          <NotificationBell />
 
           {/* Language Switcher */}
           <Dropdown

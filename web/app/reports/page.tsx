@@ -12,6 +12,7 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { DisclosurePanel } from "./components/DisclosurePanel";
 import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -239,6 +240,7 @@ function ReportsPageContent() {
     const tags = searchParams.getAll("tags");
 
     if (tab === "amortization") setActiveTab("amortization");
+    if (tab === "disclosure") setActiveTab("disclosure");
     if (view && ["contract", "store", "tag", "summary"].includes(view)) {
       setAmortView(view as any);
     }
@@ -1029,6 +1031,17 @@ function ReportsPageContent() {
                       </Spin>
                     </Card>
                   </>
+                ),
+              },
+
+              /* ================================
+                 Tab 3 — 披露报表
+                 ================================ */
+              {
+                key: "disclosure",
+                label: t("reports.tab_disclosure", language),
+                children: (
+                  <DisclosurePanel reportMode={reportMode} token={token} language={language} />
                 ),
               },
             ]}

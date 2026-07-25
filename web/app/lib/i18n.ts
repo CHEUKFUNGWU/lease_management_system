@@ -4714,6 +4714,348 @@ const dict: TranslationDict = {
     "zh-HK": "狀態更新失敗",
     en: "Failed to update status",
   },
+  // Disclosure report
+  "reports.tab_disclosure": {
+    "zh-CN": "披露报表",
+    "zh-HK": "披露報表",
+    en: "Disclosure Notes",
+  },
+  "reports.disclosure_period": {
+    "zh-CN": "报告期间",
+    "zh-HK": "報告期間",
+    en: "Reporting Period",
+  },
+  "reports.disclosure_generate": {
+    "zh-CN": "生成披露报表",
+    "zh-HK": "生成披露報表",
+    en: "Generate",
+  },
+  "reports.disclosure_export": {
+    "zh-CN": "导出验证底稿 Excel",
+    "zh-HK": "導出驗證底稿 Excel",
+    en: "Export Workpaper (Excel)",
+  },
+  "reports.disclosure_as_of": {
+    "zh-CN": "截至",
+    "zh-HK": "截至",
+    en: "As of",
+  },
+  "reports.disclosure_as_of_hint": {
+    "zh-CN": "到期分析以期间截止日 {date} 为基准日;滚动调节与费用分解覆盖整个报告期间",
+    "zh-HK": "到期分析以期間截止日 {date} 為基準日;滾動調節與費用分解覆蓋整個報告期間",
+    en: "Maturity analysis is as of {date}; roll-forwards and expense breakdown cover the full reporting period",
+  },
+  "reports.disclosure_multi_currency_caveat": {
+    "zh-CN": "组合包含多种币种({currencies}),各表金额为原币直接加总,未折算——请按币种分别核对或在总账层处理折算",
+    "zh-HK": "組合包含多種幣種({currencies}),各表金額為原幣直接加總,未折算——請按幣種分別核對或在總賬層處理折算",
+    en: "Portfolio spans multiple currencies ({currencies}); amounts are summed in original currency without translation — reconcile by currency or translate at GL level",
+  },
+  "reports.disclosure_maturity_title": {
+    "zh-CN": "一、租赁负债到期分析(未折现)",
+    "zh-HK": "一、租賃負債到期分析(未折現)",
+    en: "1. Maturity Analysis of Lease Liabilities (Undiscounted)",
+  },
+  "reports.disclosure_rou_title": {
+    "zh-CN": "二、使用权资产期初期末调节(按资产类别)",
+    "zh-HK": "二、使用權資產期初期末調節(按資產類別)",
+    en: "2. ROU Asset Reconciliation by Asset Class",
+  },
+  "reports.disclosure_liability_roll_title": {
+    "zh-CN": "三、租赁负债滚动调节",
+    "zh-HK": "三、租賃負債滾動調節",
+    en: "3. Lease Liability Roll-forward",
+  },
+  "reports.disclosure_expense_title": {
+    "zh-CN": "四、租赁相关费用分解",
+    "zh-HK": "四、租賃相關費用分解",
+    en: "4. Lease-related Expense Breakdown",
+  },
+  "reports.disclosure_cash_title": {
+    "zh-CN": "五、租赁现金流出总额",
+    "zh-HK": "五、租賃現金流出總額",
+    en: "5. Total Cash Outflow for Leases",
+  },
+  "reports.disclosure_band_1y": {
+    "zh-CN": "1 年内",
+    "zh-HK": "1 年內",
+    en: "Within 1y",
+  },
+  "reports.disclosure_band_1_2y": {
+    "zh-CN": "1–2 年",
+    "zh-HK": "1–2 年",
+    en: "1–2y",
+  },
+  "reports.disclosure_band_2_3y": {
+    "zh-CN": "2–3 年",
+    "zh-HK": "2–3 年",
+    en: "2–3y",
+  },
+  "reports.disclosure_band_3_4y": {
+    "zh-CN": "3–4 年",
+    "zh-HK": "3–4 年",
+    en: "3–4y",
+  },
+  "reports.disclosure_band_4_5y": {
+    "zh-CN": "4–5 年",
+    "zh-HK": "4–5 年",
+    en: "4–5y",
+  },
+  "reports.disclosure_band_5y_plus": {
+    "zh-CN": "5 年以上",
+    "zh-HK": "5 年以上",
+    en: "Over 5y",
+  },
+  "reports.disclosure_discount_rate": {
+    "zh-CN": "折现率",
+    "zh-HK": "折現率",
+    en: "Discount Rate",
+  },
+  "reports.disclosure_total_undiscounted": {
+    "zh-CN": "未折现合计",
+    "zh-HK": "未折現合計",
+    en: "Total Undiscounted",
+  },
+  "reports.disclosure_unearned_finance": {
+    "zh-CN": "未确认融资费用",
+    "zh-HK": "未確認融資費用",
+    en: "Unearned Finance Cost",
+  },
+  "reports.disclosure_carrying_liability": {
+    "zh-CN": "账面租赁负债",
+    "zh-HK": "賬面租賃負債",
+    en: "Carrying Liability",
+  },
+  "reports.disclosure_asset_type": {
+    "zh-CN": "资产类别",
+    "zh-HK": "資產類別",
+    en: "Asset Class",
+  },
+  "reports.disclosure_contract_count": {
+    "zh-CN": "合同数",
+    "zh-HK": "合同數",
+    en: "Contracts",
+  },
+  "reports.disclosure_opening": {
+    "zh-CN": "期初余额",
+    "zh-HK": "期初餘額",
+    en: "Opening",
+  },
+  "reports.disclosure_additions": {
+    "zh-CN": "本期新增",
+    "zh-HK": "本期新增",
+    en: "Additions",
+  },
+  "reports.disclosure_remeasurement": {
+    "zh-CN": "重计量",
+    "zh-HK": "重計量",
+    en: "Remeasurement",
+  },
+  "reports.disclosure_other_adjustments": {
+    "zh-CN": "其他调整",
+    "zh-HK": "其他調整",
+    en: "Other Adj.",
+  },
+  "reports.disclosure_closing": {
+    "zh-CN": "期末余额",
+    "zh-HK": "期末餘額",
+    en: "Closing",
+  },
+  "reports.disclosure_payments": {
+    "zh-CN": "租金支付",
+    "zh-HK": "租金支付",
+    en: "Payments",
+  },
+  "reports.disclosure_short_term_exempt": {
+    "zh-CN": "短期租赁豁免费用",
+    "zh-HK": "短期租賃豁免費用",
+    en: "Short-term Exempt Expense",
+  },
+  "reports.disclosure_low_value_exempt": {
+    "zh-CN": "低价值租赁豁免费用",
+    "zh-HK": "低價值租賃豁免費用",
+    en: "Low-value Exempt Expense",
+  },
+  "reports.disclosure_expense_total": {
+    "zh-CN": "费用合计(不含非租赁)",
+    "zh-HK": "費用合計(不含非租賃)",
+    en: "Total (excl. non-lease)",
+  },
+  "reports.disclosure_fixed_payments": {
+    "zh-CN": "固定租金支付",
+    "zh-HK": "固定租金支付",
+    en: "Fixed Payments",
+  },
+  "reports.disclosure_prepaid_payments": {
+    "zh-CN": "预付租金",
+    "zh-HK": "預付租金",
+    en: "Prepaid Rent",
+  },
+  "reports.disclosure_variable_payments": {
+    "zh-CN": "变量租金",
+    "zh-HK": "變量租金",
+    en: "Variable Payments",
+  },
+  "reports.disclosure_non_lease_payments": {
+    "zh-CN": "非租赁成分",
+    "zh-HK": "非租賃成分",
+    en: "Non-lease Components",
+  },
+  "reports.disclosure_total": {
+    "zh-CN": "合计",
+    "zh-HK": "合計",
+    en: "Total",
+  },
+  "reports.disclosure_band": {
+    "zh-CN": "时间带",
+    "zh-HK": "時間帶",
+    en: "Maturity Band",
+  },
+  "reports.disclosure_undiscounted_amount": {
+    "zh-CN": "未折现金额",
+    "zh-HK": "未折現金額",
+    en: "Undiscounted Amount",
+  },
+  "reports.disclosure_reconciliation_title": {
+    "zh-CN": "折现调节:未折现总额 − 未确认融资费用 = 账面租赁负债",
+    "zh-HK": "折現調節:未折現總額 − 未確認融資費用 = 賬面租賃負債",
+    en: "Reconciliation: Total undiscounted − Unearned finance cost = Carrying liability",
+  },
+  "reports.disclosure_less_unearned": {
+    "zh-CN": "减:未确认融资费用",
+    "zh-HK": "減:未確認融資費用",
+    en: "Less: Unearned finance cost",
+  },
+  "reports.disclosure_sheet_detail": {
+    "zh-CN": "1-合同明细",
+    "zh-HK": "1-合同明細",
+    en: "1-Contract Detail",
+  },
+  "reports.disclosure_sheet_summary": {
+    "zh-CN": "2-分带汇总与调节",
+    "zh-HK": "2-分帶匯總與調節",
+    en: "2-Band Summary",
+  },
+  "reports.disclosure_sheet_roll": {
+    "zh-CN": "3-负债滚动调节",
+    "zh-HK": "3-負債滾動調節",
+    en: "3-Liability Rollforward",
+  },
+  "reports.disclosure_sheet_rou": {
+    "zh-CN": "4-ROU调节",
+    "zh-HK": "4-ROU調節",
+    en: "4-ROU Reconciliation",
+  },
+  "reports.disclosure_sheet_expense": {
+    "zh-CN": "5-费用与现金流",
+    "zh-HK": "5-費用與現金流",
+    en: "5-Expense & Cash",
+  },
+  "reports.asset_type_real_estate": {
+    "zh-CN": "房产",
+    "zh-HK": "房產",
+    en: "Real Estate",
+  },
+  "reports.asset_type_vehicle": {
+    "zh-CN": "车辆",
+    "zh-HK": "車輛",
+    en: "Vehicles",
+  },
+  "reports.asset_type_it_equipment": {
+    "zh-CN": "IT 设备",
+    "zh-HK": "IT 設備",
+    en: "IT Equipment",
+  },
+  "reports.asset_type_machinery": {
+    "zh-CN": "机器设备",
+    "zh-HK": "機器設備",
+    en: "Machinery",
+  },
+
+  // Dashboard money KPIs & trend chart
+  "dashboard.kpi_total_liability": {
+    "zh-CN": "总租赁负债",
+    "zh-HK": "總租賃負債",
+    en: "Total Lease Liability",
+  },
+  "dashboard.kpi_total_rou": {
+    "zh-CN": "使用权资产净额",
+    "zh-HK": "使用權資產淨額",
+    en: "Net ROU Assets",
+  },
+  "dashboard.kpi_month_expense": {
+    "zh-CN": "本月租赁费用",
+    "zh-HK": "本月租賃費用",
+    en: "This Month's Lease Expense",
+  },
+  "dashboard.kpi_month_expense_sub": {
+    "zh-CN": "利息 + 折旧",
+    "zh-HK": "利息 + 折舊",
+    en: "Interest + Depreciation",
+  },
+  "dashboard.kpi_next12m_cashout": {
+    "zh-CN": "未来 12 个月现金流出",
+    "zh-HK": "未來 12 個月現金流出",
+    en: "Next 12M Cash Outflow",
+  },
+  "dashboard.kpi_contracts_sub": {
+    "zh-CN": "合同 {total} 份 · 已批 {approved} · 待批 {pending} · 草稿 {draft}",
+    "zh-HK": "合同 {total} 份 · 已批 {approved} · 待批 {pending} · 草稿 {draft}",
+    en: "{total} contracts · {approved} approved · {pending} pending · {draft} draft",
+  },
+  "dashboard.trend_liability": {
+    "zh-CN": "租赁负债",
+    "zh-HK": "租賃負債",
+    en: "Lease Liability",
+  },
+  "dashboard.trend_rou": {
+    "zh-CN": "使用权资产",
+    "zh-HK": "使用權資產",
+    en: "ROU Asset",
+  },
+
+  // Notification bell
+  "notif.title": {
+    "zh-CN": "关键日期提醒",
+    "zh-HK": "關鍵日期提醒",
+    en: "Critical Date Alerts",
+  },
+  "notif.empty": {
+    "zh-CN": "暂无临近的关键日期",
+    "zh-HK": "暫無臨近的關鍵日期",
+    en: "No upcoming critical dates",
+  },
+  "notif.overdue": {
+    "zh-CN": "已逾期 {days} 天",
+    "zh-HK": "已逾期 {days} 天",
+    en: "Overdue by {days} days",
+  },
+  "notif.due_in": {
+    "zh-CN": "剩余 {days} 天",
+    "zh-HK": "剩餘 {days} 天",
+    en: "{days} days left",
+  },
+  "notif.due_today": {
+    "zh-CN": "今天到期",
+    "zh-HK": "今天到期",
+    en: "Due today",
+  },
+
+  // Global search
+  "search.placeholder": {
+    "zh-CN": "搜索合同 / 门店 / 出租方...",
+    "zh-HK": "搜尋合同 / 門店 / 出租方...",
+    en: "Search contracts / stores / lessors...",
+  },
+  "search.no_results": {
+    "zh-CN": "未找到匹配的合同",
+    "zh-HK": "未找到匹配的合同",
+    en: "No matching contracts",
+  },
+  "search.loading": {
+    "zh-CN": "搜索中...",
+    "zh-HK": "搜尋中...",
+    en: "Searching...",
+  },
 };
 
 export function t(key: string, lang: Language, replacements?: Record<string, string>): string {

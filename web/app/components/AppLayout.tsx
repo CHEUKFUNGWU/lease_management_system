@@ -25,7 +25,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { hasRole, useAuth } from "../context/AuthContext";
-import { useLanguage } from "../context/LanguageContext";
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { pageTransition } from "../design-system/animations";
 import GlobalSearch from "./GlobalSearch";
@@ -298,39 +298,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Notifications */}
           <NotificationBell />
 
-          {/* Language Switcher */}
-          <Dropdown
-            menu={{
-              items: [
-                { key: "zh-CN", label: "简体中文", onClick: () => setLanguage("zh-CN" as any) },
-                { key: "zh-HK", label: "繁體中文", onClick: () => setLanguage("zh-HK" as any) },
-                { key: "en", label: "English", onClick: () => setLanguage("en" as any) },
-              ],
-            }}
-            placement="bottomRight"
-          >
-            <div
-              style={{
-                cursor: "pointer",
-                padding: "8px",
-                borderRadius: 8,
-                transition: "background 0.15s",
-                color: "#595959",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                fontSize: 13,
-                fontWeight: 500,
+          {/* Language switcher — shown only once more than one language is offered.
+              See SUPPORTED_LANGUAGES for why it is currently a single language. */}
+          {SUPPORTED_LANGUAGES.length > 1 && (
+            <Dropdown
+              menu={{
+                items: SUPPORTED_LANGUAGES.map((code) => ({
+                  key: code,
+                  label: LANGUAGE_LABELS[code],
+                  onClick: () => setLanguage(code),
+                })),
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              placement="bottomRight"
             >
-              <GlobalOutlined style={{ fontSize: 14 }} />
-              <span style={{ textTransform: "uppercase", fontSize: 12 }}>
-                {language === "zh-CN" ? "CN" : language === "zh-HK" ? "HK" : "EN"}
-              </span>
-            </div>
-          </Dropdown>
+              <div
+                style={{
+                  cursor: "pointer",
+                  padding: "8px",
+                  borderRadius: 8,
+                  transition: "background 0.15s",
+                  color: "#595959",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <GlobalOutlined style={{ fontSize: 14 }} />
+                <span style={{ textTransform: "uppercase", fontSize: 12 }}>
+                  {language === "zh-CN" ? "CN" : language === "zh-HK" ? "HK" : "EN"}
+                </span>
+              </div>
+            </Dropdown>
+          )}
 
           {/* Divider */}
           <div style={{ width: 1, height: 20, background: "#E5E5E5" }} />

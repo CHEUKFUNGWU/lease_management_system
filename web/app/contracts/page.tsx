@@ -87,6 +87,11 @@ const ASSET_TYPE_LABELS: Record<string, string> = {
 
 export default function ContractsPage() {
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -123,6 +128,8 @@ export default function ContractsPage() {
     statusVal: string,
     sortByVal: string,
     sortOrderVal: string,
+    pageVal: number = 1,
+    pageSizeVal: number = 20,
   ) => {
     if (!token) return;
     setLoading(true);
@@ -132,14 +139,49 @@ export default function ContractsPage() {
         status: statusVal || undefined,
         sort_by: sortByVal || undefined,
         sort_order: sortOrderVal || undefined,
+        page: pageVal,
+        page_size: pageSizeVal,
       });
       setContracts(data.data || []);
+      // The server counts every match, so the pager stays honest even though
+      // only one page was fetched.
+      setTotal(data.total ?? (data.data || []).length);
+      setPage(data.page || pageVal);
+      setPageSize(data.page_size || pageSizeVal);
     } catch (error: any) {
       message.error(error.message || t("contracts.load_failed", language));
     } finally {
       setLoading(false);
     }
   }, [token, language]);
+
+  const handleBulkSubmit = async () => {
+    if (!token || selectedRowKeys.length === 0) return;
+    setBulkSubmitting(true);
+    try {
+      const results = await Promise.allSettled(
+        selectedRowKeys.map((id) => contractApi.submitForReview(String(id), token))
+      );
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const succeeded = results.length - failed;
+      if (failed === 0) {
+        message.success(t("contracts.bulk_submit_done", language, { count: String(succeeded) }));
+      } else {
+        // Say exactly how many did not go through: a silent partial success
+        // would leave contracts sitting in draft unnoticed.
+        message.warning(
+          t("contracts.bulk_submit_partial", language, {
+            succeeded: String(succeeded),
+            failed: String(failed),
+          })
+        );
+      }
+      setSelectedRowKeys([]);
+      loadContracts(search, statusFilter, sortBy, sortOrder, page, pageSize);
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     loadContracts(search, statusFilter, sortBy, sortOrder);
@@ -441,6 +483,26 @@ export default function ContractsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.1 }}
         >
+          {selectedRowKeys.length > 0 && (
+            <div
+              style={{
+                display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
+                padding: "10px 16px", borderRadius: 10,
+                background: "#F5F5F5", border: "1px solid #E5E5E5",
+              }}
+            >
+              <span style={{ fontSize: 13 }}>
+                {t("contracts.selected_count", language, { count: String(selectedRowKeys.length) })}
+              </span>
+              <Button size="small" type="primary" loading={bulkSubmitting} onClick={handleBulkSubmit}>
+                {t("contracts.bulk_submit", language)}
+              </Button>
+              <Button size="small" onClick={() => setSelectedRowKeys([])}>
+                {t("contracts.clear_selection", language)}
+              </Button>
+            </div>
+          )}
+
           <Card
             bodyStyle={{ padding: 0 }}
             style={{ borderRadius: 10, overflow: "hidden" }}
@@ -453,9 +515,24 @@ export default function ContractsPage() {
                 spinning: loading,
                 indicator: <Skeleton active paragraph={{ rows: 5 }} />,
               }}
+              rowSelection={{
+                selectedRowKeys,
+                onChange: (keys) => setSelectedRowKeys(keys),
+                // Only a draft contract can be submitted, so anything else is
+                // not selectable for the bulk action.
+                getCheckboxProps: (record: Contract) => ({
+                  disabled: record.approval_status !== "draft",
+                }),
+              }}
               pagination={{
-                pageSize: 10,
+                current: page,
+                pageSize,
+                total,
                 showSizeChanger: true,
+                onChange: (nextPage, nextSize) => {
+                  setSelectedRowKeys([]);
+                  loadContracts(search, statusFilter, sortBy, sortOrder, nextPage, nextSize);
+                },
                 showTotal: (total) => {
                   const text = t("contracts.total_items", language, { total: "__TOTAL__" });
                   const [before, after] = text.split("__TOTAL__");

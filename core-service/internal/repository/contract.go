@@ -338,6 +338,11 @@ type ListContractsFilter struct {
 	Statuses  []string
 	SortBy    string // sort column: contract_number, commencement_date, lease_end_date, approval_status, created_at
 	SortOrder string // asc or desc
+
+	// Page and PageSize paginate in the database. Zero means "no paging", which
+	// keeps existing internal callers (reports, closes) reading the full set.
+	Page     int
+	PageSize int
 }
 
 func appendContractScopeConditions(ctx context.Context, legalEntityID string, conditions []string, args []interface{}, argIdx int) ([]string, []interface{}, int) {
@@ -389,6 +394,16 @@ var allowedSortColumns = map[string]string{
 // List returns contracts with optional filters, search, and sorting.
 // Empty filter = same behavior as GetAll.
 func (r *ContractRepository) List(ctx context.Context, legalEntityID string, filter ListContractsFilter) ([]*Contract, error) {
+	contracts, _, err := r.ListPaged(ctx, legalEntityID, filter)
+	return contracts, err
+}
+
+// ListPaged returns one page of contracts plus the total number of matches.
+//
+// The count runs over the same filters as the page, so "showing 20 of 137" stays
+// true, and paging never pulls the whole table into memory the way a
+// client-side page did.
+func (r *ContractRepository) ListPaged(ctx context.Context, legalEntityID string, filter ListContractsFilter) ([]*Contract, int, error) {
 	// Build SELECT column list (reusable)
 	sel := `
 		SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
@@ -458,9 +473,33 @@ func (r *ContractRepository) List(ctx context.Context, legalEntityID string, fil
 	}
 	query += fmt.Sprintf(" ORDER BY %s %s", sortCol, sortOrder)
 
-	rows, err := r.db.Query(ctx, query, args...)
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + conditions[0]
+		for i := 1; i < len(conditions); i++ {
+			whereClause += " AND " + conditions[i]
+		}
+	}
+	var total int
+	if err := r.db.QueryRow(ctx,
+		"SELECT COUNT(*) FROM lease_contracts"+whereClause, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count contracts: %w", err)
+	}
+
+	pageArgs := args
+	if filter.PageSize > 0 {
+		page := filter.Page
+		if page < 1 {
+			page = 1
+		}
+		query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+		pageArgs = append(append([]interface{}{}, args...), filter.PageSize, (page-1)*filter.PageSize)
+		argIdx += 2
+	}
+
+	rows, err := r.db.Query(ctx, query, pageArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list contracts: %w", err)
+		return nil, 0, fmt.Errorf("failed to list contracts: %w", err)
 	}
 	defer rows.Close()
 
@@ -486,12 +525,12 @@ func (r *ContractRepository) List(ctx context.Context, legalEntityID string, fil
 			&c.ScopeClassifiedAt, &c.ScopeSource, &c.ScopeConfidence,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan contract: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan contract: %w", err)
 		}
 		contracts = append(contracts, c)
 	}
 
-	return contracts, nil
+	return contracts, total, nil
 }
 
 func (r *ContractRepository) GetAll(ctx context.Context, legalEntityID string) ([]*Contract, error) {

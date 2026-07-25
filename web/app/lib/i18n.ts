@@ -2325,6 +2325,31 @@ const dict: TranslationDict = {
     "zh-HK": "幣種",
     en: "Currency",
   },
+  "contracts.selected_count": {
+    "zh-CN": "已选 {count} 份草稿合同",
+    "zh-HK": "已選 {count} 份草稿合同",
+    en: "{count} draft contracts selected",
+  },
+  "contracts.bulk_submit": {
+    "zh-CN": "批量提交复核",
+    "zh-HK": "批量提交覆核",
+    en: "Submit for Review",
+  },
+  "contracts.clear_selection": {
+    "zh-CN": "取消选择",
+    "zh-HK": "取消選擇",
+    en: "Clear",
+  },
+  "contracts.bulk_submit_done": {
+    "zh-CN": "{count} 份合同已提交复核",
+    "zh-HK": "{count} 份合同已提交覆核",
+    en: "{count} contracts submitted for review",
+  },
+  "contracts.bulk_submit_partial": {
+    "zh-CN": "{succeeded} 份已提交,{failed} 份失败(可能状态已变更或权限不足)",
+    "zh-HK": "{succeeded} 份已提交,{failed} 份失敗(可能狀態已變更或權限不足)",
+    en: "{succeeded} submitted, {failed} failed (status may have changed, or permission is missing)",
+  },
   "todo.title": {
     "zh-CN": "我的待办",
     "zh-HK": "我的待辦",

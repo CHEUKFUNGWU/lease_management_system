@@ -110,12 +110,24 @@ export const masterDataApi = {
 
 // Contract APIs
 export const contractApi = {
-  list: (token: string, params?: { search?: string; status?: string; sort_by?: string; sort_order?: string }) => {
+  list: (
+    token: string,
+    params?: {
+      search?: string;
+      status?: string;
+      sort_by?: string;
+      sort_order?: string;
+      page?: number;
+      page_size?: number;
+    }
+  ) => {
     const qs = new URLSearchParams();
     if (params?.search) qs.append("search", params.search);
     if (params?.status) qs.append("status", params.status);
     if (params?.sort_by) qs.append("sort_by", params.sort_by);
     if (params?.sort_order) qs.append("sort_order", params.sort_order);
+    if (params?.page) qs.append("page", String(params.page));
+    if (params?.page_size) qs.append("page_size", String(params.page_size));
     const queryString = qs.toString();
     return apiRequest(`/api/v1/contracts${queryString ? `?${queryString}` : ""}`, { token });
   },

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -428,6 +429,10 @@ func (h *ContractHandler) CreateBatch(c *gin.Context) {
 	})
 }
 
+// maxContractPageSize caps a page so one request cannot ask for the whole table
+// under the guise of paging.
+const maxContractPageSize = 200
+
 func (h *ContractHandler) GetAll(c *gin.Context) {
 	legalEntityID := middleware.GetTenantID(c)
 
@@ -437,14 +442,29 @@ func (h *ContractHandler) GetAll(c *gin.Context) {
 		SortBy:    c.Query("sort_by"),
 		SortOrder: c.Query("sort_order"),
 	}
+	// Paging is opt-in: callers that omit page_size still receive the full list,
+	// which keeps existing integrations working.
+	if pageSize, err := strconv.Atoi(c.Query("page_size")); err == nil && pageSize > 0 {
+		filter.PageSize = pageSize
+		if pageSize > maxContractPageSize {
+			filter.PageSize = maxContractPageSize
+		}
+		filter.Page = 1
+		if page, err := strconv.Atoi(c.Query("page")); err == nil && page > 1 {
+			filter.Page = page
+		}
+	}
 
-	contracts, err := h.contractRepo.List(c.Request.Context(), legalEntityID, filter)
+	contracts, total, err := h.contractRepo.ListPaged(c.Request.Context(), legalEntityID, filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list contracts: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": contracts, "total": len(contracts)})
+	c.JSON(http.StatusOK, gin.H{
+		"data": contracts, "total": total,
+		"page": filter.Page, "page_size": filter.PageSize,
+	})
 }
 
 func (h *ContractHandler) GetByID(c *gin.Context) {

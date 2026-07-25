@@ -14,6 +14,7 @@ import {
   SafetyOutlined,
   AuditOutlined,
   CalculatorOutlined,
+  CheckSquareOutlined,
   GlobalOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -38,6 +39,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
   return {
     "": t("nav.home", language as any),
     contracts: t("nav.contracts", language as any),
+    todo: t("nav.todo", language as any),
     "ai-chat": t("nav.ai_chat", language as any),
     reports: t("nav.reports", language as any),
     portfolio: "组合分析",
@@ -63,6 +65,11 @@ function useMenuItems(language: string) {
         key: "/",
         icon: <HomeOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/">{t("nav.home", language as any)}</Link>,
+      },
+      {
+        key: "/todo",
+        icon: <CheckSquareOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/todo">{t("nav.todo", language as any)}</Link>,
       },
       {
         key: "/contracts",

@@ -2325,6 +2325,86 @@ const dict: TranslationDict = {
     "zh-HK": "幣種",
     en: "Currency",
   },
+  "todo.title": {
+    "zh-CN": "我的待办",
+    "zh-HK": "我的待辦",
+    en: "My Work Queue",
+  },
+  "todo.subtitle": {
+    "zh-CN": "共 {count} 项等待处理",
+    "zh-HK": "共 {count} 項等待處理",
+    en: "{count} items waiting",
+  },
+  "todo.refresh": {
+    "zh-CN": "刷新",
+    "zh-HK": "刷新",
+    en: "Refresh",
+  },
+  "todo.load_failed": {
+    "zh-CN": "待办加载失败",
+    "zh-HK": "待辦載入失敗",
+    en: "Failed to load the work queue",
+  },
+  "todo.section_clear": {
+    "zh-CN": "这一类已清空",
+    "zh-HK": "這一類已清空",
+    en: "Nothing waiting here",
+  },
+  "todo.contracts_pending_review": {
+    "zh-CN": "待复核合同",
+    "zh-HK": "待覆核合同",
+    en: "Contracts Awaiting Review",
+  },
+  "todo.contracts_pending_approval": {
+    "zh-CN": "待审批合同",
+    "zh-HK": "待審批合同",
+    en: "Contracts Awaiting Approval",
+  },
+  "todo.events_pending": {
+    "zh-CN": "待处理租赁事件",
+    "zh-HK": "待處理租賃事件",
+    en: "Lease Events Awaiting Action",
+  },
+  "todo.entries_pending_approval": {
+    "zh-CN": "待审批分录",
+    "zh-HK": "待審批分錄",
+    en: "Journal Entries Awaiting Approval",
+  },
+  "todo.entries_pending_posting": {
+    "zh-CN": "待过账分录",
+    "zh-HK": "待過賬分錄",
+    en: "Journal Entries Awaiting Posting",
+  },
+  "todo.critical_dates_due": {
+    "zh-CN": "临近关键日期",
+    "zh-HK": "臨近關鍵日期",
+    en: "Critical Dates Due",
+  },
+  "todo.overdue": {
+    "zh-CN": "已逾期 {days} 天",
+    "zh-HK": "已逾期 {days} 天",
+    en: "Overdue by {days} days",
+  },
+  "todo.due_today": {
+    "zh-CN": "今天到期",
+    "zh-HK": "今天到期",
+    en: "Due today",
+  },
+  "todo.due_in": {
+    "zh-CN": "剩余 {days} 天",
+    "zh-HK": "剩餘 {days} 天",
+    en: "{days} days left",
+  },
+  "todo.scope_note": {
+    "zh-CN": "待办按你的数据权限范围呈现;每项能否执行,仍由对应操作的权限与职责分离规则决定。",
+    "zh-HK": "待辦按你的數據權限範圍呈現;每項能否執行,仍由對應操作的權限與職責分離規則決定。",
+    en: "The queue reflects your data scope. Whether you can act on an item is still decided by that action's own permission and segregation-of-duties rules.",
+  },
+  "nav.todo": {
+    "zh-CN": "我的待办",
+    "zh-HK": "我的待辦",
+    en: "My Work Queue",
+  },
   "settings.fx_title": {
     "zh-CN": "汇率维护",
     "zh-HK": "匯率維護",

@@ -50,6 +50,7 @@ func main() {
 	masterDataRepo := repository.NewMasterDataRepository(database.Pool)
 	accessPolicyRepo := repository.NewAccessPolicyRepository(database.Pool)
 	exchangeRateRepo := repository.NewExchangeRateRepository(database.Pool)
+	workQueueRepo := repository.NewWorkQueueRepository(database.Pool)
 
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
@@ -73,6 +74,7 @@ func main() {
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
 	masterDataHandler := handlers.NewMasterDataHandler(masterDataRepo)
 	exchangeRateHandler := handlers.NewExchangeRateHandler(exchangeRateRepo, auditLogger)
+	workQueueHandler := handlers.NewWorkQueueHandler(workQueueRepo)
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -123,6 +125,7 @@ func main() {
 		entryApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "journal_entry", "id")
 		batchApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "monthly_batch", "id")
 		protected.Handle(http.MethodGet, "/me", permission("identity", "read"), handlers.GetCurrentUser())
+		protected.Handle(http.MethodGet, "/me/work-queue", permission("identity", "read"), workQueueHandler.Get)
 
 		// Contracts
 		protected.Handle(http.MethodPost, "/contracts", permission("contracts", "create"), contractHandler.Create)

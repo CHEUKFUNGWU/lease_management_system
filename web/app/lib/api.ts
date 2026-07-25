@@ -656,6 +656,13 @@ export const auditApi = {
 };
 
 // Settings APIs
+export const workQueueApi = {
+  get: (token: string, criticalDateDays?: number) => {
+    const query = criticalDateDays ? `?critical_date_days=${criticalDateDays}` : "";
+    return apiRequest(`/api/v1/me/work-queue${query}`, { token });
+  },
+};
+
 export const exchangeRateApi = {
   list: (token: string, params?: { from_currency?: string; to_currency?: string }) => {
     const qs = new URLSearchParams();

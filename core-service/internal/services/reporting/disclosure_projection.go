@@ -148,6 +148,18 @@ func projectDisclosure(snapshot *Snapshot, request ProjectionRequest) (Projectio
 	})}, nil
 }
 
+// MaturityBandLabels names the bands in the order they are indexed. The cash
+// flow ladder and the disclosure note must agree on where a payment falls, so
+// both read the boundaries from here rather than each defining their own.
+var MaturityBandLabels = [MaturityBandCount]string{
+	"1 年内", "1-2 年", "2-3 年", "3-4 年", "4-5 年", "5 年以上",
+}
+
+// MaturityBandIndex assigns a payment date to a maturity band relative to asOf.
+func MaturityBandIndex(paymentDate, asOf time.Time) int {
+	return maturityBandIndex(paymentDate, asOf)
+}
+
 // maturityBandIndex assigns a payment date to a maturity band relative to asOf.
 func maturityBandIndex(paymentDate, asOf time.Time) int {
 	for years := 1; years <= 5; years++ {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -46,6 +47,36 @@ type CreateEventRequest struct {
 	NewValue      *string `json:"new_value"`
 	ChangeReason  string  `json:"change_reason" binding:"required"`
 	JudgmentBasis string  `json:"judgment_basis"`
+	// RevisionParameters states the rent clause as the landlord's notice puts
+	// it, so the revised payment schedule is derived rather than retyped.
+	RevisionParameters *eventaccounting.PaymentRevision `json:"revision_parameters"`
+}
+
+// encodeRevision validates the clause before it is stored. A clause that cannot
+// produce a schedule is rejected at the door rather than at month end.
+func encodeRevision(revision *eventaccounting.PaymentRevision) ([]byte, error) {
+	if revision == nil {
+		return nil, nil
+	}
+	// Deriving against an empty schedule exercises every validation the clause
+	// itself can fail, without needing the contract's payments.
+	if _, err := eventaccounting.DeriveRevisedPayments(nil, *revision, time.Time{}); err != nil {
+		return nil, err
+	}
+	return json.Marshal(revision)
+}
+
+// decodeRevision reads a stored clause back. An event recorded before clauses
+// existed has none, and must keep calculating from its free-text value.
+func decodeRevision(raw []byte) (*eventaccounting.PaymentRevision, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	revision := &eventaccounting.PaymentRevision{}
+	if err := json.Unmarshal(raw, revision); err != nil {
+		return nil, err
+	}
+	return revision, nil
 }
 
 func (h *EventHandler) Create(c *gin.Context) {
@@ -63,15 +94,22 @@ func (h *EventHandler) Create(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	userIDStr, _ := userID.(string)
 
+	clause, err := encodeRevision(req.RevisionParameters)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "条款参数无法推导付款流：" + err.Error()})
+		return
+	}
+
 	event := &repository.LeaseEvent{
-		ContractID:    req.ContractID,
-		EventType:     req.EventType,
-		EffectiveDate: ed,
-		OriginalValue: req.OriginalValue,
-		NewValue:      req.NewValue,
-		ChangeReason:  &req.ChangeReason,
-		JudgmentBasis: &req.JudgmentBasis,
-		CreatedBy:     &userIDStr,
+		ContractID:         req.ContractID,
+		EventType:          req.EventType,
+		EffectiveDate:      ed,
+		OriginalValue:      req.OriginalValue,
+		NewValue:           req.NewValue,
+		ChangeReason:       &req.ChangeReason,
+		JudgmentBasis:      &req.JudgmentBasis,
+		CreatedBy:          &userIDStr,
+		RevisionParameters: clause,
 	}
 
 	result, err := h.eventRepo.Create(c.Request.Context(), event)
@@ -338,10 +376,15 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		return
 	}
 
+	revision, err := decodeRevision(event.RevisionParameters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "stored clause is unreadable: " + err.Error()})
+		return
+	}
 	accountingResult, err := eventaccounting.Calculate(eventaccounting.Input{
 		EventID: eventID, ContractID: contractID, EventType: event.EventType,
 		EffectiveDate: event.EffectiveDate, CommencementDate: contract.CommencementDate,
-		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue,
+		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue, Revision: revision,
 		Currency: contract.Currency, DiscountRate: discountRate, Payments: payments,
 	})
 	if err != nil {
@@ -376,6 +419,65 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 
 // PreviewEventAdjustment performs calculation without persisting.
 // POST /contracts/:id/events/:eventId/preview
+type PreviewPaymentsRequest struct {
+	EffectiveDate      string                          `json:"effective_date" binding:"required"`
+	RevisionParameters eventaccounting.PaymentRevision `json:"revision_parameters" binding:"required"`
+}
+
+// PreviewRevisedPayments derives the payment schedule a clause implies, without
+// writing anything. It exists so the revised schedule can be read and agreed
+// before it is committed, which is what replaces editing the schedule by hand
+// and then hoping the event recorded alongside it says the same thing.
+//
+// POST /contracts/:id/events/preview-payments
+func (h *EventHandler) PreviewRevisedPayments(c *gin.Context) {
+	contractID := c.Param("id")
+	ctx := c.Request.Context()
+
+	var req PreviewPaymentsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	effectiveDate, err := time.Parse("2006-01-02", req.EffectiveDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "生效日期格式应为 YYYY-MM-DD"})
+		return
+	}
+
+	contract, err := h.contractRepo.GetByID(ctx, contractID, middleware.GetTenantID(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify contract: " + err.Error()})
+		return
+	}
+	if contract == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
+		return
+	}
+
+	schedules, err := h.psRepo.GetByContractID(ctx, contractID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get payment schedules: " + err.Error()})
+		return
+	}
+
+	draft, err := eventaccounting.DeriveRevisedPayments(
+		repository.ToIFRS16Payments(schedules), req.RevisionParameters, effectiveDate)
+	if err != nil {
+		// The clause itself does not work; this is the caller's mistake to fix,
+		// not a server fault.
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"contract_id":    contractID,
+		"currency":       contract.Currency,
+		"effective_date": effectiveDate.Format("2006-01-02"),
+		"draft":          draft,
+	})
+}
+
 func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 	contractID := c.Param("id")
 	eventID := c.Param("eventId")
@@ -418,10 +520,15 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "discount_rate_missing": true})
 		return
 	}
+	revision, err := decodeRevision(event.RevisionParameters)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "stored clause is unreadable: " + err.Error()})
+		return
+	}
 	result, err := eventaccounting.Calculate(eventaccounting.Input{
 		EventID: eventID, ContractID: contractID, EventType: event.EventType,
 		EffectiveDate: event.EffectiveDate, CommencementDate: contract.CommencementDate,
-		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue,
+		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue, Revision: revision,
 		Currency: contract.Currency, DiscountRate: discountRate, Payments: payments,
 	})
 	if err != nil {

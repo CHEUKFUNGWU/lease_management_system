@@ -224,6 +224,19 @@ func GetCarryingAmount(input LeaseCalculation, asOfDate time.Time) (liability, r
 }
 
 // calculateInitialLiability calculates PV of all lease payments
+// paymentsAfter keeps the payments that are still due on or after a date. A
+// prepaid payment falling exactly on the date is still due; a postpaid one
+// covers the period that just ended and has been settled.
+func paymentsAfter(payments []LeasePayment, from time.Time) []LeasePayment {
+	outstanding := make([]LeasePayment, 0, len(payments))
+	for _, payment := range payments {
+		if payment.Date.After(from) || (payment.Date.Equal(from) && payment.Timing == "prepaid") {
+			outstanding = append(outstanding, payment)
+		}
+	}
+	return outstanding
+}
+
 func calculateInitialLiability(input LeaseCalculation) float64 {
 	var liability float64
 
@@ -459,12 +472,20 @@ func round(val float64) float64 {
 func RecalculateFromDate(carryingLiability, carryingROU float64, input RemeasurementInput) (*RemeasurementOutput, error) {
 	output := &RemeasurementOutput{}
 
-	// 1. Calculate new liability = PV of revised payments from effective date
+	// 1. Calculate new liability = PV of revised payments from effective date.
+	//
+	// Only payments still outstanding are priced. A remeasured liability is the
+	// present value of what is left to pay, and a payment already made is not.
+	// The filter matters because calculateInitialLiability discounts by days
+	// from its commencement date: a past payment yields a negative day count and
+	// is compounded up rather than discounted, so leaving it in would inflate
+	// the liability by more than the payment itself.
+	outstanding := paymentsAfter(input.RevisedPayments, input.EffectiveDate)
 	calcInput := LeaseCalculation{
 		CommencementDate: input.EffectiveDate,
 		LeaseEndDate:     input.LeaseEndDate,
 		DiscountRate:     input.RevisedDiscountRate,
-		Payments:         input.RevisedPayments,
+		Payments:         outstanding,
 	}
 	output.NewLiability = calculateInitialLiability(calcInput)
 	output.LiabilityDelta = output.NewLiability - carryingLiability

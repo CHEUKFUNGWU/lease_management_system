@@ -159,6 +159,8 @@ func main() {
 		// Events
 		protected.Handle(http.MethodPost, "/contracts/:id/events", permission("events", "create"), contractScope, eventHandler.Create)
 		protected.Handle(http.MethodGet, "/contracts/:id/events", permission("events", "read"), contractScope, eventHandler.ListByContract)
+		// Deriving a draft writes nothing, so it needs only read permission.
+		protected.Handle(http.MethodPost, "/contracts/:id/events/preview-payments", permission("events", "read"), contractScope, eventHandler.PreviewRevisedPayments)
 
 		// Event approval workflow
 		protected.Handle(http.MethodPost, "/contracts/:id/events/:eventId/submit", permission("events", "submit"), contractScope, eventHandler.SubmitForReview)

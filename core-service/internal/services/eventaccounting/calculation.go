@@ -21,7 +21,13 @@ type Input struct {
 	// NewValue is event-specific: revised end date for renewal/termination,
 	// recurring fixed rent for rent_change, annual rate for
 	// discount_rate_change, and post-impairment ROU carrying value for impairment.
-	NewValue     *string
+	NewValue *string
+	// Revision states the rent clause in structured form. When present it
+	// derives the revised payment schedule, which is the only way clauses like
+	// CPI indexation or a stepped ladder can be expressed. When absent the
+	// engine falls back to NewValue, so events recorded before clauses existed
+	// keep calculating exactly as they did.
+	Revision     *PaymentRevision
 	Currency     string
 	DiscountRate float64
 	Payments     []ifrs16.LeasePayment
@@ -148,6 +154,18 @@ func scopeDecreaseProportion(effectiveDate, originalEnd, revisedEnd time.Time) f
 
 func paymentsForEvent(input Input, leaseEndDate time.Time) ([]ifrs16.LeasePayment, error) {
 	payments := paymentsThrough(input.Payments, leaseEndDate)
+
+	// A stated clause always wins: it is the more precise description of what
+	// the landlord's notice said, and it applies to any event type rather than
+	// only to rent_change.
+	if input.Revision != nil {
+		schedule, err := DeriveRevisedPayments(payments, *input.Revision, input.EffectiveDate)
+		if err != nil {
+			return nil, err
+		}
+		return schedule.Payments(), nil
+	}
+
 	if input.EventType != "rent_change" {
 		return payments, nil
 	}

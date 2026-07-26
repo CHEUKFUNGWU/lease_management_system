@@ -70,6 +70,7 @@ func main() {
 	dealCompareHandler := handlers.NewDealCompareHandler()
 	preDealHandler := handlers.NewPreDealHandler()
 	cashflowScenarioHandler := handlers.NewCashflowScenarioHandler(contractRepo, psRepo)
+	renewalCardHandler := handlers.NewRenewalCardHandler(contractRepo, psRepo, storeMetricsRepo)
 	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo, masterDataRepo)
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, eventPersistence, auditLogger)
 	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, auditLogger)
@@ -151,6 +152,7 @@ func main() {
 		protected.Handle(http.MethodPost, "/contracts/:id/approve", permission("contracts", "approve"), contractScope, contractApprovalSeparation, approvalHandler.Approve)
 		protected.Handle(http.MethodPost, "/contracts/:id/reject", permission("contracts", "approve"), contractScope, contractApprovalSeparation, approvalHandler.Reject)
 		protected.Handle(http.MethodGet, "/contracts/:id/approval-status", permission("contracts", "read"), contractScope, approvalHandler.GetStatus)
+		protected.Handle(http.MethodGet, "/contracts/:id/renewal-card", permission("reports", "read"), contractScope, renewalCardHandler.Card)
 		protected.Handle(http.MethodGet, "/contracts-by-status", permission("contracts", "read"), approvalHandler.ListByStatus)
 
 		// Discount Rate

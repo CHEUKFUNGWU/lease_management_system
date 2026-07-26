@@ -22,6 +22,7 @@ import {
   Descriptions,
   Empty,
   Skeleton,
+  Select,
 } from "antd";
 import {
   CalculatorOutlined,
@@ -43,13 +44,64 @@ import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 
+// ─── Types ─────────────────────────────────────────────────────
+
+interface EntrySummary {
+  total: number;
+  draft_count: number;
+  approved_count: number;
+  posted_count: number;
+  reversed_count: number;
+  total_amount: number;
+  contract_count: number;
+}
+
+interface EntryPeriod {
+  accounting_period: string;
+  entry_count: number;
+  contract_count: number;
+  draft_count: number;
+  posted_count: number;
+  total_amount: number;
+  is_locked: boolean;
+}
+
+const ENTRY_STATUS_OPTIONS = [
+  { value: "draft", label: "草稿" },
+  { value: "approved", label: "已审批" },
+  { value: "posted", label: "已过账" },
+  { value: "reversed", label: "已红冲" },
+];
+
+// The values are the entry types the close and the event engine actually
+// produce; anything else would filter to an empty page that looks like data.
+const ENTRY_TYPE_OPTIONS = [
+  { value: "interest", label: "利息费用" },
+  { value: "depreciation", label: "折旧" },
+  { value: "payment", label: "租金支付" },
+  { value: "fx_remeasurement", label: "外币重估" },
+  { value: "remeasurement", label: "重新计量" },
+  { value: "modification", label: "合同变更" },
+  { value: "reassessment", label: "重新评估" },
+  { value: "impairment", label: "减值" },
+];
+
 // ─── Page Header ───────────────────────────────────────────────
 
-function PageHeader({ selectedPeriod, entries }: { selectedPeriod: string; entries: any[] }) {
+// The counts come from the server's summary of the whole period rather than
+// from the rows on screen, so paging through a period does not change what the
+// header says the period contains.
+function PageHeader({
+  selectedPeriod,
+  summary,
+}: {
+  selectedPeriod: string;
+  summary: EntrySummary | null;
+}) {
   const { language } = useLanguage();
-  const draftCount = entries.filter((e: any) => e.posting_status === "draft").length;
-  const approvedCount = entries.filter((e: any) => e.posting_status === "approved").length;
-  const postedCount = entries.filter((e: any) => e.posting_status === "posted").length;
+  const draftCount = summary?.draft_count ?? 0;
+  const approvedCount = summary?.approved_count ?? 0;
+  const postedCount = summary?.posted_count ?? 0;
 
   return (
     <div
@@ -101,6 +153,12 @@ export default function MonthlyClosingPage() {
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [result, setResult] = useState<any>(null);
   const [entries, setEntries] = useState<any[]>([]);
+  const [entrySummary, setEntrySummary] = useState<EntrySummary | null>(null);
+  const [entryPeriods, setEntryPeriods] = useState<EntryPeriod[]>([]);
+  const [entryStatus, setEntryStatus] = useState<string | undefined>();
+  const [entryType, setEntryType] = useState<string | undefined>();
+  const [entryPage, setEntryPage] = useState(1);
+  const [entryPageSize, setEntryPageSize] = useState(20);
   const [batches, setBatches] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("generate");
   const [selectedPeriod, setSelectedPeriod] = useState<string>("");
@@ -163,6 +221,7 @@ export default function MonthlyClosingPage() {
       message.success(t("monthly.generate_success", language, { count: String(data.processed_contracts) }));
       await checkLockStatus(period);
       loadBatches(period);
+      loadEntryPeriods();
       loadEntries(period);
       setActiveTab("entries");
     } catch (error: any) {
@@ -172,21 +231,73 @@ export default function MonthlyClosingPage() {
     }
   };
 
-  const loadEntries = async (period: string, status?: string) => {
-    if (!token) return;
-    setEntriesLoading(true);
+  // Entries are read straight from the ledger for the chosen period, so a
+  // closed period can be reviewed without regenerating anything. Paging and
+  // filtering happen on the server; the page never holds a whole period.
+  const loadEntries = useCallback(
+    async (
+      period: string,
+      overrides?: { status?: string; entryType?: string; page?: number; pageSize?: number }
+    ) => {
+      if (!token) return;
+      setEntriesLoading(true);
+      try {
+        const data = await monthlyClosingApi.getEntries(
+          {
+            period,
+            status: overrides?.status ?? entryStatus,
+            entry_type: overrides?.entryType ?? entryType,
+            page: overrides?.page ?? entryPage,
+            page_size: overrides?.pageSize ?? entryPageSize,
+          },
+          token
+        );
+        setEntries(data.data || []);
+        setEntrySummary(data.summary || null);
+        setEntriesLoaded(true);
+      } catch (error: any) {
+        message.error(error.message || t("monthly.load_entries_failed", language));
+      } finally {
+        setEntriesLoading(false);
+      }
+    },
+    [token, language, entryStatus, entryType, entryPage, entryPageSize]
+  );
+
+  // The period list is what makes the query independent: it comes from the
+  // entries that exist, not from a date the user has to remember.
+  const loadEntryPeriods = useCallback(async () => {
+    if (!token) return [] as EntryPeriod[];
     try {
-      const data = await monthlyClosingApi.getEntries(
-        { period, status: status || undefined },
-        token
-      );
-      setEntries(data.data || []);
-      setEntriesLoaded(true);
-    } catch (error: any) {
-      message.error(error.message || t("monthly.load_entries_failed", language));
-    } finally {
-      setEntriesLoading(false);
+      const data = await monthlyClosingApi.listPeriods(token);
+      const list: EntryPeriod[] = data.data || [];
+      setEntryPeriods(list);
+      return list;
+    } catch {
+      return [] as EntryPeriod[];
     }
+  }, [token]);
+
+  // Opening the entries tab with nothing selected falls back to the most recent
+  // period that has entries, which is almost always the one being worked on.
+  const openEntriesTab = useCallback(async () => {
+    const list = await loadEntryPeriods();
+    const period = selectedPeriod || list[0]?.accounting_period;
+    if (!period) {
+      setEntriesLoaded(true);
+      return;
+    }
+    if (period !== selectedPeriod) setSelectedPeriod(period);
+    loadEntries(period);
+    checkLockStatus(period);
+  }, [loadEntryPeriods, selectedPeriod, loadEntries, checkLockStatus]);
+
+  const changeEntryPeriod = (period: string) => {
+    setSelectedPeriod(period);
+    setEntryPage(1);
+    loadEntries(period, { page: 1 });
+    checkLockStatus(period);
+    loadBatches(period);
   };
 
   const loadBatches = async (period: string) => {
@@ -452,6 +563,9 @@ export default function MonthlyClosingPage() {
           interest: t("monthly.entry_interest", language),
           depreciation: t("monthly.entry_depreciation", language),
           payment: t("monthly.entry_payment", language),
+          // The remaining types are named once, in the filter, so the column and
+          // the filter can never disagree about what a type is called.
+          ...Object.fromEntries(ENTRY_TYPE_OPTIONS.map((o) => [o.value, o.label])),
         };
         return <Tag color="processing">{labels[v] || v}</Tag>;
       },
@@ -798,7 +912,7 @@ export default function MonthlyClosingPage() {
                     });
                   }}
                 >
-                  {t("monthly.batch_approve", language)}
+                  {t("monthly.batch_approve", language)}（本页）
                 </Button>
                 <Button
                   size="small"
@@ -824,7 +938,7 @@ export default function MonthlyClosingPage() {
                     });
                   }}
                 >
-                  {t("monthly.batch_post", language)}
+                  {t("monthly.batch_post", language)}（本页）
                 </Button>
                 <Button size="small" onClick={() => refresh()}>
                   {t("monthly.refresh", language)}
@@ -833,6 +947,56 @@ export default function MonthlyClosingPage() {
             ) : undefined
           }
         >
+          <Space wrap size={12} style={{ marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>会计期间</span>
+            <Select
+              style={{ width: 260 }}
+              value={selectedPeriod || undefined}
+              onChange={changeEntryPeriod}
+              placeholder="选择一个有分录的期间"
+              notFoundContent="暂无已生成分录的期间"
+              options={entryPeriods.map((p) => ({
+                value: p.accounting_period,
+                label: `${p.accounting_period}（${p.entry_count} 笔 / ${p.contract_count} 份合同${
+                  p.is_locked ? "，已锁账" : ""
+                }）`,
+              }))}
+            />
+            <Select
+              style={{ width: 140 }}
+              allowClear
+              value={entryStatus}
+              onChange={(value) => {
+                setEntryStatus(value);
+                setEntryPage(1);
+                if (selectedPeriod) loadEntries(selectedPeriod, { status: value, page: 1 });
+              }}
+              placeholder="全部状态"
+              options={ENTRY_STATUS_OPTIONS}
+            />
+            <Select
+              style={{ width: 160 }}
+              allowClear
+              value={entryType}
+              onChange={(value) => {
+                setEntryType(value);
+                setEntryPage(1);
+                if (selectedPeriod) loadEntries(selectedPeriod, { entryType: value, page: 1 });
+              }}
+              placeholder="全部分录类型"
+              options={ENTRY_TYPE_OPTIONS}
+            />
+            {entrySummary && (
+              <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+                共 {entrySummary.total} 笔 · {entrySummary.contract_count} 份合同 · 合计{" "}
+                {entrySummary.total_amount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            )}
+          </Space>
+
           {isLocked && (
             <Alert
               message={t("monthly.locked_warning", language, { period: selectedPeriod })}
@@ -846,7 +1010,11 @@ export default function MonthlyClosingPage() {
           ) : entries.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t("monthly.no_entries", language)}
+              description={
+                selectedPeriod
+                  ? t("monthly.no_entries", language)
+                  : "尚无任何已生成分录的期间，请先在「生成月结」中运行一次结账"
+              }
             />
           ) : (
             <Spin spinning={entriesLoading && entriesLoaded}>
@@ -854,7 +1022,21 @@ export default function MonthlyClosingPage() {
                 columns={entryColumns}
                 dataSource={entries}
                 rowKey="id"
-                pagination={{ pageSize: 20 }}
+                // The server holds the period; the table shows one page of it,
+                // so the count comes from the summary rather than the rows.
+                pagination={{
+                  current: entryPage,
+                  pageSize: entryPageSize,
+                  total: entrySummary?.total ?? entries.length,
+                  showSizeChanger: true,
+                  pageSizeOptions: ["20", "50", "100", "200"],
+                  showTotal: (total) => `共 ${total} 笔`,
+                  onChange: (page, size) => {
+                    setEntryPage(page);
+                    setEntryPageSize(size);
+                    if (selectedPeriod) loadEntries(selectedPeriod, { page, pageSize: size });
+                  },
+                }}
                 size="small"
                 scroll={{ x: 1360 }}
               />
@@ -1043,15 +1225,14 @@ export default function MonthlyClosingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
         >
-          <PageHeader selectedPeriod={selectedPeriod} entries={entries} />
+          <PageHeader selectedPeriod={selectedPeriod} summary={entrySummary} />
 
           <Tabs
             activeKey={activeTab}
             onChange={(key) => {
               setActiveTab(key);
-              if (key === "entries" && selectedPeriod) {
-                loadEntries(selectedPeriod);
-                checkLockStatus(selectedPeriod);
+              if (key === "entries") {
+                openEntriesTab();
               }
               if (key === "batches" && selectedPeriod) {
                 loadBatches(selectedPeriod);

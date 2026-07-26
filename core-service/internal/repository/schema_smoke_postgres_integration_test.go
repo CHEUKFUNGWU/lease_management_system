@@ -196,6 +196,17 @@ func TestSchemaSmoke_ExchangeRatesAndWorkQueue(t *testing.T) {
 		t.Fatalf("read exchange rate: %v", err)
 	}
 
+	// The period query joins journal_entries, lease_contracts and period_locks
+	// and aggregates over them, so it is exactly the kind of statement that only
+	// fails against a real schema.
+	mc := repository.NewMonthlyClosingRepository(pool)
+	if _, _, err := mc.ListJournalEntries(ctx, repository.JournalEntryQuery{Period: "2026-03", PageSize: 10}); err != nil {
+		t.Fatalf("list journal entries by period: %v", err)
+	}
+	if _, err := mc.ListEntryPeriods(ctx, "", 12); err != nil {
+		t.Fatalf("list entry periods: %v", err)
+	}
+
 	if _, err := repository.NewWorkQueueRepository(pool).Load(ctx, "", 30); err != nil {
 		t.Fatalf("load work queue: %v", err)
 	}

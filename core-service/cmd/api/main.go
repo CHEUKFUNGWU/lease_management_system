@@ -211,6 +211,7 @@ func main() {
 		protected.Handle(http.MethodPost, "/monthly-closing/generate", permission("monthly_closing", "generate"), monthlyClosingHandler.Generate)
 		protected.Handle(http.MethodGet, "/monthly-closing/batches", permission("monthly_closing", "read"), monthlyClosingHandler.ListBatches)
 		protected.Handle(http.MethodGet, "/monthly-closing/entries", permission("monthly_closing", "read"), monthlyClosingHandler.GetJournalEntries)
+		protected.Handle(http.MethodGet, "/monthly-closing/periods", permission("monthly_closing", "read"), monthlyClosingHandler.ListEntryPeriods)
 		protected.Handle(http.MethodGet, "/contracts/:id/measurement-results", permission("calculations", "read"), contractScope, monthlyClosingHandler.GetMeasurementResults)
 
 		// Monthly Closing - Approval & Posting

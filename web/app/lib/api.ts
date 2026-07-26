@@ -324,13 +324,30 @@ export const monthlyClosingApi = {
     }),
   listBatches: (period: string, token: string) =>
     apiRequest(`/api/v1/monthly-closing/batches?period=${period}`, { token }),
-  getEntries: (params: { contract_id?: string; period?: string; status?: string }, token: string) => {
+  getEntries: (
+    params: {
+      contract_id?: string;
+      period?: string;
+      status?: string;
+      entry_type?: string;
+      page?: number;
+      page_size?: number;
+    },
+    token: string
+  ) => {
     const qs = new URLSearchParams();
     if (params.contract_id) qs.append("contract_id", params.contract_id);
     if (params.period) qs.append("period", params.period);
     if (params.status) qs.append("status", params.status);
+    if (params.entry_type) qs.append("entry_type", params.entry_type);
+    if (params.page) qs.append("page", String(params.page));
+    if (params.page_size) qs.append("page_size", String(params.page_size));
     return apiRequest(`/api/v1/monthly-closing/entries?${qs.toString()}`, { token });
   },
+  // The periods the ledger actually holds entries for — this is what lets a
+  // period be reviewed without first running a close over it.
+  listPeriods: (token: string) =>
+    apiRequest(`/api/v1/monthly-closing/periods`, { token }),
   exportEntries: async (params: { period?: string; status?: string; template?: string }, token: string) => {
     const qs = new URLSearchParams();
     if (params.period) qs.append("period", params.period);

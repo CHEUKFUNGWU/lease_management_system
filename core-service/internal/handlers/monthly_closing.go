@@ -381,13 +381,19 @@ func (h *MonthlyClosingHandler) ListBatches(c *gin.Context) {
 	})
 }
 
-// GetJournalEntries returns journal entries
+// GetJournalEntries queries the ledger by period, independently of any close.
+// A period can therefore be reviewed, reconciled or exported long after it was
+// closed, without regenerating anything.
 func (h *MonthlyClosingHandler) GetJournalEntries(c *gin.Context) {
 	contractID := c.Query("contract_id")
-	period := c.Query("period")
-	status := c.Query("status")
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
+
+	status, valid := repository.NormalizeEntryStatus(c.Query("status"))
+	if !valid {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "分录状态无效，可选：draft、approved、posted、reversed"})
+		return
+	}
 
 	// If filtering by contract, verify contract belongs to tenant
 	if contractID != "" {
@@ -402,16 +408,47 @@ func (h *MonthlyClosingHandler) GetJournalEntries(c *gin.Context) {
 		}
 	}
 
-	entries, err := h.mcRepo.GetJournalEntries(ctx, contractID, period, status)
+	requestedPage, _ := strconv.Atoi(c.Query("page"))
+	requestedSize, _ := strconv.Atoi(c.Query("page_size"))
+	page, pageSize := repository.NormalizeEntryPaging(requestedPage, requestedSize)
+
+	entries, summary, err := h.mcRepo.ListJournalEntries(ctx, repository.JournalEntryQuery{
+		LegalEntityID: legalEntityID,
+		Period:        c.Query("period"),
+		ContractID:    contractID,
+		Status:        status,
+		EntryType:     c.Query("entry_type"),
+		Page:          page,
+		PageSize:      pageSize,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":  entries,
-		"total": len(entries),
+		"data": entries,
+		// total counts the whole filtered period, not this page, so the caller
+		// can paginate without a second request to learn how far it goes.
+		"total":     summary.Total,
+		"page":      page,
+		"page_size": pageSize,
+		"summary":   summary,
 	})
+}
+
+// ListEntryPeriods returns the periods the ledger actually holds entries for,
+// so a period can be chosen from what exists rather than typed from memory.
+func (h *MonthlyClosingHandler) ListEntryPeriods(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.Query("limit"))
+
+	periods, err := h.mcRepo.ListEntryPeriods(c.Request.Context(), middleware.GetTenantID(c), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": periods, "total": len(periods)})
 }
 
 // GetMeasurementResults returns measurement results

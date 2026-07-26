@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi, reportApi } from "../lib/api";
+import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 
@@ -137,17 +138,17 @@ export default function SensitivityPage() {
             <Row gutter={16}>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="基准初始负债" value={summary.base} precision={2} prefix="¥" />
+                  <Statistic title="基准初始负债" value={summary.base} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} />
                 </Card>
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="最大上行影响" value={summary.maxUp} precision={2} prefix="¥" valueStyle={{ color: summary.maxUp > 0 ? "#CF1322" : undefined }} />
+                  <Statistic title="最大上行影响" value={summary.maxUp} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxUp > 0 ? "#CF1322" : undefined }} />
                 </Card>
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="最大下行影响" value={summary.maxDown} precision={2} prefix="¥" valueStyle={{ color: summary.maxDown < 0 ? "#3F8600" : undefined }} />
+                  <Statistic title="最大下行影响" value={summary.maxDown} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxDown < 0 ? "#3F8600" : undefined }} />
                 </Card>
               </Col>
             </Row>
@@ -160,7 +161,7 @@ export default function SensitivityPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="scenario_name" />
                       <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
-                      <Tooltip formatter={(value) => `¥${fmt(Number(value || 0))}`} />
+                      <Tooltip formatter={(value) => fmtMoney(Number(value || 0), meta?.currency)} />
                       <Bar dataKey="liability_delta" fill="#1677FF" name="负债变动" />
                     </BarChart>
                   </ResponsiveContainer>

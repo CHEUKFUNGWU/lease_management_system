@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi, reportApi } from "../lib/api";
+import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 
@@ -138,12 +139,12 @@ export default function StandardsPage() {
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="IFRS 初始负债" value={rows.find((row) => row.standard === "ifrs16")?.initial_liability || 0} precision={2} prefix="¥" />
+                  <Statistic title="IFRS 初始负债" value={rows.find((row) => row.standard === "ifrs16")?.initial_liability || 0} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} />
                 </Card>
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="ASC Operating 首期损益差异" value={delta} precision={2} prefix="¥" />
+                  <Statistic title="ASC Operating 首期损益差异" value={delta} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} />
                 </Card>
               </Col>
             </Row>
@@ -156,7 +157,7 @@ export default function StandardsPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="standard_name" interval={0} height={70} tick={{ fontSize: 11 }} />
                       <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
-                      <Tooltip formatter={(value) => `¥${fmt(Number(value || 0))}`} />
+                      <Tooltip formatter={(value) => fmtMoney(Number(value || 0), meta?.currency)} />
                       <Legend />
                       <Bar dataKey="initial_liability" fill="#1677FF" name="初始负债" />
                       <Bar dataKey="first_period_expense" fill="#52C41A" name="首期费用" />

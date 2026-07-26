@@ -18,6 +18,7 @@ import dayjs from "dayjs";
 
 import type { Language } from "../../../lib/i18n";
 import { t } from "../../../lib/i18n";
+import { fmtMoney } from "../../../lib/format";
 import { DEFAULT_TAG_SUGGESTIONS } from "../../../lib/tags";
 import type {
   ContractWorkspaceState,
@@ -50,6 +51,7 @@ export function ContractWorkspaceDialogs({
 }: ContractWorkspaceDialogsProps) {
   const {
     dialogs,
+    contract,
     contractRejection,
     eventRejection,
     adjustment,
@@ -114,7 +116,12 @@ export function ContractWorkspaceDialogs({
   const eventRejectType = eventRejection.stage;
   const eventRejectReason = eventRejection.reason;
   const eventRejectEventId = eventRejection.eventId;
+  // The amount input sits next to the currency selector, so its prefix follows
+  // that selection instead of asserting yuan for every schedule line.
+  const scheduleCurrency = Form.useWatch("currency", form);
+
   const adjustmentModalData = adjustment?.data as any;
+  const adjustmentCurrency = contract?.currency;
   const adjustmentModalTitle = adjustment ? t(adjustment.title, language) : "";
 
   const actionLoadingAliases: Record<string, string> = {
@@ -173,7 +180,7 @@ export function ContractWorkspaceDialogs({
                     style={{ width: "100%" }}
                     min={0}
                     precision={2}
-                    prefix="¥"
+                    prefix={scheduleCurrency || ""}
                   />
                 </Form.Item>
               </Col>
@@ -776,39 +783,42 @@ export function ContractWorkspaceDialogs({
                 {adjustmentModalData.discount_rate != null ? `${(adjustmentModalData.discount_rate * 100).toFixed(2)}%` : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_before", language)}>
-                {adjustmentModalData.liability_before != null ? `¥${adjustmentModalData.liability_before.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+                {adjustmentModalData.liability_before != null ? fmtMoney(adjustmentModalData.liability_before, adjustmentCurrency) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_after", language)}>
                 {adjustmentModalData.liability_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "#000" }}>¥{adjustmentModalData.liability_after.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ fontWeight: "bold", color: "#000" }}>{fmtMoney(adjustmentModalData.liability_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_change", language)}>
                 {adjustmentModalData.liability_change != null ? (
                   <span style={{ fontWeight: "bold", color: adjustmentModalData.liability_change >= 0 ? "#000" : "#000" }}>
-                    {adjustmentModalData.liability_change >= 0 ? "+" : ""}¥{adjustmentModalData.liability_change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {adjustmentModalData.liability_change >= 0 ? "+" : ""}
+                    {fmtMoney(adjustmentModalData.liability_change, adjustmentCurrency)}
                   </span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_before", language)}>
-                {adjustmentModalData.asset_before != null ? `¥${adjustmentModalData.asset_before.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+                {adjustmentModalData.asset_before != null ? fmtMoney(adjustmentModalData.asset_before, adjustmentCurrency) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_after", language)}>
                 {adjustmentModalData.asset_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "#000" }}>¥{adjustmentModalData.asset_after.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span style={{ fontWeight: "bold", color: "#000" }}>{fmtMoney(adjustmentModalData.asset_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_change", language)}>
                 {adjustmentModalData.asset_change != null ? (
                   <span style={{ fontWeight: "bold", color: adjustmentModalData.asset_change >= 0 ? "#000" : "#000" }}>
-                    {adjustmentModalData.asset_change >= 0 ? "+" : ""}¥{adjustmentModalData.asset_change.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {adjustmentModalData.asset_change >= 0 ? "+" : ""}
+                    {fmtMoney(adjustmentModalData.asset_change, adjustmentCurrency)}
                   </span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.pnl_impact", language)}>
                 {adjustmentModalData.pnl_impact != null ? (
                   <span style={{ fontWeight: "bold", color: adjustmentModalData.pnl_impact >= 0 ? "#000" : "#000" }}>
-                    {adjustmentModalData.pnl_impact >= 0 ? "+" : ""}¥{adjustmentModalData.pnl_impact.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {adjustmentModalData.pnl_impact >= 0 ? "+" : ""}
+                    {fmtMoney(adjustmentModalData.pnl_impact, adjustmentCurrency)}
                   </span>
                 ) : "-"}
               </Descriptions.Item>

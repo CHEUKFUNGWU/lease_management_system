@@ -1,19 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card, Col, InputNumber, Row, Statistic, Table, Typography } from "antd";
+import { Card, Col, InputNumber, Row, Select, Statistic, Table, Typography } from "antd";
 import { CalculatorOutlined, ClockCircleOutlined, DollarOutlined, SafetyOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { fmtMoney } from "../lib/format";
 
 const { Title, Text } = Typography;
 
-function currency(value: number) {
-  return `¥${Math.round(value).toLocaleString()}`;
-}
+// The codes the rest of the product offers, so an estimate can be stated in the
+// same currency as the reports it will be compared against.
+const ROI_CURRENCIES = ["CNY", "USD", "HKD", "EUR"];
 
 export default function RoiPage() {
   const [contracts, setContracts] = useState(500);
+  const [currencyCode, setCurrencyCode] = useState("CNY");
   const [hourlyCost, setHourlyCost] = useState(260);
   const [manualHours, setManualHours] = useState(1.6);
   const [aiHours, setAiHours] = useState(0.3);
@@ -62,8 +64,17 @@ export default function RoiPage() {
                   <InputNumber min={1} value={contracts} onChange={(v) => setContracts(Number(v || 0))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
+                  <Text strong>计价币种</Text>
+                  <Select
+                    value={currencyCode}
+                    onChange={setCurrencyCode}
+                    options={ROI_CURRENCIES.map((code) => ({ value: code, label: code }))}
+                    style={{ width: "100%", marginTop: 6 }}
+                  />
+                </label>
+                <label>
                   <Text strong>财务人员小时成本</Text>
-                  <InputNumber min={1} prefix="¥" value={hourlyCost} onChange={(v) => setHourlyCost(Number(v || 0))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber min={1} prefix={currencyCode} value={hourlyCost} onChange={(v) => setHourlyCost(Number(v || 0))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
                   <Text strong>传统单份录入小时</Text>
@@ -98,7 +109,7 @@ export default function RoiPage() {
               </Col>
               <Col xs={24} md={12}>
                 <Card style={{ borderRadius: 10 }}>
-                  <Statistic title="年度人力成本节省" value={currency(result.laborSavings)} prefix={<DollarOutlined />} />
+                  <Statistic title="年度人力成本节省" value={fmtMoney(Math.round(result.laborSavings), currencyCode)} prefix={<DollarOutlined />} />
                 </Card>
               </Col>
               <Col xs={24} md={12}>

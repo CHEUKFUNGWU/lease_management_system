@@ -43,6 +43,7 @@ import { monthlyClosingApi } from "../lib/api";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
+import { fmtMoney } from "../lib/format";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -577,8 +578,7 @@ export default function MonthlyClosingPage() {
       dataIndex: "amount",
       width: 120,
       align: "right" as const,
-      render: (v: number) =>
-        `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+      render: (v: number, record: any) => fmtMoney(v, record.currency),
     },
     { title: t("monthly.col_currency", language), dataIndex: "currency", width: 60 },
     { title: t("monthly.col_description", language), dataIndex: "description", ellipsis: true },
@@ -1291,10 +1291,7 @@ export default function MonthlyClosingPage() {
                   <Tag color="processing">{postingEntry.entry_type}</Tag>
                 </Descriptions.Item>
                 <Descriptions.Item label={t("monthly.amount", language)}>
-                  ¥
-                  {postingEntry.amount?.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                  })}
+                  {fmtMoney(postingEntry.amount, postingEntry.currency)}
                 </Descriptions.Item>
                 <Descriptions.Item label={t("monthly.description", language)}>
                   {postingEntry.description}

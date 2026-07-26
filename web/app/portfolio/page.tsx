@@ -6,6 +6,7 @@ import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { reportApi } from "../lib/api";
+import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 
@@ -90,11 +91,26 @@ export default function PortfolioPage() {
         acc.variable += row.variable_rent_exposure || 0;
         acc.nonLease += row.non_lease_component_amount || 0;
         acc.missingRates += row.missing_discount_rate_count || 0;
+        if (row.currency) acc.currencies.add(row.currency);
         return acc;
       },
-      { contracts: 0, active: 0, fixed: 0, variable: 0, nonLease: 0, missingRates: 0 }
+      {
+        contracts: 0,
+        active: 0,
+        fixed: 0,
+        variable: 0,
+        nonLease: 0,
+        missingRates: 0,
+        // The commitment is summed across the rows on screen. If those rows span
+        // several currencies the sum names no currency at all, and saying "¥"
+        // would be a claim about money that is not true.
+        currencies: new Set<string>(),
+      }
     );
   }, [rows]);
+
+  const totalsCurrency =
+    totals.currencies.size === 1 ? Array.from(totals.currencies)[0] : null;
 
   const loadData = async () => {
     if (!token) return;
@@ -179,7 +195,12 @@ export default function PortfolioPage() {
               </Col>
               <Col xs={24} md={6}>
                 <Card>
-                  <Statistic title="固定租赁承诺" value={totals.fixed} precision={2} prefix="¥" />
+                  <Statistic
+                    title={totalsCurrency ? "固定租赁承诺" : "固定租赁承诺（多币种合计）"}
+                    value={totals.fixed}
+                    precision={2}
+                    formatter={() => fmtMoney(totals.fixed, totalsCurrency)}
+                  />
                 </Card>
               </Col>
               <Col xs={24} md={6}>

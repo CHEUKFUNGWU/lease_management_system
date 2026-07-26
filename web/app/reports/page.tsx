@@ -18,7 +18,7 @@ import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
-import { fmtNum } from "../lib/format";
+import { fmtMoney, fmtNum } from "../lib/format";
 import { exportCSV, exportExcel } from "../lib/export";
 import dayjs from "dayjs";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -350,11 +350,16 @@ function ReportsPageContent() {
       }
     });
     const latestRows = Array.from(groupMap.values());
+    // The totals add up rows that may be measured in different currencies. Only
+    // when they all agree can the summary name one; otherwise it names none
+    // rather than asserting a currency the numbers do not share.
+    const currencies = new Set(amortData.map((row) => row.currency).filter(Boolean));
     return {
       closingLiability: latestRows.reduce((s, r) => s + (r.closing_liability || 0), 0),
       closingROU: latestRows.reduce((s, r) => s + (r.closing_rou_asset || 0), 0),
       totalInterest: amortData.reduce((s, r) => s + (r.interest_expense || 0), 0),
       totalDepreciation: amortData.reduce((s, r) => s + (r.depreciation || 0), 0),
+      currency: currencies.size === 1 ? Array.from(currencies)[0] : null,
     };
   }, [amortData]);
 
@@ -737,10 +742,10 @@ function ReportsPageContent() {
                                   parts.push(`${t("reports.ai_chat_period", language)}: ${amortDateRange[0].format('YYYY-MM-DD')}~${amortDateRange[1].format('YYYY-MM-DD')}`);
                                 }
                                 if (amortSummary) {
-                                  parts.push(`${t("reports.ai_chat_closing_liability", language)}: ¥${fmtNum(amortSummary.closingLiability)}`);
-                                  parts.push(`${t("reports.ai_chat_closing_rou", language)}: ¥${fmtNum(amortSummary.closingROU)}`);
-                                  parts.push(`${t("reports.ai_chat_interest", language)}: ¥${fmtNum(amortSummary.totalInterest)}`);
-                                  parts.push(`${t("reports.ai_chat_depreciation", language)}: ¥${fmtNum(amortSummary.totalDepreciation)}`);
+                                  parts.push(`${t("reports.ai_chat_closing_liability", language)}: ${fmtMoney(amortSummary.closingLiability, amortSummary.currency)}`);
+                                  parts.push(`${t("reports.ai_chat_closing_rou", language)}: ${fmtMoney(amortSummary.closingROU, amortSummary.currency)}`);
+                                  parts.push(`${t("reports.ai_chat_interest", language)}: ${fmtMoney(amortSummary.totalInterest, amortSummary.currency)}`);
+                                  parts.push(`${t("reports.ai_chat_depreciation", language)}: ${fmtMoney(amortSummary.totalDepreciation, amortSummary.currency)}`);
                                 }
                                 const summary = parts.join('; ');
                                 let url = `/ai-chat?page=reports&title=${encodeURIComponent(t("reports.ai_chat_report_title", language))}&report_view=${amortView}&summary=${encodeURIComponent(summary)}`;

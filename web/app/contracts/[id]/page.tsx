@@ -34,6 +34,7 @@ import ProtectedRoute from "../../components/ProtectedRoute";
 import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
+import { fmtMoney } from "../../lib/format";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
 import { buildContractEditValues } from "./workspace/forms";
@@ -236,8 +237,7 @@ export default function ContractDetailPage() {
       title: t("contract.amount", language),
       dataIndex: "amount",
       width: 120,
-      render: (v: number, r: PaymentSchedule) =>
-        `¥${v.toLocaleString()}`,
+      render: (v: number, r: PaymentSchedule) => fmtMoney(v, r.currency || contract?.currency),
     },
     { title: t("contract.currency", language), dataIndex: "currency", width: 80 },
     {
@@ -289,61 +289,61 @@ export default function ContractDetailPage() {
     {
       title: t("contract.opening_liability", language),
       dataIndex: "OpeningLiability",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.interest_expense", language),
       dataIndex: "InterestExpense",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.payment", language),
       dataIndex: "TotalPayments",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.closing_liability", language),
       dataIndex: "ClosingLiability",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.opening_rou", language),
       dataIndex: "OpeningROUAsset",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.depreciation", language),
       dataIndex: "Depreciation",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.closing_rou", language),
       dataIndex: "ClosingROUAsset",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.variable_rent", language),
       dataIndex: "VariableRentExpense",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
     {
       title: "豁免费用",
       dataIndex: "ExemptLeaseExpense",
-      render: (v: number) => `¥${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v || 0, contract?.currency),
       align: "right" as const,
     },
     {
       title: t("contract.non_lease_expense", language),
       dataIndex: "NonLeaseExpense",
-      render: (v: number) => `¥${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      render: (v: number) => fmtMoney(v, contract?.currency),
       align: "right" as const,
     },
   ];
@@ -983,7 +983,7 @@ export default function ContractDetailPage() {
                                 title={t("contract.initial_liability", language)}
                                 value={calcResult.initial_liability}
                                 precision={2}
-                                prefix="¥"
+                                prefix={contract?.currency || ""}
                               />
                             </Card>
                           </Col>
@@ -993,7 +993,7 @@ export default function ContractDetailPage() {
                                 title={t("contract.initial_rou", language)}
                                 value={calcResult.initial_rou_asset}
                                 precision={2}
-                                prefix="¥"
+                                prefix={contract?.currency || ""}
                               />
                             </Card>
                           </Col>

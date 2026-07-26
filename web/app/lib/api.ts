@@ -200,6 +200,19 @@ export const contractApi = {
   getApprovalStatus: (id: string, token: string) =>
     apiRequest(`/api/v1/contracts/${id}/approval-status`, { token }),
     
+  // Turns a critical date into a decision: remaining commitment, what the
+  // landlord's asking uplift costs, and how the store is actually trading.
+  renewalCard: (
+    id: string,
+    params: { renewal_term_months?: number; uplift_percent?: number },
+    token: string
+  ) => {
+    const qs = new URLSearchParams();
+    if (params.renewal_term_months) qs.append("renewal_term_months", String(params.renewal_term_months));
+    if (params.uplift_percent != null) qs.append("uplift_percent", String(params.uplift_percent));
+    return apiRequest(`/api/v1/contracts/${id}/renewal-card?${qs.toString()}`, { token });
+  },
+
   getDiscountRateStatus: (id: string, token: string) =>
     apiRequest(`/api/v1/contracts/${id}/discount-rate-status`, { token }),
 };

@@ -35,6 +35,7 @@ import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
 import { fmtMoney } from "../../lib/format";
+import { RenewalCard } from "./RenewalCard";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
 import { buildContractEditValues } from "./workspace/forms";
@@ -709,6 +710,9 @@ export default function ContractDetailPage() {
                           pagination={{ pageSize: 8 }}
                           size="small"
                         />
+                        {/* A reminder that a lease expires is only half the job;
+                            the decision it triggers belongs next to it. */}
+                        <RenewalCard contractId={contractId} />
                       </Card>
                     ),
                   },

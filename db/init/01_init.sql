@@ -971,5 +971,19 @@ INSERT INTO system_settings (setting_key, setting_value, description)
 VALUES ('global_discount_rate', '0.05', '集团默认折现率（年化，小数）')
 ON CONFLICT (setting_key) DO NOTHING;
 
+-- ----------------------------------------------------------------------------
+-- 迁移 017:事件结构化条款参数
+-- 事件此前只能用 new_value 一个自由文本记录变更,系统读不懂 CPI、上下限、
+-- 阶梯这类条款,只能先手工改付款计划再录事件。revision_parameters 按出租方
+-- 通知书的原话保存条款,使修订付款流可以被推导出来。
+-- ----------------------------------------------------------------------------
+
+ALTER TABLE lease_events
+    ADD COLUMN IF NOT EXISTS revision_parameters JSONB;
+
+CREATE INDEX IF NOT EXISTS idx_lease_events_revision_parameters
+    ON lease_events USING GIN (revision_parameters)
+    WHERE revision_parameters IS NOT NULL;
+
 -- ============================================================================
 -- End of init script

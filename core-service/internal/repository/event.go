@@ -10,14 +10,18 @@ import (
 )
 
 type LeaseEvent struct {
-	ID                   string     `json:"id"`
-	ContractID           string     `json:"contract_id"`
-	EventType            string     `json:"event_type"`
-	EffectiveDate        time.Time  `json:"effective_date"`
-	ApplicationDate      *time.Time `json:"application_date"`
-	ApprovalDate         *time.Time `json:"approval_date"`
-	OriginalValue        *string    `json:"original_value"`
-	NewValue             *string    `json:"new_value"`
+	ID              string     `json:"id"`
+	ContractID      string     `json:"contract_id"`
+	EventType       string     `json:"event_type"`
+	EffectiveDate   time.Time  `json:"effective_date"`
+	ApplicationDate *time.Time `json:"application_date"`
+	ApprovalDate    *time.Time `json:"approval_date"`
+	OriginalValue   *string    `json:"original_value"`
+	NewValue        *string    `json:"new_value"`
+	// RevisionParameters carries the clause in structured form so the revised
+	// payment schedule can be derived. Events recorded before it existed leave
+	// it nil and keep calculating from NewValue exactly as they did.
+	RevisionParameters   []byte     `json:"revision_parameters,omitempty"`
 	ChangeReason         *string    `json:"change_reason"`
 	JudgmentBasis        *string    `json:"judgment_basis"`
 	Status               string     `json:"status"`
@@ -59,8 +63,8 @@ func (r *EventRepository) Create(ctx context.Context, event *LeaseEvent) (*Lease
 			judgment_basis, status, recalculation_batch_id,
 			created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, reviewed_by,
-			reviewed_at, rejected_reason
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+			reviewed_at, rejected_reason, revision_parameters
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
 	`
 
 	_, err := r.db.Exec(ctx, query,
@@ -70,7 +74,7 @@ func (r *EventRepository) Create(ctx context.Context, event *LeaseEvent) (*Lease
 		event.Status, event.RecalculationBatchID,
 		event.CreatedBy, event.ApprovedBy, event.CreatedAt, event.UpdatedAt,
 		event.ApprovalStatus, event.IsOfficialVersion, event.ReviewedBy,
-		event.ReviewedAt, event.RejectedReason,
+		event.ReviewedAt, event.RejectedReason, nullableJSON(event.RevisionParameters),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create event: %w", err)
@@ -86,7 +90,7 @@ func (r *EventRepository) GetByContractID(ctx context.Context, contractID string
 			judgment_basis, status, recalculation_batch_id,
 			created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, reviewed_by,
-			reviewed_at, rejected_reason
+			reviewed_at, rejected_reason, revision_parameters
 		FROM lease_events WHERE contract_id = $1 ORDER BY created_at DESC
 	`
 
@@ -106,7 +110,7 @@ func (r *EventRepository) GetByContractID(ctx context.Context, contractID string
 			&e.Status, &e.RecalculationBatchID,
 			&e.CreatedBy, &e.ApprovedBy, &e.CreatedAt, &e.UpdatedAt,
 			&e.ApprovalStatus, &e.IsOfficialVersion, &e.ReviewedBy,
-			&e.ReviewedAt, &e.RejectedReason,
+			&e.ReviewedAt, &e.RejectedReason, &e.RevisionParameters,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
@@ -124,7 +128,7 @@ func (r *EventRepository) GetByID(ctx context.Context, id string) (*LeaseEvent, 
 			judgment_basis, status, recalculation_batch_id,
 			created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, reviewed_by,
-			reviewed_at, rejected_reason
+			reviewed_at, rejected_reason, revision_parameters
 		FROM lease_events WHERE id = $1
 	`
 
@@ -136,7 +140,7 @@ func (r *EventRepository) GetByID(ctx context.Context, id string) (*LeaseEvent, 
 		&e.Status, &e.RecalculationBatchID,
 		&e.CreatedBy, &e.ApprovedBy, &e.CreatedAt, &e.UpdatedAt,
 		&e.ApprovalStatus, &e.IsOfficialVersion, &e.ReviewedBy,
-		&e.ReviewedAt, &e.RejectedReason,
+		&e.ReviewedAt, &e.RejectedReason, &e.RevisionParameters,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -214,7 +218,7 @@ func (r *EventRepository) GetApprovedEventsForContract(ctx context.Context, cont
 			judgment_basis, status, recalculation_batch_id,
 			created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, reviewed_by,
-			reviewed_at, rejected_reason
+			reviewed_at, rejected_reason, revision_parameters
 		FROM lease_events
 		WHERE contract_id = $1 AND approval_status = 'approved'
 		ORDER BY effective_date ASC
@@ -236,7 +240,7 @@ func (r *EventRepository) GetApprovedEventsForContract(ctx context.Context, cont
 			&e.Status, &e.RecalculationBatchID,
 			&e.CreatedBy, &e.ApprovedBy, &e.CreatedAt, &e.UpdatedAt,
 			&e.ApprovalStatus, &e.IsOfficialVersion, &e.ReviewedBy,
-			&e.ReviewedAt, &e.RejectedReason,
+			&e.ReviewedAt, &e.RejectedReason, &e.RevisionParameters,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan event: %w", err)
@@ -274,4 +278,13 @@ func (r *EventRepository) Reject(ctx context.Context, eventID, userID, reason st
 	`
 	result, err := r.db.Exec(ctx, query, eventID, userID, reason, now)
 	return requireWorkflowTransition(result, err, "event", eventID)
+}
+
+// nullableJSON keeps an absent clause out of the column entirely. Writing an
+// empty byte slice would store an invalid JSON document and fail the insert.
+func nullableJSON(raw []byte) interface{} {
+	if len(raw) == 0 {
+		return nil
+	}
+	return raw
 }

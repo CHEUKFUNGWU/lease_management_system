@@ -2,6 +2,7 @@ package repository_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -134,6 +135,57 @@ func TestSchemaSmoke_ContractWritePaths(t *testing.T) {
 	}
 	if total < 1 || len(listed) == 0 {
 		t.Errorf("paged list returned %d rows of %d total", len(listed), total)
+	}
+}
+
+// TestSchemaSmoke_EventRevisionParameters covers the JSONB clause round-trip.
+// A column the code writes but the schema lacks is exactly the defect this suite
+// exists for, and a JSONB column adds a second way to fail: writing an empty
+// value where the type demands a valid document.
+func TestSchemaSmoke_EventRevisionParameters(t *testing.T) {
+	pool := smokePool(t)
+	ctx := context.Background()
+
+	created := seedContract(t, ctx, pool)
+	events := repository.NewEventRepository(pool)
+
+	clause := []byte(`{"kind":"index","base_index":102.4,"new_index":105.1,"cap_percentage":2}`)
+	withClause, err := events.Create(ctx, &repository.LeaseEvent{
+		ContractID:         created.ID,
+		EventType:          "index_update",
+		EffectiveDate:      time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
+		RevisionParameters: clause,
+	})
+	if err != nil {
+		t.Fatalf("create event with clause: %v", err)
+	}
+
+	// An event without a clause must still insert: nil, not an empty document.
+	if _, err := events.Create(ctx, &repository.LeaseEvent{
+		ContractID:    created.ID,
+		EventType:     "rent_change",
+		EffectiveDate: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatalf("create event without clause: %v", err)
+	}
+
+	readBack, err := events.GetByID(ctx, withClause.ID)
+	if err != nil || readBack == nil {
+		t.Fatalf("read event back: %v", err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(readBack.RevisionParameters, &decoded); err != nil {
+		t.Fatalf("stored clause is not valid JSON: %v", err)
+	}
+	if decoded["kind"] != "index" || decoded["cap_percentage"] != 2.0 {
+		t.Errorf("clause did not round-trip: %v", decoded)
+	}
+
+	if _, err := events.GetByContractID(ctx, created.ID); err != nil {
+		t.Fatalf("list events by contract: %v", err)
+	}
+	if _, err := events.GetApprovedEventsForContract(ctx, created.ID); err != nil {
+		t.Fatalf("list approved events: %v", err)
 	}
 }
 

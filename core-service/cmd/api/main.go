@@ -68,6 +68,7 @@ func main() {
 	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
 	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
 	dealCompareHandler := handlers.NewDealCompareHandler()
+	preDealHandler := handlers.NewPreDealHandler()
 	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo, masterDataRepo)
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, eventPersistence, auditLogger)
 	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, auditLogger)
@@ -205,6 +206,7 @@ func main() {
 		// with the request. It sits behind report permission because it is an
 		// analysis tool, not because it touches report data.
 		protected.Handle(http.MethodPost, "/deals/compare", permission("reports", "read"), dealCompareHandler.Compare)
+		protected.Handle(http.MethodPost, "/deals/briefing", permission("reports", "read"), preDealHandler.Briefing)
 		protected.Handle(http.MethodGet, "/reports/standard-comparison", permission("reports", "read"), reportHandler.StandardComparison)
 		protected.Handle(http.MethodGet, "/reports/amortization", permission("reports", "read"), reportHandler.Amortization)
 		protected.Handle(http.MethodGet, "/reports/tags", permission("reports", "read"), reportHandler.Tags)

@@ -669,6 +669,18 @@ export const reportApi = {
     return apiRequest(`/api/v1/reports/disclosure?${qs.toString()}`, { token });
   },
 
+  // Projects portfolio outflow under an estates plan. The baseline is always
+  // run alongside, because a scenario means nothing without what it moved from.
+  cashflowScenario: (
+    data: { as_of?: string; horizon_months?: number; scenarios: Record<string, unknown>[] },
+    token: string
+  ) =>
+    apiRequest(`/api/v1/reports/cashflow-scenario`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
   cashflowForecast: (params: {
     mode: "working" | "official";
     view: "contract" | "store" | "summary";

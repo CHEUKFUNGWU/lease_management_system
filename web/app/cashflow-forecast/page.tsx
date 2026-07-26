@@ -11,6 +11,7 @@ import {
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { ScenarioPanel } from "./ScenarioPanel";
 import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -453,6 +454,8 @@ export default function CashflowForecastPage() {
             />
           </Spin>
         </Card>
+
+        <ScenarioPanel token={token} />
       </AppLayout>
     </ProtectedRoute>
   );

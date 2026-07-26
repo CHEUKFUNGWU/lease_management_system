@@ -11,6 +11,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/audit"
 	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
+	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
 type EventHandler struct {
@@ -49,18 +50,18 @@ type CreateEventRequest struct {
 	JudgmentBasis string  `json:"judgment_basis"`
 	// RevisionParameters states the rent clause as the landlord's notice puts
 	// it, so the revised payment schedule is derived rather than retyped.
-	RevisionParameters *eventaccounting.PaymentRevision `json:"revision_parameters"`
+	RevisionParameters *ifrs16.PaymentRevision `json:"revision_parameters"`
 }
 
 // encodeRevision validates the clause before it is stored. A clause that cannot
 // produce a schedule is rejected at the door rather than at month end.
-func encodeRevision(revision *eventaccounting.PaymentRevision) ([]byte, error) {
+func encodeRevision(revision *ifrs16.PaymentRevision) ([]byte, error) {
 	if revision == nil {
 		return nil, nil
 	}
 	// Deriving against an empty schedule exercises every validation the clause
 	// itself can fail, without needing the contract's payments.
-	if _, err := eventaccounting.DeriveRevisedPayments(nil, *revision, time.Time{}); err != nil {
+	if _, err := ifrs16.DeriveRevisedPayments(nil, *revision, time.Time{}); err != nil {
 		return nil, err
 	}
 	return json.Marshal(revision)
@@ -68,11 +69,11 @@ func encodeRevision(revision *eventaccounting.PaymentRevision) ([]byte, error) {
 
 // decodeRevision reads a stored clause back. An event recorded before clauses
 // existed has none, and must keep calculating from its free-text value.
-func decodeRevision(raw []byte) (*eventaccounting.PaymentRevision, error) {
+func decodeRevision(raw []byte) (*ifrs16.PaymentRevision, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
-	revision := &eventaccounting.PaymentRevision{}
+	revision := &ifrs16.PaymentRevision{}
 	if err := json.Unmarshal(raw, revision); err != nil {
 		return nil, err
 	}
@@ -420,8 +421,8 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 // PreviewEventAdjustment performs calculation without persisting.
 // POST /contracts/:id/events/:eventId/preview
 type PreviewPaymentsRequest struct {
-	EffectiveDate      string                          `json:"effective_date" binding:"required"`
-	RevisionParameters eventaccounting.PaymentRevision `json:"revision_parameters" binding:"required"`
+	EffectiveDate      string                 `json:"effective_date" binding:"required"`
+	RevisionParameters ifrs16.PaymentRevision `json:"revision_parameters" binding:"required"`
 }
 
 // PreviewRevisedPayments derives the payment schedule a clause implies, without
@@ -461,7 +462,7 @@ func (h *EventHandler) PreviewRevisedPayments(c *gin.Context) {
 		return
 	}
 
-	draft, err := eventaccounting.DeriveRevisedPayments(
+	draft, err := ifrs16.DeriveRevisedPayments(
 		repository.ToIFRS16Payments(schedules), req.RevisionParameters, effectiveDate)
 	if err != nil {
 		// The clause itself does not work; this is the caller's mistake to fix,

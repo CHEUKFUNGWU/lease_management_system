@@ -27,7 +27,7 @@ type Input struct {
 	// CPI indexation or a stepped ladder can be expressed. When absent the
 	// engine falls back to NewValue, so events recorded before clauses existed
 	// keep calculating exactly as they did.
-	Revision     *PaymentRevision
+	Revision     *ifrs16.PaymentRevision
 	Currency     string
 	DiscountRate float64
 	Payments     []ifrs16.LeasePayment
@@ -159,7 +159,7 @@ func paymentsForEvent(input Input, leaseEndDate time.Time) ([]ifrs16.LeasePaymen
 	// the landlord's notice said, and it applies to any event type rather than
 	// only to rent_change.
 	if input.Revision != nil {
-		schedule, err := DeriveRevisedPayments(payments, *input.Revision, input.EffectiveDate)
+		schedule, err := ifrs16.DeriveRevisedPayments(payments, *input.Revision, input.EffectiveDate)
 		if err != nil {
 			return nil, err
 		}

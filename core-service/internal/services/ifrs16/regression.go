@@ -42,6 +42,24 @@ type RegressionInput struct {
 	// ForeignCurrency is set only by multi-currency cases. When present the
 	// runner also checks the IAS 21 remeasurement of the lease liability.
 	ForeignCurrency *RegressionForeignCurrency `json:"foreign_currency,omitempty"`
+
+	// Remeasurement is set only by cases that test a mid-term change. When
+	// present the runner derives the revised payments from the stated clause
+	// and remeasures, so the case covers the whole chain a rent review actually
+	// travels: clause as written → revised schedule → remeasured amounts.
+	Remeasurement *RegressionRemeasurement `json:"remeasurement,omitempty"`
+}
+
+// RegressionRemeasurement describes a change to a running lease.
+type RegressionRemeasurement struct {
+	EffectiveDate string `json:"effective_date"`
+	// RevisedLeaseEndDate shortens or extends the term. Empty leaves it alone.
+	RevisedLeaseEndDate string `json:"revised_lease_end_date,omitempty"`
+	// RevisedDiscountRate is used when the change is a rate reassessment. Zero
+	// keeps the original rate.
+	RevisedDiscountRate float64 `json:"revised_discount_rate,omitempty"`
+	// Clause is the rent term as the landlord's notice states it.
+	Clause *PaymentRevision `json:"clause,omitempty"`
 }
 
 // RegressionForeignCurrency describes a lease denominated in a currency other
@@ -73,6 +91,26 @@ type RegressionExpected struct {
 	// loss. That the right-of-use asset is *not* retranslated is asserted the
 	// ordinary way, through Monthly.ClosingROUAsset in the contract currency.
 	ExchangeDifference *float64 `json:"exchange_difference,omitempty"`
+
+	// Remeasured holds what the change in Input.Remeasurement should produce.
+	Remeasured *RegressionRemeasured `json:"remeasured,omitempty"`
+}
+
+// RegressionRemeasured is the expected outcome of a mid-term change.
+type RegressionRemeasured struct {
+	// RevisedPaymentTotal is the sum of the payments still outstanding after
+	// the clause is applied. It pins the derivation itself, so a case that
+	// fails tells you whether the schedule or the measurement was wrong.
+	RevisedPaymentTotal *float64 `json:"revised_payment_total,omitempty"`
+	ChangedPaymentCount *int     `json:"changed_payment_count,omitempty"`
+	AppliedFactor       *float64 `json:"applied_factor,omitempty"`
+
+	LiabilityBefore *float64 `json:"liability_before,omitempty"`
+	LiabilityAfter  *float64 `json:"liability_after,omitempty"`
+	ROUBefore       *float64 `json:"rou_before,omitempty"`
+	ROUAfter        *float64 `json:"rou_after,omitempty"`
+	PnLGain         *float64 `json:"pnl_gain,omitempty"`
+	PnLLoss         *float64 `json:"pnl_loss,omitempty"`
 }
 
 type RegressionMonthlyExpected struct {
@@ -169,19 +207,26 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 	}
 	caseRun.Result = result
 
-	addAssert := func(name string, expected, actual float64) {
+	// The suite tolerance is a money tolerance — one unit of currency. A
+	// dimensionless quantity such as an index factor needs its own, or a
+	// difference that matters would sit far inside the allowance and the
+	// assertion could never fail.
+	addAssertWithin := func(name string, expected, actual, allowed float64) {
 		assertion := RegressionAssert{
 			Name:      name,
 			Expected:  expected,
 			Actual:    actual,
-			Delta:     round(math.Abs(actual - expected)),
-			Tolerance: tolerance,
+			Delta:     math.Abs(actual - expected),
+			Tolerance: allowed,
 		}
-		assertion.Passed = assertion.Delta <= tolerance
+		assertion.Passed = assertion.Delta <= allowed
 		if !assertion.Passed {
 			caseRun.Passed = false
 		}
 		caseRun.Assertions = append(caseRun.Assertions, assertion)
+	}
+	addAssert := func(name string, expected, actual float64) {
+		addAssertWithin(name, expected, round(actual), tolerance)
 	}
 
 	if tc.Expected.InitialLiability != nil {
@@ -277,12 +322,122 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 		}
 	}
 
+	// Mid-term change cases walk the whole chain: the clause as written, the
+	// schedule it derives, and the amounts that schedule remeasures to.
+	if change := tc.Input.Remeasurement; change != nil && tc.Expected.Remeasured != nil {
+		if err := assertRemeasurement(&caseRun, input, *change, *tc.Expected.Remeasured, addAssert, addAssertWithin); err != nil {
+			caseRun.Passed = false
+			caseRun.Error = err.Error()
+		}
+	}
+
 	if len(caseRun.Assertions) == 0 {
 		caseRun.Passed = false
 		caseRun.Error = "regression case has no expected assertions"
 	}
 
 	return caseRun
+}
+
+// assertRemeasurement applies a mid-term change to the case's lease and checks
+// what it produced.
+func assertRemeasurement(
+	caseRun *RegressionCaseRun,
+	original LeaseCalculation,
+	change RegressionRemeasurement,
+	expected RegressionRemeasured,
+	addAssert func(name string, expected, actual float64),
+	addAssertWithin func(name string, expected, actual, allowed float64),
+) error {
+	effectiveDate, err := parseRegressionDate(change.EffectiveDate)
+	if err != nil {
+		return fmt.Errorf("invalid remeasurement effective_date: %w", err)
+	}
+
+	leaseEndDate := original.LeaseEndDate
+	if change.RevisedLeaseEndDate != "" {
+		leaseEndDate, err = parseRegressionDate(change.RevisedLeaseEndDate)
+		if err != nil {
+			return fmt.Errorf("invalid revised_lease_end_date: %w", err)
+		}
+	}
+	discountRate := original.DiscountRate
+	if change.RevisedDiscountRate > 0 {
+		discountRate = change.RevisedDiscountRate
+	}
+
+	liabilityBefore, rouBefore, err := GetCarryingAmount(original, effectiveDate)
+	if err != nil {
+		return fmt.Errorf("carrying amount at the effective date: %w", err)
+	}
+	// Only stated expectations are asserted. Comparing an actual against itself
+	// always passes and would report confidence the case has not earned.
+	if expected.LiabilityBefore != nil {
+		addAssert("remeasured.liability_before", *expected.LiabilityBefore, liabilityBefore)
+	}
+	if expected.ROUBefore != nil {
+		addAssert("remeasured.rou_before", *expected.ROUBefore, rouBefore)
+	}
+
+	revisedPayments := original.Payments
+	if change.Clause != nil {
+		draft, err := DeriveRevisedPayments(original.Payments, *change.Clause, effectiveDate)
+		if err != nil {
+			return fmt.Errorf("derive revised payments: %w", err)
+		}
+		revisedPayments = draft.Payments()
+
+		if expected.AppliedFactor != nil {
+			// A factor is a ratio, not an amount: the fourth decimal place is
+			// the difference between a capped and an uncapped review.
+			addAssertWithin("remeasured.applied_factor", *expected.AppliedFactor, draft.AppliedFactor, 0.00005)
+		}
+		if expected.ChangedPaymentCount != nil {
+			// A count is exact. Under the money tolerance of one unit, "12
+			// payments changed" and "11 payments changed" would both pass.
+			addAssertWithin("remeasured.changed_payment_count",
+				float64(*expected.ChangedPaymentCount), float64(draft.ChangedCount), 0)
+		}
+		if expected.RevisedPaymentTotal != nil {
+			addAssert("remeasured.revised_payment_total", *expected.RevisedPaymentTotal, draft.RevisedTotal)
+		}
+	}
+
+	// A shortened term is a scope decrease, which is the only path that can
+	// produce a gain or a loss.
+	var scopeDecrease float64
+	if leaseEndDate.Before(original.LeaseEndDate) {
+		remaining := original.LeaseEndDate.Sub(effectiveDate).Hours()
+		if remaining > 0 {
+			revisedRemaining := math.Max(leaseEndDate.Sub(effectiveDate).Hours(), 0)
+			scopeDecrease = (remaining - revisedRemaining) / remaining
+		}
+	}
+
+	output, err := RecalculateFromDate(liabilityBefore, rouBefore, RemeasurementInput{
+		EffectiveDate:           effectiveDate,
+		LeaseEndDate:            leaseEndDate,
+		RevisedDiscountRate:     discountRate,
+		RevisedPayments:         revisedPayments,
+		ScopeDecreaseProportion: scopeDecrease,
+	})
+	if err != nil {
+		return fmt.Errorf("remeasure: %w", err)
+	}
+
+	if expected.LiabilityAfter != nil {
+		addAssert("remeasured.liability_after", *expected.LiabilityAfter, output.NewLiability)
+	}
+	if expected.ROUAfter != nil {
+		addAssert("remeasured.rou_after", *expected.ROUAfter, output.NewROU)
+	}
+	if expected.PnLGain != nil {
+		addAssert("remeasured.pnl_gain", *expected.PnLGain, output.PnLGain)
+	}
+	if expected.PnLLoss != nil {
+		addAssert("remeasured.pnl_loss", *expected.PnLLoss, output.PnLLoss)
+	}
+	return nil
 }
 
 func (input RegressionInput) toCalculation() (LeaseCalculation, error) {

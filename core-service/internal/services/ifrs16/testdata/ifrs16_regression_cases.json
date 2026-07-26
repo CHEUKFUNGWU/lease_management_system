@@ -1131,6 +1131,184 @@
       }
     },
     {
+      "id": "TC-23",
+      "title": "参数化重计量：CPI 调租触发封顶",
+      "scenario": "两年期零售租约，月付固定租金 10,000，年利率 5%。第二年起按 CPI 条款调租：指数由 102.4 升至 105.1，涨幅 2.6367%，但租约约定封顶 2%，故实际按 2% 执行。本用例覆盖整条链路：条款原文 → 推导出的修订付款流 → 重计量结果。单独固定 revised_payment_total，使失败时能区分是付款流推导错了还是计量错了；applied_factor 按 0.00005 的独立容差断言——它是比率不是金额，若沿用一元的金额容差，封顶与不封顶的差异会落在容差内，断言将永远无法失败。调租不属于范围减少，故不进损益。",
+      "ifrs16_reference": "IFRS 16.42(b), 16.43, 16.45-46(b)",
+      "review_status": "pending_third_party_review",
+      "input": {
+        "commencement_date": "2026-01-01",
+        "lease_end_date": "2028-01-01",
+        "discount_rate": 0.05,
+        "payments": [
+          {
+            "date": "2026-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-02-28",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-04-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-05-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-06-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-07-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-08-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-09-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-10-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-11-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2026-12-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-01-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-02-28",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-03-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-04-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-05-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-06-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-07-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-08-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-09-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-10-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-11-30",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          },
+          {
+            "date": "2027-12-31",
+            "amount": 10000,
+            "timing": "postpaid",
+            "type": "fixed"
+          }
+        ],
+        "remeasurement": {
+          "effective_date": "2027-01-01",
+          "clause": {
+            "kind": "index",
+            "base_index": 102.4,
+            "new_index": 105.1,
+            "cap_percentage": 2
+          }
+        }
+      },
+      "expected": {
+        "initial_liability": 228252.35,
+        "remeasured": {
+          "applied_factor": 1.02,
+          "changed_payment_count": 12,
+          "revised_payment_total": 122400.0,
+          "liability_after": 119247.93,
+          "pnl_gain": 0,
+          "pnl_loss": 0
+        }
+      }
+    },
+    {
       "id": "TC-24",
       "title": "期末 rounding 清零",
       "scenario": "高折现率短租产生 rounding dust，验证最后一日负债和 ROU 强制归零。",

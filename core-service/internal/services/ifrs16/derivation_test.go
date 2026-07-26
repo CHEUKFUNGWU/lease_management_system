@@ -1,11 +1,9 @@
-package eventaccounting
+package ifrs16
 
 import (
 	"math"
 	"testing"
 	"time"
-
-	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
 func day(value string) time.Time {
@@ -19,12 +17,12 @@ func day(value string) time.Time {
 // monthlySchedule builds level rent falling on each month end, starting with
 // the month of start. Month ends are computed from the first of the following
 // month so that adding months never drifts the way "31 January + 1 month" does.
-func monthlySchedule(start time.Time, months int, amount float64) []ifrs16.LeasePayment {
+func monthlySchedule(start time.Time, months int, amount float64) []LeasePayment {
 	firstOfMonth := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, start.Location())
-	payments := make([]ifrs16.LeasePayment, 0, months)
+	payments := make([]LeasePayment, 0, months)
 	for i := 0; i < months; i++ {
 		monthEnd := firstOfMonth.AddDate(0, i+1, 0).AddDate(0, 0, -1)
-		payments = append(payments, ifrs16.LeasePayment{
+		payments = append(payments, LeasePayment{
 			Date:   monthEnd,
 			Amount: amount,
 			Timing: "postpaid",
@@ -93,8 +91,8 @@ func TestDerive_IndexClauseUsesTheRatioOfReadings(t *testing.T) {
 
 	want := 10000 * (105.1 / 102.4)
 	got := amountsOn(t, schedule, "2026-01-31")[0]
-	if math.Abs(got-round2(want)) > 0.01 {
-		t.Errorf("indexed payment: want %.2f, got %.2f", round2(want), got)
+	if math.Abs(got-round(want)) > 0.01 {
+		t.Errorf("indexed payment: want %.2f, got %.2f", round(want), got)
 	}
 	if schedule.CapApplied || schedule.FloorApplied {
 		t.Error("no cap or floor was stated, so neither should be reported as applied")
@@ -177,7 +175,7 @@ func TestDerive_SteppedLadderTakesTheRungInForce(t *testing.T) {
 
 func TestDerive_LeavesVariableAndServiceChargesAlone(t *testing.T) {
 	base := day("2026-06-30")
-	original := []ifrs16.LeasePayment{
+	original := []LeasePayment{
 		{Date: base, Amount: 10000, Timing: "postpaid", Type: "fixed"},
 		{Date: base, Amount: 3000, Timing: "postpaid", Type: "variable"},
 		{Date: base, Amount: 1500, Timing: "postpaid", Type: "non_lease"},

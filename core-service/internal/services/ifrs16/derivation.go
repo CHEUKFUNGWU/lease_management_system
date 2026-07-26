@@ -1,12 +1,10 @@
-package eventaccounting
+package ifrs16
 
 import (
 	"fmt"
 	"math"
 	"sort"
 	"time"
-
-	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
 // A lease event used to say only what the new rent was, as a single free-text
@@ -21,6 +19,10 @@ import (
 // derives the revised payment schedule from them. The derivation is a pure
 // function of the original schedule and the stated terms, so the draft can be
 // shown for confirmation before anything is written.
+
+// materialityRounding is the cent at which a restated payment counts as having
+// moved. Below it the difference is rounding, not a change in the rent.
+const materialityRounding = 0.01
 
 // Revision kinds. Each names how future payments are restated.
 const (
@@ -110,10 +112,10 @@ type RevisedSchedule struct {
 }
 
 // Payments returns the revised schedule as the measurement engine consumes it.
-func (s RevisedSchedule) Payments() []ifrs16.LeasePayment {
-	payments := make([]ifrs16.LeasePayment, 0, len(s.Changes))
+func (s RevisedSchedule) Payments() []LeasePayment {
+	payments := make([]LeasePayment, 0, len(s.Changes))
 	for _, change := range s.Changes {
-		payments = append(payments, ifrs16.LeasePayment{
+		payments = append(payments, LeasePayment{
 			Date:   change.Date,
 			Amount: change.RevisedAmount,
 			Timing: change.Timing,
@@ -127,13 +129,13 @@ func (s RevisedSchedule) Payments() []ifrs16.LeasePayment {
 // non-lease components are excluded: an escalation clause restates the rent, not
 // the turnover rent or the service charge, and quietly inflating those would
 // overstate the liability.
-func revisable(payment ifrs16.LeasePayment) bool {
+func revisable(payment LeasePayment) bool {
 	return payment.Type != "variable" && payment.Type != "non_lease"
 }
 
 // DeriveRevisedPayments produces the revised payment draft from the original
 // schedule and the stated terms.
-func DeriveRevisedPayments(original []ifrs16.LeasePayment, revision PaymentRevision, effectiveDate time.Time) (RevisedSchedule, error) {
+func DeriveRevisedPayments(original []LeasePayment, revision PaymentRevision, effectiveDate time.Time) (RevisedSchedule, error) {
 	from := revision.AppliesFrom
 	if from.IsZero() {
 		from = effectiveDate
@@ -175,9 +177,9 @@ func DeriveRevisedPayments(original []ifrs16.LeasePayment, revision PaymentRevis
 			if err != nil {
 				return RevisedSchedule{}, err
 			}
-			change.RevisedAmount = round2(revised)
-			change.Delta = round2(change.RevisedAmount - change.OriginalAmount)
-			change.Changed = math.Abs(change.Delta) > materialityThreshold
+			change.RevisedAmount = round(revised)
+			change.Delta = round(change.RevisedAmount - change.OriginalAmount)
+			change.Changed = math.Abs(change.Delta) > materialityRounding
 		}
 
 		if !payment.Date.Before(from) {
@@ -190,14 +192,14 @@ func DeriveRevisedPayments(original []ifrs16.LeasePayment, revision PaymentRevis
 		schedule.Changes = append(schedule.Changes, change)
 	}
 
-	schedule.OriginalTotal = round2(schedule.OriginalTotal)
-	schedule.RevisedTotal = round2(schedule.RevisedTotal)
-	schedule.Delta = round2(schedule.RevisedTotal - schedule.OriginalTotal)
+	schedule.OriginalTotal = round(schedule.OriginalTotal)
+	schedule.RevisedTotal = round(schedule.RevisedTotal)
+	schedule.Delta = round(schedule.RevisedTotal - schedule.OriginalTotal)
 	return schedule, nil
 }
 
 // reviseAmount restates one payment under the stated terms.
-func reviseAmount(payment ifrs16.LeasePayment, revision PaymentRevision, factor float64, steps []StepChange) (float64, error) {
+func reviseAmount(payment LeasePayment, revision PaymentRevision, factor float64, steps []StepChange) (float64, error) {
 	switch revision.Kind {
 	case RevisionSetAmount:
 		return revision.Amount, nil
@@ -282,8 +284,4 @@ func sortedSteps(revision PaymentRevision) ([]StepChange, error) {
 	}
 	sort.Slice(steps, func(i, j int) bool { return steps[i].FromDate.Before(steps[j].FromDate) })
 	return steps, nil
-}
-
-func round2(value float64) float64 {
-	return math.Round(value*100) / 100
 }

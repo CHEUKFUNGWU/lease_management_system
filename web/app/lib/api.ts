@@ -229,6 +229,15 @@ export const dealApi = {
       body: JSON.stringify(data),
       token,
     }),
+
+  // Prices a lease before it exists. The terms travel with the request, so
+  // nothing is read from or written to the ledger.
+  briefing: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/deals/briefing`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
 };
 
 // Store revenue and the rent-to-sales it makes possible. The system is only

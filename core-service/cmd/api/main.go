@@ -66,6 +66,7 @@ func main() {
 	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo, systemSettingRepo)
 	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
 	psHandler := handlers.NewPaymentScheduleHandler(psRepo, contractRepo)
+	dealCompareHandler := handlers.NewDealCompareHandler()
 	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo, masterDataRepo)
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, eventPersistence, auditLogger)
 	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, auditLogger)
@@ -190,6 +191,11 @@ func main() {
 		protected.Handle(http.MethodGet, "/reports/contract-summary", permission("reports", "read"), reportHandler.ContractSummary)
 		protected.Handle(http.MethodGet, "/reports/portfolio-summary", permission("reports", "read"), reportHandler.PortfolioSummary)
 		protected.Handle(http.MethodGet, "/reports/sensitivity", permission("reports", "read"), reportHandler.SensitivityAnalysis)
+
+		// Offer comparison reads nothing and writes nothing: the terms come in
+		// with the request. It sits behind report permission because it is an
+		// analysis tool, not because it touches report data.
+		protected.Handle(http.MethodPost, "/deals/compare", permission("reports", "read"), dealCompareHandler.Compare)
 		protected.Handle(http.MethodGet, "/reports/standard-comparison", permission("reports", "read"), reportHandler.StandardComparison)
 		protected.Handle(http.MethodGet, "/reports/amortization", permission("reports", "read"), reportHandler.Amortization)
 		protected.Handle(http.MethodGet, "/reports/tags", permission("reports", "read"), reportHandler.Tags)

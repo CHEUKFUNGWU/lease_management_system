@@ -20,6 +20,7 @@ import {
   MenuUnfoldOutlined,
   DollarOutlined,
   PieChartOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,6 +45,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     reports: t("nav.reports", language as any),
     portfolio: "组合分析",
     sensitivity: "敏感性分析",
+    "deal-compare": "条款比价",
     standards: "多准则对比",
     "cashflow-forecast": t("nav.cashflow", language as any),
     "monthly-closing": t("nav.monthly_closing", language as any),
@@ -90,6 +92,11 @@ function useMenuItems(language: string) {
         key: "/portfolio",
         icon: <PieChartOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/portfolio">组合分析</Link>,
+      },
+      {
+        key: "/deal-compare",
+        icon: <SwapOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/deal-compare">条款比价</Link>,
       },
       {
         key: "/sensitivity",

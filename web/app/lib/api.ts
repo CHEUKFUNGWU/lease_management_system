@@ -217,6 +217,20 @@ export const paymentScheduleApi = {
     apiRequest(`/api/v1/contracts/${contractId}/payment-schedules`, { token }),
 };
 
+// Deal comparison. The offers are hypothetical terms, not stored contracts, so
+// nothing is read from or written to the ledger.
+export const dealApi = {
+  compare: (
+    data: { discount_rate: number; currency?: string; offers: Record<string, unknown>[] },
+    token: string
+  ) =>
+    apiRequest(`/api/v1/deals/compare`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
 // Event APIs
 export const eventApi = {
   create: (contractId: string, data: any, token: string) =>

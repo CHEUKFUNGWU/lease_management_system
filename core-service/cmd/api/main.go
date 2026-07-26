@@ -52,6 +52,7 @@ func main() {
 	exchangeRateRepo := repository.NewExchangeRateRepository(database.Pool)
 	workQueueRepo := repository.NewWorkQueueRepository(database.Pool)
 	budgetRepo := repository.NewBudgetRepository(database.Pool)
+	storeMetricsRepo := repository.NewStoreMetricsRepository(database.Pool)
 
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
@@ -78,6 +79,7 @@ func main() {
 	exchangeRateHandler := handlers.NewExchangeRateHandler(exchangeRateRepo, auditLogger)
 	workQueueHandler := handlers.NewWorkQueueHandler(workQueueRepo)
 	budgetHandler := handlers.NewBudgetHandler(budgetRepo, contractRepo, psRepo, systemSettingRepo)
+	storeMetricsHandler := handlers.NewStoreMetricsHandler(storeMetricsRepo, auditLogger)
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -191,6 +193,13 @@ func main() {
 		protected.Handle(http.MethodGet, "/reports/contract-summary", permission("reports", "read"), reportHandler.ContractSummary)
 		protected.Handle(http.MethodGet, "/reports/portfolio-summary", permission("reports", "read"), reportHandler.PortfolioSummary)
 		protected.Handle(http.MethodGet, "/reports/sensitivity", permission("reports", "read"), reportHandler.SensitivityAnalysis)
+
+		// Store revenue is commercially sensitive, so writing it needs master
+		// data rights rather than report rights, and every read goes through
+		// the caller's brand and region slice.
+		protected.Handle(http.MethodPost, "/store-metrics", permission("master_data", "manage"), storeMetricsHandler.Upsert)
+		protected.Handle(http.MethodGet, "/store-metrics", permission("reports", "read"), storeMetricsHandler.List)
+		protected.Handle(http.MethodGet, "/reports/rent-to-sales", permission("reports", "read"), storeMetricsHandler.RentToSales)
 
 		// Offer comparison reads nothing and writes nothing: the terms come in
 		// with the request. It sits behind report permission because it is an

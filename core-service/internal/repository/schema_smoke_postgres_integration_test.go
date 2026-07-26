@@ -100,8 +100,17 @@ func seedContract(t *testing.T, ctx context.Context, pool *pgxpool.Pool) *reposi
 	if err != nil {
 		t.Fatalf("create contract: %v", err)
 	}
+	// Everything seeded here is removed, not just the contract. These tests run
+	// against a real database — during development that is the developer's own
+	// database — and leaving master data behind pollutes every store-level
+	// report with rows nobody created.
 	t.Cleanup(func() {
-		_, _ = pool.Exec(context.Background(), `DELETE FROM lease_contracts WHERE id = $1`, created.ID)
+		background := context.Background()
+		_, _ = pool.Exec(background, `DELETE FROM lease_events WHERE contract_id = $1`, created.ID)
+		_, _ = pool.Exec(background, `DELETE FROM lease_contracts WHERE id = $1`, created.ID)
+		_, _ = pool.Exec(background, `DELETE FROM stores WHERE id = $1`, storeID)
+		_, _ = pool.Exec(background, `DELETE FROM landlords WHERE id = $1`, landlordID)
+		_, _ = pool.Exec(background, `DELETE FROM legal_entities WHERE id = $1`, legalEntityID)
 	})
 	return created
 }

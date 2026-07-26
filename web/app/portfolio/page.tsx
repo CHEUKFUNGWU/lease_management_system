@@ -7,6 +7,7 @@ import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
+import { RentToSalesPanel } from "./RentToSalesPanel";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 
@@ -288,6 +289,8 @@ export default function PortfolioPage() {
                 ]}
               />
             </Card>
+
+            <RentToSalesPanel token={token} />
 
             <Card title="组合明细">
               <Table

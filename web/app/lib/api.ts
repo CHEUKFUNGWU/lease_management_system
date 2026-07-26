@@ -231,6 +231,35 @@ export const dealApi = {
     }),
 };
 
+// Store revenue and the rent-to-sales it makes possible. The system is only
+// ever a consumer of this data; the authoritative source stays the customer's
+// POS/ERP/BI, and every view built on it says so.
+export const storeMetricsApi = {
+  upsert: (items: Record<string, unknown>[], token: string) =>
+    apiRequest(`/api/v1/store-metrics`, {
+      method: "POST",
+      body: JSON.stringify({ items }),
+      token,
+    }),
+
+  list: (params: { period?: string; store_id?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    if (params.period) qs.append("period", params.period);
+    if (params.store_id) qs.append("store_id", params.store_id);
+    return apiRequest(`/api/v1/store-metrics?${qs.toString()}`, { token });
+  },
+
+  rentToSales: (
+    params: { period: string; healthy_ceiling?: number; warning_ceiling?: number },
+    token: string
+  ) => {
+    const qs = new URLSearchParams({ period: params.period });
+    if (params.healthy_ceiling) qs.append("healthy_ceiling", String(params.healthy_ceiling));
+    if (params.warning_ceiling) qs.append("warning_ceiling", String(params.warning_ceiling));
+    return apiRequest(`/api/v1/reports/rent-to-sales?${qs.toString()}`, { token });
+  },
+};
+
 // Event APIs
 export const eventApi = {
   create: (contractId: string, data: any, token: string) =>

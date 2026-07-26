@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -67,6 +68,33 @@ func encodeRevision(revision *ifrs16.PaymentRevision) ([]byte, error) {
 	return json.Marshal(revision)
 }
 
+// clauseError states, in the language the rest of the product speaks, that the
+// terms cannot produce a schedule. The engine's own wording is appended because
+// it names which part is wrong, which is what the person fixing it needs.
+func clauseError(err error) string {
+	reasons := map[string]string{
+		"both index readings are required and must be positive":          "指数联动条款需要基期与现期两个指数，且均须为正数",
+		"a stepped revision needs at least one step":                     "阶梯租金条款至少需要一级阶梯",
+		"every step needs a start date":                                  "每一级阶梯都需要填写起始日",
+		"step amount cannot be negative":                                 "阶梯租金不能为负数",
+		"revised rent cannot be negative":                                "调整后租金不能为负数",
+		"the stated index movement would take the rent to zero or below": "按所填指数计算，租金将降至零或以下",
+	}
+	if translated, known := reasons[err.Error()]; known {
+		return translated
+	}
+	if strings.HasPrefix(err.Error(), "unknown revision kind") {
+		return "条款类型无法识别"
+	}
+	if strings.Contains(err.Error(), "would take the rent to zero or below") {
+		return "降幅过大，租金将降至零或以下"
+	}
+	if strings.Contains(err.Error(), "before it starts") {
+		return "条款结束日早于起始日"
+	}
+	return "条款参数无法推导付款流：" + err.Error()
+}
+
 // decodeRevision reads a stored clause back. An event recorded before clauses
 // existed has none, and must keep calculating from its free-text value.
 func decodeRevision(raw []byte) (*ifrs16.PaymentRevision, error) {
@@ -97,7 +125,7 @@ func (h *EventHandler) Create(c *gin.Context) {
 
 	clause, err := encodeRevision(req.RevisionParameters)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "条款参数无法推导付款流：" + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": clauseError(err)})
 		return
 	}
 
@@ -466,8 +494,9 @@ func (h *EventHandler) PreviewRevisedPayments(c *gin.Context) {
 		repository.ToIFRS16Payments(schedules), req.RevisionParameters, effectiveDate)
 	if err != nil {
 		// The clause itself does not work; this is the caller's mistake to fix,
-		// not a server fault.
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		// not a server fault. The message is wrapped the same way the create
+		// path wraps it, so the two routes tell the user the same thing.
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": clauseError(err)})
 		return
 	}
 

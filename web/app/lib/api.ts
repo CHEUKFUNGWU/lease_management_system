@@ -228,7 +228,21 @@ export const eventApi = {
   
   list: (contractId: string, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/events`, { token }),
-    
+
+  // Derives the payment schedule a clause implies. It writes nothing, so the
+  // revised rent can be read and agreed before the event is recorded.
+  previewPayments: (
+    contractId: string,
+    data: { effective_date: string; revision_parameters: Record<string, unknown> },
+    token: string
+  ) =>
+    apiRequest(`/api/v1/contracts/${contractId}/events/preview-payments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
+
   submitForReview: (contractId: string, eventId: string, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/events/${eventId}/submit`, { method: "POST", token }),
     

@@ -83,6 +83,66 @@ export function buildSchedulePayload(contractId: string, values: FormValues): Re
   };
 }
 
+// buildRevisionParameters turns the clause fields into the shape the derivation
+// engine reads. Only the fields belonging to the chosen kind are sent: an index
+// clause that also carried a stray percentage would be ambiguous about which
+// one the landlord actually wrote.
+//
+// Returning undefined means "no clause stated", which leaves the event on the
+// old free-text path rather than inventing terms for it.
+export function buildRevisionParameters(values: FormValues): Record<string, unknown> | undefined {
+  const kind = values.revision_kind;
+  if (!kind) return undefined;
+
+  const clause: Record<string, unknown> = { kind };
+  if (values.revision_applies_from) {
+    clause.applies_from = toClauseDate(values.revision_applies_from);
+  }
+  if (values.revision_applies_to) {
+    clause.applies_to = toClauseDate(values.revision_applies_to);
+  }
+
+  switch (kind) {
+    case "set_amount":
+      clause.amount = Number(values.revision_amount);
+      break;
+    case "percentage":
+      clause.percentage = Number(values.revision_percentage);
+      break;
+    case "index":
+      clause.base_index = Number(values.revision_base_index);
+      clause.new_index = Number(values.revision_new_index);
+      // A cap or floor is only sent when stated. Sending zero would read as
+      // "capped at 0%", which is a real and very different clause.
+      if (values.revision_cap != null && values.revision_cap !== "") {
+        clause.cap_percentage = Number(values.revision_cap);
+      }
+      if (values.revision_floor != null && values.revision_floor !== "") {
+        clause.floor_percentage = Number(values.revision_floor);
+      }
+      break;
+    case "stepped":
+      clause.steps = (values.revision_steps || [])
+        .filter((step: FormValues) => step && step.from_date && step.amount != null)
+        .map((step: FormValues) => ({
+          from_date: toClauseDate(step.from_date),
+          amount: Number(step.amount),
+        }));
+      break;
+    default:
+      return undefined;
+  }
+  return clause;
+}
+
+// The engine reads clause dates as timestamps, so a plain date is sent at the
+// start of its day in UTC rather than in the reader's local zone — otherwise a
+// clause dated the first of the month could land on the last of the previous.
+function toClauseDate(value: any): string | undefined {
+  const formatted = formatDate(value);
+  return formatted ? `${formatted}T00:00:00Z` : undefined;
+}
+
 export function buildEventPayload(contractId: string, values: FormValues): Record<string, unknown> {
   return {
     contract_id: contractId,
@@ -92,6 +152,7 @@ export function buildEventPayload(contractId: string, values: FormValues): Recor
     new_value: values.new_value,
     change_reason: values.change_reason,
     judgment_basis: values.judgment_basis,
+    revision_parameters: buildRevisionParameters(values),
   };
 }
 

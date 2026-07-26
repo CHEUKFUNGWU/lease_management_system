@@ -1,16 +1,20 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
+  Alert,
   Button,
   Col,
   DatePicker,
   Descriptions,
+  Divider,
   Form,
   Input,
   InputNumber,
   Modal,
   Row,
   Select,
+  Table,
   Tag,
 } from "antd";
 import type { FormInstance } from "antd";
@@ -20,6 +24,10 @@ import type { Language } from "../../../lib/i18n";
 import { t } from "../../../lib/i18n";
 import { fmtMoney } from "../../../lib/format";
 import { DEFAULT_TAG_SUGGESTIONS } from "../../../lib/tags";
+import { eventApi } from "../../../lib/api";
+import { useAuth } from "../../../context/AuthContext";
+import { buildRevisionParameters } from "./forms";
+
 import type {
   ContractWorkspaceState,
 } from "./types";
@@ -27,6 +35,15 @@ import type {
   WorkspaceAction,
   WorkspaceCommand,
 } from "./workspace";
+
+// The clause kinds the derivation engine understands, named the way a lease
+// states them rather than the way the engine spells them.
+const CLAUSE_KINDS = [
+  { value: "percentage", label: "固定比例调升/调降" },
+  { value: "index", label: "指数联动（CPI）" },
+  { value: "stepped", label: "阶梯租金" },
+  { value: "set_amount", label: "直接指定新租金" },
+];
 
 interface ContractWorkspaceDialogsProps {
   language: Language;
@@ -65,6 +82,7 @@ export function ContractWorkspaceDialogs({
     document: documentForm,
     obligation: obligationForm,
   } = forms;
+  const { token } = useAuth();
 
   const setDialog = (dialog: keyof typeof dialogs, open: boolean) =>
     dispatch({ type: open ? "dialog.open" : "dialog.close", dialog });
@@ -119,6 +137,56 @@ export function ContractWorkspaceDialogs({
   // The amount input sits next to the currency selector, so its prefix follows
   // that selection instead of asserting yuan for every schedule line.
   const scheduleCurrency = Form.useWatch("currency", form);
+
+  // The clause fields shown depend on the kind of clause being recorded: a CPI
+  // review and a stepped ladder need different things said about them.
+  const clauseKind = Form.useWatch("revision_kind", eventForm);
+  const [clauseDraft, setClauseDraft] = useState<any>(null);
+  const [clauseDraftLoading, setClauseDraftLoading] = useState(false);
+  const [clauseDraftError, setClauseDraftError] = useState<string | null>(null);
+
+  // A draft derived from earlier terms would misdescribe the current ones, so
+  // changing the clause type clears it rather than leaving it on screen.
+  useEffect(() => {
+    setClauseDraft(null);
+    setClauseDraftError(null);
+  }, [clauseKind]);
+
+  const handlePreviewPayments = async () => {
+    if (!token || !contract) return;
+    const values = eventForm.getFieldsValue();
+    const effectiveDate = values.revision_applies_from || values.effective_date;
+    if (!effectiveDate) {
+      setClauseDraftError("请先填写生效日期或条款起始日");
+      return;
+    }
+    const clause = buildRevisionParameters(values);
+    if (!clause) {
+      setClauseDraftError("请先选择条款类型");
+      return;
+    }
+
+    setClauseDraftLoading(true);
+    setClauseDraftError(null);
+    try {
+      const response = await eventApi.previewPayments(
+        contract.id,
+        {
+          effective_date: effectiveDate.format ? effectiveDate.format("YYYY-MM-DD") : effectiveDate,
+          revision_parameters: clause,
+        },
+        token
+      );
+      setClauseDraft(response.draft);
+    } catch (error: any) {
+      // The message comes from the engine and names what is wrong with the
+      // clause, which is more use than a generic failure notice.
+      setClauseDraftError(error?.message || "推导失败");
+      setClauseDraft(null);
+    } finally {
+      setClauseDraftLoading(false);
+    }
+  };
 
   const adjustmentModalData = adjustment?.data as any;
   const adjustmentCurrency = contract?.currency;
@@ -391,6 +459,196 @@ export function ContractWorkspaceDialogs({
             <Form.Item label={t("contract.judgment_basis", language)} name="judgment_basis">
               <Input.TextArea rows={2} placeholder={t("contract.judgment_basis_placeholder", language)} />
             </Form.Item>
+
+            {/* The clause replaces editing the payment schedule by hand. Stating
+                it here means the event and the revised rent can no longer
+                disagree, because one is derived from the other. */}
+            <Divider style={{ margin: "8px 0 16px" }}>
+              <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>调租条款（可选）</span>
+            </Divider>
+
+            <Form.Item
+              label="条款类型"
+              name="revision_kind"
+              extra="填写后，系统据此推导修订付款流；留空则沿用手工维护的付款计划。"
+            >
+              <Select allowClear placeholder="不按条款推导" options={CLAUSE_KINDS} />
+            </Form.Item>
+
+            {clauseKind === "set_amount" && (
+              <Form.Item label="调整后租金" name="revision_amount" rules={[{ required: true, message: "请填写调整后租金" }]}>
+                <InputNumber style={{ width: "100%" }} min={0} precision={2} prefix={contract?.currency || ""} />
+              </Form.Item>
+            )}
+
+            {clauseKind === "percentage" && (
+              <Form.Item
+                label="涨跌幅（%）"
+                name="revision_percentage"
+                rules={[{ required: true, message: "请填写涨跌幅" }]}
+                extra="正数为上调，负数为下调。例如装修期减租填 -50。"
+              >
+                <InputNumber style={{ width: "100%" }} precision={4} />
+              </Form.Item>
+            )}
+
+            {clauseKind === "index" && (
+              <>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="基期指数" name="revision_base_index" rules={[{ required: true, message: "请填写基期指数" }]}>
+                      <InputNumber style={{ width: "100%" }} min={0} precision={4} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="现期指数" name="revision_new_index" rules={[{ required: true, message: "请填写现期指数" }]}>
+                      <InputNumber style={{ width: "100%" }} min={0} precision={4} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="封顶涨幅（%）" name="revision_cap" extra="留空表示不封顶">
+                      <InputNumber style={{ width: "100%" }} precision={4} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="保底涨幅（%）" name="revision_floor" extra="留空表示无下限">
+                      <InputNumber style={{ width: "100%" }} precision={4} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </>
+            )}
+
+            {clauseKind === "stepped" && (
+              <Form.List name="revision_steps">
+                {(fields, { add, remove }) => (
+                  <div style={{ marginBottom: 16 }}>
+                    {fields.map((field) => (
+                      <Row gutter={8} key={field.key} style={{ marginBottom: 8 }}>
+                        <Col span={11}>
+                          <Form.Item
+                            {...field}
+                            key={`${field.key}-date`}
+                            name={[field.name, "from_date"]}
+                            noStyle
+                          >
+                            <DatePicker style={{ width: "100%" }} placeholder="自该日起" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={10}>
+                          <Form.Item
+                            {...field}
+                            key={`${field.key}-amount`}
+                            name={[field.name, "amount"]}
+                            noStyle
+                          >
+                            <InputNumber style={{ width: "100%" }} min={0} precision={2} placeholder="租金" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={3}>
+                          <Button danger size="small" onClick={() => remove(field.name)} style={{ width: "100%" }}>
+                            删除
+                          </Button>
+                        </Col>
+                      </Row>
+                    ))}
+                    <Button size="small" onClick={() => add()} style={{ width: "100%" }}>
+                      添加一级阶梯
+                    </Button>
+                  </div>
+                )}
+              </Form.List>
+            )}
+
+            {clauseKind && (
+              <>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="条款起始日" name="revision_applies_from" extra="留空则取生效日">
+                      <DatePicker style={{ width: "100%" }} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="条款结束日" name="revision_applies_to" extra="留空则至租期结束">
+                      <DatePicker style={{ width: "100%" }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                <Button
+                  onClick={handlePreviewPayments}
+                  loading={clauseDraftLoading}
+                  style={{ marginBottom: 12 }}
+                  block
+                >
+                  推导修订付款流
+                </Button>
+
+                {clauseDraftError && (
+                  <Alert type="error" showIcon message={clauseDraftError} style={{ marginBottom: 12 }} />
+                )}
+
+                {clauseDraft && (
+                  <>
+                    <Alert
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 12 }}
+                      message={
+                        <span>
+                          {clauseDraft.changed_count} 笔付款变动，合计{" "}
+                          <strong>{fmtMoney(clauseDraft.delta, contract?.currency)}</strong>
+                          {clauseDraft.cap_applied && "（封顶已生效）"}
+                          {clauseDraft.floor_applied && "（保底已生效）"}
+                        </span>
+                      }
+                      description={
+                        clauseKind === "index" || clauseKind === "percentage"
+                          ? `实际采用系数 ${clauseDraft.applied_factor.toFixed(6)}`
+                          : undefined
+                      }
+                    />
+                    <Table
+                      size="small"
+                      rowKey={(row: any) => `${row.date}-${row.type}-${row.original_amount}`}
+                      dataSource={clauseDraft.changes.filter((row: any) => row.changed)}
+                      pagination={{ pageSize: 6, size: "small" }}
+                      columns={[
+                        {
+                          title: "付款日",
+                          dataIndex: "date",
+                          render: (value: string) => dayjs(value).format("YYYY-MM-DD"),
+                        },
+                        {
+                          title: "原金额",
+                          dataIndex: "original_amount",
+                          align: "right" as const,
+                          render: (value: number) => fmtMoney(value, contract?.currency),
+                        },
+                        {
+                          title: "新金额",
+                          dataIndex: "revised_amount",
+                          align: "right" as const,
+                          render: (value: number) => fmtMoney(value, contract?.currency),
+                        },
+                        {
+                          title: "差额",
+                          dataIndex: "delta",
+                          align: "right" as const,
+                          render: (value: number) => (
+                            <span style={{ color: value > 0 ? "#CF1322" : undefined }}>
+                              {fmtMoney(value, contract?.currency)}
+                            </span>
+                          ),
+                        },
+                      ]}
+                    />
+                  </>
+                )}
+              </>
+            )}
           </Form>
         </Modal>
 

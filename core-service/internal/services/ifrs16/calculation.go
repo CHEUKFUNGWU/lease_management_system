@@ -99,6 +99,19 @@ type RemeasurementInput struct {
 	RevisedPayments     []LeasePayment
 	InitialDirectCost   float64
 	LeaseIncentives     float64
+
+	// ScopeDecreaseProportion is the share of the lease given up, between 0 and
+	// 1, where 1 is a full termination. It selects IFRS 16.46(a): the ROU asset
+	// is written down in proportion to the scope surrendered and the difference
+	// against the liability released goes to profit or loss. Leaving it at zero
+	// keeps 46(b), where the whole liability movement is absorbed by the ROU
+	// asset and no gain or loss arises.
+	//
+	// The distinction is what makes a loss possible at all. Under 46(b) the ROU
+	// asset moves with the liability, so a shortened lease can only ever produce
+	// a gain, which is not what happens when a lease is walked away from while
+	// the asset still carries initial direct costs or a prepayment.
+	ScopeDecreaseProportion float64
 }
 
 // RemeasurementOutput holds the results of a lease remeasurement
@@ -456,13 +469,34 @@ func RecalculateFromDate(carryingLiability, carryingROU float64, input Remeasure
 	output.NewLiability = calculateInitialLiability(calcInput)
 	output.LiabilityDelta = output.NewLiability - carryingLiability
 
-	// 2. Adjust ROU by change in liability (IFRS 16.46)
-	output.ROUAdjustment = output.LiabilityDelta
+	if input.ScopeDecreaseProportion > 0 {
+		// IFRS 16.46(a): scope decrease. The ROU asset is written down by the
+		// share of the lease surrendered, and the difference between that
+		// write-down and the liability released is a gain or a loss.
+		proportion := math.Min(input.ScopeDecreaseProportion, 1)
+		rouRemoved := carryingROU * proportion
+		liabilityReleased := -output.LiabilityDelta
 
-	// 3. Check if ROU reduction exceeds carrying amount → P&L gain
-	if output.ROUAdjustment < 0 && math.Abs(output.ROUAdjustment) > carryingROU {
-		output.PnLGain = math.Abs(output.ROUAdjustment) - carryingROU
-		output.ROUAdjustment = -carryingROU
+		output.ROUAdjustment = -rouRemoved
+		difference := liabilityReleased - rouRemoved
+		if difference >= 0 {
+			output.PnLGain = round(difference)
+		} else {
+			// More asset written off than liability released — this is the loss
+			// the engine previously had no way to express.
+			output.PnLLoss = round(-difference)
+		}
+	} else {
+		// IFRS 16.46(b): every other remeasurement. The ROU asset absorbs the
+		// liability movement, so no gain or loss arises.
+		output.ROUAdjustment = output.LiabilityDelta
+
+		// An ROU asset cannot be driven below zero; whatever the liability
+		// reduction cannot absorb is a gain.
+		if output.ROUAdjustment < 0 && math.Abs(output.ROUAdjustment) > carryingROU {
+			output.PnLGain = round(math.Abs(output.ROUAdjustment) - carryingROU)
+			output.ROUAdjustment = -carryingROU
+		}
 	}
 
 	// 4. Compute new ROU

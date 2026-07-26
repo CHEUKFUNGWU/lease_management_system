@@ -99,6 +99,8 @@ func Calculate(input Input) (Result, error) {
 		LeaseEndDate:        leaseEndDate,
 		RevisedDiscountRate: revisedRate,
 		RevisedPayments:     revisedPayments,
+		ScopeDecreaseProportion: scopeDecreaseProportion(
+			input.EffectiveDate, input.LeaseEndDate, leaseEndDate),
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("remeasure lease: %w", err)
@@ -118,6 +120,30 @@ func Calculate(input Input) (Result, error) {
 		ForwardSchedule: remeasurement.ForwardSchedule,
 		JournalEntries:  buildJournalEntries(input, adjustment),
 	}, nil
+}
+
+// scopeDecreaseProportion measures how much of the remaining lease is being
+// given up, as a share of the term that was left on the effective date. A
+// shortened term is the scope decrease this engine can see; an area reduction
+// would be another, but the contract's area is not part of this input, so it is
+// deliberately not guessed at here.
+//
+// Returning zero means "not a scope decrease", which keeps every other
+// remeasurement on the treatment it has always had.
+func scopeDecreaseProportion(effectiveDate, originalEnd, revisedEnd time.Time) float64 {
+	if !revisedEnd.Before(originalEnd) {
+		return 0
+	}
+	originalRemaining := originalEnd.Sub(effectiveDate).Hours()
+	if originalRemaining <= 0 {
+		return 0
+	}
+	revisedRemaining := revisedEnd.Sub(effectiveDate).Hours()
+	if revisedRemaining < 0 {
+		// The lease ends on or before the effective date: it is given up whole.
+		revisedRemaining = 0
+	}
+	return (originalRemaining - revisedRemaining) / originalRemaining
 }
 
 func paymentsForEvent(input Input, leaseEndDate time.Time) ([]ifrs16.LeasePayment, error) {
@@ -260,7 +286,11 @@ func buildJournalEntries(input Input, adjustment Adjustment) []JournalEntry {
 	}
 	if adjustment.PnLLoss > materialityThreshold {
 		entry := base
-		entry.DebitAccount, entry.CreditAccount, entry.Amount = "6711-资产处置损失", "2801-租赁负债", adjustment.PnLLoss
+		// A loss on a scope decrease is the asset written off beyond what the
+		// liability release absorbed, so it is credited against the right-of-use
+		// asset. Crediting the liability — which the entry above has already
+		// released in full — would leave the ledger unbalanced by the loss.
+		entry.DebitAccount, entry.CreditAccount, entry.Amount = "6711-资产处置损失", "1701-使用权资产", adjustment.PnLLoss
 		entry.Description += " (处置损失)"
 		entries = append(entries, entry)
 	}

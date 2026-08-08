@@ -84,8 +84,8 @@ func TestCloseReadinessRepositoryAppliesPopulationAndScopeFacts(t *testing.T) {
 	}
 	otherContract := uuid.NewString()
 	if _, err := pool.Exec(ctx, `
-		INSERT INTO lease_contracts (id, contract_number, contract_name, legal_entity_id, store_id, landlord_id, asset_type, commencement_date, lease_start_date, lease_end_date, approval_status, is_official_version)
-		VALUES ($1, $2, 'Other', $3, $4, $5, 'real_estate', '2026-01-01', '2026-01-01', '2027-01-01', 'approved', true)
+		INSERT INTO lease_contracts (id, contract_number, contract_name, legal_entity_id, store_id, landlord_id, asset_type, currency, commencement_date, lease_start_date, lease_end_date, approval_status, is_official_version)
+		VALUES ($1, $2, 'Other', $3, $4, $5, 'real_estate', 'CNY', '2026-01-01', '2026-01-01', '2027-01-01', 'approved', true)
 	`, otherContract, "CR-OTHER-CONTRACT-"+suffix, *contract.LegalEntityID, otherStore, *contract.LandlordID); err != nil {
 		t.Fatalf("seed other contract: %v", err)
 	}

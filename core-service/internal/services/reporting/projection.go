@@ -30,8 +30,9 @@ const (
 )
 
 var (
-	ErrContractNotFound         = errors.New("contract not found")
-	ErrPaymentSchedulesRequired = errors.New("payment schedules are required")
+	ErrContractNotFound          = errors.New("contract not found")
+	ErrPaymentSchedulesRequired  = errors.New("payment schedules are required")
+	ErrSensitivityShocksRequired = errors.New("sensitivity shocks are required")
 )
 
 type ProjectionFormat string
@@ -415,11 +416,15 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 	}
 	shocks := request.Shocks
 	if len(shocks) == 0 {
-		shocks = []float64{-0.01, -0.005, 0, 0.005, 0.01}
+		return ProjectionResult{}, fmt.Errorf("sensitivity shocks are required")
 	}
 	payments := repository.ToIFRS16Payments(fact.PaymentSchedules)
 	rows := make([]SensitivityRow, 0, len(shocks))
-	baseLiability := 0.0
+	baseResult, err := calculateContract(fact, payments, baseRate)
+	if err != nil {
+		return ProjectionResult{}, err
+	}
+	baseLiability := baseResult.InitialLiability
 	for _, shock := range shocks {
 		rate := baseRate + shock
 		if rate < 0 {
@@ -429,16 +434,10 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 		if err != nil {
 			return ProjectionResult{}, err
 		}
-		if math.Abs(shock) < 0.0000001 {
-			baseLiability = result.InitialLiability
-		}
 		rows = append(rows, SensitivityRow{
 			ScenarioName: fmt.Sprintf("%+.2f%%", shock*100), DiscountRate: rate, RateDelta: shock,
 			InitialLiability: result.InitialLiability, InitialROUAsset: result.InitialROUAsset,
 		})
-	}
-	if baseLiability == 0 && len(rows) > 0 {
-		baseLiability = rows[0].InitialLiability
 	}
 	for index := range rows {
 		rows[index].LiabilityDelta = rows[index].InitialLiability - baseLiability
@@ -482,17 +481,8 @@ func projectPortfolio(snapshot *Snapshot) ProjectionResult {
 	for _, fact := range snapshot.Contracts {
 		contract := fact.Contract
 		assetType := contract.AssetType
-		if assetType == "" {
-			assetType = "real_estate"
-		}
 		leaseScope := contract.LeaseScope
-		if leaseScope == "" {
-			leaseScope = "in_scope"
-		}
 		currency := contract.Currency
-		if currency == "" {
-			currency = "CNY"
-		}
 		key := assetType + "|" + leaseScope + "|" + currency
 		row := rowsByKey[key]
 		if row == nil {
@@ -637,6 +627,13 @@ func projectCashflow(snapshot *Snapshot, request ProjectionRequest) (ProjectionR
 		period string
 	}
 	rows := make(map[groupKey]*CashflowRow)
+	currencySet := make(map[string]struct{})
+	for _, fact := range snapshot.Contracts {
+		if fact.Contract != nil && fact.Contract.Currency != "" {
+			currencySet[fact.Contract.Currency] = struct{}{}
+		}
+	}
+	separateCurrencies := request.View != ViewContract && len(currencySet) > 1
 	tagFilters := normalizeProjectionTokens(request.Tags)
 	for _, fact := range snapshot.Contracts {
 		contract := fact.Contract
@@ -662,7 +659,7 @@ func projectCashflow(snapshot *Snapshot, request ProjectionRequest) (ProjectionR
 			}
 			periodKey := projectionBucketKey(schedule.DueDate, request.Granularity)
 			periodStart, periodEnd := projectionBucketRange(schedule.DueDate, request.Granularity)
-			group, label, currency := "summary", "汇总", "CNY"
+			group, label, currency := "summary", "汇总", contract.Currency
 			contractID, contractNumber, contractName, storeName := "", "", "", ""
 			switch request.View {
 			case ViewContract:
@@ -673,6 +670,12 @@ func projectCashflow(snapshot *Snapshot, request ProjectionRequest) (ProjectionR
 			case ViewStore:
 				group = fallbackProjectionStore(contract.StoreName)
 				label = group
+			}
+			if separateCurrencies {
+				// A store or portfolio can contain leases in more than one
+				// currency. Keep those totals separate instead of silently
+				// presenting an arithmetic sum in one currency.
+				group += "|" + currency
 			}
 			key := groupKey{group: group, period: periodKey}
 			row := rows[key]

@@ -59,8 +59,11 @@ func (h *CashflowScenarioHandler) Scenario(c *gin.Context) {
 
 	leases := make([]cashflow.Lease, 0, len(contracts))
 	currency := ""
-	mixedCurrency := false
 	for _, contract := range contracts {
+		if contract.Currency == "" {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "组合内存在缺失币种的合同，无法进行现金流情景汇总"})
+			return
+		}
 		schedules, err := h.psRepo.GetByContractID(ctx, contract.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -69,7 +72,8 @@ func (h *CashflowScenarioHandler) Scenario(c *gin.Context) {
 		if currency == "" {
 			currency = contract.Currency
 		} else if currency != contract.Currency {
-			mixedCurrency = true
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "组合内包含多个币种，请先按币种分别运行现金流情景"})
+			return
 		}
 		leases = append(leases, cashflow.Lease{
 			ContractID: contract.ID, ContractNumber: contract.ContractNumber,
@@ -77,6 +81,10 @@ func (h *CashflowScenarioHandler) Scenario(c *gin.Context) {
 			LeaseEndDate: contract.LeaseEndDate,
 			Payments:     repository.ToIFRS16Payments(schedules),
 		})
+	}
+	if req.HorizonMonths <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请提供大于零的测算期（月）"})
+		return
 	}
 
 	results := make([]cashflow.Result, 0, len(req.Scenarios))
@@ -92,12 +100,5 @@ func (h *CashflowScenarioHandler) Scenario(c *gin.Context) {
 		results = append(results, projected)
 	}
 
-	response := gin.H{"as_of": asOf.Format("2006-01-02"), "results": results}
-	if mixedCurrency {
-		// Adding rents in different currencies produces a number in none of
-		// them. The projection is still useful per scenario, but the caller
-		// needs to know the totals are not a single currency.
-		response["currency_warning"] = "组合内存在多种币种，合计金额不代表任何单一币种，请按币种分别查看"
-	}
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, gin.H{"as_of": asOf.Format("2006-01-02"), "results": results})
 }

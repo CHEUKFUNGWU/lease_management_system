@@ -24,6 +24,7 @@ func TestScopeDecrease_PartialTerminationWritesOffTheProportionGivenUp(t *testin
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &newEnd,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
@@ -68,6 +69,7 @@ func TestScopeDecrease_RecognisesALossWhenTheAssetExceedsTheLiability(t *testing
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &newEnd,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			// Two years of rent settled up front. The asset carries it; the
@@ -114,6 +116,7 @@ func TestScopeDecrease_LossJournalsBalance(t *testing.T) {
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &newEnd,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2024-01-01"), Amount: 400000, Timing: "prepaid", Type: "fixed"},
@@ -170,6 +173,7 @@ func TestScopeDecrease_ExtensionIsUnaffected(t *testing.T) {
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &newEnd,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},

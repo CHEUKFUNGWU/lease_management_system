@@ -160,7 +160,7 @@ func (r *ContractRepository) ResolveLegalEntityID(ctx context.Context, nameOrCod
 		}
 
 		if currency == "" {
-			currency = "CNY"
+			return nil, fmt.Errorf("currency is required when creating a legal entity")
 		}
 		err = r.db.QueryRow(ctx, `
 			INSERT INTO legal_entities (code, name, country, currency, is_active)
@@ -262,12 +262,6 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 	contract.Status = "draft"
 	if contract.ApprovalStatus == "" {
 		contract.ApprovalStatus = "draft"
-	}
-	if contract.LeaseScope == "" {
-		contract.LeaseScope = "in_scope"
-	}
-	if contract.AssetType == "" {
-		contract.AssetType = "real_estate"
 	}
 	contract.CreatedAt = time.Now()
 	contract.UpdatedAt = time.Now()
@@ -632,12 +626,6 @@ func (r *ContractRepository) GetByStatuses(ctx context.Context, statuses []strin
 // Only allowed if approval_status is 'draft' or 'rejected'.
 // updatedBy is the user ID performing the update.
 func (r *ContractRepository) Update(ctx context.Context, contract *Contract, legalEntityID string, updatedBy string) error {
-	if contract.LeaseScope == "" {
-		contract.LeaseScope = "in_scope"
-	}
-	if contract.AssetType == "" {
-		contract.AssetType = "real_estate"
-	}
 	if scope, scoped := access.ScopeFromContext(ctx); scoped {
 		current, found, err := r.GetContractAttributes(ctx, contract.ID)
 		if err != nil {

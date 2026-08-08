@@ -58,7 +58,7 @@ func (r *PaymentScheduleRepository) Create(ctx context.Context, ps *PaymentSched
 		ps.ApprovalStatus = "approved"
 	}
 	if ps.Currency == "" {
-		ps.Currency = "CNY"
+		return nil, fmt.Errorf("payment schedule currency is required")
 	}
 
 	query := `

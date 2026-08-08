@@ -44,7 +44,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
     try {
       const response = await reportApi.cashflowScenario(
         {
-          horizon_months: values.horizon_months || 60,
+          horizon_months: values.horizon_months,
           // The do-nothing case is always run alongside the plan: a scenario
           // means nothing without the baseline it moved away from.
           scenarios: [
@@ -54,8 +54,8 @@ export function ScenarioPanel({ token }: { token: string | null }) {
                 (values.closure_rate || 0) * 100
               )}% 关店`,
               renewal_rate: values.renewal_rate || 0,
-              renewal_term_months: values.renewal_term_months || 36,
-              renewal_uplift_percent: values.renewal_uplift_percent || 0,
+              renewal_term_months: values.renewal_term_months,
+              renewal_uplift_percent: values.renewal_uplift_percent,
               closure_rate: values.closure_rate || 0,
               closure_cost_months: values.closure_cost_months || 0,
             },
@@ -106,18 +106,10 @@ export function ScenarioPanel({ token }: { token: string | null }) {
         form={form}
         layout="vertical"
         onFinish={run}
-        initialValues={{
-          horizon_months: 60,
-          renewal_rate: 0.3,
-          renewal_term_months: 36,
-          renewal_uplift_percent: 5,
-          closure_rate: 0.1,
-          closure_cost_months: 3,
-        }}
       >
         <Row gutter={12}>
           <Col xs={12} md={4}>
-            <Form.Item label="测算期（月）" name="horizon_months">
+            <Form.Item label="测算期（月）" name="horizon_months" rules={[{ required: true, message: "请填写测算期" }]}>
               <InputNumber style={{ width: "100%" }} min={12} max={120} />
             </Form.Item>
           </Col>
@@ -127,7 +119,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
-            <Form.Item label="续租租期（月）" name="renewal_term_months">
+            <Form.Item label="续租租期（月）" name="renewal_term_months" rules={[{ required: true, message: "请填写续租租期" }]}>
               <InputNumber style={{ width: "100%" }} min={1} />
             </Form.Item>
           </Col>

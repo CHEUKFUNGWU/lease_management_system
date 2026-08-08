@@ -465,8 +465,11 @@ func (input RegressionInput) toCalculation() (LeaseCalculation, error) {
 	}
 
 	calcInput := LeaseCalculation{
-		CommencementDate:  commencementDate,
-		LeaseEndDate:      leaseEndDate,
+		CommencementDate: commencementDate,
+		LeaseEndDate:     leaseEndDate,
+		// The original regression fixture predates the scope-gate field. Keep
+		// those historical cases comparable while production calculation input
+		// still rejects an omitted scope.
 		LeaseScope:        input.LeaseScope,
 		DiscountRate:      input.DiscountRate,
 		InitialDirectCost: input.InitialDirectCost,
@@ -474,6 +477,9 @@ func (input RegressionInput) toCalculation() (LeaseCalculation, error) {
 		IncentiveReceived: input.IncentiveReceived,
 		RestorationCost:   input.RestorationCost,
 		Payments:          payments,
+	}
+	if calcInput.LeaseScope == "" {
+		calcInput.LeaseScope = LeaseScopeInScope
 	}
 	if calcInput.PrepaidRent == 0 {
 		calcInput.PrepaidRent = CalculatePrepaidRent(calcInput)

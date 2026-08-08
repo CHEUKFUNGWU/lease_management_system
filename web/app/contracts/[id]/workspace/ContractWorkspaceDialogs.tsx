@@ -220,7 +220,6 @@ export function ContractWorkspaceDialogs({
             layout="vertical"
             onFinish={handleCreateSchedule}
             initialValues={{
-              currency: "CNY",
               payment_timing: "postpaid",
               amount_type: "fixed_rent",
               is_fixed: true,
@@ -257,10 +256,7 @@ export function ContractWorkspaceDialogs({
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item label={t("contract.currency", language)} name="currency">
-                  <Select>
-                    <Select.Option value="CNY">{t("contract.currency_cny", language)}</Select.Option>
-                    <Select.Option value="USD">{t("contract.currency_usd", language)}</Select.Option>
-                  </Select>
+                  <Input placeholder="ISO 4217" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -719,10 +715,7 @@ export function ContractWorkspaceDialogs({
                   name="currency"
                   rules={[{ required: true, message: t("contract_detail.validation.currency", language) }]}
                 >
-                  <Select>
-                    <Select.Option value="CNY">{t("contract.currency_cny", language)}</Select.Option>
-                    <Select.Option value="USD">{t("contract.currency_usd", language)}</Select.Option>
-                  </Select>
+                  <Input placeholder="ISO 4217" />
                 </Form.Item>
               </Col>
               <Col span={12}>

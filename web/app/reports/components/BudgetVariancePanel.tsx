@@ -15,6 +15,10 @@ interface BudgetVersion {
   from_period: string;
   to_period: string;
   contract_count: number;
+  version_type: "budget" | "forecast" | "scenario";
+  source: string;
+  coverage_scope: string;
+  is_official: boolean;
 }
 
 interface BridgeLine {
@@ -32,6 +36,11 @@ interface ContractVariance {
   actual: number;
   variance: number;
   cause: string;
+  explanation?: string;
+  owner_name?: string;
+  due_date?: string;
+  action_status?: string;
+  is_overdue?: boolean;
 }
 
 interface VarianceResult {
@@ -42,6 +51,23 @@ interface VarianceResult {
   bridge: BridgeLine[];
   by_contract: ContractVariance[];
   bridge_ties_out: boolean;
+  explained_count: number;
+  variance_count: number;
+  explanation_coverage: number;
+  open_action_amount: number;
+  open_action_count: number;
+  currency?: string;
+}
+
+interface ManagementBrief {
+  period: string;
+  budget: { total: number; version: BudgetVersion };
+  forecast: { total: number; version: BudgetVersion };
+  actual: { total: number; source: string };
+  forecast_vs_budget: number;
+  actual_vs_budget: number;
+  actual_vs_forecast: number;
+  currency?: string;
 }
 
 const causeKeys: Record<string, string> = {
@@ -49,6 +75,10 @@ const causeKeys: Record<string, string> = {
   ended: "budget.cause_ended",
   renewal_or_termination: "budget.cause_renewal",
   rent_change: "budget.cause_rent_change",
+  index_adjustment: "budget.cause_index_adjustment",
+  discount_rate: "budget.cause_discount_rate",
+  payment_timing: "budget.cause_payment_timing",
+  data_correction: "budget.cause_data_correction",
   exchange_rate: "budget.cause_exchange_rate",
   other: "budget.cause_other",
 };
@@ -58,6 +88,10 @@ const causeColors: Record<string, string> = {
   ended: "purple",
   renewal_or_termination: "gold",
   rent_change: "cyan",
+  index_adjustment: "lime",
+  discount_rate: "orange",
+  payment_timing: "geekblue",
+  data_correction: "volcano",
   exchange_rate: "magenta",
   other: "default",
 };
@@ -65,11 +99,19 @@ const causeColors: Record<string, string> = {
 export function BudgetVariancePanel({ token, language }: { token: string | null; language: Language }) {
   const [versions, setVersions] = useState<BudgetVersion[]>([]);
   const [versionId, setVersionId] = useState<string>();
+  const [rightId, setRightId] = useState("actual");
   const [period, setPeriod] = useState(dayjs().format("YYYY-MM"));
   const [result, setResult] = useState<VarianceResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState("budget");
+  const [newSource, setNewSource] = useState("");
+  const [fromPeriod, setFromPeriod] = useState("");
+  const [toPeriod, setToPeriod] = useState("");
+  const [coverageScope, setCoverageScope] = useState("");
+  const [savingActions, setSavingActions] = useState(false);
+  const [brief, setBrief] = useState<ManagementBrief | null>(null);
 
   const loadVersions = useCallback(async () => {
     if (!token) return;
@@ -78,6 +120,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
       const list: BudgetVersion[] = res.data || [];
       setVersions(list);
       setVersionId((current) => current || list[0]?.id);
+      setRightId((current) => current === "actual" ? current : current || "actual");
     } catch (error: any) {
       message.error(error?.message || t("budget.load_failed", language));
     }
@@ -94,7 +137,34 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
     }
     setLoading(true);
     try {
-      setResult(await budgetApi.variance(versionId, period, token));
+      if (rightId === "actual") {
+        const payload = await budgetApi.variance(versionId, period, token);
+        setResult(payload.result || payload);
+      } else {
+        const payload = await budgetApi.compare(versionId, rightId, period, token);
+        const comparison = payload.comparison;
+        setResult({
+          period: comparison.period,
+          budget_total: comparison.left_total,
+          actual_total: comparison.right_total,
+          variance: comparison.variance,
+          bridge: [],
+          by_contract: comparison.by_contract || [],
+          bridge_ties_out: comparison.ties_out,
+          explained_count: 0,
+          variance_count: comparison.by_contract?.length || 0,
+          explanation_coverage: 0,
+          open_action_amount: 0,
+          open_action_count: 0,
+        });
+      }
+      const budgetVersion = versions.find((version) => version.version_type === "budget");
+      const forecastVersion = versions.find((version) => version.version_type === "forecast");
+      if (budgetVersion && forecastVersion) {
+        setBrief(await budgetApi.managementBrief(budgetVersion.id, forecastVersion.id, period, token));
+      } else {
+        setBrief(null);
+      }
     } catch (error: any) {
       message.error(error?.message || t("budget.load_failed", language));
     } finally {
@@ -109,9 +179,13 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
     }
     setCreating(true);
     try {
-      const year = dayjs().format("YYYY");
+      if (!newSource.trim() || !fromPeriod || !toPeriod) {
+        message.warning(t("budget.version_metadata_required", language));
+        setCreating(false);
+        return;
+      }
       const res = await budgetApi.createVersion(
-        { name: newName.trim(), from_period: `${year}-01`, to_period: `${year}-12` },
+        { name: newName.trim(), version_type: newType, source: newSource.trim(), coverage_scope: coverageScope.trim(), from_period: fromPeriod, to_period: toPeriod },
         token
       );
       message.success(
@@ -121,6 +195,10 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
         })
       );
       setNewName("");
+      setNewSource("");
+      setFromPeriod("");
+      setToPeriod("");
+      setCoverageScope("");
       setVersionId(res.data?.id);
       loadVersions();
     } catch (error: any) {
@@ -128,6 +206,33 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
     } finally {
       setCreating(false);
     }
+  };
+
+  const saveActions = async () => {
+    if (!token || !versionId || rightId !== "actual" || !result) return;
+    setSavingActions(true);
+    try {
+      await budgetApi.saveVarianceActions(versionId, {
+        period,
+        items: result.by_contract.map((row) => ({
+          contract_id: row.contract_id,
+          explanation: row.explanation || "",
+          owner_name: row.owner_name || "",
+          due_date: row.due_date || "",
+          status: row.action_status || "open",
+        })),
+      }, token);
+      message.success(t("budget.actions_saved", language));
+      await runVariance();
+    } catch (error: any) {
+      message.error(error?.message || t("budget.actions_save_failed", language));
+    } finally {
+      setSavingActions(false);
+    }
+  };
+
+  const updateRow = (contractId: string, patch: Partial<ContractVariance>) => {
+    setResult((current) => current ? { ...current, by_contract: current.by_contract.map((row) => row.contract_id === contractId ? { ...row, ...patch } : row) } : current);
   };
 
   const varianceColor = useMemo(() => {
@@ -148,14 +253,21 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             placeholder={t("budget.pick_version", language)}
             options={versions.map((v) => ({
               value: v.id,
-              label: `${v.name}（${v.from_period}~${v.to_period}, ${v.contract_count} 份）`,
+              label: `${v.name}（${v.version_type}, ${v.from_period}~${v.to_period}）`,
             }))}
+          />
+          <span style={{ fontSize: 13, color: "#595959" }}>{t("budget.compare_to", language)}</span>
+          <Select
+            style={{ width: 260 }}
+            value={rightId}
+            onChange={setRightId}
+            options={[{ value: "actual", label: t("budget.actual_measurement_readonly", language) }, ...versions.filter((v) => v.id !== versionId).map((v) => ({ value: v.id, label: `${v.name}（${v.version_type}）` }))]}
           />
           <Input
             style={{ width: 140 }}
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            placeholder="YYYY-MM"
+            placeholder={t("budget.period_placeholder", language)}
           />
           <Button type="primary" icon={<SearchOutlined />} loading={loading} onClick={runVariance}>
             {t("budget.compare", language)}
@@ -169,11 +281,31 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             onChange={(e) => setNewName(e.target.value)}
             placeholder={t("budget.new_name_placeholder", language)}
           />
+          <Select
+            style={{ width: 130 }}
+            value={newType}
+            onChange={setNewType}
+            options={[{ value: "budget", label: t("budget.type_budget", language) }, { value: "forecast", label: t("budget.type_forecast", language) }, { value: "scenario", label: t("budget.type_scenario", language) }]}
+          />
+          <Input
+            style={{ width: 180 }}
+            value={newSource}
+            onChange={(e) => setNewSource(e.target.value)}
+            placeholder={t("budget.source_placeholder", language)}
+          />
+          <Input style={{ width: 120 }} value={fromPeriod} onChange={(e) => setFromPeriod(e.target.value)} placeholder={t("budget.from_period", language)} />
+          <Input style={{ width: 120 }} value={toPeriod} onChange={(e) => setToPeriod(e.target.value)} placeholder={t("budget.to_period", language)} />
+          <Input style={{ width: 180 }} value={coverageScope} onChange={(e) => setCoverageScope(e.target.value)} placeholder={t("budget.coverage_scope", language)} />
           <Button icon={<PlusOutlined />} loading={creating} onClick={createVersion}>
             {t("budget.freeze", language)}
           </Button>
           <span style={{ fontSize: 12, color: "#8C8C8C" }}>{t("budget.freeze_hint", language)}</span>
         </div>
+        {versionId && (
+          <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12 }}>
+            {t("budget.measurement_source_hint", language)}
+          </div>
+        )}
       </Card>
 
       {result && (
@@ -208,6 +340,26 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                 />
               </Card>
             </Col>
+          </Row>
+
+          {brief && (
+            <Card title={t("budget.brief_title", language, { period: brief.period })} style={{ borderRadius: 10, marginBottom: 16 }}>
+              <Row gutter={[12, 12]}>
+                <Col xs={24} sm={8}><Statistic title={t("budget.brief_budget", language, { name: brief.budget.version.name })} value={brief.budget.total} precision={2} /></Col>
+                <Col xs={24} sm={8}><Statistic title={t("budget.brief_forecast", language, { name: brief.forecast.version.name })} value={brief.forecast.total} precision={2} /></Col>
+                <Col xs={24} sm={8}><Statistic title={t("budget.brief_actual", language)} value={brief.actual.total} precision={2} /></Col>
+              </Row>
+              <div style={{ marginTop: 12, color: "#6B7280", fontSize: 13 }}>
+                {t("budget.brief_variance", language, { forecastBudget: fmtNum(brief.forecast_vs_budget), actualBudget: fmtNum(brief.actual_vs_budget), actualForecast: fmtNum(brief.actual_vs_forecast) })}
+              </div>
+            </Card>
+          )}
+
+          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.explanation_coverage", language)} value={(result.explanation_coverage || 0) * 100} precision={1} suffix="%" /></Card></Col>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.open_actions", language)} value={result.open_action_count || 0} /></Card></Col>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.open_action_amount", language)} value={result.open_action_amount || 0} precision={2} /></Card></Col>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.comparison_basis", language)} value={rightId === "actual" ? t("budget.plan_actual", language) : t("budget.plan_plan", language)} valueStyle={{ fontSize: 18 }} /></Card></Col>
           </Row>
 
           <Card
@@ -262,6 +414,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
           </Card>
 
           <Card title={t("budget.by_contract_title", language)} style={{ borderRadius: 10 }}>
+            {rightId === "actual" && <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}><Button loading={savingActions} onClick={saveActions}>{t("budget.save_actions", language)}</Button></div>}
             <Table
               dataSource={result.by_contract}
               rowKey="contract_id"
@@ -303,6 +456,32 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                     </Tag>
                   ),
                 },
+                ...(rightId === "actual" ? [
+                  {
+                    title: t("budget.explanation", language),
+                    dataIndex: "explanation",
+                    width: 220,
+                    render: (_: string, row: ContractVariance) => <Input value={row.explanation || ""} placeholder={t("budget.explanation_placeholder", language)} onChange={(e) => updateRow(row.contract_id, { explanation: e.target.value })} />,
+                  },
+                  {
+                    title: t("budget.owner", language),
+                    dataIndex: "owner_name",
+                    width: 150,
+                    render: (_: string, row: ContractVariance) => <Input value={row.owner_name || ""} placeholder={t("budget.owner_placeholder", language)} onChange={(e) => updateRow(row.contract_id, { owner_name: e.target.value })} />,
+                  },
+                  {
+                    title: t("budget.due_date", language),
+                    dataIndex: "due_date",
+                    width: 130,
+                    render: (_: string, row: ContractVariance) => <Input value={row.due_date || ""} placeholder="YYYY-MM-DD" onChange={(e) => updateRow(row.contract_id, { due_date: e.target.value })} />,
+                  },
+                  {
+                    title: t("budget.status", language),
+                    dataIndex: "action_status",
+                    width: 130,
+                    render: (_: string, row: ContractVariance) => <Select value={row.action_status || "open"} style={{ width: 120 }} onChange={(value) => updateRow(row.contract_id, { action_status: value })} options={[{ value: "open", label: t("budget.status_open", language) }, { value: "in_progress", label: t("budget.status_in_progress", language) }, { value: "resolved", label: t("budget.status_resolved", language) }, { value: "accepted", label: t("budget.status_accepted", language) }]} />,
+                  },
+                ] : []),
               ]}
             />
           </Card>

@@ -9,8 +9,6 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
-const materialityThreshold = 0.01
-
 type Input struct {
 	EventID          string
 	ContractID       string
@@ -27,10 +25,14 @@ type Input struct {
 	// CPI indexation or a stepped ladder can be expressed. When absent the
 	// engine falls back to NewValue, so events recorded before clauses existed
 	// keep calculating exactly as they did.
-	Revision     *ifrs16.PaymentRevision
-	Currency     string
-	DiscountRate float64
-	Payments     []ifrs16.LeasePayment
+	Revision   *ifrs16.PaymentRevision
+	Currency   string
+	LeaseScope string
+	// MaterialityThreshold is an accounting policy input. Zero means do not
+	// suppress a non-zero adjustment when the policy is not configured.
+	MaterialityThreshold float64
+	DiscountRate         float64
+	Payments             []ifrs16.LeasePayment
 }
 
 type Adjustment struct {
@@ -80,6 +82,7 @@ func Calculate(input Input) (Result, error) {
 	calculation := ifrs16.LeaseCalculation{
 		CommencementDate: input.CommencementDate,
 		LeaseEndDate:     input.LeaseEndDate,
+		LeaseScope:       input.LeaseScope,
 		DiscountRate:     input.DiscountRate,
 		Payments:         originalPayments,
 		PrepaidRent: ifrs16.CalculatePrepaidRent(ifrs16.LeaseCalculation{
@@ -268,7 +271,7 @@ func buildJournalEntries(input Input, adjustment Adjustment) []JournalEntry {
 
 	if adjustment.Treatment == "impairment" {
 		amount := adjustment.ROUBefore - adjustment.ROUAfter
-		if amount <= materialityThreshold {
+		if amount <= input.MaterialityThreshold {
 			return nil
 		}
 		base.DebitAccount, base.CreditAccount = "6701-资产减值损失", "1702-使用权资产减值准备"
@@ -282,11 +285,11 @@ func buildJournalEntries(input Input, adjustment Adjustment) []JournalEntry {
 	}
 	base.Description = fmt.Sprintf("%s - 事件 %s", description, shortID)
 	entries := make([]JournalEntry, 0, 3)
-	if adjustment.LiabilityAdjustment > materialityThreshold {
+	if adjustment.LiabilityAdjustment > input.MaterialityThreshold {
 		entry := base
 		entry.DebitAccount, entry.CreditAccount, entry.Amount = "1701-使用权资产", "2801-租赁负债", adjustment.LiabilityAdjustment
 		entries = append(entries, entry)
-	} else if adjustment.LiabilityAdjustment < -materialityThreshold {
+	} else if adjustment.LiabilityAdjustment < -input.MaterialityThreshold {
 		entry := base
 		rouReduction := math.Abs(adjustment.ROUAdjustment)
 		if rouReduction > math.Abs(adjustment.LiabilityAdjustment) {
@@ -296,13 +299,13 @@ func buildJournalEntries(input Input, adjustment Adjustment) []JournalEntry {
 		entry.Description += " (负债减少)"
 		entries = append(entries, entry)
 	}
-	if adjustment.PnLGain > materialityThreshold {
+	if adjustment.PnLGain > input.MaterialityThreshold {
 		entry := base
 		entry.DebitAccount, entry.CreditAccount, entry.Amount = "2801-租赁负债", "6301-资产处置收益", adjustment.PnLGain
 		entry.Description += " (处置收益)"
 		entries = append(entries, entry)
 	}
-	if adjustment.PnLLoss > materialityThreshold {
+	if adjustment.PnLLoss > input.MaterialityThreshold {
 		entry := base
 		// A loss on a scope decrease is the asset written off beyond what the
 		// liability release absorbed, so it is credited against the right-of-use

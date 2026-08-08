@@ -7,23 +7,26 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/services/closereadiness"
 	"github.com/lease-management-system/core-service/internal/services/monthend"
 )
 
 type MonthlyClosingHandler struct {
-	mcRepo       *repository.MonthlyClosingRepository
-	contractRepo *repository.ContractRepository
-	closeService *monthend.Service
-	auditLogger  *audit.Logger
+	mcRepo           *repository.MonthlyClosingRepository
+	contractRepo     *repository.ContractRepository
+	closeService     *monthend.Service
+	readinessService *closereadiness.Service
+	auditLogger      *audit.Logger
 }
 
-func NewMonthlyClosingHandler(mcRepo *repository.MonthlyClosingRepository, contractRepo *repository.ContractRepository, closeService *monthend.Service, auditLogger *audit.Logger) *MonthlyClosingHandler {
-	return &MonthlyClosingHandler{mcRepo: mcRepo, contractRepo: contractRepo, closeService: closeService, auditLogger: auditLogger}
+func NewMonthlyClosingHandler(mcRepo *repository.MonthlyClosingRepository, contractRepo *repository.ContractRepository, closeService *monthend.Service, readinessService *closereadiness.Service, auditLogger *audit.Logger) *MonthlyClosingHandler {
+	return &MonthlyClosingHandler{mcRepo: mcRepo, contractRepo: contractRepo, closeService: closeService, readinessService: readinessService, auditLogger: auditLogger}
 }
 
 type GenerateMonthlyClosingRequest struct {
@@ -81,6 +84,36 @@ func (h *MonthlyClosingHandler) Generate(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, result)
+}
+
+// Readiness returns a deterministic, read-only preflight for the selected
+// period. It does not authorize close, posting or period lock; those decisions
+// remain behind the existing month-end workflow.
+func (h *MonthlyClosingHandler) Readiness(c *gin.Context) {
+	period := strings.TrimSpace(c.Query("period"))
+	if _, err := time.Parse("2006-01", period); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "会计期间格式应为 YYYY-MM"})
+		return
+	}
+	if h.readinessService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "月结准备度服务不可用"})
+		return
+	}
+
+	scope, scopeAvailable := middleware.GetAccessScope(c)
+	scopeComplete := scopeAvailable && (scope.Global ||
+		(scope.LegalEntityID != "" && len(scope.StoreIDs) == 0 && len(scope.Regions) == 0 && len(scope.Brands) == 0))
+
+	result, err := h.readinessService.Evaluate(c.Request.Context(), closereadiness.Command{
+		AccountingPeriod: period,
+		LegalEntityID:    middleware.GetTenantID(c),
+		ScopeComplete:    scopeComplete,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, result)
 }
 
@@ -241,7 +274,15 @@ func (h *MonthlyClosingHandler) PostBatch(c *gin.Context) {
 func (h *MonthlyClosingHandler) ExportJournalEntries(c *gin.Context) {
 	period := c.Query("period")
 	status := c.DefaultQuery("status", "approved")
-	template := c.DefaultQuery("template", "kingdee")
+	template := strings.TrimSpace(c.Query("template"))
+	if template == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请提供 ERP 导出模板标识"})
+		return
+	}
+	if strings.ContainsAny(template, `/\\:\"'`) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ERP 导出模板标识包含非法字符"})
+		return
+	}
 	legalEntityID := middleware.GetTenantID(c)
 
 	entries, err := h.mcRepo.GetJournalEntriesForExport(c.Request.Context(), legalEntityID, period, status)
@@ -323,6 +364,10 @@ func (h *MonthlyClosingHandler) LockPeriod(c *gin.Context) {
 	legalEntityID := middleware.GetTenantID(c)
 
 	if err := h.mcRepo.LockPeriod(c.Request.Context(), period, legalEntityID, userIDStr); err != nil {
+		if errors.Is(err, repository.ErrUnresolvedBlockingExceptions) {
+			c.JSON(http.StatusConflict, gin.H{"error": "本期间仍有未解决的阻塞性异常，完成解决或受控豁免后才能锁账", "blocking_exceptions": true})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

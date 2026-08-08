@@ -18,6 +18,7 @@ func TestCalculateEarlyTerminationReturnsOneReusableAccountingPlan(t *testing.T)
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &newEndDate,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
@@ -79,6 +80,7 @@ func TestCalculateRentModificationUsesRevisedFuturePayments(t *testing.T) {
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &newRent,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
@@ -114,6 +116,7 @@ func TestCalculateDiscountRateChangeIsReassessmentAtRevisedRate(t *testing.T) {
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &newRate,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
@@ -145,6 +148,7 @@ func TestCalculateImpairmentReducesROUWithoutRemeasuringLiability(t *testing.T) 
 		LeaseEndDate:     date("2026-01-01"),
 		NewValue:         &postImpairmentROU,
 		Currency:         "CNY",
+		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},

@@ -15,6 +15,16 @@ func store(code string, rent float64, sales *float64) StoreInput {
 	}
 }
 
+func policyInput(input Input) Input {
+	if input.HealthyCeiling <= 0 {
+		input.HealthyCeiling = 15
+	}
+	if input.WarningCeiling <= 0 {
+		input.WarningCeiling = 20
+	}
+	return input
+}
+
 func find(t *testing.T, result Result, code string) StoreRatio {
 	t.Helper()
 	for _, row := range result.Stores {
@@ -27,11 +37,11 @@ func find(t *testing.T, result Result, code string) StoreRatio {
 }
 
 func TestCalculate_BandsTheRatioAgainstTheThresholds(t *testing.T) {
-	result, err := Calculate(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
 		store("HEALTHY", 100000, revenue(1000000)), // 10%
 		store("WATCH", 180000, revenue(1000000)),   // 18%
 		store("OVER", 250000, revenue(1000000)),    // 25%
-	}})
+	}}))
 	if err != nil {
 		t.Fatalf("Calculate: %v", err)
 	}
@@ -56,11 +66,11 @@ func TestCalculate_KeepsUnknownApartFromZeroAndFromMismatch(t *testing.T) {
 	mismatch := store("FX", 100000, revenue(1000000))
 	mismatch.RevenueCurrency = "USD"
 
-	result, err := Calculate(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
 		store("UNREPORTED", 100000, nil),
 		store("ZERO", 100000, revenue(0)),
 		mismatch,
-	}})
+	}}))
 	if err != nil {
 		t.Fatalf("Calculate: %v", err)
 	}
@@ -85,10 +95,10 @@ func TestCalculate_KeepsUnknownApartFromZeroAndFromMismatch(t *testing.T) {
 // A portfolio ratio computed over the stores that happen to have data reads as
 // though it covered them all.
 func TestCalculate_WithholdsThePortfolioRatioWhenCoverageIsPartial(t *testing.T) {
-	partial, err := Calculate(Input{Period: "2026-06", Stores: []StoreInput{
+	partial, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
 		store("A", 100000, revenue(1000000)),
 		store("B", 100000, nil),
-	}})
+	}}))
 	if err != nil {
 		t.Fatalf("Calculate: %v", err)
 	}
@@ -99,10 +109,10 @@ func TestCalculate_WithholdsThePortfolioRatioWhenCoverageIsPartial(t *testing.T)
 		t.Error("withholding the figure needs to be explained, not silent")
 	}
 
-	full, err := Calculate(Input{Period: "2026-06", Stores: []StoreInput{
+	full, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
 		store("A", 100000, revenue(1000000)),
 		store("B", 300000, revenue(1000000)),
-	}})
+	}}))
 	if err != nil {
 		t.Fatalf("Calculate: %v", err)
 	}
@@ -116,11 +126,11 @@ func TestCalculate_WithholdsThePortfolioRatioWhenCoverageIsPartial(t *testing.T)
 }
 
 func TestCalculate_SortsWorstFirstAndUnknownLast(t *testing.T) {
-	result, err := Calculate(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
 		store("LOW", 50000, revenue(1000000)),
 		store("UNKNOWN", 90000, nil),
 		store("HIGH", 300000, revenue(1000000)),
-	}})
+	}}))
 	if err != nil {
 		t.Fatalf("Calculate: %v", err)
 	}
@@ -138,10 +148,10 @@ func TestCalculate_SalesPerSqmOnlyWhenAreaIsKnown(t *testing.T) {
 	withArea := store("WITH", 100000, revenue(1000000))
 	withArea.AreaSqm = &area
 
-	result, err := Calculate(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
 		withArea,
 		store("WITHOUT", 100000, revenue(1000000)),
-	}})
+	}}))
 	if err != nil {
 		t.Fatalf("Calculate: %v", err)
 	}
@@ -181,10 +191,10 @@ func TestCalculate_RejectsInputItCannotJudge(t *testing.T) {
 }
 
 func TestCalculate_CoverageStatementNamesTheSourceOfTheNumbers(t *testing.T) {
-	result, err := Calculate(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
 		store("A", 100000, revenue(1000000)),
 		store("B", 100000, nil),
-	}})
+	}}))
 	if err != nil {
 		t.Fatalf("Calculate: %v", err)
 	}

@@ -213,10 +213,10 @@ function ReportsPageContent() {
   /* ---- Tab 2: amortisation ---- */
   const [amortView, setAmortView] = useState<"contract" | "store" | "tag" | "summary">("contract");
   const [amortGranularity, setAmortGranularity] = useState<"day" | "month" | "quarter" | "half_year" | "year">("month");
-  const [amortDateRange, setAmortDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>([
-    dayjs("2024-01-01"),
-    dayjs("2024-12-31"),
-  ]);
+	const [amortDateRange, setAmortDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>([
+		dayjs().startOf("year"),
+		dayjs().endOf("year"),
+	]);
   const [amortContractId, setAmortContractId] = useState("");
   const [amortStore, setAmortStore] = useState("");
   const [amortTag, setAmortTag] = useState("");
@@ -322,7 +322,7 @@ function ReportsPageContent() {
   const handleAmortReset = () => {
     setAmortView("contract");
     setAmortGranularity("month");
-    setAmortDateRange([dayjs("2024-01-01"), dayjs("2024-12-31")]);
+    setAmortDateRange([dayjs().startOf("year"), dayjs().endOf("year")]);
     setAmortContractId("");
     setAmortStore("");
     setAmortTag("");
@@ -868,19 +868,13 @@ function ReportsPageContent() {
                                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
                                    {t("reports.report_currency", language)}
                                  </span>
-                                 <Select
-                                   size="small"
-                                   value={reportCurrency || undefined}
-                                   onChange={(v) => { setReportCurrency(v || ""); setAmortFetched(false); }}
-                                   style={{ width: "100%" }}
-                                   placeholder={t("reports.select_currency", language)}
+                                <Input
+                                  size="small"
+                                  value={reportCurrency}
+                                  onChange={(e) => { setReportCurrency(e.target.value.toUpperCase()); setAmortFetched(false); }}
+                                  style={{ width: "100%" }}
+                                  placeholder="ISO 4217"
                                   allowClear
-                                   options={[
-                                    { value: "CNY", label: t("reports.option.currency_cny", language) },
-                                    { value: "USD", label: t("reports.option.currency_usd", language) },
-                                    { value: "HKD", label: t("reports.option.currency_hkd", language) },
-                                    { value: "EUR", label: t("reports.option.currency_eur", language) },
-                                  ]}
                                 />
                               </div>
                             </Col>

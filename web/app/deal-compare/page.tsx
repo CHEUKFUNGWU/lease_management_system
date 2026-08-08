@@ -55,25 +55,25 @@ const LINE_COLORS = ["#1677FF", "#CF1322", "#389E0D", "#D48806", "#722ED1"];
 const INITIAL_OFFERS = [
   {
     name: "方案 A",
-    term_months: 60,
-    base_monthly_rent: 100000,
-    rent_free_months: 6,
-    annual_escalation_percent: 5,
-    other_monthly_cost: 0,
-    upfront_cost: 0,
-    landlord_contribution: 0,
-    area_sqm: 500,
+    term_months: undefined,
+    base_monthly_rent: undefined,
+    rent_free_months: undefined,
+    annual_escalation_percent: undefined,
+    other_monthly_cost: undefined,
+    upfront_cost: undefined,
+    landlord_contribution: undefined,
+    area_sqm: undefined,
   },
   {
     name: "方案 B",
-    term_months: 60,
-    base_monthly_rent: 100000,
-    rent_free_months: 0,
-    annual_escalation_percent: 0,
-    other_monthly_cost: 0,
-    upfront_cost: 0,
-    landlord_contribution: 0,
-    area_sqm: 500,
+    term_months: undefined,
+    base_monthly_rent: undefined,
+    rent_free_months: undefined,
+    annual_escalation_percent: undefined,
+    other_monthly_cost: undefined,
+    upfront_cost: undefined,
+    landlord_contribution: undefined,
+    area_sqm: undefined,
   },
 ];
 
@@ -91,7 +91,7 @@ export default function DealComparePage() {
         await dealApi.compare(
           {
             discount_rate: values.discount_rate,
-            currency: values.currency || "CNY",
+            currency: values.currency,
             offers: (values.offers || []).map((offer: any) => ({
               ...offer,
               // The form keeps blanks as null; the engine reads them as zero.
@@ -148,7 +148,7 @@ export default function DealComparePage() {
             form={form}
             layout="vertical"
             onFinish={handleCompare}
-            initialValues={{ discount_rate: 0.05, currency: "CNY", offers: INITIAL_OFFERS }}
+            initialValues={{ offers: INITIAL_OFFERS }}
           >
             <Card style={{ borderRadius: 10, marginBottom: 16 }}>
               <Row gutter={16}>
@@ -163,8 +163,8 @@ export default function DealComparePage() {
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={8}>
-                  <Form.Item label="币种" name="currency">
-                    <Input placeholder="CNY" />
+                  <Form.Item label="币种" name="currency" rules={[{ required: true, message: "请填写币种" }]}>
+                    <Input placeholder="ISO 4217" />
                   </Form.Item>
                 </Col>
               </Row>

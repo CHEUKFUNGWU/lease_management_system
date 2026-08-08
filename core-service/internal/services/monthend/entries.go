@@ -33,28 +33,20 @@ func measurementResult(contractID, period string, periodStart, periodEnd time.Ti
 	}
 }
 
-// defaultEntryCurrency is used only when a contract carries no currency of its
-// own, which the contract repository already prevents for new records.
-const defaultEntryCurrency = "CNY"
-
 // buildJournalEntries produces the draft journal entries for one contract-period
 // from its monthly IFRS 16 entry. Capitalized leases yield interest,
 // depreciation, payment, variable-rent and non-lease entries; exempt
 // (straight-line) leases yield expense, variable-rent and non-lease entries.
-// Only non-trivial amounts (> 0.01) produce an entry.
+// Only amounts above the configured materiality threshold produce an entry.
 //
 // Entries are denominated in the contract's own currency. This subledger does
 // not translate foreign-currency leases: translation and any resulting exchange
 // difference belong to the general ledger.
-func buildJournalEntries(contractID, currency, period string, entryDate time.Time, monthly *ifrs16svc.MonthlyEntry, batchID, measurementBasis string) []*repository.JournalEntry {
+func buildJournalEntries(contractID, currency, period string, entryDate time.Time, monthly *ifrs16svc.MonthlyEntry, batchID, measurementBasis string, materialityThreshold float64) []*repository.JournalEntry {
 	var entries []*repository.JournalEntry
 
-	if currency == "" {
-		currency = defaultEntryCurrency
-	}
-
 	add := func(entryType, debit, credit string, amount float64, desc string) {
-		if amount <= 0.01 {
+		if amount <= materialityThreshold {
 			return
 		}
 		entries = append(entries, &repository.JournalEntry{

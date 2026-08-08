@@ -16,20 +16,20 @@ CREATE TABLE IF NOT EXISTS store_metrics (
     -- follows is the customer's business, so period_basis records what they
     -- told us rather than assuming a natural month.
     period VARCHAR(7) NOT NULL,
-    period_basis VARCHAR(20) NOT NULL DEFAULT 'calendar_month',
+    period_basis VARCHAR(20) NOT NULL,
 
     revenue DECIMAL(18, 2) NOT NULL,
     gross_profit DECIMAL(18, 2),
     -- Sales in one currency against rent in another is not a ratio, so the
     -- currency travels with the figure and the report checks it.
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
 
     -- Revenue gets restated. version keeps the earlier submission rather than
     -- overwriting it, so a report can say which vintage it was based on.
     version INTEGER NOT NULL DEFAULT 1,
     -- Where the figure came from: 'manual', 'api', 'ai_upload'. Reports name it
     -- so a reader knows how much weight it carries.
-    source VARCHAR(50) NOT NULL DEFAULT 'manual',
+    source VARCHAR(50) NOT NULL,
     note TEXT,
 
     created_by UUID REFERENCES users(id),

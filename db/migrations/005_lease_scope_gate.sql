@@ -1,7 +1,7 @@
 -- IFRS 16 scope gate: distinguish capitalized leases, exemptions, and non-lease contracts.
 
 ALTER TABLE lease_contracts
-    ADD COLUMN IF NOT EXISTS lease_scope VARCHAR(50) NOT NULL DEFAULT 'in_scope'
+    ADD COLUMN IF NOT EXISTS lease_scope VARCHAR(50) NOT NULL
         CHECK (lease_scope IN ('in_scope', 'short_term_exempt', 'low_value_exempt', 'not_a_lease')),
     ADD COLUMN IF NOT EXISTS exemption_reason TEXT,
     ADD COLUMN IF NOT EXISTS scope_classified_by UUID REFERENCES users(id),

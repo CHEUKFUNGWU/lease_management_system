@@ -146,7 +146,7 @@ func accountingResultForPersistenceTest(t *testing.T) Result {
 		EventID: "event-1", ContractID: "contract-1", EventType: "early_termination",
 		EffectiveDate: date("2025-01-01"), CommencementDate: date("2024-01-01"),
 		LeaseEndDate: date("2026-01-01"), NewValue: &newEndDate,
-		Currency: "CNY", DiscountRate: 0.05,
+		Currency: "CNY", LeaseScope: ifrs16.LeaseScopeInScope, DiscountRate: 0.05,
 		Payments: fixedPaymentsForPersistenceTest(),
 	})
 	if err != nil {

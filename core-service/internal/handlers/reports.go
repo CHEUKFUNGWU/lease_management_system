@@ -26,7 +26,9 @@ type SensitivityScenarioRow = reporting.SensitivityRow
 type StandardComparisonRow = reporting.StandardComparisonRow
 
 type ReportHandler struct {
-	snapshotBuilder *reporting.SnapshotBuilder
+	snapshotBuilder    *reporting.SnapshotBuilder
+	closeControlRepo   *repository.CloseControlRepository
+	monthlyClosingRepo *repository.MonthlyClosingRepository
 }
 
 func NewReportHandler(
@@ -35,10 +37,17 @@ func NewReportHandler(
 	mcRepo *repository.MonthlyClosingRepository,
 	systemSettingRepo *repository.SystemSettingRepository,
 	masterDataRepo *repository.MasterDataRepository,
+	closeControlRepos ...*repository.CloseControlRepository,
 ) *ReportHandler {
+	var closeControlRepo *repository.CloseControlRepository
+	if len(closeControlRepos) > 0 {
+		closeControlRepo = closeControlRepos[0]
+	}
 	return &ReportHandler{
 		snapshotBuilder: reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo, mcRepo).
 			WithStores(masterDataRepo),
+		closeControlRepo:   closeControlRepo,
+		monthlyClosingRepo: mcRepo,
 	}
 }
 
@@ -78,9 +87,10 @@ func (h *ReportHandler) SensitivityAnalysis(c *gin.Context) {
 				shocks = append(shocks, value)
 			}
 		}
-		if len(shocks) == 0 {
-			shocks = []float64{0}
-		}
+	}
+	if len(shocks) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "shocks is required and must contain at least one numeric rate change"})
+		return
 	}
 	h.projectJSON(c, reporting.Working, reporting.ProjectionRequest{
 		Kind: reporting.KindSensitivity, ContractID: contractID, Rate: baseRate, Shocks: shocks,
@@ -229,6 +239,75 @@ func (h *ReportHandler) Disclosure(c *gin.Context) {
 	})
 }
 
+// ClosePack aggregates the disclosure/audit package with the close evidence
+// for a single accounting period. It is still read-only: it does not resolve
+// exceptions, approve a batch or change an Official snapshot.
+func (h *ReportHandler) ClosePack(c *gin.Context) {
+	period := strings.TrimSpace(c.Query("period"))
+	periodStart, err := time.Parse("2006-01", period)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "period 格式应为 YYYY-MM"})
+		return
+	}
+	periodEnd := periodStart.AddDate(0, 1, -1)
+	mode := reporting.NormalizeMode(c.Query("mode"))
+	snapshot, ok := h.buildSnapshot(c, mode)
+	if !ok {
+		return
+	}
+	disclosure, err := reporting.Project(snapshot, reporting.ProjectionRequest{
+		Kind: reporting.KindDisclosure, StartDate: periodStart, EndDate: periodEnd,
+	})
+	if err != nil {
+		writeProjectionError(c, err)
+		return
+	}
+	var exceptions []closeControlExceptionResponse
+	if h.closeControlRepo != nil {
+		items, listErr := h.closeControlRepo.ListExceptions(c.Request.Context(), period, middleware.GetTenantID(c))
+		if listErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": listErr.Error()})
+			return
+		}
+		exceptions = make([]closeControlExceptionResponse, 0, len(items))
+		for _, item := range items {
+			exceptions = append(exceptions, closeControlExceptionResponse{
+				ID: item.ID, RuleCode: item.RuleCode, Severity: item.Severity,
+				ExceptionState: item.ExceptionState, ClosingDisposition: item.ClosingDisposition,
+				ContractNumber: item.ContractNumber, BatchNumber: item.BatchNumber,
+			})
+		}
+	}
+	var batches []*repository.MonthlyClosingBatch
+	if h.monthlyClosingRepo != nil {
+		batches, err = h.monthlyClosingRepo.GetBatches(c.Request.Context(), period, middleware.GetTenantID(c))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"period":                period,
+		"mode":                  mode,
+		"is_official":           mode == reporting.Official,
+		"report_basis":          disclosure.Payload["report_basis"],
+		"disclosure":            disclosure.Payload,
+		"close_exceptions":      exceptions,
+		"monthly_close_batches": batches,
+		"exception_count":       len(exceptions),
+	})
+}
+
+type closeControlExceptionResponse struct {
+	ID                 string `json:"id"`
+	RuleCode           string `json:"rule_code"`
+	Severity           string `json:"severity"`
+	ExceptionState     string `json:"exception_state"`
+	ClosingDisposition string `json:"closing_disposition"`
+	ContractNumber     string `json:"contract_number,omitempty"`
+	BatchNumber        string `json:"batch_number,omitempty"`
+}
+
 func (h *ReportHandler) projectJSON(c *gin.Context, mode reporting.Mode, request reporting.ProjectionRequest) {
 	snapshot, ok := h.buildSnapshot(c, mode)
 	if !ok {
@@ -258,6 +337,8 @@ func writeProjectionError(c *gin.Context, err error) {
 	case errors.Is(err, reporting.ErrContractNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 	case errors.Is(err, reporting.ErrPaymentSchedulesRequired):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, reporting.ErrSensitivityShocksRequired):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, contractsvc.ErrDiscountRateRequired):
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "discount_rate_missing": true})

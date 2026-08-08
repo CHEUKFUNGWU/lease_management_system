@@ -204,14 +204,21 @@ export const contractApi = {
   // landlord's asking uplift costs, and how the store is actually trading.
   renewalCard: (
     id: string,
-    params: { renewal_term_months?: number; uplift_percent?: number },
+    params: { renewal_term_months?: number; uplift_percent?: number; rent_free_months?: number; annual_escalation_percent?: number; early_exit_penalty_months?: number },
     token: string
   ) => {
     const qs = new URLSearchParams();
     if (params.renewal_term_months) qs.append("renewal_term_months", String(params.renewal_term_months));
     if (params.uplift_percent != null) qs.append("uplift_percent", String(params.uplift_percent));
+    if (params.rent_free_months != null) qs.append("rent_free_months", String(params.rent_free_months));
+    if (params.annual_escalation_percent != null) qs.append("annual_escalation_percent", String(params.annual_escalation_percent));
+    if (params.early_exit_penalty_months != null) qs.append("early_exit_penalty_months", String(params.early_exit_penalty_months));
     return apiRequest(`/api/v1/contracts/${id}/renewal-card?${qs.toString()}`, { token });
   },
+  createRenewalDecision: (id: string, data: any, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/renewal-decisions`, { method: "POST", body: JSON.stringify(data), token }),
+  listRenewalDecisions: (id: string, token: string) =>
+    apiRequest(`/api/v1/contracts/${id}/renewal-decisions`, { token }),
 
   getDiscountRateStatus: (id: string, token: string) =>
     apiRequest(`/api/v1/contracts/${id}/discount-rate-status`, { token }),
@@ -395,6 +402,21 @@ export const leaseAdminApi = {
 
 // Monthly Closing APIs
 export const monthlyClosingApi = {
+  getReadiness: (period: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/readiness?period=${encodeURIComponent(period)}`, { token }),
+  listExceptions: (period: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/periods/${encodeURIComponent(period)}/exceptions`, { token }),
+  detectExceptions: (period: string, token: string) =>
+    apiRequest(`/api/v1/monthly-closing/periods/${encodeURIComponent(period)}/exceptions/detect`, {
+      method: "POST",
+      token,
+    }),
+  applyExceptionAction: (exceptionId: string, data: { action: string; owner_id?: string; note: string }, token: string) =>
+    apiRequest(`/api/v1/close-exceptions/${encodeURIComponent(exceptionId)}/actions`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
   generate: (data: any, token: string) =>
     apiRequest("/api/v1/monthly-closing/generate", {
       method: "POST",
@@ -682,6 +704,11 @@ export const reportApi = {
     return apiRequest(`/api/v1/reports/disclosure?${qs.toString()}`, { token });
   },
 
+  closePack: (params: { mode: "working" | "official"; period: string }, token: string) => {
+    const qs = new URLSearchParams({ mode: params.mode, period: params.period });
+    return apiRequest(`/api/v1/reports/close-pack?${qs.toString()}`, { token });
+  },
+
   // Projects portfolio outflow under an estates plan. The baseline is always
   // run alongside, because a scenario means nothing without what it moved from.
   cashflowScenario: (
@@ -778,10 +805,16 @@ export const auditApi = {
 // Settings APIs
 export const budgetApi = {
   listVersions: (token: string) => apiRequest("/api/v1/budget-versions", { token }),
-  createVersion: (data: { name: string; from_period: string; to_period: string }, token: string) =>
+  createVersion: (data: { name: string; version_type?: string; source?: string; coverage_scope?: string; is_official?: boolean; from_period: string; to_period: string }, token: string) =>
     apiRequest("/api/v1/budget-versions", { method: "POST", body: JSON.stringify(data), token }),
   variance: (versionId: string, period: string, token: string) =>
     apiRequest(`/api/v1/budget-versions/${versionId}/variance?period=${encodeURIComponent(period)}`, { token }),
+  compare: (leftId: string, rightId: string, period: string, token: string) =>
+    apiRequest(`/api/v1/budget-versions/compare?left_id=${encodeURIComponent(leftId)}&right_id=${encodeURIComponent(rightId)}&period=${encodeURIComponent(period)}`, { token }),
+  managementBrief: (budgetId: string, forecastId: string, period: string, token: string) =>
+    apiRequest(`/api/v1/budget-versions/management-brief?budget_id=${encodeURIComponent(budgetId)}&forecast_id=${encodeURIComponent(forecastId)}&period=${encodeURIComponent(period)}`, { token }),
+  saveVarianceActions: (versionId: string, data: { period: string; items: Array<{ contract_id: string; explanation: string; owner_name: string; due_date?: string; status: string }> }, token: string) =>
+    apiRequest(`/api/v1/budget-versions/${versionId}/variance-actions`, { method: "PUT", body: JSON.stringify(data), token }),
 };
 
 export const workQueueApi = {
@@ -820,7 +853,7 @@ export const exchangeRateApi = {
 export const settingsApi = {
   getGlobal: (token: string) =>
     apiRequest(`/api/v1/settings/global`, { token }),
-  updateGlobal: (data: { global_discount_rate: number }, token: string) =>
+  updateGlobal: (data: { global_discount_rate?: number; rent_to_sales_healthy_ceiling?: number; rent_to_sales_warning_ceiling?: number; budget_variance_materiality_threshold?: number; budget_tie_out_tolerance?: number; journal_entry_materiality_threshold?: number }, token: string) =>
     apiRequest(`/api/v1/settings/global`, {
       method: "PUT",
       body: JSON.stringify(data),

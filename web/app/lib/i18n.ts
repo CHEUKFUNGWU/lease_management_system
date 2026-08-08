@@ -1839,6 +1839,21 @@ const dict: TranslationDict = {
     "zh-HK": "輸入 ERP 憑證號",
     en: "Enter ERP reference",
   },
+  "monthly.export_erp_csv": {
+    "zh-CN": "导出 ERP CSV",
+    "zh-HK": "導出 ERP CSV",
+    en: "Export ERP CSV",
+  },
+  "monthly.export_template_placeholder": {
+    "zh-CN": "ERP 模板标识",
+    "zh-HK": "ERP 模板標識",
+    en: "ERP template identifier",
+  },
+  "monthly.export_template_required": {
+    "zh-CN": "请先填写 ERP 导出模板标识",
+    "zh-HK": "請先填寫 ERP 導出模板標識",
+    en: "Enter an ERP export template identifier first",
+  },
   "monthly.ok": {
     "zh-CN": "确认",
     "zh-HK": "確認",
@@ -2345,6 +2360,16 @@ const dict: TranslationDict = {
     "zh-HK": "對比",
     en: "Compare",
   },
+  "budget.compare_to": {
+    "zh-CN": "比较至",
+    "zh-HK": "比較至",
+    en: "Compare to",
+  },
+  "budget.period_placeholder": {
+    "zh-CN": "期间 YYYY-MM",
+    "zh-HK": "期間 YYYY-MM",
+    en: "Period YYYY-MM",
+  },
   "budget.freeze": {
     "zh-CN": "固化当前计量为预算",
     "zh-HK": "固化當前計量為預算",
@@ -2359,6 +2384,31 @@ const dict: TranslationDict = {
     "zh-CN": "预算版本名称,如 2026 年度预算",
     "zh-HK": "預算版本名稱,如 2026 年度預算",
     en: "Version name, e.g. FY2026 budget",
+  },
+  "budget.source_placeholder": {
+    "zh-CN": "来源（必填）",
+    "zh-HK": "來源（必填）",
+    en: "Source (required)",
+  },
+  "budget.from_period": {
+    "zh-CN": "起始期间",
+    "zh-HK": "起始期間",
+    en: "From period",
+  },
+  "budget.to_period": {
+    "zh-CN": "结束期间",
+    "zh-HK": "結束期間",
+    en: "To period",
+  },
+  "budget.coverage_scope": {
+    "zh-CN": "覆盖范围",
+    "zh-HK": "覆蓋範圍",
+    en: "Coverage scope",
+  },
+  "budget.version_metadata_required": {
+    "zh-CN": "来源、起始期间和结束期间均为必填项",
+    "zh-HK": "來源、起始期間和結束期間均為必填項",
+    en: "Source, from period and to period are required",
   },
   "budget.name_required": {
     "zh-CN": "请填写预算版本名称",
@@ -2450,6 +2500,26 @@ const dict: TranslationDict = {
     "zh-HK": "租金變更",
     en: "Rent change",
   },
+  "budget.cause_index_adjustment": {
+    "zh-CN": "指数调整",
+    "zh-HK": "指數調整",
+    en: "Index adjustment",
+  },
+  "budget.cause_discount_rate": {
+    "zh-CN": "折现率/重估利率",
+    "zh-HK": "折現率/重估利率",
+    en: "Discount rate",
+  },
+  "budget.cause_payment_timing": {
+    "zh-CN": "付款时点",
+    "zh-HK": "付款時點",
+    en: "Payment timing",
+  },
+  "budget.cause_data_correction": {
+    "zh-CN": "数据修正",
+    "zh-HK": "數據修正",
+    en: "Data correction",
+  },
   "budget.cause_exchange_rate": {
     "zh-CN": "汇率",
     "zh-HK": "匯率",
@@ -2459,6 +2529,466 @@ const dict: TranslationDict = {
     "zh-CN": "其他(事件未解释)",
     "zh-HK": "其他(事件未解釋)",
     en: "Other (unexplained)",
+  },
+  "budget.actual_measurement_readonly": {
+    "zh-CN": "Actual（计量结果，只读）",
+    "zh-HK": "Actual（計量結果，只讀）",
+    en: "Actual (measurement results, read-only)",
+  },
+  "budget.type_budget": {
+    "zh-CN": "预算",
+    "zh-HK": "預算",
+    en: "Budget",
+  },
+  "budget.type_forecast": {
+    "zh-CN": "预测 / LE",
+    "zh-HK": "預測 / LE",
+    en: "Forecast / LE",
+  },
+  "budget.type_scenario": {
+    "zh-CN": "情景",
+    "zh-HK": "情景",
+    en: "Scenario",
+  },
+  "budget.measurement_source_hint": {
+    "zh-CN": "Actual 来自 measurement_results；Forecast / Scenario 只作为冻结假设层，不会覆盖原 Budget。",
+    "zh-HK": "Actual 來自 measurement_results；Forecast / Scenario 只作為凍結假設層，不會覆蓋原 Budget。",
+    en: "Actual comes from measurement_results. Forecast and Scenario remain frozen assumption layers and do not overwrite the Budget.",
+  },
+  "budget.brief_title": {
+    "zh-CN": "三口径管理简报 · {period}",
+    "zh-HK": "三口徑管理簡報 · {period}",
+    en: "Three-view management brief · {period}",
+  },
+  "budget.brief_budget": {
+    "zh-CN": "Budget · {name}",
+    "zh-HK": "Budget · {name}",
+    en: "Budget · {name}",
+  },
+  "budget.brief_forecast": {
+    "zh-CN": "Latest Estimate · {name}",
+    "zh-HK": "Latest Estimate · {name}",
+    en: "Latest Estimate · {name}",
+  },
+  "budget.brief_actual": {
+    "zh-CN": "Actual · measurement_results",
+    "zh-HK": "Actual · measurement_results",
+    en: "Actual · measurement_results",
+  },
+  "budget.brief_variance": {
+    "zh-CN": "Forecast vs Budget：{forecastBudget}；Actual vs Budget：{actualBudget}；Actual vs Forecast：{actualForecast}。三者均为租赁成本（利息 + 折旧）口径。",
+    "zh-HK": "Forecast vs Budget：{forecastBudget}；Actual vs Budget：{actualBudget}；Actual vs Forecast：{actualForecast}。三者均為租賃成本（利息 + 折舊）口徑。",
+    en: "Forecast vs Budget: {forecastBudget}; Actual vs Budget: {actualBudget}; Actual vs Forecast: {actualForecast}. All three use lease cost (interest + depreciation).",
+  },
+  "budget.explanation_coverage": {
+    "zh-CN": "解释覆盖率",
+    "zh-HK": "解釋覆蓋率",
+    en: "Explanation coverage",
+  },
+  "budget.open_actions": {
+    "zh-CN": "待跟进项",
+    "zh-HK": "待跟進項",
+    en: "Open actions",
+  },
+  "budget.open_action_amount": {
+    "zh-CN": "待跟进金额",
+    "zh-HK": "待跟進金額",
+    en: "Open action amount",
+  },
+  "budget.comparison_basis": {
+    "zh-CN": "比较口径",
+    "zh-HK": "比較口徑",
+    en: "Comparison basis",
+  },
+  "budget.plan_actual": {
+    "zh-CN": "Plan → Actual",
+    "zh-HK": "Plan → Actual",
+    en: "Plan → Actual",
+  },
+  "budget.plan_plan": {
+    "zh-CN": "Plan → Plan",
+    "zh-HK": "Plan → Plan",
+    en: "Plan → Plan",
+  },
+  "budget.save_actions": {
+    "zh-CN": "保存差异行动",
+    "zh-HK": "保存差異行動",
+    en: "Save variance actions",
+  },
+  "budget.actions_saved": {
+    "zh-CN": "差异跟进行动已保存",
+    "zh-HK": "差異跟進行動已保存",
+    en: "Variance actions saved",
+  },
+  "budget.actions_save_failed": {
+    "zh-CN": "差异行动保存失败",
+    "zh-HK": "差異行動保存失敗",
+    en: "Failed to save variance actions",
+  },
+  "budget.explanation": {
+    "zh-CN": "解释",
+    "zh-HK": "解釋",
+    en: "Explanation",
+  },
+  "budget.explanation_placeholder": {
+    "zh-CN": "补充人工解释",
+    "zh-HK": "補充人工解釋",
+    en: "Add a human explanation",
+  },
+  "budget.owner": {
+    "zh-CN": "责任人",
+    "zh-HK": "責任人",
+    en: "Owner",
+  },
+  "budget.owner_placeholder": {
+    "zh-CN": "团队/责任人",
+    "zh-HK": "團隊/責任人",
+    en: "Team / owner",
+  },
+  "budget.due_date": {
+    "zh-CN": "截止日期",
+    "zh-HK": "截止日期",
+    en: "Due date",
+  },
+  "budget.status": {
+    "zh-CN": "状态",
+    "zh-HK": "狀態",
+    en: "Status",
+  },
+  "budget.status_open": {
+    "zh-CN": "待处理",
+    "zh-HK": "待處理",
+    en: "Open",
+  },
+  "budget.status_in_progress": {
+    "zh-CN": "处理中",
+    "zh-HK": "處理中",
+    en: "In progress",
+  },
+  "budget.status_resolved": {
+    "zh-CN": "已解决",
+    "zh-HK": "已解決",
+    en: "Resolved",
+  },
+  "budget.status_accepted": {
+    "zh-CN": "已接受",
+    "zh-HK": "已接受",
+    en: "Accepted",
+  },
+  "renewal.title": {
+    "zh-CN": "续租决策卡",
+    "zh-HK": "續租決策卡",
+    en: "Renewal decision card",
+  },
+  "renewal.term": {
+    "zh-CN": "续租租期",
+    "zh-HK": "續租租期",
+    en: "Renewal term",
+  },
+  "renewal.month": {
+    "zh-CN": "月",
+    "zh-HK": "月",
+    en: "months",
+  },
+  "renewal.uplift": {
+    "zh-CN": "续租涨幅",
+    "zh-HK": "續租漲幅",
+    en: "Renewal uplift",
+  },
+  "renewal.rent_free": {
+    "zh-CN": "免租期",
+    "zh-HK": "免租期",
+    en: "Rent-free period",
+  },
+  "renewal.escalation": {
+    "zh-CN": "年递增",
+    "zh-HK": "年遞增",
+    en: "Annual escalation",
+  },
+  "renewal.exit_penalty": {
+    "zh-CN": "退出罚金",
+    "zh-HK": "退出罰金",
+    en: "Exit penalty",
+  },
+  "renewal.intro": {
+    "zh-CN": "续租不是日期提醒，而是一次经营与会计联合决策。请明确输入谈判假设后查看租金、现值、利润表和退出成本影响。",
+    "zh-HK": "續租不是日期提醒，而是一次經營與會計聯合決策。請明確輸入談判假設後查看租金、現值、損益表和退出成本影響。",
+    en: "Renewal is an operating and accounting decision, not just a date reminder. Enter explicit negotiation assumptions to view rent, present value, P&L and exit-cost impacts.",
+  },
+  "renewal.expiry_date": {
+    "zh-CN": "到期日",
+    "zh-HK": "到期日",
+    en: "Expiry date",
+  },
+  "renewal.day": {
+    "zh-CN": "天",
+    "zh-HK": "天",
+    en: "days",
+  },
+  "renewal.remaining_commitment": {
+    "zh-CN": "剩余承诺",
+    "zh-HK": "剩餘承諾",
+    en: "Remaining commitment",
+  },
+  "renewal.current_rent": {
+    "zh-CN": "当前月租",
+    "zh-HK": "當前月租",
+    en: "Current monthly rent",
+  },
+  "renewal.uplift_cost": {
+    "zh-CN": "涨幅成本（{percent}%）",
+    "zh-HK": "漲幅成本（{percent}%）",
+    en: "Uplift cost ({percent}%)",
+  },
+  "renewal.offer": {
+    "zh-CN": "方案",
+    "zh-HK": "方案",
+    en: "Offer",
+  },
+  "renewal.effective_monthly_rent": {
+    "zh-CN": "有效月租",
+    "zh-HK": "有效月租",
+    en: "Effective monthly rent",
+  },
+  "renewal.rent_per_sqm": {
+    "zh-CN": "每平米有效单价",
+    "zh-HK": "每平方米有效單價",
+    en: "Effective rent per sqm",
+  },
+  "renewal.total_rent": {
+    "zh-CN": "全期租金",
+    "zh-HK": "全期租金",
+    en: "Total rent",
+  },
+  "renewal.present_value": {
+    "zh-CN": "现值",
+    "zh-HK": "現值",
+    en: "Present value",
+  },
+  "renewal.scenarios": {
+    "zh-CN": "经营与会计情景",
+    "zh-HK": "經營與會計情景",
+    en: "Operating and accounting scenarios",
+  },
+  "renewal.scenario_notice": {
+    "zh-CN": "仅为情景假设，不会修改合同",
+    "zh-HK": "僅為情景假設，不會修改合同",
+    en: "Scenario assumptions only; the contract is not modified",
+  },
+  "renewal.year": {
+    "zh-CN": "年度",
+    "zh-HK": "年度",
+    en: "Year",
+  },
+  "renewal.cash_outflow": {
+    "zh-CN": "现金流出",
+    "zh-HK": "現金流出",
+    en: "Cash outflow",
+  },
+  "renewal.ifrs16_expense": {
+    "zh-CN": "IFRS 16 费用",
+    "zh-HK": "IFRS 16 費用",
+    en: "IFRS 16 expense",
+  },
+  "renewal.ebitda_impact": {
+    "zh-CN": "EBITDA 影响",
+    "zh-HK": "EBITDA 影響",
+    en: "EBITDA impact",
+  },
+  "renewal.ebit_impact": {
+    "zh-CN": "EBIT 影响",
+    "zh-HK": "EBIT 影響",
+    en: "EBIT impact",
+  },
+  "renewal.closing_liability": {
+    "zh-CN": "期末负债",
+    "zh-HK": "期末負債",
+    en: "Closing liability",
+  },
+  "renewal.closing_rou": {
+    "zh-CN": "期末 ROU",
+    "zh-HK": "期末 ROU",
+    en: "Closing ROU",
+  },
+  "renewal.liability_released": {
+    "zh-CN": "释放负债",
+    "zh-HK": "釋放負債",
+    en: "Liability released",
+  },
+  "renewal.rou_written_off": {
+    "zh-CN": "转销 ROU",
+    "zh-HK": "轉銷 ROU",
+    en: "ROU written off",
+  },
+  "renewal.penalty": {
+    "zh-CN": "退出罚金",
+    "zh-HK": "退出罰金",
+    en: "Penalty",
+  },
+  "renewal.total_cash_to_exit": {
+    "zh-CN": "退出现金成本",
+    "zh-HK": "退出現金成本",
+    en: "Total cash to exit",
+  },
+  "renewal.exit_summary": {
+    "zh-CN": "退出现金成本 {cash}；损益影响 {pnl}",
+    "zh-HK": "退出現金成本 {cash}；損益影響 {pnl}",
+    en: "Exit cash cost {cash}; P&L impact {pnl}",
+  },
+  "renewal.exit_detail": {
+    "zh-CN": "剩余承诺 {commitment}；释放负债 {liability}；转销 ROU {rou}",
+    "zh-HK": "剩餘承諾 {commitment}；釋放負債 {liability}；轉銷 ROU {rou}",
+    en: "Remaining commitment {commitment}; liability released {liability}; ROU written off {rou}",
+  },
+  "renewal.decision": {
+    "zh-CN": "决策",
+    "zh-HK": "決策",
+    en: "Decision",
+  },
+  "renewal.type": {
+    "zh-CN": "类型",
+    "zh-HK": "類型",
+    en: "Type",
+  },
+  "renewal.type_terminate": {
+    "zh-CN": "终止",
+    "zh-HK": "終止",
+    en: "Terminate",
+  },
+  "renewal.type_renegotiate": {
+    "zh-CN": "重谈",
+    "zh-HK": "重談",
+    en: "Renegotiate",
+  },
+  "renewal.type_renew": {
+    "zh-CN": "续租",
+    "zh-HK": "續租",
+    en: "Renew",
+  },
+  "renewal.monthly_rent": {
+    "zh-CN": "月租金",
+    "zh-HK": "月租金",
+    en: "Monthly rent",
+  },
+  "renewal.total_cash_outflow": {
+    "zh-CN": "现金总流出",
+    "zh-HK": "現金總流出",
+    en: "Total cash outflow",
+  },
+  "renewal.total_ifrs16_expense": {
+    "zh-CN": "IFRS 16 总费用",
+    "zh-HK": "IFRS 16 總費用",
+    en: "Total IFRS 16 expense",
+  },
+  "renewal.source": {
+    "zh-CN": "来源",
+    "zh-HK": "來源",
+    en: "Source",
+  },
+  "renewal.scenario_assumption": {
+    "zh-CN": "情景假设",
+    "zh-HK": "情景假設",
+    en: "Scenario assumption",
+  },
+  "renewal.owner_placeholder": {
+    "zh-CN": "业务负责人",
+    "zh-HK": "業務負責人",
+    en: "Business owner",
+  },
+  "renewal.opinion_placeholder": {
+    "zh-CN": "业务意见 / 谈判结论",
+    "zh-HK": "業務意見 / 談判結論",
+    en: "Business opinion / negotiation conclusion",
+  },
+  "renewal.evidence_placeholder": {
+    "zh-CN": "依据（经营数据、报价或合同条款）",
+    "zh-HK": "依據（經營數據、報價或合同條款）",
+    en: "Evidence (operating data, offer or contract clause)",
+  },
+  "renewal.save_snapshot": {
+    "zh-CN": "保存决策快照",
+    "zh-HK": "保存決策快照",
+    en: "Save decision snapshot",
+  },
+  "renewal.saved_count": {
+    "zh-CN": "已保存 {count} 次",
+    "zh-HK": "已保存 {count} 次",
+    en: "Saved {count} time(s)",
+  },
+  "renewal.snapshot_saved": {
+    "zh-CN": "决策快照已保存",
+    "zh-HK": "決策快照已保存",
+    en: "Decision snapshot saved",
+  },
+  "renewal.snapshot_save_failed": {
+    "zh-CN": "决策快照保存失败",
+    "zh-HK": "決策快照保存失敗",
+    en: "Failed to save decision snapshot",
+  },
+  "renewal.load_failed": {
+    "zh-CN": "续租决策数据加载失败",
+    "zh-HK": "續租決策數據載入失敗",
+    en: "Failed to load renewal decision data",
+  },
+  "renewal.scenario_current_terms": {
+    "zh-CN": "按现租金续租",
+    "zh-HK": "按現租金續租",
+    en: "Renew at current rent",
+  },
+  "renewal.scenario_renegotiate": {
+    "zh-CN": "重谈续租条款",
+    "zh-HK": "重談續租條款",
+    en: "Renegotiate renewal terms",
+  },
+  "renewal.scenario_terminate": {
+    "zh-CN": "终止 / 不续租",
+    "zh-HK": "終止 / 不續租",
+    en: "Terminate / do not renew",
+  },
+  "renewal.health_healthy": {
+    "zh-CN": "健康",
+    "zh-HK": "健康",
+    en: "Healthy",
+  },
+  "renewal.health_watch": {
+    "zh-CN": "关注",
+    "zh-HK": "關注",
+    en: "Watch",
+  },
+  "renewal.health_over_threshold": {
+    "zh-CN": "超过预警线",
+    "zh-HK": "超過預警線",
+    en: "Above warning line",
+  },
+  "renewal.health_no_revenue": {
+    "zh-CN": "无营收数据",
+    "zh-HK": "無營收數據",
+    en: "No revenue data",
+  },
+  "renewal.health_zero_revenue": {
+    "zh-CN": "营收为零",
+    "zh-HK": "營收為零",
+    en: "Zero revenue",
+  },
+  "renewal.health_currency_mismatch": {
+    "zh-CN": "币种不一致",
+    "zh-HK": "幣種不一致",
+    en: "Currency mismatch",
+  },
+  "renewal.health_description": {
+    "zh-CN": "暂无可用的门店经营指标",
+    "zh-HK": "暫無可用的門店經營指標",
+    en: "No store operating metrics are available",
+  },
+  "renewal.no_revenue": {
+    "zh-CN": "暂无门店经营数据",
+    "zh-HK": "暫無門店經營數據",
+    en: "No store operating data",
+  },
+  "renewal.no_revenue_description": {
+    "zh-CN": "请先导入对应期间的 POS / ERP 营收数据，并配置租售比政策阈值。",
+    "zh-HK": "請先導入對應期間的 POS / ERP 營收數據，並配置租售比政策閾值。",
+    en: "Import POS / ERP revenue for the relevant period and configure rent-to-sales policy thresholds first.",
   },
   "contracts.selected_count": {
     "zh-CN": "已选 {count} 份草稿合同",
@@ -2559,6 +3089,156 @@ const dict: TranslationDict = {
     "zh-CN": "待办按你的数据权限范围呈现;每项能否执行,仍由对应操作的权限与职责分离规则决定。",
     "zh-HK": "待辦按你的數據權限範圍呈現;每項能否執行,仍由對應操作的權限與職責分離規則決定。",
     en: "The queue reflects your data scope. Whether you can act on an item is still decided by that action's own permission and segregation-of-duties rules.",
+  },
+  "todo.readiness_title": {
+    "zh-CN": "月结准备度预检",
+    "zh-HK": "月結準備度預檢",
+    en: "Close readiness preflight",
+  },
+  "todo.readiness_refresh": {
+    "zh-CN": "刷新预检",
+    "zh-HK": "刷新預檢",
+    en: "Refresh",
+  },
+  "todo.readiness_period": {
+    "zh-CN": "会计期间",
+    "zh-HK": "會計期間",
+    en: "Period",
+  },
+  "todo.readiness_population": {
+    "zh-CN": "评估合同",
+    "zh-HK": "評估合同",
+    en: "Contracts evaluated",
+  },
+  "todo.readiness_blocking": {
+    "zh-CN": "阻塞项",
+    "zh-HK": "阻塞項",
+    en: "Blocking findings",
+  },
+  "todo.readiness_evaluated": {
+    "zh-CN": "评估时间",
+    "zh-HK": "評估時間",
+    en: "Evaluated",
+  },
+  "todo.readiness_scope_complete": {
+    "zh-CN": "法人范围完整",
+    "zh-HK": "法人範圍完整",
+    en: "Legal-entity-wide scope",
+  },
+  "todo.readiness_scope_limited": {
+    "zh-CN": "当前权限为局部范围",
+    "zh-HK": "當前權限為局部範圍",
+    en: "Scope limited",
+  },
+  "todo.readiness_scope_warning": {
+    "zh-CN": "当前结果仅覆盖你的数据权限范围，不能代表整个法人期间已准备就绪。",
+    "zh-HK": "當前結果僅覆蓋你的數據權限範圍，不能代表整個法人期間已準備就緒。",
+    en: "This result covers only your data scope and must not be treated as legal-entity-wide readiness.",
+  },
+  "todo.readiness_ready": {
+    "zh-CN": "准备就绪",
+    "zh-HK": "準備就緒",
+    en: "Ready",
+  },
+  "todo.readiness_blocked": {
+    "zh-CN": "存在阻塞项",
+    "zh-HK": "存在阻塞項",
+    en: "Blocked",
+  },
+  "todo.readiness_not_run": {
+    "zh-CN": "尚未评估",
+    "zh-HK": "尚未評估",
+    en: "Not evaluated",
+  },
+  "todo.readiness_blocking_tag": {
+    "zh-CN": "阻塞",
+    "zh-HK": "阻塞",
+    en: "Blocking",
+  },
+  "todo.readiness_clear": {
+    "zh-CN": "当前可见范围没有预检发现。请确认范围完整后再进行正式月结。",
+    "zh-HK": "當前可見範圍沒有預檢發現。請確認範圍完整後再進行正式月結。",
+    en: "No findings in the visible scope. Confirm scope completeness before the formal close.",
+  },
+  "todo.exceptions_title": {
+    "zh-CN": "正式月结异常",
+    "zh-HK": "正式月結異常",
+    en: "Formal close exceptions",
+  },
+  "todo.exceptions_detect": {
+    "zh-CN": "运行异常检测",
+    "zh-HK": "運行異常檢測",
+    en: "Detect exceptions",
+  },
+  "todo.exceptions_empty": {
+    "zh-CN": "当前期间还没有持久化异常。运行检测后，预检发现会进入治理队列。",
+    "zh-HK": "當前期間還沒有持久化異常。運行檢測後，預檢發現會進入治理隊列。",
+    en: "No persisted exceptions for this period. Run detection to turn preflight findings into governed work.",
+  },
+  "todo.exceptions_scope_warning": {
+    "zh-CN": "当前异常列表只覆盖你的数据范围，不能作为法人全量的关闭结论。",
+    "zh-HK": "當前異常列表只覆蓋你的數據範圍，不能作為法人全量的關閉結論。",
+    en: "This exception list covers only your data scope and is not a legal-entity-wide close conclusion.",
+  },
+  "todo.exceptions_detected": {
+    "zh-CN": "异常检测完成",
+    "zh-HK": "異常檢測完成",
+    en: "Exception detection completed",
+  },
+  "todo.exceptions_action_done": {
+    "zh-CN": "异常治理动作已完成",
+    "zh-HK": "異常治理動作已完成",
+    en: "Exception action completed",
+  },
+  "todo.exceptions_action_failed": {
+    "zh-CN": "异常治理动作失败",
+    "zh-HK": "異常治理動作失敗",
+    en: "Exception action failed",
+  },
+  "todo.exceptions_note_prompt": {
+    "zh-CN": "请输入本次治理动作的证据或说明",
+    "zh-HK": "請輸入本次治理動作的證據或說明",
+    en: "Enter evidence or a note for this exception action",
+  },
+  "todo.exceptions_owner_prompt": {
+    "zh-CN": "请输入负责人用户 ID",
+    "zh-HK": "請輸入負責人用戶 ID",
+    en: "Enter the owner user ID",
+  },
+  "todo.exceptions_assign": {
+    "zh-CN": "分派",
+    "zh-HK": "分派",
+    en: "Assign",
+  },
+  "todo.exceptions_verify": {
+    "zh-CN": "验证解决",
+    "zh-HK": "驗證解決",
+    en: "Verify resolution",
+  },
+  "todo.exceptions_conclude": {
+    "zh-CN": "记录会计结论",
+    "zh-HK": "記錄會計結論",
+    en: "Record accounting conclusion",
+  },
+  "todo.exceptions_waive": {
+    "zh-CN": "期间豁免",
+    "zh-HK": "期間豁免",
+    en: "Period waiver",
+  },
+  "todo.exceptions_close": {
+    "zh-CN": "关闭异常",
+    "zh-HK": "關閉異常",
+    en: "Close exception",
+  },
+  "todo.exceptions_disposition": {
+    "zh-CN": "处置",
+    "zh-HK": "處置",
+    en: "Disposition",
+  },
+  "todo.exceptions_detected_at": {
+    "zh-CN": "最近检测",
+    "zh-HK": "最近檢測",
+    en: "Last detected",
   },
   "nav.todo": {
     "zh-CN": "我的待办",
@@ -3193,6 +3873,101 @@ const dict: TranslationDict = {
     "zh-CN": "保存集团折现率失败",
     "zh-HK": "保存集團折現率失敗",
     en: "Failed to save group discount rate",
+  },
+  "settings.group_rent_to_sales": {
+    "zh-CN": "租售比政策",
+    "zh-HK": "租售比政策",
+    en: "Rent-to-sales policy",
+  },
+  "settings.ratio_policy_desc": {
+    "zh-CN": "健康线和预警线必须由法人或业态政策明确配置，系统不会自行假设阈值。",
+    "zh-HK": "健康線和預警線必須由法人或業態政策明確配置，系統不會自行假設閾值。",
+    en: "The healthy and warning lines must be explicitly configured by legal entity or format; the system will not assume them.",
+  },
+  "settings.ratio_healthy": {
+    "zh-CN": "健康线",
+    "zh-HK": "健康線",
+    en: "Healthy line",
+  },
+  "settings.ratio_warning": {
+    "zh-CN": "预警线",
+    "zh-HK": "預警線",
+    en: "Warning line",
+  },
+  "settings.save_ratio_policy": {
+    "zh-CN": "保存租售比政策",
+    "zh-HK": "保存租售比政策",
+    en: "Save ratio policy",
+  },
+  "settings.ratio_policy_invalid": {
+    "zh-CN": "请确认两条线均大于零，且预警线不低于健康线。",
+    "zh-HK": "請確認兩條線均大於零，且預警線不低於健康線。",
+    en: "Both lines must be positive, and the warning line must not be below the healthy line.",
+  },
+  "settings.ratio_policy_saved": {
+    "zh-CN": "租售比政策已保存",
+    "zh-HK": "租售比政策已保存",
+    en: "Rent-to-sales policy saved",
+  },
+  "settings.group_variance_policy": {
+    "zh-CN": "预算差异政策",
+    "zh-HK": "預算差異政策",
+    en: "Budget variance policy",
+  },
+  "settings.variance_policy_desc": {
+    "zh-CN": "配置预算差异的重大性阈值和桥接勾稽容差；系统不会自行采用金额假设。",
+    "zh-HK": "配置預算差異的重要性閾值和橋接勾稽容差；系統不會自行採用金額假設。",
+    en: "Configure the materiality threshold and bridge tie-out tolerance; the system will not assume monetary values.",
+  },
+  "settings.variance_materiality": {
+    "zh-CN": "重大性阈值",
+    "zh-HK": "重要性閾值",
+    en: "Materiality threshold",
+  },
+  "settings.tie_out_tolerance": {
+    "zh-CN": "勾稽容差",
+    "zh-HK": "勾稽容差",
+    en: "Tie-out tolerance",
+  },
+  "settings.save_variance_policy": {
+    "zh-CN": "保存差异政策",
+    "zh-HK": "保存差異政策",
+    en: "Save variance policy",
+  },
+  "settings.variance_policy_invalid": {
+    "zh-CN": "请填写大于零的重大性阈值和勾稽容差。",
+    "zh-HK": "請填寫大於零的重要性閾值和勾稽容差。",
+    en: "Enter positive values for the materiality threshold and tie-out tolerance.",
+  },
+  "settings.variance_policy_saved": {
+    "zh-CN": "预算差异政策已保存",
+    "zh-HK": "預算差異政策已保存",
+    en: "Budget variance policy saved",
+  },
+  "settings.group_journal_policy": {
+    "zh-CN": "会计分录重大性政策",
+    "zh-HK": "會計分錄重要性政策",
+    en: "Journal entry materiality policy",
+  },
+  "settings.journal_policy_desc": {
+    "zh-CN": "控制月结和事件重算生成分录时的最小金额；未配置时不静默丢弃非零金额。",
+    "zh-HK": "控制月結和事件重算生成分錄時的最小金額；未配置時不靜默丟棄非零金額。",
+    en: "Controls the minimum amount for month-end and event journal entries; non-zero amounts are not silently dropped when unset.",
+  },
+  "settings.journal_materiality": {
+    "zh-CN": "分录重大性阈值",
+    "zh-HK": "分錄重要性閾值",
+    en: "Journal entry materiality threshold",
+  },
+  "settings.save_journal_policy": {
+    "zh-CN": "保存分录政策",
+    "zh-HK": "保存分錄政策",
+    en: "Save journal policy",
+  },
+  "settings.journal_policy_invalid": {
+    "zh-CN": "请填写大于零的分录重大性阈值。",
+    "zh-HK": "請填寫大於零的分錄重要性閾值。",
+    en: "Enter a positive journal entry materiality threshold.",
   },
   "settings.load_failed": {
     "zh-CN": "加载集团折现率失败",
@@ -5369,6 +6144,131 @@ const dict: TranslationDict = {
     "zh-CN": "5-费用与现金流",
     "zh-HK": "5-費用與現金流",
     en: "5-Expense & Cash",
+  },
+  "reports.disclosure_report_basis": {
+    "zh-CN": "报告基准",
+    "zh-HK": "報告基準",
+    en: "Report Basis",
+  },
+  "reports.disclosure_snapshot": {
+    "zh-CN": "数据快照",
+    "zh-HK": "數據快照",
+    en: "Snapshot",
+  },
+  "reports.disclosure_policy_version": {
+    "zh-CN": "规则版本",
+    "zh-HK": "規則版本",
+    en: "Policy Version",
+  },
+  "reports.disclosure_mode": {
+    "zh-CN": "报表模式",
+    "zh-HK": "報表模式",
+    en: "Report Mode",
+  },
+  "reports.disclosure_generated_at": {
+    "zh-CN": "生成时间",
+    "zh-HK": "生成時間",
+    en: "Generated At",
+  },
+  "reports.disclosure_population": {
+    "zh-CN": "覆盖合同数",
+    "zh-HK": "覆蓋合同數",
+    en: "Population",
+  },
+  "reports.disclosure_computed": {
+    "zh-CN": "已计算",
+    "zh-HK": "已計算",
+    en: "Computed",
+  },
+  "reports.disclosure_skipped": {
+    "zh-CN": "跳过",
+    "zh-HK": "跳過",
+    en: "Skipped",
+  },
+  "reports.disclosure_excluded": {
+    "zh-CN": "非租赁排除",
+    "zh-HK": "非租賃排除",
+    en: "Non-lease Excluded",
+  },
+  "reports.disclosure_approval_policy": {
+    "zh-CN": "审批口径",
+    "zh-HK": "審批口徑",
+    en: "Approval Policy",
+  },
+  "reports.disclosure_sheet_basis": {
+    "zh-CN": "0-报告基准",
+    "zh-HK": "0-報告基準",
+    en: "0-Report Basis",
+  },
+  "reports.disclosure_sheet_audit": {
+    "zh-CN": "6-审计底稿",
+    "zh-HK": "6-審計底稿",
+    en: "6-Audit Workpaper",
+  },
+  "reports.disclosure_audit_title": {
+    "zh-CN": "六、合同级审计底稿",
+    "zh-HK": "六、合同級審計底稿",
+    en: "6. Contract-level Audit Workpaper",
+  },
+  "reports.disclosure_audit_hint": {
+    "zh-CN": "底稿金额来自同一份披露计算结果；差异检查用于定位输入或重算问题，不代表自动审计结论。",
+    "zh-HK": "底稿金額來自同一份披露計算結果；差異檢查用於定位輸入或重算問題，不代表自動審計結論。",
+    en: "Workpaper amounts use the same disclosure calculation; tie-out flags help locate input or recalculation issues and are not an automated audit conclusion.",
+  },
+  "reports.disclosure_rate_source": {
+    "zh-CN": "折现率来源",
+    "zh-HK": "折現率來源",
+    en: "Rate Source",
+  },
+  "reports.disclosure_input_count": {
+    "zh-CN": "付款计划数",
+    "zh-HK": "付款計劃數",
+    en: "Payment Plans",
+  },
+  "reports.disclosure_event_count": {
+    "zh-CN": "事件调整数",
+    "zh-HK": "事件調整數",
+    en: "Event Adjustments",
+  },
+  "reports.disclosure_opening_liability": {
+    "zh-CN": "期初负债",
+    "zh-HK": "期初負債",
+    en: "Opening Liability",
+  },
+  "reports.disclosure_closing_liability": {
+    "zh-CN": "期末负债",
+    "zh-HK": "期末負債",
+    en: "Closing Liability",
+  },
+  "reports.disclosure_tie_out": {
+    "zh-CN": "调节检查",
+    "zh-HK": "調節檢查",
+    en: "Tie-out",
+  },
+  "reports.disclosure_tied": {
+    "zh-CN": "已勾稽",
+    "zh-HK": "已勾稽",
+    en: "Tied",
+  },
+  "reports.disclosure_not_tied": {
+    "zh-CN": "需检查",
+    "zh-HK": "需檢查",
+    en: "Review",
+  },
+  "reports.disclosure_rows": {
+    "zh-CN": "行",
+    "zh-HK": "行",
+    en: "rows",
+  },
+  "reports.disclosure_liability_tie_out": {
+    "zh-CN": "负债调节差额",
+    "zh-HK": "負債調節差額",
+    en: "Liability Tie-out",
+  },
+  "reports.disclosure_rou_tie_out": {
+    "zh-CN": "ROU调节差额",
+    "zh-HK": "ROU調節差額",
+    en: "ROU Tie-out",
   },
   "reports.asset_type_real_estate": {
     "zh-CN": "房产",

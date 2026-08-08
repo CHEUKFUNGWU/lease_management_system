@@ -19,15 +19,6 @@ import (
 	"sort"
 )
 
-// Health bands. The conventional retail warning line sits around 15–20%; above
-// it, rent is eating margin. The defaults are stated here rather than buried,
-// and are overridable because the right line differs by format — a supermarket
-// and a jewellery counter do not share one.
-const (
-	DefaultHealthyCeiling = 15.0
-	DefaultWarningCeiling = 20.0
-)
-
 // Status of one store's ratio.
 const (
 	StatusHealthy       = "healthy"
@@ -108,12 +99,9 @@ func Calculate(input Input) (Result, error) {
 		return Result{}, fmt.Errorf("请指定期间")
 	}
 	healthy := input.HealthyCeiling
-	if healthy <= 0 {
-		healthy = DefaultHealthyCeiling
-	}
 	warning := input.WarningCeiling
-	if warning <= 0 {
-		warning = DefaultWarningCeiling
+	if healthy <= 0 || warning <= 0 {
+		return Result{}, fmt.Errorf("租售比健康线和预警线必须通过政策配置提供")
 	}
 	if warning < healthy {
 		return Result{}, fmt.Errorf("预警线 %.2f%% 低于健康线 %.2f%%", warning, healthy)

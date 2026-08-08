@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
@@ -13,12 +14,17 @@ import (
 )
 
 type StoreMetricsHandler struct {
-	repo        *repository.StoreMetricsRepository
-	auditLogger *audit.Logger
+	repo              *repository.StoreMetricsRepository
+	auditLogger       *audit.Logger
+	systemSettingRepo *repository.SystemSettingRepository
 }
 
-func NewStoreMetricsHandler(repo *repository.StoreMetricsRepository, auditLogger *audit.Logger) *StoreMetricsHandler {
-	return &StoreMetricsHandler{repo: repo, auditLogger: auditLogger}
+func NewStoreMetricsHandler(repo *repository.StoreMetricsRepository, auditLogger *audit.Logger, settingRepos ...*repository.SystemSettingRepository) *StoreMetricsHandler {
+	var settings *repository.SystemSettingRepository
+	if len(settingRepos) > 0 {
+		settings = settingRepos[0]
+	}
+	return &StoreMetricsHandler{repo: repo, auditLogger: auditLogger, systemSettingRepo: settings}
 }
 
 var periodPattern = regexp.MustCompile(`^\d{4}-\d{2}$`)
@@ -72,11 +78,15 @@ func (h *StoreMetricsHandler) Upsert(c *gin.Context) {
 			failures = append(failures, gin.H{"index": index, "error": "营收不能为负数"})
 			continue
 		}
+		if strings.TrimSpace(item.PeriodBasis) == "" || strings.TrimSpace(item.Currency) == "" || strings.TrimSpace(item.Source) == "" {
+			failures = append(failures, gin.H{"index": index, "error": "期间口径、币种和来源均为必填项"})
+			continue
+		}
 
 		metric := &repository.StoreMetric{
-			StoreID: item.StoreID, Period: item.Period, PeriodBasis: item.PeriodBasis,
-			Revenue: item.Revenue, GrossProfit: item.GrossProfit, Currency: item.Currency,
-			Version: item.Version, Source: item.Source, Note: item.Note,
+			StoreID: item.StoreID, Period: item.Period, PeriodBasis: strings.TrimSpace(item.PeriodBasis),
+			Revenue: item.Revenue, GrossProfit: item.GrossProfit, Currency: strings.TrimSpace(item.Currency),
+			Version: item.Version, Source: strings.TrimSpace(item.Source), Note: item.Note,
 		}
 		if userIDStr != "" {
 			metric.CreatedBy = &userIDStr
@@ -145,6 +155,14 @@ func (h *StoreMetricsHandler) RentToSales(c *gin.Context) {
 
 	healthy, _ := strconv.ParseFloat(c.Query("healthy_ceiling"), 64)
 	warning, _ := strconv.ParseFloat(c.Query("warning_ceiling"), 64)
+	if h.systemSettingRepo != nil {
+		if healthy <= 0 {
+			healthy = h.systemSettingRepo.GetFloat64(c.Request.Context(), "rent_to_sales_healthy_ceiling", 0)
+		}
+		if warning <= 0 {
+			warning = h.systemSettingRepo.GetFloat64(c.Request.Context(), "rent_to_sales_warning_ceiling", 0)
+		}
+	}
 
 	result, err := renttosales.Calculate(renttosales.Input{
 		Period: period, HealthyCeiling: healthy, WarningCeiling: warning, Stores: stores,

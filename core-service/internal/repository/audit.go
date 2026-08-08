@@ -96,6 +96,10 @@ func (r *AuditRepository) resolveRecordLegalEntity(ctx context.Context, tableNam
 		query = `SELECT c.legal_entity_id::text FROM lease_documents d JOIN lease_contracts c ON c.id = d.contract_id WHERE d.id = $1 AND c.legal_entity_id IS NOT NULL`
 	case "lease_obligations":
 		query = `SELECT c.legal_entity_id::text FROM lease_obligations o JOIN lease_contracts c ON c.id = o.contract_id WHERE o.id = $1 AND c.legal_entity_id IS NOT NULL`
+	case "close_exceptions":
+		query = `SELECT legal_entity_id::text FROM close_exceptions WHERE id = $1 AND legal_entity_id IS NOT NULL`
+	case "close_detection_events":
+		query = `SELECT legal_entity_id::text FROM close_detection_events WHERE id = $1 AND legal_entity_id IS NOT NULL`
 	default:
 		return nil, nil
 	}

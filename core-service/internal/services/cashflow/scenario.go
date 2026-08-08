@@ -102,6 +102,9 @@ func Project(input Input) (Result, error) {
 	if input.AsOf.IsZero() {
 		return Result{}, fmt.Errorf("请指定测算基准日")
 	}
+	if input.HorizonMonths <= 0 {
+		return Result{}, fmt.Errorf("请指定大于零的测算期（月）")
+	}
 	scenario := input.Scenario
 	if scenario.RenewalRate < 0 || scenario.RenewalRate > 1 {
 		return Result{}, fmt.Errorf("续租比例须介于 0 与 1 之间")
@@ -116,9 +119,6 @@ func Project(input Input) (Result, error) {
 			(scenario.RenewalRate+scenario.ClosureRate)*100)
 	}
 	horizon := input.HorizonMonths
-	if horizon <= 0 {
-		horizon = 60
-	}
 
 	result := Result{Scenario: scenario, Currency: input.Currency, AsOf: input.AsOf.Format("2006-01-02")}
 	result.Ladder.Labels = reporting.MaturityBandLabels

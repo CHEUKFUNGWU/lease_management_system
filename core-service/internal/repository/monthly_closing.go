@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lease-management-system/core-service/internal/access"
 )
+
+var ErrUnresolvedBlockingExceptions = errors.New("unresolved blocking close exceptions")
 
 // DBTX is the subset of database operations shared by *pgxpool.Pool and pgx.Tx.
 // Depending on this interface lets a repository run its queries either directly
@@ -981,10 +984,23 @@ func (r *MonthlyClosingRepository) LockPeriod(ctx context.Context, period, legal
 				'monthend:' || COALESCE($2::text, '*') || ':' || $1,
 				0
 			))
+		), blocking AS (
+			SELECT EXISTS (
+				SELECT 1
+				FROM close_exceptions
+				WHERE accounting_period = $1
+				  AND ($2::uuid IS NULL OR legal_entity_id = $2::uuid)
+				  AND severity = 'blocking'
+				  AND NOT (
+					 exception_state = 'closed'
+					 AND closing_disposition IN ('verified_resolution', 'accounting_conclusion', 'period_waiver', 'standing_waiver')
+				  )
+			) AS found
 		)
 		INSERT INTO period_locks (accounting_period, legal_entity_id, is_locked, locked_by, locked_at, created_at, updated_at)
 		SELECT $1, $2::uuid, true, $3, NOW(), NOW(), NOW()
-		FROM guard
+		FROM guard, blocking
+		WHERE NOT blocking.found
 		ON CONFLICT (accounting_period, legal_entity_id) DO UPDATE SET
 			is_locked = true,
 			locked_by = $3,
@@ -992,6 +1008,7 @@ func (r *MonthlyClosingRepository) LockPeriod(ctx context.Context, period, legal
 			unlocked_by = NULL,
 			unlocked_at = NULL,
 			updated_at = NOW()
+		RETURNING id::text
 	`
 	var legalEntityIDVal interface{}
 	if legalEntityID == "" {
@@ -999,7 +1016,11 @@ func (r *MonthlyClosingRepository) LockPeriod(ctx context.Context, period, legal
 	} else {
 		legalEntityIDVal = legalEntityID
 	}
-	_, err := r.db.Exec(ctx, query, period, legalEntityIDVal, userID)
+	var lockID string
+	err := r.db.QueryRow(ctx, query, period, legalEntityIDVal, userID).Scan(&lockID)
+	if err == pgx.ErrNoRows {
+		return ErrUnresolvedBlockingExceptions
+	}
 	if err != nil {
 		return fmt.Errorf("failed to lock period: %w", err)
 	}

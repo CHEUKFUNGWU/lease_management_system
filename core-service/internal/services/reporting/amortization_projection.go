@@ -184,10 +184,20 @@ func matchesProjectionFilters(contract *repository.Contract, request ProjectionR
 
 func aggregateAmortization(contractRows []amortizationBucket, contractTags map[string][]string, request ProjectionRequest) []AmortizationRow {
 	rows := make(map[string]*AmortizationRow)
+	currencySet := make(map[string]struct{})
+	for _, bucket := range contractRows {
+		if bucket.currency != "" {
+			currencySet[bucket.currency] = struct{}{}
+		}
+	}
+	separateCurrencies := request.View != ViewContract && len(currencySet) > 1
 	for _, bucket := range contractRows {
 		groups := projectionGroups(bucket, contractTags, request.View)
 		for _, group := range groups {
 			key := group.key + "|" + bucket.periodKey
+			if separateCurrencies {
+				key = group.key + "|" + bucket.currency + "|" + bucket.periodKey
+			}
 			row := rows[key]
 			if row == nil {
 				currency := request.ReportCurrency
@@ -195,10 +205,14 @@ func aggregateAmortization(contractRows []amortizationBucket, contractTags map[s
 					currency = bucket.currency
 				}
 				if currency == "" {
-					currency = "CNY"
+					currency = bucket.currency
+				}
+				groupKey := group.key
+				if separateCurrencies {
+					groupKey += "|" + bucket.currency
 				}
 				row = &AmortizationRow{
-					GroupKey: group.key, GroupLabel: group.label, StoreName: group.store,
+					GroupKey: groupKey, GroupLabel: group.label, StoreName: group.store,
 					PeriodKey: bucket.periodKey, PeriodStart: bucket.periodStart.Format("2006-01-02"),
 					PeriodEnd: bucket.periodEnd.Format("2006-01-02"), Currency: currency,
 				}

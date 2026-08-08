@@ -148,6 +148,9 @@ func Build(draft Draft) (Briefing, error) {
 	if draft.MonthlyRent < 0 {
 		return Briefing{}, fmt.Errorf("月租金不能为负数")
 	}
+	if draft.Currency == "" {
+		return Briefing{}, fmt.Errorf("请提供币种")
+	}
 	if draft.RentFreeMonths < 0 || draft.RentFreeMonths > draft.TermMonths {
 		return Briefing{}, fmt.Errorf("免租期须介于零与租期之间")
 	}

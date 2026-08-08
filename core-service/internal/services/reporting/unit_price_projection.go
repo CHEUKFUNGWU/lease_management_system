@@ -58,9 +58,6 @@ func projectUnitPrice(snapshot *Snapshot, request ProjectionRequest) (Projection
 		contract := fact.Contract
 
 		currency := contract.Currency
-		if currency == "" {
-			currency = defaultUnitPriceCurrency
-		}
 		label := unitPriceGroupLabel(fact, groupBy)
 		key := label + "|" + currency
 
@@ -117,8 +114,6 @@ func projectUnitPrice(snapshot *Snapshot, request ProjectionRequest) (Projection
 		"area_basis_caveat":      contractsWithoutArea > 0,
 	})}, nil
 }
-
-const defaultUnitPriceCurrency = "CNY"
 
 // unassignedGroupLabel marks contracts whose store, brand or region is unknown,
 // so they stay visible in the comparison instead of silently merging into a

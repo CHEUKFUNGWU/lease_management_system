@@ -2,7 +2,7 @@
 -- asset type dimension, critical date reminders, and centralized document metadata.
 
 ALTER TABLE lease_contracts
-    ADD COLUMN IF NOT EXISTS asset_type VARCHAR(50) NOT NULL DEFAULT 'real_estate'
+    ADD COLUMN IF NOT EXISTS asset_type VARCHAR(50) NOT NULL
         CHECK (asset_type IN ('real_estate', 'vehicle', 'it_equipment', 'machinery', 'other'));
 
 CREATE TABLE IF NOT EXISTS lease_documents (

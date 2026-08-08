@@ -72,13 +72,13 @@ func (r *StoreMetricsRepository) Upsert(ctx context.Context, metric *StoreMetric
 		metric.Version = 1
 	}
 	if metric.PeriodBasis == "" {
-		metric.PeriodBasis = "calendar_month"
+		return nil, fmt.Errorf("period basis is required")
 	}
 	if metric.Currency == "" {
-		metric.Currency = "CNY"
+		return nil, fmt.Errorf("currency is required")
 	}
 	if metric.Source == "" {
-		metric.Source = "manual"
+		return nil, fmt.Errorf("source is required")
 	}
 
 	query := `

@@ -176,6 +176,7 @@ export default function MonthlyClosingPage() {
   const [rejectingEntry, setRejectingEntry] = useState<any>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [erpReference, setErpReference] = useState("");
+  const [erpTemplate, setErpTemplate] = useState("");
   const [writebackModalOpen, setWritebackModalOpen] = useState(false);
   const [writebackText, setWritebackText] = useState("");
   const [writebackLoading, setWritebackLoading] = useState(false);
@@ -213,7 +214,7 @@ export default function MonthlyClosingPage() {
       const data = await monthlyClosingApi.generate(
         {
           accounting_period: period,
-          discount_rate: values.discount_rate || 0.05,
+          discount_rate: values.discount_rate,
         },
         token
       );
@@ -360,16 +361,20 @@ export default function MonthlyClosingPage() {
       message.warning("请先选择或生成月结期间");
       return;
     }
+    if (!erpTemplate.trim()) {
+      message.warning(t("monthly.export_template_required", language));
+      return;
+    }
     setActionLoading((prev) => ({ ...prev, export_entries: true }));
     try {
       const blob = await monthlyClosingApi.exportEntries(
-        { period: selectedPeriod, status: "approved", template: "kingdee" },
+        { period: selectedPeriod, status: "approved", template: erpTemplate.trim() },
         token
       );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Lease_GL_${selectedPeriod}_kingdee.csv`;
+      link.download = `Lease_GL_${selectedPeriod}_${erpTemplate.trim()}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -812,7 +817,7 @@ export default function MonthlyClosingPage() {
                 </Form.Item>
               </Col>
               <Col span={12}>
-                <Form.Item label={t("monthly.discount_rate", language)} name="discount_rate" initialValue={0.05}>
+                <Form.Item label={t("monthly.discount_rate", language)} name="discount_rate">
                   <Input type="number" step={0.001} />
                 </Form.Item>
               </Col>
@@ -873,13 +878,20 @@ export default function MonthlyClosingPage() {
           extra={
             canManage && entries.length > 0 ? (
               <Space>
+                <Input
+                  size="small"
+                  value={erpTemplate}
+                  onChange={(event) => setErpTemplate(event.target.value)}
+                  placeholder={t("monthly.export_template_placeholder", language)}
+                  style={{ width: 150 }}
+                />
                 <Button
                   size="small"
                   icon={<DownloadOutlined />}
                   loading={actionLoading.export_entries}
                   onClick={handleExportEntries}
                 >
-                  导出 ERP CSV
+                  {t("monthly.export_erp_csv", language)}
                 </Button>
                 <Button
                   size="small"

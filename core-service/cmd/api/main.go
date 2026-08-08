@@ -16,6 +16,8 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/services/closecontrol"
+	"github.com/lease-management-system/core-service/internal/services/closereadiness"
 	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 	"github.com/lease-management-system/core-service/internal/services/monthend"
 )
@@ -51,14 +53,19 @@ func main() {
 	accessPolicyRepo := repository.NewAccessPolicyRepository(database.Pool)
 	exchangeRateRepo := repository.NewExchangeRateRepository(database.Pool)
 	workQueueRepo := repository.NewWorkQueueRepository(database.Pool)
+	closeReadinessRepo := repository.NewCloseReadinessRepository(database.Pool)
+	closeControlRepo := repository.NewCloseControlRepository(database.Pool)
 	budgetRepo := repository.NewBudgetRepository(database.Pool)
 	storeMetricsRepo := repository.NewStoreMetricsRepository(database.Pool)
+	renewalDecisionRepo := repository.NewRenewalDecisionRepository(database.Pool)
 
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(auditRepo)
 
 	// Initialize services
 	closeService := monthend.NewService(database.Pool, mcRepo, contractRepo, psRepo, systemSettingRepo, exchangeRateRepo, masterDataRepo, auditLogger)
+	closeReadinessService := closereadiness.NewService(closeReadinessRepo, systemSettingRepo, closeControlRepo)
+	closeControlService := closecontrol.NewService(closeReadinessRepo, systemSettingRepo, closeControlRepo)
 	eventPersistence := eventaccounting.NewPersistenceService(database.Pool, mcRepo, eventRepo, auditLogger)
 
 	// Initialize handlers
@@ -70,10 +77,11 @@ func main() {
 	dealCompareHandler := handlers.NewDealCompareHandler()
 	preDealHandler := handlers.NewPreDealHandler()
 	cashflowScenarioHandler := handlers.NewCashflowScenarioHandler(contractRepo, psRepo)
-	renewalCardHandler := handlers.NewRenewalCardHandler(contractRepo, psRepo, storeMetricsRepo)
-	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo, masterDataRepo)
+	renewalCardHandler := handlers.NewRenewalCardHandler(contractRepo, psRepo, storeMetricsRepo, mcRepo, renewalDecisionRepo, auditLogger, systemSettingRepo)
+	reportHandler := handlers.NewReportHandler(contractRepo, psRepo, mcRepo, systemSettingRepo, masterDataRepo, closeControlRepo)
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, eventPersistence, auditLogger)
-	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, auditLogger)
+	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, closeReadinessService, auditLogger)
+	closeExceptionHandler := handlers.NewCloseExceptionHandler(closeControlService, auditLogger)
 	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
@@ -82,7 +90,7 @@ func main() {
 	exchangeRateHandler := handlers.NewExchangeRateHandler(exchangeRateRepo, auditLogger)
 	workQueueHandler := handlers.NewWorkQueueHandler(workQueueRepo)
 	budgetHandler := handlers.NewBudgetHandler(budgetRepo, contractRepo, psRepo, systemSettingRepo)
-	storeMetricsHandler := handlers.NewStoreMetricsHandler(storeMetricsRepo, auditLogger)
+	storeMetricsHandler := handlers.NewStoreMetricsHandler(storeMetricsRepo, auditLogger, systemSettingRepo)
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -153,6 +161,8 @@ func main() {
 		protected.Handle(http.MethodPost, "/contracts/:id/reject", permission("contracts", "approve"), contractScope, contractApprovalSeparation, approvalHandler.Reject)
 		protected.Handle(http.MethodGet, "/contracts/:id/approval-status", permission("contracts", "read"), contractScope, approvalHandler.GetStatus)
 		protected.Handle(http.MethodGet, "/contracts/:id/renewal-card", permission("reports", "read"), contractScope, renewalCardHandler.Card)
+		protected.Handle(http.MethodPost, "/contracts/:id/renewal-decisions", permission("renewal_decisions", "write"), contractScope, renewalCardHandler.CreateDecision)
+		protected.Handle(http.MethodGet, "/contracts/:id/renewal-decisions", permission("reports", "read"), contractScope, renewalCardHandler.ListDecisions)
 		protected.Handle(http.MethodGet, "/contracts-by-status", permission("contracts", "read"), approvalHandler.ListByStatus)
 
 		// Discount Rate
@@ -217,6 +227,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/reports/tags/summary", permission("reports", "read"), reportHandler.TagSummary)
 		protected.Handle(http.MethodGet, "/reports/cashflow-forecast", permission("reports", "read"), reportHandler.CashflowForecast)
 		protected.Handle(http.MethodGet, "/reports/disclosure", permission("reports", "read"), reportHandler.Disclosure)
+		protected.Handle(http.MethodGet, "/reports/close-pack", permission("reports", "read"), reportHandler.ClosePack)
 		protected.Handle(http.MethodGet, "/reports/unit-price", permission("reports", "read"), reportHandler.UnitPrice)
 
 		// Exchange rates: settings-grade master data used to translate
@@ -228,11 +239,15 @@ func main() {
 		// can be explained against a stable plan.
 		protected.Handle(http.MethodGet, "/budget-versions", permission("reports", "read"), budgetHandler.ListVersions)
 		protected.Handle(http.MethodPost, "/budget-versions", permission("reports", "read"), budgetHandler.CreateVersion)
+		protected.Handle(http.MethodGet, "/budget-versions/compare", permission("reports", "read"), budgetHandler.CompareVersions)
+		protected.Handle(http.MethodGet, "/budget-versions/management-brief", permission("reports", "read"), budgetHandler.ManagementBrief)
 		protected.Handle(http.MethodGet, "/budget-versions/:id/variance", permission("reports", "read"), budgetHandler.Variance)
+		protected.Handle(http.MethodPut, "/budget-versions/:id/variance-actions", permission("variance_actions", "write"), budgetHandler.VarianceActions)
 
 		// Monthly Closing
 		protected.Handle(http.MethodPost, "/monthly-closing/generate", permission("monthly_closing", "generate"), monthlyClosingHandler.Generate)
 		protected.Handle(http.MethodGet, "/monthly-closing/batches", permission("monthly_closing", "read"), monthlyClosingHandler.ListBatches)
+		protected.Handle(http.MethodGet, "/monthly-closing/readiness", permission("monthly_closing", "read"), monthlyClosingHandler.Readiness)
 		protected.Handle(http.MethodGet, "/monthly-closing/entries", permission("monthly_closing", "read"), monthlyClosingHandler.GetJournalEntries)
 		protected.Handle(http.MethodGet, "/monthly-closing/periods", permission("monthly_closing", "read"), monthlyClosingHandler.ListEntryPeriods)
 		protected.Handle(http.MethodGet, "/contracts/:id/measurement-results", permission("calculations", "read"), contractScope, monthlyClosingHandler.GetMeasurementResults)
@@ -251,6 +266,11 @@ func main() {
 		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/lock", permission("monthly_closing", "lock"), middleware.RequireLegalEntityWideScope(), monthlyClosingHandler.LockPeriod)
 		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/unlock", permission("monthly_closing", "unlock"), middleware.RequireLegalEntityWideScope(), monthlyClosingHandler.UnlockPeriod)
 		protected.Handle(http.MethodGet, "/monthly-closing/periods/:period/lock-status", permission("monthly_closing", "read"), monthlyClosingHandler.GetPeriodLockStatus)
+
+		// Close Exception Governance
+		protected.Handle(http.MethodGet, "/monthly-closing/periods/:period/exceptions", permission("monthly_closing", "exception_read"), closeExceptionHandler.List)
+		protected.Handle(http.MethodPost, "/monthly-closing/periods/:period/exceptions/detect", permission("monthly_closing", "exception_detect"), middleware.RequireLegalEntityWideScope(), closeExceptionHandler.Detect)
+		protected.Handle(http.MethodPost, "/close-exceptions/:id/actions", permission("monthly_closing", "exception_manage"), middleware.RequireLegalEntityWideScope(), closeExceptionHandler.ApplyAction)
 
 		// AI Chat
 		protected.Handle(http.MethodPost, "/ai/chat", permission("ai_chat", "use"), aiChatHandler.Chat)

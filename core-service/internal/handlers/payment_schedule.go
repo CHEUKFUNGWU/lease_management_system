@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
-	
+
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
@@ -45,19 +46,42 @@ func (h *PaymentScheduleHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	
+	ctx := c.Request.Context()
+	contract, err := h.contractRepo.GetByID(ctx, req.ContractID, middleware.GetTenantID(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to verify contract: " + err.Error()})
+		return
+	}
+	if contract == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
+		return
+	}
+	contractCurrency := strings.TrimSpace(contract.Currency)
+	requestedCurrency := strings.ToUpper(strings.TrimSpace(req.Currency))
+	if contractCurrency == "" {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "合同缺少币种，无法创建付款计划"})
+		return
+	}
+	if requestedCurrency == "" {
+		requestedCurrency = strings.ToUpper(contractCurrency)
+	}
+	if requestedCurrency != strings.ToUpper(contractCurrency) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "付款计划币种必须与合同币种一致"})
+		return
+	}
+
 	esd, _ := time.Parse("2006-01-02", req.EffectiveStartDate)
 	eed, _ := time.Parse("2006-01-02", req.EffectiveEndDate)
 	csd, _ := time.Parse("2006-01-02", req.CoverageStartDate)
 	ced, _ := time.Parse("2006-01-02", req.CoverageEndDate)
 	dd, _ := time.Parse("2006-01-02", req.DueDate)
-	
+
 	var apd *time.Time
 	if req.ActualPaymentDate != nil {
 		t, _ := time.Parse("2006-01-02", *req.ActualPaymentDate)
 		apd = &t
 	}
-	
+
 	ps := &repository.PaymentSchedule{
 		ContractID:            req.ContractID,
 		EffectiveStartDate:    esd,
@@ -68,7 +92,7 @@ func (h *PaymentScheduleHandler) Create(c *gin.Context) {
 		ActualPaymentDate:     apd,
 		PaymentTiming:         req.PaymentTiming,
 		Amount:                req.Amount,
-		Currency:              req.Currency,
+		Currency:              requestedCurrency,
 		TaxAmount:             req.TaxAmount,
 		AmountType:            req.AmountType,
 		IsFixed:               req.IsFixed,
@@ -78,16 +102,12 @@ func (h *PaymentScheduleHandler) Create(c *gin.Context) {
 		IsNonLeaseComponent:   req.IsNonLeaseComponent,
 		IncludedInLiabilityPV: req.IncludedInLiabilityPV,
 	}
-	if ps.Currency == "" {
-		ps.Currency = "CNY"
-	}
-	
-	result, err := h.psRepo.Create(c.Request.Context(), ps)
+	result, err := h.psRepo.Create(ctx, ps)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, result)
 }
 
@@ -95,7 +115,7 @@ func (h *PaymentScheduleHandler) ListByContract(c *gin.Context) {
 	contractID := c.Param("id")
 	ctx := c.Request.Context()
 	legalEntityID := middleware.GetTenantID(c)
-	
+
 	// Verify contract belongs to tenant
 	contract, err := h.contractRepo.GetByID(ctx, contractID, legalEntityID)
 	if err != nil {
@@ -106,13 +126,13 @@ func (h *PaymentScheduleHandler) ListByContract(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "contract not found"})
 		return
 	}
-	
+
 	schedules, err := h.psRepo.GetByContractID(ctx, contractID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"data":  schedules,
 		"total": len(schedules),

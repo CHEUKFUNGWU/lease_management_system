@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     debit_account VARCHAR(100) NOT NULL,
     credit_account VARCHAR(100) NOT NULL,
     amount DECIMAL(18, 2) NOT NULL,
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
     description TEXT,
     voucher_number VARCHAR(100),
     posting_status VARCHAR(20) NOT NULL DEFAULT 'draft', -- draft, preview, approved, posted, reversed

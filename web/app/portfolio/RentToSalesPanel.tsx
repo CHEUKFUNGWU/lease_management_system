@@ -48,8 +48,8 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
 
 export function RentToSalesPanel({ token }: { token: string | null }) {
   const [period, setPeriod] = useState(dayjs().format("YYYY-MM"));
-  const [healthy, setHealthy] = useState<number>(15);
-  const [warning, setWarning] = useState<number>(20);
+  const [healthy, setHealthy] = useState<number | null>(null);
+  const [warning, setWarning] = useState<number | null>(null);
   const [result, setResult] = useState<RentToSales | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -59,7 +59,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
     try {
       setResult(
         await storeMetricsApi.rentToSales(
-          { period, healthy_ceiling: healthy, warning_ceiling: warning },
+          { period, ...(healthy != null ? { healthy_ceiling: healthy } : {}), ...(warning != null ? { warning_ceiling: warning } : {}) },
           token
         )
       );
@@ -74,6 +74,12 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!result) return;
+    setHealthy(result.healthy_ceiling_percent);
+    setWarning(result.warning_ceiling_percent);
+  }, [result]);
 
   return (
     <Card
@@ -93,7 +99,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
             value={healthy}
             min={1}
             max={100}
-            onChange={(value) => setHealthy(Number(value || 15))}
+            onChange={(value) => setHealthy(value == null ? null : Number(value))}
             suffix="%"
           />
           <span style={{ fontSize: 12, color: "#8C8C8C" }}>预警线</span>
@@ -102,7 +108,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
             value={warning}
             min={1}
             max={100}
-            onChange={(value) => setWarning(Number(value || 20))}
+            onChange={(value) => setWarning(value == null ? null : Number(value))}
             suffix="%"
           />
         </Space>

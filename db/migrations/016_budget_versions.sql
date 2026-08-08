@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS budget_lines (
     budget_version_id UUID NOT NULL REFERENCES budget_versions(id) ON DELETE CASCADE,
     contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
     accounting_period VARCHAR(7) NOT NULL,
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
     interest_expense DECIMAL(18, 2) NOT NULL DEFAULT 0,
     depreciation DECIMAL(18, 2) NOT NULL DEFAULT 0,
     total_payment DECIMAL(18, 2) NOT NULL DEFAULT 0,

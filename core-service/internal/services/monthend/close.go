@@ -152,6 +152,7 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 			return err
 		}
 		globalRate := resolveGlobalDiscountRate(ctx, store)
+		journalMateriality := store.GetFloat64(ctx, "journal_entry_materiality_threshold", 0)
 		contractIDs := make([]string, 0, len(contracts))
 		for _, contract := range contracts {
 			contractIDs = append(contractIDs, contract.ID)
@@ -246,7 +247,7 @@ func (s *Service) Close(ctx context.Context, cmd Command) (*Result, error) {
 					return fmt.Errorf("contract %s: %w", contract.ID, err)
 				}
 			}
-			entries := buildJournalEntries(contract.ID, contract.Currency, cmd.AccountingPeriod, periodEnd, monthly, batch.ID, basis)
+			entries := buildJournalEntries(contract.ID, contract.Currency, cmd.AccountingPeriod, periodEnd, monthly, batch.ID, basis, journalMateriality)
 
 			// A foreign-currency lease also carries an exchange difference on its
 			// liability. A missing rate fails this contract rather than the batch,

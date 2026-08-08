@@ -141,7 +141,7 @@ func calculateFixtureResult(t *testing.T, fixture eventAccountingFixture) Result
 		EventID: fixture.eventID, ContractID: fixture.contractID, EventType: "early_termination",
 		EffectiveDate: date("2098-01-01"), CommencementDate: date("2097-01-01"),
 		LeaseEndDate: date("2099-01-01"), NewValue: &newEndDate,
-		Currency: "CNY", DiscountRate: 0.05,
+		Currency: "CNY", LeaseScope: ifrs16.LeaseScopeInScope, DiscountRate: 0.05,
 		Payments: []ifrs16.LeasePayment{
 			{Date: date("2098-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
 			{Date: date("2098-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},

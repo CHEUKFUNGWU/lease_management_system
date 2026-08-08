@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, Card, Empty, List, Space, Spin, Tag, Typography, message } from "antd";
+import { Alert, Badge, Button, Card, Empty, Input, List, Space, Spin, Tag, Typography, message } from "antd";
 import { ReloadOutlined, RightOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { workQueueApi } from "../lib/api";
+import { monthlyClosingApi, workQueueApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -36,6 +36,53 @@ interface WorkQueue {
   total: number;
 }
 
+interface ReadinessFinding {
+  rule_code: string;
+  severity: string;
+  gate_effect: string;
+  contract_id?: string;
+  contract_number?: string;
+  contract_name?: string;
+  title: string;
+  reason: string;
+  remediation: string;
+  source_kind: string;
+  source_id: string;
+  target_path: string;
+}
+
+interface CloseReadiness {
+  accounting_period: string;
+  evaluated_at: string;
+  scope_complete: boolean;
+  population_count: number;
+  status: "not_run" | "blocked" | "ready" | "scope_limited";
+  blocking_count: number;
+  finding_count: number;
+  findings: ReadinessFinding[];
+}
+
+interface CloseException {
+  id: string;
+  rule_code: string;
+  rule_version: string;
+  severity: string;
+  gate_effect: string;
+  accounting_period: string;
+  subject_type: string;
+  subject_id: string;
+  contract_number?: string;
+  contract_name?: string;
+  batch_number?: string;
+  exception_state: "open" | "investigating" | "resolved" | "waived" | "closed";
+  closing_disposition: string;
+  owner_id?: string;
+  reviewer_id?: string;
+  approver_id?: string;
+  last_detected_at: string;
+  resolution_note?: string;
+}
+
 const emptyQueue: WorkQueue = {
   contracts_pending_review: [],
   contracts_pending_approval: [],
@@ -51,14 +98,25 @@ export default function TodoPage() {
   const { language } = useLanguage();
   const router = useRouter();
   const [queue, setQueue] = useState<WorkQueue>(emptyQueue);
+  const [period, setPeriod] = useState(dayjs().format("YYYY-MM"));
+  const [readiness, setReadiness] = useState<CloseReadiness | null>(null);
+  const [exceptions, setExceptions] = useState<CloseException[]>([]);
+  const [exceptionsScopeComplete, setExceptionsScopeComplete] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (requestedPeriod: string) => {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await workQueueApi.get(token);
-      setQueue({ ...emptyQueue, ...res });
+      const [queueRes, readinessRes, exceptionsRes] = await Promise.all([
+        workQueueApi.get(token),
+        monthlyClosingApi.getReadiness(requestedPeriod, token),
+        monthlyClosingApi.listExceptions(requestedPeriod, token),
+      ]);
+      setQueue({ ...emptyQueue, ...queueRes });
+      setReadiness(readinessRes);
+      setExceptions(exceptionsRes.data || []);
+      setExceptionsScopeComplete(exceptionsRes.scope_complete !== false);
     } catch (error: any) {
       message.error(error?.message || t("todo.load_failed", language));
     } finally {
@@ -67,7 +125,7 @@ export default function TodoPage() {
   }, [token, language]);
 
   useEffect(() => {
-    load();
+    load(dayjs().format("YYYY-MM"));
   }, [load]);
 
   // A due date is what makes an item urgent, so overdue items are called out
@@ -134,6 +192,172 @@ export default function TodoPage() {
   const openContract = (item: WorkQueueItem) => router.push(`/contracts/${item.contract_id}`);
   const openClosing = () => router.push("/monthly-closing");
 
+  const readinessStatus = (status: CloseReadiness["status"]) => {
+    if (status === "blocked") return { color: "error", label: t("todo.readiness_blocked", language) };
+    if (status === "scope_limited") return { color: "warning", label: t("todo.readiness_scope_limited", language) };
+    if (status === "ready") return { color: "success", label: t("todo.readiness_ready", language) };
+    return { color: "default", label: t("todo.readiness_not_run", language) };
+  };
+
+  const readinessPanel = readiness && (
+    <Card
+      title={
+        <Space>
+          <span>{t("todo.readiness_title", language)}</span>
+          <Tag color={readinessStatus(readiness.status).color}>{readinessStatus(readiness.status).label}</Tag>
+        </Space>
+      }
+      extra={
+        <Space>
+          <Input
+            value={period}
+            onChange={(event) => setPeriod(event.target.value)}
+            onPressEnter={() => load(period)}
+            placeholder="YYYY-MM"
+            style={{ width: 110 }}
+          />
+          <Button size="small" onClick={() => load(period)} loading={loading}>
+            {t("todo.readiness_refresh", language)}
+          </Button>
+        </Space>
+      }
+      style={{ borderRadius: 10, marginBottom: 16 }}
+    >
+      <Space wrap size={16} style={{ marginBottom: 12 }}>
+        <span>{t("todo.readiness_period", language)}: <strong>{readiness.accounting_period}</strong></span>
+        <span>{t("todo.readiness_population", language)}: <strong>{readiness.population_count}</strong></span>
+        <span>{t("todo.readiness_blocking", language)}: <strong>{readiness.blocking_count}</strong></span>
+        <span>{t("todo.readiness_evaluated", language)}: <strong>{dayjs(readiness.evaluated_at).format("YYYY-MM-DD HH:mm")}</strong></span>
+        <span>
+          {readiness.scope_complete
+            ? t("todo.readiness_scope_complete", language)
+            : t("todo.readiness_scope_limited", language)}
+        </span>
+      </Space>
+
+      {readiness.status === "scope_limited" && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={t("todo.readiness_scope_warning", language)}
+        />
+      )}
+
+      {readiness.findings.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("todo.readiness_clear", language)} />
+      ) : (
+        <List
+          size="small"
+          dataSource={readiness.findings}
+          renderItem={(finding) => (
+            <List.Item
+              style={{ cursor: "pointer" }}
+              onClick={() => router.push(finding.target_path)}
+              actions={[<RightOutlined key="open" style={{ color: "#BFBFBF" }} />]}
+            >
+              <List.Item.Meta
+                title={
+                  <Space size={8} wrap>
+                    <Tag color={finding.severity === "blocking" ? "error" : "warning"}>
+                      {finding.severity === "blocking" ? t("todo.readiness_blocking_tag", language) : finding.severity}
+                    </Tag>
+                    <span style={{ fontWeight: 500 }}>{finding.title}</span>
+                    {finding.contract_number && <span>{finding.contract_number}</span>}
+                  </Space>
+                }
+                description={
+                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                    {finding.reason}；{finding.remediation}
+                  </span>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      )}
+    </Card>
+  );
+
+  const detectExceptions = async () => {
+    if (!token) return;
+    try {
+      await monthlyClosingApi.detectExceptions(period, token);
+      message.success(t("todo.exceptions_detected", language));
+      await load(period);
+    } catch (error: any) {
+      message.error(error?.message || t("todo.exceptions_action_failed", language));
+    }
+  };
+
+  const applyExceptionAction = async (exception: CloseException, action: string) => {
+    if (!token) return;
+    const note = window.prompt(t("todo.exceptions_note_prompt", language));
+    if (!note?.trim()) return;
+    const ownerId = action === "assign"
+      ? window.prompt(t("todo.exceptions_owner_prompt", language), exception.owner_id || "") || ""
+      : undefined;
+    if (action === "assign" && !ownerId?.trim()) return;
+    try {
+      await monthlyClosingApi.applyExceptionAction(exception.id, { action, owner_id: ownerId, note }, token);
+      message.success(t("todo.exceptions_action_done", language));
+      await load(period);
+    } catch (error: any) {
+      message.error(error?.message || t("todo.exceptions_action_failed", language));
+    }
+  };
+
+  const exceptionAction = (exception: CloseException) => {
+    if (exception.exception_state === "open") {
+      return <Button size="small" onClick={() => applyExceptionAction(exception, "assign")}>{t("todo.exceptions_assign", language)}</Button>;
+    }
+    if (exception.exception_state === "investigating") {
+      return (
+        <Space size={4} wrap>
+          <Button size="small" onClick={() => applyExceptionAction(exception, "verify_resolution")}>{t("todo.exceptions_verify", language)}</Button>
+          <Button size="small" onClick={() => applyExceptionAction(exception, "accounting_conclusion")}>{t("todo.exceptions_conclude", language)}</Button>
+          <Button size="small" onClick={() => applyExceptionAction(exception, "period_waiver")}>{t("todo.exceptions_waive", language)}</Button>
+        </Space>
+      );
+    }
+    if (exception.exception_state === "resolved" || exception.exception_state === "waived") {
+      return <Button size="small" onClick={() => applyExceptionAction(exception, "close")}>{t("todo.exceptions_close", language)}</Button>;
+    }
+    return null;
+  };
+
+  const exceptionPanel = (
+    <Card
+      title={<Space><span>{t("todo.exceptions_title", language)}</span><Badge count={exceptions.filter((item) => item.exception_state !== "closed").length} showZero /></Space>}
+      extra={<Button size="small" onClick={detectExceptions}>{t("todo.exceptions_detect", language)}</Button>}
+      style={{ borderRadius: 10, marginBottom: 16 }}
+    >
+      {!exceptionsScopeComplete && <Alert type="warning" showIcon style={{ marginBottom: 12 }} message={t("todo.exceptions_scope_warning", language)} />}
+      {exceptions.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("todo.exceptions_empty", language)} />
+      ) : (
+        <List
+          size="small"
+          dataSource={exceptions}
+          renderItem={(exception) => (
+            <List.Item actions={[exceptionAction(exception)]}>
+              <List.Item.Meta
+                title={<Space size={8} wrap>
+                  <Tag color={exception.exception_state === "closed" ? "default" : "error"}>{exception.exception_state}</Tag>
+                  <Tag>{exception.rule_code} · {exception.rule_version}</Tag>
+                  <span>{exception.contract_number || exception.batch_number || exception.subject_id}</span>
+                </Space>}
+                description={<span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                  {t("todo.exceptions_disposition", language)}: {exception.closing_disposition} · {t("todo.exceptions_detected_at", language)}: {dayjs(exception.last_detected_at).format("YYYY-MM-DD HH:mm")}
+                </span>}
+              />
+            </List.Item>
+          )}
+        />
+      )}
+    </Card>
+  );
+
   return (
     <ProtectedRoute>
       <AppLayout>
@@ -147,17 +371,18 @@ export default function TodoPage() {
                 {t("todo.subtitle", language, { count: String(queue.total) })}
               </p>
             </div>
-            <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
+            <Button icon={<ReloadOutlined />} onClick={() => load(period)} loading={loading}>
               {t("todo.refresh", language)}
             </Button>
           </div>
 
           <Spin spinning={loading}>
+            {readinessPanel}
+            {exceptionPanel}
             {section("todo.contracts_pending_review", queue.contracts_pending_review, openContract)}
             {section("todo.contracts_pending_approval", queue.contracts_pending_approval, openContract)}
             {section("todo.events_pending", queue.events_pending, openContract)}
             {section("todo.entries_pending_approval", queue.entries_pending_approval, openClosing)}
-            {section("todo.entries_pending_posting", queue.entries_pending_posting, openClosing)}
             {section("todo.critical_dates_due", queue.critical_dates_due, openContract)}
           </Spin>
 

@@ -138,8 +138,8 @@ export default function NewContractPage() {
         legal_entity_id: values.legal_entity_id,
         store_id: values.store_id,
         landlord_id: values.landlord_id,
-        currency: values.currency || "CNY",
-        asset_type: values.asset_type || "real_estate",
+        currency: values.currency,
+        asset_type: values.asset_type,
         area_sqm: values.area_sqm ?? null,
         commencement_date: values.commencement_date?.format("YYYY-MM-DD"),
         lease_start_date: values.lease_start_date?.format("YYYY-MM-DD"),
@@ -149,7 +149,7 @@ export default function NewContractPage() {
         discount_rate_type: values.discount_rate_type,
         discount_rate_version: values.discount_rate_version,
         discount_rate_value: values.discount_rate_value ?? null,
-        lease_scope: values.lease_scope || "in_scope",
+        lease_scope: values.lease_scope,
         exemption_reason: values.exemption_reason || null,
         scope_source: "manual",
         tags: normalizeTagValues(values.tags),
@@ -194,7 +194,6 @@ export default function NewContractPage() {
             form={form}
             layout="vertical"
             onFinish={handleSubmit}
-            initialValues={{ currency: "CNY", asset_type: "real_estate" }}
           >
             <Form.Item
               label={t("contract_new.contract_number", language)}
@@ -264,11 +263,7 @@ export default function NewContractPage() {
               name="currency"
               rules={[{ required: true }]}
             >
-              <Select>
-                <Select.Option value="CNY">{t("contract_new.currency_cny", language)}</Select.Option>
-                <Select.Option value="USD">{t("contract_new.currency_usd", language)}</Select.Option>
-                <Select.Option value="EUR">{t("contract_new.currency_eur", language)}</Select.Option>
-              </Select>
+              <Input placeholder="ISO 4217" />
             </Form.Item>
 
             <Form.Item label="资产类型" name="asset_type" rules={[{ required: true, message: "请选择资产类型" }]}>
@@ -389,7 +384,6 @@ export default function NewContractPage() {
                 <Form.Item
                   label="计量范围"
                   name="lease_scope"
-                  initialValue="in_scope"
                   rules={[{ required: true, message: "请选择 IFRS 16 计量范围" }]}
                 >
                   <Select>

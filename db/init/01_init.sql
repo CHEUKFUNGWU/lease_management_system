@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS legal_entities (
     code VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(255) NOT NULL,
     country VARCHAR(50),
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
@@ -86,12 +86,12 @@ CREATE TABLE IF NOT EXISTS lease_contracts (
     store_name VARCHAR(255),
     store_address TEXT,
     tags VARCHAR(500),
-    asset_type VARCHAR(50) NOT NULL DEFAULT 'real_estate',
+    asset_type VARCHAR(50) NOT NULL,
     asset_category VARCHAR(100),
     property_category VARCHAR(100),
     -- 租赁面积(㎡):按本合同承租的面积,用于每平米单价对比;设备/车辆租赁留空
     area_sqm DECIMAL(12, 2) CHECK (area_sqm IS NULL OR area_sqm > 0),
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
     signing_date DATE,
     commencement_date DATE NOT NULL,
     lease_start_date DATE NOT NULL,
@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS lease_payment_schedules (
     actual_payment_date DATE,
     payment_timing VARCHAR(10) NOT NULL CHECK (payment_timing IN ('prepaid', 'postpaid')),
     amount DECIMAL(18, 2) NOT NULL,
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
     tax_amount DECIMAL(18, 2),
     amount_type VARCHAR(50) NOT NULL,
     is_fixed BOOLEAN NOT NULL DEFAULT true,
@@ -390,7 +390,7 @@ ALTER TABLE lease_contracts
 
 -- 5b. Contract table: IFRS 16 scope gate columns
 ALTER TABLE lease_contracts
-    ADD COLUMN IF NOT EXISTS lease_scope VARCHAR(50) NOT NULL DEFAULT 'in_scope'
+    ADD COLUMN IF NOT EXISTS lease_scope VARCHAR(50) NOT NULL
         CHECK (lease_scope IN ('in_scope', 'short_term_exempt', 'low_value_exempt', 'not_a_lease')),
     ADD COLUMN IF NOT EXISTS exemption_reason TEXT,
     ADD COLUMN IF NOT EXISTS scope_classified_by UUID REFERENCES users(id),
@@ -402,7 +402,7 @@ ALTER TABLE lease_contracts
 
 -- 5c. Contract table: lease administration dimensions
 ALTER TABLE lease_contracts
-    ADD COLUMN IF NOT EXISTS asset_type VARCHAR(50) NOT NULL DEFAULT 'real_estate'
+    ADD COLUMN IF NOT EXISTS asset_type VARCHAR(50) NOT NULL
         CHECK (asset_type IN ('real_estate', 'vehicle', 'it_equipment', 'machinery', 'other'));
 
 -- 6. Payment schedules: approval status
@@ -685,6 +685,15 @@ INSERT INTO permissions (role_id, resource, action) VALUES
     ('66666666-6666-6666-6666-666666666666', 'reports', 'read')
 ON CONFLICT (role_id, resource, action) DO NOTHING;
 
+INSERT INTO permissions (role_id, resource, action) VALUES
+    ('22222222-2222-2222-2222-222222222222', 'variance_actions', 'write'),
+    ('22222222-2222-2222-2222-222222222222', 'renewal_decisions', 'write'),
+    ('33333333-3333-3333-3333-333333333333', 'variance_actions', 'write'),
+    ('33333333-3333-3333-3333-333333333333', 'renewal_decisions', 'write'),
+    ('44444444-4444-4444-4444-444444444444', 'variance_actions', 'write'),
+    ('44444444-4444-4444-4444-444444444444', 'renewal_decisions', 'write')
+ON CONFLICT (role_id, resource, action) DO NOTHING;
+
 -- 12. Expanded access-policy permissions for all protected modules
 INSERT INTO permissions (role_id, resource, action) VALUES
     ('22222222-2222-2222-2222-222222222222', 'identity', 'read'),
@@ -791,7 +800,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     debit_account VARCHAR(100) NOT NULL,
     credit_account VARCHAR(100) NOT NULL,
     amount DECIMAL(18, 2) NOT NULL,
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
     description TEXT,
     voucher_number VARCHAR(100),
     posting_status VARCHAR(20) NOT NULL DEFAULT 'draft', -- draft, preview, approved, posted, reversed
@@ -920,6 +929,10 @@ CREATE TABLE IF NOT EXISTS budget_versions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     legal_entity_id UUID REFERENCES legal_entities(id),
+    version_type VARCHAR(20) NOT NULL DEFAULT 'budget',
+    source VARCHAR(255) NOT NULL,
+    coverage_scope TEXT NOT NULL DEFAULT '',
+    is_official BOOLEAN NOT NULL DEFAULT false,
     as_of_period VARCHAR(7) NOT NULL,
     from_period VARCHAR(7) NOT NULL,
     to_period VARCHAR(7) NOT NULL,
@@ -928,12 +941,25 @@ CREATE TABLE IF NOT EXISTS budget_versions (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE budget_versions
+    ADD COLUMN IF NOT EXISTS version_type VARCHAR(20) NOT NULL DEFAULT 'budget',
+    ADD COLUMN IF NOT EXISTS source VARCHAR(255) NOT NULL,
+    ADD COLUMN IF NOT EXISTS coverage_scope TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS is_official BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE budget_versions
+    DROP CONSTRAINT IF EXISTS budget_versions_version_type_check;
+
+ALTER TABLE budget_versions
+    ADD CONSTRAINT budget_versions_version_type_check
+    CHECK (version_type IN ('budget', 'forecast', 'scenario'));
+
 CREATE TABLE IF NOT EXISTS budget_lines (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     budget_version_id UUID NOT NULL REFERENCES budget_versions(id) ON DELETE CASCADE,
     contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
     accounting_period VARCHAR(7) NOT NULL,
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+    currency VARCHAR(10) NOT NULL,
     interest_expense DECIMAL(18, 2) NOT NULL DEFAULT 0,
     depreciation DECIMAL(18, 2) NOT NULL DEFAULT 0,
     total_payment DECIMAL(18, 2) NOT NULL DEFAULT 0,
@@ -967,9 +993,8 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 CREATE INDEX IF NOT EXISTS idx_exchange_rates_lookup
     ON exchange_rates(from_currency, to_currency, rate_type, rate_date DESC);
 
-INSERT INTO system_settings (setting_key, setting_value, description)
-VALUES ('global_discount_rate', '0.05', '集团默认折现率（年化，小数）')
-ON CONFLICT (setting_key) DO NOTHING;
+-- Do not seed a discount rate. A missing rate must stay missing until an
+-- approved policy or human confirmation supplies one.
 
 -- ----------------------------------------------------------------------------
 -- 迁移 017:事件结构化条款参数
@@ -1007,20 +1032,20 @@ CREATE TABLE IF NOT EXISTS store_metrics (
     -- follows is the customer's business, so period_basis records what they
     -- told us rather than assuming a natural month.
     period VARCHAR(7) NOT NULL,
-    period_basis VARCHAR(20) NOT NULL DEFAULT 'calendar_month',
+	period_basis VARCHAR(20) NOT NULL,
 
     revenue DECIMAL(18, 2) NOT NULL,
     gross_profit DECIMAL(18, 2),
     -- Sales in one currency against rent in another is not a ratio, so the
     -- currency travels with the figure and the report checks it.
-    currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
+	currency VARCHAR(10) NOT NULL,
 
     -- Revenue gets restated. version keeps the earlier submission rather than
     -- overwriting it, so a report can say which vintage it was based on.
     version INTEGER NOT NULL DEFAULT 1,
     -- Where the figure came from: 'manual', 'api', 'ai_upload'. Reports name it
     -- so a reader knows how much weight it carries.
-    source VARCHAR(50) NOT NULL DEFAULT 'manual',
+	source VARCHAR(50) NOT NULL,
     note TEXT,
 
     created_by UUID REFERENCES users(id),
@@ -1056,6 +1081,154 @@ CREATE TABLE IF NOT EXISTS store_aliases (
 
 COMMENT ON TABLE store_aliases IS
     '门店别名映射:营收表里的叫法确认一次后记住,避免每月重复匹配';
+
+-- ============================================================================
+-- Migration 019: Close Exception Governance
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS close_control_rules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    rule_code VARCHAR(100) NOT NULL,
+    rule_version VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    severity VARCHAR(20) NOT NULL DEFAULT 'blocking',
+    gate_effect VARCHAR(100) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    reason_template TEXT NOT NULL DEFAULT '',
+    remediation TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+    effective_to DATE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE (rule_code, rule_version),
+    CHECK (severity IN ('blocking', 'warning', 'informational'))
+);
+
+CREATE TABLE IF NOT EXISTS close_detection_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    control_rule_id UUID NOT NULL REFERENCES close_control_rules(id),
+    rule_code VARCHAR(100) NOT NULL,
+    rule_version VARCHAR(50) NOT NULL,
+    legal_entity_id UUID REFERENCES legal_entities(id),
+    accounting_period VARCHAR(7) NOT NULL,
+    projection_version VARCHAR(100) NOT NULL,
+    subject_type VARCHAR(50) NOT NULL,
+    subject_id UUID NOT NULL,
+    subject_contract_id UUID REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    fingerprint VARCHAR(64) NOT NULL,
+    evidence JSONB NOT NULL DEFAULT '{}'::jsonb,
+    detected_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE close_detection_events
+    DROP CONSTRAINT IF EXISTS close_detection_events_fingerprint_projection_version_key;
+
+CREATE TABLE IF NOT EXISTS close_exceptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    detection_event_id UUID NOT NULL REFERENCES close_detection_events(id),
+    fingerprint VARCHAR(64) NOT NULL UNIQUE,
+    rule_code VARCHAR(100) NOT NULL,
+    rule_version VARCHAR(50) NOT NULL,
+    severity VARCHAR(20) NOT NULL,
+    gate_effect VARCHAR(100) NOT NULL,
+    legal_entity_id UUID REFERENCES legal_entities(id),
+    accounting_period VARCHAR(7) NOT NULL,
+    subject_type VARCHAR(50) NOT NULL,
+    subject_id UUID NOT NULL,
+    subject_contract_id UUID REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    projection_version VARCHAR(100) NOT NULL,
+    exception_state VARCHAR(30) NOT NULL DEFAULT 'open',
+    closing_disposition VARCHAR(40) NOT NULL DEFAULT 'unresolved',
+    owner_id UUID REFERENCES users(id),
+    reviewer_id UUID REFERENCES users(id),
+    approver_id UUID REFERENCES users(id),
+    opened_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    last_detected_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    investigating_at TIMESTAMP WITH TIME ZONE,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    waived_at TIMESTAMP WITH TIME ZONE,
+    closed_at TIMESTAMP WITH TIME ZONE,
+    resolution_note TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (exception_state IN ('open', 'investigating', 'resolved', 'waived', 'closed')),
+    CHECK (closing_disposition IN ('unresolved', 'verified_resolution', 'accounting_conclusion', 'period_waiver', 'standing_waiver')),
+    CHECK (severity IN ('blocking', 'warning', 'informational'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_close_detection_period
+    ON close_detection_events(accounting_period, legal_entity_id, detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_close_detection_fingerprint
+    ON close_detection_events(fingerprint);
+CREATE INDEX IF NOT EXISTS idx_close_exceptions_period
+    ON close_exceptions(accounting_period, legal_entity_id, exception_state);
+CREATE INDEX IF NOT EXISTS idx_close_exceptions_subject
+    ON close_exceptions(subject_contract_id, subject_id);
+
+ALTER TABLE close_control_rules
+    ADD COLUMN IF NOT EXISTS reason_template TEXT NOT NULL DEFAULT '';
+
+INSERT INTO close_control_rules (rule_code, rule_version, name, severity, gate_effect, title, reason_template, remediation)
+VALUES
+    ('missing_payment_schedule', 'v1', 'Approved payment schedule', 'blocking', 'formal_calculation', '缺少已批准付款计划', '已批准合同没有可用于本期间计量的正式付款计划', '补充或导入付款计划，并完成付款计划复核/审批流程'),
+    ('missing_discount_rate', 'v1', 'Confirmed discount rate', 'blocking', 'formal_calculation', '缺少已确认折现率', '合同没有已确认折现率，且当前政策库没有可用折现率', '通过折现率政策匹配或人工确认补充折现率，不得由系统猜测'),
+    ('pending_event_before_period_end', 'v1', 'Pending event before period end', 'blocking', 'formal_calculation', '存在期间内待审批事件', '合同存在生效日在本期间结束日前、但尚未完成审批的事件', '通过事件工作流完成复核、审批或退回处理，再重新运行预检'),
+    ('failed_close_batch', 'v1', 'Failed close batch', 'blocking', 'close_preparation', '本期间存在失败月结批次', '月结批次 %s 状态为 %s，失败合同数为 %d', '打开结账中心检查失败合同，完成修正后再重新生成本期间月结')
+ON CONFLICT (rule_code, rule_version) DO UPDATE SET
+    name = EXCLUDED.name,
+    severity = EXCLUDED.severity,
+    gate_effect = EXCLUDED.gate_effect,
+    title = EXCLUDED.title,
+    reason_template = EXCLUDED.reason_template,
+    remediation = EXCLUDED.remediation,
+    enabled = true;
+
+INSERT INTO permissions (role_id, resource, action) VALUES
+    ('33333333-3333-3333-3333-333333333333', 'monthly_closing', 'exception_read'),
+    ('33333333-3333-3333-3333-333333333333', 'monthly_closing', 'exception_detect'),
+    ('33333333-3333-3333-3333-333333333333', 'monthly_closing', 'exception_manage'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'exception_read'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'exception_detect'),
+    ('44444444-4444-4444-4444-444444444444', 'monthly_closing', 'exception_manage'),
+    ('55555555-5555-5555-5555-555555555555', 'monthly_closing', 'exception_read')
+ON CONFLICT (role_id, resource, action) DO NOTHING;
+
+-- ============================================================================
+-- Migration 020: FP&A version metadata, variance actions and renewal decisions
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS variance_actions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    budget_version_id UUID NOT NULL REFERENCES budget_versions(id) ON DELETE CASCADE,
+    contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    accounting_period VARCHAR(7) NOT NULL,
+    explanation TEXT NOT NULL DEFAULT '',
+    owner_name VARCHAR(255) NOT NULL DEFAULT '',
+    due_date DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'open',
+    updated_by UUID REFERENCES users(id),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE (budget_version_id, contract_id, accounting_period),
+    CHECK (status IN ('open', 'in_progress', 'resolved', 'accepted'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_variance_actions_period
+    ON variance_actions(budget_version_id, accounting_period, status);
+
+CREATE TABLE IF NOT EXISTS renewal_decision_snapshots (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    contract_id UUID NOT NULL REFERENCES lease_contracts(id) ON DELETE CASCADE,
+    legal_entity_id UUID REFERENCES legal_entities(id),
+    decision_date DATE NOT NULL,
+    owner_name VARCHAR(255) NOT NULL DEFAULT '',
+    business_opinion TEXT NOT NULL DEFAULT '',
+    evidence TEXT NOT NULL DEFAULT '',
+    snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_renewal_decisions_contract
+    ON renewal_decision_snapshots(contract_id, decision_date DESC, created_at DESC);
 
 -- ============================================================================
 -- End of init script

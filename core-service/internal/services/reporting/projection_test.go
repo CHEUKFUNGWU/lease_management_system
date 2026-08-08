@@ -109,7 +109,7 @@ func TestProjectPortfolioAppliesDefaultsAndAccountingClassification(t *testing.T
 		t.Fatalf("portfolio rows = %#v", result.Payload["data"])
 	}
 	row := rows[0]
-	if row.AssetType != "real_estate" || row.LeaseScope != "in_scope" || row.Currency != "CNY" || row.ActiveContractCount != 1 || row.MissingDiscountRateCount != 1 || row.FixedLeaseCommitment != 100 || row.VariableRentExposure != 20 || row.NonLeaseComponentAmount != 5 || row.PaymentCount != 3 {
+	if row.AssetType != "" || row.LeaseScope != "" || row.Currency != "" || row.ActiveContractCount != 1 || row.MissingDiscountRateCount != 1 || row.FixedLeaseCommitment != 100 || row.VariableRentExposure != 20 || row.NonLeaseComponentAmount != 5 || row.PaymentCount != 3 {
 		t.Fatalf("portfolio row = %#v", row)
 	}
 }

@@ -63,7 +63,7 @@ export default function SensitivityPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const shock = (values.shock_percent || 1) / 100;
+      const shock = values.shock_percent / 100;
       const res = await reportApi.sensitivity(
         {
           contract_id: values.contract_id,
@@ -99,7 +99,6 @@ export default function SensitivityPage() {
                 form={form}
                 layout="inline"
                 onFinish={runAnalysis}
-                initialValues={{ shock_percent: 1 }}
               >
                 <Form.Item name="contract_id" rules={[{ required: true, message: "请选择合同" }]} style={{ minWidth: 320 }}>
                   <Select
@@ -115,7 +114,7 @@ export default function SensitivityPage() {
                 <Form.Item name="base_rate_percent" label="基准折现率">
                   <InputNumber min={0} max={50} precision={2} addonAfter="%" placeholder="默认合同/系统利率" />
                 </Form.Item>
-                <Form.Item name="shock_percent" label="冲击幅度">
+                <Form.Item name="shock_percent" label="冲击幅度" rules={[{ required: true, message: "请填写冲击幅度" }]}>
                   <InputNumber min={0.1} max={10} precision={2} addonAfter="%" />
                 </Form.Item>
                 <Form.Item>

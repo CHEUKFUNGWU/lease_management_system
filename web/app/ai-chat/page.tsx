@@ -1079,7 +1079,7 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
                     <Text type="secondary" style={{ fontSize: 11 }}>资产类型</Text>
                     <Input
                       size="small"
-                      value={contract.asset_type || "real_estate"}
+                      value={contract.asset_type || ""}
                       onChange={(e) => updateContract(index, "asset_type", e.target.value)}
                       style={{ fontSize: 13 }}
                     />
@@ -1088,7 +1088,7 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
                     <Text type="secondary" style={{ fontSize: 11 }}>租赁范围</Text>
                     <Input
                       size="small"
-                      value={contract.lease_scope || contract.suggested_scope || "in_scope"}
+                      value={contract.lease_scope || contract.suggested_scope || ""}
                       onChange={(e) => updateContract(index, "lease_scope", e.target.value)}
                       style={{ fontSize: 13 }}
                       status={!contract.lease_scope && !contract.suggested_scope ? "warning" : ""}
@@ -1947,17 +1947,17 @@ function AIChatPageContent() {
                                   lessor_name: c.lessor,
                                   store_name: c.store_name,
                                   store_address: c.store_address,
-                                  currency: c.currency || "CNY",
-                                  asset_type: c.asset_type || "real_estate",
+                                  currency: c.currency || "",
+                                  asset_type: c.asset_type || "",
                                   area_sqm: c.area_sqm && c.area_sqm > 0 ? c.area_sqm : null,
                                   commencement_date: c.commencement_date,
                                   lease_start_date: c.lease_start_date,
                                   lease_end_date: c.lease_end_date,
                                   discount_rate_type: c.discount_rate_type || null,
                                   discount_rate_value: c.discount_rate || null,
-                                  lease_scope: c.lease_scope || c.suggested_scope || "in_scope",
+                                  lease_scope: c.lease_scope || c.suggested_scope || "",
                                   exemption_reason: c.exemption_reason || null,
-                                  scope_source: c.scope_source || "ai_suggested",
+                                  scope_source: c.scope_source || "",
                                   scope_confidence: c.scope_confidence ?? null,
                                   tags: "",
                                 }));
@@ -2073,7 +2073,7 @@ function AIChatPageContent() {
                                     due_date: schedule.due_date,
                                     payment_timing: schedule.payment_timing,
                                     amount: schedule.amount,
-                                    currency: schedule.currency || "CNY",
+                                    currency: schedule.currency || "",
                                     amount_type: schedule.amount_type || "fixed_rent",
                                     is_fixed: schedule.is_fixed,
                                     is_variable: !schedule.is_fixed,

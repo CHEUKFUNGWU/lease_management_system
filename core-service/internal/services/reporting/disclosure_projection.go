@@ -78,6 +78,55 @@ type CashOutflowSummary struct {
 	Total            float64 `json:"total"`
 }
 
+// AuditWorkpaperRow is the contract-level evidence row behind the aggregated
+// disclosure sections. It is intentionally built from the same disclosureFact
+// so the UI and an auditor never receive a second accounting calculation.
+type AuditWorkpaperRow struct {
+	ContractID                string  `json:"contract_id"`
+	ContractNumber            string  `json:"contract_number"`
+	ContractName              string  `json:"contract_name"`
+	LegalEntityID             string  `json:"legal_entity_id,omitempty"`
+	StoreName                 string  `json:"store_name,omitempty"`
+	AssetType                 string  `json:"asset_type"`
+	Currency                  string  `json:"currency"`
+	LeaseScope                string  `json:"lease_scope"`
+	ApprovalStatus            string  `json:"approval_status"`
+	ReportMode                string  `json:"report_mode"`
+	CommencementDate          string  `json:"commencement_date"`
+	LeaseEndDate              string  `json:"lease_end_date"`
+	DiscountRate              float64 `json:"discount_rate"`
+	DiscountRateType          string  `json:"discount_rate_type,omitempty"`
+	DiscountRateVersion       string  `json:"discount_rate_version,omitempty"`
+	DiscountRateSource        string  `json:"discount_rate_source,omitempty"`
+	DiscountRateConfirmedAt   string  `json:"discount_rate_confirmed_at,omitempty"`
+	PaymentScheduleCount      int     `json:"payment_schedule_count"`
+	EventAdjustmentCount      int     `json:"event_adjustment_count"`
+	InitialLiability          float64 `json:"initial_liability"`
+	InitialROUAsset           float64 `json:"initial_rou_asset"`
+	OpeningLiability          float64 `json:"opening_liability"`
+	Additions                 float64 `json:"additions"`
+	Interest                  float64 `json:"interest"`
+	Payments                  float64 `json:"payments"`
+	LiabilityRemeasurement    float64 `json:"liability_remeasurement"`
+	LiabilityOtherAdjustments float64 `json:"liability_other_adjustments"`
+	ClosingLiability          float64 `json:"closing_liability"`
+	OpeningROU                float64 `json:"opening_rou"`
+	ROUAdditions              float64 `json:"rou_additions"`
+	Depreciation              float64 `json:"depreciation"`
+	ROURemeasurement          float64 `json:"rou_remeasurement"`
+	Impairment                float64 `json:"impairment"`
+	ROUOtherAdjustments       float64 `json:"rou_other_adjustments"`
+	ClosingROU                float64 `json:"closing_rou"`
+	LiabilityTieOut           float64 `json:"liability_tie_out"`
+	ROUTieOut                 float64 `json:"rou_tie_out"`
+}
+
+type AuditWorkpaperTotals struct {
+	RowCount         int `json:"row_count"`
+	CapitalizedCount int `json:"capitalized_count"`
+	ExemptCount      int `json:"exempt_count"`
+}
+
 // disclosureFact is one contract's computed state, shared across the five tables
 // so the engine runs once per contract rather than once per table.
 type disclosureFact struct {
@@ -140,12 +189,139 @@ func projectDisclosure(snapshot *Snapshot, request ProjectionRequest) (Projectio
 		"currencies":            currencies,
 		"multi_currency_caveat": len(currencies) > 1,
 		"skipped_contracts":     skipped,
+		"report_basis": map[string]any{
+			"snapshot_id": snapshot.ID, "policy_version": snapshot.PolicyVersion,
+			"mode": snapshot.Mode, "is_official": snapshot.IsOfficial, "generated_at": snapshot.GeneratedAt,
+			"approval_status": func() string {
+				if snapshot.IsOfficial {
+					return "approved"
+				}
+				return "mixed_working_statuses"
+			}(),
+			"period_start": request.StartDate.Format("2006-01-02"), "period_end": request.EndDate.Format("2006-01-02"),
+			"as_of": asOf.Format("2006-01-02"), "population_count": len(snapshot.Contracts),
+			"computed_contract_count": len(facts), "skipped_contract_count": skipped,
+			"excluded_not_a_lease_count": countNotALease(snapshot),
+			"approval_status_policy":     approvalStatusPolicy(snapshot.Mode),
+		},
 		"maturity_analysis":     map[string]any{"rows": maturityRows, "totals": maturityTotals},
 		"rou_reconciliation":    map[string]any{"rows": rouRows, "totals": rouTotals},
 		"liability_rollforward": buildLiabilityRollforward(facts, request.StartDate, request.EndDate),
 		"expense_breakdown":     buildExpenseBreakdown(facts, request.StartDate, request.EndDate),
 		"cash_outflow":          buildCashOutflow(facts, request.StartDate, request.EndDate),
+		"audit_workpaper": func() map[string]any {
+			rows, totals := buildAuditWorkpaper(facts, request.StartDate, request.EndDate, snapshot.Mode)
+			return map[string]any{"rows": rows, "totals": totals}
+		}(),
 	})}, nil
+}
+
+func approvalStatusPolicy(mode Mode) string {
+	if mode == Official {
+		return "approved_only"
+	}
+	return "working_statuses"
+}
+
+func countNotALease(snapshot *Snapshot) int {
+	count := 0
+	for _, fact := range snapshot.Contracts {
+		if ifrs16.NormalizeLeaseScope(fact.Contract.LeaseScope) == ifrs16.LeaseScopeNotALease {
+			count++
+		}
+	}
+	return count
+}
+
+func buildAuditWorkpaper(facts []disclosureFact, periodStart, periodEnd time.Time, mode Mode) ([]AuditWorkpaperRow, AuditWorkpaperTotals) {
+	rows := make([]AuditWorkpaperRow, 0, len(facts))
+	totals := AuditWorkpaperTotals{}
+	for _, fact := range facts {
+		contract := fact.contract
+		row := AuditWorkpaperRow{
+			ContractID: contract.ID, ContractNumber: contract.ContractNumber, ContractName: contract.ContractName,
+			StoreName: contract.StoreName, AssetType: contract.AssetType, Currency: contract.Currency,
+			LeaseScope: ifrs16.NormalizeLeaseScope(contract.LeaseScope), ApprovalStatus: contract.ApprovalStatus,
+			ReportMode: string(mode), CommencementDate: contract.CommencementDate.Format("2006-01-02"),
+			LeaseEndDate: contract.LeaseEndDate.Format("2006-01-02"), DiscountRate: roundProjection(fact.rate),
+			PaymentScheduleCount: len(fact.payments), EventAdjustmentCount: len(fact.adjustments),
+			InitialLiability: roundProjection(fact.calculation.InitialLiability), InitialROUAsset: roundProjection(fact.calculation.InitialROUAsset),
+		}
+		if contract.LegalEntityID != nil {
+			row.LegalEntityID = *contract.LegalEntityID
+		}
+		if contract.DiscountRateType != nil {
+			row.DiscountRateType = *contract.DiscountRateType
+		}
+		if contract.DiscountRateVersion != nil {
+			row.DiscountRateVersion = *contract.DiscountRateVersion
+		}
+		if contract.DiscountRateSource != nil {
+			row.DiscountRateSource = *contract.DiscountRateSource
+		}
+		if contract.DiscountRateConfirmedAt != nil {
+			row.DiscountRateConfirmedAt = contract.DiscountRateConfirmedAt.Format(time.RFC3339)
+		}
+
+		row.OpeningLiability, row.OpeningROU = carryingAmountsAt(fact.calculation.DailyAmortization, periodStart.AddDate(0, 0, -1))
+		row.ClosingLiability, row.ClosingROU = carryingAmountsAt(fact.calculation.DailyAmortization, periodEnd)
+		if !contract.CommencementDate.Before(periodStart) && !contract.CommencementDate.After(periodEnd) {
+			row.Additions = fact.calculation.InitialLiability
+			row.ROUAdditions = fact.calculation.InitialROUAsset
+		}
+		for _, entry := range fact.calculation.DailyAmortization {
+			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
+				continue
+			}
+			row.Interest += entry.InterestExpense
+			row.Payments += entry.Payment
+			row.LiabilityOtherAdjustments += entry.LiabilityAdjustment
+			row.Depreciation += entry.Depreciation
+			row.ROUOtherAdjustments += entry.ROUAdjustment
+		}
+		for _, adjustment := range fact.adjustments {
+			if adjustment.EffectiveDate.Before(periodStart) || adjustment.EffectiveDate.After(periodEnd) {
+				continue
+			}
+			if adjustment.AdjustmentType == "impairment" {
+				written := math.Abs(adjustment.ROUAdjustment)
+				if written == 0 {
+					written = adjustment.PnLLoss
+				}
+				row.Impairment += written
+				continue
+			}
+			row.LiabilityRemeasurement += adjustment.LiabilityAdjustment
+			row.ROURemeasurement += adjustment.ROUAdjustment
+		}
+		row.LiabilityTieOut = roundProjection(row.OpeningLiability + row.Additions + row.Interest - row.Payments + row.LiabilityRemeasurement + row.LiabilityOtherAdjustments - row.ClosingLiability)
+		row.ROUTieOut = roundProjection(row.OpeningROU + row.ROUAdditions - row.Depreciation + row.ROURemeasurement - row.Impairment + row.ROUOtherAdjustments - row.ClosingROU)
+		row.InitialLiability = roundProjection(row.InitialLiability)
+		row.InitialROUAsset = roundProjection(row.InitialROUAsset)
+		row.OpeningLiability = roundProjection(row.OpeningLiability)
+		row.Additions = roundProjection(row.Additions)
+		row.Interest = roundProjection(row.Interest)
+		row.Payments = roundProjection(row.Payments)
+		row.LiabilityRemeasurement = roundProjection(row.LiabilityRemeasurement)
+		row.LiabilityOtherAdjustments = roundProjection(row.LiabilityOtherAdjustments)
+		row.ClosingLiability = roundProjection(row.ClosingLiability)
+		row.OpeningROU = roundProjection(row.OpeningROU)
+		row.ROUAdditions = roundProjection(row.ROUAdditions)
+		row.Depreciation = roundProjection(row.Depreciation)
+		row.ROURemeasurement = roundProjection(row.ROURemeasurement)
+		row.Impairment = roundProjection(row.Impairment)
+		row.ROUOtherAdjustments = roundProjection(row.ROUOtherAdjustments)
+		row.ClosingROU = roundProjection(row.ClosingROU)
+		rows = append(rows, row)
+		totals.RowCount++
+		if fact.calculation.MeasurementBasis == "capitalized" {
+			totals.CapitalizedCount++
+		} else {
+			totals.ExemptCount++
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ContractNumber < rows[j].ContractNumber })
+	return rows, totals
 }
 
 // MaturityBandLabels names the bands in the order they are indexed. The cash

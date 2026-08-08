@@ -127,7 +127,7 @@ func buildFXEntry(
 	if err != nil {
 		return nil, err
 	}
-	if math.Abs(difference) <= 0.01 {
+	if math.Abs(difference) <= store.GetFloat64(ctx, "journal_entry_materiality_threshold", 0) {
 		return nil, nil
 	}
 

@@ -414,7 +414,9 @@ func (h *EventHandler) RecalculateEvent(c *gin.Context) {
 		EventID: eventID, ContractID: contractID, EventType: event.EventType,
 		EffectiveDate: event.EffectiveDate, CommencementDate: contract.CommencementDate,
 		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue, Revision: revision,
-		Currency: contract.Currency, DiscountRate: discountRate, Payments: payments,
+		Currency: contract.Currency, LeaseScope: contract.LeaseScope,
+		MaterialityThreshold: h.systemSettingRepo.GetFloat64(ctx, "journal_entry_materiality_threshold", 0),
+		DiscountRate:         discountRate, Payments: payments,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "recalculation failed: " + err.Error()})
@@ -559,7 +561,9 @@ func (h *EventHandler) PreviewEventAdjustment(c *gin.Context) {
 		EventID: eventID, ContractID: contractID, EventType: event.EventType,
 		EffectiveDate: event.EffectiveDate, CommencementDate: contract.CommencementDate,
 		LeaseEndDate: contract.LeaseEndDate, NewValue: event.NewValue, Revision: revision,
-		Currency: contract.Currency, DiscountRate: discountRate, Payments: payments,
+		Currency: contract.Currency, LeaseScope: contract.LeaseScope,
+		MaterialityThreshold: h.systemSettingRepo.GetFloat64(ctx, "journal_entry_materiality_threshold", 0),
+		DiscountRate:         discountRate, Payments: payments,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "preview calculation failed: " + err.Error()})

@@ -45,6 +45,49 @@ interface ROURow {
   closing: number;
 }
 
+interface AuditWorkpaperRow {
+  contract_id: string;
+  contract_number: string;
+  contract_name: string;
+  store_name?: string;
+  asset_type: string;
+  currency: string;
+  lease_scope: string;
+  approval_status: string;
+  report_mode: string;
+  discount_rate: number;
+  discount_rate_source?: string;
+  discount_rate_version?: string;
+  payment_schedule_count: number;
+  event_adjustment_count: number;
+  opening_liability: number;
+  closing_liability: number;
+  interest: number;
+  payments: number;
+  opening_rou: number;
+  closing_rou: number;
+  depreciation: number;
+  liability_tie_out: number;
+  rou_tie_out: number;
+}
+
+interface ReportBasis {
+  snapshot_id: string;
+  policy_version: string;
+  mode: string;
+  is_official: boolean;
+  approval_status: string;
+  generated_at: string;
+  period_start: string;
+  period_end: string;
+  as_of: string;
+  population_count: number;
+  computed_contract_count: number;
+  skipped_contract_count: number;
+  excluded_not_a_lease_count: number;
+  approval_status_policy: string;
+}
+
 interface DisclosureData {
   mode: string;
   period_start: string;
@@ -53,6 +96,8 @@ interface DisclosureData {
   currencies: string[];
   multi_currency_caveat: boolean;
   skipped_contracts: number;
+  report_basis: ReportBasis;
+  audit_workpaper: { rows: AuditWorkpaperRow[] | null; totals: { row_count: number; capitalized_count: number; exempt_count: number } };
   maturity_analysis: { rows: MaturityRow[] | null; totals: MaturityRow };
   rou_reconciliation: { rows: ROURow[] | null; totals: ROURow };
   liability_rollforward: {
@@ -217,10 +262,27 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
       { title: t("reports.disclosure_opening", language), dataIndex: "opening", width: 130, align: "right" as const, render: fmtNum },
       { title: t("reports.disclosure_additions", language), dataIndex: "additions", width: 130, align: "right" as const, render: fmtNum },
       { title: t("reports.col_depreciation", language), dataIndex: "depreciation", width: 130, align: "right" as const, render: fmtNum },
-      { title: t("reports.disclosure_remeasurement", language), dataIndex: "remeasurement", width: 120, align: "right" as const, render: fmtNum },
       { title: t("reports.col_impairment", language), dataIndex: "impairment", width: 110, align: "right" as const, render: fmtNum },
       { title: t("reports.disclosure_other_adjustments", language), dataIndex: "other_adjustments", width: 110, align: "right" as const, render: fmtNum },
       { title: t("reports.disclosure_closing", language), dataIndex: "closing", width: 130, align: "right" as const, render: fmtNum },
+    ],
+    [language],
+  );
+
+  const workpaperColumns = useMemo(
+    () => [
+      { title: t("reports.contract_number", language), dataIndex: "contract_number", width: 130, fixed: "left" as const },
+      { title: t("reports.contract_name", language), dataIndex: "contract_name", width: 170, ellipsis: true, fixed: "left" as const },
+      { title: t("reports.store", language), dataIndex: "store_name", width: 120, ellipsis: true },
+      { title: t("reports.currency", language), dataIndex: "currency", width: 70 },
+      { title: t("reports.disclosure_rate_source", language), dataIndex: "discount_rate_source", width: 130 },
+      { title: t("reports.disclosure_input_count", language), dataIndex: "payment_schedule_count", width: 110, align: "right" as const },
+      { title: t("reports.disclosure_event_count", language), dataIndex: "event_adjustment_count", width: 100, align: "right" as const },
+      { title: t("reports.disclosure_opening_liability", language), dataIndex: "opening_liability", width: 130, align: "right" as const, render: fmtNum },
+      { title: t("reports.disclosure_closing_liability", language), dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
+      { title: t("reports.col_interest", language), dataIndex: "interest", width: 110, align: "right" as const, render: fmtNum },
+      { title: t("reports.col_depreciation", language), dataIndex: "depreciation", width: 110, align: "right" as const, render: fmtNum },
+      { title: t("reports.disclosure_tie_out", language), dataIndex: "liability_tie_out", width: 110, align: "right" as const, render: (v: number, row: AuditWorkpaperRow) => <Tag color={Math.abs(v) <= 1 && Math.abs(row.rou_tie_out) <= 1 ? "green" : "red"}>{Math.abs(v) <= 1 && Math.abs(row.rou_tie_out) <= 1 ? t("reports.disclosure_tied", language) : t("reports.disclosure_not_tied", language)}</Tag> },
     ],
     [language],
   );
@@ -231,6 +293,23 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
     const wb = XLSX.utils.book_new();
     const maturityRows = data.maturity_analysis.rows || [];
     const totals = data.maturity_analysis.totals;
+
+    const basis = data.report_basis;
+    const basisSheet = XLSX.utils.aoa_to_sheet([
+      [t("reports.disclosure_report_basis", language)],
+      [t("reports.disclosure_snapshot", language), basis.snapshot_id],
+      [t("reports.disclosure_policy_version", language), basis.policy_version],
+      [t("reports.disclosure_mode", language), basis.mode],
+      [t("reports.disclosure_approval_policy", language), basis.approval_status],
+      [t("reports.disclosure_generated_at", language), basis.generated_at],
+      [t("reports.disclosure_period", language), `${basis.period_start} ~ ${basis.period_end}`],
+      [t("reports.disclosure_population", language), basis.population_count],
+      [t("reports.disclosure_computed", language), basis.computed_contract_count],
+      [t("reports.disclosure_skipped", language), basis.skipped_contract_count],
+      [t("reports.disclosure_excluded", language), basis.excluded_not_a_lease_count],
+      [t("reports.disclosure_approval_policy", language), basis.approval_status_policy],
+    ]);
+    XLSX.utils.book_append_sheet(wb, basisSheet, t("reports.disclosure_sheet_basis", language));
 
     // Sheet 1 — contract-level detail (workpaper layer 1)
     const detailHeader = [
@@ -333,7 +412,26 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
     ]);
     XLSX.utils.book_append_sheet(wb, sheet5, t("reports.disclosure_sheet_expense", language));
 
-    XLSX.writeFile(wb, `IFRS16_Disclosure_Workpaper_${data.mode}_${data.as_of}.xlsx`);
+    const workpaperRows = data.audit_workpaper.rows || [];
+    const sheet6 = XLSX.utils.aoa_to_sheet([
+      [
+        t("reports.contract_number", language), t("reports.contract_name", language), t("reports.store", language),
+        t("reports.currency", language), t("reports.disclosure_rate_source", language),
+        t("reports.disclosure_input_count", language), t("reports.disclosure_event_count", language),
+        t("reports.disclosure_opening_liability", language), t("reports.disclosure_closing_liability", language),
+        t("reports.col_interest", language), t("reports.col_depreciation", language),
+        t("reports.disclosure_liability_tie_out", language), t("reports.disclosure_rou_tie_out", language),
+      ],
+      ...workpaperRows.map((row) => [
+        row.contract_number, row.contract_name, row.store_name || "", row.currency, row.discount_rate_source || "",
+        row.payment_schedule_count, row.event_adjustment_count, row.opening_liability, row.closing_liability,
+        row.interest, row.depreciation, row.liability_tie_out, row.rou_tie_out,
+      ]),
+    ]);
+    XLSX.utils.book_append_sheet(wb, sheet6, t("reports.disclosure_sheet_audit", language));
+
+    const snapshotID = String(data.report_basis?.snapshot_id || "snapshot-missing").replace(/[^A-Za-z0-9._-]/g, "_");
+    XLSX.writeFile(wb, `IFRS16_Disclosure_Workpaper_${data.mode}_${snapshotID}_${data.as_of}.xlsx`);
   };
 
   return (
@@ -370,6 +468,22 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
             currencies: (data.currencies || []).join(", "),
           })}
         />
+      )}
+
+      {data && (
+        <Card size="small" style={{ borderRadius: 10, marginBottom: 16 }}>
+          <Space direction="vertical" size={4} style={{ width: "100%" }}>
+            <Space wrap>
+              <Tag color={data.report_basis.is_official ? "blue" : "gold"}>{data.report_basis.mode}</Tag>
+              <span>{t("reports.disclosure_snapshot", language)}: {data.report_basis.snapshot_id}</span>
+              <span>{t("reports.disclosure_policy_version", language)}: {data.report_basis.policy_version}</span>
+              <span>{t("reports.disclosure_generated_at", language)}: {new Date(data.report_basis.generated_at).toLocaleString()}</span>
+            </Space>
+            <span style={{ color: "#595959", fontSize: 12 }}>
+              {t("reports.disclosure_population", language)} {data.report_basis.population_count} · {t("reports.disclosure_computed", language)} {data.report_basis.computed_contract_count} · {t("reports.disclosure_skipped", language)} {data.report_basis.skipped_contract_count}
+            </span>
+          </Space>
+        </Card>
       )}
 
       <Spin spinning={loading}>
@@ -498,6 +612,28 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
                   { label: t("reports.disclosure_non_lease_payments", language), value: data.cash_outflow.non_lease_payments },
                   { label: t("reports.disclosure_total", language), value: data.cash_outflow.total, strong: true },
                 ]}
+              />
+            </SectionCard>
+
+            {/* 6. Contract-level audit workpaper */}
+            <SectionCard
+              title={t("reports.disclosure_audit_title", language)}
+              extra={<Tag>{data.audit_workpaper.totals.row_count} {t("reports.disclosure_rows", language)}</Tag>}
+            >
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={t("reports.disclosure_audit_hint", language)}
+              />
+              <Table
+                columns={workpaperColumns as any}
+                dataSource={data.audit_workpaper.rows || []}
+                rowKey="contract_id"
+                pagination={{ pageSize: 10, showSizeChanger: true }}
+                scroll={{ x: "max-content" }}
+                size="small"
+                locale={{ emptyText: t("reports.empty", language) }}
               />
             </SectionCard>
           </>

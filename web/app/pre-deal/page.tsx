@@ -30,7 +30,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import dayjs from "dayjs";
 import { motion } from "framer-motion";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -108,7 +107,7 @@ export default function PreDealPage() {
             rent_free_months: values.rent_free_months || 0,
             annual_escalation_percent: values.annual_escalation_percent || 0,
             discount_rate: values.discount_rate,
-            currency: values.currency || "CNY",
+            currency: values.currency,
             initial_direct_cost: values.initial_direct_cost || 0,
             early_exit_penalty_months: values.early_exit_penalty_months || 0,
           },
@@ -142,15 +141,6 @@ export default function PreDealPage() {
             form={form}
             layout="vertical"
             onFinish={handleBuild}
-            initialValues={{
-              name: "厂房 5 年租约",
-              commencement_date: dayjs().add(1, "month").startOf("month"),
-              term_months: 60,
-              monthly_rent: 100000,
-              discount_rate: 0.05,
-              currency: "CNY",
-              early_exit_penalty_months: 3,
-            }}
           >
             <Card title="条款草案" style={{ borderRadius: 10, marginBottom: 16 }}>
               <Row gutter={16}>
@@ -185,7 +175,7 @@ export default function PreDealPage() {
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
-                  <Form.Item label="币种" name="currency">
+                  <Form.Item label="币种" name="currency" rules={[{ required: true, message: "请填写币种" }]}>
                     <Input />
                   </Form.Item>
                 </Col>

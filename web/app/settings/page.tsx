@@ -44,13 +44,20 @@ export default function SettingsPage() {
   const [discountRatePercent, setDiscountRatePercent] = useState<number | null>(null);
   const [discountRateSaving, setDiscountRateSaving] = useState(false);
   const [effectiveRate, setEffectiveRate] = useState<number | null>(null);
+  const [healthyCeiling, setHealthyCeiling] = useState<number | null>(null);
+  const [warningCeiling, setWarningCeiling] = useState<number | null>(null);
+  const [ratioSaving, setRatioSaving] = useState(false);
+  const [varianceMateriality, setVarianceMateriality] = useState<number | null>(null);
+  const [tieOutTolerance, setTieOutTolerance] = useState<number | null>(null);
+  const [journalMateriality, setJournalMateriality] = useState<number | null>(null);
+  const [variancePolicySaving, setVariancePolicySaving] = useState(false);
 
   /* ---- exchange rates ---- */
   const [rates, setRates] = useState<any[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [rateForm, setRateForm] = useState({
-    from_currency: "USD",
-    to_currency: "CNY",
+    from_currency: "",
+    to_currency: "",
     rate_date: "",
     rate_type: "closing" as "closing" | "average",
     rate: null as number | null,
@@ -105,6 +112,11 @@ export default function SettingsPage() {
         const percent = raw > 1 ? raw : raw * 100;
         setEffectiveRate(percent);
         setDiscountRatePercent(percent);
+        setHealthyCeiling(res.rent_to_sales_healthy_ceiling || null);
+        setWarningCeiling(res.rent_to_sales_warning_ceiling || null);
+        setVarianceMateriality(res.budget_variance_materiality_threshold || null);
+        setTieOutTolerance(res.budget_tie_out_tolerance || null);
+        setJournalMateriality(res.journal_entry_materiality_threshold || null);
       })
       .catch(() => message.error(t("settings.load_failed", language)))
       .finally(() => setDiscountRateLoading(false));
@@ -124,6 +136,61 @@ export default function SettingsPage() {
       message.error(t("settings.save_failed", language));
     } finally {
       setDiscountRateSaving(false);
+    }
+  };
+
+  const handleSaveRatioPolicy = async () => {
+    if (!token || healthyCeiling == null || warningCeiling == null) return;
+    if (healthyCeiling <= 0 || warningCeiling <= 0 || warningCeiling < healthyCeiling || warningCeiling > 100) {
+      message.warning(t("settings.ratio_policy_invalid", language));
+      return;
+    }
+    setRatioSaving(true);
+    try {
+      await settingsApi.updateGlobal({
+        rent_to_sales_healthy_ceiling: healthyCeiling,
+        rent_to_sales_warning_ceiling: warningCeiling,
+      }, token);
+      message.success(t("settings.ratio_policy_saved", language));
+    } catch (error: any) {
+      message.error(error?.message || t("settings.save_failed", language));
+    } finally {
+      setRatioSaving(false);
+    }
+  };
+
+  const handleSaveVariancePolicy = async () => {
+    if (!token || varianceMateriality == null || tieOutTolerance == null || varianceMateriality <= 0 || tieOutTolerance <= 0) {
+      message.warning(t("settings.variance_policy_invalid", language));
+      return;
+    }
+    setVariancePolicySaving(true);
+    try {
+      await settingsApi.updateGlobal({
+        budget_variance_materiality_threshold: varianceMateriality,
+        budget_tie_out_tolerance: tieOutTolerance,
+      }, token);
+      message.success(t("settings.variance_policy_saved", language));
+    } catch (error: any) {
+      message.error(error?.message || t("settings.save_failed", language));
+    } finally {
+      setVariancePolicySaving(false);
+    }
+  };
+
+  const handleSaveJournalPolicy = async () => {
+    if (!token || journalMateriality == null || journalMateriality <= 0) {
+      message.warning(t("settings.journal_policy_invalid", language));
+      return;
+    }
+    setVariancePolicySaving(true);
+    try {
+      await settingsApi.updateGlobal({ journal_entry_materiality_threshold: journalMateriality }, token);
+      message.success(t("settings.journal_policy_saved", language));
+    } catch (error: any) {
+      message.error(error?.message || t("settings.save_failed", language));
+    } finally {
+      setVariancePolicySaving(false);
     }
   };
 
@@ -308,6 +375,46 @@ export default function SettingsPage() {
           </Spin>
         </Card>
 
+        <Card
+          title={t("settings.group_rent_to_sales", language)}
+          style={{ marginBottom: 24 }}
+        >
+          <Paragraph type="secondary">{t("settings.ratio_policy_desc", language)}</Paragraph>
+          <Space align="center" size={12} wrap>
+            <Text strong>{t("settings.ratio_healthy", language)}</Text>
+            <InputNumber value={healthyCeiling} onChange={(value) => setHealthyCeiling(value)} min={0.01} max={100} step={0.5} addonAfter="%" />
+            <Text strong>{t("settings.ratio_warning", language)}</Text>
+            <InputNumber value={warningCeiling} onChange={(value) => setWarningCeiling(value)} min={0.01} max={100} step={0.5} addonAfter="%" />
+            <Button type="primary" loading={ratioSaving} onClick={handleSaveRatioPolicy}>{t("settings.save_ratio_policy", language)}</Button>
+          </Space>
+        </Card>
+
+        <Card
+          title={t("settings.group_variance_policy", language)}
+          style={{ marginBottom: 24 }}
+        >
+          <Paragraph type="secondary">{t("settings.variance_policy_desc", language)}</Paragraph>
+          <Space align="center" size={12} wrap>
+            <Text strong>{t("settings.variance_materiality", language)}</Text>
+            <InputNumber value={varianceMateriality} onChange={(value) => setVarianceMateriality(value)} min={0.000001} step={0.01} />
+            <Text strong>{t("settings.tie_out_tolerance", language)}</Text>
+            <InputNumber value={tieOutTolerance} onChange={(value) => setTieOutTolerance(value)} min={0.000001} step={0.01} />
+            <Button type="primary" loading={variancePolicySaving} onClick={handleSaveVariancePolicy}>{t("settings.save_variance_policy", language)}</Button>
+          </Space>
+        </Card>
+
+        <Card
+          title={t("settings.group_journal_policy", language)}
+          style={{ marginBottom: 24 }}
+        >
+          <Paragraph type="secondary">{t("settings.journal_policy_desc", language)}</Paragraph>
+          <Space align="center" size={12} wrap>
+            <Text strong>{t("settings.journal_materiality", language)}</Text>
+            <InputNumber value={journalMateriality} onChange={(value) => setJournalMateriality(value)} min={0.000001} step={0.01} />
+            <Button type="primary" loading={variancePolicySaving} onClick={handleSaveJournalPolicy}>{t("settings.save_journal_policy", language)}</Button>
+          </Space>
+        </Card>
+
         {/* summary cards */}
         <Spin spinning={loading}>
           <Row gutter={16} style={{ marginBottom: 24 }}>
@@ -350,14 +457,14 @@ export default function SettingsPage() {
               style={{ width: 90 }}
               value={rateForm.from_currency}
               onChange={(e) => setRateForm({ ...rateForm, from_currency: e.target.value.toUpperCase() })}
-              placeholder="USD"
+              placeholder="ISO 4217"
             />
             <span>→</span>
             <Input
               style={{ width: 90 }}
               value={rateForm.to_currency}
               onChange={(e) => setRateForm({ ...rateForm, to_currency: e.target.value.toUpperCase() })}
-              placeholder="CNY"
+              placeholder="ISO 4217"
             />
             <Input
               style={{ width: 140 }}

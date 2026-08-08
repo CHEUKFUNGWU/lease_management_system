@@ -159,6 +159,35 @@ func TestDisclosureExpenseAndCashOutflow(t *testing.T) {
 	}
 }
 
+func TestDisclosureIncludesReportBasisAndContractAuditWorkpaper(t *testing.T) {
+	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)
+	payload := disclosurePayload(t, capitalizedLeaseSnapshot(), start, end)
+
+	basis, ok := payload["report_basis"].(map[string]any)
+	if !ok {
+		t.Fatalf("report basis type = %T", payload["report_basis"])
+	}
+	if basis["population_count"] != 1 || basis["computed_contract_count"] != 1 || basis["approval_status_policy"] != "working_statuses" {
+		t.Fatalf("report basis = %#v", basis)
+	}
+	workpaper, ok := payload["audit_workpaper"].(map[string]any)
+	if !ok {
+		t.Fatalf("audit workpaper type = %T", payload["audit_workpaper"])
+	}
+	rows, ok := workpaper["rows"].([]AuditWorkpaperRow)
+	if !ok || len(rows) != 1 {
+		t.Fatalf("audit workpaper rows = %#v", workpaper["rows"])
+	}
+	row := rows[0]
+	if row.ContractNumber != "LC-001" || row.PaymentScheduleCount != 36 || row.DiscountRate != 0.05 {
+		t.Fatalf("audit workpaper row = %#v", row)
+	}
+	if math.Abs(row.LiabilityTieOut) > 1 || math.Abs(row.ROUTieOut) > 1 {
+		t.Fatalf("audit workpaper tie-outs = liability %.4f rou %.4f", row.LiabilityTieOut, row.ROUTieOut)
+	}
+}
+
 func TestDisclosureClassifiesExemptLeasesOutsideTheBalanceSheet(t *testing.T) {
 	commencement := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
 	snapshot := &Snapshot{

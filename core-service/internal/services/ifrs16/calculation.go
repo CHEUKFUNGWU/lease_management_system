@@ -1,6 +1,7 @@
 package ifrs16
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -17,12 +18,12 @@ func NormalizeLeaseScope(scope string) string {
 	case LeaseScopeInScope, LeaseScopeShortTermExempt, LeaseScopeLowValueExempt, LeaseScopeNotALease:
 		return scope
 	default:
-		return LeaseScopeInScope
+		return ""
 	}
 }
 
 func IsCapitalizedScope(scope string) bool {
-	return NormalizeLeaseScope(scope) == LeaseScopeInScope
+	return scope == LeaseScopeInScope
 }
 
 // LeaseCalculation holds all inputs for IFRS 16 calculation
@@ -144,6 +145,9 @@ func CalculatePrepaidRent(input LeaseCalculation) float64 {
 // Calculate performs full IFRS 16 calculation with daily granularity
 func Calculate(input LeaseCalculation) (*CalculationResult, error) {
 	scope := NormalizeLeaseScope(input.LeaseScope)
+	if scope == "" {
+		return nil, fmt.Errorf("lease scope is required and must be one of in_scope, short_term_exempt, low_value_exempt, not_a_lease")
+	}
 	switch scope {
 	case LeaseScopeInScope:
 		return calculateCapitalized(input, scope), nil
@@ -151,9 +155,8 @@ func Calculate(input LeaseCalculation) (*CalculationResult, error) {
 		return calculateStraightLineExpense(input, scope), nil
 	case LeaseScopeNotALease:
 		return skipMeasurement(input, scope), nil
-	default:
-		return calculateCapitalized(input, LeaseScopeInScope), nil
 	}
+	return nil, fmt.Errorf("unsupported lease scope %q", input.LeaseScope)
 }
 
 func calculateCapitalized(input LeaseCalculation, scope string) *CalculationResult {

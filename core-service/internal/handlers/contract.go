@@ -33,7 +33,7 @@ type ContractRequest struct {
 	StoreAddress                 string   `json:"store_address"`
 	Tags                         string   `json:"tags"`
 	Currency                     string   `json:"currency" binding:"required"`
-	AssetType                    string   `json:"asset_type"`
+	AssetType                    string   `json:"asset_type" binding:"required,oneof=real_estate vehicle it_equipment machinery other"`
 	CommencementDate             string   `json:"commencement_date" binding:"required"`
 	LeaseStartDate               string   `json:"lease_start_date" binding:"required"`
 	LeaseEndDate                 string   `json:"lease_end_date" binding:"required"`
@@ -48,7 +48,7 @@ type ContractRequest struct {
 	DiscountRateType             *string  `json:"discount_rate_type"`
 	DiscountRateVersion          *string  `json:"discount_rate_version"`
 	DiscountRateValue            *float64 `json:"discount_rate_value"`
-	LeaseScope                   string   `json:"lease_scope"`
+	LeaseScope                   string   `json:"lease_scope" binding:"required,oneof=in_scope short_term_exempt low_value_exempt not_a_lease"`
 	ExemptionReason              *string  `json:"exemption_reason"`
 	ScopeSource                  *string  `json:"scope_source"`
 	ScopeConfidence              *float64 `json:"scope_confidence"`
@@ -127,7 +127,7 @@ func normalizeLeaseScope(scope string) string {
 	case "in_scope", "short_term_exempt", "low_value_exempt", "not_a_lease":
 		return scope
 	default:
-		return "in_scope"
+		return ""
 	}
 }
 
@@ -145,7 +145,7 @@ func normalizeAssetType(assetType string) string {
 	case "real_estate", "vehicle", "it_equipment", "machinery", "other":
 		return assetType
 	default:
-		return "real_estate"
+		return ""
 	}
 }
 

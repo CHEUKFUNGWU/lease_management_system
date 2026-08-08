@@ -82,11 +82,11 @@ func createReportSnapshotFixture(t *testing.T, ctx context.Context, pool *pgxpoo
 		{`INSERT INTO landlords (id, code, name) VALUES ($1, $2, 'Report Landlord')`, []any{fixture.landlordID, "RS-LL-" + suffix}},
 		{`INSERT INTO lease_contracts (
 			id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-			commencement_date, lease_start_date, lease_end_date, currency, status,
+			asset_type, commencement_date, lease_start_date, lease_end_date, currency, status,
 			approval_status, lease_scope, discount_rate_value
 		) VALUES
-			($1, $2, 'Allowed Contract', $3, $4, $5, '2026-01-01', '2026-01-01', '2026-12-31', 'CNY', 'active', 'approved', 'in_scope', 0.06),
-			($6, $7, 'Restricted Contract', $3, $8, $5, '2026-01-01', '2026-01-01', '2026-12-31', 'CNY', 'active', 'approved', 'in_scope', 0.07)`, []any{
+			($1, $2, 'Allowed Contract', $3, $4, $5, 'real_estate', '2026-01-01', '2026-01-01', '2026-12-31', 'CNY', 'active', 'approved', 'in_scope', 0.06),
+			($6, $7, 'Restricted Contract', $3, $8, $5, 'real_estate', '2026-01-01', '2026-01-01', '2026-12-31', 'CNY', 'active', 'approved', 'in_scope', 0.07)`, []any{
 			fixture.allowedContractID, "RS-AC-" + suffix, fixture.legalEntityID, fixture.allowedStoreID, fixture.landlordID,
 			fixture.restrictedContract, "RS-RC-" + suffix, fixture.restrictedStoreID,
 		}},

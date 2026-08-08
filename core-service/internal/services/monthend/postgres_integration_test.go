@@ -167,11 +167,11 @@ func createMonthEndFixture(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 		{`INSERT INTO landlords (id, code, name) VALUES ($1, $2, $3)`, []any{f.landlordID, "IT-LL-" + suffix, "Integration Landlord " + suffix}},
 		{`INSERT INTO users (id, username, email, password_hash, role, legal_entity_id, is_active) VALUES ($1, $2, $3, 'integration-only', 'approver', $4, true)`, []any{f.userID, "it-user-" + suffix, "it-" + suffix + "@example.com", f.legalEntityID}},
 		{`INSERT INTO lease_contracts (
-			id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
+			id, contract_number, contract_name, legal_entity_id, store_id, landlord_id, asset_type,
 			commencement_date, lease_start_date, lease_end_date, status, approval_status,
 			is_official_version, included_in_reporting, report_mode, lease_scope,
 			discount_rate_value, currency
-		) VALUES ($1, $2, $3, $4, $5, $6, '2098-01-01', '2098-01-01', '2098-12-31',
+		) VALUES ($1, $2, $3, $4, $5, $6, 'real_estate', '2098-01-01', '2098-01-01', '2098-12-31',
 			'active', 'approved', true, true, 'official', 'in_scope', 0.05, 'CNY')`, []any{f.contractID, "IT-CT-" + suffix, "Integration Contract " + suffix, f.legalEntityID, f.storeID, f.landlordID}},
 		{`INSERT INTO lease_payment_schedules (
 			contract_id, effective_start_date, effective_end_date, coverage_start_date,

@@ -140,10 +140,10 @@ func createAccessFixture(t *testing.T, ctx context.Context, pool *pgxpool.Pool) 
 		}},
 		{`INSERT INTO landlords (id, code, name) VALUES ($1, $2, $3), ($4, $5, $6)`, []any{fixture.allowedLandlord, "AP-AL-" + suffix, "Allowed Landlord " + suffix, fixture.deniedLandlord, "AP-DL-" + suffix, "Denied Landlord " + suffix}},
 		{`INSERT INTO users (id, username, email, password_hash, role, legal_entity_id, is_active) VALUES ($1, $2, $3, 'integration-only', 'approver', $4, true)`, []any{fixture.userID, "ap-user-" + suffix, "ap-" + suffix + "@example.com", fixture.allowedLegalEntity}},
-		{`INSERT INTO lease_contracts (id, contract_number, contract_name, legal_entity_id, store_id, landlord_id, commencement_date, lease_start_date, lease_end_date, currency, status, approval_status, lease_scope)
-		 VALUES ($1, $2, $3, $4, $5, $6, '2097-01-01', '2097-01-01', '2099-01-01', 'CNY', 'active', 'approved', 'in_scope'),
-		        ($7, $8, $9, $4, $10, $6, '2097-01-01', '2097-01-01', '2099-01-01', 'CNY', 'active', 'approved', 'in_scope'),
-		        ($11, $12, $13, $14, $15, $16, '2097-01-01', '2097-01-01', '2099-01-01', 'CNY', 'active', 'approved', 'in_scope')`, []any{
+		{`INSERT INTO lease_contracts (id, contract_number, contract_name, legal_entity_id, store_id, landlord_id, asset_type, commencement_date, lease_start_date, lease_end_date, currency, status, approval_status, lease_scope)
+			 VALUES ($1, $2, $3, $4, $5, $6, 'real_estate', '2097-01-01', '2097-01-01', '2099-01-01', 'CNY', 'active', 'approved', 'in_scope'),
+			        ($7, $8, $9, $4, $10, $6, 'real_estate', '2097-01-01', '2097-01-01', '2099-01-01', 'CNY', 'active', 'approved', 'in_scope'),
+			        ($11, $12, $13, $14, $15, $16, 'real_estate', '2097-01-01', '2097-01-01', '2099-01-01', 'CNY', 'active', 'approved', 'in_scope')`, []any{
 			fixture.allowedContract, "AP-AC-" + suffix, "Allowed Contract " + suffix, fixture.allowedLegalEntity, fixture.allowedStore, fixture.allowedLandlord,
 			fixture.restrictedContract, "AP-RC-" + suffix, "Restricted Contract " + suffix, fixture.restrictedStore,
 			fixture.deniedContract, "AP-DC-" + suffix, "Denied Contract " + suffix, fixture.deniedLegalEntity, fixture.deniedStore, fixture.deniedLandlord,

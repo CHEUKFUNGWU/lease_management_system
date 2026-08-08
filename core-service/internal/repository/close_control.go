@@ -68,9 +68,9 @@ func (r *CloseControlRepository) PersistDetections(ctx context.Context, detectio
 				projection_version, subject_type, subject_id, subject_contract_id,
 				fingerprint, evidence, detected_at
 			)
-			SELECT id, $1, $2, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10::jsonb, $11
+			SELECT id, $1::varchar, $2::varchar, $3::uuid, $4, $5, $6, $7::uuid, $8::uuid, $9, $10::jsonb, $11
 			FROM close_control_rules
-			WHERE rule_code = $1 AND rule_version = $2 AND enabled = true
+			WHERE rule_code = $1::varchar AND rule_version = $2::varchar AND enabled = true
 			RETURNING id::text
 		`, detection.RuleCode, detection.RuleVersion, legalEntity, detection.AccountingPeriod,
 			detection.ProjectionVersion, detection.SubjectType, detection.SubjectID, subjectContract,

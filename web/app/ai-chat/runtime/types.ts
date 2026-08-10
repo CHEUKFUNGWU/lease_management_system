@@ -102,6 +102,22 @@ export interface AgentReviewPrompt {
   contract_numbers?: string[];
 }
 
+export interface RuntimeArtifact {
+  id: string;
+  run_id?: string;
+  artifact_type: string;
+  title?: string;
+  status?: string;
+  schema_version?: string;
+  data: any;
+  evidence_refs?: any[];
+  evidence_complete?: boolean;
+  review_required?: boolean;
+  review_reasons?: string[];
+  model_version?: string;
+  rule_version?: string;
+}
+
 export interface RuntimeReviewAction {
   id: string;
   actionType: string;
@@ -110,6 +126,14 @@ export interface RuntimeReviewAction {
   runId?: string;
   comment?: string;
   payload?: Record<string, unknown>;
+  draftResult?: {
+	batch_id?: string;
+	operation?: string;
+    items?: Array<Record<string, unknown>>;
+    created_count?: number;
+    replayed_count?: number;
+    failed_count?: number;
+  };
 }
 
 export interface Message {
@@ -127,6 +151,7 @@ export interface Message {
   toolCalls?: AgentToolCall[];
   reviewPrompts?: AgentReviewPrompt[];
   reviewActions?: RuntimeReviewAction[];
+  artifacts?: RuntimeArtifact[];
   draftContracts?: ContractDraftItem[];
   batchSummary?: BatchParseSummary;
   contractDraftArtifactId?: string;

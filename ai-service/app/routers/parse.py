@@ -12,6 +12,7 @@ from app.intake.adapters import (
 from app.intake.models import (
     ContractBatchIntakeResponse,
     ContractIntakeResponse,
+    EventIntakeResponse,
     PaymentScheduleIntakeResponse,
 )
 from app.intake.producer import (
@@ -20,7 +21,7 @@ from app.intake.producer import (
     IntakeKind,
     IntakeProducerError,
 )
-from app.services.document_extractor import extract_text
+from app.services.document_extractor import extract_text, extract_text_with_evidence
 from app.services.llm import llm_client
 from app.services.storage import download_from_minio
 
@@ -56,6 +57,14 @@ class PaymentScheduleParseRequest(BaseModel):
     file_id: str
     object_name: str
     content_type: str
+    mode: str = "assist"
+
+
+class EventParseRequest(BaseModel):
+    file_id: str
+    object_name: str
+    content_type: str = "application/pdf"
+    contract_id: str = ""
     mode: str = "assist"
 
 
@@ -103,6 +112,19 @@ async def parse_payment_schedule(request: PaymentScheduleParseRequest):
     )
 
 
+@router.post("/parse/event", response_model=EventIntakeResponse)
+async def parse_event(request: EventParseRequest):
+    return await _produce(
+        IntakeKind.EVENT,
+        request.file_id,
+        request.object_name,
+        request.content_type,
+        request.mode,
+        None,
+        request.contract_id,
+    )
+
+
 @router.post("/parse/contract-batch", response_model=ContractBatchIntakeResponse)
 async def parse_contract_batch(request: ContractBatchDraftRequest):
     return await _produce(
@@ -122,12 +144,14 @@ async def _produce(
     content_type: str,
     mode: str,
     file_content: Optional[str],
+    contract_id: str = "",
 ):
     command = IntakeCommand(
         kind=kind,
         file_id=file_id,
         object_name=object_name,
         content_type=content_type,
+        contract_id=contract_id,
         mode=mode,
     )
     if file_content:
@@ -138,6 +162,7 @@ async def _produce(
         source_adapter = StoredDocumentAdapter(
             download_from_minio,
             extract_text,
+            extract_with_evidence=extract_text_with_evidence,
         )
     try:
         return await intake_producer.produce(

@@ -28,6 +28,8 @@ describe("AI chat runtime", () => {
     });
 
     expect(result.message.contractDraftArtifactId).toBe("artifact-1");
+    expect(result.message.artifacts?.[0].schema_version).toBeUndefined();
+    expect(result.message.artifacts?.[0].artifact_type).toBe("contract_draft");
     expect(result.message.draftContracts?.[0].contract_number).toBe("LEASE-001");
     expect(result.terminal).toBe(false);
   });
@@ -117,6 +119,7 @@ describe("AI chat runtime", () => {
     );
 
     expect(hydrated[0].paymentScheduleArtifactId).toBe("artifact-1");
+    expect(hydrated[0].artifacts?.[0].artifact_type).toBe("payment_schedule_draft");
     expect(hydrated[0].draftPaymentSchedules?.[0].amount).toBe(1000);
     expect(hydrated[0].reviewActions?.map((action) => action.id)).toEqual([
       "action-1",

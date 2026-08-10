@@ -96,6 +96,32 @@ class PaymentScheduleIntakeResponse(IntakeResponse):
         return self
 
 
+class EventDraftData(BaseModel):
+    """A document-derived event draft, never an approved accounting event."""
+
+    contract_id: str = ""
+    contract_number: str = ""
+    event_type: str = ""
+    effective_date: str = ""
+    original_value: Optional[str] = None
+    new_value: Optional[str] = None
+    change_reason: str = ""
+    judgment_basis: str = ""
+    revision_parameters: dict[str, Any] = Field(default_factory=dict)
+    field_confidence: dict[str, float] = Field(default_factory=dict)
+
+
+class EventIntakeResponse(IntakeResponse):
+    draft_type: Literal["event_draft"] = "event_draft"
+    event: EventDraftData
+
+    @model_validator(mode="after")
+    def validate_event_review_gate(self) -> "EventIntakeResponse":
+        if not self.warnings:
+            raise ValueError("event drafts must carry explicit review warnings")
+        return self
+
+
 class ContractDraftData(BaseModel):
     contract_number: str = ""
     contract_name: str = ""
@@ -319,6 +345,38 @@ def build_contract_batch_intake(
         total_count=len(typed_contracts),
         **_build_intake_metadata(
             task_prefix="task_batch_",
+            file_id=file_id,
+            object_name=object_name,
+            content_type=content_type,
+            confidence_scores=confidence_scores,
+            missing_fields=missing_fields,
+            warnings=warnings,
+            evidence_locators=evidence_locators,
+            evidence_complete=evidence_complete,
+            evidence_missing_reason=evidence_missing_reason,
+        ),
+    )
+
+
+def build_event_intake(
+    *,
+    file_id: str,
+    object_name: str,
+    content_type: str,
+    event: EventDraftData,
+    confidence_scores: dict[str, float],
+    missing_fields: list[str],
+    warnings: list[str],
+    evidence_locators: Optional[list[EvidenceLocator]] = None,
+    evidence_complete: bool = False,
+    evidence_missing_reason: Optional[str] = None,
+) -> EventIntakeResponse:
+    """Build an event draft with an unconditional human review gate."""
+
+    return EventIntakeResponse(
+        event=event,
+        **_build_intake_metadata(
+            task_prefix="task_event_",
             file_id=file_id,
             object_name=object_name,
             content_type=content_type,

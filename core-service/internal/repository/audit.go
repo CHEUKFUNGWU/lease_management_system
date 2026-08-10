@@ -119,6 +119,10 @@ type AuditLogFilter struct {
 	RecordID  string
 	Action    string
 	ChangedBy string
+	RunID     string
+	ToolName  string
+	TraceID   string
+	Status    string
 	StartDate string
 	EndDate   string
 	Limit     int
@@ -216,6 +220,26 @@ func (r *AuditRepository) List(ctx context.Context, filter AuditLogFilter) ([]*A
 	if filter.ChangedBy != "" {
 		conditions = append(conditions, fmt.Sprintf("a.changed_by::text = $%d", argIdx))
 		args = append(args, filter.ChangedBy)
+		argIdx++
+	}
+	if filter.RunID != "" {
+		conditions = append(conditions, fmt.Sprintf("a.table_name = 'agent_tool_executions' AND a.new_values->>'run_id' = $%d", argIdx))
+		args = append(args, filter.RunID)
+		argIdx++
+	}
+	if filter.ToolName != "" {
+		conditions = append(conditions, fmt.Sprintf("a.table_name = 'agent_tool_executions' AND a.new_values->>'tool_name' = $%d", argIdx))
+		args = append(args, filter.ToolName)
+		argIdx++
+	}
+	if filter.TraceID != "" {
+		conditions = append(conditions, fmt.Sprintf("a.table_name = 'agent_tool_executions' AND a.new_values->>'trace_id' = $%d", argIdx))
+		args = append(args, filter.TraceID)
+		argIdx++
+	}
+	if filter.Status != "" {
+		conditions = append(conditions, fmt.Sprintf("a.table_name = 'agent_tool_executions' AND a.new_values->>'status' = $%d", argIdx))
+		args = append(args, filter.Status)
 		argIdx++
 	}
 	if filter.StartDate != "" {

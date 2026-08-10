@@ -44,7 +44,6 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { contractApi, paymentScheduleApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -62,6 +61,7 @@ import {
   type PaymentScheduleDraftItem,
   type PaymentScheduleParseSummary,
   type RuntimeReviewAction,
+  type RuntimeArtifact,
   type UploadedFile,
 } from "./runtime";
 
@@ -137,6 +137,72 @@ function formatTime(timestamp: number): string {
     return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   }
   return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+}
+
+function getContractDraftView(message: Message) {
+  const artifact = message.artifacts?.find((item) => item.artifact_type === "contract_draft");
+  const data = artifact?.data || {};
+  const contracts = data.contracts || message.draftContracts;
+  const summary = data.summary || message.batchSummary;
+  if (!contracts || !summary) return null;
+  return {
+    artifactId: artifact?.id || message.contractDraftArtifactId,
+    contracts: contracts as ContractDraftItem[],
+    summary: summary as BatchParseSummary,
+  };
+}
+
+function getPaymentScheduleDraftView(message: Message) {
+  const artifact = message.artifacts?.find((item) => item.artifact_type === "payment_schedule_draft");
+  const data = artifact?.data || {};
+  const schedules = data.schedules || message.draftPaymentSchedules;
+  const summary = data.summary || message.paymentScheduleSummary;
+  if (!schedules || !summary) return null;
+  return {
+    artifactId: artifact?.id || message.paymentScheduleArtifactId,
+    schedules: schedules as PaymentScheduleDraftItem[],
+    summary: summary as PaymentScheduleParseSummary,
+  };
+}
+
+function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) {
+  const genericArtifacts = (artifacts || []).filter(
+    (artifact) => artifact.artifact_type !== "contract_draft" && artifact.artifact_type !== "payment_schedule_draft",
+  );
+  if (genericArtifacts.length === 0) return null;
+  return (
+    <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+      {genericArtifacts.map((artifact) => (
+        <div
+          key={artifact.id}
+          style={{
+            border: "1px solid #d9e2f2",
+            borderRadius: 8,
+            padding: 12,
+            background: "#f7faff",
+          }}
+        >
+          <Space wrap>
+            <FileTextOutlined style={{ color: "#1677ff" }} />
+            <Text strong>{artifact.title || artifact.artifact_type}</Text>
+            <Tag color={artifact.status === "confirmed" ? "green" : "blue"}>{artifact.status || "ready"}</Tag>
+            {artifact.evidence_complete ? <Tag color="green">证据完整</Tag> : <Tag color="orange">需补证据</Tag>}
+          </Space>
+          {artifact.review_reasons && artifact.review_reasons.length > 0 && (
+            <div style={{ marginTop: 6, color: "#595959", fontSize: 12 }}>
+              复核项：{artifact.review_reasons.join("、")}
+            </div>
+          )}
+          <details style={{ marginTop: 8 }}>
+            <summary style={{ cursor: "pointer", color: "#1677ff" }}>查看结构化 Artifact</summary>
+            <pre style={{ marginTop: 8, maxHeight: 260, overflow: "auto", fontSize: 11 }}>
+              {JSON.stringify(artifact.data || {}, null, 2)}
+            </pre>
+          </details>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function reviewActionLabel(actionType: string, i18nLang: Language): string {
@@ -1390,6 +1456,9 @@ function AIChatPageContent() {
 
   const [input, setInput] = useState("");
   const [selectedModel, setSelectedModel] = useState("deepseek-v4-flash");
+  const [traceRunId, setTraceRunId] = useState<string | null>(null);
+  const [traceData, setTraceData] = useState<any>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
   const runtime = useAIChatRuntime({ token, language, selectedModel });
   const {
     sessions,
@@ -1410,6 +1479,11 @@ function AIChatPageContent() {
     continueFromTarget,
     continueActive,
     recordReviewAction,
+    getRunTrace,
+    cancelRun,
+    steerRun,
+    followUpRun,
+    branchRun,
   } = runtime;
 
   // Scroll to bottom when messages change
@@ -1518,6 +1592,74 @@ function AIChatPageContent() {
         }),
       );
     }
+  };
+
+  const handleOpenTrace = async (runId: string) => {
+    setTraceRunId(runId);
+    setTraceLoading(true);
+    setTraceData(null);
+    try {
+      setTraceData(await getRunTrace(runId));
+    } catch (error: any) {
+      message.error(
+        t("ai.request_failed", language, {
+          error: error.message || t("ai.unknown_error", language),
+        }),
+      );
+    } finally {
+      setTraceLoading(false);
+    }
+  };
+
+  const handleRunControl = (runId: string, action: "cancel" | "steer" | "follow-up" | "branch") => {
+    if (action === "cancel") {
+      Modal.confirm({
+        title: t("ai.run_cancel_title", language),
+        content: t("ai.run_cancel_content", language),
+        okText: t("ai.run_cancel", language),
+        okType: "danger",
+        cancelText: t("ai.cancel", language),
+        onOk: async () => {
+          await cancelRun(runId);
+          setLoading(false);
+          if (activeSessionId) updateSession(activeSessionId, { currentRunId: undefined });
+          message.success(t("ai.run_control_sent", language));
+        },
+      });
+      return;
+    }
+
+    let instruction = "";
+    const titleKey = action === "steer"
+      ? "ai.run_steer_title"
+      : action === "follow-up"
+        ? "ai.run_follow_up_title"
+        : "ai.run_branch_title";
+    Modal.confirm({
+      title: t(titleKey, language),
+      content: (
+        <Input
+          autoFocus
+          placeholder={t("ai.run_control_placeholder", language)}
+          onChange={(event) => {
+            instruction = event.target.value;
+          }}
+        />
+      ),
+      okText: t("ai.confirm", language),
+      cancelText: t("ai.cancel", language),
+      onOk: async () => {
+        const value = instruction.trim();
+        if (!value) {
+          message.warning(t("ai.run_control_required", language));
+          throw new Error("instruction is required");
+        }
+        if (action === "steer") await steerRun(runId, value);
+        if (action === "follow-up") await followUpRun(runId, value);
+        if (action === "branch") await branchRun(runId, value);
+        message.success(t("ai.run_control_sent", language));
+      },
+    });
   };
 
   const handleSend = async (messageOverride?: string, fileOverride?: UploadedFile) => {
@@ -1883,6 +2025,8 @@ function AIChatPageContent() {
                           />
                         )}
 
+                        {msg.role === "assistant" && <ArtifactSummaryPanel artifacts={msg.artifacts} />}
+
                         {msg.role === "assistant" && (
                           <ReviewActionHistoryPanel
                             actions={msg.reviewActions}
@@ -1892,7 +2036,7 @@ function AIChatPageContent() {
                                 { type: "action", id: action.id },
                                 {
                                   contractId:
-                                    msg.paymentScheduleSummary?.contract_id ||
+                                    getPaymentScheduleDraftView(msg)?.summary.contract_id ||
                                     searchParams.get("contract_id") ||
                                     undefined,
                                 }
@@ -1922,69 +2066,43 @@ function AIChatPageContent() {
                         )}
 
                         {/* Draft Confirmation Panel */}
-                        {msg.draftContracts && msg.batchSummary && msg.role === "assistant" && (
+                        {getContractDraftView(msg) && msg.role === "assistant" && (
                           <DraftConfirmationPanel
-                            contracts={msg.draftContracts}
-                            summary={msg.batchSummary}
+                            contracts={getContractDraftView(msg)!.contracts}
+                            summary={getContractDraftView(msg)!.summary}
                             language={language}
                             onConfirm={async (selectedContracts) => {
                               try {
-                                if (msg.contractDraftArtifactId) {
-                                  await recordReviewAction(
-                                    activeSessionId!,
-                                    msg.contractDraftArtifactId,
-                                    "confirm",
-                                    {
-                                      selected_count: selectedContracts.length,
-                                      contract_numbers: selectedContracts.map((contract) => contract.contract_number),
-                                    },
-                                  );
+                                const draftView = getContractDraftView(msg);
+                                if (!draftView?.artifactId) {
+                                  throw new Error("合同草稿 Artifact 不存在，无法提交确认");
                                 }
-                                const payload = selectedContracts.map((c) => ({
-                                  contract_number: c.contract_number,
-                                  contract_name: c.contract_name || c.contract_number,
-                                  lessee_name: c.lessee,
-                                  lessor_name: c.lessor,
-                                  store_name: c.store_name,
-                                  store_address: c.store_address,
-                                  currency: c.currency || "",
-                                  asset_type: c.asset_type || "",
-                                  area_sqm: c.area_sqm && c.area_sqm > 0 ? c.area_sqm : null,
-                                  commencement_date: c.commencement_date,
-                                  lease_start_date: c.lease_start_date,
-                                  lease_end_date: c.lease_end_date,
-                                  discount_rate_type: c.discount_rate_type || null,
-                                  discount_rate_value: c.discount_rate || null,
-                                  lease_scope: c.lease_scope || c.suggested_scope || "",
-                                  exemption_reason: c.exemption_reason || null,
-                                  scope_source: c.scope_source || "",
-                                  scope_confidence: c.scope_confidence ?? null,
-                                  tags: "",
-                                }));
-
-                                const result = await contractApi.batchCreate(payload, token!);
-                                const failedContracts = result.failed_contracts || [];
-                                const createSucceeded = Number(result.failed_count || 0) === 0;
-                                let createDraftAction: RuntimeReviewAction | undefined;
-                                if (msg.contractDraftArtifactId) {
-                                  createDraftAction = await recordReviewAction(
-                                    activeSessionId!,
-                                    msg.contractDraftArtifactId,
-                                    "create_draft",
-                                    {
-                                      selected_count: selectedContracts.length,
-                                      created_count: result.created_count,
-                                      failed_count: result.failed_count,
-                                      failed_contracts: failedContracts,
-                                    },
-                                  );
-                                }
-                                if (createSucceeded) {
-                                  message.success(t("ai.batch_create_success", language, { count: String(result.created_count) }));
+                                const selectedNumbers = selectedContracts.map((contract) => contract.contract_number);
+                                const selectedNumberSet = new Set(selectedNumbers);
+                                const selectedIndexes = (draftView.contracts || [])
+                                  .map((contract, index) => selectedNumberSet.has(contract.contract_number) ? index : -1)
+                                  .filter((index) => index >= 0);
+                                const createDraftAction = await recordReviewAction(
+                                  activeSessionId!,
+                                  draftView.artifactId,
+                                  "create_draft",
+                                  {
+                                    selected_count: selectedContracts.length,
+                                    selected_indexes: selectedIndexes,
+                                    contract_numbers: selectedNumbers,
+                                  },
+                                );
+                                const result = createDraftAction.draftResult;
+                                const createdCount = Number(result?.created_count || 0);
+                                const replayedCount = Number(result?.replayed_count || 0);
+                                const failedCount = Number(result?.failed_count || 0);
+                                const successfulCount = createdCount + replayedCount;
+                                if (failedCount === 0) {
+                                  message.success(t("ai.batch_create_success", language, { count: String(successfulCount) }));
                                 } else {
-                                  message.warning(t("ai.batch_create_result", language, { success: String(result.created_count), failed: String(result.failed_count), details: "" }));
+                                  message.warning(t("ai.batch_create_result", language, { success: String(successfulCount), failed: String(failedCount), details: "" }));
                                 }
-                                if (activeSession?.serverSessionId && createDraftAction?.id) {
+                                if (activeSession?.serverSessionId && createDraftAction.id) {
                                   setLoading(true);
                                   try {
                                     await continueFromTarget(
@@ -2006,10 +2124,11 @@ function AIChatPageContent() {
                               (async () => {
                                 try {
                                   let skipAction: RuntimeReviewAction | undefined;
-                                  if (msg.contractDraftArtifactId) {
+                                  const draftView = getContractDraftView(msg);
+                                  if (draftView?.artifactId) {
                                     skipAction = await recordReviewAction(
                                       activeSessionId!,
-                                      msg.contractDraftArtifactId,
+                                      draftView.artifactId,
                                       "skip",
                                       {
                                         reason: "user_skipped_contract_draft_import",
@@ -2038,65 +2157,46 @@ function AIChatPageContent() {
                           />
                         )}
 
-                        {msg.draftPaymentSchedules && msg.paymentScheduleSummary && msg.role === "assistant" && (
+                        {getPaymentScheduleDraftView(msg) && msg.role === "assistant" && (
                           <PaymentScheduleDraftPanel
-                            schedules={msg.draftPaymentSchedules}
-                            summary={msg.paymentScheduleSummary}
+                            schedules={getPaymentScheduleDraftView(msg)!.schedules}
+                            summary={getPaymentScheduleDraftView(msg)!.summary}
                             language={language}
                             onConfirm={async (selectedSchedules) => {
-                              const contractId = msg.paymentScheduleSummary?.contract_id;
+                              const scheduleView = getPaymentScheduleDraftView(msg);
+                              const contractId = scheduleView?.summary.contract_id;
                               if (!contractId) {
                                 message.warning(t("ai.schedule_bind_contract_first", language));
                                 return;
                               }
                               try {
-                                let importActionResponse: RuntimeReviewAction | undefined;
-                                if (msg.paymentScheduleArtifactId) {
-                                  await recordReviewAction(
-                                    activeSessionId!,
-                                    msg.paymentScheduleArtifactId,
-                                    "confirm",
-                                    {
-                                      selected_count: selectedSchedules.length,
-                                      contract_id: contractId,
-                                    },
-                                  );
+                                if (!scheduleView?.artifactId) {
+                                  throw new Error("付款计划草稿 Artifact 不存在，无法提交确认");
                                 }
-                                let successCount = 0;
-                                for (const schedule of selectedSchedules) {
-                                  await paymentScheduleApi.create(contractId, {
+                                const selectedIndexes = (scheduleView.schedules || [])
+                                  .map((schedule, index) => selectedSchedules.includes(schedule) ? index : -1)
+                                  .filter((index) => index >= 0);
+                                const importActionResponse = await recordReviewAction(
+                                  activeSessionId!,
+                                  scheduleView.artifactId,
+                                  "import",
+                                  {
+                                    selected_count: selectedSchedules.length,
+                                    selected_indexes: selectedIndexes,
                                     contract_id: contractId,
-                                    effective_start_date: schedule.period_start || schedule.due_date,
-                                    effective_end_date: schedule.period_end || schedule.due_date,
-                                    coverage_start_date: schedule.period_start || schedule.due_date,
-                                    coverage_end_date: schedule.period_end || schedule.due_date,
-                                    due_date: schedule.due_date,
-                                    payment_timing: schedule.payment_timing,
-                                    amount: schedule.amount,
-                                    currency: schedule.currency || "",
-                                    amount_type: schedule.amount_type || "fixed_rent",
-                                    is_fixed: schedule.is_fixed,
-                                    is_variable: !schedule.is_fixed,
-                                    is_lease_component: schedule.is_lease_component,
-                                    is_non_lease_component: !schedule.is_lease_component,
-                                    included_in_liability_pv: schedule.is_lease_component && schedule.is_fixed,
-                                  }, token!);
-                                  successCount++;
+                                  },
+                                );
+                                const result = importActionResponse.draftResult;
+                                const createdCount = Number(result?.created_count || 0);
+                                const replayedCount = Number(result?.replayed_count || 0);
+                                const failedCount = Number(result?.failed_count || 0);
+                                const successCount = createdCount + replayedCount;
+                                if (failedCount === 0) {
+                                  message.success(t("ai.schedule_import_success", language, { count: String(successCount) }));
+                                } else {
+                                  message.warning(t("ai.batch_create_result", language, { success: String(successCount), failed: String(failedCount), details: "" }));
                                 }
-                                if (msg.paymentScheduleArtifactId) {
-                                  importActionResponse = await recordReviewAction(
-                                    activeSessionId!,
-                                    msg.paymentScheduleArtifactId,
-                                    "import",
-                                    {
-                                      imported_count: successCount,
-                                      selected_count: selectedSchedules.length,
-                                      contract_id: contractId,
-                                    },
-                                  );
-                                }
-                                message.success(t("ai.schedule_import_success", language, { count: String(successCount) }));
-                                if (activeSession?.serverSessionId && importActionResponse?.id) {
+                                if (activeSession?.serverSessionId && importActionResponse.id) {
                                   setLoading(true);
                                   try {
                                     await continueFromTarget(
@@ -2118,14 +2218,15 @@ function AIChatPageContent() {
                               (async () => {
                                 try {
                                   let skipAction: RuntimeReviewAction | undefined;
-                                  if (msg.paymentScheduleArtifactId) {
+                                  const scheduleView = getPaymentScheduleDraftView(msg);
+                                  if (scheduleView?.artifactId) {
                                     skipAction = await recordReviewAction(
                                       activeSessionId!,
-                                      msg.paymentScheduleArtifactId,
+                                      scheduleView.artifactId,
                                       "skip",
                                       {
                                         reason: "user_skipped_payment_schedule_import",
-                                        contract_id: msg.paymentScheduleSummary?.contract_id,
+                                        contract_id: scheduleView.summary.contract_id,
                                       },
                                     );
                                   }
@@ -2136,7 +2237,7 @@ function AIChatPageContent() {
                                         activeSessionId!,
                                         activeSession.serverSessionId,
                                         { type: "action", id: skipAction.id },
-                                        { contractId: msg.paymentScheduleSummary?.contract_id }
+                                        { contractId: scheduleView?.summary.contract_id }
                                       );
                                     } catch (error: any) {
                                       setLoading(false);
@@ -2177,22 +2278,81 @@ function AIChatPageContent() {
                             </Button>
 
                             {msg.runId && (
-                              <Button
-                                type="text"
-                                size="small"
-                                icon={<ToolOutlined />}
-                                disabled={loading}
-                                onClick={() => triggerRuntimeContinuation({ type: "run", id: msg.runId! })}
-                                style={{
-                                  paddingInline: 8,
-                                  color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
-                                }}
-                              >
-                                {t("ai.continue_from_run", language)}
-                              </Button>
+                              <>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<ToolOutlined />}
+                                  disabled={loading}
+                                  onClick={() => triggerRuntimeContinuation({ type: "run", id: msg.runId! })}
+                                  style={{
+                                    paddingInline: 8,
+                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                  }}
+                                >
+                                  {t("ai.continue_from_run", language)}
+                                </Button>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<ClockCircleOutlined />}
+                                  onClick={() => handleOpenTrace(msg.runId!)}
+                                  style={{
+                                    paddingInline: 8,
+                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                  }}
+                                >
+                                  {t("ai.view_trace", language)}
+                                </Button>
+                                {msg.role === "assistant" && (
+                                  <>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      danger
+                                      icon={<CloseCircleOutlined />}
+                                      disabled={!loading}
+                                      onClick={() => handleRunControl(msg.runId!, "cancel")}
+                                      style={{ paddingInline: 8 }}
+                                    >
+                                      {t("ai.run_cancel", language)}
+                                    </Button>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<MessageOutlined />}
+                                      disabled={loading === false}
+                                      onClick={() => handleRunControl(msg.runId!, "steer")}
+                                      style={{ paddingInline: 8, color: "#595959" }}
+                                    >
+                                      {t("ai.run_steer", language)}
+                                    </Button>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<MessageOutlined />}
+                                      disabled={loading}
+                                      onClick={() => handleRunControl(msg.runId!, "follow-up")}
+                                      style={{ paddingInline: 8, color: "#595959" }}
+                                    >
+                                      {t("ai.run_follow_up", language)}
+                                    </Button>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      icon={<ClockCircleOutlined />}
+                                      disabled={loading}
+                                      onClick={() => handleRunControl(msg.runId!, "branch")}
+                                      style={{ paddingInline: 8, color: "#595959" }}
+                                    >
+                                      {t("ai.run_branch", language)}
+                                    </Button>
+                                  </>
+                                )}
+                              </>
                             )}
 
-                            {(msg.contractDraftArtifactId || msg.paymentScheduleArtifactId) && (
+                            {(msg.artifacts?.length || msg.contractDraftArtifactId || msg.paymentScheduleArtifactId) && (
                               <Button
                                 type="text"
                                 size="small"
@@ -2201,7 +2361,7 @@ function AIChatPageContent() {
                                 onClick={() =>
                                   triggerRuntimeContinuation({
                                     type: "artifact",
-                                    id: msg.contractDraftArtifactId || msg.paymentScheduleArtifactId!,
+                                    id: msg.artifacts?.[0]?.id || msg.contractDraftArtifactId || msg.paymentScheduleArtifactId!,
                                   })
                                 }
                                 style={{
@@ -2390,6 +2550,58 @@ function AIChatPageContent() {
             </div>
           </div>
         </div>
+        <Modal
+          open={Boolean(traceRunId)}
+          title={t("ai.agent_trace_title", language)}
+          footer={null}
+          width={820}
+          onCancel={() => {
+            setTraceRunId(null);
+            setTraceData(null);
+          }}
+        >
+          {traceLoading ? (
+            <div style={{ padding: 32, textAlign: "center" }}>
+              <Spin />
+            </div>
+          ) : traceData ? (
+            <div>
+              <Space wrap style={{ marginBottom: 12 }}>
+                <Tag color="blue">{String(traceData.run?.status || "unknown")}</Tag>
+                <Tag>{`events: ${Array.isArray(traceData.events) ? traceData.events.length : 0}`}</Tag>
+                <Tag>{`artifacts: ${Array.isArray(traceData.artifacts) ? traceData.artifacts.length : 0}`}</Tag>
+                <Tag>{`reviews: ${Array.isArray(traceData.review_actions) ? traceData.review_actions.length : 0}`}</Tag>
+                <Tag>{`audits: ${traceData.audit_total ?? 0}`}</Tag>
+                {traceData.summary && (
+                  <>
+                    <Tag color={traceData.summary.terminal ? "green" : "gold"}>
+                      {`summary events: ${traceData.summary.event_count ?? 0}`}
+                    </Tag>
+                    <Tag>{`tools: ${traceData.summary.tool_event_count ?? 0}`}</Tag>
+                    <Tag>{`failed: ${traceData.summary.failed_event_count ?? 0}`}</Tag>
+                  </>
+                )}
+              </Space>
+              <pre
+                style={{
+                  maxHeight: 480,
+                  overflow: "auto",
+                  padding: 12,
+                  margin: 0,
+                  background: "#111",
+                  color: "#E6E6E6",
+                  borderRadius: 6,
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                }}
+              >
+                {JSON.stringify(traceData, null, 2)}
+              </pre>
+            </div>
+          ) : (
+            <Empty description={t("ai.agent_trace_empty", language)} />
+          )}
+        </Modal>
       </AppLayout>
     </ProtectedRoute>
   );

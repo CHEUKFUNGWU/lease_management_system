@@ -1,0 +1,255 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Empty,
+  Row,
+  Select,
+  Space,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
+import {
+  BarChartOutlined,
+  ClockCircleOutlined,
+  DollarOutlined,
+  DatabaseOutlined,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import AppLayout from "../components/AppLayout";
+import ProtectedRoute from "../components/ProtectedRoute";
+import { hasRole, useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { agentUsageApi } from "../lib/api";
+import { t } from "../lib/i18n";
+
+const { Title, Text, Paragraph } = Typography;
+
+type RangeKey = "24h" | "7d" | "31d";
+
+interface UsageRollup {
+  provider: string;
+  model: string;
+  pricing_version: string;
+  cost_status: string;
+  planner_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_micros: number;
+}
+
+interface UsageSummary {
+  from: string;
+  to: string;
+  planner_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_micros: number;
+  cost_accounting_available: boolean;
+  unavailable_usage_count: number;
+  rollups: UsageRollup[];
+}
+
+function formatNumber(value: number | undefined) {
+  return (value || 0).toLocaleString("zh-CN");
+}
+
+function formatCost(micros: number | undefined, available: boolean) {
+  if (!available) return "—";
+  return `USD ${(micros || 0) / 1_000_000}`;
+}
+
+function rangeDuration(range: RangeKey) {
+  if (range === "31d") return 31 * 24 * 60 * 60 * 1000;
+  if (range === "7d") return 7 * 24 * 60 * 60 * 1000;
+  return 24 * 60 * 60 * 1000;
+}
+
+export default function AgentMetricsPage() {
+  const { token, user } = useAuth();
+  const { language } = useLanguage();
+  const [range, setRange] = useState<RangeKey>("24h");
+  const [summary, setSummary] = useState<UsageSummary | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadSummary = async (selectedRange: RangeKey = range) => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    const to = new Date();
+    const from = new Date(to.getTime() - rangeDuration(selectedRange));
+    try {
+      const response = await agentUsageApi.summary(token, {
+        from: from.toISOString(),
+        to: to.toISOString(),
+      });
+      setSummary(response as UsageSummary);
+    } catch (requestError: any) {
+      const errorMessage = requestError?.message || t("agent_metrics.load_failed", language);
+      setError(errorMessage);
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadSummary("24h");
+    // The initial load is intentionally independent of the selected range.
+    // Changing the range is an explicit user action below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const canView = hasRole(user, "admin") || hasRole(user, "auditor");
+  const columns = [
+    { title: t("agent_metrics.provider", language), dataIndex: "provider", key: "provider" },
+    { title: t("agent_metrics.model", language), dataIndex: "model", key: "model" },
+    { title: t("agent_metrics.pricing_version", language), dataIndex: "pricing_version", key: "pricing_version" },
+    {
+      title: t("agent_metrics.calls", language),
+      dataIndex: "planner_calls",
+      key: "planner_calls",
+      render: (value: number) => formatNumber(value),
+    },
+    {
+      title: t("agent_metrics.tokens", language),
+      dataIndex: "total_tokens",
+      key: "total_tokens",
+      render: (value: number) => formatNumber(value),
+    },
+    {
+      title: t("agent_metrics.cost_status", language),
+      dataIndex: "cost_status",
+      key: "cost_status",
+      render: (value: string) => (
+        <Tag color={value === "measured" || value === "calculated" ? "green" : "orange"}>
+          {value || "unavailable"}
+        </Tag>
+      ),
+    },
+    {
+      title: t("agent_metrics.cost", language),
+      dataIndex: "cost_micros",
+      key: "cost_micros",
+      render: (value: number, item: UsageRollup) => formatCost(value, item.cost_status === "measured" || item.cost_status === "calculated"),
+    },
+  ];
+
+  return (
+    <ProtectedRoute>
+      <AppLayout>
+        <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
+          <div>
+            <Title level={2} style={{ marginBottom: 4, letterSpacing: "-0.04em" }}>
+              {t("agent_metrics.title", language)}
+            </Title>
+            <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 760 }}>
+              {t("agent_metrics.description", language)}
+            </Paragraph>
+          </div>
+          <Space wrap>
+            <Select<RangeKey>
+              value={range}
+              onChange={(value) => {
+                setRange(value);
+                void loadSummary(value);
+              }}
+              options={[
+                { value: "24h", label: t("agent_metrics.range_24h", language) },
+                { value: "7d", label: t("agent_metrics.range_7d", language) },
+                { value: "31d", label: t("agent_metrics.range_31d", language) },
+              ]}
+              style={{ minWidth: 130 }}
+            />
+            <Button icon={<ReloadOutlined />} onClick={() => void loadSummary()} loading={loading}>
+              {t("agent_metrics.refresh", language)}
+            </Button>
+          </Space>
+        </div>
+
+        {!canView && (
+          <Alert
+            type="warning"
+            showIcon
+            message={t("agent_metrics.permission_required", language)}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        {error && (
+          <Alert
+            type="error"
+            showIcon
+            message={error}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {loading && !summary ? (
+          <Card><Spin /></Card>
+        ) : (
+          <>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={12} lg={6}>
+                <Card><Statistic title={t("agent_metrics.calls", language)} value={formatNumber(summary?.planner_calls)} prefix={<BarChartOutlined />} /></Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card><Statistic title={t("agent_metrics.input_tokens", language)} value={formatNumber(summary?.input_tokens)} prefix={<DatabaseOutlined />} /></Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card><Statistic title={t("agent_metrics.output_tokens", language)} value={formatNumber(summary?.output_tokens)} prefix={<ClockCircleOutlined />} /></Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card>
+                  <Statistic
+                    title={t("agent_metrics.cost", language)}
+                    value={formatCost(summary?.cost_micros, summary?.cost_accounting_available === true)}
+                    prefix={<DollarOutlined />}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            {summary && !summary.cost_accounting_available && summary.planner_calls > 0 && (
+              <Alert
+                type="info"
+                showIcon
+                message={t("agent_metrics.cost_unavailable", language)}
+                description={t("agent_metrics.cost_unavailable_desc", language)}
+                style={{ margin: "16px 0" }}
+              />
+            )}
+
+            <Card title={t("agent_metrics.breakdown", language)} style={{ marginTop: 16 }}>
+              {summary?.rollups?.length ? (
+                <Table<UsageRollup>
+                  rowKey={(item) => `${item.provider}:${item.model}:${item.pricing_version}:${item.cost_status}`}
+                  columns={columns}
+                  dataSource={summary.rollups}
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 900 }}
+                />
+              ) : (
+                <Empty description={t("agent_metrics.empty", language)} />
+              )}
+            </Card>
+
+            <Text type="secondary" style={{ display: "block", marginTop: 16 }}>
+              {t("agent_metrics.audit_note", language)}
+            </Text>
+          </>
+        )}
+      </AppLayout>
+    </ProtectedRoute>
+  );
+}

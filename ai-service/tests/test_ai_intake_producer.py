@@ -6,6 +6,7 @@ from app.intake.producer import (
     IntakeCommand,
     IntakeKind,
     IntakeProducerError,
+    _resolve_llm_evidence,
 )
 from app.intake.adapters import SourceMaterial
 from app.intake.models import EvidenceLocator
@@ -47,6 +48,65 @@ class MemoryLLMAdapter:
 
 
 class AIIntakeProducerTest(unittest.IsolatedAsyncioTestCase):
+    def test_llm_evidence_is_resolved_only_against_adapter_locators(self):
+        available = [
+            EvidenceLocator(
+                field="document.pages[0].blocks",
+                source="paddleocr:page:1:page[1].parsing_res_list[0]",
+                page=1,
+                coordinates=[1, 2, 30, 40],
+                quote="合同编号：LEASE-001",
+            )
+        ]
+        resolved = _resolve_llm_evidence(
+            [
+                {"field": "extracted_data.contract_number", "page": 1, "quote": "LEASE-001"},
+                {"field": "extracted_data.lessor", "page": 9, "quote": "伪造出租方"},
+            ],
+            available,
+        )
+        self.assertEqual(len(resolved), 1)
+        self.assertEqual(resolved[0].field, "extracted_data.contract_number")
+        self.assertEqual(resolved[0].source, available[0].source)
+        self.assertEqual(resolved[0].coordinates, available[0].coordinates)
+
+    async def test_event_production_keeps_complex_event_as_reviewable_draft(self):
+        class EventLLMAdapter:
+            async def complete(self, **_: object) -> str:
+                return json.dumps(
+                    {
+                        "event": {
+                            "event_type": "modification",
+                            "effective_date": "",
+                            "change_reason": "补充协议调整月租金",
+                            "judgment_basis": "补充协议文本",
+                            "revision_parameters": {},
+                            "field_confidence": {"event_type": 0.72},
+                        },
+                        "overall_confidence": 0.62,
+                        "missing_fields": ["effective_date", "revision_parameters"],
+                        "warnings": ["需要核对原文"],
+                    }
+                )
+
+        result = await AIIntakeProducer().produce(
+            IntakeCommand(
+                kind=IntakeKind.EVENT,
+                file_id="file-event",
+                object_name="event.pdf",
+                content_type="application/pdf",
+                contract_id="contract-1",
+            ),
+            MemorySourceAdapter(),
+            EventLLMAdapter(),
+        )
+
+        self.assertEqual(result.draft_type, "event_draft")
+        self.assertEqual(result.event.contract_id, "contract-1")
+        self.assertIn("effective_date", result.missing_fields)
+        self.assertFalse(result.evidence.complete)
+        self.assertTrue(result.requires_human_confirmation)
+
     async def test_producer_rejects_auto_post_before_calling_adapters(self):
         with self.assertRaises(IntakeProducerError) as raised:
             await AIIntakeProducer().produce(

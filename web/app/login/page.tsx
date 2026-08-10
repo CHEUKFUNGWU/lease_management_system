@@ -38,7 +38,7 @@ export default function LoginPage() {
         role: data.role,
         roles: data.roles || [data.role],
         legal_entity_id: data.legal_entity_id || undefined,
-      });
+      }, data.refresh_token);
       message.success(t("login.success", language));
       router.push("/");
     } catch (error: any) {

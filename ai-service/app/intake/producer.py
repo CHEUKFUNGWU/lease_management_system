@@ -19,11 +19,15 @@ from app.intake.models import (
     ContractBatchIntakeResponse,
     ContractDraftData,
     ContractIntakeResponse,
+    EventDraftData,
+    EventIntakeResponse,
+    EvidenceLocator,
     IntakeResponse,
     PaymentScheduleIntakeResponse,
     PaymentScheduleItem,
     build_contract_intake,
     build_contract_batch_intake,
+    build_event_intake,
     build_payment_schedule_intake,
 )
 
@@ -32,6 +36,7 @@ class IntakeKind(str, Enum):
     CONTRACT = "contract"
     PAYMENT_SCHEDULE = "payment_schedule"
     CONTRACT_BATCH = "contract_batch"
+    EVENT = "event"
 
 
 @dataclass(frozen=True)
@@ -40,6 +45,7 @@ class IntakeCommand:
     file_id: str
     object_name: str
     content_type: str
+    contract_id: str = ""
     mode: str = "assist"
 
 
@@ -68,19 +74,123 @@ class AIIntakeProducer:
         except IntakeAdapterError as exc:
             raise IntakeProducerError(str(exc)) from exc
         if command.kind == IntakeKind.CONTRACT:
-            return await self._produce_contract(command, material.text, llm_adapter)
+            return await self._produce_contract(command, material, llm_adapter)
         if command.kind == IntakeKind.PAYMENT_SCHEDULE:
-            return await self._produce_payment(command, material.text, llm_adapter)
+            return await self._produce_payment(command, material, llm_adapter)
         if command.kind == IntakeKind.CONTRACT_BATCH:
             return await self._produce_contract_batch(command, material, llm_adapter)
+        if command.kind == IntakeKind.EVENT:
+            return await self._produce_event(command, material, llm_adapter)
         raise IntakeProducerError(f"unsupported intake kind: {command.kind}", 400)
 
     @staticmethod
     def _max_characters(kind: IntakeKind) -> int:
         return 30000 if kind == IntakeKind.CONTRACT_BATCH else 15000
 
+    async def _produce_event(
+        self, command: IntakeCommand, material: SourceMaterial, llm_adapter: LLMAdapter
+    ) -> EventIntakeResponse:
+        """Extract a complex event as a reviewable draft with no accounting posting."""
+
+        warnings = [
+            "AI Assist Mode: 事件草稿必须由人工确认后提交复核",
+            "事件解析不会决定最终会计处理，也不会自动触发重算或过账",
+            "扫描件字段定位当前只能回溯到提取文本，需人工核对原文页码/坐标",
+        ]
+        try:
+            content = await llm_adapter.complete(
+                system=(
+                    "你是一位 IFRS 16 合同事件识别助手。只提取原文明确出现的事实，"
+                    "不要猜测事件类型、日期、金额、租期或会计处理；无法确定就留空并列入 missing_fields。"
+                    "输出 JSON，不要输出解释性文字。"
+                ),
+                prompt=_event_prompt(material.text, command.contract_id),
+                temperature=0.1,
+                max_tokens=3000,
+                response_format={"type": "json_object"},
+            )
+            parsed = json.loads(content)
+        except Exception as exc:
+            parsed = {}
+            warnings.append(f"事件文档 LLM 提取失败，已生成空草稿供人工转录: {type(exc).__name__}")
+
+        if not isinstance(parsed, dict):
+            parsed = {}
+        candidate_event = parsed.get("event")
+        raw_event = candidate_event if isinstance(candidate_event, dict) else parsed
+        field_confidence = raw_event.get("field_confidence")
+        if not isinstance(field_confidence, dict):
+            field_confidence = {}
+        event = EventDraftData(
+            contract_id=str(raw_event.get("contract_id") or command.contract_id or "").strip(),
+            contract_number=str(raw_event.get("contract_number") or "").strip(),
+            event_type=str(raw_event.get("event_type") or "").strip(),
+            effective_date=str(raw_event.get("effective_date") or "").strip(),
+            original_value=_optional_text(raw_event.get("original_value")),
+            new_value=_optional_text(raw_event.get("new_value")),
+            change_reason=str(raw_event.get("change_reason") or "").strip(),
+            judgment_basis=str(raw_event.get("judgment_basis") or "").strip(),
+            revision_parameters=dict(raw_event.get("revision_parameters") or {}),
+            field_confidence=_sanitize_confidence_scores(field_confidence),
+        )
+        missing = [str(item) for item in _as_list(parsed.get("missing_fields"))]
+        required_values = {
+            "contract_id": event.contract_id,
+            "event_type": event.event_type,
+            "effective_date": event.effective_date,
+            "change_reason": event.change_reason,
+            "judgment_basis": event.judgment_basis,
+        }
+        missing.extend(field for field, value in required_values.items() if not value)
+        if event.event_type not in {
+            "modification", "reassessment", "impairment", "early_termination", "renewal",
+            "area_adjustment", "rent_change", "index_update", "discount_rate_change",
+        } and event.event_type:
+            missing.append("event_type_review")
+            warnings.append("识别到未标准化事件类型，必须人工分类")
+        warnings.extend(str(item) for item in _as_list(parsed.get("warnings")))
+        if not event.revision_parameters:
+            warnings.append("未提取到结构化变更参数；若事件需要重算，请人工补录原值/新值和参数")
+        overall = _sanitize_confidence(parsed.get("overall_confidence"))
+        if missing:
+            overall = min(overall, 0.7)
+        verified_locators = _resolve_llm_evidence(
+            parsed.get("evidence") or parsed.get("evidence_refs"),
+            material.evidence_locators,
+        )
+        evidence_fields = [
+            f"event.{field}"
+            for field, value in {
+                "event_type": event.event_type,
+                "effective_date": event.effective_date,
+                "original_value": event.original_value,
+                "new_value": event.new_value,
+                "change_reason": event.change_reason,
+                "judgment_basis": event.judgment_basis,
+                "revision_parameters": event.revision_parameters,
+            }.items()
+            if value not in (None, "", {})
+        ]
+        evidence_complete = _evidence_covers_fields(verified_locators, evidence_fields)
+        return build_event_intake(
+            file_id=command.file_id,
+            object_name=command.object_name,
+            content_type=command.content_type,
+            event=event,
+            confidence_scores={"overall": overall, **event.field_confidence},
+            missing_fields=sorted(set(missing)),
+            warnings=warnings,
+            evidence_locators=verified_locators or material.evidence_locators,
+            evidence_complete=evidence_complete,
+            evidence_missing_reason=(
+                "field_mapping_not_verified_by_llm"
+                if material.evidence_locators
+                else "document_adapter_does_not_yet_provide_page_or_coordinate_locators"
+            ),
+        )
+
     async def _produce_contract(
-        self, command: IntakeCommand, file_content: str, llm_adapter: LLMAdapter
+        self, command: IntakeCommand, material: SourceMaterial, llm_adapter: LLMAdapter
     ) -> ContractIntakeResponse:
         try:
             content = await llm_adapter.complete(
@@ -88,7 +198,7 @@ class AIIntakeProducer:
                     "你是一位专业的 IFRS 16 租赁合同解析专家。请准确提取合同字段。"
                     "如果字段未在合同中出现，不要猜测，标记为缺失。"
                 ),
-                prompt=_contract_prompt(file_content),
+                prompt=_contract_prompt(material.text),
                 temperature=0.1,
                 max_tokens=2500,
                 response_format={"type": "json_object"},
@@ -146,6 +256,16 @@ class AIIntakeProducer:
             normalized["confidence"] = _sanitize_confidence(
                 extracted.get("confidence", confidence["overall"])
             )
+            verified_locators = _resolve_llm_evidence(
+                parsed.get("evidence") or parsed.get("evidence_refs"),
+                material.evidence_locators,
+            )
+            evidence_fields = [
+                f"extracted_data.{field}"
+                for field, value in extracted.items()
+                if value not in (None, "", {}, [])
+            ]
+            evidence_complete = _evidence_covers_fields(verified_locators, evidence_fields)
             return build_contract_intake(
                 file_id=command.file_id,
                 object_name=command.object_name,
@@ -154,8 +274,12 @@ class AIIntakeProducer:
                 confidence_scores=confidence,
                 missing_fields=missing,
                 warnings=warnings,
+                evidence_locators=verified_locators or material.evidence_locators,
+                evidence_complete=evidence_complete,
                 evidence_missing_reason=(
-                    "field_locators_not_produced_by_document_adapter"
+                    "field_mapping_not_verified_by_llm"
+                    if material.evidence_locators
+                    else "field_locators_not_produced_by_document_adapter"
                 ),
             )
         except IntakeProducerError:
@@ -164,7 +288,7 @@ class AIIntakeProducer:
             raise IntakeProducerError(f"解析失败: {exc}") from exc
 
     async def _produce_payment(
-        self, command: IntakeCommand, file_content: str, llm_adapter: LLMAdapter
+        self, command: IntakeCommand, material: SourceMaterial, llm_adapter: LLMAdapter
     ) -> PaymentScheduleIntakeResponse:
         try:
             content = await llm_adapter.complete(
@@ -172,17 +296,36 @@ class AIIntakeProducer:
                     "你是一位专业的 IFRS 16 租金表解析专家。请准确提取付款计划信息，"
                     "严格遵守日期格式和金额格式要求。"
                 ),
-                prompt=_payment_prompt(file_content),
+                prompt=_payment_prompt(material.text),
                 temperature=0.1,
                 max_tokens=4000,
             )
             parsed = _parse_payment_llm_content(content)
         except Exception as exc:
             reason = f"{type(exc).__name__}: {str(exc) or repr(exc)}"
-            parsed = _fallback_parse_payment_schedule_text(file_content, reason)
+            parsed = _fallback_parse_payment_schedule_text(material.text, reason)
 
         schedules, missing_fields, warnings = _validate_payment_schedules(parsed)
         overall_confidence = _sanitize_confidence(parsed.get("overall_confidence"))
+        verified_locators = _resolve_llm_evidence(
+            parsed.get("evidence") or parsed.get("evidence_refs"),
+            material.evidence_locators,
+        )
+        raw_schedules = parsed.get("schedules") or []
+        evidence_fields: list[str] = []
+        if len(raw_schedules) == len(schedules):
+            for index, schedule in enumerate(schedules):
+                for field, value in {
+                    "period_start": schedule.period_start,
+                    "period_end": schedule.period_end,
+                    "due_date": schedule.due_date,
+                    "amount": schedule.amount,
+                    "payment_timing": schedule.payment_timing,
+                    "currency": schedule.currency,
+                }.items():
+                    if value not in (None, "", 0):
+                        evidence_fields.append(f"schedules[{index}].{field}")
+        evidence_complete = _evidence_covers_fields(verified_locators, evidence_fields)
         return build_payment_schedule_intake(
             file_id=command.file_id,
             object_name=command.object_name,
@@ -195,7 +338,13 @@ class AIIntakeProducer:
             },
             missing_fields=sorted(set(missing_fields)),
             warnings=warnings + ["AI Assist Mode: 付款计划草稿需人工确认后入库"],
-            evidence_missing_reason=("field_locators_not_produced_by_document_adapter"),
+            evidence_locators=verified_locators or material.evidence_locators,
+            evidence_complete=evidence_complete,
+            evidence_missing_reason=(
+                "field_mapping_not_verified_by_llm"
+                if material.evidence_locators
+                else "field_locators_not_produced_by_document_adapter"
+            ),
         )
 
     async def _produce_contract_batch(
@@ -315,7 +464,25 @@ class AIIntakeProducer:
                 len(contracts), 1
             )
         warnings.append("AI Assist Mode: 合同台账草稿需人工逐条确认后入库")
-        evidence_locators = material.evidence_locators if deterministic else None
+        verified_locators = _resolve_llm_evidence(
+            parsed.get("evidence") or parsed.get("evidence_refs"),
+            material.evidence_locators,
+        )
+        batch_evidence_fields: list[str] = []
+        if not deterministic:
+            for index, candidate in enumerate(contracts):
+                raw_candidate = parsed.get("contracts", [])[index] if index < len(parsed.get("contracts") or []) else {}
+                for field, value in dict(raw_candidate).items():
+                    if field in {"missing_fields", "warnings", "confidence"}:
+                        continue
+                    if value not in (None, "", {}, []):
+                        batch_evidence_fields.append(f"contracts[{index}].{field}")
+        evidence_complete = bool(deterministic and material.evidence_locators) or _evidence_covers_fields(
+            verified_locators, batch_evidence_fields
+        )
+        evidence_locators = (
+            material.evidence_locators if deterministic else verified_locators or material.evidence_locators
+        )
         return build_contract_batch_intake(
             file_id=command.file_id,
             object_name=command.object_name,
@@ -328,8 +495,8 @@ class AIIntakeProducer:
             },
             missing_fields=sorted(set(missing)),
             warnings=warnings,
-            evidence_locators=evidence_locators,
-            evidence_complete=bool(deterministic and evidence_locators),
+            evidence_locators=(evidence_locators or material.evidence_locators),
+            evidence_complete=evidence_complete,
             evidence_missing_reason=(
                 "field_locators_not_produced_by_llm_adapter"
                 if _is_excel_content_type(command.content_type)
@@ -388,6 +555,7 @@ def _contract_prompt(file_content: str) -> str:
     - overall_confidence: 总体置信度
     - missing_fields: 识别为缺失的字段列表
     - warnings: 需要人工注意的问题列表
+    - evidence: 字段级原文定位数组。每项必须包含 field、page（如有）、quote；只能引用上面文本中明确出现的短语，不得自行编造坐标。
     """
 
 
@@ -426,8 +594,50 @@ def _payment_prompt(file_content: str) -> str:
 - missing_fields: 识别中遇到问题的字段列表
 - warnings: 需要人工注意的问题列表（如：日期格式不确定、金额可能有误等）
 - total_schedules: 识别到的付款笔数
+- evidence: 字段级原文定位数组。每项包含 field（如 schedules[0].amount）、page（如有）和 quote；只能引用原文。
 
 请以纯 JSON 格式输出，不要包含任何 markdown 代码块标记。
+"""
+
+
+def _event_prompt(file_content: str, contract_id: str) -> str:
+    return f"""
+你是一位 IFRS 16 合同事件识别助手。请从以下合同变更通知、补充协议、闭店通知或扫描件文本中提取“事件草稿”。
+
+硬性规则：
+1. 只提取原文明确出现的事实；缺失或有歧义的字段必须留空并加入 missing_fields。
+2. 不要猜测最终会计处理、折现率、租期、金额、是否合理确定或是否需要重算。
+3. modification（合同范围/对价改变）与 reassessment（选择权判断变化）必须按原文证据区分；不确定时 event_type 留空。
+4. 事件草稿只能进入人工复核，不得表示已批准、已重算或已过账。
+5. 日期统一为 YYYY-MM-DD；金额或原值/新值保留原文语义，可放入 original_value/new_value。
+6. revision_parameters 只填原文明确的结构化变化，例如 new_area_sqm、new_monthly_rent、new_lease_end_date、index_name、index_value；不明确就返回空对象。
+
+当前合同上下文 ID（仅作绑定提示，不代表文档证据）：{contract_id or ""}
+
+文档文本：
+{file_content}
+
+请只返回 JSON：
+{{
+  "event": {{
+    "contract_id": "",
+    "contract_number": "",
+    "event_type": "modification|reassessment|impairment|early_termination|renewal|area_adjustment|rent_change|index_update|discount_rate_change",
+    "effective_date": "YYYY-MM-DD",
+    "original_value": "",
+    "new_value": "",
+    "change_reason": "",
+    "judgment_basis": "仅引用或概括原文依据，不给出最终会计结论",
+    "revision_parameters": {{}},
+    "field_confidence": {{"event_type": 0.0, "effective_date": 0.0, "change_reason": 0.0}}
+  }},
+  "overall_confidence": 0.0,
+  "missing_fields": [],
+  "warnings": []
+  ,"evidence": [
+    {{"field": "event.event_type", "page": 1, "quote": "原文短语"}}
+  ]
+}}
 """
 
 
@@ -486,7 +696,99 @@ def _contract_batch_prompt(file_content: str) -> str:
     - overall_confidence: 总体置信度 (0-1)
     - missing_fields: 全局缺失字段汇总
     - warnings: 全局警告列表
+    - evidence: 字段级原文定位数组，每项包含 field（如 contracts[0].contract_number）、page（如有）和 quote；只能引用原文。
     """
+
+
+def _resolve_llm_evidence(
+    raw_evidence: Any,
+    available: list[EvidenceLocator] | None,
+) -> list[EvidenceLocator]:
+    """Resolve model-proposed evidence against adapter-owned locators.
+
+    The model may propose a page and quote, but it cannot manufacture a
+    source. A locator is emitted only when its page (when supplied) and quote
+    match an adapter locator. Provider coordinates are copied from the adapter
+    rather than accepted from the model.
+    """
+    if not available:
+        return []
+    if isinstance(raw_evidence, dict):
+        raw_evidence = raw_evidence.get("items") or raw_evidence.get("locators") or []
+    if not isinstance(raw_evidence, list):
+        return []
+    resolved: list[EvidenceLocator] = []
+    for candidate in raw_evidence:
+        if not isinstance(candidate, dict):
+            continue
+        field = str(candidate.get("field") or "").strip()
+        quote = str(candidate.get("quote") or "").strip()
+        if not field or not quote:
+            continue
+        page = _optional_int(candidate.get("page"))
+        match = next(
+            (
+                locator
+                for locator in available
+                if (page is None or locator.page == page)
+                and _evidence_quote_matches(quote, locator.quote)
+            ),
+            None,
+        )
+        if match is None:
+            continue
+        resolved.append(
+            EvidenceLocator(
+                field=field,
+                source=match.source,
+                page=match.page,
+                coordinates=list(match.coordinates) if match.coordinates else None,
+                quote=quote,
+            )
+        )
+    unique: dict[tuple[str, str, str], EvidenceLocator] = {}
+    for locator in resolved:
+        unique[(locator.field, locator.source, locator.quote)] = locator
+    return list(unique.values())
+
+
+def _evidence_covers_fields(
+    locators: list[EvidenceLocator], fields: list[str]
+) -> bool:
+    if not locators or not fields:
+        return False
+    covered = {
+        locator.field
+        for locator in locators
+        if locator.field
+    }
+    return all(
+        field in covered
+        or any(value.startswith(field + ".") for value in covered)
+        for field in fields
+    )
+
+
+def _evidence_quote_matches(candidate: str, source: str) -> bool:
+    left = _normalize_evidence_text(candidate)
+    right = _normalize_evidence_text(source)
+    if not left or not right:
+        return False
+    return left in right or right in left
+
+
+def _normalize_evidence_text(value: str) -> str:
+    return "".join(str(value).split()).lower()
+
+
+def _optional_int(value: Any) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        parsed = int(value)
+        return parsed if parsed > 0 else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_payment_llm_content(content: str) -> dict[str, Any]:
@@ -892,6 +1194,13 @@ def _optional_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _optional_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _coerce_bool(value: Any, default: bool = False) -> bool:

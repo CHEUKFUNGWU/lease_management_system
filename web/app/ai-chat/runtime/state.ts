@@ -6,6 +6,7 @@ import type {
   Message,
   PaymentScheduleDraftItem,
   RuntimeEvent,
+  RuntimeArtifact,
   RuntimeReviewAction,
   UploadedFile,
 } from "./types";
@@ -90,7 +91,16 @@ export function enrichMessages(
         payload: {
           artifact_id: artifact.id,
           artifact_type: artifact.artifact_type,
+          title: artifact.title,
+          status: artifact.status,
+          schema_version: artifact.schema_version,
           data,
+          evidence_refs: parseRuntimeField<any[]>(artifact.evidence_refs) || [],
+          evidence_complete: artifact.evidence_complete,
+          review_required: artifact.review_required,
+          review_reasons: parseRuntimeField<string[]>(artifact.review_reasons) || [],
+          model_version: artifact.model_version,
+          rule_version: artifact.rule_version,
         },
       };
       next = applyRuntimeEvent(next, event).message;
@@ -135,14 +145,35 @@ export function applyRuntimeEvent(message: Message, event: RuntimeEvent): Runtim
       };
       break;
     case "artifact_ready":
+      {
+        const artifact: RuntimeArtifact = {
+          id: payload.artifact_id,
+          artifact_type: payload.artifact_type || "generic",
+          title: payload.title,
+          status: payload.status,
+          schema_version: payload.schema_version,
+          data: payload.data || {},
+          evidence_refs: payload.evidence_refs || [],
+          evidence_complete: payload.evidence_complete,
+          review_required: payload.review_required,
+          review_reasons: payload.review_reasons || [],
+          model_version: payload.model_version,
+          rule_version: payload.rule_version,
+        };
+        const artifacts = (message.artifacts || []).filter((item) => item.id !== artifact.id);
+        artifacts.push(artifact);
+        patch = { artifacts };
+      }
       if (payload.artifact_type === "contract_draft") {
         patch = {
+          ...patch,
           draftContracts: payload.data?.contracts as ContractDraftItem[] | undefined,
           batchSummary: payload.data?.summary,
           contractDraftArtifactId: payload.artifact_id,
         };
       } else if (payload.artifact_type === "payment_schedule_draft") {
         patch = {
+          ...patch,
           draftPaymentSchedules: payload.data?.schedules as PaymentScheduleDraftItem[] | undefined,
           paymentScheduleSummary: payload.data?.summary,
           paymentScheduleArtifactId: payload.artifact_id,
@@ -168,7 +199,7 @@ export function appendReviewAction(
   artifactId: string,
   action: RuntimeReviewAction,
 ): Message {
-  const matches =
+  const matches = (message.artifacts || []).some((artifact) => artifact.id === artifactId) ||
     message.contractDraftArtifactId === artifactId ||
     message.paymentScheduleArtifactId === artifactId;
   if (!matches) return message;

@@ -57,9 +57,13 @@ class StoredDocumentAdapter:
         download: Callable[[str, str], bytes],
         extract: Callable[[bytes, str], Awaitable[str]],
         bucket: str = "lease-uploads",
+        extract_with_evidence: Callable[
+            [bytes, str], Awaitable[tuple[str, list[EvidenceLocator]]]
+        ] | None = None,
     ):
         self._download = download
         self._extract = extract
+        self._extract_with_evidence = extract_with_evidence
         self._bucket = bucket
 
     async def read(self, command: SourceCommand, max_characters: int) -> SourceMaterial:
@@ -68,13 +72,20 @@ class StoredDocumentAdapter:
         except Exception as exc:
             raise IntakeAdapterError(f"文件下载失败: {exc}") from exc
         try:
-            text = await self._extract(file_data, command.content_type)
+            evidence_locators: list[EvidenceLocator] | None = None
+            if self._extract_with_evidence is not None:
+                text, evidence_locators = await self._extract_with_evidence(
+                    file_data, command.content_type
+                )
+            else:
+                text = await self._extract(file_data, command.content_type)
         except Exception as exc:
             raise IntakeAdapterError(f"文本提取失败: {exc}") from exc
         return SourceMaterial(
             text=_truncate(text, max_characters),
             content_type=command.content_type,
             file_data=file_data,
+            evidence_locators=evidence_locators,
         )
 
 

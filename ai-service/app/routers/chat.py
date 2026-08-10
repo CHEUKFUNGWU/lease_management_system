@@ -40,6 +40,7 @@ class ChatResponse(BaseModel):
     confidence: float
     model: str
     tool_calls: Optional[List[ToolCall]] = None
+    usage: Optional[Dict[str, Any]] = None
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -107,7 +108,8 @@ async def chat(request: ChatRequest):
             sources=[],
             confidence=0.9,
             model=llm_client.get_model_name(),
-            tool_calls=tool_calls
+            tool_calls=tool_calls,
+            usage=llm_client.usage_metadata(result),
         )
     except ValueError as e:
         raise HTTPException(status_code=503, detail=f"LLM 配置错误: {str(e)}")

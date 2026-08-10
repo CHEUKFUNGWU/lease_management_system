@@ -1,0 +1,35 @@
+groups:
+  - name: lease-agent-runtime
+    interval: 30s
+    rules:
+      - alert: LeaseAgentToolFailureRateHigh
+        expr: |
+          lease_agent:tool_failure_ratio:5m > 0.20
+        for: 10m
+        labels:
+          severity: warning
+          service: lease-agent
+        annotations:
+          summary: "Agent Tool failure/rejection rate is high"
+          description: "More than 20% of Tool attempts failed or were rejected for ten minutes."
+
+      - alert: LeaseAgentToolLatencyHigh
+        expr: |
+          lease_agent:tool_average_latency_seconds:5m > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: lease-agent
+        annotations:
+          summary: "Agent Tool average latency is high"
+          description: "Average Tool Runtime latency is above five seconds for ten minutes."
+
+      - alert: LeaseAgentCostAccountingUnavailable
+        expr: lease_agent_tool_cost_accounting_available == 0
+        for: 30m
+        labels:
+          severity: info
+          service: lease-agent
+        annotations:
+          summary: "Agent cost accounting is unavailable"
+          description: "This is expected until the model pricing book is configured; do not infer cost from token counts alone."

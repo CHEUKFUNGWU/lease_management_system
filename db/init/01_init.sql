@@ -484,6 +484,11 @@ CREATE TABLE IF NOT EXISTS ai_chat_runs (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
+    worker_id VARCHAR(150),
+    lease_token VARCHAR(120),
+    leased_until TIMESTAMP WITH TIME ZONE,
+    heartbeat_at TIMESTAMP WITH TIME ZONE,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
     CHECK (status IN ('queued', 'running', 'waiting_review', 'completed', 'failed', 'cancelled', 'aborted'))
 );
 
@@ -554,6 +559,7 @@ CREATE TABLE IF NOT EXISTS ai_chat_artifacts (
     CHECK (artifact_type IN (
         'contract_draft',
         'payment_schedule_draft',
+        'event_draft',
         'audit_pack',
         'data_quality_issue_list',
         'report_explanation',
@@ -1229,6 +1235,298 @@ CREATE TABLE IF NOT EXISTS renewal_decision_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_renewal_decisions_contract
     ON renewal_decision_snapshots(contract_id, decision_date DESC, created_at DESC);
+
+-- ============================================================================
+-- Migration 022: transactional idempotency for draft application commands
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_draft_idempotency (
+    operation VARCHAR(120) NOT NULL,
+    idempotency_key VARCHAR(255) NOT NULL,
+    result JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (operation, idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_draft_idempotency_created
+    ON agent_draft_idempotency(created_at DESC);
+
+-- ============================================================================
+-- Migration 023: versioned Agent Artifact/Evidence protocol
+-- ============================================================================
+
+ALTER TABLE ai_chat_artifacts
+    ADD COLUMN IF NOT EXISTS schema_version VARCHAR(80) NOT NULL DEFAULT 'agent-artifact.v1',
+    ADD COLUMN IF NOT EXISTS evidence_complete BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS review_reasons JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ADD COLUMN IF NOT EXISTS model_version VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS rule_version VARCHAR(150);
+
+UPDATE ai_chat_artifacts
+SET schema_version = 'agent-artifact.v1'
+WHERE schema_version IS NULL OR schema_version = '';
+
+UPDATE ai_chat_artifacts
+SET evidence_refs = '[]'::jsonb
+WHERE evidence_refs IS NULL;
+
+ALTER TABLE ai_chat_artifacts
+    ALTER COLUMN evidence_refs SET DEFAULT '[]'::jsonb,
+    ALTER COLUMN evidence_refs SET NOT NULL;
+
+ALTER TABLE ai_chat_artifacts
+    DROP CONSTRAINT IF EXISTS ai_chat_artifacts_artifact_type_check;
+
+ALTER TABLE ai_chat_artifacts
+    ADD CONSTRAINT ai_chat_artifacts_artifact_type_check CHECK (artifact_type IN (
+        'contract_draft',
+        'payment_schedule_draft',
+        'event_draft',
+        'audit_pack',
+        'data_quality_issue_list',
+        'report_explanation',
+        'monthly_close_blockers',
+        'generic'
+    ));
+
+CREATE INDEX IF NOT EXISTS idx_ai_chat_artifacts_schema_status
+    ON ai_chat_artifacts(schema_version, status);
+
+-- ============================================================================
+-- Migration 024: persisted batch envelope for partial draft recovery
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_draft_batches (
+    batch_id UUID PRIMARY KEY,
+    operation VARCHAR(120) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_by VARCHAR(255),
+    run_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (status IN ('in_progress', 'completed', 'partial_failed', 'failed'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_draft_batches_status_updated
+    ON agent_draft_batches(status, updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_agent_draft_batches_run
+    ON agent_draft_batches(run_id, updated_at DESC);
+
+-- Durable capability metadata and revocation state. Raw JWTs are never stored.
+
+CREATE TABLE IF NOT EXISTS agent_capability_grants (
+    token_id VARCHAR(120) PRIMARY KEY,
+    run_id VARCHAR(255) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_capability_grants_run
+    ON agent_capability_grants(run_id, expires_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_agent_capability_grants_expiry
+    ON agent_capability_grants(expires_at);
+
+-- ============================================================================
+-- Migration 026: persist evidence linkage on event drafts
+-- ============================================================================
+
+ALTER TABLE lease_events
+    ADD COLUMN IF NOT EXISTS source_reference_locator JSONB;
+
+CREATE INDEX IF NOT EXISTS idx_lease_events_source_reference
+    ON lease_events USING GIN (source_reference_locator)
+    WHERE source_reference_locator IS NOT NULL;
+
+-- ============================================================================
+-- Migration 027: durable Runner checkpoint metadata on the owned Core Run
+-- ============================================================================
+
+ALTER TABLE ai_chat_runs
+    ADD COLUMN IF NOT EXISTS checkpoint JSONB;
+
+-- ============================================================================
+-- Migration 028: Agent Run event types
+-- ============================================================================
+
+ALTER TABLE ai_chat_run_events
+    DROP CONSTRAINT IF EXISTS ai_chat_run_events_event_type_check;
+
+ALTER TABLE ai_chat_run_events
+    ADD CONSTRAINT ai_chat_run_events_event_type_check CHECK (event_type IN (
+        'message_start', 'message_delta', 'message_end',
+        'tool_start', 'tool_update', 'tool_end', 'tool_execution',
+        'tool_started', 'tool_completed',
+        'review_prompt', 'artifact_ready', 'queue_update',
+        'run_status', 'run_started', 'run_resumed', 'run_steered',
+        'run_steer', 'run_follow_up', 'run_branch_created',
+        'checkpoint_restored', 'run_end', 'run_finished',
+        'run_error', 'run_failed', 'run_cancelled'
+    ));
+
+CREATE INDEX IF NOT EXISTS idx_ai_chat_runs_checkpoint_updated
+    ON ai_chat_runs(created_at DESC)
+    WHERE checkpoint IS NOT NULL;
+
+-- ==========================================================================
+-- Migration 029: durable Agent Run worker leases
+-- ==========================================================================
+
+ALTER TABLE ai_chat_runs
+    ADD COLUMN IF NOT EXISTS worker_id VARCHAR(150),
+    ADD COLUMN IF NOT EXISTS lease_token VARCHAR(120),
+    ADD COLUMN IF NOT EXISTS leased_until TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS attempt_count INTEGER NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_ai_chat_runs_worker_lease
+    ON ai_chat_runs(status, leased_until, created_at)
+    WHERE status IN ('queued', 'running');
+
+-- Migration 030: persistent, one-time refresh-token sessions
+CREATE TABLE IF NOT EXISTS auth_refresh_sessions (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_id UUID NOT NULL UNIQUE,
+    token_hash VARCHAR(128) NOT NULL UNIQUE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    replaced_by UUID,
+    ip_address INET,
+    user_agent TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_sessions_user_active
+    ON auth_refresh_sessions(user_id, expires_at)
+    WHERE revoked_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_auth_refresh_sessions_expiry
+    ON auth_refresh_sessions(expires_at);
+
+-- Migration 031: durable Run audit summary read model
+CREATE TABLE IF NOT EXISTS agent_run_audit_summaries (
+    run_id UUID PRIMARY KEY REFERENCES ai_chat_runs(id) ON DELETE CASCADE,
+    session_id UUID NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    tool_event_count INTEGER NOT NULL DEFAULT 0,
+    failed_event_count INTEGER NOT NULL DEFAULT 0,
+    review_event_count INTEGER NOT NULL DEFAULT 0,
+    artifact_count INTEGER NOT NULL DEFAULT 0,
+    last_sequence INTEGER NOT NULL DEFAULT 0,
+    last_event_type VARCHAR(100),
+    terminal BOOLEAN NOT NULL DEFAULT FALSE,
+    last_event_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO agent_run_audit_summaries (
+    run_id, session_id, event_count, tool_event_count, failed_event_count,
+    review_event_count, artifact_count, last_sequence, last_event_type,
+    terminal, last_event_at, updated_at
+)
+SELECT e.run_id, e.session_id,
+       COUNT(*),
+       COUNT(*) FILTER (WHERE e.event_type LIKE 'tool_%' OR e.event_type = 'tool_execution'),
+       COUNT(*) FILTER (WHERE e.event_type IN ('run_failed', 'run_error', 'tool_error')),
+       COUNT(*) FILTER (WHERE e.event_type IN ('review_prompt', 'artifact_ready')),
+       (SELECT COUNT(*) FROM ai_chat_artifacts a WHERE a.run_id = e.run_id),
+       MAX(e.sequence_no),
+       (array_agg(e.event_type ORDER BY e.sequence_no DESC))[1],
+       BOOL_OR(e.is_terminal), MAX(e.created_at), NOW()
+FROM ai_chat_run_events e
+GROUP BY e.run_id, e.session_id
+ON CONFLICT (run_id) DO UPDATE SET
+    session_id = EXCLUDED.session_id,
+    event_count = EXCLUDED.event_count,
+    tool_event_count = EXCLUDED.tool_event_count,
+    failed_event_count = EXCLUDED.failed_event_count,
+    review_event_count = EXCLUDED.review_event_count,
+    artifact_count = EXCLUDED.artifact_count,
+    last_sequence = EXCLUDED.last_sequence,
+    last_event_type = EXCLUDED.last_event_type,
+    terminal = EXCLUDED.terminal,
+    last_event_at = EXCLUDED.last_event_at,
+    updated_at = EXCLUDED.updated_at;
+
+CREATE INDEX IF NOT EXISTS idx_agent_run_audit_summaries_session
+    ON agent_run_audit_summaries(session_id, updated_at DESC);
+
+-- Migration 032: immutable checkpoint audit index and terminal alert outbox.
+CREATE TABLE IF NOT EXISTS agent_run_checkpoint_audits (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    run_id UUID NOT NULL REFERENCES ai_chat_runs(id) ON DELETE CASCADE,
+    session_id UUID NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+    checkpoint_hash CHAR(64) NOT NULL,
+    checkpoint_size_bytes INTEGER NOT NULL CHECK (checkpoint_size_bytes >= 0),
+    schema_version VARCHAR(100),
+    checkpoint_status VARCHAR(30) NOT NULL DEFAULT 'saved',
+    next_index INTEGER CHECK (next_index IS NULL OR next_index >= 0),
+    actor_id UUID,
+    worker_id VARCHAR(150),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_agent_run_checkpoint_audits_run_created
+    ON agent_run_checkpoint_audits(run_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS agent_run_terminal_alerts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    run_id UUID NOT NULL UNIQUE REFERENCES ai_chat_runs(id) ON DELETE CASCADE,
+    session_id UUID NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+    terminal_status VARCHAR(30) NOT NULL,
+    event_type VARCHAR(100) NOT NULL,
+    error_message TEXT,
+    payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'acknowledged')),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    acknowledged_at TIMESTAMP WITH TIME ZONE,
+    acknowledged_by UUID
+);
+CREATE INDEX IF NOT EXISTS idx_agent_run_terminal_alerts_status_created
+    ON agent_run_terminal_alerts(status, created_at DESC);
+
+ALTER TABLE agent_run_audit_summaries
+    ADD COLUMN IF NOT EXISTS checkpoint_count INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS last_checkpoint_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS terminal_status VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS terminal_error TEXT;
+
+ALTER TABLE ai_chat_run_events
+    DROP CONSTRAINT IF EXISTS ai_chat_run_events_event_type_check;
+ALTER TABLE ai_chat_run_events
+    ADD CONSTRAINT ai_chat_run_events_event_type_check CHECK (event_type IN (
+        'message_start', 'message_delta', 'message_end',
+        'tool_start', 'tool_update', 'tool_end', 'tool_execution',
+        'tool_started', 'tool_completed',
+        'review_prompt', 'artifact_ready', 'queue_update',
+        'run_status', 'run_started', 'run_resumed', 'run_steered',
+        'run_steer', 'run_follow_up', 'run_branch_created',
+        'planner_usage',
+        'checkpoint_saved', 'checkpoint_restored',
+        'run_end', 'run_finished', 'run_error', 'run_failed', 'run_cancelled'
+    ));
+
+-- Migration 033: explicit cross-system Run/Artifact/business record links.
+CREATE TABLE IF NOT EXISTS agent_run_audit_links (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    run_id UUID NOT NULL REFERENCES ai_chat_runs(id) ON DELETE CASCADE,
+    artifact_id UUID REFERENCES ai_chat_artifacts(id) ON DELETE SET NULL,
+    business_table VARCHAR(100) NOT NULL,
+    business_record_id VARCHAR(150) NOT NULL,
+    relation VARCHAR(50) NOT NULL,
+    item_status VARCHAR(30),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    UNIQUE (run_id, artifact_id, business_table, business_record_id, relation)
+);
+CREATE INDEX IF NOT EXISTS idx_agent_run_audit_links_run
+    ON agent_run_audit_links(run_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_run_audit_links_business
+    ON agent_run_audit_links(business_table, business_record_id);
 
 -- ============================================================================
 -- End of init script

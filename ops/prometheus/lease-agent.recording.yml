@@ -1,0 +1,23 @@
+groups:
+  - name: lease-agent-baseline
+    interval: 30s
+    rules:
+      - record: lease_agent:tool_failure_ratio:5m
+        expr: |
+          sum(rate(lease_agent_tool_failures_total[5m]))
+            /
+          clamp_min(sum(rate(lease_agent_tool_executions_total[5m])), 1)
+
+      - record: lease_agent:tool_average_latency_seconds:5m
+        expr: |
+          (
+            sum(rate(lease_agent_tool_execution_duration_milliseconds_sum[5m]))
+            /
+            clamp_min(sum(rate(lease_agent_tool_executions_total[5m])), 1)
+          ) / 1000
+
+      - record: lease_agent:tool_review_ratio:5m
+        expr: |
+          sum(rate(lease_agent_tool_review_required_total[5m]))
+            /
+          clamp_min(sum(rate(lease_agent_tool_executions_total[5m])), 1)

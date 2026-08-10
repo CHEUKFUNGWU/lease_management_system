@@ -9,6 +9,7 @@ export type {
   ChatSession,
   ContractDraftItem,
   Message,
+  RuntimeArtifact,
   PageContext,
   PaymentScheduleDraftItem,
   PaymentScheduleParseSummary,

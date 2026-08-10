@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/agentcapability"
 	"github.com/lease-management-system/core-service/internal/config"
 	"github.com/lease-management-system/core-service/internal/db"
 	"github.com/lease-management-system/core-service/internal/handlers"
@@ -18,6 +19,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/audit"
 	"github.com/lease-management-system/core-service/internal/services/closecontrol"
 	"github.com/lease-management-system/core-service/internal/services/closereadiness"
+	"github.com/lease-management-system/core-service/internal/services/draftapp"
 	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 	"github.com/lease-management-system/core-service/internal/services/monthend"
 )
@@ -41,6 +43,7 @@ func main() {
 	userRepo := repository.NewUserRepository(database.Pool)
 	contractRepo := repository.NewContractRepository(database.Pool)
 	roleRepo := repository.NewRoleRepository(database.Pool)
+	authRefreshRepo := repository.NewAuthRefreshRepository(database.Pool)
 	approvalRepo := repository.NewApprovalRepository(database.Pool)
 	psRepo := repository.NewPaymentScheduleRepository(database.Pool)
 	eventRepo := repository.NewEventRepository(database.Pool)
@@ -49,6 +52,7 @@ func main() {
 	systemSettingRepo := repository.NewSystemSettingRepository(database.Pool)
 	leaseAdminRepo := repository.NewLeaseAdminRepository(database.Pool)
 	aiChatRuntimeRepo := repository.NewAIChatRuntimeRepository(database.Pool)
+	aiRunQueueRepo := repository.NewAgentRunQueueRepository(database.Pool)
 	masterDataRepo := repository.NewMasterDataRepository(database.Pool)
 	accessPolicyRepo := repository.NewAccessPolicyRepository(database.Pool)
 	exchangeRateRepo := repository.NewExchangeRateRepository(database.Pool)
@@ -67,9 +71,20 @@ func main() {
 	closeReadinessService := closereadiness.NewService(closeReadinessRepo, systemSettingRepo, closeControlRepo)
 	closeControlService := closecontrol.NewService(closeReadinessRepo, systemSettingRepo, closeControlRepo)
 	eventPersistence := eventaccounting.NewPersistenceService(database.Pool, mcRepo, eventRepo, auditLogger)
+	draftService := draftapp.NewPostgresService(database.Pool, contractRepo, psRepo, eventRepo)
+	capabilityIssuer, err := agentcapability.NewIssuer(cfg.AgentCapabilitySecret, "lease-agent-gateway", time.Duration(cfg.AgentCapabilityTTLSeconds)*time.Second)
+	if err != nil {
+		log.Fatalf("Failed to initialize agent capability issuer: %v", err)
+	}
+	capabilityStore := agentcapability.NewPostgresStore(database.Pool)
+	capabilityIssuer = capabilityIssuer.WithRevocationStore(capabilityStore)
+	maintenanceCtx, stopCapabilityMaintenance := context.WithCancel(context.Background())
+	go runCapabilityMaintenance(maintenanceCtx, capabilityStore, time.Duration(cfg.AgentCapabilityCleanupSeconds)*time.Second)
+	refreshMaintenanceCtx, stopRefreshMaintenance := context.WithCancel(context.Background())
+	go runAuthRefreshMaintenance(refreshMaintenanceCtx, authRefreshRepo, time.Duration(cfg.RefreshTokenCleanupSeconds)*time.Second)
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(cfg, userRepo, roleRepo)
+	authHandler := handlers.NewAuthHandler(cfg, userRepo, roleRepo).WithRefreshTokenStore(authRefreshRepo)
 	contractHandler := handlers.NewContractHandler(contractRepo, auditLogger)
 	calcHandler := handlers.NewCalculationHandler(contractRepo, psRepo, systemSettingRepo)
 	approvalHandler := handlers.NewApprovalHandler(approvalRepo, contractRepo, auditLogger)
@@ -82,7 +97,7 @@ func main() {
 	eventHandler := handlers.NewEventHandler(eventRepo, contractRepo, mcRepo, psRepo, systemSettingRepo, eventPersistence, auditLogger)
 	monthlyClosingHandler := handlers.NewMonthlyClosingHandler(mcRepo, contractRepo, closeService, closeReadinessService, auditLogger)
 	closeExceptionHandler := handlers.NewCloseExceptionHandler(closeControlService, auditLogger)
-	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo)
+	aiChatHandler := handlers.NewAIChatHandler(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
@@ -91,6 +106,7 @@ func main() {
 	workQueueHandler := handlers.NewWorkQueueHandler(workQueueRepo)
 	budgetHandler := handlers.NewBudgetHandler(budgetRepo, contractRepo, psRepo, systemSettingRepo)
 	storeMetricsHandler := handlers.NewStoreMetricsHandler(storeMetricsRepo, auditLogger, systemSettingRepo)
+	agentGatewayHandler := handlers.NewAgentGatewayHandler(aiChatHandler.AgentToolRuntime(), handlers.NewAgentToolAuditRecorder(auditLogger)).WithCapabilityIssuer(capabilityIssuer).WithSkillRegistry(aiChatHandler.AgentSkillRegistry()).WithSessionStore(aiChatHandler.AgentSessionStore()).WithContractScopeReader(contractRepo).WithRunStore(aiChatHandler.AgentRunStore()).WithCheckpointStore(aiChatHandler.AgentRunCheckpointStore()).WithQueueStore(aiRunQueueRepo).WithWorkerRunStore(aiRunQueueRepo).WithTerminalAlertStore(aiChatRuntimeRepo).WithUsageStore(aiChatRuntimeRepo)
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)
@@ -123,6 +139,8 @@ func main() {
 	// Public routes - registration disabled, only login is public
 	r.POST("/api/v1/auth/register", authHandler.Register)
 	r.POST("/api/v1/auth/login", authHandler.Login)
+	r.POST("/api/v1/auth/refresh", authHandler.Refresh)
+	r.POST("/api/v1/auth/logout", authHandler.Logout)
 
 	// Protected routes
 	api := r.Group("/api/v1")
@@ -141,6 +159,9 @@ func main() {
 		entryApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "journal_entry", "id")
 		batchApprovalSeparation := middleware.RequireApprovalSeparation(accessPolicyRepo, "monthly_batch", "id")
 		protected.Handle(http.MethodGet, "/me", permission("identity", "read"), handlers.GetCurrentUser())
+		protected.Handle(http.MethodGet, "/auth/sessions", permission("identity", "read"), authHandler.ListSessions)
+		protected.Handle(http.MethodDelete, "/auth/sessions/:id", permission("identity", "read"), authHandler.RevokeSession)
+		protected.Handle(http.MethodPost, "/auth/logout-all", permission("identity", "read"), authHandler.LogoutAll)
 		protected.Handle(http.MethodGet, "/me/work-queue", permission("identity", "read"), workQueueHandler.Get)
 
 		// Contracts
@@ -228,6 +249,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/reports/cashflow-forecast", permission("reports", "read"), reportHandler.CashflowForecast)
 		protected.Handle(http.MethodGet, "/reports/disclosure", permission("reports", "read"), reportHandler.Disclosure)
 		protected.Handle(http.MethodGet, "/reports/close-pack", permission("reports", "read"), reportHandler.ClosePack)
+		protected.Handle(http.MethodGet, "/reports/close-pack/export", permission("reports", "export"), reportHandler.ExportClosePack)
 		protected.Handle(http.MethodGet, "/reports/unit-price", permission("reports", "read"), reportHandler.UnitPrice)
 
 		// Exchange rates: settings-grade master data used to translate
@@ -280,9 +302,44 @@ func main() {
 		protected.Handle(http.MethodPost, "/ai/chat/sessions/:id/runs", permission("ai_chat", "use"), aiChatHandler.CreateRun)
 		protected.Handle(http.MethodGet, "/ai/chat/sessions/:id/runs", permission("ai_chat", "use"), aiChatHandler.ListRuns)
 		protected.Handle(http.MethodPost, "/ai/chat/continuations", permission("ai_chat", "use"), aiChatHandler.CreateContinuation)
+		protected.Handle(http.MethodGet, "/ai/chat/draft-batches/:id", permission("ai_chat", "use"), aiChatHandler.GetDraftBatch)
+		protected.Handle(http.MethodPost, "/ai/chat/draft-batches/:id/retry", permission("ai_chat", "use"), aiChatHandler.RetryDraftBatch)
 		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/events", permission("ai_chat", "use"), aiChatHandler.ListRunEvents)
+		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/trace", permission("ai_chat", "use"), aiChatHandler.GetAgentRunTrace)
 		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/stream", permission("ai_chat", "use"), aiChatHandler.StreamRunEvents)
 		protected.Handle(http.MethodPost, "/ai/chat/artifacts/:id/actions", permission("ai_chat", "use"), aiChatHandler.CreateReviewAction)
+
+		// Agent Gateway: individual Tools enforce their own permissions. Do not
+		// put a broad ai_chat permission in front of this group, otherwise CLI
+		// and external Agent callers could not use permitted read Tools such as
+		// contracts:read or calculations:read.
+		api.GET("/agent/tools", agentGatewayHandler.Describe)
+		api.GET("/agent/skills", agentGatewayHandler.Skills)
+		api.GET("/agent/metrics", agentGatewayHandler.Metrics)
+		api.GET("/agent/metrics/prometheus", agentGatewayHandler.MetricsPrometheus)
+		api.GET("/agent/usage", agentGatewayHandler.Usage)
+		api.POST("/agent/sessions", agentGatewayHandler.CreateSession)
+		api.POST("/agent/tools/execute", agentGatewayHandler.Execute)
+		api.POST("/agent/capabilities", agentGatewayHandler.IssueCapability)
+		api.POST("/agent/capabilities/revoke", agentGatewayHandler.RevokeCapability)
+		api.POST("/agent/runs", agentGatewayHandler.CreateRun)
+		api.POST("/agent/runs/claim", agentGatewayHandler.ClaimRun)
+		api.POST("/agent/runs/recover-leases", agentGatewayHandler.RecoverRunLeases)
+		api.GET("/agent/runs/:id/events", agentGatewayHandler.ListRunEvents)
+		protected.Handle(http.MethodGet, "/agent/runs/:id/trace", permission("ai_chat", "use"), aiChatHandler.GetAgentRunTrace)
+		api.GET("/agent/runs/:id/checkpoint", agentGatewayHandler.GetRunCheckpoint)
+		api.GET("/agent/runs/:id/stream", aiChatHandler.StreamRunEvents)
+		api.GET("/agent/alerts/terminal", agentGatewayHandler.ListTerminalAlerts)
+		api.POST("/agent/alerts/terminal/:id/ack", agentGatewayHandler.AcknowledgeTerminalAlert)
+		api.POST("/agent/runs/:id/events", agentGatewayHandler.AppendRunEvent)
+		api.POST("/agent/runs/:id/checkpoint", agentGatewayHandler.SaveRunCheckpoint)
+		api.POST("/agent/runs/:id/cancel", agentGatewayHandler.CancelRun)
+		api.POST("/agent/runs/:id/steer", agentGatewayHandler.SteerRun)
+		api.POST("/agent/runs/:id/follow-up", agentGatewayHandler.FollowUpRun)
+		api.POST("/agent/runs/:id/branch", agentGatewayHandler.BranchRun)
+		api.POST("/agent/runs/:id/lease/heartbeat", agentGatewayHandler.HeartbeatRunLease)
+		api.POST("/agent/runs/:id/lease/release", agentGatewayHandler.ReleaseRunLease)
+		api.POST("/agent/artifacts/:id/actions", aiChatHandler.CreateReviewAction)
 
 		// Audit Logs
 		protected.Handle(http.MethodGet, "/audit-logs", permission("audit_logs", "read"), auditHandler.List)
@@ -323,6 +380,8 @@ func main() {
 
 	<-quit
 	log.Println("Shutting down server...")
+	stopCapabilityMaintenance()
+	stopRefreshMaintenance()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -332,6 +391,63 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+func runCapabilityMaintenance(ctx context.Context, store *agentcapability.PostgresStore, interval time.Duration) {
+	if store == nil || interval <= 0 {
+		return
+	}
+	cleanup := func() {
+		deleted, err := store.CleanupExpired(ctx, time.Now().UTC())
+		if err != nil {
+			log.Printf("Agent capability cleanup failed: %v", err)
+			return
+		}
+		stats, err := store.Stats(ctx, time.Now().UTC())
+		if err != nil {
+			log.Printf("Agent capability stats failed after cleanup: %v", err)
+			return
+		}
+		log.Printf("Agent capability maintenance: deleted=%d active=%d revoked=%d expired=%d", deleted, stats.Active, stats.Revoked, stats.Expired)
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			cleanup()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+type authRefreshCleanupStore interface {
+	CleanupExpired(context.Context, time.Time) (int64, error)
+}
+
+func runAuthRefreshMaintenance(ctx context.Context, store authRefreshCleanupStore, interval time.Duration) {
+	if store == nil || interval <= 0 {
+		return
+	}
+	cleanup := func() {
+		deleted, err := store.CleanupExpired(ctx, time.Now().UTC())
+		if err != nil {
+			log.Printf("Auth refresh session cleanup failed: %v", err)
+			return
+		}
+		log.Printf("Auth refresh session maintenance: deleted=%d", deleted)
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			cleanup()
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func corsMiddleware() gin.HandlerFunc {

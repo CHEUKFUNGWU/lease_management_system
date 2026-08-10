@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/agentartifact"
 )
 
 type AIChatSession struct {
@@ -41,6 +43,14 @@ type AIChatRun struct {
 	CreatedAt        time.Time       `json:"created_at"`
 	StartedAt        *time.Time      `json:"started_at"`
 	CompletedAt      *time.Time      `json:"completed_at"`
+	// Checkpoint is persisted with a branch run but intentionally omitted from
+	// API JSON responses. Callers must use the owner-protected checkpoint API.
+	Checkpoint   json.RawMessage `json:"-"`
+	WorkerID     *string         `json:"worker_id,omitempty"`
+	LeaseToken   string          `json:"-"`
+	LeasedUntil  *time.Time      `json:"leased_until,omitempty"`
+	HeartbeatAt  *time.Time      `json:"heartbeat_at,omitempty"`
+	AttemptCount int             `json:"attempt_count,omitempty"`
 }
 
 type AIChatMessage struct {
@@ -70,20 +80,44 @@ type AIChatRunEvent struct {
 	CreatedAt  time.Time       `json:"created_at"`
 }
 
+type AgentRunAuditSummary struct {
+	RunID            string     `json:"run_id"`
+	SessionID        string     `json:"session_id"`
+	EventCount       int        `json:"event_count"`
+	ToolEventCount   int        `json:"tool_event_count"`
+	FailedEventCount int        `json:"failed_event_count"`
+	ReviewEventCount int        `json:"review_event_count"`
+	ArtifactCount    int        `json:"artifact_count"`
+	LastSequence     int        `json:"last_sequence"`
+	LastEventType    string     `json:"last_event_type"`
+	Terminal         bool       `json:"terminal"`
+	CheckpointCount  int        `json:"checkpoint_count"`
+	LastCheckpointAt *time.Time `json:"last_checkpoint_at,omitempty"`
+	TerminalStatus   *string    `json:"terminal_status,omitempty"`
+	TerminalError    *string    `json:"terminal_error,omitempty"`
+	LastEventAt      time.Time  `json:"last_event_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
 type AIChatArtifact struct {
-	ID             string          `json:"id"`
-	SessionID      string          `json:"session_id"`
-	RunID          string          `json:"run_id"`
-	ArtifactType   string          `json:"artifact_type"`
-	Title          string          `json:"title"`
-	Status         string          `json:"status"`
-	Data           json.RawMessage `json:"data"`
-	Actions        json.RawMessage `json:"actions"`
-	EvidenceRefs   json.RawMessage `json:"evidence_refs"`
-	ReviewRequired bool            `json:"review_required"`
-	CreatedBy      *string         `json:"created_by"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	ID               string          `json:"id"`
+	SessionID        string          `json:"session_id"`
+	RunID            string          `json:"run_id"`
+	ArtifactType     string          `json:"artifact_type"`
+	Title            string          `json:"title"`
+	Status           string          `json:"status"`
+	Data             json.RawMessage `json:"data"`
+	Actions          json.RawMessage `json:"actions"`
+	EvidenceRefs     json.RawMessage `json:"evidence_refs"`
+	EvidenceComplete bool            `json:"evidence_complete"`
+	ReviewRequired   bool            `json:"review_required"`
+	ReviewReasons    json.RawMessage `json:"review_reasons"`
+	SchemaVersion    string          `json:"schema_version"`
+	ModelVersion     *string         `json:"model_version"`
+	RuleVersion      *string         `json:"rule_version"`
+	CreatedBy        *string         `json:"created_by"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 type AIChatReviewAction struct {
@@ -124,11 +158,18 @@ type AIChatSessionFilter struct {
 }
 
 type AIChatRuntimeRepository struct {
-	db *pgxpool.Pool
+	db DBTX
 }
 
 func NewAIChatRuntimeRepository(db *pgxpool.Pool) *AIChatRuntimeRepository {
 	return &AIChatRuntimeRepository{db: db}
+}
+
+// WithTx returns a runtime repository view backed by the caller-owned
+// transaction. It is used by the review coordinator to keep Artifact, Review
+// Action and Run Event writes in the Draft Service transaction.
+func (r *AIChatRuntimeRepository) WithTx(tx DBTX) *AIChatRuntimeRepository {
+	return &AIChatRuntimeRepository{db: tx}
 }
 
 func normalizeJSON(raw json.RawMessage, fallback string) json.RawMessage {
@@ -228,12 +269,12 @@ func (r *AIChatRuntimeRepository) CreateRun(ctx context.Context, run *AIChatRun)
 		INSERT INTO ai_chat_runs (
 			id, session_id, trigger_message_id, parent_run_id, status, agent_mode,
 			skill_id, skill_version, page_context, review_required, summary_text,
-			error_message, created_by, created_at, started_at, completed_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16)
+			error_message, created_by, created_at, started_at, completed_at, checkpoint
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17::jsonb)
 	`,
 		run.ID, run.SessionID, run.TriggerMessageID, run.ParentRunID, run.Status, run.AgentMode,
 		run.SkillID, run.SkillVersion, normalizeJSON(run.PageContext, "null"), run.ReviewRequired, run.SummaryText,
-		run.ErrorMessage, run.CreatedBy, run.CreatedAt, run.StartedAt, run.CompletedAt,
+		run.ErrorMessage, run.CreatedBy, run.CreatedAt, run.StartedAt, run.CompletedAt, normalizeJSON(run.Checkpoint, "null"),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ai chat run: %w", err)
@@ -270,6 +311,19 @@ func (r *AIChatRuntimeRepository) UpdateRunStatus(ctx context.Context, runID, st
 	return nil
 }
 
+func (r *AIChatRuntimeRepository) GetRunCheckpoint(ctx context.Context, runID, userID string) (json.RawMessage, error) {
+	var checkpoint []byte
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(checkpoint, 'null'::jsonb)
+		FROM ai_chat_runs
+		WHERE id = $1 AND created_by = $2
+	`, runID, userID).Scan(&checkpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ai chat run checkpoint: %w", err)
+	}
+	return json.RawMessage(checkpoint), nil
+}
+
 func (r *AIChatRuntimeRepository) UpdateRunParent(ctx context.Context, runID, parentRunID string) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE ai_chat_runs
@@ -287,7 +341,8 @@ func (r *AIChatRuntimeRepository) GetRunByID(ctx context.Context, runID, userID 
 	err := r.db.QueryRow(ctx, `
 		SELECT r.id, r.session_id, r.trigger_message_id, r.parent_run_id, r.status, r.agent_mode,
 		       r.skill_id, r.skill_version, COALESCE(r.page_context, 'null'::jsonb), r.review_required,
-		       r.summary_text, r.error_message, r.created_by, r.created_at, r.started_at, r.completed_at
+		       r.summary_text, r.error_message, r.created_by, r.created_at, r.started_at, r.completed_at,
+		       r.worker_id, r.leased_until, r.heartbeat_at, r.attempt_count
 		FROM ai_chat_runs r
 		INNER JOIN ai_chat_sessions s ON s.id = r.session_id
 		WHERE r.id = $1 AND s.user_id = $2
@@ -295,6 +350,7 @@ func (r *AIChatRuntimeRepository) GetRunByID(ctx context.Context, runID, userID 
 		&run.ID, &run.SessionID, &run.TriggerMessageID, &run.ParentRunID, &run.Status, &run.AgentMode,
 		&run.SkillID, &run.SkillVersion, &run.PageContext, &run.ReviewRequired,
 		&run.SummaryText, &run.ErrorMessage, &run.CreatedBy, &run.CreatedAt, &run.StartedAt, &run.CompletedAt,
+		&run.WorkerID, &run.LeasedUntil, &run.HeartbeatAt, &run.AttemptCount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat run: %w", err)
@@ -310,7 +366,8 @@ func (r *AIChatRuntimeRepository) ListRunsBySession(ctx context.Context, session
 	rows, err := r.db.Query(ctx, `
 		SELECT id, session_id, trigger_message_id, parent_run_id, status, agent_mode,
 		       skill_id, skill_version, COALESCE(page_context, 'null'::jsonb), review_required,
-		       summary_text, error_message, created_by, created_at, started_at, completed_at
+		       summary_text, error_message, created_by, created_at, started_at, completed_at,
+		       worker_id, leased_until, heartbeat_at, attempt_count
 		FROM ai_chat_runs
 		WHERE session_id = $1
 		ORDER BY created_at DESC
@@ -328,6 +385,7 @@ func (r *AIChatRuntimeRepository) ListRunsBySession(ctx context.Context, session
 			&run.ID, &run.SessionID, &run.TriggerMessageID, &run.ParentRunID, &run.Status, &run.AgentMode,
 			&run.SkillID, &run.SkillVersion, &run.PageContext, &run.ReviewRequired,
 			&run.SummaryText, &run.ErrorMessage, &run.CreatedBy, &run.CreatedAt, &run.StartedAt, &run.CompletedAt,
+			&run.WorkerID, &run.LeasedUntil, &run.HeartbeatAt, &run.AttemptCount,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan ai chat run: %w", err)
 		}
@@ -439,20 +497,96 @@ func (r *AIChatRuntimeRepository) GetMessageByID(ctx context.Context, messageID,
 }
 
 func (r *AIChatRuntimeRepository) AppendRunEvent(ctx context.Context, event *AIChatRunEvent) error {
-	event.ID = uuid.New().String()
-	event.CreatedAt = time.Now()
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO ai_chat_run_events (
-			id, run_id, session_id, sequence_no, event_type, payload, is_terminal, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
-	`,
-		event.ID, event.RunID, event.SessionID, event.SequenceNo, event.EventType,
-		normalizeJSON(event.Payload, "{}"), event.IsTerminal, event.CreatedAt,
-	)
+	if r == nil || r.db == nil {
+		return fmt.Errorf("ai chat runtime repository unavailable")
+	}
+	if pool, ok := r.db.(*pgxpool.Pool); ok {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return fmt.Errorf("begin run event transaction: %w", err)
+		}
+		defer tx.Rollback(ctx)
+		if err := appendAgentRunEvent(ctx, tx, event); err != nil {
+			return err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit run event transaction: %w", err)
+		}
+		return nil
+	}
+	return appendAgentRunEvent(ctx, r.db, event)
+}
+
+func upsertAgentRunAuditSummary(ctx context.Context, db DBTX, event *AIChatRunEvent) error {
+	if event == nil {
+		return fmt.Errorf("agent run event is required")
+	}
+	_, err := db.Exec(ctx, `
+		INSERT INTO agent_run_audit_summaries (
+			run_id, session_id, event_count, tool_event_count, failed_event_count,
+			review_event_count, artifact_count, last_sequence, last_event_type,
+			terminal, checkpoint_count, last_checkpoint_at, terminal_status,
+			terminal_error, last_event_at, updated_at
+		)
+		SELECT $1, $2,
+			COUNT(*),
+			COUNT(*) FILTER (WHERE event_type LIKE 'tool_%' OR event_type = 'tool_execution'),
+			COUNT(*) FILTER (WHERE event_type IN ('run_failed', 'run_error', 'tool_error')),
+			COUNT(*) FILTER (WHERE event_type IN ('review_prompt', 'artifact_ready')),
+			(SELECT COUNT(*) FROM ai_chat_artifacts WHERE run_id = $1),
+			MAX(sequence_no), $3, BOOL_OR(is_terminal),
+			(SELECT COUNT(*) FROM agent_run_checkpoint_audits WHERE run_id = $1),
+			(SELECT MAX(created_at) FROM agent_run_checkpoint_audits WHERE run_id = $1),
+			NULLIF($4, ''), NULLIF($5, ''), MAX(created_at), NOW()
+		FROM ai_chat_run_events
+		WHERE run_id = $1
+		ON CONFLICT (run_id) DO UPDATE SET
+			session_id = EXCLUDED.session_id,
+			event_count = EXCLUDED.event_count,
+			tool_event_count = EXCLUDED.tool_event_count,
+			failed_event_count = EXCLUDED.failed_event_count,
+			review_event_count = EXCLUDED.review_event_count,
+			artifact_count = EXCLUDED.artifact_count,
+			last_sequence = EXCLUDED.last_sequence,
+			last_event_type = EXCLUDED.last_event_type,
+			terminal = EXCLUDED.terminal,
+			checkpoint_count = EXCLUDED.checkpoint_count,
+			last_checkpoint_at = EXCLUDED.last_checkpoint_at,
+			terminal_status = COALESCE(EXCLUDED.terminal_status, agent_run_audit_summaries.terminal_status),
+			terminal_error = COALESCE(EXCLUDED.terminal_error, agent_run_audit_summaries.terminal_error),
+			last_event_at = EXCLUDED.last_event_at,
+			updated_at = EXCLUDED.updated_at
+	`, event.RunID, event.SessionID, event.EventType, terminalStatus(event.EventType), terminalError(event.Payload))
 	if err != nil {
-		return fmt.Errorf("failed to append ai chat run event: %w", err)
+		return err
+	}
+	if event.IsTerminal {
+		return upsertAgentRunTerminalAlert(ctx, db, event)
 	}
 	return nil
+}
+
+func (r *AIChatRuntimeRepository) GetRunAuditSummary(ctx context.Context, runID string) (*AgentRunAuditSummary, error) {
+	var summary AgentRunAuditSummary
+	err := r.db.QueryRow(ctx, `
+		SELECT run_id, session_id, event_count, tool_event_count, failed_event_count,
+		       review_event_count, artifact_count, last_sequence, last_event_type,
+		       terminal, checkpoint_count, last_checkpoint_at, terminal_status,
+		       terminal_error, last_event_at, updated_at
+		FROM agent_run_audit_summaries
+		WHERE run_id = $1
+	`, runID).Scan(
+		&summary.RunID, &summary.SessionID, &summary.EventCount, &summary.ToolEventCount,
+		&summary.FailedEventCount, &summary.ReviewEventCount, &summary.ArtifactCount,
+		&summary.LastSequence, &summary.LastEventType, &summary.Terminal,
+		&summary.CheckpointCount, &summary.LastCheckpointAt, &summary.TerminalStatus,
+		&summary.TerminalError,
+		&summary.LastEventAt, &summary.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent run audit summary: %w", err)
+	}
+	return &summary, nil
 }
 
 func (r *AIChatRuntimeRepository) ListRunEvents(ctx context.Context, runID string, afterSequence, limit int) ([]*AIChatRunEvent, error) {
@@ -487,6 +621,9 @@ func (r *AIChatRuntimeRepository) ListRunEvents(ctx context.Context, runID strin
 }
 
 func (r *AIChatRuntimeRepository) GetNextRunEventSequence(ctx context.Context, runID string) (int, error) {
+	if _, err := r.db.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, "ai-run-events:"+runID); err != nil {
+		return 0, fmt.Errorf("failed to lock ai chat run event sequence: %w", err)
+	}
 	var nextSeq int
 	err := r.db.QueryRow(ctx, `
 		SELECT COALESCE(MAX(sequence_no), 0) + 1
@@ -511,13 +648,15 @@ func (r *AIChatRuntimeRepository) CreateArtifact(ctx context.Context, artifact *
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO ai_chat_artifacts (
 			id, session_id, run_id, artifact_type, title, status, data,
-			actions, evidence_refs, review_required, created_by, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11, $12, $13)
+			actions, evidence_refs, schema_version, evidence_complete, review_reasons,
+			model_version, rule_version, review_required, created_by, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11, $12::jsonb, $13, $14, $15, $16, $17, $18)
 	`,
 		artifact.ID, artifact.SessionID, artifact.RunID, artifact.ArtifactType, artifact.Title, artifact.Status,
 		normalizeJSON(artifact.Data, "{}"), normalizeJSON(artifact.Actions, "null"),
-		normalizeJSON(artifact.EvidenceRefs, "null"), artifact.ReviewRequired, artifact.CreatedBy,
-		artifact.CreatedAt, artifact.UpdatedAt,
+		normalizeJSON(artifact.EvidenceRefs, "[]"), defaultArtifactSchemaVersion(artifact.SchemaVersion),
+		artifact.EvidenceComplete, normalizeJSON(artifact.ReviewReasons, "[]"), artifact.ModelVersion, artifact.RuleVersion,
+		artifact.ReviewRequired, artifact.CreatedBy, artifact.CreatedAt, artifact.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ai chat artifact: %w", err)
@@ -525,19 +664,28 @@ func (r *AIChatRuntimeRepository) CreateArtifact(ctx context.Context, artifact *
 	return nil
 }
 
+func defaultArtifactSchemaVersion(version string) string {
+	if version == "" {
+		return agentartifact.SchemaVersion
+	}
+	return version
+}
+
 func (r *AIChatRuntimeRepository) GetArtifactByID(ctx context.Context, artifactID, userID string) (*AIChatArtifact, error) {
 	var artifact AIChatArtifact
 	err := r.db.QueryRow(ctx, `
 		SELECT a.id, a.session_id, a.run_id, a.artifact_type, a.title, a.status,
 		       COALESCE(a.data, '{}'::jsonb), COALESCE(a.actions, 'null'::jsonb),
-		       COALESCE(a.evidence_refs, 'null'::jsonb), a.review_required, a.created_by,
-		       a.created_at, a.updated_at
+		       COALESCE(a.evidence_refs, '[]'::jsonb), a.schema_version, a.evidence_complete,
+		       COALESCE(a.review_reasons, '[]'::jsonb), a.model_version, a.rule_version,
+		       a.review_required, a.created_by, a.created_at, a.updated_at
 		FROM ai_chat_artifacts a
 		INNER JOIN ai_chat_sessions s ON s.id = a.session_id
 		WHERE a.id = $1 AND s.user_id = $2
 	`, artifactID, userID).Scan(
 		&artifact.ID, &artifact.SessionID, &artifact.RunID, &artifact.ArtifactType, &artifact.Title, &artifact.Status,
-		&artifact.Data, &artifact.Actions, &artifact.EvidenceRefs, &artifact.ReviewRequired, &artifact.CreatedBy,
+		&artifact.Data, &artifact.Actions, &artifact.EvidenceRefs, &artifact.SchemaVersion, &artifact.EvidenceComplete,
+		&artifact.ReviewReasons, &artifact.ModelVersion, &artifact.RuleVersion, &artifact.ReviewRequired, &artifact.CreatedBy,
 		&artifact.CreatedAt, &artifact.UpdatedAt,
 	)
 	if err != nil {
@@ -553,8 +701,9 @@ func (r *AIChatRuntimeRepository) ListArtifactsBySession(ctx context.Context, se
 	rows, err := r.db.Query(ctx, `
 		SELECT id, session_id, run_id, artifact_type, title, status,
 		       COALESCE(data, '{}'::jsonb), COALESCE(actions, 'null'::jsonb),
-		       COALESCE(evidence_refs, 'null'::jsonb), review_required, created_by,
-		       created_at, updated_at
+		       COALESCE(evidence_refs, '[]'::jsonb), schema_version, evidence_complete,
+		       COALESCE(review_reasons, '[]'::jsonb), model_version, rule_version,
+		       review_required, created_by, created_at, updated_at
 		FROM ai_chat_artifacts
 		WHERE session_id = $1
 		ORDER BY created_at ASC
@@ -570,7 +719,8 @@ func (r *AIChatRuntimeRepository) ListArtifactsBySession(ctx context.Context, se
 		var artifact AIChatArtifact
 		if err := rows.Scan(
 			&artifact.ID, &artifact.SessionID, &artifact.RunID, &artifact.ArtifactType, &artifact.Title, &artifact.Status,
-			&artifact.Data, &artifact.Actions, &artifact.EvidenceRefs, &artifact.ReviewRequired, &artifact.CreatedBy,
+			&artifact.Data, &artifact.Actions, &artifact.EvidenceRefs, &artifact.SchemaVersion, &artifact.EvidenceComplete,
+			&artifact.ReviewReasons, &artifact.ModelVersion, &artifact.RuleVersion, &artifact.ReviewRequired, &artifact.CreatedBy,
 			&artifact.CreatedAt, &artifact.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan ai chat artifact: %w", err)
@@ -608,6 +758,46 @@ func (r *AIChatRuntimeRepository) RecordReviewAction(ctx context.Context, action
 		return fmt.Errorf("failed to record ai chat review action: %w", err)
 	}
 	return nil
+}
+
+// CommitReviewAction makes the review audit row and Artifact state transition
+// one database transaction. The business Draft Service intentionally remains
+// a separate idempotent boundary; this method closes the runtime-side gap so
+// an action can never be durable while its Artifact status is stale (or vice
+// versa).
+func (r *AIChatRuntimeRepository) CommitReviewAction(ctx context.Context, action *AIChatReviewAction, status string) error {
+	if r == nil || r.db == nil {
+		return fmt.Errorf("AI chat runtime database is unavailable")
+	}
+	beginner, ok := r.db.(interface {
+		Begin(context.Context) (pgx.Tx, error)
+	})
+	if !ok {
+		return fmt.Errorf("AI chat runtime database does not support transactions")
+	}
+	tx, err := beginner.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin AI agent review transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	txRepo := &AIChatRuntimeRepository{db: tx}
+	if err := txRepo.RecordReviewAction(ctx, action); err != nil {
+		return err
+	}
+	if err := txRepo.UpdateArtifactStatus(ctx, actionArtifactID(action), status); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit AI agent review transaction: %w", err)
+	}
+	return nil
+}
+
+func actionArtifactID(action *AIChatReviewAction) string {
+	if action == nil || action.ArtifactID == nil {
+		return ""
+	}
+	return *action.ArtifactID
 }
 
 func (r *AIChatRuntimeRepository) GetReviewActionByID(ctx context.Context, actionID, userID string) (*AIChatReviewAction, error) {

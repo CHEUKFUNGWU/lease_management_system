@@ -9,7 +9,10 @@ type EvidenceLocator struct {
 	Field       string    `json:"field"`
 	Source      string    `json:"source"`
 	Page        *int      `json:"page"`
+	Sheet       string    `json:"sheet,omitempty"`
+	CellRange   string    `json:"cell_range,omitempty"`
 	Coordinates []float64 `json:"coordinates"`
+	FileHash    string    `json:"file_hash,omitempty"`
 	Quote       string    `json:"quote"`
 }
 
@@ -17,6 +20,7 @@ type Evidence struct {
 	SourceFileID  string            `json:"source_file_id"`
 	ObjectName    string            `json:"object_name"`
 	ContentType   string            `json:"content_type"`
+	FileHash      string            `json:"file_hash,omitempty"`
 	Locators      []EvidenceLocator `json:"locators"`
 	Complete      bool              `json:"complete"`
 	MissingReason string            `json:"missing_reason"`
@@ -103,4 +107,22 @@ type ContractBatchDraft struct {
 	IntakeMetadata
 	Contracts  []ContractDraftData `json:"contracts"`
 	TotalCount int                 `json:"total_count"`
+}
+
+type EventDraftData struct {
+	ContractID         string                 `json:"contract_id"`
+	ContractNumber     string                 `json:"contract_number"`
+	EventType          string                 `json:"event_type"`
+	EffectiveDate      string                 `json:"effective_date"`
+	OriginalValue      *string                `json:"original_value,omitempty"`
+	NewValue           *string                `json:"new_value,omitempty"`
+	ChangeReason       string                 `json:"change_reason"`
+	JudgmentBasis      string                 `json:"judgment_basis"`
+	RevisionParameters map[string]interface{} `json:"revision_parameters"`
+	FieldConfidence    map[string]float64     `json:"field_confidence"`
+}
+
+type EventDraft struct {
+	IntakeMetadata
+	Event EventDraftData `json:"event"`
 }

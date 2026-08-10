@@ -53,6 +53,8 @@ export default function AuditLogsPage() {
   const [tableName, setTableName] = useState("");
   const [action, setAction] = useState("");
   const [recordId, setRecordId] = useState("");
+  const [runId, setRunId] = useState("");
+  const [toolName, setToolName] = useState("");
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
 
   // i18n option arrays
@@ -119,6 +121,8 @@ export default function AuditLogsPage() {
       if (tableName) params.table_name = tableName;
       if (action) params.action = action;
       if (recordId) params.record_id = recordId;
+      if (runId) params.run_id = runId;
+      if (toolName) params.tool_name = toolName;
       if (dateRange && dateRange[0]) params.start_date = dateRange[0].format("YYYY-MM-DD");
       if (dateRange && dateRange[1]) params.end_date = dateRange[1].format("YYYY-MM-DD");
 
@@ -130,7 +134,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, tableName, action, recordId, dateRange]);
+  }, [token, tableName, action, recordId, runId, toolName, dateRange]);
 
   useEffect(() => {
     fetchLogs(1, pagination.pageSize);
@@ -145,6 +149,8 @@ export default function AuditLogsPage() {
     setTableName("");
     setAction("");
     setRecordId("");
+    setRunId("");
+    setToolName("");
     setDateRange(null);
   };
 
@@ -296,6 +302,24 @@ export default function AuditLogsPage() {
                   value={recordId}
                   onChange={(e) => setRecordId(e.target.value)}
                   placeholder={t("audit.filter_record_placeholder", language)}
+                  allowClear
+                />
+              </Col>
+              <Col xs={24} sm={6}>
+                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_run_id", language)}</span>
+                <Input
+                  value={runId}
+                  onChange={(e) => setRunId(e.target.value)}
+                  placeholder={t("audit.filter_run_placeholder", language)}
+                  allowClear
+                />
+              </Col>
+              <Col xs={24} sm={6}>
+                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_tool_name", language)}</span>
+                <Input
+                  value={toolName}
+                  onChange={(e) => setToolName(e.target.value)}
+                  placeholder={t("audit.filter_tool_placeholder", language)}
                   allowClear
                 />
               </Col>

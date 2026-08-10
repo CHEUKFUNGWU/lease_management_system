@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.services.llm import llm_client
-from app.routers import files, parse, chat
+from app.routers import agent_plan, files, parse, chat
 
 
 @asynccontextmanager
@@ -38,13 +38,18 @@ app.add_middleware(
 app.include_router(files.router, prefix="/api/v1", tags=["files"])
 app.include_router(parse.router, prefix="/api/v1", tags=["parse"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
+app.include_router(agent_plan.router, prefix="/api/v1", tags=["agent-planner"])
 
 
 @app.get("/health")
 async def health_check():
+    settings = get_settings()
+    pricing_configured = settings.llm_pricing_version.strip().lower() != "unconfigured"
     return {
         "status": "ok",
         "service": "ai-service",
-        "provider": get_settings().llm_provider,
-        "model": llm_client.get_model_name()
+        "provider": settings.llm_provider,
+        "model": llm_client.get_model_name(),
+        "pricing_version": settings.llm_pricing_version,
+        "cost_accounting_available": pricing_configured,
     }

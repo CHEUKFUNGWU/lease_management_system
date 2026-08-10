@@ -8,19 +8,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
 const defaultRunTimeout = 4 * time.Minute
 
 type Runtime[T any] struct {
-	store    store
-	planner  Planner
-	executor Executor[T]
-	project  Projector[T]
-	dispatch func(func())
-	timeout  time.Duration
-	now      func() time.Time
+	store        store
+	planner      Planner
+	executor     Executor[T]
+	project      Projector[T]
+	dispatch     func(func())
+	timeout      time.Duration
+	now          func() time.Time
+	reviewCommit ReviewCommitFunc
 }
 
 type preparedRun struct {
@@ -50,7 +52,7 @@ func newRuntime[T any](persistence store, planner Planner, executor Executor[T],
 	}
 	return &Runtime[T]{
 		store: persistence, planner: planner, executor: executor, project: project,
-		dispatch: dispatch, timeout: timeout, now: now,
+		dispatch: dispatch, timeout: timeout, now: now, reviewCommit: options.ReviewCommit,
 	}
 }
 
@@ -81,7 +83,11 @@ func (r *Runtime[T]) Start(ctx context.Context, input Input) (*Started, error) {
 	}
 	started := r.started(prepared, nil)
 	r.dispatch(func() {
-		runCtx, cancel := context.WithTimeout(context.Background(), r.timeout)
+		// Keep authenticated request values (notably the access.Scope installed
+		// by DataScopeMiddleware) while detaching the background run from the
+		// HTTP request cancellation. The old Background() call silently dropped
+		// the scope before asynchronous Agent execution.
+		runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.timeout)
 		defer cancel()
 		r.executeDispatched(runCtx, prepared)
 	})
@@ -270,9 +276,24 @@ func (r *Runtime[T]) complete(ctx context.Context, prepared *preparedRun, result
 		}
 	}
 	for _, draft := range result.Artifacts {
+		data := marshalJSON(draft.Data)
+		artifactProtocol, err := agentartifact.Normalize(agentartifact.Artifact{
+			SchemaVersion: draft.SchemaVersion, ArtifactType: agentartifact.ArtifactType(draft.Type),
+			Title: draft.Title, Status: "ready", Data: data, EvidenceRefs: draft.EvidenceRefs,
+			EvidenceComplete: draft.EvidenceComplete, ReviewRequired: draft.ReviewRequired,
+			ReviewReasons: draft.ReviewReasons, ModelVersion: draft.ModelVersion, RuleVersion: draft.RuleVersion,
+		})
+		if err != nil {
+			return fmt.Errorf("validate AI agent artifact: %w", err)
+		}
+		modelVersion := artifactProtocol.ModelVersion
+		ruleVersion := artifactProtocol.RuleVersion
 		artifact := &repository.AIChatArtifact{
 			SessionID: prepared.session.ID, RunID: prepared.run.ID, ArtifactType: draft.Type,
-			Title: draft.Title, Status: "ready", Data: marshalJSON(draft.Data),
+			Title: draft.Title, Status: "ready", Data: data,
+			SchemaVersion: artifactProtocol.SchemaVersion, EvidenceRefs: marshalJSON(artifactProtocol.EvidenceRefs),
+			EvidenceComplete: artifactProtocol.EvidenceComplete, ReviewReasons: marshalJSON(artifactProtocol.ReviewReasons),
+			ModelVersion: stringPointerOrNil(modelVersion), RuleVersion: stringPointerOrNil(ruleVersion),
 			ReviewRequired: draft.ReviewRequired, CreatedBy: &prepared.input.UserID,
 		}
 		if err := r.store.CreateArtifact(ctx, artifact); err != nil {
@@ -280,7 +301,11 @@ func (r *Runtime[T]) complete(ctx context.Context, prepared *preparedRun, result
 		}
 		if err := r.appendEvent(ctx, prepared, "artifact_ready", map[string]any{
 			"artifact_id": artifact.ID, "artifact_type": artifact.ArtifactType,
-			"title": artifact.Title, "data": draft.Data,
+			"title": artifact.Title, "status": artifact.Status, "schema_version": artifact.SchemaVersion,
+			"data": draft.Data, "evidence_refs": artifactProtocol.EvidenceRefs,
+			"evidence_complete": artifactProtocol.EvidenceComplete, "review_required": artifactProtocol.ReviewRequired,
+			"review_reasons": artifactProtocol.ReviewReasons, "model_version": artifactProtocol.ModelVersion,
+			"rule_version": artifactProtocol.RuleVersion,
 		}, false); err != nil {
 			return err
 		}
@@ -298,6 +323,13 @@ func (r *Runtime[T]) complete(ctx context.Context, prepared *preparedRun, result
 		"status": status, "review_required": result.ReviewRequired,
 		"artifact_present": len(result.Artifacts) > 0,
 	}, true)
+}
+
+func stringPointerOrNil(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func (r *Runtime[T]) fail(ctx context.Context, prepared *preparedRun, result Result, executionErr error) error {

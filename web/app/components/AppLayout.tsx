@@ -53,6 +53,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     "monthly-closing": t("nav.monthly_closing", language as any),
     roi: "ROI 测算",
     "audit-logs": t("nav.audit_logs", language as any),
+    "agent-metrics": t("nav.agent_metrics", language as any),
     settings: t("nav.settings", language as any),
     admin: t("nav.admin", language as any),
     users: "用户管理",
@@ -62,7 +63,8 @@ function getBreadcrumbMap(language: string): Record<string, string> {
 
 // ─── Menu Items ────────────────────────────────────────────────
 
-function useMenuItems(language: string) {
+function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]) {
+  const canViewAgentMetrics = hasRole(user, "admin") || hasRole(user, "auditor");
   return useMemo(
     () => [
       {
@@ -135,13 +137,20 @@ function useMenuItems(language: string) {
         icon: <AuditOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/audit-logs">{t("nav.audit_logs", language as any)}</Link>,
       },
+      ...(canViewAgentMetrics
+        ? [{
+            key: "/agent-metrics",
+            icon: <BarChartOutlined style={{ fontSize: 16 }} />,
+            label: <Link href="/agent-metrics">{t("nav.agent_metrics", language as any)}</Link>,
+          }]
+        : []),
       {
         key: "/settings",
         icon: <SettingOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/settings">{t("nav.settings", language as any)}</Link>,
       },
     ],
-    [language]
+    [canViewAgentMetrics, language]
   );
 }
 
@@ -159,7 +168,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
-  const baseMenuItems = useMenuItems(language);
+  const baseMenuItems = useMenuItems(language, user);
   const adminMenuItem = {
     key: "/admin/users",
     icon: <SafetyOutlined style={{ fontSize: 16 }} />,

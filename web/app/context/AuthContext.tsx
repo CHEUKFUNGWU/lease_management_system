@@ -17,7 +17,7 @@ export function hasRole(user: User | null | undefined, role: string): boolean {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (token: string, user: User) => void;
+  login: (token: string, user: User, refreshToken?: string) => void;
   logout: () => void;
   isLoading: boolean;
 }
@@ -36,11 +36,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
     }
+    const handleTokenRefresh = (event: Event) => {
+      const refreshedToken = (event as CustomEvent<string>).detail;
+      if (refreshedToken) setToken(refreshedToken);
+    };
+    window.addEventListener("auth-token-refreshed", handleTokenRefresh);
     setIsLoading(false);
+    return () => window.removeEventListener("auth-token-refreshed", handleTokenRefresh);
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  const login = (newToken: string, newUser: User, newRefreshToken?: string) => {
     localStorage.setItem("token", newToken);
+    if (newRefreshToken) localStorage.setItem("refresh_token", newRefreshToken);
     localStorage.setItem("user", JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
@@ -48,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
     setToken(null);
     setUser(null);

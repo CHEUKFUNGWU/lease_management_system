@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/draftapp"
 )
 
 type CreateAIChatSessionRequest struct {
@@ -40,6 +42,12 @@ type CreateAIChatReviewActionRequest struct {
 	ActionPayload map[string]interface{} `json:"action_payload,omitempty"`
 	Comment       string                 `json:"comment,omitempty"`
 	FollowUp      *AIChatFollowUpRequest `json:"follow_up,omitempty"`
+}
+
+type RetryAIChatDraftBatchRequest struct {
+	ArtifactID    string                 `json:"artifact_id" binding:"required"`
+	ActionPayload map[string]interface{} `json:"action_payload,omitempty"`
+	Comment       string                 `json:"comment,omitempty"`
 }
 
 func aiReviewActionPermission(actionType string) (string, bool) {
@@ -300,16 +308,43 @@ func (h *AIChatHandler) ListRunEvents(c *gin.Context) {
 }
 
 func (h *AIChatHandler) StreamRunEvents(c *gin.Context) {
-	userID, ok := c.Get("user_id")
-	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user context"})
+	runID := c.Param("id")
+	workerID, leaseToken, isWorker, workerErr := workerLeaseHeaders(c)
+	if workerErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": workerErr.Error()})
 		return
 	}
-	userIDStr, _ := userID.(string)
-	runID := c.Param("id")
-
-	run, err := h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDStr)
-	if err != nil {
+	var run *repository.AIChatRun
+	var err error
+	var listEvents func(context.Context, int, int) ([]*repository.AIChatRunEvent, error)
+	if isWorker {
+		permissionsValue, _ := c.Get("permissions")
+		permissions, _ := permissionsValue.([]string)
+		if !middleware.HasPermission(permissions, "agent_runtime", "worker") && !middleware.HasPermission(permissions, "*", "*") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "agent worker permission is required"})
+			return
+		}
+		if h == nil || h.workerRuns == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "agent worker run store unavailable"})
+			return
+		}
+		run, err = h.workerRuns.GetClaimedRun(c.Request.Context(), runID, workerID, leaseToken)
+		listEvents = func(ctx context.Context, after, limit int) ([]*repository.AIChatRunEvent, error) {
+			return h.workerRuns.ListClaimedRunEvents(ctx, runID, workerID, leaseToken, after, limit)
+		}
+	} else {
+		userID, ok := c.Get("user_id")
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user context"})
+			return
+		}
+		userIDStr, _ := userID.(string)
+		run, err = h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDStr)
+		listEvents = func(ctx context.Context, after, limit int) ([]*repository.AIChatRunEvent, error) {
+			return h.runtimeRepo.ListRunEvents(ctx, runID, after, limit)
+		}
+	}
+	if err != nil || run == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "ai chat run not found"})
 		return
 	}
@@ -335,7 +370,7 @@ func (h *AIChatHandler) StreamRunEvents(c *gin.Context) {
 	defer ticker.Stop()
 
 	for {
-		events, err := h.runtimeRepo.ListRunEvents(c.Request.Context(), runID, afterSequence, 200)
+		events, err := listEvents(c.Request.Context(), afterSequence, 200)
 		if err != nil {
 			_ = writeSSEEvent(c, "error", gin.H{"error": "failed to list ai chat run events"})
 			return
@@ -385,12 +420,14 @@ func (h *AIChatHandler) CreateContinuation(c *gin.Context) {
 
 	role, _ := c.Get("role")
 	roleString, _ := role.(string)
+	permissionValue, _ := c.Get("permissions")
+	permissions, _ := permissionValue.([]string)
 	started, err := h.agentRuntime.Continue(c.Request.Context(), aichat.ContinueCommand{
 		Target:      aichat.Target{Type: req.Target.Type, ID: req.Target.ID},
 		Instruction: req.Instruction, ContractID: req.ContractID,
 		Language: req.Language, PageContext: req.PageContext,
 		UserID: userIDStr, LegalEntityID: middleware.GetTenantID(c),
-		Role: roleString, AuthHeader: c.GetHeader("Authorization"),
+		Role: roleString, Permissions: append([]string(nil), permissions...), AuthHeader: c.GetHeader("Authorization"),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create ai chat continuation: " + err.Error()})
@@ -435,6 +472,11 @@ func (h *AIChatHandler) CreateReviewAction(c *gin.Context) {
 		ArtifactID: c.Param("id"), ActionType: req.ActionType,
 		ActionPayload: req.ActionPayload, Comment: req.Comment, UserID: userIDStr,
 	}
+	_, artifactErr := h.runtimeRepo.GetArtifactByID(c.Request.Context(), command.ArtifactID, userIDStr)
+	if artifactErr != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "AI draft artifact not found"})
+		return
+	}
 	if req.FollowUp != nil {
 		role, _ := c.Get("role")
 		roleString, _ := role.(string)
@@ -450,9 +492,16 @@ func (h *AIChatHandler) CreateReviewAction(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record ai chat review action: " + err.Error()})
 		return
 	}
+	var draftResult *draftapp.BatchResult
+	if committed, ok := result.CommitResult.(*draftapp.BatchResult); ok {
+		draftResult = committed
+	}
 	response := gin.H{
 		"action":   result.Action,
 		"artifact": gin.H{"id": result.ArtifactID, "status": result.ArtifactStatus},
+	}
+	if draftResult != nil {
+		response["draft_result"] = draftResult
 	}
 	if result.FollowUp != nil {
 		response["run"] = result.FollowUp.Run
@@ -464,4 +513,102 @@ func (h *AIChatHandler) CreateReviewAction(c *gin.Context) {
 		response["continuation"] = result.FollowUp.Continuation
 	}
 	c.JSON(http.StatusCreated, response)
+}
+
+// RetryDraftBatch replays only the selected items of an existing partial
+// batch. The artifact remains the review/audit anchor; idempotency in the
+// application service prevents already-created drafts from being duplicated.
+func (h *AIChatHandler) RetryDraftBatch(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user context"})
+		return
+	}
+	userIDStr, _ := userID.(string)
+	permissionsValue, _ := c.Get("permissions")
+	permissions, _ := permissionsValue.([]string)
+	if !middleware.HasPermission(permissions, "ai_drafts", "confirm") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions", "required": "ai_drafts:confirm"})
+		return
+	}
+	var req RetryAIChatDraftBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), req.ArtifactID, userIDStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "AI draft artifact not found"})
+		return
+	}
+	if req.ActionPayload == nil {
+		req.ActionPayload = map[string]interface{}{}
+	}
+	if batchID := strings.TrimSpace(c.Param("id")); batchID != "" {
+		req.ActionPayload["batch_id"] = batchID
+	}
+	actionType := "import"
+	if artifact.ArtifactType == "contract_draft" {
+		actionType = "create_draft"
+	}
+	if artifact.ArtifactType != "contract_draft" && artifact.ArtifactType != "payment_schedule_draft" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "artifact is not a retryable draft"})
+		return
+	}
+	reviewResult, err := h.agentRuntime.Review(c.Request.Context(), aichat.ReviewCommand{
+		ArtifactID: artifact.ID, ActionType: actionType, ActionPayload: req.ActionPayload,
+		Comment: req.Comment, UserID: userIDStr,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record AI draft retry: " + err.Error()})
+		return
+	}
+	var draftResult *draftapp.BatchResult
+	if committed, ok := reviewResult.CommitResult.(*draftapp.BatchResult); ok {
+		draftResult = committed
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"action": reviewResult.Action, "artifact": gin.H{"id": reviewResult.ArtifactID, "status": reviewResult.ArtifactStatus},
+		"draft_result": draftResult,
+	})
+}
+
+type aiChatRunEventWriter interface {
+	GetNextRunEventSequence(context.Context, string) (int, error)
+	AppendRunEvent(context.Context, *repository.AIChatRunEvent) error
+}
+
+func (h *AIChatHandler) appendDraftBatchEvent(ctx context.Context, artifact *repository.AIChatArtifact, action string, result *draftapp.BatchResult) error {
+	if h == nil || artifact == nil || result == nil {
+		return nil
+	}
+	writer, ok := h.runtimeRepo.(aiChatRunEventWriter)
+	if !ok || strings.TrimSpace(artifact.RunID) == "" {
+		return nil
+	}
+	return appendDraftBatchEventToWriter(ctx, writer, artifact, action, result)
+}
+
+func appendDraftBatchEventToWriter(ctx context.Context, writer aiChatRunEventWriter, artifact *repository.AIChatArtifact, action string, result *draftapp.BatchResult) error {
+	if writer == nil || artifact == nil || result == nil {
+		return nil
+	}
+	sequence, err := writer.GetNextRunEventSequence(ctx, artifact.RunID)
+	if err != nil {
+		return err
+	}
+	payload := map[string]interface{}{
+		"action": action, "artifact_id": artifact.ID, "batch_id": result.BatchID,
+		"operation": result.Operation, "status": result.Status,
+		"created_count": result.CreatedCount, "replayed_count": result.ReplayedCount,
+		"failed_count": result.FailedCount,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return writer.AppendRunEvent(ctx, &repository.AIChatRunEvent{
+		RunID: artifact.RunID, SessionID: artifact.SessionID, SequenceNo: sequence,
+		EventType: "draft_batch", Payload: raw, IsTerminal: false,
+	})
 }

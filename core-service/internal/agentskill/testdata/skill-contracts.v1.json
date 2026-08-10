@@ -1,0 +1,7 @@
+[
+  {"id":"excel_ledger","version":"v1","allowed_tools":["lease.file.parse_contract_batch","lease.contract.draft.create"],"artifact_types":["contract_draft"],"review_required":true,"confirm_action":"create_draft"},
+  {"id":"contract_review","version":"v1","allowed_tools":["lease.file.parse_contract","lease.contract.get","lease.measurement.list","lease.event.list","lease.journal.list"],"artifact_types":["report_explanation","data_quality_issue_list"],"review_required":true,"confirm_action":"confirm_review"},
+  {"id":"payment_schedule","version":"v1","allowed_tools":["lease.file.parse_payment_schedule","lease.payment_schedule.draft.create"],"artifact_types":["payment_schedule_draft"],"review_required":true,"confirm_action":"import_draft"},
+  {"id":"event_change","version":"v1","allowed_tools":["lease.file.parse_event","lease.event.draft.create","lease.contract.get","lease.event.list"],"artifact_types":["event_draft","data_quality_issue_list"],"review_required":true,"confirm_action":"review_ai_draft"},
+  {"id":"audit_pack","version":"v1","allowed_tools":["lease.contract.get","lease.measurement.list","lease.event.list","lease.journal.list"],"artifact_types":["audit_pack","data_quality_issue_list"],"review_required":true,"confirm_action":"confirm_audit_scope"}
+]

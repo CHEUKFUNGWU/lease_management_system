@@ -5,6 +5,35 @@ interface RequestOptions extends RequestInit {
   token?: string;
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return null;
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data.token) return null;
+        localStorage.setItem("token", data.token);
+        if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+        window.dispatchEvent(new CustomEvent("auth-token-refreshed", { detail: data.token }));
+        return data.token as string;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
 export async function apiRequest(
   endpoint: string,
   options: RequestOptions = {}
@@ -20,10 +49,23 @@ export async function apiRequest(
     headers["Authorization"] = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  const fetchRequest = (accessToken?: string) => {
+    const requestHeaders = { ...headers };
+    if (accessToken) requestHeaders["Authorization"] = `Bearer ${accessToken}`;
+    else delete requestHeaders["Authorization"];
+    return fetch(url, { ...options, headers: requestHeaders });
+  };
+
+  let response = await fetchRequest(options.token);
+  if (
+    response.status === 401 &&
+    options.token &&
+    !endpoint.startsWith("/api/v1/auth/") &&
+    (options.body === undefined || typeof options.body === "string")
+  ) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) response = await fetchRequest(refreshedToken);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -68,6 +110,12 @@ export const authApi = {
       body: JSON.stringify({ username, password }),
     }),
 
+  refresh: (refreshToken: string) =>
+    apiRequest("/api/v1/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }),
+
   register: (username: string, email: string, password: string, role: string, legalEntityId?: string) =>
     apiRequest("/api/v1/auth/register", {
       method: "POST",
@@ -76,6 +124,21 @@ export const authApi = {
 
   me: (token: string) =>
     apiRequest("/api/v1/me", { token }),
+
+  listSessions: (token: string) =>
+    apiRequest("/api/v1/auth/sessions", { token }),
+
+  revokeSession: (sessionId: string, token: string) =>
+    apiRequest(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  logoutAll: (token: string) =>
+    apiRequest("/api/v1/auth/logout-all", {
+      method: "POST",
+      token,
+    }),
 };
 
 // Admin APIs
@@ -576,6 +639,20 @@ export const aiChatApi = {
       token,
     }),
 
+  getDraftBatch: (batchId: string, token: string) =>
+    apiRequest(`/api/v1/ai/chat/draft-batches/${encodeURIComponent(batchId)}`, { token }),
+
+  retryDraftBatch: (batchId: string, data: {
+    artifact_id: string;
+    action_payload?: Record<string, any>;
+    comment?: string;
+  }, token: string) =>
+    apiRequest(`/api/v1/ai/chat/draft-batches/${encodeURIComponent(batchId)}/retry`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
   createContinuation: (data: {
     target: {
       type: "run" | "message" | "artifact" | "action";
@@ -624,6 +701,48 @@ export const aiChatApi = {
       body: JSON.stringify(data),
       token,
     }),
+
+  getRunTrace: (runId: string, token: string) =>
+    apiRequest(`/api/v1/ai/chat/runs/${encodeURIComponent(runId)}/trace`, { token }),
+
+  cancelRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      token,
+    }),
+
+  steerRun: (runId: string, instruction: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/steer`, {
+      method: "POST",
+      body: JSON.stringify({ instruction }),
+      token,
+    }),
+
+  followUpRun: (runId: string, instruction: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/follow-up`, {
+      method: "POST",
+      body: JSON.stringify({ instruction }),
+      token,
+    }),
+
+  branchRun: (runId: string, message: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/branch`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+      token,
+    }),
+};
+
+// Persisted Planner usage is intentionally separate from process-local Tool
+// metrics. The Core endpoint derives user and tenant scope from the JWT.
+export const agentUsageApi = {
+  summary: (token: string, params?: { from?: string; to?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.from) qs.append("from", params.from);
+    if (params?.to) qs.append("to", params.to);
+    const query = qs.toString();
+    return apiRequest(`/api/v1/agent/usage${query ? `?${query}` : ""}`, { token });
+  },
 };
 
 // Report APIs
@@ -789,6 +908,10 @@ export const auditApi = {
     record_id?: string;
     action?: string;
     changed_by?: string;
+    run_id?: string;
+    tool_name?: string;
+    trace_id?: string;
+    status?: string;
     start_date?: string;
     end_date?: string;
     limit?: number;

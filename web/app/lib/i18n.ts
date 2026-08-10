@@ -45,6 +45,121 @@ const dict: TranslationDict = {
     "zh-HK": "審計日誌",
     en: "Audit Logs",
   },
+  "nav.agent_metrics": {
+    "zh-CN": "Agent 运营",
+    "zh-HK": "Agent 運營",
+    en: "Agent Operations",
+  },
+  "agent_metrics.title": {
+    "zh-CN": "Agent 运营与用量",
+    "zh-HK": "Agent 運營與用量",
+    en: "Agent Operations & Usage",
+  },
+  "agent_metrics.description": {
+    "zh-CN": "查看当前权限范围内 Planner 跨 Run 的调用、Token 和成本核算状态。数据来自持久化 Trace，不展示业务数据或敏感提示词。",
+    "zh-HK": "查看當前權限範圍內 Planner 跨 Run 的調用、Token 和成本核算狀態。數據來自持久化 Trace，不展示業務數據或敏感提示詞。",
+    en: "Review Planner calls, tokens, and cost-accounting status across Runs in your authorized scope. The data comes from persisted traces and excludes business data and sensitive prompts.",
+  },
+  "agent_metrics.range_24h": {
+    "zh-CN": "最近 24 小时",
+    "zh-HK": "最近 24 小時",
+    en: "Last 24 hours",
+  },
+  "agent_metrics.range_7d": {
+    "zh-CN": "最近 7 天",
+    "zh-HK": "最近 7 天",
+    en: "Last 7 days",
+  },
+  "agent_metrics.range_31d": {
+    "zh-CN": "最近 31 天",
+    "zh-HK": "最近 31 天",
+    en: "Last 31 days",
+  },
+  "agent_metrics.refresh": {
+    "zh-CN": "刷新",
+    "zh-HK": "刷新",
+    en: "Refresh",
+  },
+  "agent_metrics.permission_required": {
+    "zh-CN": "需要管理员或审计查看权限",
+    "zh-HK": "需要管理員或審計查看權限",
+    en: "Administrator or auditor access is required",
+  },
+  "agent_metrics.load_failed": {
+    "zh-CN": "Agent 用量加载失败",
+    "zh-HK": "Agent 用量加載失敗",
+    en: "Failed to load Agent usage",
+  },
+  "agent_metrics.calls": {
+    "zh-CN": "Planner 调用次数",
+    "zh-HK": "Planner 調用次數",
+    en: "Planner calls",
+  },
+  "agent_metrics.input_tokens": {
+    "zh-CN": "输入 Token",
+    "zh-HK": "輸入 Token",
+    en: "Input tokens",
+  },
+  "agent_metrics.output_tokens": {
+    "zh-CN": "输出 Token",
+    "zh-HK": "輸出 Token",
+    en: "Output tokens",
+  },
+  "agent_metrics.provider": {
+    "zh-CN": "供应商",
+    "zh-HK": "供應商",
+    en: "Provider",
+  },
+  "agent_metrics.model": {
+    "zh-CN": "模型",
+    "zh-HK": "模型",
+    en: "Model",
+  },
+  "agent_metrics.pricing_version": {
+    "zh-CN": "价格版本",
+    "zh-HK": "價格版本",
+    en: "Pricing version",
+  },
+  "agent_metrics.tokens": {
+    "zh-CN": "总 Token",
+    "zh-HK": "總 Token",
+    en: "Total tokens",
+  },
+  "agent_metrics.cost_status": {
+    "zh-CN": "成本状态",
+    "zh-HK": "成本狀態",
+    en: "Cost status",
+  },
+  "agent_metrics.cost": {
+    "zh-CN": "成本（USD）",
+    "zh-HK": "成本（USD）",
+    en: "Cost (USD)",
+  },
+  "agent_metrics.cost_unavailable": {
+    "zh-CN": "成本暂不可用",
+    "zh-HK": "成本暫不可用",
+    en: "Cost accounting is unavailable",
+  },
+  "agent_metrics.cost_unavailable_desc": {
+    "zh-CN": "部分 Planner 事件缺少可验证的价格版本或成本数据。系统保留 Token 用量，并明确显示 unavailable，不会猜测金额。",
+    "zh-HK": "部分 Planner 事件缺少可驗證的價格版本或成本數據。系統保留 Token 用量，並明確顯示 unavailable，不會猜測金額。",
+    en: "Some Planner events lack a verifiable pricing version or cost value. Token usage remains visible, while cost stays unavailable instead of being guessed.",
+  },
+  "agent_metrics.breakdown": {
+    "zh-CN": "按供应商与模型汇总",
+    "zh-HK": "按供應商與模型匯總",
+    en: "Breakdown by provider and model",
+  },
+  "agent_metrics.empty": {
+    "zh-CN": "所选期间暂无 Planner 用量",
+    "zh-HK": "所選期間暫無 Planner 用量",
+    en: "No Planner usage in the selected period",
+  },
+  "agent_metrics.audit_note": {
+    "zh-CN": "口径：仅统计服务端写入的 planner_usage 事件；范围由当前登录身份和法人权限决定；成本以微美元持久化，只有 measured/calculated 才会展示金额。",
+    "zh-HK": "口徑：僅統計服務端寫入的 planner_usage 事件；範圍由當前登入身份和法人權限決定；成本以微美元持久化，只有 measured/calculated 才會展示金額。",
+    en: "Scope: server-generated planner_usage events only. The current identity and legal-entity permissions define visibility. Costs are persisted in micros and shown only for measured/calculated statuses.",
+  },
   "nav.settings": {
     "zh-CN": "设置",
     "zh-HK": "設置",
@@ -3829,6 +3944,91 @@ const dict: TranslationDict = {
     "zh-HK": "標籤總管",
     en: "Tag Manager",
   },
+  "settings.group_device_sessions": {
+    "zh-CN": "设备会话",
+    "zh-HK": "設備會話",
+    en: "Device Sessions",
+  },
+  "settings.device_sessions_desc": {
+    "zh-CN": "查看当前账号的登录设备，并撤销不再信任的 refresh session。",
+    "zh-HK": "查看當前帳號的登入設備，並撤銷不再信任的 refresh session。",
+    en: "View signed-in devices and revoke refresh sessions you no longer trust.",
+  },
+  "settings.sessions_refresh": {
+    "zh-CN": "刷新",
+    "zh-HK": "刷新",
+    en: "Refresh",
+  },
+  "settings.sessions_logout_all": {
+    "zh-CN": "撤销全部会话",
+    "zh-HK": "撤銷全部會話",
+    en: "Revoke All Sessions",
+  },
+  "settings.sessions_empty": {
+    "zh-CN": "暂无设备会话",
+    "zh-HK": "暫無設備會話",
+    en: "No device sessions",
+  },
+  "settings.session_created": {
+    "zh-CN": "登录时间",
+    "zh-HK": "登入時間",
+    en: "Signed in",
+  },
+  "settings.session_device": {
+    "zh-CN": "设备信息",
+    "zh-HK": "設備資訊",
+    en: "Device",
+  },
+  "settings.session_ip": {
+    "zh-CN": "IP 地址",
+    "zh-HK": "IP 地址",
+    en: "IP address",
+  },
+  "settings.session_status": {
+    "zh-CN": "状态",
+    "zh-HK": "狀態",
+    en: "Status",
+  },
+  "settings.session_active": {
+    "zh-CN": "有效",
+    "zh-HK": "有效",
+    en: "Active",
+  },
+  "settings.session_revoked_status": {
+    "zh-CN": "已撤销",
+    "zh-HK": "已撤銷",
+    en: "Revoked",
+  },
+  "settings.session_revoke": {
+    "zh-CN": "撤销",
+    "zh-HK": "撤銷",
+    en: "Revoke",
+  },
+  "settings.sessions_load_failed": {
+    "zh-CN": "设备会话加载失败",
+    "zh-HK": "設備會話加載失敗",
+    en: "Failed to load device sessions",
+  },
+  "settings.session_revoked": {
+    "zh-CN": "设备会话已撤销",
+    "zh-HK": "設備會話已撤銷",
+    en: "Device session revoked",
+  },
+  "settings.session_revoke_failed": {
+    "zh-CN": "设备会话撤销失败",
+    "zh-HK": "設備會話撤銷失敗",
+    en: "Failed to revoke device session",
+  },
+  "settings.sessions_revoked": {
+    "zh-CN": "全部设备会话已撤销",
+    "zh-HK": "全部設備會話已撤銷",
+    en: "All device sessions revoked",
+  },
+  "settings.sessions_revoke_failed": {
+    "zh-CN": "全部设备会话撤销失败",
+    "zh-HK": "全部設備會話撤銷失敗",
+    en: "Failed to revoke all device sessions",
+  },
   "settings.description": {
     "zh-CN": "标签用于驱动 IFRS 16 摊销报表的多维度分组与汇总分析",
     "zh-HK": "標籤用於驅動 IFRS 16 攤銷報表的多維度分組與匯總分析",
@@ -4438,6 +4638,26 @@ const dict: TranslationDict = {
     "zh-HK": "UUID 搜索",
     en: "UUID Search",
   },
+  "audit.filter_run_id": {
+    "zh-CN": "Run ID",
+    "zh-HK": "Run ID",
+    en: "Run ID",
+  },
+  "audit.filter_tool_name": {
+    "zh-CN": "Tool 名称",
+    "zh-HK": "Tool 名稱",
+    en: "Tool Name",
+  },
+  "audit.filter_run_placeholder": {
+    "zh-CN": "运行 ID 搜索",
+    "zh-HK": "運行 ID 搜索",
+    en: "Run ID Search",
+  },
+  "audit.filter_tool_placeholder": {
+    "zh-CN": "例如 lease.contract.get",
+    "zh-HK": "例如 lease.contract.get",
+    en: "e.g. lease.contract.get",
+  },
   "audit.filter_time_range": {
     "zh-CN": "时间范围",
     "zh-HK": "時間範圍",
@@ -5013,6 +5233,81 @@ const dict: TranslationDict = {
     "zh-CN": "Agent 技能执行轨迹",
     "zh-HK": "Agent 技能執行軌跡",
     en: "Agent Skill Trace",
+  },
+  "ai.view_trace": {
+    "zh-CN": "查看 Trace",
+    "zh-HK": "查看 Trace",
+    en: "View Trace",
+  },
+  "ai.agent_trace_empty": {
+    "zh-CN": "暂无可用的运行轨迹",
+    "zh-HK": "暫無可用的運行軌跡",
+    en: "No run trace is available",
+  },
+  "ai.confirm": {
+    "zh-CN": "确认",
+    "zh-HK": "確認",
+    en: "Confirm",
+  },
+  "ai.run_cancel_title": {
+    "zh-CN": "取消 Agent 运行",
+    "zh-HK": "取消 Agent 運行",
+    en: "Cancel Agent Run",
+  },
+  "ai.run_cancel_content": {
+    "zh-CN": "确定要取消当前运行吗？",
+    "zh-HK": "確定要取消目前運行嗎？",
+    en: "Cancel the current run?",
+  },
+  "ai.run_cancel": {
+    "zh-CN": "取消运行",
+    "zh-HK": "取消運行",
+    en: "Cancel Run",
+  },
+  "ai.run_steer_title": {
+    "zh-CN": "调整 Agent 运行方向",
+    "zh-HK": "調整 Agent 運行方向",
+    en: "Steer Agent Run",
+  },
+  "ai.run_follow_up_title": {
+    "zh-CN": "创建运行后续任务",
+    "zh-HK": "建立運行後續任務",
+    en: "Create Run Follow-up",
+  },
+  "ai.run_branch_title": {
+    "zh-CN": "从运行检查点创建分支",
+    "zh-HK": "從運行檢查點建立分支",
+    en: "Branch from Run Checkpoint",
+  },
+  "ai.run_control_placeholder": {
+    "zh-CN": "输入指令",
+    "zh-HK": "輸入指令",
+    en: "Enter an instruction",
+  },
+  "ai.run_control_required": {
+    "zh-CN": "请输入指令",
+    "zh-HK": "請輸入指令",
+    en: "Enter an instruction",
+  },
+  "ai.run_control_sent": {
+    "zh-CN": "运行控制指令已提交",
+    "zh-HK": "運行控制指令已提交",
+    en: "Run control command submitted",
+  },
+  "ai.run_steer": {
+    "zh-CN": "调整方向",
+    "zh-HK": "調整方向",
+    en: "Steer",
+  },
+  "ai.run_follow_up": {
+    "zh-CN": "后续任务",
+    "zh-HK": "後續任務",
+    en: "Follow-up",
+  },
+  "ai.run_branch": {
+    "zh-CN": "创建分支",
+    "zh-HK": "建立分支",
+    en: "Branch",
   },
   "ai.agent_skills": {
     "zh-CN": "Agent skills:",

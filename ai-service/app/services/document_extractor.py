@@ -8,6 +8,8 @@ import logging
 import io
 from typing import Optional
 
+from app.intake.models import EvidenceLocator
+
 from app.services.paddleocr import get_paddleocr_client
 
 try:
@@ -240,3 +242,87 @@ async def extract_text(data: bytes, content_type: str, file_url: Optional[str] =
 
     else:
         raise ValueError(f"不支持的文件类型: {content_type}")
+
+
+async def extract_text_with_evidence(
+    data: bytes, content_type: str
+) -> tuple[str, list[EvidenceLocator]]:
+    """Extract text plus only evidence that the adapter can prove.
+
+    PyMuPDF can provide page bounds for a real PDF text layer. PaddleOCR
+    structured results may additionally provide provider-owned boxes. When
+    OCR has already been attempted, the fallback deliberately stays local so
+    one intake request does not submit the same document twice.
+    """
+    # Ask PaddleOCR for structured evidence in the same request used to
+    # produce the OCR text. The provider may return Markdown without boxes;
+    # that remains useful text but must not be promoted to a coordinate claim.
+    if content_type in (
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/tiff",
+        "image/bmp",
+        "image/webp",
+    ):
+        client = get_paddleocr_client()
+        if client.is_available():
+            try:
+                text, provider_locators = await client.extract_text_with_evidence_from_file(
+                    data,
+                    content_type=("application/pdf" if content_type == "application/pdf" else content_type),
+                )
+                return text, [
+                    EvidenceLocator(
+                        field=f"document.pages[{int(locator['page']) - 1}].blocks",
+                        source=str(locator["source"]),
+                        page=int(locator["page"]),
+                        coordinates=[float(value) for value in locator["coordinates"]],
+                        quote=str(locator["quote"]),
+                    )
+                    for locator in provider_locators
+                    if locator.get("page") and locator.get("coordinates") and locator.get("quote")
+                ]
+            except Exception as exc:
+                logger.info("PaddleOCR structured evidence unavailable, using text fallback: %s", exc)
+
+    if content_type == "application/pdf" and HAS_PYMUPDF:
+        text = extract_text_from_pdf_fallback(data)
+    elif content_type in (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+    ):
+        text = extract_text_from_excel(data)
+    else:
+        text = await extract_text(data, content_type)
+    locators: list[EvidenceLocator] = []
+    if content_type == "application/pdf" and HAS_PYMUPDF:
+        try:
+            document = fitz.open(stream=data, filetype="pdf")
+            try:
+                for page_index, page in enumerate(document, start=1):
+                    words = page.get_text("words")
+                    if not words:
+                        continue
+                    x0 = min(float(word[0]) for word in words)
+                    y0 = min(float(word[1]) for word in words)
+                    x1 = max(float(word[2]) for word in words)
+                    y1 = max(float(word[3]) for word in words)
+                    page_text = " ".join(str(word[4]) for word in words).strip()
+                    if page_text:
+                        locators.append(
+                            EvidenceLocator(
+                                field=f"document.pages[{page_index - 1}]",
+                                source=f"page:{page_index}",
+                                page=page_index,
+                                coordinates=[x0, y0, x1, y1],
+                                quote=page_text[:1000],
+                            )
+                        )
+            finally:
+                document.close()
+        except Exception:
+            # The text result is still useful, but the adapter must remain
+            # conservative about evidence when the locator pass fails.
+            locators = []
+    return text, locators

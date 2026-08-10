@@ -7,10 +7,10 @@
 - 需求阶段已完成（见 `IFRS16_IT_需求文档.md`）
 - MVP 技术架构方案已确定（见 `IFRS16_MVP_技术架构方案.md`）
 - 商业进阶路线图已落地（见 `docs/租赁平台进阶提升方案.md`）
-- **项目已初始化**，5 个 Docker 容器正常运行
+- **项目已初始化**，5 个基础 Docker 容器正常运行；可选 `agent-runner` Worker profile 已完成运行态验证
 - 数据库 26 张表 + 种子数据已部署，`db/init/01_init.sql` 作为容器自动初始化主 schema
 - MVP + 进阶能力已实现：正确性证明、范围闸门、租赁全生命周期管理、AI 对话式录入、ROI、ERP 导出/回写、组合分析、多准则对比、敏感性分析
-- 计量回归报告：20 个用例 / 133 条断言全部通过（见 `docs/IFRS16_计量回归对数报告.md`）
+- 计量回归报告：22 个用例 / 148 条断言全部通过（见 `docs/IFRS16_计量回归对数报告.md`）
 - 注意：回归用例当前标记为 `pending_third_party_review`，仍需第三方会计师线下复核后才能作为正式审计背书
 
 ## 技术栈
@@ -64,7 +64,7 @@
 - 先付租金首期处理：首期付款不形成未来融资成本，进入 ROU 初始成本
 - 变量租金费用化、非租赁成分费用化，避免错误资本化
 - 租赁范围闸门：`in_scope` 资本化；`short_term_exempt` / `low_value_exempt` 直线法费用化；`not_a_lease` 跳过资本化
-- 自动化回归测试：20 个典型场景、133 条断言、一键生成对数报告
+- 自动化回归测试：22 个典型场景、148 条断言、一键生成对数报告
 - 准则映射白皮书：计量方法与 IFRS 16 条款对应关系
 - 月结跑批：计量结果表 + 会计分录表 + 批次表 + 前端四 Tab（生成/分录预览/批次历史/锁账控制）
 - 月结审批/过账工作流：分录草稿 → 审批 → 过账（支持单条和批量）
@@ -107,6 +107,14 @@
 - AI Service 调用 DeepSeek / OpenAI 生成回答，返回引用来源并区分正式数据与 AI 建议
 - 对话式录入主入口：在 `/ai-chat` 上传文件后自动解析，生成结构化合同草稿卡片，人工确认后批量创建草稿合同
 - 保留 `/upload` 传统批量上传路径作为高级/备用入口
+- Agent Gateway 已提供 Session/Run、Tool discovery/execute、Capability、Run Event/SSE、统一 Trace、owner-protected checkpoint/branch、cancel、steer、follow-up、worker claim/heartbeat/release/recovery、终态告警和 Artifact action 路由；`lease-agent` CLI 与 `agent-runner` Pi-like Worker 均只通过 Gateway 调用，不持有数据库、MinIO 或 Shell 权限。Worker 事件/checkpoint/SSE 数据面按 `worker_id + lease_token` 绑定已领取 Run，并与 owner 控制面隔离。`agent-runner --worker-loop --plan <file>` 或 `--planner-url` 可持续领取队列 Run；Core 以不可变 checkpoint metadata、terminal alert outbox 和 Run/Artifact/业务记录 link 支持审计回放
+- Agent Runner 支持 `--planner-url` 调用 AI Service `/api/v1/agent/plan` 生成结构化计划；`docker compose --profile worker up -d --build agent-runner` 提供可选独立 Worker 拓扑，离线环境仍可使用 `--plan` 静态计划
+- 认证刷新：`POST /api/v1/auth/login` 返回短期 access token 和 refresh token；Core 以哈希形式持久化 refresh session、原子轮换并支持 `/api/v1/auth/logout` / 受保护的 `/api/v1/auth/logout-all`、设备会话列表/撤销 API；`POST /api/v1/auth/refresh` 重新读取用户角色/法人，CLI 使用 `lease-agent auth refresh`，Web 在 API 401 时自动刷新，`/settings` 提供设备会话查看/撤销，过期 session 由 Core maintenance 按配置清理
+- 事件文档解析已提供 `lease.file.parse_event` / AI Service `/api/v1/parse/event`，只生成 Assist Mode 事件草稿；扫描件尚未具备可靠页码/坐标时必须 `evidence_complete=false`，不得直接写正式事件
+- 披露审计包可通过 Core `GET /api/v1/reports/close-pack/export?period=YYYY-MM&mode=working|official` 导出，服务端生成统一快照、Disclosure JSON、关账证据、工作底稿 CSV 和 SHA-256 manifest
+- Tool Runtime 监控：`GET /api/v1/agent/metrics` 返回低基数 JSON；`GET /api/v1/agent/metrics/prometheus` 返回 Prometheus 文本，需 `agent_runtime:metrics` 或 `audit_logs:read`
+- 指标当前覆盖 Tool 调用次数、失败/拒绝、Review Gate 和延迟；AI Planner 的 `llm-usage.v1` 通过 `planner_usage` Run Event 记录 token、供应商、模型、价格版本和成本状态。只有 token 完整且价格配置有效时才计算成本，缺失时必须保持 `unavailable`；AI Service 启动时拒绝空版本、负价格和半配置价格簿
+- 管理员/审计员可在 `/agent-metrics` 查看按当前身份和法人范围聚合的跨 Run Planner 用量；Core `GET /api/v1/agent/usage` 只返回聚合 Token/成本状态，不返回业务数据或敏感提示词
 
 ### ROI 与商业化展示
 - ROI 测算页 `/roi`：按合同数量、人力成本、传统处理工时、本系统处理工时估算节省
@@ -132,7 +140,7 @@
 
 | 优先级 | 主题 | 状态 | 关键产出 |
 |--------|------|------|----------|
-| P0 | 正确性证明 | ✅ 已完成 | 20 个回归测试用例、133 条断言、自动化对数报告、准则映射白皮书 |
+| P0 | 正确性证明 | ✅ 已完成 | 22 个回归测试用例、148 条断言、自动化对数报告、准则映射白皮书 |
 | P0 | 范围判定与分流 | ✅ 已完成 | `lease_scope` 字段、AI 初判、计量引擎分流、豁免费用化、披露分列 |
 | P1 | 平台化第一步 | ✅ 已完成 | 集中合同库、附件文档、关键日期提醒、`asset_type`、AI 录入 |
 | P1 | AI 对话式入口第一步 | ✅ 已完成 | `/ai-chat` 上传文件 → 自动解析 → 结构化草稿卡片 → 人工确认入库 |
@@ -300,6 +308,7 @@ lease_management_system/
 │       ├── admin/               # Admin 管理后台（login + users）
 │       ├── contracts/           # 合同列表 / 新增 / [id]详情（合同、付款、事件、计量、日期、文档、义务）
 │       ├── ai-chat/             # AI 录入主入口（上传 → 解析 → 草稿卡片 → 人工确认）
+│       ├── agent-metrics/       # Agent 运营面板（跨 Run Planner 用量与成本状态）
 │       ├── upload/              # 传统批量上传备用入口
 │       ├── reports/             # 报表查询
 │       ├── portfolio/           # 组合分析
@@ -371,7 +380,7 @@ make ifrs16-regression
 - ⚠️ 数据库已重置（2026-05-30），历史测试合同数据需重新创建
 - IFRS 16 计算参考值：初始负债 ¥3,255,676.79，36 个月摊销
 - 月结 2024-01 参考分录：利息 ¥13,318、折旧 ¥92,170、付款 ¥50,000
-- 回归测试参考：20 个用例 / 133 条断言，通过后生成 `docs/IFRS16_计量回归对数报告.md`
+- 回归测试参考：22 个用例 / 148 条断言，通过后生成 `docs/IFRS16_计量回归对数报告.md`
 
 ## 关键设计决策
 

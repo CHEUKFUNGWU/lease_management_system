@@ -92,19 +92,22 @@ func (r *PaymentScheduleRepository) Create(ctx context.Context, ps *PaymentSched
 
 func (r *PaymentScheduleRepository) GetByContractID(ctx context.Context, contractID string) ([]*PaymentSchedule, error) {
 	query := `
-		SELECT id, contract_id, effective_start_date, effective_end_date,
-			coverage_start_date, coverage_end_date, due_date, actual_payment_date,
-			payment_timing, amount, currency, tax_amount, amount_type,
-			is_fixed, is_variable, is_index_adjusted, is_lease_component,
-			is_non_lease_component, included_in_liability_pv,
-			approval_status, is_official_version, reviewed_by, approved_by,
-			created_at, updated_at
-		FROM lease_payment_schedules
-		WHERE contract_id = $1
-		ORDER BY due_date ASC
+		SELECT ps.id, ps.contract_id, ps.effective_start_date, ps.effective_end_date,
+			ps.coverage_start_date, ps.coverage_end_date, ps.due_date, ps.actual_payment_date,
+			ps.payment_timing, ps.amount, ps.currency, ps.tax_amount, ps.amount_type,
+			ps.is_fixed, ps.is_variable, ps.is_index_adjusted, ps.is_lease_component,
+			ps.is_non_lease_component, ps.included_in_liability_pv,
+			ps.approval_status, ps.is_official_version, ps.reviewed_by, ps.approved_by,
+			ps.created_at, ps.updated_at
+		FROM lease_payment_schedules ps
+		JOIN lease_contracts lc ON lc.id = ps.contract_id
+		WHERE ps.contract_id = $1
 	`
+	args := []interface{}{contractID}
+	query, args, _ = appendContractScopePredicate(ctx, query, args, 2, "lc")
+	query += " ORDER BY ps.due_date ASC"
 
-	rows, err := r.db.Query(ctx, query, contractID)
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list payment schedules: %w", err)
 	}

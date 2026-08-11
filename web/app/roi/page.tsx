@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { Card, Col, Input, InputNumber, Row, Statistic, Table, Typography } from "antd";
 import { CalculatorOutlined, ClockCircleOutlined, DollarOutlined, SafetyOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { fmtMoney } from "../lib/format";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export default function RoiPage() {
   const [contracts, setContracts] = useState<number | null>(null);
@@ -64,12 +65,10 @@ export default function RoiPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <div style={{ marginBottom: 24 }}>
-          <Title level={2} style={{ marginBottom: 4, letterSpacing: "-0.04em" }}>
-            ROI 测算
-          </Title>
-          <Text type="secondary">把 AI 录入、月结自动化和审计留痕翻译成可量化的商业价值。</Text>
-        </div>
+        <PageHeader
+          title="ROI 测算"
+          subtitle={`当前假设 · ${contracts == null ? "未设置合同数量" : `${contracts.toLocaleString()} 份合同`} · 可随参数调整`}
+        />
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={8}>

@@ -41,8 +41,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (refreshedToken) setToken(refreshedToken);
     };
     window.addEventListener("auth-token-refreshed", handleTokenRefresh);
+    const handleSessionExpired = () => {
+      localStorage.removeItem("token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+      setToken(null);
+      setUser(null);
+    };
+    window.addEventListener("auth-session-expired", handleSessionExpired);
     setIsLoading(false);
-    return () => window.removeEventListener("auth-token-refreshed", handleTokenRefresh);
+    return () => {
+      window.removeEventListener("auth-token-refreshed", handleTokenRefresh);
+      window.removeEventListener("auth-session-expired", handleSessionExpired);
+    };
   }, []);
 
   const login = (newToken: string, newUser: User, newRefreshToken?: string) => {

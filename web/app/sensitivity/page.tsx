@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Tag, message } from "antd";
 import { CalculatorOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi, reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
+import { useUrlState } from "../hooks/useUrlState";
 
 interface ContractOption {
   id: string;
@@ -30,9 +34,12 @@ interface ScenarioRow {
 
 const fmt = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-export default function SensitivityPage() {
+function SensitivityPage() {
   const { token } = useAuth();
   const [form] = Form.useForm();
+  const [contractParam, setContractParam] = useUrlState("contract_id", "");
+  const [baseRateParam, setBaseRateParam] = useUrlState("base_rate", "");
+  const [shockParam, setShockParam] = useUrlState("shock", "1");
   const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [rows, setRows] = useState<ScenarioRow[]>([]);
   const [meta, setMeta] = useState<any>(null);
@@ -64,6 +71,9 @@ export default function SensitivityPage() {
     setLoading(true);
     try {
       const shock = values.shock_percent / 100;
+      setContractParam(values.contract_id || "");
+      setBaseRateParam(values.base_rate_percent == null ? "" : String(values.base_rate_percent));
+      setShockParam(values.shock_percent == null ? "1" : String(values.shock_percent));
       const res = await reportApi.sensitivity(
         {
           contract_id: values.contract_id,
@@ -85,20 +95,23 @@ export default function SensitivityPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 24 }}>敏感性分析</h1>
-              <div style={{ color: "#6B7280", marginTop: 6 }}>
-                复用 IFRS 16 计量引擎，量化折现率假设变动对初始租赁负债和 ROU 资产的影响。
-              </div>
-            </div>
+            <PageHeader
+              title="敏感性分析"
+              subtitle="复用 IFRS 16 计量引擎，量化折现率假设变动对初始租赁负债和 ROU 资产的影响。"
+            />
 
             <Card>
               <Form
                 form={form}
                 layout="inline"
                 onFinish={runAnalysis}
+                initialValues={{
+                  contract_id: contractParam || undefined,
+                  base_rate_percent: baseRateParam ? Number(baseRateParam) : undefined,
+                  shock_percent: Number(shockParam) || 1,
+                }}
               >
                 <Form.Item name="contract_id" rules={[{ required: true, message: "请选择合同" }]} style={{ minWidth: 320 }}>
                   <Select
@@ -142,12 +155,12 @@ export default function SensitivityPage() {
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="最大上行影响" value={summary.maxUp} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxUp > 0 ? "#CF1322" : undefined }} />
+                  <Statistic title="最大上行影响" value={summary.maxUp} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxUp > 0 ? "var(--state-error-text)" : undefined }} />
                 </Card>
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="最大下行影响" value={summary.maxDown} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxDown < 0 ? "#3F8600" : undefined }} />
+                  <Statistic title="最大下行影响" value={summary.maxDown} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxDown < 0 ? "var(--state-success-text)" : undefined }} />
                 </Card>
               </Col>
             </Row>
@@ -161,7 +174,7 @@ export default function SensitivityPage() {
                       <XAxis dataKey="scenario_name" />
                       <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value || 0), meta?.currency)} />
-                      <Bar dataKey="liability_delta" fill="#1677FF" name="负债变动" />
+                      <Bar isAnimationActive={false} dataKey="liability_delta" fill="var(--chart-blue)" name="负债变动" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -176,7 +189,7 @@ export default function SensitivityPage() {
                 pagination={false}
                 size="small"
                 columns={[
-                  { title: "场景", dataIndex: "scenario_name", width: 100, render: (v: string) => <Tag color={v === "+0.00%" ? "success" : "processing"}>{v}</Tag> },
+                  { title: "场景", dataIndex: "scenario_name", width: 100, render: (v: string) => <StatusTag kind={statusKindFromAntColor(v === "+0.00%" ? "success" : "processing")}>{v}</StatusTag> },
                   { title: "折现率", dataIndex: "discount_rate", width: 100, render: (v: number) => `${(v * 100).toFixed(2)}%` },
                   { title: "初始负债", dataIndex: "initial_liability", align: "right" as const, render: (v: number) => fmt(v) },
                   { title: "ROU 资产", dataIndex: "initial_rou_asset", align: "right" as const, render: (v: number) => fmt(v) },
@@ -189,5 +202,13 @@ export default function SensitivityPage() {
         </motion.div>
       </AppLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function SensitivityPageWithUrlState() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+      <SensitivityPage />
+    </Suspense>
   );
 }

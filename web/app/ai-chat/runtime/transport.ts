@@ -1,4 +1,4 @@
-import { API_BASE_URL, aiChatApi } from "../../lib/api";
+import { API_BASE_URL, ApiError, aiChatApi } from "../../lib/api";
 import { consumeSSEStream } from "./stream";
 import type { PageContext, RunRequest, RuntimeTarget } from "./types";
 
@@ -60,7 +60,13 @@ export function createHTTPRuntimeTransport(token: string): RuntimeTransport {
       const response = await fetch(`${API_BASE_URL}/api/v1/ai/chat/runs/${runId}/stream`, {
         headers: { Accept: "text/event-stream", Authorization: `Bearer ${token}` },
       });
-      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 401 && typeof window !== "undefined") {
+          window.dispatchEvent(new Event("auth-session-expired"));
+        }
+        throw new ApiError(`http_${response.status}`, response.status);
+      }
+      if (!response.body) throw new ApiError("stream_unavailable", 503);
       await consumeSSEStream(response.body, onFrame);
     },
   };

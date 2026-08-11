@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Input, Row, Select, Space, Statistic, Table, Tag, message } from "antd";
 import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
@@ -238,14 +240,14 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
   const varianceColor = useMemo(() => {
     if (!result) return undefined;
     // An overspend is what a reader needs to notice, so only that is coloured.
-    return result.variance > 0 ? "#CF1322" : undefined;
+    return result.variance > 0 ? "var(--state-error-text)" : undefined;
   }, [result]);
 
   return (
     <>
-      <Card style={{ borderRadius: 10, marginBottom: 16 }} bodyStyle={{ padding: "16px 20px" }}>
+      <Card style={{ borderRadius: 10, marginBottom: 16 }} styles={{ body: { padding: "16px 20px" } }}>
         <Space wrap size={12}>
-          <span style={{ fontSize: 13, color: "#595959" }}>{t("budget.version", language)}</span>
+          <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>{t("budget.version", language)}</span>
           <Select
             style={{ width: 260 }}
             value={versionId}
@@ -256,7 +258,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
               label: `${v.name}（${v.version_type}, ${v.from_period}~${v.to_period}）`,
             }))}
           />
-          <span style={{ fontSize: 13, color: "#595959" }}>{t("budget.compare_to", language)}</span>
+          <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>{t("budget.compare_to", language)}</span>
           <Select
             style={{ width: 260 }}
             value={rightId}
@@ -299,10 +301,10 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
           <Button icon={<PlusOutlined />} loading={creating} onClick={createVersion}>
             {t("budget.freeze", language)}
           </Button>
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>{t("budget.freeze_hint", language)}</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("budget.freeze_hint", language)}</span>
         </div>
         {versionId && (
-          <div style={{ marginTop: 10, color: "#6B7280", fontSize: 12 }}>
+          <div style={{ marginTop: 10, color: "var(--fg-tertiary)", fontSize: 12 }}>
             {t("budget.measurement_source_hint", language)}
           </div>
         )}
@@ -321,17 +323,17 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
 
           <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
             <Col xs={24} sm={8}>
-              <Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "16px 20px" }}>
+              <Card style={{ borderRadius: 10 }} styles={{ body: { padding: "16px 20px" } }}>
                 <Statistic title={t("budget.budget_total", language)} value={result.budget_total} precision={2} />
               </Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "16px 20px" }}>
+              <Card style={{ borderRadius: 10 }} styles={{ body: { padding: "16px 20px" } }}>
                 <Statistic title={t("budget.actual_total", language)} value={result.actual_total} precision={2} />
               </Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "16px 20px" }}>
+              <Card style={{ borderRadius: 10 }} styles={{ body: { padding: "16px 20px" } }}>
                 <Statistic
                   title={t("budget.variance", language)}
                   value={result.variance}
@@ -349,24 +351,24 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                 <Col xs={24} sm={8}><Statistic title={t("budget.brief_forecast", language, { name: brief.forecast.version.name })} value={brief.forecast.total} precision={2} /></Col>
                 <Col xs={24} sm={8}><Statistic title={t("budget.brief_actual", language)} value={brief.actual.total} precision={2} /></Col>
               </Row>
-              <div style={{ marginTop: 12, color: "#6B7280", fontSize: 13 }}>
+              <div style={{ marginTop: 12, color: "var(--fg-tertiary)", fontSize: 13 }}>
                 {t("budget.brief_variance", language, { forecastBudget: fmtNum(brief.forecast_vs_budget), actualBudget: fmtNum(brief.actual_vs_budget), actualForecast: fmtNum(brief.actual_vs_forecast) })}
               </div>
             </Card>
           )}
 
           <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.explanation_coverage", language)} value={(result.explanation_coverage || 0) * 100} precision={1} suffix="%" /></Card></Col>
-            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.open_actions", language)} value={result.open_action_count || 0} /></Card></Col>
-            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.open_action_amount", language)} value={result.open_action_amount || 0} precision={2} /></Card></Col>
-            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} bodyStyle={{ padding: "12px 16px" }}><Statistic title={t("budget.comparison_basis", language)} value={rightId === "actual" ? t("budget.plan_actual", language) : t("budget.plan_plan", language)} valueStyle={{ fontSize: 18 }} /></Card></Col>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.explanation_coverage", language)} value={(result.explanation_coverage || 0) * 100} precision={1} suffix="%" /></Card></Col>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.open_actions", language)} value={result.open_action_count || 0} /></Card></Col>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.open_action_amount", language)} value={result.open_action_amount || 0} precision={2} /></Card></Col>
+            <Col xs={12} sm={6}><Card style={{ borderRadius: 10 }} styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.comparison_basis", language)} value={rightId === "actual" ? t("budget.plan_actual", language) : t("budget.plan_plan", language)} valueStyle={{ fontSize: 18 }} /></Card></Col>
           </Row>
 
           <Card
             title={t("budget.bridge_title", language)}
             style={{ borderRadius: 10, marginBottom: 16 }}
           >
-            <div style={{ color: "#6B7280", marginBottom: 12, fontSize: 13 }}>
+            <div style={{ color: "var(--fg-tertiary)", marginBottom: 12, fontSize: 13 }}>
               {t("budget.bridge_desc", language)}
             </div>
             <Table
@@ -379,9 +381,9 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   title: t("budget.cause", language),
                   dataIndex: "cause",
                   render: (cause: string) => (
-                    <Tag color={causeColors[cause] || "default"}>
+                    <StatusTag kind={statusKindFromAntColor(causeColors[cause] || "default")}>
                       {t(causeKeys[cause] || cause, language)}
-                    </Tag>
+                    </StatusTag>
                   ),
                 },
                 {
@@ -389,7 +391,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   dataIndex: "amount",
                   align: "right" as const,
                   render: (value: number) => (
-                    <span style={{ color: value > 0 ? "#CF1322" : undefined }}>{fmtNum(value)}</span>
+                    <span style={{ color: value > 0 ? "var(--state-error-text)" : undefined }}>{fmtNum(value)}</span>
                   ),
                 },
                 {
@@ -443,7 +445,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   align: "right" as const,
                   sorter: (a: ContractVariance, b: ContractVariance) => a.variance - b.variance,
                   render: (value: number) => (
-                    <strong style={{ color: value > 0 ? "#CF1322" : undefined }}>{fmtNum(value)}</strong>
+                    <strong style={{ color: value > 0 ? "var(--state-error-text)" : undefined }}>{fmtNum(value)}</strong>
                   ),
                 },
                 {
@@ -451,9 +453,9 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   dataIndex: "cause",
                   width: 130,
                   render: (cause: string) => (
-                    <Tag color={causeColors[cause] || "default"}>
+                    <StatusTag kind={statusKindFromAntColor(causeColors[cause] || "default")}>
                       {t(causeKeys[cause] || cause, language)}
-                    </Tag>
+                    </StatusTag>
                   ),
                 },
                 ...(rightId === "actual" ? [

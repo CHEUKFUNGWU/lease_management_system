@@ -1,10 +1,13 @@
 "use client";
 
+import { StatusTag } from "../components/StatusTag";
+
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
 import { SafetyOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi, reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
@@ -82,14 +85,12 @@ export default function StandardsPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: 24 }}>多准则对比</h1>
-              <div style={{ color: "#6B7280", marginTop: 6 }}>
-                对同一合同展示 IFRS 16、ASC 842 与中国租赁准则下的资产负债表和损益表差异。
-              </div>
-            </div>
+            <PageHeader
+              title="多准则对比"
+              subtitle="对同一合同展示 IFRS 16、ASC 842 与中国租赁准则下的资产负债表和损益表差异。"
+            />
 
             <Card>
               <Form form={form} layout="inline" onFinish={runComparison}>
@@ -159,8 +160,8 @@ export default function StandardsPage() {
                       <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value || 0), meta?.currency)} />
                       <Legend />
-                      <Bar dataKey="initial_liability" fill="#1677FF" name="初始负债" />
-                      <Bar dataKey="first_period_expense" fill="#52C41A" name="首期费用" />
+                      <Bar isAnimationActive={false} dataKey="initial_liability" fill="var(--chart-blue)" name="初始负债" />
+                      <Bar isAnimationActive={false} dataKey="first_period_expense" fill="var(--state-success-text)" name="首期费用" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -177,7 +178,7 @@ export default function StandardsPage() {
                 scroll={{ x: 1320 }}
                 columns={[
                   { title: "准则", dataIndex: "standard_name", width: 210, fixed: "left" },
-                  { title: "分类", dataIndex: "classification", width: 160, render: (v: string) => <Tag color="processing">{v}</Tag> },
+                  { title: "分类", dataIndex: "classification", width: 160, render: (v: string) => <StatusTag kind="processing">{v}</StatusTag> },
                   { title: "计量路径", dataIndex: "measurement_basis", width: 150 },
                   { title: "初始负债", dataIndex: "initial_liability", width: 120, align: "right" as const, render: (v: number) => fmt(v) },
                   { title: "ROU 资产", dataIndex: "initial_rou_asset", width: 120, align: "right" as const, render: (v: number) => fmt(v) },

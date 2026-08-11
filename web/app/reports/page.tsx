@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { motion } from "framer-motion";
 import {
@@ -11,6 +13,7 @@ import {
   SearchOutlined, ClearOutlined, TagOutlined, RobotOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { BudgetVariancePanel } from "./components/BudgetVariancePanel";
 import { DisclosurePanel } from "./components/DisclosurePanel";
@@ -22,7 +25,8 @@ import { fmtMoney, fmtNum } from "../lib/format";
 import { exportCSV, exportExcel } from "../lib/export";
 import dayjs from "dayjs";
 import { useSearchParams, useRouter } from "next/navigation";
-import { fadeInUp, staggerContainer, staggerItem } from "../design-system/animations";
+import { useUrlState } from "../hooks/useUrlState";
+import { staggerContainer, staggerItem } from "../design-system/animations";
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -125,7 +129,7 @@ function KPIStatCard({ title, value, loading }: { title: string; value: number; 
   return (
     <motion.div variants={staggerItem}>
       <Card
-        bodyStyle={{ padding: "20px 24px" }}
+        styles={{ body: { padding: "20px 24px" } }}
         style={{ borderRadius: 10, height: "100%" }}
       >
         {loading ? (
@@ -137,7 +141,7 @@ function KPIStatCard({ title, value, loading }: { title: string; value: number; 
                 style={{
                   fontSize: 12,
                   fontWeight: 500,
-                  color: "#8C8C8C",
+                  color: "var(--fg-muted)",
                   textTransform: "uppercase",
                   letterSpacing: "0.02em",
                 }}
@@ -147,10 +151,10 @@ function KPIStatCard({ title, value, loading }: { title: string; value: number; 
             }
             value={value}
             valueStyle={{
-              fontSize: 28,
+              fontSize: 26,
               fontWeight: 700,
               letterSpacing: "-0.03em",
-              color: "#000",
+              color: "var(--fg-primary)",
             }}
           />
         )}
@@ -179,10 +183,12 @@ function ReportsPageContent() {
   const router = useRouter();
 
   /* ---- shared ---- */
-  const [reportMode, setReportMode] = useState<"working" | "official">("working");
+  const [reportModeParam, setReportModeParam] = useUrlState("mode", "working");
+  const reportMode = reportModeParam === "official" ? "official" : "working";
+  const setReportMode = (next: "working" | "official") => setReportModeParam(next);
 
   /* ---- tab key ---- */
-  const [activeTab, setActiveTab] = useState<string>("ledger");
+  const [activeTab, setActiveTab] = useUrlState("tab", "ledger");
 
   /* ---- Tab 1: contract ledger ---- */
   const [loading, setLoading] = useState(false);
@@ -212,6 +218,7 @@ function ReportsPageContent() {
 
   /* ---- Tab 2: amortisation ---- */
   const [amortView, setAmortView] = useState<"contract" | "store" | "tag" | "summary">("contract");
+  const [, setAmortViewParam] = useUrlState("view", "contract");
   const [amortGranularity, setAmortGranularity] = useState<"day" | "month" | "quarter" | "half_year" | "year">("month");
 	const [amortDateRange, setAmortDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>([
 		dayjs().startOf("year"),
@@ -236,13 +243,9 @@ function ReportsPageContent() {
   const [tagsFromUrl, setTagsFromUrl] = useState<string[] | null>(null);
 
   useEffect(() => {
-    const tab = searchParams.get("tab");
     const view = searchParams.get("view");
     const tags = searchParams.getAll("tags");
 
-    if (tab === "amortization") setActiveTab("amortization");
-    if (tab === "disclosure") setActiveTab("disclosure");
-    if (tab === "budget") setActiveTab("budget");
     if (view && ["contract", "store", "tag", "summary"].includes(view)) {
       setAmortView(view as any);
     }
@@ -321,6 +324,7 @@ function ReportsPageContent() {
 
   const handleAmortReset = () => {
     setAmortView("contract");
+    setAmortViewParam("contract");
     setAmortGranularity("month");
     setAmortDateRange([dayjs().startOf("year"), dayjs().endOf("year")]);
     setAmortContractId("");
@@ -335,6 +339,20 @@ function ReportsPageContent() {
     setShowFilters(false);
     setTagsFromUrl(null);
   };
+
+  const reportEmptyState = (description: string) => (
+    <div style={{ padding: "24px 12px", textAlign: "center" }}>
+      <div style={{ color: "var(--fg-muted)", marginBottom: 12 }}>{description}</div>
+      <Space>
+        <Button size="small" icon={<FileTextOutlined />} onClick={() => router.push("/contracts/new")}>
+          {t("contracts.add_contract", language)}
+        </Button>
+        <Button size="small" icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>
+          {t("dashboard.upload_file", language)}
+        </Button>
+      </Space>
+    </div>
+  );
 
   const amortCols = useMemo(() => buildAmortColumns(amortView, amortGranularity, language), [amortView, amortGranularity, language]);
 
@@ -367,26 +385,15 @@ function ReportsPageContent() {
     <ProtectedRoute>
       <AppLayout>
         <motion.div
-          initial={{ opacity: 0, y: 4 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         >
           {/* ─── Page Header ─── */}
-          <div style={{ marginBottom: 24 }}>
-            <h1
-              style={{
-                marginBottom: 4,
-                fontSize: 28,
-                fontWeight: 700,
-                letterSpacing: "-0.04em",
-              }}
-            >
-              {t("reports.title", language)}
-            </h1>
-            <p style={{ color: "#8C8C8C", fontSize: 14, margin: 0 }}>
-              {t("reports.subtitle", language)}
-            </p>
-          </div>
+          <PageHeader
+            title={t("reports.title", language)}
+            subtitle={t("reports.subtitle", language)}
+          />
 
           {/* ─── Report mode selector ─── */}
           <Card style={{ marginBottom: 16 }}>
@@ -404,7 +411,7 @@ function ReportsPageContent() {
                   style={{
                     fontWeight: 600,
                     fontSize: 14,
-                    color: "#000",
+                    color: "var(--fg-primary)",
                   }}
                 >
                   {t("reports.mode", language)}
@@ -426,7 +433,7 @@ function ReportsPageContent() {
               <span
                 style={{
                   fontSize: 12,
-                  color: "#8C8C8C",
+                  color: "var(--fg-muted)",
                   display: "flex",
                   alignItems: "center",
                   gap: 4,
@@ -464,7 +471,7 @@ function ReportsPageContent() {
                     {summary && (
                       <motion.div
                         variants={staggerContainer}
-                        initial="initial"
+                        initial={false}
                         animate="animate"
                       >
                         <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
@@ -500,11 +507,11 @@ function ReportsPageContent() {
                           <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
                             {t("reports.tab_ledger", language)}
                           </span>
-                          <Tag style={{ fontSize: 11 }}>
+                          <StatusTag style={{ fontSize: 11 }}>
                             {reportMode === "working"
                               ? t("reports.mode_working", language)
                               : t("reports.mode_official", language)}
-                          </Tag>
+                          </StatusTag>
                         </div>
                       }
                       extra={
@@ -540,9 +547,9 @@ function ReportsPageContent() {
                               dataIndex: "approval_status",
                               width: 100,
                               render: (s: string) => (
-                                <Tag color={statusColor[s] || "default"}>
+                                <StatusTag kind={statusKindFromAntColor(statusColor[s] || "default")}>
                                   {getStatusText(language)[s] || s}
-                                </Tag>
+                                </StatusTag>
                               ),
                             },
                             {
@@ -550,7 +557,7 @@ function ReportsPageContent() {
                               dataIndex: "is_official_version",
                               width: 90,
                               render: (v: boolean) =>
-                                v ? <Tag>{t("reports.yes", language)}</Tag> : <Tag>{t("reports.no", language)}</Tag>,
+                                v ? <StatusTag>{t("reports.yes", language)}</StatusTag> : <StatusTag>{t("reports.no", language)}</StatusTag>,
                             },
                             {
                               title: t("reports.discount_rate_missing", language),
@@ -558,9 +565,9 @@ function ReportsPageContent() {
                               width: 100,
                               render: (v: boolean) =>
                                 v ? (
-                                  <Tag color="error">{t("reports.missing", language)}</Tag>
+                                  <StatusTag kind="error">{t("reports.missing", language)}</StatusTag>
                                 ) : (
-                                  <Tag color="success">{t("reports.filled", language)}</Tag>
+                                  <StatusTag kind="success">{t("reports.filled", language)}</StatusTag>
                                 ),
                             },
                             { title: t("reports.currency", language), dataIndex: "currency", width: 80 },
@@ -570,7 +577,8 @@ function ReportsPageContent() {
                           dataSource={data}
                           rowKey="contract_id"
                           pagination={{ pageSize: 10 }}
-                          locale={{ emptyText: t("reports.empty", language) }}
+                          scroll={{ x: "max-content" }}
+                          locale={{ emptyText: reportEmptyState(t("reports.empty_hint", language)) }}
                         />
                       </Spin>
                     </Card>
@@ -593,20 +601,20 @@ function ReportsPageContent() {
                           marginBottom: 16,
                           padding: "10px 14px",
                           borderRadius: 8,
-                          background: "#F7F7F7",
-                          border: "1px solid #E5E5E5",
+                          background: "var(--bg-surface)",
+                          border: "1px solid var(--border-default)",
                           display: "flex",
                           alignItems: "center",
                           gap: 8,
                           flexWrap: "wrap",
                           fontSize: 13,
-                          color: "#595959",
+                          color: "var(--fg-tertiary)",
                         }}
                       >
                         <TagOutlined style={{ opacity: 0.5 }} />
                         {t("reports.tags_imported", language)}
                         {tagsFromUrl.map((tg) => (
-                          <Tag key={tg}>{tg}</Tag>
+                          <StatusTag key={tg}>{tg}</StatusTag>
                         ))}
                         <Button
                           type="link"
@@ -624,12 +632,12 @@ function ReportsPageContent() {
                       <Row gutter={[12, 10]} align="middle" style={{ marginBottom: showFilters ? 8 : 0 }}>
                         <Col>
                           <Space size={4}>
-                            <span style={{ fontSize: 13, color: "#595959" }}>
+                            <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>
                               {t("reports.view_dimension", language)}
                             </span>
                             <Select
                               value={amortView}
-                              onChange={(v) => { setAmortView(v as any); setAmortFetched(false); }}
+                              onChange={(v) => { setAmortView(v as any); setAmortViewParam(v); setAmortFetched(false); }}
                               style={{ width: 110 }}
                               size="small"
                               options={[
@@ -643,7 +651,7 @@ function ReportsPageContent() {
                         </Col>
                         <Col>
                           <Space size={4}>
-                            <span style={{ fontSize: 13, color: "#595959" }}>
+                            <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>
                               {t("reports.granularity", language)}
                             </span>
                             <Select
@@ -663,7 +671,7 @@ function ReportsPageContent() {
                         </Col>
                         <Col>
                           <Space size={4}>
-                            <span style={{ fontSize: 13, color: "#595959" }}>
+                            <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>
                               {t("reports.date_range", language)}
                             </span>
                             <RangePicker
@@ -781,7 +789,7 @@ function ReportsPageContent() {
                             {amortView !== "contract" && (
                               <Col xs={24} sm={8}>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                  <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
                                     {t("reports.contract_id", language)}
                                   </span>
                                   <Input
@@ -797,7 +805,7 @@ function ReportsPageContent() {
                             {amortView !== "store" && (
                               <Col xs={24} sm={8}>
                                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                  <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                  <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
                                     {t("reports.store", language)}
                                   </span>
                                   <Input
@@ -812,7 +820,7 @@ function ReportsPageContent() {
                             )}
                             <Col xs={24} sm={8}>
                               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
                                   {t("reports.tags", language)}
                                 </span>
                                 <Select
@@ -835,13 +843,13 @@ function ReportsPageContent() {
                               marginTop: 12,
                               padding: "10px 14px",
                               borderRadius: 8,
-                              background: "#F7F7F7",
-                              border: "1px solid #E5E5E5",
+                              background: "var(--bg-surface)",
+                              border: "1px solid var(--border-default)",
                               fontSize: 12,
-                              color: "#8C8C8C",
+                              color: "var(--fg-muted)",
                             }}
                           >
-                            <span style={{ fontWeight: 600, color: "#595959" }}>
+                            <span style={{ fontWeight: 600, color: "var(--fg-tertiary)" }}>
                               {t("reports.override_title", language)}
                             </span>
                             <span style={{ marginLeft: 8 }}>
@@ -851,7 +859,7 @@ function ReportsPageContent() {
                           <Row gutter={[12, 10]} style={{ marginTop: 10 }}>
                             <Col xs={24} sm={8}>
                               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
                                   {t("reports.discount_rate_override", language)}
                                 </span>
                                 <Input
@@ -865,7 +873,7 @@ function ReportsPageContent() {
                              </Col>
                              <Col xs={24} sm={8}>
                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                 <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                 <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
                                    {t("reports.report_currency", language)}
                                  </span>
                                 <Input
@@ -880,7 +888,7 @@ function ReportsPageContent() {
                             </Col>
                             <Col xs={24} sm={8}>
                               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, color: "#8C8C8C" }}>
+                                <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
                                   {t("reports.exchange_rate", language)}
                                 </span>
                                 <Input
@@ -901,14 +909,14 @@ function ReportsPageContent() {
                     {(discountRateOverride || reportCurrency) && amortFetched && (
                       <div style={{ marginBottom: 16 }}>
                         {discountRateOverride && (
-                          <Tag style={{ fontSize: 12, padding: "2px 10px" }}>
+                          <StatusTag style={{ fontSize: 12, padding: "2px 10px" }}>
                             {t("reports.discount_rate_override", language)}: {Number(discountRateOverride).toFixed(2)}%
-                          </Tag>
+                          </StatusTag>
                         )}
                         {reportCurrency && (
-                          <Tag style={{ fontSize: 12, padding: "2px 10px" }}>
+                          <StatusTag style={{ fontSize: 12, padding: "2px 10px" }}>
                             {t("reports.report_currency", language)}: {reportCurrency}{exchangeRate ? ` @ ${Number(exchangeRate).toFixed(2)}` : ""}
-                          </Tag>
+                          </StatusTag>
                         )}
                       </div>
                     )}
@@ -920,10 +928,10 @@ function ReportsPageContent() {
                           marginBottom: 16,
                           padding: "10px 14px",
                           borderRadius: 8,
-                          background: "#F7F7F7",
-                          border: "1px solid #E5E5E5",
+                          background: "var(--bg-surface)",
+                          border: "1px solid var(--border-default)",
                           fontSize: 12,
-                          color: "#8C8C8C",
+                          color: "var(--fg-muted)",
                         }}
                       >
                         {t("reports.tag_caveat", language)}
@@ -935,69 +943,69 @@ function ReportsPageContent() {
                       <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
                         <Col xs={24} sm={12} lg={6}>
                           <Card
-                            bodyStyle={{ padding: "16px 20px" }}
+                            styles={{ body: { padding: "16px 20px" } }}
                             style={{ borderRadius: 10 }}
                           >
                             <Statistic
                               title={
-                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>
                                   {t("reports.closing_liability", language)}
                                 </span>
                               }
                               value={amortSummary.closingLiability}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
                           <Card
-                            bodyStyle={{ padding: "16px 20px" }}
+                            styles={{ body: { padding: "16px 20px" } }}
                             style={{ borderRadius: 10 }}
                           >
                             <Statistic
                               title={
-                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>
                                   {t("reports.closing_rou", language)}
                                 </span>
                               }
                               value={amortSummary.closingROU}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
                           <Card
-                            bodyStyle={{ padding: "16px 20px" }}
+                            styles={{ body: { padding: "16px 20px" } }}
                             style={{ borderRadius: 10 }}
                           >
                             <Statistic
                               title={
-                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>
                                   {t("reports.total_interest", language)}
                                 </span>
                               }
                               value={amortSummary.totalInterest}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
                           <Card
-                            bodyStyle={{ padding: "16px 20px" }}
+                            styles={{ body: { padding: "16px 20px" } }}
                             style={{ borderRadius: 10 }}
                           >
                             <Statistic
                               title={
-                                <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>
                                   {t("reports.total_depreciation", language)}
                                 </span>
                               }
                               value={amortSummary.totalDepreciation}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "#000" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>
@@ -1011,11 +1019,11 @@ function ReportsPageContent() {
                           <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
                             {t("reports.amortization_table", language)}
                           </span>
-                          <Tag style={{ fontSize: 11 }}>
+                          <StatusTag style={{ fontSize: 11 }}>
                             {reportMode === "working"
                               ? t("reports.mode_working", language)
                               : t("reports.mode_official", language)}
-                          </Tag>
+                          </StatusTag>
                         </div>
                       }
                     >
@@ -1023,11 +1031,23 @@ function ReportsPageContent() {
                         <Table
                           columns={amortCols}
                           dataSource={amortData}
-                          rowKey={(record: any, index?: number) => `${record.group_key || index}-${record.period_key || index}`}
+                          rowKey={(record: any) =>
+                            [
+                              record.group_key,
+                              record.contract_id,
+                              record.store_id,
+                              record.asset_type,
+                              record.period_key,
+                              record.period_start,
+                              record.currency,
+                            ]
+                              .filter((value) => value !== undefined && value !== null && value !== "")
+                              .join("|") || JSON.stringify(record)
+                          }
                           pagination={{ pageSize: 20, showSizeChanger: true }}
                           scroll={{ x: "max-content" }}
                           size="small"
-                          locale={{ emptyText: amortFetched ? t("reports.empty", language) : t("reports.no_data_hint", language) }}
+                          locale={{ emptyText: reportEmptyState(amortFetched ? t("reports.empty_hint", language) : t("reports.no_data_hint", language)) }}
                         />
                       </Spin>
                     </Card>

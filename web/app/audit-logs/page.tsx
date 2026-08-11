@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
 import { useState, useCallback, useEffect } from "react";
 import {
   Card,
@@ -17,6 +19,7 @@ import {
 import { SearchOutlined, ReloadOutlined, ExpandAltOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { auditApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -190,9 +193,9 @@ export default function AuditLogsPage() {
       key: "action",
       width: 110,
       render: (val: string) => (
-        <Tag color={ACTION_COLORS[val] || "default"}>
+        <StatusTag kind={statusKindFromAntColor(ACTION_COLORS[val] || "default")}>
           {ACTION_LABELS[val] || val}
-        </Tag>
+        </StatusTag>
       ),
     },
     {
@@ -219,7 +222,7 @@ export default function AuditLogsPage() {
       key: "old_values",
       width: 60,
       render: (val: string) => {
-        if (!val || val === "null" || val === "{}") return <span style={{ color: "#999" }}>{t("audit.none", language)}</span>;
+        if (!val || val === "null" || val === "{}") return <span style={{ color: "var(--fg-muted)" }}>{t("audit.none", language)}</span>;
         const text = formatJsonContent(val);
         return (
           <Button
@@ -245,7 +248,7 @@ export default function AuditLogsPage() {
       key: "new_values",
       width: 60,
       render: (val: string) => {
-        if (!val || val === "null" || val === "{}") return <span style={{ color: "#999" }}>{t("audit.none", language)}</span>;
+        if (!val || val === "null" || val === "{}") return <span style={{ color: "var(--fg-muted)" }}>{t("audit.none", language)}</span>;
         const text = formatJsonContent(val);
         return (
           <Button
@@ -271,7 +274,10 @@ export default function AuditLogsPage() {
     <ProtectedRoute>
       <AppLayout>
         <div style={{ padding: 0 }}>
-          <h2 style={{ marginBottom: 16 }}>{t("audit.title", language)}</h2>
+          <PageHeader
+            title={t("audit.title", language)}
+            subtitle={t("audit.subtitle", language, { total: String(total) })}
+          />
 
           {/* Filters */}
           <Card size="small" style={{ marginBottom: 16 }}>

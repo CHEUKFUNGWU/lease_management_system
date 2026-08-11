@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { setApiLanguage } from "../lib/api";
 
 export type Language = "zh-CN" | "zh-HK" | "en";
 
@@ -36,8 +37,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     // half-translated UI, so anything unsupported falls back to the default.
     if (stored && SUPPORTED_LANGUAGES.includes(stored)) {
       setLanguageState(stored);
+      setApiLanguage(stored);
     } else if (stored) {
       localStorage.removeItem(STORAGE_KEY);
+      setApiLanguage(DEFAULT_LANGUAGE);
     }
   }, []);
 
@@ -45,6 +48,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     if (!SUPPORTED_LANGUAGES.includes(lang)) return;
     localStorage.setItem(STORAGE_KEY, lang);
     setLanguageState(lang);
+    setApiLanguage(lang);
   };
 
   return (

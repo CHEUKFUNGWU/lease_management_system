@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Row, Segmented, Space, Statistic, Table, Tag, message } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { RentToSalesPanel } from "./RentToSalesPanel";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
+import { useUrlState } from "../hooks/useUrlState";
 
 interface PortfolioRow {
   asset_type: string;
@@ -73,12 +77,14 @@ const groupingLabels: Record<UnitPriceGrouping, string> = {
 
 const fmt = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-export default function PortfolioPage() {
+function PortfolioPage() {
   const { token } = useAuth();
-  const [mode, setMode] = useState<"working" | "official">("working");
+  const [modeParam, setModeParam] = useUrlState("mode", "working");
+  const [groupingParam, setGroupingParam] = useUrlState("group_by", "store");
+  const mode: "working" | "official" = modeParam === "official" ? "official" : "working";
+  const grouping: UnitPriceGrouping = ["store", "brand", "region"].includes(groupingParam) ? groupingParam as UnitPriceGrouping : "store";
   const [rows, setRows] = useState<PortfolioRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [grouping, setGrouping] = useState<UnitPriceGrouping>("store");
   const [unitPriceRows, setUnitPriceRows] = useState<UnitPriceRow[]>([]);
   const [contractsWithoutArea, setContractsWithoutArea] = useState(0);
   const [unitPriceLoading, setUnitPriceLoading] = useState(false);
@@ -151,20 +157,16 @@ export default function PortfolioPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <Row justify="space-between" align="middle">
-              <Col>
-                <h1 style={{ margin: 0, fontSize: 24 }}>租赁组合分析</h1>
-                <div style={{ color: "#6B7280", marginTop: 6 }}>
-                  按资产类型、IFRS 16 范围和币种查看合同规模、租金承诺与非租赁成本暴露。
-                </div>
-              </Col>
-              <Col>
+            <PageHeader
+              title="租赁组合分析"
+              subtitle="按资产类型、IFRS 16 范围和币种查看合同规模、租金承诺与非租赁成本暴露。"
+              primaryAction={
                 <Space>
                   <Segmented
                     value={mode}
-                    onChange={(value) => setMode(value as "working" | "official")}
+                    onChange={(value) => setModeParam(value as string)}
                     options={[
                       { label: "Working", value: "working" },
                       { label: "Official", value: "official" },
@@ -174,8 +176,8 @@ export default function PortfolioPage() {
                     刷新
                   </Button>
                 </Space>
-              </Col>
-            </Row>
+              }
+            />
 
             <Alert
               type={mode === "official" ? "success" : "info"}
@@ -206,7 +208,7 @@ export default function PortfolioPage() {
               </Col>
               <Col xs={24} md={6}>
                 <Card>
-                  <Statistic title="缺失折现率" value={totals.missingRates} valueStyle={{ color: totals.missingRates ? "#CF1322" : undefined }} />
+                  <Statistic title="缺失折现率" value={totals.missingRates} valueStyle={{ color: totals.missingRates ? "var(--state-error-text)" : undefined }} />
                 </Card>
               </Col>
             </Row>
@@ -216,7 +218,7 @@ export default function PortfolioPage() {
               extra={
                 <Segmented
                   value={grouping}
-                  onChange={(value) => setGrouping(value as UnitPriceGrouping)}
+                  onChange={(value) => setGroupingParam(value as string)}
                   options={(["store", "brand", "region"] as UnitPriceGrouping[]).map((value) => ({
                     label: groupingLabels[value],
                     value,
@@ -224,7 +226,7 @@ export default function PortfolioPage() {
                 />
               }
             >
-              <div style={{ color: "#6B7280", marginBottom: 12, fontSize: 13 }}>
+              <div style={{ color: "var(--fg-tertiary)", marginBottom: 12, fontSize: 13 }}>
                 月租按全租期固定租金直线化计算，因此免租期与递增条款不影响可比性；单价仅统计已填写租赁面积的合同。
               </div>
               {contractsWithoutArea > 0 && (
@@ -281,9 +283,9 @@ export default function PortfolioPage() {
                     key: "coverage",
                     width: 110,
                     render: (_: unknown, row: UnitPriceRow) => (
-                      <Tag color={row.area_coverage_count === row.contract_count ? "success" : "warning"}>
+                      <StatusTag kind={statusKindFromAntColor(row.area_coverage_count === row.contract_count ? "success" : "warning")}>
                         {row.area_coverage_count}/{row.contract_count}
-                      </Tag>
+                      </StatusTag>
                     ),
                   },
                 ]}
@@ -313,7 +315,7 @@ export default function PortfolioPage() {
                     dataIndex: "lease_scope",
                     width: 130,
                     fixed: "left",
-                    render: (value: string) => <Tag color={scopeColors[value]}>{leaseScopeLabels[value] || value}</Tag>,
+                    render: (value: string) => <StatusTag kind={statusKindFromAntColor(scopeColors[value])}>{leaseScopeLabels[value] || value}</StatusTag>,
                   },
                   { title: "币种", dataIndex: "currency", width: 80 },
                   { title: "合同数", dataIndex: "contract_count", width: 90, align: "right" },
@@ -346,7 +348,7 @@ export default function PortfolioPage() {
                     dataIndex: "missing_discount_rate_count",
                     width: 110,
                     align: "right",
-                    render: (value: number) => value ? <Tag color="error">{value}</Tag> : <Tag color="success">0</Tag>,
+                    render: (value: number) => value ? <StatusTag kind="error">{value}</StatusTag> : <StatusTag kind="success">0</StatusTag>,
                   },
                   { title: "最早开始日", dataIndex: "earliest_commencement_date", width: 120 },
                   { title: "最晚结束日", dataIndex: "latest_lease_end_date", width: 120 },
@@ -357,5 +359,13 @@ export default function PortfolioPage() {
         </motion.div>
       </AppLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function PortfolioPageWithUrlState() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+      <PortfolioPage />
+    </Suspense>
   );
 }

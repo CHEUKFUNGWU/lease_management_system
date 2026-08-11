@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
 import { useState, useEffect, useMemo } from "react";
 import {
   Card, Typography, Table, Spin, Statistic, Row, Col, Input, InputNumber,
@@ -10,6 +12,7 @@ import {
   TagOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { authApi, exchangeRateApi, reportApi, settingsApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -329,9 +332,9 @@ export default function SettingsPage() {
       dataIndex: "tag",
       width: 200,
       render: (tag: string) => (
-        <Tag color="blue" style={{ fontSize: 13, padding: "1px 8px" }}>
+        <StatusTag kind="processing" style={{ fontSize: 13, padding: "1px 8px" }}>
           {tag}
-        </Tag>
+        </StatusTag>
       ),
     },
     {
@@ -351,9 +354,9 @@ export default function SettingsPage() {
         return (
           <Space size={4} wrap>
             {show.map((c) => (
-              <Tag key={c.contract_id} color="default">
+              <StatusTag key={c.contract_id} kind="neutral">
                 {c.contract_number}
-              </Tag>
+              </StatusTag>
             ))}
             {rest > 0 && <Text type="secondary">+{rest}</Text>}
           </Space>
@@ -394,13 +397,10 @@ export default function SettingsPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <Title level={2}>
-          <TagOutlined style={{ marginRight: 8 }} />
-          {t("settings.title", language)}
-        </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 24 }}>
-          {t("settings.description", language)}
-        </Paragraph>
+        <PageHeader
+          title={<><TagOutlined style={{ marginRight: 8 }} />{t("settings.title", language)}</>}
+          subtitle={t("settings.description", language)}
+        />
 
         <Card
           title={t("settings.group_device_sessions", language)}
@@ -455,11 +455,11 @@ export default function SettingsPage() {
                 title: t("settings.session_status", language),
                 dataIndex: "active",
                 render: (active: boolean) => (
-                  <Tag color={active ? "green" : "default"}>
+                  <StatusTag kind={statusKindFromAntColor(active ? "green" : "default")}>
                     {active
                       ? t("settings.session_active", language)
                       : t("settings.session_revoked_status", language)}
-                  </Tag>
+                  </StatusTag>
                 ),
               },
               {
@@ -486,7 +486,7 @@ export default function SettingsPage() {
           style={{ marginBottom: 24 }}
           extra={
             effectiveRate != null ? (
-              <Tag color="blue">{t("settings.current_effective", language)}{effectiveRate.toFixed(2)}%</Tag>
+              <StatusTag kind="processing">{t("settings.current_effective", language)}{effectiveRate.toFixed(2)}%</StatusTag>
             ) : null
           }
         >
@@ -655,11 +655,11 @@ export default function SettingsPage() {
                 title: t("settings.fx_type", language),
                 dataIndex: "rate_type",
                 render: (value: string) => (
-                  <Tag color={value === "closing" ? "blue" : "gold"}>
+                  <StatusTag kind={statusKindFromAntColor(value === "closing" ? "blue" : "gold")}>
                     {value === "closing"
                       ? t("settings.fx_type_closing", language)
                       : t("settings.fx_type_average", language)}
-                  </Tag>
+                  </StatusTag>
                 ),
               },
               { title: t("settings.fx_rate", language), dataIndex: "rate", align: "right" as const },

@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag } from "../components/StatusTag";
+
 import { useState } from "react";
 import {
   Alert,
@@ -20,12 +22,13 @@ import { DeleteOutlined, PlusOutlined, SwapOutlined } from "@ant-design/icons";
 import { Line, LineChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { motion } from "framer-motion";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface OfferResult {
   name: string;
@@ -48,7 +51,7 @@ interface Comparison {
   conclusion: string;
 }
 
-const LINE_COLORS = ["#1677FF", "#CF1322", "#389E0D", "#D48806", "#722ED1"];
+const LINE_COLORS = ["var(--chart-blue)", "var(--state-error-text)", "var(--state-success-text)", "var(--state-warning-text)", "var(--chart-purple)"];
 
 // A comparison starts from the two shapes a negotiation usually offers: an
 // incentive package with escalation, and a flat deal.
@@ -134,15 +137,11 @@ export default function DealComparePage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-          <div style={{ marginBottom: 24 }}>
-            <Title level={2} style={{ marginBottom: 4, letterSpacing: "-0.04em" }}>
-              条款比价
-            </Title>
-            <Text type="secondary">
-              把免租期、递增、装修补贴这些谈不拢的条款，折算成同一把尺子：直线化有效租金与现金流现值。
-            </Text>
-          </div>
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+          <PageHeader
+            title="条款比价"
+            subtitle={chartData.length > 0 ? `已比较 ${chartData.length} 个方案 · 按直线化有效租金与现金流现值折算` : "尚未生成比较结果 · 填写方案条款后计算"}
+          />
 
           <Form
             form={form}
@@ -333,8 +332,8 @@ export default function DealComparePage() {
                       render: (name: string) => (
                         <Space>
                           <strong>{name}</strong>
-                          {name === result.best_by_present_value && <Tag color="green">现值最优</Tag>}
-                          {name === result.best_by_effective_rent && <Tag color="blue">有效租金最优</Tag>}
+                          {name === result.best_by_present_value && <StatusTag kind="success">现值最优</StatusTag>}
+                          {name === result.best_by_effective_rent && <StatusTag kind="processing">有效租金最优</StatusTag>}
                         </Space>
                       ),
                     },
@@ -391,7 +390,7 @@ export default function DealComparePage() {
                       <Tooltip formatter={(value) => fmtMoney(Number(value), currency)} />
                       <Legend />
                       {result.offers.map((offer, index) => (
-                        <Line
+                        <Line isAnimationActive={false}
                           key={offer.name}
                           type="monotone"
                           dataKey={offer.name}

@@ -14,7 +14,7 @@ import {
   Col,
   Divider,
 } from "antd";
-import { RobotOutlined, LockOutlined, UserOutlined, SafetyOutlined } from "@ant-design/icons";
+import { LockOutlined, UserOutlined, SafetyOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -54,7 +54,7 @@ export default function LoginPage() {
       align="middle"
       style={{
         minHeight: "100vh",
-        background: "#F7F7F7",
+        background: "var(--bg-surface)",
         position: "relative",
       }}
     >
@@ -63,7 +63,7 @@ export default function LoginPage() {
         style={{
           position: "absolute",
           inset: 0,
-          backgroundImage: `radial-gradient(circle at 1px 1px, #E5E5E5 1px, transparent 0)`,
+          backgroundImage: `radial-gradient(circle at 1px 1px, var(--border-default) 1px, transparent 0)`,
           backgroundSize: "32px 32px",
           opacity: 0.5,
         }}
@@ -71,7 +71,7 @@ export default function LoginPage() {
 
       <Col xs={24} sm={16} md={12} lg={8} xl={6} style={{ position: "relative", zIndex: 1 }}>
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
         >
@@ -81,25 +81,25 @@ export default function LoginPage() {
               boxShadow: "0 0 0 1px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.08)",
               border: "none",
             }}
-            bodyStyle={{ padding: "40px 36px" }}
+            styles={{ body: { padding: "40px 36px" } }}
           >
             <div style={{ textAlign: "center", marginBottom: 32 }}>
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={false}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: 0.1, duration: 0.3 }}
                 style={{
                   width: 56,
                   height: 56,
                   borderRadius: 14,
-                  background: "#000",
+                  background: "var(--fg-primary)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: 20,
                 }}
               >
-                <RobotOutlined style={{ fontSize: 28, color: "#fff" }} />
+                <span aria-hidden="true" style={{ fontSize: 18, fontWeight: 800, color: "var(--fg-inverse)", letterSpacing: "-0.8px" }}>L16</span>
               </motion.div>
 
               <Title
@@ -109,7 +109,7 @@ export default function LoginPage() {
                   fontSize: 22,
                   fontWeight: 700,
                   letterSpacing: "-0.03em",
-                  color: "#000",
+                  color: "var(--fg-primary)",
                 }}
               >
                 {t("login.title", language)}
@@ -129,7 +129,7 @@ export default function LoginPage() {
               >
                 <Input
                   prefix={
-                    <UserOutlined style={{ color: "#BFBFBF", fontSize: 16 }} />
+                    <UserOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />
                   }
                   placeholder={t("login.username", language)}
                   size="large"
@@ -149,7 +149,7 @@ export default function LoginPage() {
               >
                 <Input.Password
                   prefix={
-                    <LockOutlined style={{ color: "#BFBFBF", fontSize: 16 }} />
+                    <LockOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />
                   }
                   placeholder={t("login.password", language)}
                   size="large"
@@ -182,14 +182,14 @@ export default function LoginPage() {
               </Form.Item>
             </Form>
 
-            <Divider style={{ margin: "24px 0 16px", borderColor: "#F0F0F0" }} />
+            <Divider style={{ margin: "24px 0 16px", borderColor: "var(--bg-inset)" }} />
 
             <div style={{ textAlign: "center" }}>
-              <SafetyOutlined style={{ fontSize: 12, color: "#BFBFBF", marginRight: 6 }} />
+              <SafetyOutlined style={{ fontSize: 12, color: "var(--fg-muted)", marginRight: 6 }} />
               <Text
                 style={{
                   fontSize: 12,
-                  color: "#BFBFBF",
+                  color: "var(--fg-muted)",
                   lineHeight: 1.5,
                 }}
               >

@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AutoComplete, Input, Tag } from "antd";
-import { FileTextOutlined, SearchOutlined } from "@ant-design/icons";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Button, Input, Modal, Space, Tag } from "antd";
+import type { InputRef } from "antd";
+import { ArrowRightOutlined, FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -17,164 +19,192 @@ interface SearchableContract {
   lessor_name?: string;
 }
 
+interface CommandItem {
+  id: string;
+  label: string;
+  description?: string;
+  path: string;
+  kind: "page" | "action" | "contract";
+}
+
 export default function GlobalSearch() {
   const router = useRouter();
   const { token } = useAuth();
   const { language } = useLanguage();
-  const [focused, setFocused] = useState(false);
+  const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [contracts, setContracts] = useState<SearchableContract[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<any>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<InputRef>(null);
 
-  // ⌘K / Ctrl+K focuses the search box
+  const pageItems = useMemo<CommandItem[]>(() => [
+    { id: "page-todo", label: t("nav.todo", language), description: t("search.group_daily", language), path: "/todo", kind: "page" },
+    { id: "page-contracts", label: t("nav.contracts", language), description: t("search.group_daily", language), path: "/contracts", kind: "page" },
+    { id: "page-reports", label: t("nav.reports", language), description: t("search.group_accounting", language), path: "/reports", kind: "page" },
+    { id: "page-closing", label: t("nav.monthly_closing", language), description: t("search.group_accounting", language), path: "/monthly-closing", kind: "page" },
+    { id: "page-cashflow", label: t("nav.cashflow", language), description: t("search.group_analysis", language), path: "/cashflow-forecast", kind: "page" },
+    { id: "page-sensitivity", label: t("nav.sensitivity", language), description: t("search.group_analysis", language), path: "/sensitivity", kind: "page" },
+    { id: "page-settings", label: t("nav.settings", language), description: t("search.group_system", language), path: "/settings", kind: "page" },
+  ], [language]);
+
+  const actionItems = useMemo<CommandItem[]>(() => [
+    { id: "action-new-contract", label: t("search.action_new_contract", language), path: "/contracts/new", kind: "action" },
+    { id: "action-ai-entry", label: t("search.action_ai_entry", language), path: "/ai-chat", kind: "action" },
+    { id: "action-todo", label: t("search.action_todo", language), path: "/todo", kind: "action" },
+    { id: "action-reports", label: t("search.action_reports", language), path: "/reports", kind: "action" },
+  ], [language]);
+
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        inputRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setOpen(true);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const ensureLoaded = async () => {
-    if (loaded || loading || !token) return;
-    setLoading(true);
-    try {
-      const res = await contractApi.list(token);
-      setContracts(res.data || []);
-      setLoaded(true);
-    } catch (error) {
-      console.error("Global search failed to load contracts:", error);
-    } finally {
+  useEffect(() => {
+    if (!open || !token) return;
+    const query = keyword.trim();
+    if (query.length < 2) {
+      setContracts([]);
       setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await contractApi.list(token, { search: query, page: 1, page_size: 8 });
+        if (!cancelled) setContracts(res.data || []);
+      } catch {
+        if (!cancelled) setContracts([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 180);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [keyword, open, token]);
+
+  const items = useMemo<CommandItem[]>(() => {
+    const query = keyword.trim().toLowerCase();
+    const staticItems = [...actionItems, ...pageItems].filter((item) => {
+      if (!query) return true;
+      return `${item.label} ${item.description || ""}`.toLowerCase().includes(query);
+    });
+    const contractItems = contracts
+      .filter((contract) => `${contract.contract_number} ${contract.contract_name} ${contract.store_name || ""} ${contract.lessor_name || ""}`.toLowerCase().includes(query))
+      .map((contract) => ({
+        id: `contract-${contract.id}`,
+        label: contract.contract_number,
+        description: contract.contract_name,
+        path: `/contracts/${contract.id}`,
+        kind: "contract" as const,
+      }));
+    return [...staticItems, ...contractItems].slice(0, 14);
+  }, [actionItems, contracts, keyword, pageItems]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [keyword, open]);
+
+  const close = () => {
+    setOpen(false);
+    setKeyword("");
+    setSelectedIndex(0);
+  };
+
+  const navigateTo = (item: CommandItem) => {
+    close();
+    router.push(item.path);
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (!items.length) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedIndex((index) => (index + 1) % items.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedIndex((index) => (index - 1 + items.length) % items.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      navigateTo(items[selectedIndex]);
     }
   };
 
-  const options = useMemo(() => {
-    const query = keyword.trim().toLowerCase();
-    if (!query) return [];
-    const matches = contracts
-      .filter((contract) => {
-        const haystack = [
-          contract.contract_number,
-          contract.contract_name,
-          contract.store_name,
-          contract.lessor_name,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(query);
-      })
-      .slice(0, 8);
-
-    if (!matches.length) {
-      return [
-        {
-          value: "__empty__",
-          disabled: true,
-          label: (
-            <span style={{ color: "#BFBFBF", fontSize: 13 }}>
-              {loading ? t("search.loading", language) : t("search.no_results", language)}
-            </span>
-          ),
-        },
-      ];
-    }
-
-    return matches.map((contract) => ({
-      value: contract.id,
-      label: (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
-          <FileTextOutlined style={{ color: "#8C8C8C", fontSize: 13, flexShrink: 0 }} />
-          <span style={{ fontWeight: 500, fontSize: 13, whiteSpace: "nowrap" }}>
-            {contract.contract_number}
-          </span>
-          <span
-            style={{
-              fontSize: 13,
-              color: "#595959",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              flex: 1,
-            }}
-          >
-            {contract.contract_name}
-          </span>
-          {contract.store_name && (
-            <Tag style={{ fontSize: 11, marginRight: 0, flexShrink: 0 }}>{contract.store_name}</Tag>
-          )}
-        </div>
-      ),
-    }));
-  }, [contracts, keyword, language, loading]);
+  const kindLabel = (kind: CommandItem["kind"]) => {
+    if (kind === "contract") return t("search.group_contracts", language);
+    if (kind === "page") return t("search.group_pages", language);
+    return t("search.group_actions", language);
+  };
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: focused ? 320 : 200,
-        transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-      }}
-    >
-      <AutoComplete
-        value={keyword}
-        options={options}
-        onChange={(value) => setKeyword(value)}
-        onSelect={(value) => {
-          if (value === "__empty__") return;
-          setKeyword("");
-          router.push(`/contracts/${value}`);
-        }}
-        style={{ width: "100%" }}
-        popupMatchSelectWidth={420}
+    <>
+      <Button
+        className="global-search-trigger"
+        type="text"
+        icon={<SearchOutlined />}
+        onClick={() => setOpen(true)}
+        aria-label={t("search.open_command_palette", language)}
+      >
+        <span>{t("search.placeholder_short", language)}</span>
+        <kbd>⌘K</kbd>
+      </Button>
+      <Modal
+        open={open}
+        onCancel={close}
+        footer={null}
+        title={t("search.command_title", language)}
+        width={620}
+        destroyOnHidden
+        afterOpenChange={(visible) => { if (visible) window.setTimeout(() => inputRef.current?.focus(), 0); }}
       >
         <Input
           ref={inputRef}
-          placeholder={t("search.placeholder", language)}
-          prefix={<SearchOutlined style={{ color: "#8C8C8C", fontSize: 14 }} />}
-          onFocus={() => {
-            setFocused(true);
-            ensureLoaded();
-          }}
-          onBlur={() => setFocused(false)}
-          allowClear
-          style={{
-            borderRadius: 9999,
-            background: "#F5F5F5",
-            border: "none",
-            fontSize: 13,
-            height: 34,
-            paddingLeft: 14,
-          }}
+          autoFocus
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={t("search.command_placeholder", language)}
+          prefix={<SearchOutlined style={{ color: "var(--fg-muted)" }} />}
+          suffix={loading ? t("search.loading", language) : <kbd>↑↓ Enter</kbd>}
+          size="large"
         />
-      </AutoComplete>
-      {!focused && (
-        <kbd
-          style={{
-            position: "absolute",
-            right: 10,
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: 10,
-            color: "#BFBFBF",
-            background: "#fff",
-            border: "1px solid #E5E5E5",
-            borderRadius: 4,
-            padding: "0 5px",
-            lineHeight: "16px",
-            fontFamily: "monospace",
-            pointerEvents: "none",
-          }}
-        >
-          ⌘K
-        </kbd>
-      )}
-    </div>
+        <div className="command-palette-results" role="listbox" aria-label={t("search.command_title", language)}>
+          {items.length === 0 ? (
+            <div className="command-palette-empty">{loading ? t("search.loading", language) : t("search.no_results", language)}</div>
+          ) : items.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`command-palette-item${index === selectedIndex ? " is-selected" : ""}`}
+              onMouseEnter={() => setSelectedIndex(index)}
+              onClick={() => navigateTo(item)}
+              role="option"
+              aria-selected={index === selectedIndex}
+            >
+              <span className="command-palette-item-icon"><FileTextOutlined /></span>
+              <span className="command-palette-item-copy">
+                <strong>{item.label}</strong>
+                {item.description && <span>{item.description}</span>}
+              </span>
+              <Tag>{kindLabel(item.kind)}</Tag>
+              <ArrowRightOutlined className="command-palette-item-arrow" />
+            </button>
+          ))}
+        </div>
+        <Space className="command-palette-hint" size={16}>
+          <span>{t("search.command_keyboard_hint", language)}</span>
+          <span>{t("search.command_scope_hint", language)}</span>
+        </Space>
+      </Modal>
+    </>
   );
 }

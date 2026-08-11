@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { Layout, Menu, Avatar, Dropdown, Breadcrumb } from "antd";
+import React, { useState, useMemo, useEffect } from "react";
+import { Layout, Menu, Avatar, Dropdown, Breadcrumb, Drawer } from "antd";
 import {
   HomeOutlined,
   FileTextOutlined,
@@ -45,119 +45,97 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     todo: t("nav.todo", language as any),
     "ai-chat": t("nav.ai_chat", language as any),
     reports: t("nav.reports", language as any),
-    performance: "经营驾驶舱",
-    portfolio: "组合分析",
-    sensitivity: "敏感性分析",
-    "deal-compare": "条款比价",
-    "pre-deal": "签约前决策",
-    standards: "多准则对比",
+    performance: t("nav.performance", language as any),
+    portfolio: t("nav.portfolio", language as any),
+    sensitivity: t("nav.sensitivity", language as any),
+    "deal-compare": t("nav.deal_compare", language as any),
+    "pre-deal": t("nav.pre_deal", language as any),
+    standards: t("nav.standards", language as any),
     "cashflow-forecast": t("nav.cashflow", language as any),
     "monthly-closing": t("nav.monthly_closing", language as any),
-    roi: "ROI 测算",
+    roi: t("nav.roi", language as any),
     "audit-logs": t("nav.audit_logs", language as any),
     "agent-metrics": t("nav.agent_metrics", language as any),
     settings: t("nav.settings", language as any),
     admin: t("nav.admin", language as any),
-    users: "用户管理",
-    new: "新增",
+    users: t("nav.users", language as any),
+    new: t("nav.new", language as any),
   };
 }
 
 // ─── Menu Items ────────────────────────────────────────────────
 
 function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]) {
-  const canViewAgentMetrics = hasRole(user, "admin") || hasRole(user, "auditor");
+  const isAdmin = hasRole(user, "admin");
+  const isAuditor = hasRole(user, "auditor");
+  const isReadonly = hasRole(user, "readonly");
+  const canViewAccounting = isAdmin || isAuditor || hasRole(user, "editor") || hasRole(user, "reviewer") || hasRole(user, "approver");
+  // Admins need the complete decision surface. Keep role cropping for other
+  // users, but never hide existing product pages from the system owner.
+  const canViewAnalysis = isAdmin || isReadonly || isAuditor;
+  const canViewSystem = isAdmin || isAuditor;
+  const item = (key: string, href: string, icon: React.ReactNode, label: string) => ({
+    key,
+    icon,
+    label: <Link href={href}>{label}</Link>,
+  });
   return useMemo(
-    () => [
-      {
-        key: "/",
-        icon: <HomeOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/">{t("nav.home", language as any)}</Link>,
-      },
-      {
-        key: "/todo",
-        icon: <CheckSquareOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/todo">{t("nav.todo", language as any)}</Link>,
-      },
-      {
-        key: "/contracts",
-        icon: <FileTextOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/contracts">{t("nav.contracts", language as any)}</Link>,
-      },
-      {
-        key: "/ai-chat",
-        icon: <RobotOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/ai-chat">{t("nav.ai_chat", language as any)}</Link>,
-      },
-      {
-        key: "/reports",
-        icon: <BarChartOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/reports">{t("nav.reports", language as any)}</Link>,
-      },
-      {
-        key: "/performance",
-        icon: <DashboardOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/performance">经营驾驶舱</Link>,
-      },
-      {
-        key: "/portfolio",
-        icon: <PieChartOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/portfolio">组合分析</Link>,
-      },
-      {
-        key: "/pre-deal",
-        icon: <FileSearchOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/pre-deal">签约前决策</Link>,
-      },
-      {
-        key: "/deal-compare",
-        icon: <SwapOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/deal-compare">条款比价</Link>,
-      },
-      {
-        key: "/sensitivity",
-        icon: <LineChartOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/sensitivity">敏感性分析</Link>,
-      },
-      {
-        key: "/standards",
-        icon: <SafetyOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/standards">多准则对比</Link>,
-      },
-      {
-        key: "/cashflow-forecast",
-        icon: <LineChartOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/cashflow-forecast">{t("nav.cashflow", language as any)}</Link>,
-      },
-      {
-        key: "/monthly-closing",
-        icon: <CalculatorOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/monthly-closing">{t("nav.monthly_closing", language as any)}</Link>,
-      },
-      {
-        key: "/roi",
-        icon: <DollarOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/roi">ROI 测算</Link>,
-      },
-      {
-        key: "/audit-logs",
-        icon: <AuditOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/audit-logs">{t("nav.audit_logs", language as any)}</Link>,
-      },
-      ...(canViewAgentMetrics
-        ? [{
-            key: "/agent-metrics",
-            icon: <BarChartOutlined style={{ fontSize: 16 }} />,
-            label: <Link href="/agent-metrics">{t("nav.agent_metrics", language as any)}</Link>,
-          }]
-        : []),
-      {
-        key: "/settings",
-        icon: <SettingOutlined style={{ fontSize: 16 }} />,
-        label: <Link href="/settings">{t("nav.settings", language as any)}</Link>,
-      },
-    ],
-    [canViewAgentMetrics, language]
+    () => {
+      const groups: any[] = [
+        {
+          type: "group",
+          key: "daily-work",
+          label: t("nav.group_daily", language as any),
+          children: [
+            item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
+            item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
+            item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
+          ],
+        },
+      ];
+      if (canViewAnalysis) {
+        groups.push({
+          type: "group",
+          key: "analysis",
+          label: t("nav.group_analysis", language as any),
+          children: [
+            item("/performance", "/performance", <DashboardOutlined />, t("nav.performance", language as any)),
+            item("/portfolio", "/portfolio", <PieChartOutlined />, t("nav.portfolio", language as any)),
+            item("/pre-deal", "/pre-deal", <FileSearchOutlined />, t("nav.pre_deal", language as any)),
+            item("/deal-compare", "/deal-compare", <SwapOutlined />, t("nav.deal_compare", language as any)),
+            item("/sensitivity", "/sensitivity", <LineChartOutlined />, t("nav.sensitivity", language as any)),
+            item("/cashflow-forecast", "/cashflow-forecast", <DollarOutlined />, t("nav.cashflow", language as any)),
+            item("/roi", "/roi", <CalculatorOutlined />, t("nav.roi", language as any)),
+          ],
+        });
+      }
+      if (canViewAccounting) {
+        groups.push({
+          type: "group",
+          key: "accounting",
+          label: t("nav.group_accounting", language as any),
+          children: [
+            item("/reports", "/reports", <BarChartOutlined />, t("nav.reports", language as any)),
+            item("/monthly-closing", "/monthly-closing", <CalculatorOutlined />, t("nav.monthly_closing", language as any)),
+            item("/standards", "/standards", <SafetyOutlined />, t("nav.standards", language as any)),
+            item("/audit-logs", "/audit-logs", <AuditOutlined />, t("nav.audit_logs", language as any)),
+          ],
+        });
+      }
+      if (canViewSystem) {
+        groups.push({
+          type: "group",
+          key: "system",
+          label: t("nav.group_system", language as any),
+          children: [
+            ...(isAuditor || isAdmin ? [item("/agent-metrics", "/agent-metrics", <BarChartOutlined />, t("nav.agent_metrics", language as any))] : []),
+            ...(isAdmin ? [item("/settings", "/settings", <SettingOutlined />, t("nav.settings", language as any))] : []),
+          ],
+        });
+      }
+      return groups.filter((group) => group.children.length > 0);
+    },
+    [canViewAccounting, canViewAnalysis, canViewSystem, isAdmin, isAuditor, language]
   );
 }
 
@@ -169,6 +147,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { language, setLanguage } = useLanguage();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const syncViewport = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setCollapsed(mobile || window.innerWidth < 1024);
+      if (!mobile) setMobileNavOpen(false);
+    };
+    syncViewport();
+    window.addEventListener("resize", syncViewport);
+    return () => window.removeEventListener("resize", syncViewport);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -183,7 +175,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const menuItems = hasRole(user, "admin")
-    ? [...baseMenuItems, adminMenuItem]
+    ? baseMenuItems.map((group: any) => group.key === "system"
+      ? { ...group, children: [...group.children, adminMenuItem] }
+      : group)
     : baseMenuItems;
 
   // Generate breadcrumbs from pathname
@@ -242,8 +236,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "#fff",
-          borderBottom: "1px solid #E5E5E5",
+          background: "var(--fg-inverse)",
+          borderBottom: "1px solid var(--border-default)",
           padding: "0 32px",
           height: 60,
           position: "sticky",
@@ -255,7 +249,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Left: Logo + Collapse + Breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0 }}>
           {/* Logo */}
-          <div
+          <Link
+            href="/"
+            aria-label={t("app.title", language)}
+            className="app-logo"
             style={{
               display: "flex",
               alignItems: "center",
@@ -268,52 +265,55 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 width: 28,
                 height: 28,
                 borderRadius: 7,
-                background: "#000",
+                background: "var(--fg-primary)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <RobotOutlined style={{ fontSize: 15, color: "#fff" }} />
+              <span aria-hidden="true" style={{ fontSize: 11, fontWeight: 800, color: "var(--fg-inverse)", letterSpacing: "-0.5px" }}>L16</span>
             </div>
             <span
               style={{
                 fontSize: 16,
                 fontWeight: 700,
                 letterSpacing: "-0.5px",
-                color: "#000",
+                color: "var(--fg-primary)",
                 whiteSpace: "nowrap",
               }}
             >
               {t("app.title", language)}
             </span>
-          </div>
+          </Link>
 
           {/* Collapse Toggle */}
-          <div
-            onClick={() => setCollapsed(!collapsed)}
+          <button
+            type="button"
+            aria-label={collapsed ? t("nav.expand", language) : t("nav.collapse", language)}
+            aria-expanded={!collapsed}
+            onClick={() => (isMobile ? setMobileNavOpen(true) : setCollapsed(!collapsed))}
+            className="layout-icon-button"
             style={{
-              cursor: "pointer",
               padding: "6px",
               borderRadius: 6,
               transition: "background 0.15s",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#595959",
+              color: "var(--fg-tertiary)",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          </div>
+          </button>
 
           {/* Breadcrumb */}
           {pathname !== "/" && (
             <div style={{ marginLeft: 8, minWidth: 0, overflow: "hidden" }}>
               <Breadcrumb
                 items={breadcrumbs}
-                separator={<span style={{ color: "#D9D9D9" }}>/</span>}
+                separator={<span style={{ color: "var(--border-strong)" }}>/</span>}
                 style={{ fontSize: 13 }}
               />
             </div>
@@ -341,37 +341,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               }}
               placement="bottomRight"
             >
-              <div
+              <button
+                type="button"
+                aria-label={t("nav.language", language)}
+                aria-haspopup="menu"
                 style={{
                   cursor: "pointer",
                   padding: "8px",
                   borderRadius: 8,
                   transition: "background 0.15s",
-                  color: "#595959",
+                  color: "var(--fg-tertiary)",
                   display: "flex",
                   alignItems: "center",
                   gap: 4,
                   fontSize: 13,
                   fontWeight: 500,
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <GlobalOutlined style={{ fontSize: 14 }} />
                 <span style={{ textTransform: "uppercase", fontSize: 12 }}>
                   {language === "zh-CN" ? "CN" : language === "zh-HK" ? "HK" : "EN"}
                 </span>
-              </div>
+              </button>
             </Dropdown>
           )}
 
           {/* Divider */}
-          <div style={{ width: 1, height: 20, background: "#E5E5E5" }} />
+          <div style={{ width: 1, height: 20, background: "var(--border-default)" }} />
 
           {/* User */}
           {user && (
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-              <div
+              <button
+                type="button"
+                aria-label={t("user.menu", language)}
+                aria-haspopup="menu"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -381,18 +387,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   borderRadius: 9999,
                   transition: "background 0.15s",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <Avatar
                   size={28}
                   icon={<UserOutlined />}
-                  style={{ background: "#000", fontSize: 12 }}
+                  style={{ background: "var(--fg-primary)", fontSize: 12 }}
                 />
-                <span style={{ fontSize: 13, fontWeight: 500, color: "#262626" }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-secondary)" }}>
                   {user.username}
                 </span>
-              </div>
+              </button>
             </Dropdown>
           )}
         </div>
@@ -400,14 +406,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <Layout style={{ flex: 1, overflow: "hidden" }}>
         {/* ── Sidebar ── */}
-        <Sider
+        {!isMobile && <Sider
           width={240}
           collapsed={collapsed}
           collapsedWidth={64}
           trigger={null}
           style={{
-            background: "#fff",
-            borderRight: "1px solid #E5E5E5",
+            background: "var(--fg-inverse)",
+            borderRight: "1px solid var(--border-default)",
             flexShrink: 0,
             overflowY: "auto",
             overflowX: "hidden",
@@ -435,9 +441,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 left: 0,
                 right: 0,
                 padding: "12px 16px",
-                borderTop: "1px solid #F0F0F0",
+                borderTop: "1px solid var(--bg-inset)",
                 fontSize: 11,
-                color: "#BFBFBF",
+                color: "var(--fg-muted)",
                 textAlign: "center",
                 lineHeight: 1.5,
               }}
@@ -446,13 +452,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div style={{ marginTop: 2 }}>v0.1.0</div>
             </div>
           )}
-        </Sider>
+        </Sider>}
+
+        <Drawer
+          title={t("app.title", language)}
+          placement="left"
+          open={isMobile && mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+          width={272}
+          styles={{ body: { padding: "8px 0" }, header: { padding: "16px 20px" } }}
+        >
+          <Menu
+            mode="inline"
+            selectedKeys={[activeMenuKey]}
+            items={menuItems}
+            onClick={() => setMobileNavOpen(false)}
+            style={{ borderRight: 0 }}
+          />
+        </Drawer>
 
         {/* ── Content ── */}
         <Content
           style={{
             padding: "32px 48px",
-            background: "#FFFFFF",
+            background: "var(--fg-inverse)",
             overflowY: "auto",
             overflowX: "hidden",
             minWidth: 0,
@@ -461,9 +484,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
-              initial={pageTransition.initial}
+              initial={false}
               animate={pageTransition.animate}
-              exit={pageTransition.exit}
+              exit={undefined}
               transition={pageTransition.transition as any}
               style={{ maxWidth: 1440, margin: "0 auto" }}
             >

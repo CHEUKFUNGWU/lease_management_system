@@ -1,52 +1,59 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Dropdown, Empty, Tag } from "antd";
+import { Badge, Dropdown, Empty } from "antd";
 import { BellOutlined, CalendarOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { leaseAdminApi } from "../lib/api";
+import { workQueueApi } from "../lib/api";
 import { t } from "../lib/i18n";
+import { StatusTag } from "./StatusTag";
 
-interface UpcomingCriticalDate {
-  id: string;
-  contract_id: string;
-  contract_number?: string;
-  contract_name?: string;
-  date_type: string;
-  target_date: string;
+interface WorkQueueItem {
+  kind: string;
+  contract_id?: string;
+  record_id?: string;
   title: string;
+  subtitle?: string;
+  due_date?: string;
 }
 
 function urgency(targetDate: string, language: Parameters<typeof t>[1]) {
   const days = dayjs(targetDate).startOf("day").diff(dayjs().startOf("day"), "day");
   if (days < 0) {
-    return { color: "error" as const, text: t("notif.overdue", language, { days: String(Math.abs(days)) }) };
+    return { kind: "error" as const, text: t("notif.overdue", language, { days: String(Math.abs(days)) }) };
   }
   if (days === 0) {
-    return { color: "warning" as const, text: t("notif.due_today", language) };
+    return { kind: "warning" as const, text: t("notif.due_today", language) };
   }
   if (days <= 30) {
-    return { color: "warning" as const, text: t("notif.due_in", language, { days: String(days) }) };
+    return { kind: "warning" as const, text: t("notif.due_in", language, { days: String(days) }) };
   }
-  return { color: "processing" as const, text: t("notif.due_in", language, { days: String(days) }) };
+  return { kind: "processing" as const, text: t("notif.due_in", language, { days: String(days) }) };
 }
 
 export default function NotificationBell() {
   const router = useRouter();
   const { token } = useAuth();
   const { language } = useLanguage();
-  const [dates, setDates] = useState<UpcomingCriticalDate[]>([]);
+  const [items, setItems] = useState<WorkQueueItem[]>([]);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await leaseAdminApi.listUpcomingCriticalDates(token, { days: 90, limit: 10 });
-        if (!cancelled) setDates(res.data || []);
+        const res = await workQueueApi.get(token, 90);
+        const queue = res || {};
+        const all = Object.entries(queue)
+          .filter(([key, value]) => key !== "total" && Array.isArray(value))
+          .flatMap(([, value]) => value as WorkQueueItem[])
+          .filter((item) => item.due_date || item.kind === "contract_pending_review" || item.kind === "entry_pending_approval")
+          .slice(0, 12);
+        if (!cancelled) setItems(all);
       } catch (error) {
         console.error("Failed to load critical date notifications:", error);
       }
@@ -59,17 +66,17 @@ export default function NotificationBell() {
     };
   }, [token]);
 
-  const urgentCount = dates.filter(
-    (d) => dayjs(d.target_date).startOf("day").diff(dayjs().startOf("day"), "day") <= 30
+  const urgentCount = items.filter(
+    (item) => item.due_date && dayjs(item.due_date).startOf("day").diff(dayjs().startOf("day"), "day") <= 30
   ).length;
 
   const dropdown = (
     <div
       style={{
         width: 360,
-        background: "#fff",
+        background: "var(--fg-inverse)",
         borderRadius: 10,
-        border: "1px solid #E5E5E5",
+        border: "1px solid var(--border-default)",
         boxShadow: "0 0 0 1px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.1)",
         overflow: "hidden",
       }}
@@ -77,7 +84,7 @@ export default function NotificationBell() {
       <div
         style={{
           padding: "12px 16px",
-          borderBottom: "1px solid #F0F0F0",
+          borderBottom: "1px solid var(--bg-inset)",
           fontSize: 13,
           fontWeight: 600,
           display: "flex",
@@ -87,31 +94,38 @@ export default function NotificationBell() {
       >
         <CalendarOutlined style={{ fontSize: 13 }} />
         {t("notif.title", language)}
-        {urgentCount > 0 && (
-          <Tag color="error" style={{ fontSize: 11, marginLeft: "auto", marginRight: 0 }}>
-            {urgentCount}
-          </Tag>
+        {items.length > 0 && (
+          <StatusTag kind={urgentCount > 0 ? "error" : "neutral"} style={{ fontSize: 11, marginLeft: "auto", padding: "1px 7px" }}>
+            {items.length}
+          </StatusTag>
         )}
       </div>
       <div style={{ maxHeight: 380, overflowY: "auto" }}>
-        {dates.length === 0 ? (
+        {items.length === 0 ? (
           <div style={{ padding: "32px 0" }}>
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("notif.empty", language)} />
           </div>
         ) : (
-          dates.map((item) => {
-            const info = urgency(item.target_date, language);
+          items.map((item, index) => {
+            const info = item.due_date ? urgency(item.due_date, language) : { kind: "processing" as const, text: t("notif.pending", language) };
             return (
-              <div
-                key={item.id}
-                onClick={() => router.push(`/contracts/${item.contract_id}`)}
-                style={{
-                  padding: "10px 16px",
-                  borderBottom: "1px solid #F7F7F7",
-                  cursor: "pointer",
-                  transition: "background 0.15s",
+              <button
+                type="button"
+                key={`${item.record_id || item.contract_id || item.title}-${index}`}
+                onClick={() => {
+                  setOpen(false);
+                  router.push(item.contract_id ? `/contracts/${item.contract_id}` : "/todo");
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFAFA")}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  background: "transparent",
+                  border: 0,
+                  padding: "10px 16px",
+                  borderBottom: "1px solid var(--bg-surface)",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-surface)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -127,42 +141,48 @@ export default function NotificationBell() {
                   >
                     {item.title}
                   </span>
-                  <Tag color={info.color} style={{ fontSize: 11, marginRight: 0, flexShrink: 0 }}>
+                  <StatusTag kind={info.kind} style={{ fontSize: 11, padding: "1px 7px", marginRight: 0, flexShrink: 0 }}>
                     {info.text}
-                  </Tag>
+                  </StatusTag>
                 </div>
-                <div style={{ fontSize: 12, color: "#8C8C8C", marginTop: 2 }}>
-                  {[item.contract_number, item.contract_name].filter(Boolean).join(" · ")}
-                  <span style={{ marginLeft: 8, color: "#BFBFBF" }}>
-                    {dayjs(item.target_date).format("YYYY-MM-DD")}
-                  </span>
+                <div style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 2 }}>
+                  {item.subtitle || t("notif.work_queue_item", language)}
+                  {item.due_date && <span style={{ marginLeft: 8 }}>{dayjs(item.due_date).format("YYYY-MM-DD")}</span>}
                 </div>
-              </div>
+              </button>
             );
           })
         )}
+        <button type="button" className="notification-view-all" onClick={() => { setOpen(false); router.push("/todo"); }}>
+          {t("notif.view_all", language)}
+        </button>
       </div>
     </div>
   );
 
   return (
-    <Dropdown popupRender={() => dropdown} placement="bottomRight" trigger={["click"]}>
-      <div
+    <Dropdown open={open} onOpenChange={setOpen} popupRender={() => dropdown} placement="bottomRight" trigger={["click"]}>
+      <button
+        type="button"
+        aria-label={t("notif.title", language)}
+        aria-expanded={open}
         style={{
           cursor: "pointer",
+          border: 0,
+          background: "transparent",
           padding: "8px",
           borderRadius: 8,
           transition: "background 0.15s",
-          color: "#595959",
+          color: "var(--fg-tertiary)",
           position: "relative",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F5F5")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
         <Badge count={urgentCount} size="small" offset={[-2, 2]}>
           <BellOutlined style={{ fontSize: 16 }} />
         </Badge>
-      </div>
+      </button>
     </Dropdown>
   );
 }

@@ -54,7 +54,7 @@ INSERT INTO permissions (role_id, resource, action) VALUES
     ('33333333-3333-3333-3333-333333333333', 'variance_actions', 'write'),
     ('33333333-3333-3333-3333-333333333333', 'renewal_decisions', 'write'),
     ('44444444-4444-4444-4444-444444444444', 'variance_actions', 'write'),
-    ('44444444-4444-4444-444444444444', 'renewal_decisions', 'write')
+    ('44444444-4444-4444-4444-444444444444', 'renewal_decisions', 'write')
 ON CONFLICT (role_id, resource, action) DO NOTHING;
 
 -- +goose StatementEnd

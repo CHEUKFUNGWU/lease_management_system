@@ -206,6 +206,7 @@ docker exec -i lease-postgres psql -U lease -d lease < db/migrations/030_auth_re
 docker exec -i lease-postgres psql -U lease -d lease < db/migrations/031_agent_run_audit_summaries.sql
 docker exec -i lease-postgres psql -U lease -d lease < db/migrations/032_agent_run_checkpoint_audit_and_terminal_alerts.sql
 docker exec -i lease-postgres psql -U lease -d lease < db/migrations/033_agent_run_audit_links.sql
+docker exec -i lease-postgres psql -U lease -d lease < db/migrations/036_close_exception_governance_repair.sql
 ```
 
 如果要清空数据库并按最新 schema 重建：

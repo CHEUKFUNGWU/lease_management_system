@@ -275,3 +275,16 @@ func TestSchemaSmoke_ExchangeRatesAndWorkQueue(t *testing.T) {
 		t.Fatalf("list budget versions: %v", err)
 	}
 }
+
+// TestSchemaSmoke_CloseExceptionGovernance protects the authenticated todo
+// page's formal-exception query. The init script and the repair migration must
+// both leave the joined close-control tables available before the page is
+// served; otherwise the UI turns an empty list into an HTTP 500 toast.
+func TestSchemaSmoke_CloseExceptionGovernance(t *testing.T) {
+	pool := smokePool(t)
+	ctx := context.Background()
+
+	if _, err := repository.NewCloseControlRepository(pool).ListExceptions(ctx, "2099-12", ""); err != nil {
+		t.Fatalf("list close exceptions on an empty period: %v", err)
+	}
+}

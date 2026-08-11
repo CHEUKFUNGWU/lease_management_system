@@ -71,6 +71,12 @@ type Contract struct {
 	CreatedBy                    *string     `json:"created_by"`
 	CreatedAt                    time.Time   `json:"created_at"`
 	UpdatedAt                    time.Time   `json:"updated_at"`
+	LatestLiability              *float64    `json:"latest_liability,omitempty"`
+	LatestROUAsset               *float64    `json:"latest_rou_asset,omitempty"`
+	CurrentRent                  *float64    `json:"current_rent,omitempty"`
+	CurrentRentCurrency          *string     `json:"current_rent_currency,omitempty"`
+	CurrentRentCoverageStart     *time.Time  `json:"current_rent_coverage_start,omitempty"`
+	CurrentRentCoverageEnd       *time.Time  `json:"current_rent_coverage_end,omitempty"`
 }
 
 type ContractRepository struct {
@@ -330,11 +336,15 @@ func (r *ContractRepository) Create(ctx context.Context, contract *Contract) (*C
 
 // ListContractsFilter holds optional filters for listing contracts.
 type ListContractsFilter struct {
-	Search    string // search in contract_number, contract_name, lessee_name, lessor_name, store_name
-	Status    string // filter by exact approval_status
-	Statuses  []string
-	SortBy    string // sort column: contract_number, commencement_date, lease_end_date, approval_status, created_at
-	SortOrder string // asc or desc
+	Search              string // search in contract_number, contract_name, lessee_name, lessor_name, store_name
+	Status              string // filter by exact approval_status
+	Statuses            []string
+	MissingDiscountRate bool
+	LeaseScope          string
+	AssetType           string
+	LeaseEndBefore      *time.Time
+	SortBy              string // sort column: contract_number, commencement_date, lease_end_date, approval_status, created_at
+	SortOrder           string // asc or desc
 
 	// Page and PageSize paginate in the database. Zero means "no paging", which
 	// keeps existing internal callers (reports, closes) reading the full set.
@@ -385,6 +395,9 @@ var allowedSortColumns = map[string]string{
 	"commencement_date": "commencement_date",
 	"lease_end_date":    "lease_end_date",
 	"approval_status":   "approval_status",
+	"latest_liability":  "latest_liability",
+	"latest_rou_asset":  "latest_rou_asset",
+	"current_rent":      "current_rent",
 	"created_at":        "created_at",
 }
 
@@ -405,7 +418,7 @@ func (r *ContractRepository) ListPaged(ctx context.Context, legalEntityID string
 	sel := `
 		SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
 			COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-			COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
+			COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, lease_contracts.currency, signing_date,
 			commencement_date, lease_start_date, lease_end_date, status,
 			created_by, approved_by, created_at, updated_at,
 			approval_status, is_official_version, draft_version_no,
@@ -416,8 +429,35 @@ func (r *ContractRepository) ListPaged(ctx context.Context, legalEntityID string
 			ai_extracted_discount_rate, ai_suggested_rate_policies,
 			ai_confidence_score, source_reference_locator, approved_at,
 			COALESCE(lease_scope, 'in_scope') AS lease_scope, exemption_reason,
-			scope_classified_by, scope_classified_at, scope_source, scope_confidence
+			scope_classified_by, scope_classified_at, scope_source, scope_confidence,
+			(SELECT mr.closing_liability
+			 FROM measurement_results mr
+			 WHERE mr.contract_id = lease_contracts.id AND mr.is_calculated = true
+			 ORDER BY mr.accounting_period DESC, mr.period_end_date DESC
+			 LIMIT 1) AS latest_liability,
+			(SELECT mr.closing_rou_asset
+			 FROM measurement_results mr
+			 WHERE mr.contract_id = lease_contracts.id AND mr.is_calculated = true
+			 ORDER BY mr.accounting_period DESC, mr.period_end_date DESC
+			 LIMIT 1) AS latest_rou_asset,
+			cur.amount AS current_rent,
+			cur.currency AS current_rent_currency,
+			cur.coverage_start_date AS current_rent_coverage_start,
+			cur.coverage_end_date AS current_rent_coverage_end
 		FROM lease_contracts
+		LEFT JOIN LATERAL (
+			SELECT ps.amount, ps.currency, ps.coverage_start_date, ps.coverage_end_date
+			FROM lease_payment_schedules ps
+			WHERE ps.contract_id = lease_contracts.id
+			  AND ps.is_fixed = true
+			  AND ps.is_variable = false
+			  AND ps.is_lease_component = true
+			  AND ps.is_non_lease_component = false
+			  AND ps.effective_start_date <= CURRENT_DATE
+			  AND ps.effective_end_date >= CURRENT_DATE
+			ORDER BY ps.effective_start_date DESC, ps.due_date DESC
+			LIMIT 1
+		) cur ON true
 	`
 
 	var conditions []string
@@ -435,6 +475,27 @@ func (r *ContractRepository) ListPaged(ctx context.Context, legalEntityID string
 	if len(filter.Statuses) > 0 {
 		conditions = append(conditions, fmt.Sprintf("approval_status = ANY($%d)", argIdx))
 		args = append(args, filter.Statuses)
+		argIdx++
+	}
+	if filter.MissingDiscountRate {
+		conditions = append(conditions, "discount_rate_missing = true")
+	}
+	if filter.LeaseScope != "" {
+		// Older rows may predate the scope-gate migration and have NULL here;
+		// the SELECT/API contract treats those rows as in-scope, so filtering
+		// must use the same compatibility default.
+		conditions = append(conditions, fmt.Sprintf("COALESCE(lease_scope, 'in_scope') = $%d", argIdx))
+		args = append(args, filter.LeaseScope)
+		argIdx++
+	}
+	if filter.AssetType != "" {
+		conditions = append(conditions, fmt.Sprintf("asset_type = $%d", argIdx))
+		args = append(args, filter.AssetType)
+		argIdx++
+	}
+	if filter.LeaseEndBefore != nil {
+		conditions = append(conditions, fmt.Sprintf("lease_end_date <= $%d", argIdx))
+		args = append(args, *filter.LeaseEndBefore)
 		argIdx++
 	}
 
@@ -520,6 +581,8 @@ func (r *ContractRepository) ListPaged(ctx context.Context, legalEntityID string
 			&c.AIConfidenceScore, &c.SourceReferenceLocator, &c.ApprovedAt,
 			&c.LeaseScope, &c.ExemptionReason, &c.ScopeClassifiedBy,
 			&c.ScopeClassifiedAt, &c.ScopeSource, &c.ScopeConfidence,
+			&c.LatestLiability, &c.LatestROUAsset,
+			&c.CurrentRent, &c.CurrentRentCurrency, &c.CurrentRentCoverageStart, &c.CurrentRentCoverageEnd,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("failed to scan contract: %w", err)

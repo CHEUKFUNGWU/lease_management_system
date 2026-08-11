@@ -437,10 +437,21 @@ func (h *ContractHandler) GetAll(c *gin.Context) {
 	legalEntityID := middleware.GetTenantID(c)
 
 	filter := repository.ListContractsFilter{
-		Search:    c.Query("search"),
-		Status:    c.Query("status"),
-		SortBy:    c.Query("sort_by"),
-		SortOrder: c.Query("sort_order"),
+		Search:              c.Query("search"),
+		Status:              c.Query("status"),
+		SortBy:              c.Query("sort_by"),
+		SortOrder:           c.Query("sort_order"),
+		MissingDiscountRate: c.Query("discount_rate_missing") == "true" || c.Query("risk") == "discount_rate_missing",
+		LeaseScope:          c.Query("lease_scope"),
+		AssetType:           c.Query("asset_type"),
+	}
+	if endBefore := c.Query("lease_end_before"); endBefore != "" {
+		parsed, err := time.Parse("2006-01-02", endBefore)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "lease_end_before must use YYYY-MM-DD"})
+			return
+		}
+		filter.LeaseEndBefore = &parsed
 	}
 	// Paging is opt-in: callers that omit page_size still receive the full list,
 	// which keeps existing integrations working.

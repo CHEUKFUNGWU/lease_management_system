@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
+
 import { useParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -30,6 +32,7 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
+import PageHeader from "../../components/PageHeader";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -181,13 +184,13 @@ export default function ContractDetailPage() {
     other: "其他",
   };
 
-  const criticalDateLabels: Record<string, string> = {
-    renewal_deadline: "续租截止",
-    break_notice: "Break 通知",
-    rent_review: "租金 Review",
-    lease_expiry: "租约到期",
-    insurance_renewal: "保险续保",
-    other: "其他",
+  const criticalDateKeys: Record<string, string> = {
+    renewal_deadline: "critical_date.renewal_deadline",
+    break_notice: "critical_date.break_notice",
+    rent_review: "critical_date.rent_review",
+    lease_expiry: "critical_date.lease_expiry",
+    insurance_renewal: "critical_date.insurance_renewal",
+    other: "critical_date.other",
   };
 
   const criticalStatusColors: Record<string, string> = {
@@ -247,9 +250,9 @@ export default function ContractDetailPage() {
       width: 90,
       render: (v: string) =>
         v === "prepaid" ? (
-          <Tag color="processing">{t("contract.prepaid", language)}</Tag>
+          <StatusTag kind="processing">{t("contract.prepaid", language)}</StatusTag>
         ) : (
-          <Tag color="success">{t("contract.postpaid", language)}</Tag>
+          <StatusTag kind="success">{t("contract.postpaid", language)}</StatusTag>
         ),
     },
     { title: t("contract.amount_type", language), dataIndex: "amount_type", width: 120 },
@@ -258,8 +261,8 @@ export default function ContractDetailPage() {
       width: 100,
       render: (_: any, r: PaymentSchedule) => (
         <Space>
-          {r.is_fixed && <Tag>{t("contract.fixed", language)}</Tag>}
-          {r.is_variable && <Tag color="warning">{t("contract.variable", language)}</Tag>}
+          {r.is_fixed && <StatusTag>{t("contract.fixed", language)}</StatusTag>}
+          {r.is_variable && <StatusTag kind="warning">{t("contract.variable", language)}</StatusTag>}
         </Space>
       ),
     },
@@ -267,16 +270,16 @@ export default function ContractDetailPage() {
       title: t("contract.lease_component", language),
       width: 90,
       render: (_: any, r: PaymentSchedule) =>
-        r.is_lease_component ? <Tag color="success">{t("contract.yes", language)}</Tag> : <Tag>{t("contract.no", language)}</Tag>,
+        r.is_lease_component ? <StatusTag kind="success">{t("contract.yes", language)}</StatusTag> : <StatusTag>{t("contract.no", language)}</StatusTag>,
     },
     {
       title: t("contract.include_liability", language),
       width: 90,
       render: (_: any, r: PaymentSchedule) =>
         r.included_in_liability_pv ? (
-          <Tag color="success">{t("contract.yes", language)}</Tag>
+          <StatusTag kind="success">{t("contract.yes", language)}</StatusTag>
         ) : (
-          <Tag>{t("contract.no", language)}</Tag>
+          <StatusTag>{t("contract.no", language)}</StatusTag>
         ),
     },
   ];
@@ -358,31 +361,27 @@ export default function ContractDetailPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        {/* Page Header */}
-        <div style={{ marginBottom: 24 }}>
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => router.push("/contracts")}
-            style={{ marginBottom: 8, paddingLeft: 0 }}
-          >
-            {t("contract.back_to_list", language)}
-          </Button>
-          <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.04em', margin: 0, lineHeight: 1.3 }}>
-            {contract?.contract_name || t("contract.detail_title", language)}
-          </h1>
-          {contract && (
-            <div style={{ fontSize: 14, color: '#8C8C8C', marginTop: 4 }}>
-              {contract.contract_number} ·{" "}
-              <Tag color={statusColors[contract.approval_status]}>
-                {statusLabels[contract.approval_status]}
-              </Tag>
-            </div>
+        <PageHeader
+          title={contract?.contract_name || t("contract.detail_title", language)}
+          subtitle={contract?.contract_number}
+          meta={contract && (
+            <StatusTag kind={statusKindFromAntColor(statusColors[contract.approval_status])}>
+              {statusLabels[contract.approval_status]}
+            </StatusTag>
           )}
-        </div>
+          secondaryAction={
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => router.push("/contracts")}
+            >
+              {t("contract.back_to_list", language)}
+            </Button>
+          }
+        />
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
         >
@@ -395,11 +394,11 @@ export default function ContractDetailPage() {
                     title={
                       <Space>
                         <span>{contract.contract_name}</span>
-                        <Tag color={statusColors[contract.approval_status]}>
+                        <StatusTag kind={statusKindFromAntColor(statusColors[contract.approval_status])}>
                           {statusLabels[contract.approval_status]}
-                        </Tag>
+                        </StatusTag>
                         {contract.is_official_version && (
-                          <Tag color="processing">{t("contracts.official", language)}</Tag>
+                          <StatusTag kind="processing">{t("contracts.official", language)}</StatusTag>
                         )}
                       </Space>
                     }
@@ -491,26 +490,26 @@ export default function ContractDetailPage() {
                         {contract.currency}
                       </Descriptions.Item>
                       <Descriptions.Item label="资产类型">
-                        <Tag>{assetTypeLabels[contract.asset_type || "real_estate"]}</Tag>
+                        <StatusTag>{assetTypeLabels[contract.asset_type || "real_estate"]}</StatusTag>
                       </Descriptions.Item>
                       <Descriptions.Item label={t("contract_detail.area_sqm", language)}>
                         {contract.area_sqm != null ? `${Number(contract.area_sqm).toLocaleString()} ㎡` : "-"}
                       </Descriptions.Item>
                       <Descriptions.Item label={t("contract.discount_rate", language)}>
                         {contract.discount_rate_value != null ? (
-                          <Tag color="success">{(contract.discount_rate_value * 100).toFixed(2)}%</Tag>
+                          <StatusTag kind="success">{(contract.discount_rate_value * 100).toFixed(2)}%</StatusTag>
                         ) : contract.discount_rate_missing ? (
-                          <Tag color="error">{t("contracts.missing", language)}</Tag>
+                          <StatusTag kind="error">{t("contracts.missing", language)}</StatusTag>
                         ) : (
-                          <Tag color="success">
+                          <StatusTag kind="success">
                             {contract.discount_rate_type} / {contract.discount_rate_version}
-                          </Tag>
+                          </StatusTag>
                         )}
                       </Descriptions.Item>
                       <Descriptions.Item label="IFRS 16 范围">
-                        <Tag color={leaseScopeColors[contract.lease_scope || "in_scope"]}>
+                        <StatusTag kind={statusKindFromAntColor(leaseScopeColors[contract.lease_scope || "in_scope"])}>
                           {leaseScopeLabels[contract.lease_scope || "in_scope"]}
-                        </Tag>
+                        </StatusTag>
                       </Descriptions.Item>
                       <Descriptions.Item label={t("contract.commencement_date", language)}>
                         {dayjs(contract.commencement_date).format("YYYY-MM-DD")}
@@ -536,26 +535,26 @@ export default function ContractDetailPage() {
                       items={[
                         {
                           dot: <ClockCircleOutlined />,
-                          color: contract.created_at ? "#000000" : "#D9D9D9",
+                          color: contract.created_at ? "var(--fg-primary)" : "var(--border-strong)",
                           children: `${t("contract.created", language)} ${dayjs(contract.created_at).format("YYYY-MM-DD")}`,
                         },
                         {
                           dot: <FileTextOutlined />,
-                          color: contract.submitted_at ? "#000000" : "#D9D9D9",
+                          color: contract.submitted_at ? "var(--fg-primary)" : "var(--border-strong)",
                           children: contract.submitted_at
                             ? `${t("contract.submitted", language)} ${dayjs(contract.submitted_at).format("YYYY-MM-DD")}`
                             : `${t("contract.pending", language)}${t("contract.submitted", language)}`,
                         },
                         {
                           dot: <CheckCircleOutlined />,
-                          color: contract.reviewed_at ? "#000000" : "#D9D9D9",
+                          color: contract.reviewed_at ? "var(--fg-primary)" : "var(--border-strong)",
                           children: contract.reviewed_at
                             ? `${t("contract.reviewed", language)} ${dayjs(contract.reviewed_at).format("YYYY-MM-DD")}`
                             : `${t("contract.pending", language)}${t("contract.reviewed", language)}`,
                         },
                         {
                           dot: <CheckCircleOutlined />,
-                          color: contract.approved_at ? "#000000" : "#D9D9D9",
+                          color: contract.approved_at ? "var(--fg-primary)" : "var(--border-strong)",
                           children: contract.approved_at
                             ? `${t("contract.approved", language)} ${dayjs(contract.approved_at).format("YYYY-MM-DD")}`
                             : `${t("contract.pending", language)}${t("contract.approved", language)}`,
@@ -610,7 +609,7 @@ export default function ContractDetailPage() {
                       <Space>
                         <span>{t("contract.tab_payments", language)}</span>
                         {schedules.length > 0 && (
-                          <Tag color="processing">{schedules.length} {t("contract_detail.item_unit", language)}</Tag>
+                          <StatusTag kind="processing">{schedules.length} {t("contract_detail.item_unit", language)}</StatusTag>
                         )}
                       </Space>
                     }
@@ -653,7 +652,7 @@ export default function ContractDetailPage() {
                           <Space>
                             <span>关键日期与提醒</span>
                             {criticalDates.filter((d) => d.status === "open").length > 0 && (
-                              <Tag color="processing">{criticalDates.filter((d) => d.status === "open").length} 待处理</Tag>
+                              <StatusTag kind="processing">{criticalDates.filter((d) => d.status === "open").length} 待处理</StatusTag>
                             )}
                           </Space>
                         }
@@ -669,7 +668,7 @@ export default function ContractDetailPage() {
                               title: "类型",
                               dataIndex: "date_type",
                               width: 130,
-                              render: (v: string) => criticalDateLabels[v] || v,
+                              render: (v: string) => t(criticalDateKeys[v] || "critical_date.other", language),
                             },
                             { title: "标题", dataIndex: "title" },
                             {
@@ -683,7 +682,7 @@ export default function ContractDetailPage() {
                               title: "状态",
                               dataIndex: "status",
                               width: 100,
-                              render: (v: string) => <Tag color={criticalStatusColors[v]}>{v}</Tag>,
+                              render: (v: string) => <StatusTag kind={statusKindFromAntColor(criticalStatusColors[v])}>{v}</StatusTag>,
                             },
                             {
                               title: "操作",
@@ -758,7 +757,7 @@ export default function ContractDetailPage() {
                           <Space>
                             <span>运营条款与义务</span>
                             {obligations.filter((item) => item.status === "active").length > 0 && (
-                              <Tag color="processing">{obligations.filter((item) => item.status === "active").length} 生效中</Tag>
+                              <StatusTag kind="processing">{obligations.filter((item) => item.status === "active").length} 生效中</StatusTag>
                             )}
                           </Space>
                         }
@@ -787,7 +786,7 @@ export default function ContractDetailPage() {
                               title: "状态",
                               dataIndex: "status",
                               width: 100,
-                              render: (v: string) => <Tag color={obligationStatusColors[v]}>{v}</Tag>,
+                              render: (v: string) => <StatusTag kind={statusKindFromAntColor(obligationStatusColors[v])}>{v}</StatusTag>,
                             },
                             { title: "条款摘录", dataIndex: "source_clause", ellipsis: true, render: (v: string) => v || "-" },
                             { title: "页码", dataIndex: "source_page", width: 80, render: (v: number) => v || "-" },
@@ -833,7 +832,7 @@ export default function ContractDetailPage() {
                         title={
                           <Space>
                             <span>{t("contract.tab_events", language)}</span>
-                            {events.length > 0 && <Tag color="processing">{events.length}</Tag>}
+                            {events.length > 0 && <StatusTag kind="processing">{events.length}</StatusTag>}
                           </Space>
                         }
                         extra={
@@ -871,9 +870,9 @@ export default function ContractDetailPage() {
                                   returned_to_editor: t("status.returned_to_editor", language),
                                 };
                                 return (
-                                  <Tag color={eventStatusColors[v] || "default"}>
+                                  <StatusTag kind={statusKindFromAntColor(eventStatusColors[v] || "default")}>
                                     {eventStatusLabels[v] || v}
-                                  </Tag>
+                                  </StatusTag>
                                 );
                               },
                             },
@@ -1025,8 +1024,8 @@ export default function ContractDetailPage() {
                     ) : (
                       <Card>
                         <div style={{ textAlign: "center", padding: 40 }}>
-                          <CalculatorOutlined style={{ fontSize: 48, color: "#BFBFBF" }} />
-                          <p style={{ marginTop: 16, color: "#8C8C8C" }}>
+                          <CalculatorOutlined style={{ fontSize: 48, color: "var(--fg-muted)" }} />
+                          <p style={{ marginTop: 16, color: "var(--fg-muted)" }}>
                             {t("contract.click_calculate", language)}
                           </p>
                         </div>

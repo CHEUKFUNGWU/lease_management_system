@@ -393,19 +393,24 @@ func (r *MonthlyClosingRepository) SaveMeasurementResult(ctx context.Context, mr
 
 func (r *MonthlyClosingRepository) GetMeasurementResults(ctx context.Context, contractID, period string) ([]*MeasurementResult, error) {
 	query := `
-		SELECT id, contract_id, accounting_period, period_start_date, period_end_date,
-			opening_liability, interest_expense, principal_repayment, total_payment,
-			closing_liability, opening_rou_asset, depreciation, closing_rou_asset,
-			variable_rent_expense, non_lease_expense, discount_rate,
-			is_calculated, calculation_batch_id, calculated_at, created_at, updated_at
-		FROM measurement_results WHERE contract_id = $1
+		SELECT mr.id, mr.contract_id, mr.accounting_period, mr.period_start_date, mr.period_end_date,
+			mr.opening_liability, mr.interest_expense, mr.principal_repayment, mr.total_payment,
+			mr.closing_liability, mr.opening_rou_asset, mr.depreciation, mr.closing_rou_asset,
+			mr.variable_rent_expense, mr.non_lease_expense, mr.discount_rate,
+			mr.is_calculated, mr.calculation_batch_id, mr.calculated_at, mr.created_at, mr.updated_at
+		FROM measurement_results mr
+		JOIN lease_contracts lc ON lc.id = mr.contract_id
+		WHERE mr.contract_id = $1
 	`
 	args := []interface{}{contractID}
+	argIdx := 2
 	if period != "" {
-		query += " AND accounting_period = $2"
+		query += " AND mr.accounting_period = $2"
 		args = append(args, period)
+		argIdx++
 	}
-	query += " ORDER BY accounting_period ASC"
+	query, args, _ = appendContractScopePredicate(ctx, query, args, argIdx, "lc")
+	query += " ORDER BY mr.accounting_period ASC"
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

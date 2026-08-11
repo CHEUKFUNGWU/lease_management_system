@@ -22,6 +22,7 @@ import {
   PieChartOutlined,
   SwapOutlined,
   FileSearchOutlined,
+  DashboardOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,6 +45,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     todo: t("nav.todo", language as any),
     "ai-chat": t("nav.ai_chat", language as any),
     reports: t("nav.reports", language as any),
+    performance: "经营驾驶舱",
     portfolio: "组合分析",
     sensitivity: "敏感性分析",
     "deal-compare": "条款比价",
@@ -53,6 +55,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     "monthly-closing": t("nav.monthly_closing", language as any),
     roi: "ROI 测算",
     "audit-logs": t("nav.audit_logs", language as any),
+    "agent-metrics": t("nav.agent_metrics", language as any),
     settings: t("nav.settings", language as any),
     admin: t("nav.admin", language as any),
     users: "用户管理",
@@ -62,7 +65,8 @@ function getBreadcrumbMap(language: string): Record<string, string> {
 
 // ─── Menu Items ────────────────────────────────────────────────
 
-function useMenuItems(language: string) {
+function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]) {
+  const canViewAgentMetrics = hasRole(user, "admin") || hasRole(user, "auditor");
   return useMemo(
     () => [
       {
@@ -89,6 +93,11 @@ function useMenuItems(language: string) {
         key: "/reports",
         icon: <BarChartOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/reports">{t("nav.reports", language as any)}</Link>,
+      },
+      {
+        key: "/performance",
+        icon: <DashboardOutlined style={{ fontSize: 16 }} />,
+        label: <Link href="/performance">经营驾驶舱</Link>,
       },
       {
         key: "/portfolio",
@@ -135,13 +144,20 @@ function useMenuItems(language: string) {
         icon: <AuditOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/audit-logs">{t("nav.audit_logs", language as any)}</Link>,
       },
+      ...(canViewAgentMetrics
+        ? [{
+            key: "/agent-metrics",
+            icon: <BarChartOutlined style={{ fontSize: 16 }} />,
+            label: <Link href="/agent-metrics">{t("nav.agent_metrics", language as any)}</Link>,
+          }]
+        : []),
       {
         key: "/settings",
         icon: <SettingOutlined style={{ fontSize: 16 }} />,
         label: <Link href="/settings">{t("nav.settings", language as any)}</Link>,
       },
     ],
-    [language]
+    [canViewAgentMetrics, language]
   );
 }
 
@@ -159,7 +175,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
-  const baseMenuItems = useMenuItems(language);
+  const baseMenuItems = useMenuItems(language, user);
   const adminMenuItem = {
     key: "/admin/users",
     icon: <SafetyOutlined style={{ fontSize: 16 }} />,

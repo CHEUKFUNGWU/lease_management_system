@@ -5,14 +5,44 @@ interface RequestOptions extends RequestInit {
   token?: string;
 }
 
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return null;
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data.token) return null;
+        localStorage.setItem("token", data.token);
+        if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+        window.dispatchEvent(new CustomEvent("auth-token-refreshed", { detail: data.token }));
+        return data.token as string;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
 export async function apiRequest(
   endpoint: string,
   options: RequestOptions = {}
 ) {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormDataBody ? {} : { "Content-Type": "application/json" }),
     ...((options.headers as Record<string, string>) || {}),
   };
 
@@ -20,10 +50,23 @@ export async function apiRequest(
     headers["Authorization"] = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  const fetchRequest = (accessToken?: string) => {
+    const requestHeaders = { ...headers };
+    if (accessToken) requestHeaders["Authorization"] = `Bearer ${accessToken}`;
+    else delete requestHeaders["Authorization"];
+    return fetch(url, { ...options, headers: requestHeaders });
+  };
+
+  let response = await fetchRequest(options.token);
+  if (
+    response.status === 401 &&
+    options.token &&
+    !endpoint.startsWith("/api/v1/auth/") &&
+    (options.body === undefined || typeof options.body === "string")
+  ) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) response = await fetchRequest(refreshedToken);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
@@ -68,6 +111,12 @@ export const authApi = {
       body: JSON.stringify({ username, password }),
     }),
 
+  refresh: (refreshToken: string) =>
+    apiRequest("/api/v1/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }),
+
   register: (username: string, email: string, password: string, role: string, legalEntityId?: string) =>
     apiRequest("/api/v1/auth/register", {
       method: "POST",
@@ -76,6 +125,21 @@ export const authApi = {
 
   me: (token: string) =>
     apiRequest("/api/v1/me", { token }),
+
+  listSessions: (token: string) =>
+    apiRequest("/api/v1/auth/sessions", { token }),
+
+  revokeSession: (sessionId: string, token: string) =>
+    apiRequest(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+      token,
+    }),
+
+  logoutAll: (token: string) =>
+    apiRequest("/api/v1/auth/logout-all", {
+      method: "POST",
+      token,
+    }),
 };
 
 // Admin APIs
@@ -576,6 +640,20 @@ export const aiChatApi = {
       token,
     }),
 
+  getDraftBatch: (batchId: string, token: string) =>
+    apiRequest(`/api/v1/ai/chat/draft-batches/${encodeURIComponent(batchId)}`, { token }),
+
+  retryDraftBatch: (batchId: string, data: {
+    artifact_id: string;
+    action_payload?: Record<string, any>;
+    comment?: string;
+  }, token: string) =>
+    apiRequest(`/api/v1/ai/chat/draft-batches/${encodeURIComponent(batchId)}/retry`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+
   createContinuation: (data: {
     target: {
       type: "run" | "message" | "artifact" | "action";
@@ -624,6 +702,48 @@ export const aiChatApi = {
       body: JSON.stringify(data),
       token,
     }),
+
+  getRunTrace: (runId: string, token: string) =>
+    apiRequest(`/api/v1/ai/chat/runs/${encodeURIComponent(runId)}/trace`, { token }),
+
+  cancelRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: "POST",
+      token,
+    }),
+
+  steerRun: (runId: string, instruction: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/steer`, {
+      method: "POST",
+      body: JSON.stringify({ instruction }),
+      token,
+    }),
+
+  followUpRun: (runId: string, instruction: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/follow-up`, {
+      method: "POST",
+      body: JSON.stringify({ instruction }),
+      token,
+    }),
+
+  branchRun: (runId: string, message: string, token: string) =>
+    apiRequest(`/api/v1/agent/runs/${encodeURIComponent(runId)}/branch`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+      token,
+    }),
+};
+
+// Persisted Planner usage is intentionally separate from process-local Tool
+// metrics. The Core endpoint derives user and tenant scope from the JWT.
+export const agentUsageApi = {
+  summary: (token: string, params?: { from?: string; to?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.from) qs.append("from", params.from);
+    if (params?.to) qs.append("to", params.to);
+    const query = qs.toString();
+    return apiRequest(`/api/v1/agent/usage${query ? `?${query}` : ""}`, { token });
+  },
 };
 
 // Report APIs
@@ -789,6 +909,10 @@ export const auditApi = {
     record_id?: string;
     action?: string;
     changed_by?: string;
+    run_id?: string;
+    tool_name?: string;
+    trace_id?: string;
+    status?: string;
     start_date?: string;
     end_date?: string;
     limit?: number;
@@ -822,6 +946,178 @@ export const workQueueApi = {
     const query = criticalDateDays ? `?critical_date_days=${criticalDateDays}` : "";
     return apiRequest(`/api/v1/me/work-queue${query}`, { token });
   },
+};
+
+// Unified FP&A / Finance BP decision surface. Responses carry Working/Official
+// basis, source version and coverage metadata; the UI must not turn missing
+// operating facts into zeroes.
+export const performanceApi = {
+  overview: (period: string | undefined, token: string) => {
+    const qs = period ? `?period=${encodeURIComponent(period)}` : "";
+    return apiRequest(`/api/v1/performance/overview${qs}`, { token });
+  },
+  managementBrief: (period: string, cadence: "wbr" | "mbr" | "qbr", token: string) =>
+    apiRequest(`/api/v1/performance/brief?period=${encodeURIComponent(period)}&cadence=${cadence}`, { token }),
+  actions: (params: { period?: string; status?: string; category?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/actions${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  createAction: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/actions`, { method: "POST", body: JSON.stringify(data), token }),
+  updateAction: (id: string, data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/actions/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data), token }),
+  bulkUpdateActions: (data: { ids: string[]; status?: string; owner_name?: string; due_date?: string }, token: string) =>
+    apiRequest(`/api/v1/performance/actions/bulk`, { method: "POST", body: JSON.stringify(data), token }),
+  exportActions: async (params: { period?: string; status?: string; category?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    const response = await fetch(`${API_BASE_URL}/api/v1/performance/actions/export?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.blob();
+  },
+  assumptions: (key: string | undefined, token: string) => {
+    const qs = key ? `?key=${encodeURIComponent(key)}` : "";
+    return apiRequest(`/api/v1/performance/assumptions${qs}`, { token });
+  },
+  createAssumption: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/assumptions`, { method: "POST", body: JSON.stringify(data), token }),
+  storePerformance: (period: string, token: string, storeId?: string) => {
+    const qs = new URLSearchParams({ period });
+    if (storeId) qs.set("store_id", storeId);
+    return apiRequest(`/api/v1/reports/store-performance?${qs}`, { token });
+  },
+  storeBenchmarks: (period: string, token: string) =>
+    apiRequest(`/api/v1/reports/store-performance/benchmarks?period=${encodeURIComponent(period)}`, { token }),
+  storeCohorts: (period: string, token: string) =>
+    apiRequest(`/api/v1/reports/store-performance/cohorts?period=${encodeURIComponent(period)}`, { token }),
+  storePromotionROI: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/reports/store-promotion-roi`, { method: "POST", body: JSON.stringify(data), token }),
+  equipmentPerformance: (period: string, token: string, plant?: string) => {
+    const qs = new URLSearchParams({ period });
+    if (plant) qs.set("plant", plant);
+    return apiRequest(`/api/v1/reports/equipment-performance?${qs}`, { token });
+  },
+  equipmentCandidates: (period: string, token: string, withinDays?: number) => {
+    const qs = new URLSearchParams({ period }); if (withinDays) qs.set("within_days", String(withinDays));
+    return apiRequest(`/api/v1/reports/equipment-candidates?${qs}`, { token });
+  },
+  storeScenario: (scenarios: Record<string, unknown>[], token: string) =>
+    apiRequest(`/api/v1/reports/store-decision-scenario`, { method: "POST", body: JSON.stringify({ scenarios }), token }),
+  storeDecisionEventDraft: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/reports/store-decision-event-draft`, { method: "POST", body: JSON.stringify(data), token }),
+  equipmentScenario: (scenarios: Record<string, unknown>[], token: string) =>
+    apiRequest(`/api/v1/reports/equipment-decision-scenario`, { method: "POST", body: JSON.stringify({ scenarios }), token }),
+  actionRealizations: (id: string, token: string) =>
+    apiRequest(`/api/v1/performance/actions/${encodeURIComponent(id)}/realizations`, { token }),
+  createActionRealization: (id: string, data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/actions/${encodeURIComponent(id)}/realizations`, { method: "POST", body: JSON.stringify(data), token }),
+  planVersions: (versionType: string | undefined, token: string) => {
+    const query = versionType ? `?version_type=${encodeURIComponent(versionType)}` : "";
+    return apiRequest(`/api/v1/performance/plan-versions${query}`, { token });
+  },
+  createPlanVersion: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/plan-versions`, { method: "POST", body: JSON.stringify(data), token }),
+  freezePlanVersion: (id: string, official: boolean, token: string) =>
+    apiRequest(`/api/v1/performance/plan-versions/${encodeURIComponent(id)}/freeze?official=${official ? "true" : "false"}`, { method: "POST", token }),
+  comparePlanVersions: (params: { left_id: string; right_id: string; period: string; left_basis?: string; right_basis?: string; grain?: string; business_segment?: string; brand?: string; region?: string; store_id?: string; plant?: string; line?: string; equipment_id?: string; asset_type?: string; currency?: string; exchange_rate_version?: string }, token: string) => {
+    const qs = new URLSearchParams(params as Record<string, string>);
+    return apiRequest(`/api/v1/performance/plan-versions/compare?${qs}`, { token });
+  },
+  forecastAccuracy: (params: { forecast_id: string; actual_id: string; period?: string; grain?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/forecast-accuracy?${qs}`, { token });
+  },
+  hybridForecast: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/forecast/hybrid`, { method: "POST", body: JSON.stringify(data), token }),
+  mappings: (params: { mapping_type?: string; effective_date?: string }, token: string) => {
+    const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/mappings${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  createMapping: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/mappings`, { method: "POST", body: JSON.stringify(data), token }),
+  metricDefinitions: (metricKey: string | undefined, token: string) => {
+    const query = metricKey ? `?metric_key=${encodeURIComponent(metricKey)}` : "";
+    return apiRequest(`/api/v1/performance/metrics${query}`, { token });
+  },
+  createMetricDefinition: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/metrics`, { method: "POST", body: JSON.stringify(data), token }),
+  agentSignals: (params: { period?: string; status?: string }, token: string) => {
+    const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/agent-signals${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  createAgentSignal: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/agent-signals`, { method: "POST", body: JSON.stringify(data), token }),
+  dataQuality: (params: { period?: string; status?: string }, token: string) => {
+    const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/data-quality${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  createDataQuality: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/data-quality`, { method: "POST", body: JSON.stringify(data), token }),
+  updateDataQualityStatus: (id: string, status: string, token: string) =>
+    apiRequest(`/api/v1/performance/data-quality/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }), token }),
+  decisionMemos: (params: { memo_type?: string; status?: string }, token: string) => {
+    const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/decision-memos${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  createDecisionMemo: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/performance/decision-memos`, { method: "POST", body: JSON.stringify(data), token }),
+  updateDecisionMemoStatus: (id: string, status: string, token: string) =>
+    apiRequest(`/api/v1/performance/decision-memos/${encodeURIComponent(id)}/status`, { method: "PATCH", body: JSON.stringify({ status }), token }),
+  reportPacks: (params: { report_type?: string; period?: string; basis?: string }, token: string) => {
+    const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/report-packs${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  generateReportPack: (params: { report_type: string; period: string; format?: string; view?: string; basis?: string; official_version_id?: string; scenario_id?: string }, token: string) => {
+    const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/report-packs?${qs}`, { method: "POST", token });
+  },
+  downloadReportPack: async (id: string, token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/performance/report-packs/${encodeURIComponent(id)}/download`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.blob();
+  },
+};
+
+export const operatingFactsApi = {
+  upsertStores: (items: Record<string, unknown>[], token: string, sourceFile?: string, sourceSystem?: string) =>
+    apiRequest(`/api/v1/operating-facts/stores`, { method: "POST", body: JSON.stringify({ items, source_file: sourceFile, source_system: sourceSystem }), token }),
+  importStoresCSV: (file: File, token: string, sourceSystem?: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (sourceSystem) form.append("source_system", sourceSystem);
+    return apiRequest(`/api/v1/operating-facts/stores/import`, { method: "POST", body: form, token, headers: {} });
+  },
+  importStoresXLSX: (file: File, token: string, sourceSystem?: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (sourceSystem) form.append("source_system", sourceSystem);
+    return apiRequest(`/api/v1/operating-facts/stores/import-xlsx`, { method: "POST", body: form, token, headers: {} });
+  },
+  downloadStoreCSVTemplate: async (token: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/operating-facts/stores/template`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.blob();
+  },
+  listStores: (params: { period?: string; store_id?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/operating-facts/stores${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  listBatches: (status: string | undefined, token: string) => {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return apiRequest(`/api/v1/operating-facts/batches${query}`, { token });
+  },
+  upsertEquipment: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/operating-facts/equipment`, { method: "POST", body: JSON.stringify(data), token }),
+  listEquipment: (params: { plant?: string; line?: string }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/operating-facts/equipment${qs.toString() ? `?${qs}` : ""}`, { token });
+  },
+  upsertEquipmentFact: (data: Record<string, unknown>, token: string) =>
+    apiRequest(`/api/v1/operating-facts/equipment-facts`, { method: "POST", body: JSON.stringify(data), token }),
 };
 
 export const exchangeRateApi = {

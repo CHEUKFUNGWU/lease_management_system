@@ -1,10 +1,15 @@
 package handlers
 
 import (
+	"archive/zip"
+	"bytes"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -296,6 +301,203 @@ func (h *ReportHandler) ClosePack(c *gin.Context) {
 		"monthly_close_batches": batches,
 		"exception_count":       len(exceptions),
 	})
+}
+
+// ExportClosePack writes the same server-side disclosure projection and close
+// evidence returned by ClosePack into an immutable, self-describing ZIP. The
+// browser may still offer a convenient XLSX export, but the audit hand-off
+// must have one Core-generated snapshot, manifest and hashable evidence set.
+// This endpoint is read-only: it never changes approval, posting or lock state.
+func (h *ReportHandler) ExportClosePack(c *gin.Context) {
+	period := strings.TrimSpace(c.Query("period"))
+	periodStart, err := time.Parse("2006-01", period)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "period 格式应为 YYYY-MM"})
+		return
+	}
+	periodEnd := periodStart.AddDate(0, 1, -1)
+	mode := reporting.NormalizeMode(c.Query("mode"))
+	snapshot, ok := h.buildSnapshot(c, mode)
+	if !ok {
+		return
+	}
+	disclosure, err := reporting.Project(snapshot, reporting.ProjectionRequest{
+		Kind: reporting.KindDisclosure, StartDate: periodStart, EndDate: periodEnd,
+	})
+	if err != nil {
+		writeProjectionError(c, err)
+		return
+	}
+
+	exceptions := []closeControlExceptionResponse{}
+	if h.closeControlRepo != nil {
+		items, listErr := h.closeControlRepo.ListExceptions(c.Request.Context(), period, middleware.GetTenantID(c))
+		if listErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": listErr.Error()})
+			return
+		}
+		for _, item := range items {
+			exceptions = append(exceptions, closeControlExceptionResponse{
+				ID: item.ID, RuleCode: item.RuleCode, Severity: item.Severity,
+				ExceptionState: item.ExceptionState, ClosingDisposition: item.ClosingDisposition,
+				ContractNumber: item.ContractNumber, BatchNumber: item.BatchNumber,
+			})
+		}
+	}
+	batches := []*repository.MonthlyClosingBatch{}
+	if h.monthlyClosingRepo != nil {
+		batches, err = h.monthlyClosingRepo.GetBatches(c.Request.Context(), period, middleware.GetTenantID(c))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	closePack := map[string]any{
+		"period": period, "mode": mode, "is_official": mode == reporting.Official,
+		"report_basis": disclosure.Payload["report_basis"], "disclosure": disclosure.Payload,
+		"close_exceptions": exceptions, "monthly_close_batches": batches,
+		"exception_count": len(exceptions),
+	}
+	files, err := closePackFiles(closePack, disclosure.Payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build close pack: " + err.Error()})
+		return
+	}
+	manifest := map[string]any{
+		"schema_version": "lease.close-pack.v1", "period": period, "mode": mode,
+		"is_official": mode == reporting.Official, "snapshot_id": snapshot.ID,
+		"policy_version": snapshot.PolicyVersion, "generated_at": time.Now().UTC(),
+		"legal_entity_id": middleware.GetTenantID(c), "files": closePackManifest(files),
+		"review_note": "该导出包是系统生成的审计资料包，不替代第三方会计师复核或正式审计结论。",
+	}
+	manifestRaw, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encode close pack manifest"})
+		return
+	}
+	files["manifest.json"] = manifestRaw
+
+	var archive bytes.Buffer
+	zw := zip.NewWriter(&archive)
+	for name, content := range files {
+		writer, createErr := zw.Create(name)
+		if createErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create close pack archive"})
+			return
+		}
+		if _, writeErr := writer.Write(content); writeErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to write close pack archive"})
+			return
+		}
+	}
+	if err := zw.Close(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to finalize close pack archive"})
+		return
+	}
+
+	filename := fmt.Sprintf("IFRS16_Close_Pack_%s_%s_%s.zip", period, mode, safeFilename(snapshot.ID))
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	c.Header("X-Report-Snapshot-ID", snapshot.ID)
+	c.Header("X-Report-Policy-Version", snapshot.PolicyVersion)
+	c.Header("X-Report-Mode", string(mode))
+	c.Data(http.StatusOK, "application/zip", archive.Bytes())
+}
+
+func closePackFiles(closePack map[string]any, disclosure map[string]any) (map[string][]byte, error) {
+	closePackRaw, err := json.MarshalIndent(closePack, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	disclosureRaw, err := json.MarshalIndent(disclosure, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	files := map[string][]byte{
+		"close_pack.json": closePackRaw, "disclosure.json": disclosureRaw,
+	}
+	workpaper, ok := disclosure["audit_workpaper"]
+	if !ok {
+		return files, nil
+	}
+	workpaperRaw, err := json.Marshal(workpaper)
+	if err != nil {
+		return nil, err
+	}
+	var decoded struct {
+		Rows []reporting.AuditWorkpaperRow `json:"rows"`
+	}
+	if err := json.Unmarshal(workpaperRaw, &decoded); err != nil {
+		return nil, err
+	}
+	var csvBuffer bytes.Buffer
+	csvWriter := csv.NewWriter(&csvBuffer)
+	if err := csvWriter.Write([]string{
+		"contract_id", "contract_number", "contract_name", "legal_entity_id", "store_name",
+		"asset_type", "currency", "lease_scope", "approval_status", "report_mode",
+		"discount_rate", "discount_rate_source", "payment_schedule_count", "event_adjustment_count",
+		"opening_liability", "additions", "interest", "payments", "liability_remeasurement",
+		"closing_liability", "opening_rou", "rou_additions", "depreciation", "impairment",
+		"closing_rou", "liability_tie_out", "rou_tie_out",
+	}); err != nil {
+		return nil, err
+	}
+	for _, row := range decoded.Rows {
+		if err := csvWriter.Write([]string{
+			row.ContractID, row.ContractNumber, row.ContractName, row.LegalEntityID, row.StoreName,
+			row.AssetType, row.Currency, row.LeaseScope, row.ApprovalStatus, row.ReportMode,
+			fmt.Sprintf("%.10f", row.DiscountRate), row.DiscountRateSource,
+			strconv.Itoa(row.PaymentScheduleCount), strconv.Itoa(row.EventAdjustmentCount),
+			fmt.Sprintf("%.2f", row.OpeningLiability), fmt.Sprintf("%.2f", row.Additions),
+			fmt.Sprintf("%.2f", row.Interest), fmt.Sprintf("%.2f", row.Payments),
+			fmt.Sprintf("%.2f", row.LiabilityRemeasurement), fmt.Sprintf("%.2f", row.ClosingLiability),
+			fmt.Sprintf("%.2f", row.OpeningROU), fmt.Sprintf("%.2f", row.ROUAdditions),
+			fmt.Sprintf("%.2f", row.Depreciation), fmt.Sprintf("%.2f", row.Impairment),
+			fmt.Sprintf("%.2f", row.ClosingROU), fmt.Sprintf("%.2f", row.LiabilityTieOut),
+			fmt.Sprintf("%.2f", row.ROUTieOut),
+		}); err != nil {
+			return nil, err
+		}
+	}
+	csvWriter.Flush()
+	if err := csvWriter.Error(); err != nil {
+		return nil, err
+	}
+	files["audit_workpaper.csv"] = csvBuffer.Bytes()
+	return files, nil
+}
+
+func closePackManifest(files map[string][]byte) []map[string]any {
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	manifest := make([]map[string]any, 0, len(names))
+	for _, name := range names {
+		manifest = append(manifest, map[string]any{
+			"name": name, "sha256": fmt.Sprintf("%x", sha256.Sum256(files[name])), "bytes": len(files[name]),
+		})
+	}
+	return manifest
+}
+
+func safeFilename(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "snapshot-missing"
+	}
+	var b strings.Builder
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "snapshot"
+	}
+	return b.String()
 }
 
 type closeControlExceptionResponse struct {

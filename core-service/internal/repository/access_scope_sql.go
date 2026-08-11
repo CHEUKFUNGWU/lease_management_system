@@ -70,3 +70,31 @@ func appendContractScopePredicate(ctx context.Context, query string, args []inte
 	}
 	return query, args, argIdx
 }
+
+// appendEquipmentScopePredicate applies the plant/line/equipment slices to a
+// joined equipment asset. Legal entity remains the mandatory tenant boundary.
+func appendEquipmentScopePredicate(ctx context.Context, query string, args []interface{}, argIdx int, equipmentAlias string) (string, []interface{}, int) {
+	scope, scoped := access.ScopeFromContext(ctx)
+	if !scoped || scope.Global {
+		return query, args, argIdx
+	}
+	if scope.LegalEntityID == "" {
+		return query + " AND false", args, argIdx
+	}
+	if len(scope.Plants) > 0 {
+		query += fmt.Sprintf(" AND %s.plant_code = ANY($%d)", equipmentAlias, argIdx)
+		args = append(args, scope.Plants)
+		argIdx++
+	}
+	if len(scope.ProductionLines) > 0 {
+		query += fmt.Sprintf(" AND %s.production_line_code = ANY($%d)", equipmentAlias, argIdx)
+		args = append(args, scope.ProductionLines)
+		argIdx++
+	}
+	if len(scope.EquipmentIDs) > 0 {
+		query += fmt.Sprintf(" AND %s.id::text = ANY($%d)", equipmentAlias, argIdx)
+		args = append(args, scope.EquipmentIDs)
+		argIdx++
+	}
+	return query, args, argIdx
+}

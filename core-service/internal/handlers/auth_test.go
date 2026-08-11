@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/config"
@@ -48,6 +50,78 @@ type fakeRoleAssignmentStore struct {
 	roleCodes        []string
 	assignedByID     string
 	roleCodesForUser []string
+}
+
+type fakeRefreshStore struct {
+	sessions map[string]*repository.AuthRefreshSession
+}
+
+func newFakeRefreshStore() *fakeRefreshStore {
+	return &fakeRefreshStore{sessions: make(map[string]*repository.AuthRefreshSession)}
+}
+
+func (s *fakeRefreshStore) Create(_ context.Context, session *repository.AuthRefreshSession) error {
+	if session.ID == "" {
+		session.ID = session.TokenID
+	}
+	copy := *session
+	s.sessions[session.TokenID] = &copy
+	return nil
+}
+
+func (s *fakeRefreshStore) Rotate(_ context.Context, tokenID, tokenHash string, replacement *repository.AuthRefreshSession) error {
+	current := s.sessions[tokenID]
+	if current == nil || current.TokenHash != tokenHash || current.RevokedAt != nil || !current.ExpiresAt.After(time.Now()) {
+		return repository.ErrRefreshTokenInvalid
+	}
+	now := time.Now()
+	current.RevokedAt = &now
+	current.ReplacedBy = &replacement.TokenID
+	return s.Create(context.Background(), replacement)
+}
+
+func (s *fakeRefreshStore) Revoke(_ context.Context, tokenID, tokenHash string) error {
+	current := s.sessions[tokenID]
+	if current == nil || current.TokenHash != tokenHash {
+		return repository.ErrRefreshTokenInvalid
+	}
+	now := time.Now()
+	current.RevokedAt = &now
+	return nil
+}
+
+func (s *fakeRefreshStore) RevokeAll(_ context.Context, userID string) error {
+	now := time.Now()
+	for _, session := range s.sessions {
+		if session.UserID == userID {
+			session.RevokedAt = &now
+		}
+	}
+	return nil
+}
+
+func (s *fakeRefreshStore) List(_ context.Context, userID string) ([]*repository.AuthRefreshSession, error) {
+	result := make([]*repository.AuthRefreshSession, 0)
+	for _, session := range s.sessions {
+		if session.UserID != userID {
+			continue
+		}
+		copy := *session
+		result = append(result, &copy)
+	}
+	return result, nil
+}
+
+func (s *fakeRefreshStore) RevokeByID(_ context.Context, userID, sessionID string) error {
+	for _, session := range s.sessions {
+		if session.ID != sessionID || session.UserID != userID {
+			continue
+		}
+		now := time.Now()
+		session.RevokedAt = &now
+		return nil
+	}
+	return repository.ErrRefreshTokenInvalid
 }
 
 func (s *fakeRoleAssignmentStore) GetUserRoleCodes(context.Context, string) ([]string, error) {
@@ -91,6 +165,189 @@ func TestLoginReturnsEveryAuthoritativeRole(t *testing.T) {
 	}
 	if !reflect.DeepEqual(response.Roles, []string{"editor", "reviewer"}) {
 		t.Fatalf("expected authoritative roles, got %#v", response.Roles)
+	}
+}
+
+func TestLoginAndRefreshRotateAuthoritativeTokens(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	users := &fakeAuthUserStore{lookup: &repository.User{
+		ID: "user-1", Username: "finance_user", Role: "editor", IsActive: true,
+	}}
+	roles := &fakeRoleAssignmentStore{roleCodesForUser: []string{"editor", "reviewer"}}
+	handler := NewAuthHandler(&config.Config{JWTSecret: "test-secret"}, users, roles)
+	router := gin.New()
+	router.POST("/login", handler.Login)
+	router.POST("/refresh", handler.Refresh)
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader([]byte(`{"username":"finance_user","password":"password123"}`)))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(loginRecorder, loginRequest)
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("login status=%d body=%s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var loginResponse struct {
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &loginResponse); err != nil {
+		t.Fatal(err)
+	}
+	if loginResponse.Token == "" || loginResponse.RefreshToken == "" || loginResponse.Token == loginResponse.RefreshToken {
+		t.Fatalf("login tokens not issued separately: %+v", loginResponse)
+	}
+
+	refreshRecorder := httptest.NewRecorder()
+	refreshRequest := httptest.NewRequest(http.MethodPost, "/refresh", bytes.NewBufferString(`{"refresh_token":"`+loginResponse.RefreshToken+`"}`))
+	refreshRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(refreshRecorder, refreshRequest)
+	if refreshRecorder.Code != http.StatusOK {
+		t.Fatalf("refresh status=%d body=%s", refreshRecorder.Code, refreshRecorder.Body.String())
+	}
+	var refreshResponse struct {
+		Token        string   `json:"token"`
+		RefreshToken string   `json:"refresh_token"`
+		Roles        []string `json:"roles"`
+	}
+	if err := json.Unmarshal(refreshRecorder.Body.Bytes(), &refreshResponse); err != nil {
+		t.Fatal(err)
+	}
+	if refreshResponse.Token == "" || refreshResponse.RefreshToken == "" || refreshResponse.RefreshToken == loginResponse.RefreshToken {
+		t.Fatalf("refresh did not rotate credentials: %+v", refreshResponse)
+	}
+	if !reflect.DeepEqual(refreshResponse.Roles, []string{"editor", "reviewer"}) {
+		t.Fatalf("refresh roles=%v", refreshResponse.Roles)
+	}
+}
+
+func TestPersistentRefreshTokenIsSingleUseAndLogoutAllRevokesSessions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	users := &fakeAuthUserStore{lookup: &repository.User{
+		ID: "user-1", Username: "finance_user", Role: "editor", IsActive: true,
+	}}
+	roles := &fakeRoleAssignmentStore{roleCodesForUser: []string{"editor"}}
+	refreshStore := newFakeRefreshStore()
+	handler := NewAuthHandler(&config.Config{JWTSecret: "test-secret"}, users, roles).WithRefreshTokenStore(refreshStore)
+	router := gin.New()
+	router.POST("/login", handler.Login)
+	router.POST("/refresh", handler.Refresh)
+	router.POST("/logout-all", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		handler.LogoutAll(c)
+	})
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"finance_user","password":"password123"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginRequest.Header.Set("User-Agent", "lease-agent-test/1.0")
+	loginRequest.Header.Set("X-Forwarded-For", "203.0.113.10")
+	router.ServeHTTP(loginRecorder, loginRequest)
+	var loginResponse AuthResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &loginResponse); err != nil {
+		t.Fatal(err)
+	}
+	if len(refreshStore.sessions) != 1 {
+		t.Fatalf("persistent sessions after login=%d", len(refreshStore.sessions))
+	}
+	for _, session := range refreshStore.sessions {
+		if session.UserAgent != "lease-agent-test/1.0" || session.IPAddress == "" {
+			t.Fatalf("session metadata was not captured: %+v", session)
+		}
+	}
+
+	refreshRecorder := httptest.NewRecorder()
+	refreshRequest := httptest.NewRequest(http.MethodPost, "/refresh", strings.NewReader(`{"refresh_token":"`+loginResponse.RefreshToken+`"}`))
+	refreshRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(refreshRecorder, refreshRequest)
+	if refreshRecorder.Code != http.StatusOK {
+		t.Fatalf("refresh status=%d body=%s", refreshRecorder.Code, refreshRecorder.Body.String())
+	}
+
+	replayRecorder := httptest.NewRecorder()
+	replayRequest := httptest.NewRequest(http.MethodPost, "/refresh", strings.NewReader(`{"refresh_token":"`+loginResponse.RefreshToken+`"}`))
+	replayRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(replayRecorder, replayRequest)
+	if replayRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("replayed refresh status=%d body=%s", replayRecorder.Code, replayRecorder.Body.String())
+	}
+
+	logoutAll := httptest.NewRecorder()
+	router.ServeHTTP(logoutAll, httptest.NewRequest(http.MethodPost, "/logout-all", nil))
+	if logoutAll.Code != http.StatusOK {
+		t.Fatalf("logout-all status=%d body=%s", logoutAll.Code, logoutAll.Body.String())
+	}
+	for tokenID, session := range refreshStore.sessions {
+		if session.RevokedAt == nil {
+			t.Fatalf("session %s remained active after logout-all", tokenID)
+		}
+	}
+}
+
+func TestRefreshSessionEndpointsAreScopedToAuthenticatedUser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	users := &fakeAuthUserStore{lookup: &repository.User{
+		ID: "user-1", Username: "finance_user", Role: "editor", IsActive: true,
+	}}
+	roles := &fakeRoleAssignmentStore{roleCodesForUser: []string{"editor"}}
+	refreshStore := newFakeRefreshStore()
+	handler := NewAuthHandler(&config.Config{JWTSecret: "test-secret"}, users, roles).WithRefreshTokenStore(refreshStore)
+	router := gin.New()
+	router.POST("/login", handler.Login)
+	router.GET("/sessions", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		handler.ListSessions(c)
+	})
+	router.DELETE("/sessions/:id", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		handler.RevokeSession(c)
+	})
+
+	loginRecorder := httptest.NewRecorder()
+	loginRequest := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(`{"username":"finance_user","password":"password123"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(loginRecorder, loginRequest)
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("login status=%d body=%s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+
+	var loginResponse AuthResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &loginResponse); err != nil {
+		t.Fatal(err)
+	}
+	sessionsRecorder := httptest.NewRecorder()
+	router.ServeHTTP(sessionsRecorder, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+	if sessionsRecorder.Code != http.StatusOK {
+		t.Fatalf("list sessions status=%d body=%s", sessionsRecorder.Code, sessionsRecorder.Body.String())
+	}
+	var sessionsResponse struct {
+		Sessions []struct {
+			ID     string `json:"id"`
+			Active bool   `json:"active"`
+		} `json:"sessions"`
+	}
+	if err := json.Unmarshal(sessionsRecorder.Body.Bytes(), &sessionsResponse); err != nil {
+		t.Fatal(err)
+	}
+	if len(sessionsResponse.Sessions) != 1 || sessionsResponse.Sessions[0].ID == "" || !sessionsResponse.Sessions[0].Active {
+		t.Fatalf("unexpected sessions response: %+v", sessionsResponse)
+	}
+
+	revokeRecorder := httptest.NewRecorder()
+	router.ServeHTTP(revokeRecorder, httptest.NewRequest(http.MethodDelete, "/sessions/"+sessionsResponse.Sessions[0].ID, nil))
+	if revokeRecorder.Code != http.StatusOK {
+		t.Fatalf("revoke session status=%d body=%s", revokeRecorder.Code, revokeRecorder.Body.String())
+	}
+
+	sessionsRecorder = httptest.NewRecorder()
+	router.ServeHTTP(sessionsRecorder, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+	if sessionsRecorder.Code != http.StatusOK {
+		t.Fatalf("list revoked sessions status=%d body=%s", sessionsRecorder.Code, sessionsRecorder.Body.String())
+	}
+	if err := json.Unmarshal(sessionsRecorder.Body.Bytes(), &sessionsResponse); err != nil {
+		t.Fatal(err)
+	}
+	if len(sessionsResponse.Sessions) != 1 || sessionsResponse.Sessions[0].Active {
+		t.Fatalf("revoked session remained active: %+v", sessionsResponse)
 	}
 }
 

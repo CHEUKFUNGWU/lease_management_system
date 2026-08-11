@@ -31,7 +31,7 @@ func (r *Runtime[T]) Continue(ctx context.Context, command ContinueCommand) (*St
 		Message: seed.instruction, ContractID: seed.effectiveContractID,
 		History: seed.history, Language: command.Language, PageContext: seed.pageContext,
 		UserID: command.UserID, LegalEntityID: command.LegalEntityID,
-		Role: command.Role, AuthHeader: command.AuthHeader,
+		Role: command.Role, Permissions: append([]string(nil), command.Permissions...), AuthHeader: command.AuthHeader,
 	}
 	prepared, err := r.prepare(ctx, input, seed.session, seed.sourceRun)
 	if err != nil {
@@ -45,7 +45,10 @@ func (r *Runtime[T]) Continue(ctx context.Context, command ContinueCommand) (*St
 	}
 	started := r.started(prepared, continuation)
 	r.dispatch(func() {
-		runCtx, cancel := context.WithTimeout(context.Background(), r.timeout)
+		// Preserve the authenticated scope for the detached continuation just as
+		// Start does. A follow-up must not widen access merely because it is
+		// resumed from a run/artifact target.
+		runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.timeout)
 		defer cancel()
 		r.executeDispatched(runCtx, prepared)
 	})

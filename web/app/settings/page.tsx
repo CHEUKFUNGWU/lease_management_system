@@ -7,11 +7,11 @@ import {
 } from "antd";
 import {
   SearchOutlined, CopyOutlined, EyeOutlined, BarChartOutlined,
-  TagOutlined, FileTextOutlined,
+  TagOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { exchangeRateApi, reportApi, settingsApi } from "../lib/api";
+import { authApi, exchangeRateApi, reportApi, settingsApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -31,6 +31,16 @@ interface TagSummaryRow {
   contracts?: ContractRef[];
 }
 
+interface AuthSession {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  revoked_at?: string | null;
+  ip_address?: string;
+  user_agent?: string;
+  active: boolean;
+}
+
 export default function SettingsPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
@@ -38,6 +48,12 @@ export default function SettingsPage() {
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<TagSummaryRow[]>([]);
+
+  /* ---- device sessions ---- */
+  const [authSessions, setAuthSessions] = useState<AuthSession[]>([]);
+  const [authSessionsLoading, setAuthSessionsLoading] = useState(false);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
 
   /* ---- global discount rate ---- */
   const [discountRateLoading, setDiscountRateLoading] = useState(false);
@@ -76,6 +92,52 @@ export default function SettingsPage() {
       setRatesLoading(false);
     }
   };
+
+  const loadAuthSessions = async () => {
+    if (!token) return;
+    setAuthSessionsLoading(true);
+    try {
+      const response = await authApi.listSessions(token);
+      setAuthSessions(response.sessions || []);
+    } catch (error: any) {
+      message.error(error?.message || t("settings.sessions_load_failed", language));
+    } finally {
+      setAuthSessionsLoading(false);
+    }
+  };
+
+  const revokeAuthSession = async (sessionId: string) => {
+    if (!token) return;
+    setRevokingSessionId(sessionId);
+    try {
+      await authApi.revokeSession(sessionId, token);
+      message.success(t("settings.session_revoked", language));
+      await loadAuthSessions();
+    } catch (error: any) {
+      message.error(error?.message || t("settings.session_revoke_failed", language));
+    } finally {
+      setRevokingSessionId(null);
+    }
+  };
+
+  const revokeAllAuthSessions = async () => {
+    if (!token) return;
+    setLoggingOutAll(true);
+    try {
+      await authApi.logoutAll(token);
+      message.success(t("settings.sessions_revoked", language));
+      await loadAuthSessions();
+    } catch (error: any) {
+      message.error(error?.message || t("settings.sessions_revoke_failed", language));
+    } finally {
+      setLoggingOutAll(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAuthSessions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   useEffect(() => {
     loadRates();
@@ -339,6 +401,84 @@ export default function SettingsPage() {
         <Paragraph type="secondary" style={{ marginBottom: 24 }}>
           {t("settings.description", language)}
         </Paragraph>
+
+        <Card
+          title={t("settings.group_device_sessions", language)}
+          style={{ marginBottom: 24 }}
+          extra={
+            <Space>
+              <Button
+                icon={<ReloadOutlined />}
+                loading={authSessionsLoading}
+                onClick={loadAuthSessions}
+              >
+                {t("settings.sessions_refresh", language)}
+              </Button>
+              <Button
+                danger
+                icon={<LogoutOutlined />}
+                loading={loggingOutAll}
+                onClick={revokeAllAuthSessions}
+              >
+                {t("settings.sessions_logout_all", language)}
+              </Button>
+            </Space>
+          }
+        >
+          <Paragraph type="secondary">
+            {t("settings.device_sessions_desc", language)}
+          </Paragraph>
+          <Table<AuthSession>
+            size="small"
+            loading={authSessionsLoading}
+            rowKey="id"
+            dataSource={authSessions}
+            locale={{ emptyText: t("settings.sessions_empty", language) }}
+            pagination={{ pageSize: 5, hideOnSinglePage: true }}
+            columns={[
+              {
+                title: t("settings.session_created", language),
+                dataIndex: "created_at",
+                render: (value: string) => new Date(value).toLocaleString(),
+              },
+              {
+                title: t("settings.session_device", language),
+                dataIndex: "user_agent",
+                render: (value: string) => value || "-",
+              },
+              {
+                title: t("settings.session_ip", language),
+                dataIndex: "ip_address",
+                render: (value: string) => value || "-",
+              },
+              {
+                title: t("settings.session_status", language),
+                dataIndex: "active",
+                render: (active: boolean) => (
+                  <Tag color={active ? "green" : "default"}>
+                    {active
+                      ? t("settings.session_active", language)
+                      : t("settings.session_revoked_status", language)}
+                  </Tag>
+                ),
+              },
+              {
+                title: t("settings.col_action", language),
+                render: (_: unknown, session: AuthSession) => (
+                  <Button
+                    size="small"
+                    danger
+                    disabled={!session.active}
+                    loading={revokingSessionId === session.id}
+                    onClick={() => revokeAuthSession(session.id)}
+                  >
+                    {t("settings.session_revoke", language)}
+                  </Button>
+                ),
+              },
+            ]}
+          />
+        </Card>
 
         {/* global discount rate card */}
         <Card

@@ -17,6 +17,7 @@ core-service/.gocache/
 core-service/.gomodcache/
 *.tsbuildinfo
 /core-service/api
+/core-service/agent-runner
 
 # IDE
 .idea/

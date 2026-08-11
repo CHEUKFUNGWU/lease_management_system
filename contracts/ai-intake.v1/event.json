@@ -1,0 +1,38 @@
+{
+  "schema_version": "ai-intake.v1",
+  "intake_id": "intake-event-fixture-001",
+  "task_id": "task_event_file-event-001",
+  "file_id": "event-001",
+  "mode": "assist",
+  "draft_type": "event_draft",
+  "status": "draft_generated",
+  "confidence_scores": {"overall": 0.62, "event_type": 0.72},
+  "missing_fields": ["effective_date", "revision_parameters"],
+  "warnings": ["需要核对补充协议原文"],
+  "requires_human_confirmation": true,
+  "evidence": {
+    "source_file_id": "event-001",
+    "object_name": "event/2026/08/event-001.pdf",
+    "content_type": "application/pdf",
+    "locators": [],
+    "complete": false,
+    "missing_reason": "document_adapter_does_not_yet_provide_page_or_coordinate_locators"
+  },
+  "review_gate": {
+    "required": true,
+    "reasons": ["assist_mode", "missing_fields", "evidence_incomplete"],
+    "confidence_threshold": 0.8
+  },
+  "event": {
+    "contract_id": "contract-001",
+    "contract_number": "LC-001",
+    "event_type": "modification",
+    "effective_date": "",
+    "original_value": "月租金 100000",
+    "new_value": "月租金 110000",
+    "change_reason": "补充协议调整月租金",
+    "judgment_basis": "补充协议文本，需人工确认是否构成 modification",
+    "revision_parameters": {},
+    "field_confidence": {"event_type": 0.72, "change_reason": 0.8}
+  }
+}

@@ -382,10 +382,69 @@ export function useAIChatRuntime({
         { action_type: actionType, action_payload: actionPayload, comment },
       );
       const action = mapReviewAction(response.action);
+      if (response.draft_result) {
+        action.draftResult = response.draft_result;
+      }
       appendReviewActionToArtifact(sessionId, artifactId, action);
       return action;
     },
     [appendReviewActionToArtifact, transport],
+  );
+
+  const getDraftBatch = useCallback(
+    async (batchId: string) => {
+      if (!transport) throw new Error("missing runtime transport");
+      return transport.getDraftBatch(batchId);
+    },
+    [transport],
+  );
+
+  const retryDraftBatch = useCallback(
+    async (batchId: string, data: { artifact_id: string; action_payload?: Record<string, unknown>; comment?: string }) => {
+      if (!transport) throw new Error("missing runtime transport");
+      return transport.retryDraftBatch(batchId, data);
+    },
+    [transport],
+  );
+
+  const getRunTrace = useCallback(
+    async (runId: string) => {
+      if (!transport) throw new Error("missing runtime transport");
+      return transport.getRunTrace(runId);
+    },
+    [transport],
+  );
+
+  const cancelRun = useCallback(
+    async (runId: string) => {
+      if (!transport) throw new Error("missing runtime transport");
+      return transport.cancelRun(runId);
+    },
+    [transport],
+  );
+
+  const steerRun = useCallback(
+    async (runId: string, instruction: string) => {
+      if (!transport) throw new Error("missing runtime transport");
+      return transport.steerRun(runId, instruction);
+    },
+    [transport],
+  );
+
+  const followUpRun = useCallback(
+    async (runId: string, instruction: string) => {
+      if (!transport) throw new Error("missing runtime transport");
+      return transport.followUpRun(runId, instruction);
+    },
+    [transport],
+  );
+
+  const branchRun = useCallback(
+    async (runId: string, message: string) => {
+      if (!transport) throw new Error("missing runtime transport");
+      return transport.branchRun(runId, message);
+    },
+    [transport],
   );
 
   const ensureServerSession = useCallback(
@@ -428,5 +487,12 @@ export function useAIChatRuntime({
     continueFromTarget,
     continueActive,
     recordReviewAction,
+    getDraftBatch,
+    retryDraftBatch,
+    getRunTrace,
+    cancelRun,
+    steerRun,
+    followUpRun,
+    branchRun,
   };
 }

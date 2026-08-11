@@ -52,6 +52,11 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       JWT_SECRET: ${JWT_SECRET:-lease_jwt_secret_key}
+      ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-86400}
+      REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-2592000}
+      REFRESH_TOKEN_CLEANUP_SECONDS: ${REFRESH_TOKEN_CLEANUP_SECONDS:-3600}
+      AGENT_CAPABILITY_SECRET: ${AGENT_CAPABILITY_SECRET:-lease_agent_capability_secret}
+      AGENT_CAPABILITY_TTL_SECONDS: ${AGENT_CAPABILITY_TTL_SECONDS:-300}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${CORE_PORT:-8080}:8080"
@@ -74,11 +79,15 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      LLM_PRICING_VERSION: ${LLM_PRICING_VERSION:-unconfigured}
+      LLM_INPUT_PRICE_USD_PER_MILLION: ${LLM_INPUT_PRICE_USD_PER_MILLION:-0}
+      LLM_OUTPUT_PRICE_USD_PER_MILLION: ${LLM_OUTPUT_PRICE_USD_PER_MILLION:-0}
       PADDLEOCR_API_URL: ${PADDLEOCR_API_URL:-https://paddleocr.aistudio-app.com/api/v2/ocr/jobs}
       PADDLEOCR_ACCESS_TOKEN: ${PADDLEOCR_ACCESS_TOKEN:-}
       PADDLEOCR_MODEL: ${PADDLEOCR_MODEL:-PaddleOCR-VL-1.5}
       PADDLEOCR_ENABLED: ${PADDLEOCR_ENABLED:-false}
       CORE_SERVICE_URL: http://core-service:8080
+      AGENT_PLANNER_TOKEN: ${AGENT_PLANNER_TOKEN:-}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
@@ -87,6 +96,26 @@ services:
     depends_on:
       - core-service
       - minio
+
+  # Optional production worker. Keep it behind the worker profile so the
+  # normal MVP still starts the original five services. The worker has only a
+  # JWT/worker permission and calls Core/AI over HTTP; it has no DB or MinIO
+  # credentials.
+  agent-runner:
+    profiles: ["worker"]
+    build:
+      context: ./core-service
+      dockerfile: Dockerfile.agent-runner
+    container_name: lease-agent-runner
+    environment:
+      AGENT_GATEWAY_URL: http://core-service:8080
+      AGENT_GATEWAY_TOKEN: ${AGENT_GATEWAY_TOKEN:-}
+      AGENT_PLANNER_URL: http://ai-service:8000
+      AGENT_PLANNER_TOKEN: ${AGENT_PLANNER_TOKEN:-}
+      AGENT_WORKER_ID: ${AGENT_WORKER_ID:-agent-runner-1}
+    depends_on:
+      - core-service
+      - ai-service
 
   web:
     build:

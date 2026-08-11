@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -83,6 +85,36 @@ func TestStartPersistsOneInspectableSuccessfulRun(t *testing.T) {
 	}
 	if started.TriggerMessage.Content != "review this contract" {
 		t.Fatalf("trigger message = %q", started.TriggerMessage.Content)
+	}
+}
+
+func TestStartPreservesAccessScopeForDetachedAgentRun(t *testing.T) {
+	store := newMemoryStore()
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	var observed access.Scope
+	runtime := newRuntime(
+		store,
+		PlannerFunc(func(Input, *repository.AIChatRun) Plan { return Plan{AgentMode: true} }),
+		ExecutorFunc[testResponse](func(ctx context.Context, _ Execution) (testResponse, error) {
+			var ok bool
+			observed, ok = access.ScopeFromContext(ctx)
+			if !ok {
+				return testResponse{}, fmt.Errorf("access scope was lost before detached execution")
+			}
+			return testResponse{Answer: "ok", Model: "test"}, nil
+		}),
+		func(testResponse) Result { return Result{} },
+		Options{Dispatch: func(task func()) { task() }},
+	)
+
+	scope := access.Scope{LegalEntityID: "le-001", StoreIDs: []string{"store-1"}}
+	if _, err := runtime.Start(access.WithScope(context.Background(), scope), Input{
+		SessionID: "session-1", Message: "review", UserID: "user-1",
+	}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+	if observed.LegalEntityID != scope.LegalEntityID || len(observed.StoreIDs) != 1 || observed.StoreIDs[0] != "store-1" {
+		t.Fatalf("observed scope = %+v, want %+v", observed, scope)
 	}
 }
 
@@ -176,6 +208,40 @@ func TestContinueResolvesRunTargetInsideRuntime(t *testing.T) {
 	}
 }
 
+func TestContinuePreservesAccessScopeForDetachedAgentRun(t *testing.T) {
+	store := newMemoryStore()
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.runs["source-run"] = &repository.AIChatRun{ID: "source-run", SessionID: "session-1", Status: "waiting_review"}
+	store.messages["session-1"] = []*repository.AIChatMessage{
+		{ID: "message-1", SessionID: "session-1", RunID: stringPointer("source-run"), Role: "user", Content: "review"},
+	}
+	store.runs["source-run"].TriggerMessageID = stringPointer("message-1")
+	var observed access.Scope
+	runtime := newRuntime(
+		store,
+		PlannerFunc(func(Input, *repository.AIChatRun) Plan { return Plan{AgentMode: true} }),
+		ExecutorFunc[testResponse](func(ctx context.Context, _ Execution) (testResponse, error) {
+			var ok bool
+			observed, ok = access.ScopeFromContext(ctx)
+			if !ok {
+				return testResponse{}, fmt.Errorf("continuation lost access scope")
+			}
+			return testResponse{Answer: "continued", Model: "test"}, nil
+		}),
+		func(testResponse) Result { return Result{} },
+		Options{Dispatch: func(task func()) { task() }},
+	)
+	scope := access.Scope{LegalEntityID: "le-001", StoreIDs: []string{"store-1"}}
+	if _, err := runtime.Continue(access.WithScope(context.Background(), scope), ContinueCommand{
+		Target: Target{Type: "run", ID: "source-run"}, UserID: "user-1",
+	}); err != nil {
+		t.Fatalf("Continue returned error: %v", err)
+	}
+	if observed.LegalEntityID != scope.LegalEntityID || len(observed.StoreIDs) != 1 || observed.StoreIDs[0] != "store-1" {
+		t.Fatalf("observed scope = %+v, want %+v", observed, scope)
+	}
+}
+
 func TestContinueSupportsMessageArtifactAndActionTargets(t *testing.T) {
 	targets := []Target{
 		{Type: "message", ID: "message-2"},
@@ -260,6 +326,65 @@ func TestReviewRecordsActionAndProjectsArtifactStatus(t *testing.T) {
 	}
 }
 
+func TestReviewUsesAtomicRuntimeCommitWhenAvailable(t *testing.T) {
+	base := newMemoryStore()
+	base.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	base.runs["run-1"] = &repository.AIChatRun{ID: "run-1", SessionID: "session-1", Status: "waiting_review"}
+	base.artifacts["artifact-1"] = &repository.AIChatArtifact{
+		ID: "artifact-1", SessionID: "session-1", RunID: "run-1", ArtifactType: "event_draft", Status: "ready",
+	}
+	store := &atomicMemoryStore{memoryStore: base}
+	runtime := newRuntime(
+		store,
+		PlannerFunc(func(Input, *repository.AIChatRun) Plan { return Plan{} }),
+		ExecutorFunc[testResponse](func(context.Context, Execution) (testResponse, error) { return testResponse{}, nil }),
+		func(response testResponse) Result { return Result{Answer: response.Answer, Model: response.Model} },
+		Options{Dispatch: func(task func()) { task() }},
+	)
+	if _, err := runtime.Review(context.Background(), ReviewCommand{ArtifactID: "artifact-1", ActionType: "confirm", UserID: "user-1"}); err != nil {
+		t.Fatalf("Review returned error: %v", err)
+	}
+	if !store.atomic || base.artifacts["artifact-1"].Status != "confirmed" || len(base.actions) != 1 {
+		t.Fatalf("atomic commit state = atomic:%v artifact:%+v actions:%d", store.atomic, base.artifacts["artifact-1"], len(base.actions))
+	}
+}
+
+func TestReviewUsesApplicationTransactionCommitResult(t *testing.T) {
+	store := newMemoryStore()
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.runs["run-1"] = &repository.AIChatRun{ID: "run-1", SessionID: "session-1", Status: "waiting_review"}
+	store.artifacts["artifact-1"] = &repository.AIChatArtifact{
+		ID: "artifact-1", SessionID: "session-1", RunID: "run-1", ArtifactType: "contract_draft", Status: "ready",
+	}
+	committed := false
+	runtime := newRuntime(
+		store,
+		PlannerFunc(func(Input, *repository.AIChatRun) Plan { return Plan{} }),
+		ExecutorFunc[testResponse](func(context.Context, Execution) (testResponse, error) { return testResponse{}, nil }),
+		func(response testResponse) Result { return Result{} },
+		Options{
+			Dispatch: func(task func()) { task() },
+			ReviewCommit: func(_ context.Context, artifact *repository.AIChatArtifact, action *repository.AIChatReviewAction, status string, _ ReviewCommand) (any, error) {
+				if artifact.ID != "artifact-1" || action.ActionType != "confirm" || status != "confirmed" {
+					t.Fatalf("unexpected review transaction input: artifact=%+v action=%+v status=%s", artifact, action, status)
+				}
+				committed = true
+				return map[string]any{"batch_id": "batch-1"}, nil
+			},
+		},
+	)
+	result, err := runtime.Review(context.Background(), ReviewCommand{ArtifactID: "artifact-1", ActionType: "confirm", UserID: "user-1"})
+	if err != nil || !committed {
+		t.Fatalf("Review err=%v committed=%v", err, committed)
+	}
+	if result.CommitResult == nil {
+		t.Fatal("application transaction result was not returned")
+	}
+	if len(store.actions) != 0 || store.artifacts["artifact-1"].Status != "ready" {
+		t.Fatal("runtime fallback store should not be mutated when application transaction owns the commit")
+	}
+}
+
 func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 	store := newMemoryStore()
 	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
@@ -277,7 +402,12 @@ func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 				Artifacts: []ArtifactDraft{{
 					Type: "contract_draft", Title: "Contract draft",
 					Data:           map[string]any{"contracts": []any{map[string]any{"contract_number": "LEASE-1"}}},
-					ReviewRequired: true,
+					ReviewRequired: true, EvidenceComplete: true,
+					EvidenceRefs: []agentartifact.EvidenceReference{{
+						SourceFileID: "file-1", Complete: true,
+						Locators: []agentartifact.EvidenceLocator{{Field: "contracts[0].contract_number", Source: "Sheet1!A2"}},
+					}},
+					ReviewReasons: []string{"assist_mode"}, ModelVersion: "test-model", RuleVersion: "test-rules.v1",
 				}},
 			}
 		},
@@ -297,6 +427,14 @@ func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 	}
 	if len(store.artifacts) != 1 {
 		t.Fatalf("artifact count = %d, want 1", len(store.artifacts))
+	}
+	for _, artifact := range store.artifacts {
+		if artifact.SchemaVersion != agentartifact.SchemaVersion || !artifact.EvidenceComplete || artifact.ModelVersion == nil || artifact.RuleVersion == nil {
+			t.Fatalf("artifact protocol fields = %+v", artifact)
+		}
+		if len(artifact.EvidenceRefs) == 0 || len(artifact.ReviewReasons) == 0 {
+			t.Fatalf("artifact evidence/review fields = %+v", artifact)
+		}
 	}
 	if got := eventTypes(inspection.Events); fmt.Sprint(got[len(got)-2:]) != fmt.Sprint([]string{"artifact_ready", "run_end"}) {
 		t.Fatalf("terminal events = %v", got)
@@ -355,6 +493,19 @@ type memoryStore struct {
 	actions              map[string]*repository.AIChatReviewAction
 	nextID               int
 	failAssistantMessage bool
+}
+
+type atomicMemoryStore struct {
+	*memoryStore
+	atomic bool
+}
+
+func (s *atomicMemoryStore) CommitReviewAction(ctx context.Context, action *repository.AIChatReviewAction, status string) error {
+	s.atomic = true
+	if err := s.RecordReviewAction(ctx, action); err != nil {
+		return err
+	}
+	return s.UpdateArtifactStatus(ctx, *action.ArtifactID, status)
 }
 
 func newMemoryStore() *memoryStore {

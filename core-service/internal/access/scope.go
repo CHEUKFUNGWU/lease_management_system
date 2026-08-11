@@ -1,16 +1,22 @@
 package access
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 type scopeContextKey struct{}
 
 // Scope is the maximum legal-entity access plus optional narrowing dimensions.
 type Scope struct {
-	Global        bool
-	LegalEntityID string
-	StoreIDs      []string
-	Regions       []string
-	Brands        []string
+	Global          bool
+	LegalEntityID   string
+	StoreIDs        []string
+	Regions         []string
+	Brands          []string
+	Plants          []string
+	ProductionLines []string
+	EquipmentIDs    []string
 }
 
 type ContractAttributes struct {
@@ -56,4 +62,78 @@ func WithScope(ctx context.Context, scope Scope) context.Context {
 func ScopeFromContext(ctx context.Context) (Scope, bool) {
 	scope, ok := ctx.Value(scopeContextKey{}).(Scope)
 	return scope, ok
+}
+
+// IntersectScopes returns the safe intersection of two scopes. Global means
+// "no restriction" for that operand; two non-global scopes must agree on
+// legal entity and their populated dimensions must overlap.
+func IntersectScopes(left, right Scope) (Scope, bool) {
+	if left.Global {
+		return cloneScope(right), right.Global || strings.TrimSpace(right.LegalEntityID) != ""
+	}
+	if right.Global {
+		return cloneScope(left), strings.TrimSpace(left.LegalEntityID) != ""
+	}
+	leftEntity := strings.TrimSpace(left.LegalEntityID)
+	rightEntity := strings.TrimSpace(right.LegalEntityID)
+	if leftEntity == "" || rightEntity == "" || leftEntity != rightEntity {
+		return Scope{}, false
+	}
+	result := Scope{LegalEntityID: leftEntity}
+	var ok bool
+	if result.StoreIDs, ok = intersectDimension(left.StoreIDs, right.StoreIDs); !ok {
+		return Scope{}, false
+	}
+	if result.Regions, ok = intersectDimension(left.Regions, right.Regions); !ok {
+		return Scope{}, false
+	}
+	if result.Brands, ok = intersectDimension(left.Brands, right.Brands); !ok {
+		return Scope{}, false
+	}
+	if result.Plants, ok = intersectDimension(left.Plants, right.Plants); !ok {
+		return Scope{}, false
+	}
+	if result.ProductionLines, ok = intersectDimension(left.ProductionLines, right.ProductionLines); !ok {
+		return Scope{}, false
+	}
+	if result.EquipmentIDs, ok = intersectDimension(left.EquipmentIDs, right.EquipmentIDs); !ok {
+		return Scope{}, false
+	}
+	return result, true
+}
+
+func cloneScope(scope Scope) Scope {
+	scope.StoreIDs = append([]string(nil), scope.StoreIDs...)
+	scope.Regions = append([]string(nil), scope.Regions...)
+	scope.Brands = append([]string(nil), scope.Brands...)
+	scope.Plants = append([]string(nil), scope.Plants...)
+	scope.ProductionLines = append([]string(nil), scope.ProductionLines...)
+	scope.EquipmentIDs = append([]string(nil), scope.EquipmentIDs...)
+	return scope
+}
+
+func intersectDimension(left, right []string) ([]string, bool) {
+	if len(left) == 0 {
+		return append([]string(nil), right...), true
+	}
+	if len(right) == 0 {
+		return append([]string(nil), left...), true
+	}
+	rightSet := make(map[string]struct{}, len(right))
+	for _, value := range right {
+		rightSet[value] = struct{}{}
+	}
+	result := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, value := range left {
+		if _, exists := rightSet[value]; !exists {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result, len(result) > 0
 }

@@ -73,17 +73,23 @@ func DataScopeMiddleware() gin.HandlerFunc {
 		c.Set("scope_store", scopes["store"])
 		c.Set("scope_region", scopes["region"])
 		c.Set("scope_brand", scopes["brand"])
+		c.Set("scope_plant", scopes["plant"])
+		c.Set("scope_production_line", scopes["production_line"])
+		c.Set("scope_equipment", scopes["equipment"])
 
 		legalEntityID, _ := c.Get("legal_entity_id")
 		legalEntityIDStr, _ := legalEntityID.(string)
 		permissions, _ := c.Get("permissions")
 		permissionStrings, _ := permissions.([]string)
 		scope := access.Scope{
-			Global:        HasPermission(permissionStrings, "*", "*"),
-			LegalEntityID: legalEntityIDStr,
-			StoreIDs:      append([]string(nil), scopes["store"]...),
-			Regions:       append([]string(nil), scopes["region"]...),
-			Brands:        append([]string(nil), scopes["brand"]...),
+			Global:          HasPermission(permissionStrings, "*", "*"),
+			LegalEntityID:   legalEntityIDStr,
+			StoreIDs:        append([]string(nil), scopes["store"]...),
+			Regions:         append([]string(nil), scopes["region"]...),
+			Brands:          append([]string(nil), scopes["brand"]...),
+			Plants:          append([]string(nil), scopes["plant"]...),
+			ProductionLines: append([]string(nil), scopes["production_line"]...),
+			EquipmentIDs:    append([]string(nil), scopes["equipment"]...),
 		}
 		c.Set("access_scope", scope)
 		c.Request = c.Request.WithContext(access.WithScope(c.Request.Context(), scope))
@@ -106,7 +112,7 @@ func GetAccessScope(c *gin.Context) (access.Scope, bool) {
 func RequireLegalEntityWideScope() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scope, ok := GetAccessScope(c)
-		if !ok || (!scope.Global && (scope.LegalEntityID == "" || len(scope.StoreIDs) > 0 || len(scope.Regions) > 0 || len(scope.Brands) > 0)) {
+		if !ok || (!scope.Global && (scope.LegalEntityID == "" || len(scope.StoreIDs) > 0 || len(scope.Regions) > 0 || len(scope.Brands) > 0 || len(scope.Plants) > 0 || len(scope.ProductionLines) > 0 || len(scope.EquipmentIDs) > 0)) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "operation requires legal-entity-wide access"})
 			c.Abort()
 			return

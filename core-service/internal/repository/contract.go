@@ -87,13 +87,16 @@ func (r *ContractRepository) WithTx(tx DBTX) *ContractRepository {
 
 func (r *ContractRepository) GetContractAttributes(ctx context.Context, contractID string) (access.ContractAttributes, bool, error) {
 	var attributes access.ContractAttributes
-	err := r.db.QueryRow(ctx, `
+	query := `
 		SELECT COALESCE(c.legal_entity_id::text, ''), COALESCE(c.store_id::text, ''),
 		       COALESCE(s.region, ''), COALESCE(s.brand, '')
 		FROM lease_contracts c
 		LEFT JOIN stores s ON s.id = c.store_id
 		WHERE c.id = $1
-	`, contractID).Scan(&attributes.LegalEntityID, &attributes.StoreID, &attributes.Region, &attributes.Brand)
+	`
+	args := []interface{}{contractID}
+	query, args, _ = appendContractScopePredicate(ctx, query, args, 2, "c")
+	err := r.db.QueryRow(ctx, query, args...).Scan(&attributes.LegalEntityID, &attributes.StoreID, &attributes.Region, &attributes.Brand)
 	if err == pgx.ErrNoRows {
 		return access.ContractAttributes{}, false, nil
 	}
@@ -749,47 +752,29 @@ func (r *ContractRepository) Update(ctx context.Context, contract *Contract, leg
 }
 
 func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntityID string) (*Contract, error) {
-	var query string
-	var args []interface{}
-
-	if legalEntityID != "" {
-		query = `
-			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
-				commencement_date, lease_start_date, lease_end_date, status,
-				created_by, approved_by, created_at, updated_at,
-				approval_status, is_official_version, draft_version_no,
-				included_in_reporting, report_mode, reviewed_by, reviewed_at,
-				rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
-				discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
-				discount_rate_confirmed_by, discount_rate_confirmed_at,
-				ai_extracted_discount_rate, ai_suggested_rate_policies,
-				ai_confidence_score, source_reference_locator, approved_at,
-				COALESCE(lease_scope, 'in_scope') AS lease_scope, exemption_reason,
-				scope_classified_by, scope_classified_at, scope_source, scope_confidence
-			FROM lease_contracts WHERE id = $1 AND legal_entity_id = $2
-		`
-		args = append(args, id, legalEntityID)
-	} else {
-		query = `
-			SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
-				COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
-				COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
-				commencement_date, lease_start_date, lease_end_date, status,
-				created_by, approved_by, created_at, updated_at,
-				approval_status, is_official_version, draft_version_no,
-				included_in_reporting, report_mode, reviewed_by, reviewed_at,
-				rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
-				discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
-				discount_rate_confirmed_by, discount_rate_confirmed_at,
-				ai_extracted_discount_rate, ai_suggested_rate_policies,
-				ai_confidence_score, source_reference_locator, approved_at,
-				COALESCE(lease_scope, 'in_scope') AS lease_scope, exemption_reason,
-				scope_classified_by, scope_classified_at, scope_source, scope_confidence
-			FROM lease_contracts WHERE id = $1
-		`
-		args = append(args, id)
+	query := `
+		SELECT id, contract_number, contract_name, legal_entity_id, store_id, landlord_id,
+			COALESCE(lessee_name, '') as lessee_name, COALESCE(lessor_name, '') as lessor_name, COALESCE(store_name, '') as store_name, COALESCE(store_address, '') as store_address, COALESCE(tags, '') as tags,
+			COALESCE(asset_type, 'real_estate') AS asset_type, asset_category, property_category, area_sqm, currency, signing_date,
+			commencement_date, lease_start_date, lease_end_date, status,
+			created_by, approved_by, created_at, updated_at,
+			approval_status, is_official_version, draft_version_no,
+			included_in_reporting, report_mode, reviewed_by, reviewed_at,
+			rejected_reason, submitted_at, discount_rate_type, discount_rate_version,
+			discount_rate_value, discount_rate_missing, discount_rate_source, discount_rate_policy_id,
+			discount_rate_confirmed_by, discount_rate_confirmed_at,
+			ai_extracted_discount_rate, ai_suggested_rate_policies,
+			ai_confidence_score, source_reference_locator, approved_at,
+			COALESCE(lease_scope, 'in_scope') AS lease_scope, exemption_reason,
+			scope_classified_by, scope_classified_at, scope_source, scope_confidence
+		FROM lease_contracts lc WHERE lc.id = $1
+	`
+	args := []interface{}{id}
+	if _, scoped := access.ScopeFromContext(ctx); scoped {
+		query, args, _ = appendContractScopePredicate(ctx, query, args, 2, "lc")
+	} else if legalEntityID != "" {
+		query += " AND lc.legal_entity_id = $2"
+		args = append(args, legalEntityID)
 	}
 
 	c := &Contract{}
@@ -817,16 +802,6 @@ func (r *ContractRepository) GetByID(ctx context.Context, id string, legalEntity
 		}
 		return nil, fmt.Errorf("failed to get contract: %w", err)
 	}
-	if scope, scoped := access.ScopeFromContext(ctx); scoped {
-		attributes, attrErr := r.valuesAttributes(ctx, c.LegalEntityID, c.StoreID)
-		if attrErr != nil {
-			return nil, fmt.Errorf("failed to validate contract access: %w", attrErr)
-		}
-		if !scope.AllowsContract(attributes) {
-			return nil, nil
-		}
-	}
-
 	return c, nil
 }
 

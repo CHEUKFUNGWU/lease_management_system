@@ -12,33 +12,228 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/agentartifact"
+	"github.com/lease-management-system/core-service/internal/agentskill"
+	"github.com/lease-management-system/core-service/internal/agenttools"
+	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/aiintake"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/draftapp"
 )
 
 type Agent struct {
-	contractRepo *repository.ContractRepository
-	mcRepo       *repository.MonthlyClosingRepository
-	eventRepo    *repository.EventRepository
+	contractRepo  *repository.ContractRepository
+	mcRepo        *repository.MonthlyClosingRepository
+	eventRepo     *repository.EventRepository
+	toolRuntime   *agenttools.Runtime
+	skillRegistry *agentskill.Registry
 }
 
-func New(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository) *Agent {
-	return &Agent{contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo}
+// ToolRuntime exposes only the stable execution seam to an HTTP/CLI adapter.
+// The Agent's repository wiring and model orchestration remain private.
+func (h *Agent) ToolRuntime() *agenttools.Runtime {
+	if h == nil {
+		return nil
+	}
+	return h.toolRuntime
+}
+
+// SkillRegistry exposes the read-only skill descriptor seam to adapters.
+// Skill selection and execution remain server-owned.
+func (h *Agent) SkillRegistry() *agentskill.Registry {
+	if h == nil {
+		return nil
+	}
+	return h.skillRegistry
+}
+
+func New(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, nil, nil, nil, draftServices...)
+}
+
+// NewWithPerformance keeps the historical constructor source-compatible while
+// allowing the production gateway to expose the operating decision read seam.
+// The reader is an application adapter; it never gives the Agent a database
+// handle or a way to bypass the Tool Runtime policy.
+func NewWithPerformance(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, nil, nil, draftServices...)
+}
+
+func NewWithReaders(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, nil, draftServices...)
+}
+
+// NewWithOperationalReaders wires the existing budget, cash-flow and renewal
+// deterministic services into the same governed Agent Tool Runtime.
+func NewWithOperationalReaders(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, draftServices...)
+}
+
+// NewWithOperationalReadersAndGovernance additionally exposes the governed
+// decision-memo draft seam. It is separate to preserve source compatibility
+// for lightweight adapters that do not have the governance repository.
+func NewWithOperationalReadersAndGovernance(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, draftServices ...*draftapp.Service) *Agent {
+	return newAgentWithGovernance(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, draftServices...)
+}
+
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, draftServices ...*draftapp.Service) *Agent {
+	return newAgentWithGovernance(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, nil, draftServices...)
+}
+
+func newAgentWithGovernance(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, draftServices ...*draftapp.Service) *Agent {
+	agent := &Agent{
+		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
+		skillRegistry: agentskill.ProductionRegistry(),
+	}
+	registry := agenttools.NewRegistry()
+	registered := false
+	if contractRepo != nil {
+		_ = registry.Register(agenttooldefs.NewContractSearchDefinition(contractRepo))
+		if err := registry.Register(agenttooldefs.NewContractGetDefinition(contractRepo)); err == nil {
+			registered = true
+			if mcRepo != nil {
+				_ = registry.Register(agenttooldefs.NewMeasurementListDefinition(contractRepo, mcRepo))
+				_ = registry.Register(agenttooldefs.NewJournalListDefinition(contractRepo, mcRepo))
+			}
+			if eventRepo != nil {
+				_ = registry.Register(agenttooldefs.NewEventListDefinition(contractRepo, eventRepo))
+			}
+		}
+	}
+	for _, definition := range agent.fileParseDefinitions() {
+		if err := registry.Register(definition); err == nil {
+			registered = true
+		}
+	}
+	if len(draftServices) > 0 && draftServices[0] != nil {
+		if err := registry.Register(agenttooldefs.NewContractDraftDefinition(draftServices[0])); err == nil {
+			registered = true
+		}
+		if err := registry.Register(agenttooldefs.NewPaymentScheduleDraftDefinition(draftServices[0])); err == nil {
+			registered = true
+		}
+		if eventRepo != nil {
+			if err := registry.Register(agenttooldefs.NewEventDraftDefinition(draftServices[0])); err == nil {
+				registered = true
+			}
+		}
+	}
+	if performance != nil {
+		for _, definition := range []agenttools.ToolDefinition{
+			agenttooldefs.NewPortfolioSummaryDefinition(performance),
+			agenttooldefs.NewManagementPreReadDefinition(performance),
+			agenttooldefs.NewStorePerformanceDefinition(performance),
+			agenttooldefs.NewRentToSalesDefinition(performance),
+			agenttooldefs.NewEquipmentPerformanceDefinition(performance),
+			agenttooldefs.NewActionListDefinition(performance),
+		} {
+			if err := registry.Register(definition); err == nil {
+				registered = true
+			}
+		}
+		if writer, ok := performance.(agenttooldefs.ActionDraftWriter); ok {
+			if err := registry.Register(agenttooldefs.NewActionDraftDefinition(writer)); err == nil {
+				registered = true
+			}
+			if err := registry.Register(agenttooldefs.NewExplanationDraftDefinition(writer)); err == nil {
+				registered = true
+			}
+			if err := registry.Register(agenttooldefs.NewMeetingActionDraftDefinition(writer)); err == nil {
+				registered = true
+			}
+		}
+		if writer, ok := performance.(agenttooldefs.ScenarioDraftWriter); ok {
+			if err := registry.Register(agenttooldefs.NewScenarioDraftDefinition(writer)); err == nil {
+				registered = true
+			}
+		}
+	}
+	if governance != nil {
+		if err := registry.Register(agenttooldefs.NewDecisionMemoDraftDefinition(governance)); err == nil {
+			registered = true
+		}
+	}
+	for _, definition := range []agenttools.ToolDefinition{
+		agenttooldefs.NewStoreScenarioDefinition(),
+		agenttooldefs.NewEquipmentScenarioDefinition(),
+		agenttooldefs.NewDealSimulationDefinition(),
+		agenttooldefs.NewPreDealSimulationDefinition(),
+		agenttooldefs.NewRenewalSimulationDefinition(),
+		agenttooldefs.NewDecisionSummaryDefinition(),
+	} {
+		if err := registry.Register(definition); err == nil {
+			registered = true
+		}
+	}
+	if closeReadiness != nil {
+		if err := registry.Register(agenttooldefs.NewCloseReadinessDefinition(closeReadiness)); err == nil {
+			registered = true
+		}
+	}
+	if controls != nil {
+		for _, definition := range []agenttools.ToolDefinition{
+			agenttooldefs.NewBudgetVarianceDefinition(controls.Budget),
+			agenttooldefs.NewCashflowScenarioDefinition(controls.Cashflow),
+			agenttooldefs.NewRenewalDecisionDefinition(controls.Renewal),
+		} {
+			if err := registry.Register(definition); err == nil {
+				registered = true
+			}
+		}
+	}
+	if registered {
+		agent.toolRuntime = agenttools.NewRuntime(registry, agenttools.RuntimeOptions{})
+	}
+	return agent
 }
 
 func (h *Agent) Plan(input aichat.Input, sourceRun *repository.AIChatRun) aichat.Plan {
 	req := requestFromRuntimeInput(input)
 	effectiveContractID := effectiveContractIDFromRequest(req)
-	runbook := h.buildAgentRunbook(req, effectiveContractID)
-	if runbook == nil && sourceRun != nil && sourceRun.SkillID != nil {
+	var runbook *AgentRunbook
+	if h != nil {
+		registry := h.skillRegistry
+		if registry == nil {
+			registry = agentskill.ProductionRegistry()
+		}
+		if definition, ok := registry.Select(agentskill.Intent{
+			Message: input.Message, Role: input.Role,
+			HasFile:          input.FileID != "" && input.ObjectName != "",
+			HasContract:      effectiveContractID != "",
+			RequestedSkillID: input.SkillID, RequestedVersion: input.SkillVersion,
+		}); ok {
+			runbook = runbookForSkillID(definition.ID, req, effectiveContractID)
+			if runbook != nil {
+				runbook.SkillVersion = definition.Version
+			}
+		}
+	}
+	if runbook == nil && strings.TrimSpace(input.SkillID) == "" {
+		runbook = h.buildAgentRunbook(req, effectiveContractID)
+	}
+	if runbook == nil && strings.TrimSpace(input.SkillID) == "" && sourceRun != nil && sourceRun.SkillID != nil {
 		runbook = runbookForSkillID(*sourceRun.SkillID, req, effectiveContractID)
+		if runbook != nil && h != nil {
+			registry := h.skillRegistry
+			if registry == nil {
+				registry = agentskill.ProductionRegistry()
+			}
+			version := ""
+			if sourceRun.SkillVersion != nil {
+				version = *sourceRun.SkillVersion
+			}
+			if definition, ok := registry.Resolve(*sourceRun.SkillID, version); ok {
+				runbook.SkillVersion = definition.Version
+			}
+		}
 	}
 	if runbook == nil {
 		return aichat.Plan{}
 	}
 	return aichat.Plan{
-		AgentMode: true, SkillID: runbook.SkillID,
+		AgentMode: true, SkillID: runbook.SkillID, SkillVersion: runbook.SkillVersion,
 		ReviewRequired: len(runbook.ReviewPrompts) > 0,
 		AgentPlan:      runbook.AgentPlan, ToolCalls: runbook.ToolCalls,
 		ReviewPrompts: runbook.ReviewPrompts, Payload: runbook,
@@ -49,22 +244,107 @@ func runbookForSkillID(skillID string, req Request, effectiveContractID string) 
 	hasFile := req.FileID != "" && req.ObjectName != ""
 	hasContractContext := effectiveContractID != ""
 	switch skillID {
-	case "excel_ledger":
+	case "excel_ledger", "contract_batch_intake":
 		return buildContractLedgerRunbook(hasFile)
 	case "contract_review":
 		return buildContractReviewRunbook(hasFile, hasContractContext)
-	case "payment_schedule":
+	case "payment_schedule", "payment_schedule_intake":
 		return buildPaymentScheduleRunbook(hasFile, hasContractContext)
+	case "event_change":
+		return buildEventChangeRunbook(hasContractContext)
 	case "audit_pack":
 		return buildAuditPackRunbook()
+	case "fpna_copilot", "retail_performance", "manufacturing_performance":
+		return buildPerformanceRunbook(skillID, req)
 	default:
 		return nil
 	}
 }
 
+func buildPerformanceRunbook(skillID string, req Request) *AgentRunbook {
+	period := "当前期间"
+	if req.PageContext != nil && req.PageContext.Period != "" {
+		period = req.PageContext.Period
+	}
+	return &AgentRunbook{
+		SkillID: skillID, SkillName: "FP&A / Finance BP Copilot", NeedsPortfolioContext: true,
+		AnswerPrefix: fmt.Sprintf("Agent 已切换到经营决策 Copilot。我会基于权限范围内的系统事实、期间 %s 和可追溯来源，先解释偏差与数据缺口，再提出需要人工确认的行动。AI 不会直接修改正式台账或 Official 版本。", period),
+		AgentPlan: []AgentPlanStep{
+			{ID: "load_operating_facts", Title: "读取经营组合与事实版本", Status: "completed"},
+			{ID: "check_data_quality", Title: "识别覆盖、版本和数据质量缺口", Status: "needs_review"},
+			{ID: "explain_drivers", Title: "使用确定性指标和残差解释驱动", Status: "needs_review"},
+			{ID: "prepare_actions", Title: "形成待人工确认的行动建议", Status: "pending"},
+		},
+		ToolCalls: []AgentToolCall{
+			{Tool: "lease.portfolio.summary", Skill: "FP&A Copilot", Status: "completed", InputSummary: "读取经营组合摘要", OutputSummary: "返回事实覆盖、数据准备度和行动影响", RequiresReview: false},
+			{Tool: "lease.management.pre_read", Skill: "Management Reporting", Status: "pending", InputSummary: "等待期间和权限范围", OutputSummary: "生成会前摘要、优先行动和问题清单", RequiresReview: true},
+			{Tool: "lease.store.performance", Skill: "Retail Finance BP", Status: "completed", InputSummary: "读取门店四墙表现", OutputSummary: "返回四墙 EBITDA、租售比、坪效和数据缺口", RequiresReview: false},
+			{Tool: "lease.rent_to_sales", Skill: "Retail Finance BP", Status: "completed", InputSummary: "读取门店租售比", OutputSummary: "返回固定/变量租金与销售额的租售比及证据缺口", RequiresReview: false},
+			{Tool: "lease.equipment.performance", Skill: "Manufacturing Finance BP", Status: "completed", InputSummary: "读取设备经营事实", OutputSummary: "返回成本桥和未解释残差", RequiresReview: false},
+			{Tool: "lease.fpna.actions", Skill: "FP&A Action Center", Status: "needs_review", InputSummary: "读取异常和行动兑现状态", OutputSummary: "仅生成带来源的行动草稿，正式动作需人工确认", RequiresReview: true},
+			{Tool: "lease.close.readiness", Skill: "FP&A Close Readiness", Status: "needs_review", InputSummary: "读取期间关账准备度和证据缺口", OutputSummary: "返回阻塞项与证据缺口，不会自动关账或过账", RequiresReview: true},
+			{Tool: "lease.budget.variance", Skill: "FP&A Driver Bridge", Status: "pending", InputSummary: "等待预算/Forecast 版本和期间", OutputSummary: "返回确定性差异桥与 residual", RequiresReview: false},
+			{Tool: "lease.cashflow.scenario", Skill: "FP&A Cash Planning", Status: "pending", InputSummary: "等待现金流情景结构化假设", OutputSummary: "返回无副作用租赁现金流 Scenario", RequiresReview: true},
+			{Tool: "lease.renewal.decisions", Skill: "Retail Finance BP", Status: "pending", InputSummary: "等待合同范围内续租决策快照", OutputSummary: "读取既有 Scenario 证据，不会创建续租事件", RequiresReview: false},
+			{Tool: "lease.fpna.action.draft.create", Skill: "FP&A Action Center", Status: "pending", InputSummary: "等待用户确认解释、负责人和预期收益", OutputSummary: "创建 Assist Mode 行动草稿，需 Review Gate", RequiresReview: true},
+			{Tool: "lease.store.scenario.simulate", Skill: "Retail Finance BP", Status: "pending", InputSummary: "等待门店续租/议价/搬迁/关店结构化假设", OutputSummary: "返回无副作用 Scenario 结果，不写入合同", RequiresReview: true},
+			{Tool: "lease.equipment.scenario.simulate", Skill: "Manufacturing Finance BP", Status: "pending", InputSummary: "等待设备 Buy/Lease/Replace/Outsource 假设", OutputSummary: "返回经营 NPV 与 IFRS 16 分开展示", RequiresReview: true},
+			{Tool: "lease.deal.simulate", Skill: "Deal / Pre-deal Finance", Status: "pending", InputSummary: "等待候选报价和已确认折现率", OutputSummary: "返回有效租金、现值和现金比较；无副作用", RequiresReview: true},
+			{Tool: "lease.predeal.simulate", Skill: "Deal / Pre-deal Finance", Status: "pending", InputSummary: "等待签约前结构化条款", OutputSummary: "返回费用曲线、EBITDA 桥和退出曲线", RequiresReview: true},
+			{Tool: "lease.renewal.simulate", Skill: "Retail Finance BP", Status: "pending", InputSummary: "等待续租/退出情景及已确认折现率", OutputSummary: "返回现金、损益和 IFRS 16 影响；无副作用", RequiresReview: true},
+			{Tool: "lease.decision.summary", Skill: "Decision Memo", Status: "pending", InputSummary: "等待事实、计算、假设和反方论点", OutputSummary: "生成一页决策摘要，保留数据缺口和待问问题", RequiresReview: true},
+			{Tool: "lease.fpna.scenario.draft.create", Skill: "FP&A Scenario Governance", Status: "pending", InputSummary: "等待用户确认假设和确定性计算结果", OutputSummary: "保存 Scenario 草稿，需 Review Gate，不覆盖 Budget/Forecast", RequiresReview: true},
+			{Tool: "lease.decision.memo.draft.create", Skill: "Decision Memo", Status: "pending", InputSummary: "等待系统事实、确定性计算和人类输入确认", OutputSummary: "保存分层决策备忘录草稿，需 Review Gate", RequiresReview: true},
+			{Tool: "lease.meeting.action.draft.create", Skill: "Meeting Follow-up", Status: "pending", InputSummary: "等待会议纪要、负责人和截止日期确认", OutputSummary: "保存会议行动草稿，后续用 Actual 验证兑现", RequiresReview: true},
+		},
+		ReviewPrompts: []AgentReviewPrompt{{ID: "fpna_explanation_review", Title: "确认经营解释和行动", Description: "请确认系统事实、数据覆盖、驱动解释与行动负责人；AI 建议不会自动成为正式结论。", Severity: "warning", Action: "复核来源和残差后确认解释或创建行动草稿。"}},
+	}
+}
+
 func (h *Agent) Execute(ctx context.Context, execution aichat.Execution) (Response, error) {
 	runbook, _ := execution.Plan.Payload.(*AgentRunbook)
-	return h.executeChatRequest(ctx, execution.Input.AuthHeader, requestFromRuntimeInput(execution.Input), execution.Input.LegalEntityID, execution.Input.UserID, execution.Input.Role, execution.Emit, runbook)
+	scope, scoped := access.ScopeFromContext(ctx)
+	if !scoped {
+		scope = access.Scope{
+			Global:        hasGlobalPermission(execution.Input.Permissions),
+			LegalEntityID: execution.Input.LegalEntityID,
+		}
+	}
+	runID := ""
+	if execution.Run != nil {
+		runID = execution.Run.ID
+	}
+	toolRuntime := h.toolRuntime
+	if toolRuntime != nil {
+		toolRuntime = toolRuntime.WithAudit(agenttools.AuditRecorderFunc(func(auditCtx context.Context, audit agenttools.ToolExecutionAudit) error {
+			if execution.Emit == nil {
+				return nil
+			}
+			return execution.Emit(auditCtx, "tool_execution", audit)
+		}))
+	}
+	ctx = withAIServiceAuth(ctx, execution.Input.AuthHeader)
+	ctx = agenttools.WithExecutionContext(ctx, agenttools.ExecutionContext{
+		Principal: agenttools.Principal{
+			UserID:      execution.Input.UserID,
+			SubjectType: "web_ai_agent",
+			Role:        execution.Input.Role,
+			Permissions: append([]string(nil), execution.Input.Permissions...),
+			Scope:       scope,
+			AgentMode:   "assist",
+		},
+		RunID: runID, SkillID: execution.Plan.SkillID, SkillVersion: execution.Plan.SkillVersion,
+	})
+	return h.executeChatRequest(ctx, execution.Input.AuthHeader, requestFromRuntimeInput(execution.Input), execution.Input.LegalEntityID, execution.Input.UserID, execution.Input.Role, execution.Emit, runbook, toolRuntime)
+}
+
+func hasGlobalPermission(permissions []string) bool {
+	for _, permission := range permissions {
+		if strings.EqualFold(strings.TrimSpace(permission), "*:*") {
+			return true
+		}
+	}
+	return false
 }
 
 func ProjectResult(response Response) aichat.Result {
@@ -75,17 +355,117 @@ func ProjectResult(response Response) aichat.Result {
 	}
 	if len(response.DraftContracts) > 0 {
 		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: "contract_draft", Title: "合同草稿", ReviewRequired: true,
+			Type: string(agentartifact.ArtifactContractDraft), Title: "合同草稿", ReviewRequired: true,
+			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: response.EvidenceRefs,
+			EvidenceComplete: response.BatchSummary != nil && response.BatchSummary.EvidenceComplete,
+			ReviewReasons:    batchReviewReasons(response.BatchSummary), ModelVersion: response.Model, RuleVersion: "lease-agent-rule.v1",
 			Data: map[string]any{"contracts": response.DraftContracts, "summary": response.BatchSummary},
 		})
 	}
 	if len(response.DraftPaymentSchedules) > 0 {
 		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: "payment_schedule_draft", Title: "付款计划草稿", ReviewRequired: true,
+			Type: string(agentartifact.ArtifactPaymentScheduleDraft), Title: "付款计划草稿", ReviewRequired: true,
+			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: response.EvidenceRefs,
+			EvidenceComplete: response.PaymentScheduleSummary != nil && response.PaymentScheduleSummary.EvidenceComplete,
+			ReviewReasons:    paymentReviewReasons(response.PaymentScheduleSummary), ModelVersion: response.Model, RuleVersion: "lease-agent-rule.v1",
 			Data: map[string]any{"schedules": response.DraftPaymentSchedules, "summary": response.PaymentScheduleSummary},
 		})
 	}
+	if response.AuditPack != nil {
+		reviewReasons := []string{"audit_scope_confirmation", "report_basis_confirmation"}
+		evidenceComplete := len(response.EvidenceRefs) > 0
+		if !evidenceComplete {
+			reviewReasons = append(reviewReasons, "evidence_incomplete")
+		}
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type: string(agentartifact.ArtifactAuditPack), Title: "审计包准备摘要", ReviewRequired: true,
+			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: response.EvidenceRefs,
+			EvidenceComplete: evidenceComplete, ReviewReasons: reviewReasons,
+			ModelVersion: response.Model, RuleVersion: "audit-pack-rule.v1",
+			Data: response.AuditPack,
+		})
+	}
+	if response.ReportExplanation != nil {
+		evidenceRefs := response.EvidenceRefs
+		if len(evidenceRefs) == 0 {
+			evidenceRefs = evidenceReferencesFromSources(response.Sources)
+		}
+		evidenceComplete := len(evidenceRefs) > 0
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type: string(agentartifact.ArtifactReportExplanation), Title: "报表解释摘要", ReviewRequired: true,
+			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
+			EvidenceComplete: evidenceComplete, ReviewReasons: []string{"report_basis_confirmation", "ai_explanation_review"},
+			ModelVersion: response.Model, RuleVersion: "report-explanation-rule.v1", Data: response.ReportExplanation,
+		})
+	}
+	if response.EventDraft != nil {
+		evidenceRefs := response.EvidenceRefs
+		if len(evidenceRefs) == 0 {
+			evidenceRefs = evidenceReferencesFromSources(response.Sources)
+		}
+		evidenceComplete := len(evidenceRefs) > 0
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type: string(agentartifact.ArtifactEventDraft), Title: "合同事件草稿", ReviewRequired: true,
+			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
+			EvidenceComplete: evidenceComplete, ReviewReasons: []string{"event_draft_review", "accounting_treatment_missing"},
+			ModelVersion: response.Model, RuleVersion: "event-draft-rule.v1",
+			Data: map[string]any{"event": response.EventDraft},
+		})
+	}
+	appendDataQualityArtifacts(&result, response)
 	return result
+}
+
+func appendDataQualityArtifacts(result *aichat.Result, response Response) {
+	if result == nil {
+		return
+	}
+	appendOne := func(title, source string, missingFields, warnings, reasons []string, intakeID string, evidenceComplete bool) {
+		if len(missingFields) == 0 && len(warnings) == 0 {
+			return
+		}
+		reviewReasons := append([]string{"data_quality_review"}, reasons...)
+		evidenceRefs := append([]agentartifact.EvidenceReference(nil), response.EvidenceRefs...)
+		if len(evidenceRefs) == 0 && strings.TrimSpace(intakeID) != "" {
+			evidenceRefs = []agentartifact.EvidenceReference{{
+				ReferenceID: intakeID, Complete: false, MissingReason: "解析任务未提供可定位的原文证据",
+			}}
+		}
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type: string(agentartifact.ArtifactDataQualityIssues), Title: title, ReviewRequired: true,
+			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
+			EvidenceComplete: evidenceComplete && len(evidenceRefs) > 0, ReviewReasons: reviewReasons,
+			ModelVersion: response.Model, RuleVersion: "agent-data-quality-rule.v1",
+			Data: map[string]any{
+				"source": source, "missing_fields": missingFields, "warnings": warnings,
+				"review_reasons": reviewReasons, "intake_id": intakeID,
+			},
+		})
+	}
+	if response.BatchSummary != nil {
+		appendOne("合同数据质量问题", "contract_batch", response.BatchSummary.MissingFields,
+			response.BatchSummary.Warnings, response.BatchSummary.ReviewReasons, response.BatchSummary.IntakeID,
+			response.BatchSummary.EvidenceComplete)
+	}
+	if response.PaymentScheduleSummary != nil {
+		appendOne("付款计划数据质量问题", "payment_schedule", response.PaymentScheduleSummary.MissingFields,
+			response.PaymentScheduleSummary.Warnings, response.PaymentScheduleSummary.ReviewReasons,
+			response.PaymentScheduleSummary.IntakeID, response.PaymentScheduleSummary.EvidenceComplete)
+	}
+}
+
+func batchReviewReasons(summary *BatchParseSummary) []string {
+	if summary == nil {
+		return []string{"assist_mode"}
+	}
+	return append([]string(nil), summary.ReviewReasons...)
+}
+
+func paymentReviewReasons(summary *PaymentScheduleParseSummary) []string {
+	if summary == nil {
+		return []string{"assist_mode"}
+	}
+	return append([]string(nil), summary.ReviewReasons...)
 }
 
 func requestFromRuntimeInput(input aichat.Input) Request {
@@ -100,36 +480,70 @@ func requestFromRuntimeInput(input aichat.Input) Request {
 type PageContext = aichat.PageContext
 
 type Request struct {
-	SessionID   string        `json:"session_id,omitempty"`
-	RunID       string        `json:"run_id,omitempty"`
-	Message     string        `json:"message" binding:"required"`
-	ContractID  string        `json:"contract_id,omitempty"`
-	History     []ChatMessage `json:"history,omitempty"`
-	FileID      string        `json:"file_id,omitempty"`
-	ObjectName  string        `json:"object_name,omitempty"`
-	ContentType string        `json:"content_type,omitempty"`
-	PageContext *PageContext  `json:"page_context,omitempty"`
-	Language    string        `json:"language,omitempty"`
+	SessionID    string        `json:"session_id,omitempty"`
+	RunID        string        `json:"run_id,omitempty"`
+	Message      string        `json:"message" binding:"required"`
+	ContractID   string        `json:"contract_id,omitempty"`
+	History      []ChatMessage `json:"history,omitempty"`
+	FileID       string        `json:"file_id,omitempty"`
+	ObjectName   string        `json:"object_name,omitempty"`
+	ContentType  string        `json:"content_type,omitempty"`
+	PageContext  *PageContext  `json:"page_context,omitempty"`
+	Language     string        `json:"language,omitempty"`
+	SkillID      string        `json:"skill_id,omitempty"`
+	SkillVersion string        `json:"skill_version,omitempty"`
 }
 
 type ChatMessage = aichat.Message
 
 type Response struct {
-	SessionID              string                       `json:"session_id,omitempty"`
-	RunID                  string                       `json:"run_id,omitempty"`
-	Answer                 string                       `json:"answer"`
-	Sources                []Source                     `json:"sources"`
-	Confidence             float64                      `json:"confidence"`
-	IsOfficial             bool                         `json:"is_official"`
-	Model                  string                       `json:"model,omitempty"`
-	AgentMode              bool                         `json:"agent_mode,omitempty"`
-	AgentPlan              []AgentPlanStep              `json:"agent_plan,omitempty"`
-	ToolCalls              []AgentToolCall              `json:"tool_calls,omitempty"`
-	ReviewPrompts          []AgentReviewPrompt          `json:"review_prompts,omitempty"`
-	DraftContracts         []ContractDraftItem          `json:"draft_contracts,omitempty"`
-	BatchSummary           *BatchParseSummary           `json:"batch_summary,omitempty"`
-	DraftPaymentSchedules  []PaymentScheduleDraftItem   `json:"draft_payment_schedules,omitempty"`
-	PaymentScheduleSummary *PaymentScheduleParseSummary `json:"payment_schedule_summary,omitempty"`
+	SessionID              string                            `json:"session_id,omitempty"`
+	RunID                  string                            `json:"run_id,omitempty"`
+	Answer                 string                            `json:"answer"`
+	Sources                []Source                          `json:"sources"`
+	Confidence             float64                           `json:"confidence"`
+	IsOfficial             bool                              `json:"is_official"`
+	Model                  string                            `json:"model,omitempty"`
+	AgentMode              bool                              `json:"agent_mode,omitempty"`
+	AgentPlan              []AgentPlanStep                   `json:"agent_plan,omitempty"`
+	ToolCalls              []AgentToolCall                   `json:"tool_calls,omitempty"`
+	ReviewPrompts          []AgentReviewPrompt               `json:"review_prompts,omitempty"`
+	DraftContracts         []ContractDraftItem               `json:"draft_contracts,omitempty"`
+	BatchSummary           *BatchParseSummary                `json:"batch_summary,omitempty"`
+	DraftPaymentSchedules  []PaymentScheduleDraftItem        `json:"draft_payment_schedules,omitempty"`
+	PaymentScheduleSummary *PaymentScheduleParseSummary      `json:"payment_schedule_summary,omitempty"`
+	EvidenceRefs           []agentartifact.EvidenceReference `json:"evidence_refs,omitempty"`
+	AuditPack              *AuditPackData                    `json:"audit_pack,omitempty"`
+	ReportExplanation      *ReportExplanationData            `json:"report_explanation,omitempty"`
+	EventDraft             *EventDraftData                   `json:"event_draft,omitempty"`
+}
+
+type AuditPackData struct {
+	Basis       string   `json:"basis"`
+	Scope       string   `json:"scope"`
+	Answer      string   `json:"answer"`
+	SourceCount int      `json:"source_count"`
+	SourceIDs   []string `json:"source_ids,omitempty"`
+}
+
+type ReportExplanationData struct {
+	Page      string            `json:"page"`
+	Period    string            `json:"period,omitempty"`
+	Basis     string            `json:"basis"`
+	Filters   map[string]string `json:"filters,omitempty"`
+	Answer    string            `json:"answer"`
+	SourceIDs []string          `json:"source_ids,omitempty"`
+}
+
+type EventDraftData struct {
+	ContractID         string          `json:"contract_id"`
+	EventType          string          `json:"event_type"`
+	EffectiveDate      string          `json:"effective_date"`
+	OriginalValue      *string         `json:"original_value,omitempty"`
+	NewValue           *string         `json:"new_value,omitempty"`
+	ChangeReason       string          `json:"change_reason"`
+	JudgmentBasis      string          `json:"judgment_basis,omitempty"`
+	RevisionParameters json.RawMessage `json:"revision_parameters,omitempty"`
 }
 
 type AgentPlanStep struct {
@@ -174,6 +588,7 @@ type AgentReviewPrompt struct {
 
 type AgentRunbook struct {
 	SkillID               string
+	SkillVersion          string
 	SkillName             string
 	RequiresEvidenceInput bool
 	NeedsPortfolioContext bool
@@ -239,7 +654,7 @@ func effectiveContractIDFromRequest(req Request) string {
 	return effectiveContractID
 }
 
-func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req Request, legalEntityID, userIDStr, roleStr string, emit func(context.Context, string, any) error, agentRunbook *AgentRunbook) (Response, error) {
+func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req Request, legalEntityID, userIDStr, roleStr string, emit func(context.Context, string, any) error, agentRunbook *AgentRunbook, toolRuntime *agenttools.Runtime) (Response, error) {
 	var sources []Source
 	var contextData strings.Builder
 	effectiveContractID := effectiveContractIDFromRequest(req)
@@ -263,13 +678,6 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		if err == nil && len(toolCalls) > 0 && toolCalls[0].Tool != "" {
 			selectedTool = toolCalls[0].Tool
 			toolExecutionChain = toolCalls
-			var funcArgs map[string]interface{}
-			if toolCalls[0].InputSummary != "" {
-				_ = json.Unmarshal([]byte(toolCalls[0].InputSummary), &funcArgs)
-			}
-			if cid, ok := funcArgs["contract_id"].(string); ok && cid != "" {
-				contractID = cid
-			}
 		} else if fallbackTool != "" {
 			modelName = "deterministic-router"
 		}
@@ -288,7 +696,9 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 		switch selectedTool {
 		case "parse_contract_batch":
-			batchResult, err := h.parseContractBatch(ctx, authHeader, req.FileID, req.ObjectName, req.ContentType)
+			toolResult, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_contract_batch", fileParseArguments{
+				FileID: req.FileID, ObjectName: req.ObjectName, ContentType: req.ContentType,
+			})
 			if err != nil {
 				resp := Response{
 					Answer:     fmt.Sprintf("文件解析失败: %s", err.Error()),
@@ -298,6 +708,10 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 					Model:      "fallback",
 				}
 				return resp, err
+			}
+			batchResult, ok := toolResult.Data.(*BatchParseResult)
+			if !ok || batchResult == nil {
+				return Response{Answer: "文件解析失败: 解析结果格式无效", Sources: sources, Confidence: 0.5, IsOfficial: false, Model: "fallback"}, fmt.Errorf("contract batch parse returned unexpected result")
 			}
 			resp := Response{
 				Answer:         batchResult.SummaryText,
@@ -311,11 +725,14 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 				ReviewPrompts:  batchResult.ReviewPrompts,
 				DraftContracts: batchResult.Contracts,
 				BatchSummary:   batchResult.Summary,
+				EvidenceRefs:   batchResult.EvidenceRefs,
 			}
 			return resp, nil
 
 		case "parse_payment_schedule":
-			scheduleResult, err := h.parsePaymentSchedule(ctx, authHeader, req.FileID, req.ObjectName, req.ContentType, contractID)
+			toolResult, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_payment_schedule", fileParseArguments{
+				FileID: req.FileID, ObjectName: req.ObjectName, ContentType: req.ContentType, ContractID: contractID,
+			})
 			if err != nil {
 				resp := Response{
 					Answer:     fmt.Sprintf("租金表解析失败: %s", err.Error()),
@@ -325,6 +742,10 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 					Model:      "fallback",
 				}
 				return resp, err
+			}
+			scheduleResult, ok := toolResult.Data.(*PaymentScheduleParseResult)
+			if !ok || scheduleResult == nil {
+				return Response{Answer: "租金表解析失败: 解析结果格式无效", Sources: sources, Confidence: 0.5, IsOfficial: false, Model: "fallback"}, fmt.Errorf("payment schedule parse returned unexpected result")
 			}
 			resp := Response{
 				Answer:                 scheduleResult.SummaryText,
@@ -338,26 +759,34 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 				ReviewPrompts:          scheduleResult.ReviewPrompts,
 				DraftPaymentSchedules:  scheduleResult.Schedules,
 				PaymentScheduleSummary: scheduleResult.Summary,
+				EvidenceRefs:           scheduleResult.EvidenceRefs,
 			}
 			return resp, nil
 
 		default:
-			parsed, err := h.parseFile(ctx, authHeader, req.FileID, req.ObjectName, req.ContentType)
+			toolResult, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_contract", fileParseArguments{
+				FileID: req.FileID, ObjectName: req.ObjectName, ContentType: req.ContentType,
+			})
 			if err != nil {
 				contextData.WriteString(fmt.Sprintf("\n## 文件解析失败\n错误: %s\n", err.Error()))
 			} else {
-				contextData.WriteString("\n## 上传文件解析结果\n")
-				contractJSON, marshalErr := json.MarshalIndent(parsed.ExtractedData, "", "  ")
-				if marshalErr == nil {
-					contextData.Write(contractJSON)
-					contextData.WriteString("\n")
+				parsed, ok := toolResult.Data.(*aiintake.ContractDraft)
+				if !ok || parsed == nil {
+					contextData.WriteString("\n## 文件解析失败\n错误: 解析结果格式无效\n")
+				} else {
+					contextData.WriteString("\n## 上传文件解析结果\n")
+					contractJSON, marshalErr := json.MarshalIndent(parsed.ExtractedData, "", "  ")
+					if marshalErr == nil {
+						contextData.Write(contractJSON)
+						contextData.WriteString("\n")
+					}
+					sources = append(sources, Source{
+						Type:    "file",
+						ID:      parsed.Evidence.SourceFileID,
+						Title:   "上传文件",
+						Snippet: parsed.Evidence.ObjectName,
+					})
 				}
-				sources = append(sources, Source{
-					Type:    "file",
-					ID:      parsed.Evidence.SourceFileID,
-					Title:   "上传文件",
-					Snippet: parsed.Evidence.ObjectName,
-				})
 			}
 		}
 	}
@@ -369,7 +798,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	// 2. Page-context-aware data retrieval
 	// 2a. Contract detail context: always retrieve full contract data regardless of message keywords
 	if effectiveContractID != "" {
-		h.retrieveContractDetail(ctx, effectiveContractID, legalEntityID, &contextData, &sources)
+		h.retrieveContractDetail(ctx, effectiveContractID, &contextData, &sources, toolRuntime)
 	}
 
 	// 2b. Reports page context
@@ -384,6 +813,9 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 	// 3. Keyword-based retrieval (backward compatible, works alongside page context)
 	msgLower := strings.ToLower(req.Message)
+	if h.shouldLoadPerformanceContext(msgLower, agentRunbook, req.PageContext) {
+		h.appendPerformanceContext(ctx, toolRuntime, req.PageContext, &contextData, &sources)
+	}
 
 	// Contract list queries (only if no specific contract ID is resolved)
 	if effectiveContractID == "" && containsAny(msgLower, []string{"合同", "租赁", "门店", "承租", "出租", "lease", "contract"}) {
@@ -407,20 +839,22 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	// Measurement / liability / depreciation queries (only if contract detail context hasn't already loaded them)
 	if effectiveContractID == "" && containsAny(msgLower, []string{"负债", "折旧", "利息", "摊销", "rou", "计量", "measurement", "depreciation", "liability"}) {
 		if req.ContractID != "" {
-			results, err := h.mcRepo.GetMeasurementResults(ctx, req.ContractID, "")
-			if err == nil && len(results) > 0 {
-				contextData.WriteString(fmt.Sprintf("\n## 计量结果（合同 %s，共 %d 期）\n", req.ContractID, len(results)))
-				for _, r := range results {
-					contextData.WriteString(fmt.Sprintf("- 期间: %s, 期初负债: %.2f, 期末负债: %.2f, 利息: %.2f, 本金偿还: %.2f, 折旧: %.2f, 期末ROU: %.2f\n",
-						r.AccountingPeriod, r.OpeningLiability, r.ClosingLiability, r.InterestExpense,
-						r.PrincipalRepayment, r.Depreciation, r.ClosingROUAsset))
+			if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.measurement.list", agenttooldefs.MeasurementListArguments{ContractID: req.ContractID}); ok {
+				data, dataOK := result.Data.(agenttooldefs.MeasurementListData)
+				if dataOK && len(data.Items) > 0 {
+					contextData.WriteString(fmt.Sprintf("\n## 计量结果（合同 %s，共 %d 期）\n", req.ContractID, len(data.Items)))
+					for _, r := range data.Items {
+						contextData.WriteString(fmt.Sprintf("- 期间: %s, 期初负债: %.2f, 期末负债: %.2f, 利息: %.2f, 本金偿还: %.2f, 折旧: %.2f, 期末ROU: %.2f\n",
+							r.AccountingPeriod, r.OpeningLiability, r.ClosingLiability, r.InterestExpense,
+							r.PrincipalRepayment, r.Depreciation, r.ClosingROUAsset))
+					}
+					sources = append(sources, Source{
+						Type:    "measurement",
+						ID:      req.ContractID,
+						Title:   "计量结果",
+						Snippet: fmt.Sprintf("共 %d 期", len(data.Items)),
+					})
 				}
-				sources = append(sources, Source{
-					Type:    "measurement",
-					ID:      req.ContractID,
-					Title:   "计量结果",
-					Snippet: fmt.Sprintf("共 %d 期", len(results)),
-				})
 			}
 		}
 	}
@@ -428,24 +862,22 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	// Journal entry queries (only if contract detail context hasn't already loaded them)
 	if effectiveContractID == "" && containsAny(msgLower, []string{"分录", "journal", "会计", "过账", "post", "voucher", "entry", "凭证"}) {
 		if req.ContractID != "" {
-			entries, err := h.mcRepo.GetJournalEntries(ctx, req.ContractID, "", "")
-			if err == nil && len(entries) > 0 {
-				contextData.WriteString(fmt.Sprintf("\n## 会计分录（合同 %s，共 %d 条）\n", req.ContractID, len(entries)))
-				for _, e := range entries {
-					desc := ""
-					if e.Description != nil {
-						desc = *e.Description
+			if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.journal.list", agenttooldefs.JournalListArguments{ContractID: req.ContractID}); ok {
+				data, dataOK := result.Data.(agenttooldefs.JournalListData)
+				if dataOK && len(data.Items) > 0 {
+					contextData.WriteString(fmt.Sprintf("\n## 会计分录（合同 %s，共 %d 条）\n", req.ContractID, len(data.Items)))
+					for _, e := range data.Items {
+						contextData.WriteString(fmt.Sprintf("- 期间: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
+							e.AccountingPeriod, e.EntryType, e.DebitAccount, e.CreditAccount,
+							e.Amount, e.Currency, e.PostingStatus, e.Description))
 					}
-					contextData.WriteString(fmt.Sprintf("- 期间: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
-						e.AccountingPeriod, e.EntryType, e.DebitAccount, e.CreditAccount,
-						e.Amount, e.Currency, e.PostingStatus, desc))
+					sources = append(sources, Source{
+						Type:    "journal",
+						ID:      req.ContractID,
+						Title:   "会计分录",
+						Snippet: fmt.Sprintf("共 %d 条", len(data.Items)),
+					})
 				}
-				sources = append(sources, Source{
-					Type:    "journal",
-					ID:      req.ContractID,
-					Title:   "会计分录",
-					Snippet: fmt.Sprintf("共 %d 条", len(entries)),
-				})
 			}
 		}
 	}
@@ -453,23 +885,21 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	// Event queries (only if contract detail context hasn't already loaded them)
 	if effectiveContractID == "" && containsAny(msgLower, []string{"事件", "变更", "modification", "reassessment", "impairment", "event", "change"}) {
 		if req.ContractID != "" {
-			events, err := h.eventRepo.GetByContractID(ctx, req.ContractID)
-			if err == nil && len(events) > 0 {
-				contextData.WriteString(fmt.Sprintf("\n## 事件数据（合同 %s，共 %d 条）\n", req.ContractID, len(events)))
-				for _, ev := range events {
-					reason := ""
-					if ev.ChangeReason != nil {
-						reason = *ev.ChangeReason
+			if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.event.list", agenttooldefs.EventListArguments{ContractID: req.ContractID}); ok {
+				data, dataOK := result.Data.(agenttooldefs.EventListData)
+				if dataOK && len(data.Items) > 0 {
+					contextData.WriteString(fmt.Sprintf("\n## 事件数据（合同 %s，共 %d 条）\n", req.ContractID, len(data.Items)))
+					for _, ev := range data.Items {
+						contextData.WriteString(fmt.Sprintf("- 类型: %s, 生效日: %s, 状态: %s, 审批状态: %s, 原因: %s\n",
+							ev.EventType, ev.EffectiveDate.Format("2006-01-02"), ev.Status, ev.ApprovalStatus, ev.ChangeReason))
 					}
-					contextData.WriteString(fmt.Sprintf("- 类型: %s, 生效日: %s, 状态: %s, 审批状态: %s, 原因: %s\n",
-						ev.EventType, ev.EffectiveDate.Format("2006-01-02"), ev.Status, ev.ApprovalStatus, reason))
+					sources = append(sources, Source{
+						Type:    "event",
+						ID:      req.ContractID,
+						Title:   "变更事件",
+						Snippet: fmt.Sprintf("共 %d 条", len(data.Items)),
+					})
 				}
-				sources = append(sources, Source{
-					Type:    "event",
-					ID:      req.ContractID,
-					Title:   "变更事件",
-					Snippet: fmt.Sprintf("共 %d 条", len(events)),
-				})
 			}
 		}
 	}
@@ -533,6 +963,9 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			ToolCalls:     toolCallsFromRunbook(agentRunbook),
 			ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
 		}
+		if agentRunbook != nil && agentRunbook.SkillID == "event_change" {
+			resp.EventDraft, resp.EvidenceRefs = extractEventDraft(req.Message, effectiveContractID, sources)
+		}
 		return resp, err
 	}
 	if err := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{
@@ -564,7 +997,138 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		ToolCalls:     toolCallsFromRunbook(agentRunbook),
 		ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
 	}
+	if req.PageContext != nil && strings.EqualFold(strings.TrimSpace(req.PageContext.Page), "reports") {
+		basis := strings.ToLower(strings.TrimSpace(req.PageContext.ReportView))
+		if basis == "" {
+			basis = "working"
+		}
+		sourceIDs := make([]string, 0, len(extractedSources))
+		for _, source := range extractedSources {
+			if strings.TrimSpace(source.ID) != "" {
+				sourceIDs = append(sourceIDs, source.ID)
+			}
+		}
+		resp.EvidenceRefs = evidenceReferencesFromSources(extractedSources)
+		resp.ReportExplanation = &ReportExplanationData{
+			Page: req.PageContext.Page, Period: req.PageContext.Period, Basis: basis,
+			Filters: req.PageContext.Filters, Answer: answer, SourceIDs: sourceIDs,
+		}
+	}
+	if agentRunbook != nil && agentRunbook.SkillID == "audit_pack" {
+		basis := "working"
+		if req.PageContext != nil && strings.EqualFold(strings.TrimSpace(req.PageContext.ReportView), "official") {
+			basis = "official"
+		}
+		resp.EvidenceRefs = evidenceReferencesFromSources(extractedSources)
+		sourceIDs := make([]string, 0, len(extractedSources))
+		for _, source := range extractedSources {
+			if strings.TrimSpace(source.ID) != "" {
+				sourceIDs = append(sourceIDs, source.ID)
+			}
+		}
+		resp.AuditPack = &AuditPackData{
+			Basis: basis, Scope: legalEntityID, Answer: answer,
+			SourceCount: len(extractedSources), SourceIDs: sourceIDs,
+		}
+	}
+	if agentRunbook != nil && agentRunbook.SkillID == "event_change" {
+		resp.EventDraft, resp.EvidenceRefs = extractEventDraft(req.Message, effectiveContractID, extractedSources)
+	}
 	return resp, nil
+}
+
+func (h *Agent) shouldLoadPerformanceContext(message string, runbook *AgentRunbook, page *PageContext) bool {
+	if runbook != nil && (runbook.SkillID == "fpna_copilot" || runbook.SkillID == "retail_performance" || runbook.SkillID == "manufacturing_performance") {
+		return true
+	}
+	if page != nil && (page.Page == "performance" || page.Page == "portfolio") {
+		return true
+	}
+	return containsAny(message, []string{"经营", "预算", "forecast", "行动", "异常", "四墙", "租售比", "坪效", "门店表现", "工厂", "产线", "设备", "oee", "fp&a", "finance bp"})
+}
+
+func (h *Agent) appendPerformanceContext(ctx context.Context, toolRuntime *agenttools.Runtime, page *PageContext, contextData *strings.Builder, sources *[]Source) {
+	period := time.Now().UTC().Format("2006-01")
+	if page != nil && strings.TrimSpace(page.Period) != "" {
+		period = strings.TrimSpace(page.Period)
+	}
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.portfolio.summary", agenttooldefs.PerformanceArguments{Period: period}); ok {
+		encoded, _ := json.Marshal(result.Data)
+		contextData.WriteString("\n## 经营组合摘要（系统正式事实，Working）\n")
+		contextData.Write(encoded)
+		contextData.WriteString("\n")
+		*sources = append(*sources, Source{Type: "performance_overview", ID: period, Title: "经营组合摘要", Snippet: "期间=" + period})
+	}
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.store.performance", agenttooldefs.PerformanceArguments{Period: period}); ok {
+		encoded, _ := json.Marshal(result.Data)
+		contextData.WriteString("\n## 门店四墙表现（系统正式事实，Working）\n")
+		contextData.Write(encoded)
+		contextData.WriteString("\n")
+		for _, source := range result.Sources {
+			*sources = append(*sources, Source{Type: source.Type, ID: source.ID, Title: source.Title, Snippet: source.Locator})
+		}
+	}
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.equipment.performance", agenttooldefs.PerformanceArguments{Period: period}); ok {
+		encoded, _ := json.Marshal(result.Data)
+		contextData.WriteString("\n## 制造设备表现（系统正式事实，Working）\n")
+		contextData.Write(encoded)
+		contextData.WriteString("\n")
+		for _, source := range result.Sources {
+			*sources = append(*sources, Source{Type: source.Type, ID: source.ID, Title: source.Title, Snippet: source.Locator})
+		}
+	}
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.fpna.actions", agenttooldefs.PerformanceArguments{Period: period}); ok {
+		encoded, _ := json.Marshal(result.Data)
+		contextData.WriteString("\n## 经营行动与异常（系统正式事实，待人工处理）\n")
+		contextData.Write(encoded)
+		contextData.WriteString("\n")
+		for _, source := range result.Sources {
+			*sources = append(*sources, Source{Type: source.Type, ID: source.ID, Title: source.Title, Snippet: source.Locator})
+		}
+	}
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.close.readiness", agenttooldefs.PerformanceArguments{Period: period}); ok {
+		encoded, _ := json.Marshal(result.Data)
+		contextData.WriteString("\n## 关账准备度与证据缺口（系统正式事实，Working）\n")
+		contextData.Write(encoded)
+		contextData.WriteString("\n")
+		for _, source := range result.Sources {
+			*sources = append(*sources, Source{Type: source.Type, ID: source.ID, Title: source.Title, Snippet: source.Locator})
+		}
+	}
+	if page != nil && page.Filters != nil {
+		versionID := strings.TrimSpace(page.Filters["version_id"])
+		if versionID == "" {
+			versionID = strings.TrimSpace(page.Filters["budget_version_id"])
+		}
+		if versionID != "" {
+			if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.budget.variance", agenttooldefs.BudgetVarianceArguments{VersionID: versionID, Period: period}); ok {
+				encoded, _ := json.Marshal(result.Data)
+				contextData.WriteString("\n## 预算差异桥（系统确定性服务，Working）\n")
+				contextData.Write(encoded)
+				contextData.WriteString("\n")
+				for _, source := range result.Sources {
+					*sources = append(*sources, Source{Type: source.Type, ID: source.ID, Title: source.Title, Snippet: source.Locator})
+				}
+			}
+		}
+	}
+}
+
+func evidenceReferencesFromSources(sources []Source) []agentartifact.EvidenceReference {
+	refs := make([]agentartifact.EvidenceReference, 0, len(sources))
+	for _, source := range sources {
+		id := strings.TrimSpace(source.ID)
+		if id == "" {
+			continue
+		}
+		refs = append(refs, agentartifact.EvidenceReference{
+			ReferenceID: id, Complete: true,
+			Locators: []agentartifact.EvidenceLocator{{
+				Field: "record", Source: "system:" + strings.TrimSpace(source.Type), Quote: strings.TrimSpace(source.Snippet),
+			}},
+		})
+	}
+	return refs
 }
 
 func emitAgentEvent(ctx context.Context, emit func(context.Context, string, any) error, eventType string, payload any) error {
@@ -575,22 +1139,26 @@ func emitAgentEvent(ctx context.Context, emit func(context.Context, string, any)
 }
 
 func (h *Agent) buildAgentRunbook(req Request, effectiveContractID string) *AgentRunbook {
-	message := strings.ToLower(req.Message)
 	hasFile := req.FileID != "" && req.ObjectName != ""
 	hasContractContext := effectiveContractID != ""
-
-	switch {
-	case containsAny(message, []string{"审计包", "审计底稿", "审计工作底稿", "披露核对", "抽样", "audit pack", "audit package", "disclosure checklist"}):
-		return buildAuditPackRunbook()
-	case containsAny(message, []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"}):
-		return buildPaymentScheduleRunbook(hasFile, hasContractContext)
-	case containsAny(message, []string{"合同复核", "合同审阅", "合同审核", "关键条款", "contract review", "review contract", "lease review"}):
-		return buildContractReviewRunbook(hasFile, hasContractContext)
-	case containsAny(message, []string{"excel 台账", "excel台账", "合同台账", "批量导入", "批量创建", "ledger import", "contract ledger"}):
-		return buildContractLedgerRunbook(hasFile)
-	default:
+	if h == nil {
 		return nil
 	}
+	registry := h.skillRegistry
+	if registry == nil {
+		registry = agentskill.ProductionRegistry()
+	}
+	definition, ok := registry.Select(agentskill.Intent{
+		Message: req.Message, HasFile: hasFile, HasContract: hasContractContext,
+	})
+	if !ok {
+		return nil
+	}
+	runbook := runbookForSkillID(definition.ID, req, effectiveContractID)
+	if runbook != nil {
+		runbook.SkillVersion = definition.Version
+	}
+	return runbook
 }
 
 func buildContractLedgerRunbook(hasFile bool) *AgentRunbook {
@@ -688,6 +1256,28 @@ func buildPaymentScheduleRunbook(hasFile, hasContractContext bool) *AgentRunbook
 	}
 }
 
+func buildEventChangeRunbook(hasContractContext bool) *AgentRunbook {
+	evidenceStatus := "needs_review"
+	prompt := AgentReviewPrompt{ID: "event_contract_context", Title: "指定事件所属合同", Description: "事件草稿必须绑定到当前权限范围内的合同。", Severity: "info", Action: "从合同详情页发起，或提供合同上下文后再登记事件。"}
+	if hasContractContext {
+		evidenceStatus = "completed"
+		prompt = AgentReviewPrompt{ID: "event_review", Title: "复核事件和会计处理", Description: "事件会影响后续重算。请确认事件类型、生效日期、变更原因、判断依据及原文证据。", Severity: "critical", Action: "确认事件草稿后再提交复核，不会自动触发重算或过账。"}
+	}
+	return &AgentRunbook{
+		SkillID: "event_change", SkillName: "Lease Event Change Skill",
+		RequiresEvidenceInput: !hasContractContext,
+		AnswerPrefix:          "Agent 已切换到合同事件变更技能。我会先整理事件证据和影响范围，再生成待复核事件草稿；批准前不会触发重算或过账。",
+		AgentPlan: []AgentPlanStep{
+			{ID: "bind_contract", Title: "绑定合同和数据范围", Status: evidenceStatus},
+			{ID: "classify_event", Title: "区分 modification、reassessment、减值或其他事件", Status: "needs_review"},
+			{ID: "collect_evidence", Title: "记录生效日期、变更原因和判断依据", Status: "needs_review"},
+			{ID: "create_event_draft", Title: "确认后创建事件草稿", Status: "pending"},
+		},
+		ToolCalls:     []AgentToolCall{{Tool: "lease.event.draft.create", Skill: "event_change", Status: "pending", InputSummary: "等待结构化事件字段和原文证据确认", OutputSummary: "仅创建 draft 事件，后续走复核/审批/重算流程", RequiresReview: true}},
+		ReviewPrompts: []AgentReviewPrompt{prompt},
+	}
+}
+
 func buildAuditPackRunbook() *AgentRunbook {
 	return &AgentRunbook{
 		SkillID:               "audit_pack",
@@ -770,10 +1360,13 @@ func reviewPromptsFromRunbook(runbook *AgentRunbook) []AgentReviewPrompt {
 
 // retrieveContractDetail fetches and appends contract basic info, latest measurements,
 // events, and latest journal entries for a given contract ID.
-func (h *Agent) retrieveContractDetail(ctx context.Context, contractID, legalEntityID string, contextData *strings.Builder, sources *[]Source) {
-	// Contract basic info
-	contract, err := h.contractRepo.GetByID(ctx, contractID, legalEntityID)
-	if err == nil && contract != nil {
+func (h *Agent) retrieveContractDetail(ctx context.Context, contractID string, contextData *strings.Builder, sources *[]Source, toolRuntime *agenttools.Runtime) {
+	result, ok := h.executeReadTool(ctx, toolRuntime, "lease.contract.get", agenttooldefs.ContractGetArguments{ContractID: contractID})
+	if !ok {
+		return
+	}
+	contract, ok := result.Data.(agenttooldefs.ContractView)
+	if ok {
 		contextData.WriteString(fmt.Sprintf("\n## 合同详情\n- ID: %s\n- 编号: %s\n- 名称: %s\n- 状态: %s\n- 审批状态: %s\n- 承租方: %s\n- 出租方: %s\n- 门店: %s\n- 币种: %s\n",
 			contract.ID, contract.ContractNumber, contract.ContractName,
 			contract.ApprovalStatus, contract.Status, contract.LesseeName,
@@ -799,62 +1392,92 @@ func (h *Agent) retrieveContractDetail(ctx context.Context, contractID, legalEnt
 	}
 
 	// Latest measurement results
-	results, err := h.mcRepo.GetMeasurementResults(ctx, contractID, "")
-	if err == nil && len(results) > 0 {
-		contextData.WriteString(fmt.Sprintf("\n## 计量结果（合同 %s，共 %d 期）\n", contractID, len(results)))
-		for _, r := range results {
-			contextData.WriteString(fmt.Sprintf("- 期间: %s, 期初负债: %.2f, 期末负债: %.2f, 利息: %.2f, 本金偿还: %.2f, 折旧: %.2f, 期末ROU: %.2f\n",
-				r.AccountingPeriod, r.OpeningLiability, r.ClosingLiability, r.InterestExpense,
-				r.PrincipalRepayment, r.Depreciation, r.ClosingROUAsset))
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.measurement.list", agenttooldefs.MeasurementListArguments{ContractID: contractID}); ok {
+		data, dataOK := result.Data.(agenttooldefs.MeasurementListData)
+		if dataOK && len(data.Items) > 0 {
+			contextData.WriteString(fmt.Sprintf("\n## 计量结果（合同 %s，共 %d 期）\n", contractID, len(data.Items)))
+			for _, r := range data.Items {
+				contextData.WriteString(fmt.Sprintf("- 期间: %s, 期初负债: %.2f, 期末负债: %.2f, 利息: %.2f, 本金偿还: %.2f, 折旧: %.2f, 期末ROU: %.2f\n",
+					r.AccountingPeriod, r.OpeningLiability, r.ClosingLiability, r.InterestExpense,
+					r.PrincipalRepayment, r.Depreciation, r.ClosingROUAsset))
+			}
+			*sources = append(*sources, Source{
+				Type:    "measurement",
+				ID:      contractID,
+				Title:   "计量结果",
+				Snippet: fmt.Sprintf("合同 %s 共 %d 期", contractID, len(data.Items)),
+			})
 		}
-		*sources = append(*sources, Source{
-			Type:    "measurement",
-			ID:      contractID,
-			Title:   "计量结果",
-			Snippet: fmt.Sprintf("合同 %s 共 %d 期", contractID, len(results)),
-		})
 	}
 
 	// Events for this contract
-	events, err := h.eventRepo.GetByContractID(ctx, contractID)
-	if err == nil && len(events) > 0 {
-		contextData.WriteString(fmt.Sprintf("\n## 变更事件（合同 %s，共 %d 条）\n", contractID, len(events)))
-		for _, ev := range events {
-			reason := ""
-			if ev.ChangeReason != nil {
-				reason = *ev.ChangeReason
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.event.list", agenttooldefs.EventListArguments{ContractID: contractID}); ok {
+		data, dataOK := result.Data.(agenttooldefs.EventListData)
+		if dataOK && len(data.Items) > 0 {
+			contextData.WriteString(fmt.Sprintf("\n## 变更事件（合同 %s，共 %d 条）\n", contractID, len(data.Items)))
+			for _, ev := range data.Items {
+				contextData.WriteString(fmt.Sprintf("- 类型: %s, 生效日: %s, 状态: %s, 审批状态: %s, 原因: %s\n",
+					ev.EventType, ev.EffectiveDate.Format("2006-01-02"), ev.Status, ev.ApprovalStatus, ev.ChangeReason))
 			}
-			contextData.WriteString(fmt.Sprintf("- 类型: %s, 生效日: %s, 状态: %s, 审批状态: %s, 原因: %s\n",
-				ev.EventType, ev.EffectiveDate.Format("2006-01-02"), ev.Status, ev.ApprovalStatus, reason))
+			*sources = append(*sources, Source{
+				Type:    "event",
+				ID:      contractID,
+				Title:   "变更事件",
+				Snippet: fmt.Sprintf("合同 %s 共 %d 条", contractID, len(data.Items)),
+			})
 		}
-		*sources = append(*sources, Source{
-			Type:    "event",
-			ID:      contractID,
-			Title:   "变更事件",
-			Snippet: fmt.Sprintf("合同 %s 共 %d 条", contractID, len(events)),
-		})
 	}
 
 	// Latest journal entries for this contract
-	entries, err := h.mcRepo.GetJournalEntries(ctx, contractID, "", "")
-	if err == nil && len(entries) > 0 {
-		contextData.WriteString(fmt.Sprintf("\n## 会计分录（合同 %s，共 %d 条）\n", contractID, len(entries)))
-		for _, e := range entries {
-			desc := ""
-			if e.Description != nil {
-				desc = *e.Description
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.journal.list", agenttooldefs.JournalListArguments{ContractID: contractID}); ok {
+		data, dataOK := result.Data.(agenttooldefs.JournalListData)
+		if dataOK && len(data.Items) > 0 {
+			contextData.WriteString(fmt.Sprintf("\n## 会计分录（合同 %s，共 %d 条）\n", contractID, len(data.Items)))
+			for _, e := range data.Items {
+				contextData.WriteString(fmt.Sprintf("- 期间: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
+					e.AccountingPeriod, e.EntryType, e.DebitAccount, e.CreditAccount,
+					e.Amount, e.Currency, e.PostingStatus, e.Description))
 			}
-			contextData.WriteString(fmt.Sprintf("- 期间: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
-				e.AccountingPeriod, e.EntryType, e.DebitAccount, e.CreditAccount,
-				e.Amount, e.Currency, e.PostingStatus, desc))
+			*sources = append(*sources, Source{
+				Type:    "journal",
+				ID:      contractID,
+				Title:   "会计分录",
+				Snippet: fmt.Sprintf("合同 %s 共 %d 条", contractID, len(data.Items)),
+			})
 		}
-		*sources = append(*sources, Source{
-			Type:    "journal",
-			ID:      contractID,
-			Title:   "会计分录",
-			Snippet: fmt.Sprintf("合同 %s 共 %d 条", contractID, len(entries)),
-		})
 	}
+}
+
+func (h *Agent) executeReadTool(ctx context.Context, toolRuntime *agenttools.Runtime, toolName string, arguments any) (agenttools.ToolResult, bool) {
+	result, err := h.executeToolCall(ctx, toolRuntime, toolName, arguments, "")
+	if err != nil || result.Status != agenttools.StatusCompleted || result.Error != nil {
+		return agenttools.ToolResult{}, false
+	}
+	return result, true
+}
+
+func (h *Agent) executeToolCall(ctx context.Context, toolRuntime *agenttools.Runtime, toolName string, arguments any, idempotencyKey string) (agenttools.ToolResult, error) {
+	if toolRuntime == nil {
+		return agenttools.ToolResult{}, fmt.Errorf("tool runtime is unavailable")
+	}
+	execution, err := agenttools.RequireExecutionContext(ctx)
+	if err != nil {
+		return agenttools.ToolResult{}, err
+	}
+	encoded, err := json.Marshal(arguments)
+	if err != nil {
+		return agenttools.ToolResult{}, err
+	}
+	result, err := toolRuntime.Execute(ctx, agenttools.ToolCall{
+		CallID:         toolName + "-" + execution.RunID,
+		RunID:          execution.RunID,
+		TraceID:        execution.TraceID,
+		ToolName:       toolName,
+		ToolVersion:    "v1",
+		Arguments:      encoded,
+		IdempotencyKey: idempotencyKey,
+	})
+	return result, err
 }
 
 // appendReportsContext appends report page context info from the frontend payload.
@@ -1351,6 +1974,7 @@ type PaymentScheduleParseResult struct {
 	ReviewPrompts []AgentReviewPrompt
 	Schedules     []PaymentScheduleDraftItem
 	Summary       *PaymentScheduleParseSummary
+	EvidenceRefs  []agentartifact.EvidenceReference
 }
 
 func (h *Agent) parsePaymentSchedule(ctx context.Context, authHeader, fileID, objectName, contentType, contractID string) (*PaymentScheduleParseResult, error) {
@@ -1481,6 +2105,7 @@ func (h *Agent) parsePaymentSchedule(ctx context.Context, authHeader, fileID, ob
 		ToolCalls:     toolCalls,
 		ReviewPrompts: buildPaymentScheduleReviewPrompts(schedules, missingFields, warnings, contractID),
 		Schedules:     schedules,
+		EvidenceRefs:  []agentartifact.EvidenceReference{evidenceReferenceFromIntake(intake.Evidence)},
 		Summary: &PaymentScheduleParseSummary{
 			TotalCount:           len(schedules),
 			OverallConfidence:    overallConf,
@@ -1506,6 +2131,7 @@ type BatchParseResult struct {
 	ReviewPrompts []AgentReviewPrompt
 	Contracts     []ContractDraftItem
 	Summary       *BatchParseSummary
+	EvidenceRefs  []agentartifact.EvidenceReference
 }
 
 func (h *Agent) parseContractBatch(ctx context.Context, authHeader, fileID, objectName, contentType string) (*BatchParseResult, error) {
@@ -1628,6 +2254,7 @@ func (h *Agent) parseContractBatch(ctx context.Context, authHeader, fileID, obje
 		ToolCalls:     toolCalls,
 		ReviewPrompts: reviewPrompts,
 		Contracts:     contracts,
+		EvidenceRefs:  []agentartifact.EvidenceReference{evidenceReferenceFromIntake(intake.Evidence)},
 		Summary: &BatchParseSummary{
 			TotalCount:           totalCount,
 			OverallConfidence:    overallConf,
@@ -1645,6 +2272,22 @@ func (h *Agent) parseContractBatch(ctx context.Context, authHeader, fileID, obje
 func isExcelContentType(contentType string) bool {
 	return contentType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
 		contentType == "application/vnd.ms-excel"
+}
+
+func evidenceReferenceFromIntake(evidence aiintake.Evidence) agentartifact.EvidenceReference {
+	locators := make([]agentartifact.EvidenceLocator, 0, len(evidence.Locators))
+	for _, locator := range evidence.Locators {
+		locators = append(locators, agentartifact.EvidenceLocator{
+			Field: locator.Field, Source: locator.Source, Page: locator.Page,
+			Sheet: locator.Sheet, CellRange: locator.CellRange,
+			Coordinates: append([]float64(nil), locator.Coordinates...), FileHash: locator.FileHash, Quote: locator.Quote,
+		})
+	}
+	return agentartifact.EvidenceReference{
+		SourceFileID: evidence.SourceFileID, ObjectName: evidence.ObjectName,
+		ContentType: evidence.ContentType, FileHash: evidence.FileHash, Locators: locators,
+		Complete: evidence.Complete, MissingReason: evidence.MissingReason,
+	}
 }
 
 func buildReviewPrompts(contracts []ContractDraftItem, missingFields []string, warnings []string) []AgentReviewPrompt {

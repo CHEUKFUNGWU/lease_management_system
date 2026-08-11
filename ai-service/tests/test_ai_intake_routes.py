@@ -8,14 +8,83 @@ from openpyxl import Workbook
 from app.routers.parse import (
     ContractBatchDraftRequest,
     ContractDraftRequest,
+    EventParseRequest,
     PaymentScheduleParseRequest,
     parse_contract,
     parse_contract_batch,
+    parse_event,
     parse_payment_schedule,
 )
+from app.services.paddleocr import PaddleOCRClient
 
 
 class VersionedAIIntakeRouteTest(unittest.IsolatedAsyncioTestCase):
+    def test_paddleocr_structured_result_keeps_provider_box_not_model_box(self):
+        payload = {
+            "result": {
+                "layoutParsingResults": [
+                    {
+                        "markdown": {"text": "--- OCR text ---"},
+                        "prunedResult": {
+                            "parsing_res_list": [
+                                {"block_content": "合同编号 LEASE-001", "block_bbox": [1, 2, 31, 42]}
+                            ]
+                        },
+                    }
+                ]
+            }
+        }
+        self.assertEqual(PaddleOCRClient._markdown_from_payload(payload), "--- Page 1 ---\n--- OCR text ---")
+        locators = PaddleOCRClient._structured_locators(payload)
+        self.assertEqual(len(locators), 1)
+        self.assertEqual(locators[0]["page"], 1)
+        self.assertEqual(locators[0]["coordinates"], [1.0, 2.0, 31.0, 42.0])
+    async def test_event_route_returns_reviewable_draft_without_accounting_treatment(self):
+        llm_response = {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "event": {
+                                    "event_type": "modification",
+                                    "change_reason": "补充协议调整租金",
+                                    "judgment_basis": "补充协议文本",
+                                },
+                                "overall_confidence": 0.7,
+                                "missing_fields": ["effective_date"],
+                                "warnings": ["需人工核对扫描件"],
+                            }
+                        )
+                    }
+                }
+            ]
+        }
+        request = EventParseRequest(
+            file_id="file-route-event",
+            object_name="event.pdf",
+            content_type="application/pdf",
+            contract_id="contract-1",
+        )
+        with (
+            patch("app.routers.parse.download_from_minio", return_value=b"pdf"),
+            patch(
+                "app.routers.parse.extract_text_with_evidence",
+                new=AsyncMock(return_value=("event evidence", [])),
+            ),
+            patch(
+                "app.routers.parse.llm_client.chat_completion",
+                new=AsyncMock(return_value=llm_response),
+            ),
+        ):
+            response = await parse_event(request)
+
+        self.assertEqual(response.draft_type, "event_draft")
+        self.assertEqual(response.event.contract_id, "contract-1")
+        self.assertIn("effective_date", response.missing_fields)
+        self.assertFalse(response.evidence.complete)
+        self.assertTrue(response.review_gate.required)
+
     async def test_payment_schedule_route_never_guesses_missing_timing(self):
         llm_response = {
             "choices": [
@@ -52,8 +121,8 @@ class VersionedAIIntakeRouteTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch("app.routers.parse.download_from_minio", return_value=b"pdf"),
             patch(
-                "app.routers.parse.extract_text",
-                new=AsyncMock(return_value="schedule evidence"),
+                "app.routers.parse.extract_text_with_evidence",
+                new=AsyncMock(return_value=("schedule evidence", [])),
             ),
             patch(
                 "app.routers.parse.llm_client.chat_completion",

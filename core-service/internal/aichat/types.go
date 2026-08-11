@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -37,6 +38,7 @@ type Input struct {
 	UserID        string
 	LegalEntityID string
 	Role          string
+	Permissions   []string
 	AuthHeader    string
 	AgentMode     *bool
 	SkillID       string
@@ -63,10 +65,16 @@ type Plan struct {
 }
 
 type ArtifactDraft struct {
-	Type           string
-	Title          string
-	Data           any
-	ReviewRequired bool
+	Type             string
+	Title            string
+	Data             any
+	ReviewRequired   bool
+	SchemaVersion    string
+	EvidenceRefs     []agentartifact.EvidenceReference
+	EvidenceComplete bool
+	ReviewReasons    []string
+	ModelVersion     string
+	RuleVersion      string
 }
 
 type Result struct {
@@ -137,6 +145,7 @@ type ContinueCommand struct {
 	UserID        string
 	LegalEntityID string
 	Role          string
+	Permissions   []string
 	AuthHeader    string
 }
 
@@ -163,6 +172,7 @@ type ReviewResult struct {
 	Action         *repository.AIChatReviewAction
 	ArtifactID     string
 	ArtifactStatus string
+	CommitResult   any `json:"-"`
 	FollowUp       *Started
 }
 
@@ -196,10 +206,23 @@ type store interface {
 	CreateAttachment(context.Context, *repository.AIChatAttachment) error
 }
 
+// atomicReviewCommitter is an optional production seam. PostgreSQL adapters
+// use it to commit the review action and Artifact status transition together;
+// lightweight test stores may keep the two primitive methods.
+type atomicReviewCommitter interface {
+	CommitReviewAction(context.Context, *repository.AIChatReviewAction, string) error
+}
+
+// ReviewCommitFunc is an optional application-level transaction seam. The
+// HTTP handler can use it to include business Draft writes in the same
+// transaction as the runtime Artifact, Review Action and Run Event records.
+type ReviewCommitFunc func(context.Context, *repository.AIChatArtifact, *repository.AIChatReviewAction, string, ReviewCommand) (any, error)
+
 type Options struct {
-	Dispatch func(func())
-	Timeout  time.Duration
-	Now      func() time.Time
+	Dispatch     func(func())
+	Timeout      time.Duration
+	Now          func() time.Time
+	ReviewCommit ReviewCommitFunc
 }
 
 func marshalJSON(value any) json.RawMessage {

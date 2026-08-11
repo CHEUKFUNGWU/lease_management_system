@@ -30,14 +30,27 @@ func (r *Runtime[T]) Review(ctx context.Context, command ReviewCommand) (*Review
 	if command.Comment != "" {
 		action.Comment = &command.Comment
 	}
-	if err := r.store.RecordReviewAction(ctx, action); err != nil {
-		return nil, fmt.Errorf("record AI agent review action: %w", err)
-	}
 	status := artifactStatus(command.ActionType)
-	if err := r.store.UpdateArtifactStatus(ctx, artifact.ID, status); err != nil {
-		return nil, fmt.Errorf("update AI agent artifact status: %w", err)
+	var commitResult any
+	if r.reviewCommit != nil {
+		var commitErr error
+		commitResult, commitErr = r.reviewCommit(ctx, artifact, action, status, command)
+		if commitErr != nil {
+			return nil, fmt.Errorf("commit AI agent review transaction: %w", commitErr)
+		}
+	} else if committer, ok := r.store.(atomicReviewCommitter); ok {
+		if err := committer.CommitReviewAction(ctx, action, status); err != nil {
+			return nil, fmt.Errorf("commit AI agent review action: %w", err)
+		}
+	} else {
+		if err := r.store.RecordReviewAction(ctx, action); err != nil {
+			return nil, fmt.Errorf("record AI agent review action: %w", err)
+		}
+		if err := r.store.UpdateArtifactStatus(ctx, artifact.ID, status); err != nil {
+			return nil, fmt.Errorf("update AI agent artifact status: %w", err)
+		}
 	}
-	result := &ReviewResult{Action: action, ArtifactID: artifact.ID, ArtifactStatus: status}
+	result := &ReviewResult{Action: action, ArtifactID: artifact.ID, ArtifactStatus: status, CommitResult: commitResult}
 	if command.FollowUp != nil {
 		followUp := *command.FollowUp
 		followUp.Target = Target{Type: "action", ID: action.ID}

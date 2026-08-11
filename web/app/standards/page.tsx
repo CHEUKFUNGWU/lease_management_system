@@ -13,6 +13,7 @@ import { contractApi, reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
+import { notifyError } from "../lib/notify";
 
 const { Text } = Typography;
 
@@ -58,7 +59,7 @@ export default function StandardsPage() {
     contractApi
       .list(token, { status: "approved", sort_by: "created_at", sort_order: "desc" })
       .then((res) => setContracts(res.data || []))
-      .catch((error: any) => message.error(error.message || "合同列表加载失败"));
+      .catch((error: any) => notifyError(error.message || "合同列表加载失败"));
   }, [token]);
 
   const runComparison = async (values: any) => {
@@ -76,7 +77,7 @@ export default function StandardsPage() {
       setMeta(res);
       message.success("多准则对比已生成");
     } catch (error: any) {
-      message.error(error.message || "多准则对比失败");
+      notifyError(error.message || "多准则对比失败");
     } finally {
       setLoading(false);
     }

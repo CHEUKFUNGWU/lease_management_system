@@ -27,6 +27,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
+import { notifyError } from "../lib/notify";
 
 const { Text } = Typography;
 
@@ -110,7 +111,7 @@ export default function DealComparePage() {
         )
       );
     } catch (error: any) {
-      message.error(error?.message || "比价失败");
+      notifyError(error?.message || "比价失败");
       setResult(null);
     } finally {
       setLoading(false);

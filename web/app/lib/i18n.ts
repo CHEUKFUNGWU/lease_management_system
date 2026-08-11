@@ -35,10 +35,13 @@ const dict: TranslationDict = {
     "zh-HK": "網絡連線失敗，請檢查服務狀態後重試。",
     en: "The network connection failed. Check the service status and try again.",
   },
+  // Reached by any status that is not 401/403/404/5xx, which includes plain
+  // page loads. Telling a user to check their input when they only opened a
+  // page sends them looking for a form that is not there.
   "api.request_failed": {
-    "zh-CN": "操作未完成，请检查输入后重试。",
-    "zh-HK": "操作未完成，請檢查輸入後重試。",
-    en: "The request could not be completed. Check the input and try again.",
+    "zh-CN": "请求未成功，请重试。",
+    "zh-HK": "請求未成功，請重試。",
+    en: "The request did not succeed. Please try again.",
   },
 
   // AppLayout

@@ -14,6 +14,7 @@ import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import { useUrlState } from "../hooks/useUrlState";
+import { notifyError } from "../lib/notify";
 
 interface ContractOption {
   id: string;
@@ -63,7 +64,7 @@ function SensitivityPage() {
     contractApi
       .list(token, { status: "approved", sort_by: "created_at", sort_order: "desc" })
       .then((res) => setContracts(res.data || []))
-      .catch((error: any) => message.error(error.message || "合同列表加载失败"));
+      .catch((error: any) => notifyError(error.message || "合同列表加载失败"));
   }, [token]);
 
   const runAnalysis = async (values: any) => {
@@ -86,7 +87,7 @@ function SensitivityPage() {
       setMeta(res);
       message.success("敏感性分析已生成");
     } catch (error: any) {
-      message.error(error.message || "敏感性分析失败");
+      notifyError(error.message || "敏感性分析失败");
     } finally {
       setLoading(false);
     }

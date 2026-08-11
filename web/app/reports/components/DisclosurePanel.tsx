@@ -11,6 +11,7 @@ import dayjs from "dayjs";
 import { reportApi } from "../../lib/api";
 import { t, type Language } from "../../lib/i18n";
 import { fmtNum } from "../../lib/format";
+import { notifyError } from "../../lib/notify";
 
 const { RangePicker } = DatePicker;
 
@@ -194,7 +195,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
       setData(res as DisclosureData);
     } catch (error: any) {
       console.error("Failed to fetch disclosure report:", error);
-      message.error(error?.message || t("reports.query_failed", language));
+      notifyError(error?.message || t("reports.query_failed", language));
     } finally {
       setLoading(false);
     }
@@ -509,7 +510,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
                 dataSource={data.maturity_analysis.rows || []}
                 rowKey="contract_id"
                 pagination={{ pageSize: 10, showSizeChanger: true }}
-                scroll={{ x: "max-content" }}
+                scroll={(data.maturity_analysis.rows || []).length ? { x: "max-content" } : undefined}
                 size="small"
                 locale={{ emptyText: t("reports.empty", language) }}
                 summary={() => {
@@ -548,7 +549,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
                 dataSource={data.rou_reconciliation.rows || []}
                 rowKey="asset_type"
                 pagination={false}
-                scroll={{ x: "max-content" }}
+                scroll={(data.rou_reconciliation.rows || []).length ? { x: "max-content" } : undefined}
                 size="small"
                 locale={{ emptyText: t("reports.empty", language) }}
                 summary={() => {
@@ -633,7 +634,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
                 dataSource={data.audit_workpaper.rows || []}
                 rowKey="contract_id"
                 pagination={{ pageSize: 10, showSizeChanger: true }}
-                scroll={{ x: "max-content" }}
+                scroll={(data.audit_workpaper.rows || []).length ? { x: "max-content" } : undefined}
                 size="small"
                 locale={{ emptyText: t("reports.empty", language) }}
               />

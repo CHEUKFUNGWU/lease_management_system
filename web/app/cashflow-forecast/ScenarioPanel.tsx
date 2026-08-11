@@ -3,11 +3,12 @@
 import { StatusTag } from "../components/StatusTag";
 
 import { useState } from "react";
-import { Alert, Button, Card, Col, Form, InputNumber, Row, Space, Table, Tag, message } from "antd";
+import { Alert, Button, Card, Col, Form, InputNumber, Row, Space, Table, Tag } from "antd";
 import { ExperimentOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
+import { notifyError } from "../lib/notify";
 
 interface Ladder {
   labels: string[];
@@ -68,7 +69,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
       setResults(response.results || []);
       setWarning(response.currency_warning || null);
     } catch (error: any) {
-      message.error(error?.message || "情景测算失败");
+      notifyError(error?.message || "情景测算失败");
       setResults([]);
     } finally {
       setLoading(false);

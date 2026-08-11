@@ -17,6 +17,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { authApi } from "../../lib/api";
 import { t } from "../../lib/i18n";
+import { notifyError } from "../../lib/notify";
 
 const { Title, Text } = Typography;
 
@@ -31,7 +32,7 @@ export default function AdminLoginPage() {
     try {
       const data = await authApi.login(values.username, values.password);
       if (!(data.roles || [data.role]).includes("admin")) {
-        message.error(t("admin_login.not_admin", language));
+        notifyError(t("admin_login.not_admin", language));
         setLoading(false);
         return;
       }
@@ -45,7 +46,7 @@ export default function AdminLoginPage() {
       message.success(t("admin_login.success", language));
       router.push("/admin/users");
     } catch (error: any) {
-      message.error(error.message || t("admin_login.failed", language));
+      notifyError(error.message || t("admin_login.failed", language));
     } finally {
       setLoading(false);
     }

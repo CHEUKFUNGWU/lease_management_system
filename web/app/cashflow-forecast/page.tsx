@@ -24,6 +24,7 @@ import { exportCSV } from "../lib/export";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import { useUrlState } from "../hooks/useUrlState";
+import { notifyError } from "../lib/notify";
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -162,7 +163,7 @@ function CashflowForecastPage() {
       message.success(t("cashflow.query_success", language, { total: String(res.total || 0) }));
     } catch (error: any) {
       console.error("Failed to fetch cashflow forecast:", error);
-      message.error(error?.message || t("cashflow.query_failed", language));
+      notifyError(error?.message || t("cashflow.query_failed", language));
     } finally {
       setLoading(false);
     }
@@ -464,7 +465,7 @@ function CashflowForecastPage() {
                   .join("|") || JSON.stringify(record)
               }
               pagination={{ pageSize: 20, showSizeChanger: true }}
-              scroll={{ x: "max-content" }}
+              scroll={data.length ? { x: "max-content" } : undefined}
               size="small"
               locale={{
                 emptyText: fetched

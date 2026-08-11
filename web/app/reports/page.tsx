@@ -27,6 +27,7 @@ import dayjs from "dayjs";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useUrlState } from "../hooks/useUrlState";
 import { staggerContainer, staggerItem } from "../design-system/animations";
+import { notifyError } from "../lib/notify";
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -291,7 +292,7 @@ function ReportsPageContent() {
       message.success(t("reports.query_complete", language, { count: String(res.total || 0) }));
     } catch (error: any) {
       console.error("Failed to fetch amortization:", error);
-      message.error(error?.message || t("reports.query_failed", language));
+      notifyError(error?.message || t("reports.query_failed", language));
     } finally {
       setAmortLoading(false);
     }
@@ -577,7 +578,7 @@ function ReportsPageContent() {
                           dataSource={data}
                           rowKey="contract_id"
                           pagination={{ pageSize: 10 }}
-                          scroll={{ x: "max-content" }}
+                          scroll={data.length ? { x: "max-content" } : undefined}
                           locale={{ emptyText: reportEmptyState(t("reports.empty_hint", language)) }}
                         />
                       </Spin>
@@ -1045,7 +1046,7 @@ function ReportsPageContent() {
                               .join("|") || JSON.stringify(record)
                           }
                           pagination={{ pageSize: 20, showSizeChanger: true }}
-                          scroll={{ x: "max-content" }}
+                          scroll={amortData.length ? { x: "max-content" } : undefined}
                           size="small"
                           locale={{ emptyText: reportEmptyState(amortFetched ? t("reports.empty_hint", language) : t("reports.no_data_hint", language)) }}
                         />

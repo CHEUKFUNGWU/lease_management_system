@@ -19,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { authApi } from "../lib/api";
+import { notifyError } from "../lib/notify";
 
 const { Title, Text } = Typography;
 
@@ -42,7 +43,7 @@ export default function LoginPage() {
       message.success(t("login.success", language));
       router.push("/");
     } catch (error: any) {
-      message.error(error.message || t("login.failed", language));
+      notifyError(error.message || t("login.failed", language));
     } finally {
       setLoading(false);
     }

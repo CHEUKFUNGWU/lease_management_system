@@ -19,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { useRouter } from "next/navigation";
+import { notifyError } from "../lib/notify";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -103,7 +104,7 @@ export default function SettingsPage() {
       const response = await authApi.listSessions(token);
       setAuthSessions(response.sessions || []);
     } catch (error: any) {
-      message.error(error?.message || t("settings.sessions_load_failed", language));
+      notifyError(error?.message || t("settings.sessions_load_failed", language));
     } finally {
       setAuthSessionsLoading(false);
     }
@@ -117,7 +118,7 @@ export default function SettingsPage() {
       message.success(t("settings.session_revoked", language));
       await loadAuthSessions();
     } catch (error: any) {
-      message.error(error?.message || t("settings.session_revoke_failed", language));
+      notifyError(error?.message || t("settings.session_revoke_failed", language));
     } finally {
       setRevokingSessionId(null);
     }
@@ -131,7 +132,7 @@ export default function SettingsPage() {
       message.success(t("settings.sessions_revoked", language));
       await loadAuthSessions();
     } catch (error: any) {
-      message.error(error?.message || t("settings.sessions_revoke_failed", language));
+      notifyError(error?.message || t("settings.sessions_revoke_failed", language));
     } finally {
       setLoggingOutAll(false);
     }
@@ -160,7 +161,7 @@ export default function SettingsPage() {
       setRateForm({ ...rateForm, rate: null });
       loadRates();
     } catch (error: any) {
-      message.error(error?.message || t("settings.fx_save_failed", language));
+      notifyError(error?.message || t("settings.fx_save_failed", language));
     } finally {
       setRateSaving(false);
     }
@@ -183,7 +184,7 @@ export default function SettingsPage() {
         setTieOutTolerance(res.budget_tie_out_tolerance || null);
         setJournalMateriality(res.journal_entry_materiality_threshold || null);
       })
-      .catch(() => message.error(t("settings.load_failed", language)))
+      .catch(() => notifyError(t("settings.load_failed", language)))
       .finally(() => setDiscountRateLoading(false));
   }, [token]);
 
@@ -198,7 +199,7 @@ export default function SettingsPage() {
       setEffectiveRate(discountRatePercent);
       message.success(t("settings.save_success", language));
     } catch {
-      message.error(t("settings.save_failed", language));
+      notifyError(t("settings.save_failed", language));
     } finally {
       setDiscountRateSaving(false);
     }
@@ -218,7 +219,7 @@ export default function SettingsPage() {
       }, token);
       message.success(t("settings.ratio_policy_saved", language));
     } catch (error: any) {
-      message.error(error?.message || t("settings.save_failed", language));
+      notifyError(error?.message || t("settings.save_failed", language));
     } finally {
       setRatioSaving(false);
     }
@@ -237,7 +238,7 @@ export default function SettingsPage() {
       }, token);
       message.success(t("settings.variance_policy_saved", language));
     } catch (error: any) {
-      message.error(error?.message || t("settings.save_failed", language));
+      notifyError(error?.message || t("settings.save_failed", language));
     } finally {
       setVariancePolicySaving(false);
     }
@@ -253,7 +254,7 @@ export default function SettingsPage() {
       await settingsApi.updateGlobal({ journal_entry_materiality_threshold: journalMateriality }, token);
       message.success(t("settings.journal_policy_saved", language));
     } catch (error: any) {
-      message.error(error?.message || t("settings.save_failed", language));
+      notifyError(error?.message || t("settings.save_failed", language));
     } finally {
       setVariancePolicySaving(false);
     }
@@ -275,7 +276,7 @@ export default function SettingsPage() {
     reportApi
       .tagSummary(token)
       .then((res) => setData(res.data || []))
-      .catch(() => message.error(t("settings.load_tags_failed", language)))
+      .catch(() => notifyError(t("settings.load_tags_failed", language)))
       .finally(() => setLoading(false));
   }, [token]);
 

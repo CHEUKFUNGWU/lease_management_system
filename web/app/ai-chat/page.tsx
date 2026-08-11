@@ -66,6 +66,7 @@ import {
   type RuntimeArtifact,
   type UploadedFile,
 } from "./runtime";
+import { notifyError } from "../lib/notify";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -1576,7 +1577,7 @@ function AIChatPageContent() {
       }
     } catch (err: any) {
       onError(err);
-      message.error(`${t("ai.upload_failed", language)}: ${err.message}`);
+      notifyError(`${t("ai.upload_failed", language)}: ${err.message}`);
     }
   };
 
@@ -1587,7 +1588,7 @@ function AIChatPageContent() {
     try {
       await continueActive(target, options);
     } catch (error: any) {
-      message.error(
+      notifyError(
         t("ai.request_failed", language, {
           error: error.message || t("ai.unknown_error", language),
         }),
@@ -1602,7 +1603,7 @@ function AIChatPageContent() {
     try {
       setTraceData(await getRunTrace(runId));
     } catch (error: any) {
-      message.error(
+      notifyError(
         t("ai.request_failed", language, {
           error: error.message || t("ai.unknown_error", language),
         }),
@@ -2114,11 +2115,11 @@ function AIChatPageContent() {
                                     );
                                   } catch (error: any) {
                                     setLoading(false);
-                                    message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                    notifyError(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
                                   }
                                 }
                               } catch (error: any) {
-                                message.error(t("ai.batch_create_failed", language, { error: error.message }));
+                                notifyError(t("ai.batch_create_failed", language, { error: error.message }));
                               }
                             }}
                             onSkip={() => {
@@ -2147,11 +2148,11 @@ function AIChatPageContent() {
                                       );
                                     } catch (error: any) {
                                       setLoading(false);
-                                      message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                      notifyError(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
                                     }
                                   }
                                 } catch (error: any) {
-                                  message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                  notifyError(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
                                 }
                               })();
                             }}
@@ -2208,11 +2209,11 @@ function AIChatPageContent() {
                                     );
                                   } catch (error: any) {
                                     setLoading(false);
-                                    message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                    notifyError(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
                                   }
                                 }
                               } catch (error: any) {
-                                message.error(t("ai.schedule_import_failed", language, { error: error.message }));
+                                notifyError(t("ai.schedule_import_failed", language, { error: error.message }));
                               }
                             }}
                             onSkip={() => {
@@ -2242,11 +2243,11 @@ function AIChatPageContent() {
                                       );
                                     } catch (error: any) {
                                       setLoading(false);
-                                      message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                      notifyError(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
                                     }
                                   }
                                 } catch (error: any) {
-                                  message.error(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
+                                  notifyError(t("ai.request_failed", language, { error: error.message || t("ai.unknown_error", language) }));
                                 }
                               })();
                             }}
@@ -2474,12 +2475,12 @@ function AIChatPageContent() {
                       "image/tiff",
                     ];
                     if (!allowedTypes.includes(file.type)) {
-                      message.error(t("ai.unsupported_file", language));
+                      notifyError(t("ai.unsupported_file", language));
                       return Upload.LIST_IGNORE;
                     }
                     const isLt50M = file.size / 1024 / 1024 < 50;
                     if (!isLt50M) {
-                      message.error(t("ai.file_too_large", language));
+                      notifyError(t("ai.file_too_large", language));
                       return Upload.LIST_IGNORE;
                     }
                     return true;

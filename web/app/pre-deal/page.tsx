@@ -37,6 +37,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
+import { notifyError } from "../lib/notify";
 
 const { Text } = Typography;
 
@@ -122,7 +123,7 @@ export default function PreDealPage() {
         )
       );
     } catch (error: any) {
-      message.error(error?.message || "测算失败");
+      notifyError(error?.message || "测算失败");
       setBriefing(null);
     } finally {
       setLoading(false);

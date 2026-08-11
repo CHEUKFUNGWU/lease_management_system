@@ -11,6 +11,7 @@ import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
 import { performanceApi } from "../lib/api";
+import { notifyError } from "../lib/notify";
 
 type Overview = { period: string; store_fact_count: number; store_fact_ready_count: number; store_fact_missing_count: number; store_fact_unmapped_count: number; store_fact_unreconciled_count: number; equipment_fact_count: number; equipment_fact_unreconciled_count: number; open_action_count: number; open_action_impact: number; latest_store_as_of?: string; latest_equipment_as_of?: string };
 type FourWall = { store_id: string; store_code: string; store_name: string; brand: string; region: string; currency: string; revenue: number; gross_profit?: number; four_wall_ebitda?: number; rent_to_sales?: number; occupancy_cost_ratio?: number; sales_per_sqm?: number; break_even_sales?: number; data_ready: boolean; data_gaps?: string[]; reconciliation_status: string };
@@ -47,7 +48,7 @@ export default function PerformancePage() {
       setEquipment(equipmentResult.data || []);
       setActions(actionResult.data || []);
     } catch (error: any) {
-      message.error(error?.message || "经营数据加载失败");
+      notifyError(error?.message || "经营数据加载失败");
     } finally { setLoading(false); }
   }, [period, token]);
 
@@ -56,7 +57,7 @@ export default function PerformancePage() {
   const acknowledge = async (action: Action) => {
     if (!token) return;
     try { await performanceApi.updateAction(action.id, { status: "acknowledged" }, token); message.success("已确认行动"); load(); }
-    catch (error: any) { message.error(error?.message || "行动更新失败"); }
+    catch (error: any) { notifyError(error?.message || "行动更新失败"); }
   };
 
   const acknowledgeSelected = async () => {
@@ -66,7 +67,7 @@ export default function PerformancePage() {
       message.success(`已确认 ${selectedActionIds.length} 项行动`);
       setSelectedActionIds([]);
       load();
-    } catch (error: any) { message.error(error?.message || "批量更新失败"); }
+    } catch (error: any) { notifyError(error?.message || "批量更新失败"); }
   };
 
   const exportActions = async () => {
@@ -79,7 +80,7 @@ export default function PerformancePage() {
       link.download = `fpna-actions-${period}.csv`;
       link.click();
       URL.revokeObjectURL(url);
-    } catch (error: any) { message.error(error?.message || "导出失败"); }
+    } catch (error: any) { notifyError(error?.message || "导出失败"); }
   };
 
   const simulateStore = async () => {
@@ -90,7 +91,7 @@ export default function PerformancePage() {
         { name: "close", decision: "close", currency: "CNY", horizon_months: 36, discount_rate: scenarioInput.discount, monthly_sales: scenarioInput.sales, gross_margin_pct: scenarioInput.margin, monthly_labor: scenarioInput.sales * 0.1, monthly_other_cost: scenarioInput.sales * 0.05, monthly_rent: scenarioInput.rent, exit_cost: scenarioInput.rent * 3 },
       ], token);
       setScenarioResult(response.data || []);
-    } catch (error: any) { message.error(error?.message || "情景测算失败"); }
+    } catch (error: any) { notifyError(error?.message || "情景测算失败"); }
   };
 
   const storeColumns = useMemo(() => [

@@ -25,6 +25,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { adminApi, legalEntityApi } from "../../lib/api";
 import { t } from "../../lib/i18n";
+import { notifyError } from "../../lib/notify";
 
 interface User {
   id: string;
@@ -50,7 +51,7 @@ export default function AdminUsersPage() {
   useEffect(() => {
     if (isLoading) return;
     if (!hasRole(user, "admin")) {
-      message.error(t("admin_users.need_admin", language));
+      notifyError(t("admin_users.need_admin", language));
       router.push("/login");
       return;
     }
@@ -65,7 +66,7 @@ export default function AdminUsersPage() {
       const data = await adminApi.listUsers(token);
       setUsers(data.data || []);
     } catch (error: any) {
-      message.error(error.message || t("admin_users.load_failed", language));
+      notifyError(error.message || t("admin_users.load_failed", language));
     } finally {
       setLoading(false);
     }
@@ -99,7 +100,7 @@ export default function AdminUsersPage() {
       form.resetFields();
       fetchUsers();
     } catch (error: any) {
-      message.error(error.message || t("admin_users.create_failed", language));
+      notifyError(error.message || t("admin_users.create_failed", language));
     }
   };
 

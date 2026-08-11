@@ -3,7 +3,7 @@
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Row, Segmented, Space, Statistic, Table, Tag, message } from "antd";
+import { Alert, Button, Card, Col, Row, Segmented, Space, Statistic, Table, Tag } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -14,6 +14,7 @@ import { RentToSalesPanel } from "./RentToSalesPanel";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import { useUrlState } from "../hooks/useUrlState";
+import { notifyError } from "../lib/notify";
 
 interface PortfolioRow {
   asset_type: string;
@@ -126,7 +127,7 @@ function PortfolioPage() {
       const res = await reportApi.portfolioSummary(mode, token);
       setRows(res.data || []);
     } catch (error: any) {
-      message.error(error.message || "组合分析加载失败");
+      notifyError(error.message || "组合分析加载失败");
     } finally {
       setLoading(false);
     }
@@ -140,7 +141,7 @@ function PortfolioPage() {
       setUnitPriceRows(res.data || []);
       setContractsWithoutArea(res.contracts_without_area || 0);
     } catch (error: any) {
-      message.error(error.message || "单价对比加载失败");
+      notifyError(error.message || "单价对比加载失败");
     } finally {
       setUnitPriceLoading(false);
     }

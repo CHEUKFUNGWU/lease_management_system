@@ -37,6 +37,7 @@ import { t } from "../lib/i18n";
 import { StatusTag, type StatusKind } from "../components/StatusTag";
 import { fmtMoney } from "../lib/format";
 import { useUrlState } from "../hooks/useUrlState";
+import { notifyError } from "../lib/notify";
 
 interface Contract {
   id: string;
@@ -182,7 +183,7 @@ function ContractsPage() {
       setPageParam(String(data.page || pageVal));
       setPageSizeParam(String(data.page_size || pageSizeVal));
     } catch (error: any) {
-      message.error(error.message || t("contracts.load_failed", language));
+      notifyError(error.message || t("contracts.load_failed", language));
     } finally {
       setLoading(false);
     }
@@ -599,7 +600,7 @@ function ContractsPage() {
             <Table
               columns={columns}
               dataSource={contracts}
-              scroll={{ x: "max-content" }}
+              scroll={contracts.length ? { x: "max-content" } : undefined}
               rowKey="id"
               loading={{
                 spinning: loading,

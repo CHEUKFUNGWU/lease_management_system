@@ -9,6 +9,7 @@ import dayjs from "dayjs";
 import { budgetApi } from "../../lib/api";
 import { t, type Language } from "../../lib/i18n";
 import { fmtNum } from "../../lib/format";
+import { notifyError } from "../../lib/notify";
 
 interface BudgetVersion {
   id: string;
@@ -124,7 +125,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
       setVersionId((current) => current || list[0]?.id);
       setRightId((current) => current === "actual" ? current : current || "actual");
     } catch (error: any) {
-      message.error(error?.message || t("budget.load_failed", language));
+      notifyError(error?.message || t("budget.load_failed", language));
     }
   }, [token, language]);
 
@@ -168,7 +169,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
         setBrief(null);
       }
     } catch (error: any) {
-      message.error(error?.message || t("budget.load_failed", language));
+      notifyError(error?.message || t("budget.load_failed", language));
     } finally {
       setLoading(false);
     }
@@ -204,7 +205,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
       setVersionId(res.data?.id);
       loadVersions();
     } catch (error: any) {
-      message.error(error?.message || t("budget.create_failed", language));
+      notifyError(error?.message || t("budget.create_failed", language));
     } finally {
       setCreating(false);
     }
@@ -227,7 +228,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
       message.success(t("budget.actions_saved", language));
       await runVariance();
     } catch (error: any) {
-      message.error(error?.message || t("budget.actions_save_failed", language));
+      notifyError(error?.message || t("budget.actions_save_failed", language));
     } finally {
       setSavingActions(false);
     }

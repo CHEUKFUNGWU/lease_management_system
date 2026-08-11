@@ -24,6 +24,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
 import { normalizeTagValues, DEFAULT_TAG_SUGGESTIONS } from "../../lib/tags";
+import { notifyError } from "../../lib/notify";
 
 interface LegalEntityOption {
   id: string;
@@ -86,7 +87,7 @@ export default function NewContractPage() {
         }
       })
       .catch((error: Error) => {
-        message.error(error.message || t("contract_new.create_failed", language));
+        notifyError(error.message || t("contract_new.create_failed", language));
       })
       .finally(() => setMasterDataLoading(false));
   }, [token, user?.legal_entity_id, form, language]);
@@ -110,14 +111,14 @@ export default function NewContractPage() {
       })
       .catch((error: Error) => {
         setStores([]);
-        message.error(error.message || t("contract_new.create_failed", language));
+        notifyError(error.message || t("contract_new.create_failed", language));
       })
       .finally(() => setStoresLoading(false));
   }, [token, selectedLegalEntityId, form, language]);
 
   const handleSubmit = async (values: any) => {
     if (!token) {
-      message.error(t("contract_new.please_login", language));
+      notifyError(t("contract_new.please_login", language));
       return;
     }
 
@@ -161,7 +162,7 @@ export default function NewContractPage() {
       message.success(t("contract_new.create_success", language));
       router.push("/contracts");
     } catch (error: any) {
-      message.error(error.message || t("contract_new.create_failed", language));
+      notifyError(error.message || t("contract_new.create_failed", language));
     } finally {
       setLoading(false);
     }

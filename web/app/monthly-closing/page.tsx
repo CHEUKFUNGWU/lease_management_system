@@ -49,6 +49,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { fmtMoney } from "../lib/format";
 import { useUrlState } from "../hooks/useUrlState";
+import { notifyError } from "../lib/notify";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -201,7 +202,7 @@ function MonthlyClosingPage() {
     if (!token) return;
     const period = values.period?.format("YYYY-MM");
     if (!period) {
-      message.error(t("monthly.select_period", language));
+      notifyError(t("monthly.select_period", language));
       return;
     }
     setLoading(true);
@@ -222,7 +223,7 @@ function MonthlyClosingPage() {
       loadEntries(period);
       setActiveTab("entries");
     } catch (error: any) {
-      message.error(error.message || t("monthly.generate_failed", language));
+      notifyError(error.message || t("monthly.generate_failed", language));
     } finally {
       setLoading(false);
     }
@@ -253,7 +254,7 @@ function MonthlyClosingPage() {
         setEntrySummary(data.summary || null);
         setEntriesLoaded(true);
       } catch (error: any) {
-        message.error(error.message || t("monthly.load_entries_failed", language));
+        notifyError(error.message || t("monthly.load_entries_failed", language));
       } finally {
         setEntriesLoading(false);
       }
@@ -328,7 +329,7 @@ function MonthlyClosingPage() {
       message.success(t("monthly.approve_success", language));
       refresh();
     } catch (error: any) {
-      message.error(error.message || t("monthly.approve_failed", language));
+      notifyError(error.message || t("monthly.approve_failed", language));
     } finally {
       setActionLoading((prev) => ({ ...prev, [entryId]: false }));
     }
@@ -345,7 +346,7 @@ function MonthlyClosingPage() {
       setErpReference("");
       refresh();
     } catch (error: any) {
-      message.error(error.message || t("monthly.post_failed", language));
+      notifyError(error.message || t("monthly.post_failed", language));
     } finally {
       setActionLoading((prev) => ({ ...prev, [postingEntry.id]: false }));
     }
@@ -376,7 +377,7 @@ function MonthlyClosingPage() {
       URL.revokeObjectURL(url);
       message.success("ERP 分录文件已导出");
     } catch (error: any) {
-      message.error(error.message || "ERP 分录导出失败");
+      notifyError(error.message || "ERP 分录导出失败");
     } finally {
       setActionLoading((prev) => ({ ...prev, export_entries: false }));
     }
@@ -407,7 +408,7 @@ function MonthlyClosingPage() {
       setWritebackText("");
       refresh();
     } catch (error: any) {
-      message.error(error.message || "凭证回写失败");
+      notifyError(error.message || "凭证回写失败");
     } finally {
       setWritebackLoading(false);
     }
@@ -421,7 +422,7 @@ function MonthlyClosingPage() {
       message.success(t("monthly.batch_approve_success", language, { count: String(data.approved_count) }));
       refresh();
     } catch (error: any) {
-      message.error(error.message || t("monthly.batch_approve_failed", language));
+      notifyError(error.message || t("monthly.batch_approve_failed", language));
     } finally {
       setActionLoading((prev) => ({ ...prev, [`batch_${batchId}`]: false }));
     }
@@ -435,7 +436,7 @@ function MonthlyClosingPage() {
       message.success(t("monthly.batch_post_success", language, { count: String(data.posted_count) }));
       refresh();
     } catch (error: any) {
-      message.error(error.message || t("monthly.batch_post_failed", language));
+      notifyError(error.message || t("monthly.batch_post_failed", language));
     } finally {
       setActionLoading((prev) => ({ ...prev, [`postbatch_${batchId}`]: false }));
     }
@@ -443,7 +444,7 @@ function MonthlyClosingPage() {
 
   const handleLockPeriod = async () => {
     if (!token || !selectedPeriod) {
-      message.error(t("monthly.no_period", language));
+      notifyError(t("monthly.no_period", language));
       return;
     }
     setLockLoading(true);
@@ -452,7 +453,7 @@ function MonthlyClosingPage() {
       message.success(t("monthly.lock_success", language, { period: selectedPeriod }));
       await checkLockStatus(selectedPeriod);
     } catch (error: any) {
-      message.error(error.message || t("monthly.lock_failed", language));
+      notifyError(error.message || t("monthly.lock_failed", language));
     } finally {
       setLockLoading(false);
     }
@@ -460,7 +461,7 @@ function MonthlyClosingPage() {
 
   const handleUnlockPeriod = async () => {
     if (!token || !selectedPeriod) {
-      message.error(t("monthly.no_period", language));
+      notifyError(t("monthly.no_period", language));
       return;
     }
     setLockLoading(true);
@@ -469,7 +470,7 @@ function MonthlyClosingPage() {
       message.success(t("monthly.unlock_success", language, { period: selectedPeriod }));
       await checkLockStatus(selectedPeriod);
     } catch (error: any) {
-      message.error(error.message || t("monthly.unlock_failed", language));
+      notifyError(error.message || t("monthly.unlock_failed", language));
     } finally {
       setLockLoading(false);
     }
@@ -506,7 +507,7 @@ function MonthlyClosingPage() {
       closeRejectModal();
       refresh();
     } catch (error: any) {
-      message.error(error?.message || t("monthly.reject_failed", language));
+      notifyError(error?.message || t("monthly.reject_failed", language));
     } finally {
       setActionLoading((prev) => ({ ...prev, [rejectingEntry.id]: false }));
     }
@@ -545,7 +546,7 @@ function MonthlyClosingPage() {
       closeReverseModal();
       refresh();
     } catch (error: any) {
-      message.error(error?.message || t("monthly.reverse_failed", language));
+      notifyError(error?.message || t("monthly.reverse_failed", language));
     } finally {
       setActionLoading((prev) => ({ ...prev, [reversingEntry.id]: false }));
     }

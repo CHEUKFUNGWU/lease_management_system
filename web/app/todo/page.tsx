@@ -15,6 +15,7 @@ import { monthlyClosingApi, workQueueApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
+import { notifyError } from "../lib/notify";
 
 interface WorkQueueItem {
   kind: string;
@@ -121,7 +122,7 @@ export default function TodoPage() {
       setExceptions(exceptionsRes.data || []);
       setExceptionsScopeComplete(exceptionsRes.scope_complete !== false);
     } catch (error: any) {
-      message.error(error?.message || t("todo.load_failed", language));
+      notifyError(error?.message || t("todo.load_failed", language));
     } finally {
       setLoading(false);
     }
@@ -289,7 +290,7 @@ export default function TodoPage() {
       message.success(t("todo.exceptions_detected", language));
       await load(period);
     } catch (error: any) {
-      message.error(error?.message || t("todo.exceptions_action_failed", language));
+      notifyError(error?.message || t("todo.exceptions_action_failed", language));
     }
   };
 
@@ -306,7 +307,7 @@ export default function TodoPage() {
       message.success(t("todo.exceptions_action_done", language));
       await load(period);
     } catch (error: any) {
-      message.error(error?.message || t("todo.exceptions_action_failed", language));
+      notifyError(error?.message || t("todo.exceptions_action_failed", language));
     }
   };
 

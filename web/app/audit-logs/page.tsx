@@ -25,6 +25,7 @@ import { auditApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
+import { notifyError } from "../lib/notify";
 
 const { RangePicker } = DatePicker;
 
@@ -133,7 +134,7 @@ export default function AuditLogsPage() {
       setLogs(data.data || []);
       setTotal(data.total || 0);
     } catch (err: any) {
-      message.error(t("audit.query_failed", language) + ": " + (err.message || ""));
+      notifyError(t("audit.query_failed", language) + ": " + (err.message || ""));
     } finally {
       setLoading(false);
     }

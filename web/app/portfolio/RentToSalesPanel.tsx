@@ -3,10 +3,11 @@
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Card, Col, Input, InputNumber, Row, Space, Statistic, Table, Tag, message } from "antd";
+import { Alert, Card, Col, Input, InputNumber, Row, Space, Statistic, Table, Tag } from "antd";
 import dayjs from "dayjs";
 import { storeMetricsApi } from "../lib/api";
 import { fmtMoney, fmtNum } from "../lib/format";
+import { notifyError } from "../lib/notify";
 
 interface StoreRatio {
   store_id: string;
@@ -66,7 +67,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
         )
       );
     } catch (error: any) {
-      message.error(error?.message || "租售比加载失败");
+      notifyError(error?.message || "租售比加载失败");
       setResult(null);
     } finally {
       setLoading(false);

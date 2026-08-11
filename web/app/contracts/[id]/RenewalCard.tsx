@@ -9,6 +9,7 @@ import { fmtMoney, fmtNum } from "../../lib/format";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
+import { notifyError } from "../../lib/notify";
 
 interface OfferResult {
   name: string;
@@ -160,7 +161,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
       setHistoryCount((count) => count + 1);
       message.success(t("renewal.snapshot_saved", language));
     } catch (err: any) {
-      message.error(err?.message || t("renewal.snapshot_save_failed", language));
+      notifyError(err?.message || t("renewal.snapshot_save_failed", language));
     } finally {
       setSavingDecision(false);
     }

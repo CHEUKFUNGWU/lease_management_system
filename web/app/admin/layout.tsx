@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag } from "../components/StatusTag";
+
 import React from "react";
 import { Layout, Menu, Button, Avatar, Dropdown, Tag } from "antd";
 import {
@@ -55,23 +57,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          background: "#001529",
+          background: "var(--admin-surface)",
           padding: "0 24px",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <SafetyOutlined style={{ fontSize: 24, color: "#cf1322" }} />
-          <span style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>
+          <SafetyOutlined style={{ fontSize: 24, color: "var(--state-error-text)" }} />
+          <span style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-inverse)" }}>
             管理后台
           </span>
-          <Tag color="red" style={{ marginLeft: 8 }}>
+          <StatusTag kind="error" style={{ marginLeft: 8 }}>
             ADMIN
-          </Tag>
+          </StatusTag>
         </div>
 
         {user && (
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: "#fff" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: "var(--fg-inverse)" }}>
               <Avatar icon={<UserOutlined />} />
               <span>{user.username}</span>
             </div>
@@ -83,8 +85,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <Sider
           width={200}
           style={{
-            background: "#fff",
-            borderRight: "1px solid #f0f0f0",
+            background: "var(--fg-inverse)",
+            borderRight: "1px solid var(--bg-inset)",
           }}
         >
           <Menu
@@ -99,7 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           style={{
             margin: 24,
             padding: 24,
-            background: "#fff",
+            background: "var(--fg-inverse)",
             borderRadius: 8,
             minHeight: 280,
           }}

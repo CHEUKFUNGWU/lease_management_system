@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { StatusTag } from "../components/StatusTag";
+
+import { Suspense, useState, useEffect, useMemo } from "react";
 import {
   Card, Radio, Alert, Tag, Typography, Table, Spin, Statistic,
   Row, Col, Button, Select, Input, Space, message, DatePicker,
@@ -10,6 +12,7 @@ import {
   SearchOutlined, ClearOutlined, LineChartOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { ScenarioPanel } from "./ScenarioPanel";
 import { reportApi } from "../lib/api";
@@ -20,6 +23,7 @@ import { fmtNum } from "../lib/format";
 import { exportCSV } from "../lib/export";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
+import { useUrlState } from "../hooks/useUrlState";
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -80,18 +84,24 @@ const buildColumns = (view: string, language: Language) => {
 
 /* ──────────────── page ──────────────── */
 
-export default function CashflowForecastPage() {
+function CashflowForecastPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
 
   /* ---- controls ---- */
-  const [reportMode, setReportMode] = useState<"working" | "official">("working");
-  const [view, setView] = useState<"contract" | "store" | "summary">("summary");
-  const [granularity, setGranularity] = useState<"month" | "quarter" | "year">("month");
-  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>([
-    dayjs(),
-    dayjs().add(12, "month"),
-  ]);
+  const [reportModeParam, setReportModeParam] = useUrlState("mode", "working");
+  const [viewParam, setViewParam] = useUrlState("view", "summary");
+  const [granularityParam, setGranularityParam] = useUrlState("granularity", "month");
+  const [startParam, setStartParam] = useUrlState("start", dayjs().format("YYYY-MM-DD"));
+  const [endParam, setEndParam] = useUrlState("end", dayjs().add(12, "month").format("YYYY-MM-DD"));
+  const reportMode: "working" | "official" = reportModeParam === "official" ? "official" : "working";
+  const view: "contract" | "store" | "summary" = ["contract", "store", "summary"].includes(viewParam) ? viewParam as any : "summary";
+  const granularity: "month" | "quarter" | "year" = ["month", "quarter", "year"].includes(granularityParam) ? granularityParam as any : "month";
+  const dateRange = useMemo<[Dayjs, Dayjs] | null>(() => {
+    const start = dayjs(startParam);
+    const end = dayjs(endParam);
+    return start.isValid() && end.isValid() ? [start, end] : null;
+  }, [endParam, startParam]);
   const [contractId, setContractId] = useState("");
   const [store, setStore] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -126,7 +136,7 @@ export default function CashflowForecastPage() {
     if (!token) return;
     const start = dateRange?.[0]?.format("YYYY-MM-DD") || "";
     const end = dateRange?.[1]?.format("YYYY-MM-DD") || "";
-    if (!start || !end) {
+    if (!dateRange || !start || !end) {
       message.warning(t("cashflow.please_select_date", language));
       return;
     }
@@ -160,9 +170,10 @@ export default function CashflowForecastPage() {
 
   /* ---- reset ---- */
   const handleReset = () => {
-    setView("summary");
-    setGranularity("month");
-    setDateRange([dayjs(), dayjs().add(12, "month")]);
+    setViewParam("summary");
+    setGranularityParam("month");
+    setStartParam(dayjs().format("YYYY-MM-DD"));
+    setEndParam(dayjs().add(12, "month").format("YYYY-MM-DD"));
     setContractId("");
     setStore("");
     setSelectedTags([]);
@@ -193,24 +204,19 @@ export default function CashflowForecastPage() {
     <ProtectedRoute>
       <AppLayout>
         {/* ─── page heading ─── */}
-        <Title level={2}>
-          <LineChartOutlined style={{ marginRight: 8 }} />
-          {t("cashflow.title", language)}
-        </Title>
-        <Typography.Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
-          {t("cashflow.description", language)}
-        </Typography.Text>
+        <PageHeader
+          title={<><LineChartOutlined style={{ marginRight: 8 }} />{t("cashflow.title", language)}</>}
+          subtitle={t("cashflow.description", language)}
+        />
 
         {/* ─── report mode card ─── */}
         <Card style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Space>
-              <Title level={4} style={{ margin: 0 }}>
-                {t("cashflow.report_mode", language)}
-              </Title>
+              <span style={{ fontWeight: 600 }}>{t("cashflow.report_mode", language)}</span>
               <Radio.Group
                 value={reportMode}
-                onChange={(e) => { setReportMode(e.target.value); setFetched(false); }}
+                onChange={(e) => { setReportModeParam(e.target.value); setFetched(false); }}
                 buttonStyle="solid"
               >
                 <Radio.Button value="working">
@@ -251,7 +257,7 @@ export default function CashflowForecastPage() {
                 <span>{t("cashflow.view_dimension", language)}</span>
                 <Select
                   value={view}
-                  onChange={(v) => { setView(v); setFetched(false); }}
+                  onChange={(v) => { setViewParam(v); setFetched(false); }}
                   style={{ width: 120 }}
                   options={[
                     { value: "contract", label: t("cashflow.dimension_contract", language) },
@@ -266,7 +272,7 @@ export default function CashflowForecastPage() {
                 <span>{t("cashflow.granularity", language)}</span>
                 <Select
                   value={granularity}
-                  onChange={(v) => { setGranularity(v); setFetched(false); }}
+                  onChange={(v) => { setGranularityParam(v); setFetched(false); }}
                   style={{ width: 100 }}
                   options={[
                     { value: "month", label: t("cashflow.granularity_month", language) },
@@ -281,7 +287,11 @@ export default function CashflowForecastPage() {
                 <span>{t("cashflow.date_range", language)}</span>
                 <RangePicker
                   value={dateRange}
-                  onChange={(dates) => { setDateRange(dates as any); setFetched(false); }}
+                  onChange={(dates) => {
+                    setStartParam(dates?.[0]?.format("YYYY-MM-DD") || "");
+                    setEndParam(dates?.[1]?.format("YYYY-MM-DD") || "");
+                    setFetched(false);
+                  }}
                   allowClear={false}
                   picker={granularity === "year" ? "year" : granularity === "quarter" ? "quarter" : "month"}
                   style={{ width: 260 }}
@@ -381,7 +391,7 @@ export default function CashflowForecastPage() {
                   title={t("cashflow.stat_total_outflow", language)}
                   value={summary.totalOutflow}
                   precision={2}
-                  valueStyle={{ fontSize: 16, color: "#1677ff" }}
+                  valueStyle={{ fontSize: 16, color: "var(--chart-blue)" }}
                 />
               </Card>
             </Col>
@@ -401,7 +411,7 @@ export default function CashflowForecastPage() {
                   title={t("cashflow.stat_variable_rent", language)}
                   value={summary.variableRent}
                   precision={2}
-                  valueStyle={{ fontSize: 16, color: "#fa8c16" }}
+                  valueStyle={{ fontSize: 16, color: "var(--state-warning-text)" }}
                 />
               </Card>
             </Col>
@@ -411,7 +421,7 @@ export default function CashflowForecastPage() {
                   title={t("cashflow.stat_non_lease", language)}
                   value={summary.nonLease}
                   precision={2}
-                  valueStyle={{ fontSize: 16, color: "#722ed1" }}
+                  valueStyle={{ fontSize: 16, color: "var(--chart-purple)" }}
                 />
               </Card>
             </Col>
@@ -424,14 +434,14 @@ export default function CashflowForecastPage() {
             <span>
               {t("cashflow.table_title", language)}
               {reportMode === "working" && (
-                <Tag color="orange" style={{ marginLeft: 8 }}>
+                <StatusTag kind="warning" style={{ marginLeft: 8 }}>
                   {t("cashflow.table_working_hint", language)}
-                </Tag>
+                </StatusTag>
               )}
               {reportMode === "official" && (
-                <Tag color="green" style={{ marginLeft: 8 }}>
+                <StatusTag kind="success" style={{ marginLeft: 8 }}>
                   {t("cashflow.table_official_hint", language)}
-                </Tag>
+                </StatusTag>
               )}
             </span>
           }
@@ -440,8 +450,18 @@ export default function CashflowForecastPage() {
             <Table
               columns={columns}
               dataSource={data}
-              rowKey={(record: any, index?: number) =>
-                `${record.group_key || index}-${record.period_key || index}`
+              rowKey={(record: any) =>
+                [
+                  record.group_key,
+                  record.contract_id,
+                  record.store_id,
+                  record.asset_type,
+                  record.period_key,
+                  record.period_start,
+                  record.currency,
+                ]
+                  .filter((value) => value !== undefined && value !== null && value !== "")
+                  .join("|") || JSON.stringify(record)
               }
               pagination={{ pageSize: 20, showSizeChanger: true }}
               scroll={{ x: "max-content" }}
@@ -458,5 +478,13 @@ export default function CashflowForecastPage() {
         <ScenarioPanel token={token} />
       </AppLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function CashflowForecastPageWithUrlState() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+      <CashflowForecastPage />
+    </Suspense>
   );
 }

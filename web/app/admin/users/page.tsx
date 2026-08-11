@@ -1,5 +1,8 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
+import PageHeader from "../../components/PageHeader";
+
 import { useEffect, useState } from "react";
 import {
   Card,
@@ -12,7 +15,6 @@ import {
   message,
   Tag,
   Space,
-  Typography,
 } from "antd";
 import {
   PlusOutlined,
@@ -23,8 +25,6 @@ import { useLanguage } from "../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { adminApi, legalEntityApi } from "../../lib/api";
 import { t } from "../../lib/i18n";
-
-const { Title } = Typography;
 
 interface User {
   id: string;
@@ -43,11 +43,12 @@ export default function AdminUsersPage() {
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [legalEntities, setLegalEntities] = useState<any[]>([]);
-  const { user, token } = useAuth();
+  const { user, token, isLoading } = useAuth();
   const { language } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
+    if (isLoading) return;
     if (!hasRole(user, "admin")) {
       message.error(t("admin_users.need_admin", language));
       router.push("/login");
@@ -55,7 +56,7 @@ export default function AdminUsersPage() {
     }
     fetchUsers();
     fetchLegalEntities();
-  }, [user, token]);
+  }, [isLoading, user, token]);
 
   const fetchUsers = async () => {
     if (!token) return;
@@ -140,9 +141,9 @@ export default function AdminUsersPage() {
       render: (role: string, record: User) => (
         <Space size={[4, 4]} wrap>
           {(record.roles?.length ? record.roles : [role]).map((assignedRole) => (
-            <Tag key={assignedRole} color={roleColorMap[assignedRole] || "default"}>
+            <StatusTag key={assignedRole} kind={statusKindFromAntColor(roleColorMap[assignedRole] || "default")}>
               {roleLabelMap[assignedRole] || assignedRole}
-            </Tag>
+            </StatusTag>
           ))}
         </Space>
       ),
@@ -161,9 +162,9 @@ export default function AdminUsersPage() {
       dataIndex: "is_active",
       key: "is_active",
       render: (active: boolean) => (
-        <Tag color={active ? "success" : "default"}>
+        <StatusTag kind={statusKindFromAntColor(active ? "success" : "default")}>
           {active ? t("admin_users.status_active", language) : t("admin_users.status_disabled", language)}
-        </Tag>
+        </StatusTag>
       ),
     },
     {
@@ -176,25 +177,19 @@ export default function AdminUsersPage() {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
-        <Title level={3} style={{ margin: 0 }}>
-          <UserOutlined /> {t("admin_users.title", language)}
-        </Title>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setModalVisible(true)}
-        >
-          {t("admin_users.new_user", language)}
-        </Button>
-      </div>
+      <PageHeader
+        title={<><UserOutlined /> {t("admin_users.title", language)}</>}
+        subtitle={t("admin_users.subtitle", language, { count: String(users.length) })}
+        primaryAction={
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setModalVisible(true)}
+          >
+            {t("admin_users.new_user", language)}
+          </Button>
+        }
+      />
 
       <Card>
         <Table

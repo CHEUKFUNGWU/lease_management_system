@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Card, Col, Input, InputNumber, Row, Space, Statistic, Table, Tag, message } from "antd";
 import dayjs from "dayjs";
@@ -93,7 +95,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
             onChange={(event) => setPeriod(event.target.value)}
             placeholder="YYYY-MM"
           />
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>健康线</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>健康线</span>
           <InputNumber
             style={{ width: 80 }}
             value={healthy}
@@ -102,7 +104,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
             onChange={(value) => setHealthy(value == null ? null : Number(value))}
             suffix="%"
           />
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>预警线</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>预警线</span>
           <InputNumber
             style={{ width: 80 }}
             value={warning}
@@ -114,7 +116,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
         </Space>
       }
     >
-      <div style={{ color: "#6B7280", marginBottom: 12, fontSize: 13 }}>
+      <div style={{ color: "var(--fg-tertiary)", marginBottom: 12, fontSize: 13 }}>
         租售比 = 当期应付固定租金 ÷ 当期营收。分母用的是提成租金所依据的营收，因此提成租金本身不计入分子，
         否则这个指标会自己追自己。
       </div>
@@ -139,7 +141,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
                   suffix={result.portfolio_rent_to_sales_percent != null ? "%" : undefined}
                   formatter={
                     result.portfolio_rent_to_sales_percent == null
-                      ? () => <span style={{ fontSize: 20, color: "#8C8C8C" }}>覆盖不全，不给出</span>
+                      ? () => <span style={{ fontSize: 20, color: "var(--fg-muted)" }}>覆盖不全，不给出</span>
                       : undefined
                   }
                 />
@@ -150,7 +152,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
                 <Statistic
                   title="超预警线门店"
                   value={result.stores_over_line}
-                  valueStyle={{ color: result.stores_over_line ? "#CF1322" : undefined }}
+                  valueStyle={{ color: result.stores_over_line ? "var(--state-error-text)" : undefined }}
                 />
               </Card>
             </Col>
@@ -159,7 +161,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
                 <Statistic
                   title="缺营收门店"
                   value={result.stores_without_revenue}
-                  valueStyle={{ color: result.stores_without_revenue ? "#D48806" : undefined }}
+                  valueStyle={{ color: result.stores_without_revenue ? "var(--state-warning-text)" : undefined }}
                 />
               </Card>
             </Col>
@@ -176,7 +178,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
               { title: "门店", dataIndex: "store_name", render: (name: string, row: StoreRatio) => (
                 <span>
                   <strong>{name}</strong>
-                  <span style={{ color: "#8C8C8C", marginLeft: 8, fontSize: 12 }}>{row.store_code}</span>
+                  <span style={{ color: "var(--fg-muted)", marginLeft: 8, fontSize: 12 }}>{row.store_code}</span>
                 </span>
               ) },
               { title: "品牌", dataIndex: "brand", width: 100, render: (value: string) => value || "—" },
@@ -207,9 +209,9 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
                   (a.rent_to_sales_percent ?? -1) - (b.rent_to_sales_percent ?? -1),
                 render: (value: number | null, row: StoreRatio) =>
                   value == null ? (
-                    <span style={{ color: "#8C8C8C" }}>—</span>
+                    <span style={{ color: "var(--fg-muted)" }}>—</span>
                   ) : (
-                    <strong style={{ color: row.status === "over_threshold" ? "#CF1322" : undefined }}>
+                    <strong style={{ color: row.status === "over_threshold" ? "var(--state-error-text)" : undefined }}>
                       {value.toFixed(2)}%
                     </strong>
                   ),
@@ -222,9 +224,9 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
                   const meta = STATUS_META[status] || { label: status, color: "default" };
                   return (
                     <Space size={4} direction="vertical">
-                      <Tag color={meta.color}>{meta.label}</Tag>
+                      <StatusTag kind={statusKindFromAntColor(meta.color)}>{meta.label}</StatusTag>
                       {row.status_reason && (
-                        <span style={{ fontSize: 12, color: "#8C8C8C" }}>{row.status_reason}</span>
+                        <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{row.status_reason}</span>
                       )}
                     </Space>
                   );

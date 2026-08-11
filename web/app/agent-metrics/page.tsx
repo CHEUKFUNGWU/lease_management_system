@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -24,6 +26,7 @@ import {
   ReloadOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -132,9 +135,9 @@ export default function AgentMetricsPage() {
       dataIndex: "cost_status",
       key: "cost_status",
       render: (value: string) => (
-        <Tag color={value === "measured" || value === "calculated" ? "green" : "orange"}>
+        <StatusTag kind={statusKindFromAntColor(value === "measured" || value === "calculated" ? "green" : "orange")}>
           {value || "unavailable"}
-        </Tag>
+        </StatusTag>
       ),
     },
     {
@@ -148,34 +151,30 @@ export default function AgentMetricsPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
-          <div>
-            <Title level={2} style={{ marginBottom: 4, letterSpacing: "-0.04em" }}>
-              {t("agent_metrics.title", language)}
-            </Title>
-            <Paragraph type="secondary" style={{ marginBottom: 0, maxWidth: 760 }}>
-              {t("agent_metrics.description", language)}
-            </Paragraph>
-          </div>
-          <Space wrap>
-            <Select<RangeKey>
-              value={range}
-              onChange={(value) => {
-                setRange(value);
-                void loadSummary(value);
-              }}
-              options={[
-                { value: "24h", label: t("agent_metrics.range_24h", language) },
-                { value: "7d", label: t("agent_metrics.range_7d", language) },
-                { value: "31d", label: t("agent_metrics.range_31d", language) },
-              ]}
-              style={{ minWidth: 130 }}
-            />
-            <Button icon={<ReloadOutlined />} onClick={() => void loadSummary()} loading={loading}>
-              {t("agent_metrics.refresh", language)}
-            </Button>
-          </Space>
-        </div>
+        <PageHeader
+          title={t("agent_metrics.title", language)}
+          subtitle={t("agent_metrics.description", language)}
+          primaryAction={
+            <Space wrap>
+              <Select<RangeKey>
+                value={range}
+                onChange={(value) => {
+                  setRange(value);
+                  void loadSummary(value);
+                }}
+                options={[
+                  { value: "24h", label: t("agent_metrics.range_24h", language) },
+                  { value: "7d", label: t("agent_metrics.range_7d", language) },
+                  { value: "31d", label: t("agent_metrics.range_31d", language) },
+                ]}
+                style={{ minWidth: 130 }}
+              />
+              <Button icon={<ReloadOutlined />} onClick={() => void loadSummary()} loading={loading}>
+                {t("agent_metrics.refresh", language)}
+              </Button>
+            </Space>
+          }
+        />
 
         {!canView && (
           <Alert

@@ -34,4 +34,9 @@ describe("fmtMoney", () => {
   it("renders a missing amount as a dash", () => {
     expect(fmtMoney(null, "CNY")).toBe("—");
   });
+
+  it("renders negative amounts with accounting parentheses", () => {
+    expect(fmtMoney(-1234.5, "USD")).toContain("(US$");
+    expect(fmtMoney(-1234.5, "USD")).toContain("1,234.50)");
+  });
 });

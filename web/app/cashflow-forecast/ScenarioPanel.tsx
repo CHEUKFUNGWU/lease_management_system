@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag } from "../components/StatusTag";
+
 import { useState } from "react";
 import { Alert, Button, Card, Col, Form, InputNumber, Row, Space, Table, Tag, message } from "antd";
 import { ExperimentOutlined } from "@ant-design/icons";
@@ -167,7 +169,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
                 render: (name: string, row: ScenarioResult) => (
                   <Space>
                     <strong>{name}</strong>
-                    {row.renewal_total === 0 && row.closure_total === 0 && <Tag>基准</Tag>}
+                    {row.renewal_total === 0 && row.closure_total === 0 && <StatusTag>基准</StatusTag>}
                   </Space>
                 ),
               },
@@ -207,10 +209,10 @@ export function ScenarioPanel({ token }: { token: string | null }) {
                 <Tooltip formatter={(value) => fmtMoney(Number(value), currency)} />
                 <Legend />
                 {results.map((result, index) => (
-                  <Bar
+                  <Bar isAnimationActive={false}
                     key={result.scenario.name}
                     dataKey={result.scenario.name}
-                    fill={index === 0 ? "#8C8C8C" : "#1677FF"}
+                    fill={index === 0 ? "var(--fg-muted)" : "var(--chart-blue)"}
                   />
                 ))}
               </BarChart>

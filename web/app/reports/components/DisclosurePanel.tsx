@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert, Button, Card, Col, DatePicker, Row, Space, Spin, Statistic, Table, Tag, message,
@@ -150,7 +152,7 @@ function StatRow({ items }: { items: { label: string; value: number; strong?: bo
         <Col xs={12} sm={8} lg={6} key={item.label}>
           <Statistic
             title={
-              <span style={{ fontSize: 11, fontWeight: 500, color: "#8C8C8C", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>
                 {item.label}
               </span>
             }
@@ -160,7 +162,7 @@ function StatRow({ items }: { items: { label: string; value: number; strong?: bo
               fontSize: item.strong ? 20 : 16,
               fontWeight: item.strong ? 700 : 600,
               letterSpacing: "-0.02em",
-              color: "#000",
+              color: "var(--fg-primary)",
             }}
           />
         </Col>
@@ -282,7 +284,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
       { title: t("reports.disclosure_closing_liability", language), dataIndex: "closing_liability", width: 130, align: "right" as const, render: fmtNum },
       { title: t("reports.col_interest", language), dataIndex: "interest", width: 110, align: "right" as const, render: fmtNum },
       { title: t("reports.col_depreciation", language), dataIndex: "depreciation", width: 110, align: "right" as const, render: fmtNum },
-      { title: t("reports.disclosure_tie_out", language), dataIndex: "liability_tie_out", width: 110, align: "right" as const, render: (v: number, row: AuditWorkpaperRow) => <Tag color={Math.abs(v) <= 1 && Math.abs(row.rou_tie_out) <= 1 ? "green" : "red"}>{Math.abs(v) <= 1 && Math.abs(row.rou_tie_out) <= 1 ? t("reports.disclosure_tied", language) : t("reports.disclosure_not_tied", language)}</Tag> },
+      { title: t("reports.disclosure_tie_out", language), dataIndex: "liability_tie_out", width: 110, align: "right" as const, render: (v: number, row: AuditWorkpaperRow) => <StatusTag kind={statusKindFromAntColor(Math.abs(v) <= 1 && Math.abs(row.rou_tie_out) <= 1 ? "green" : "red")}>{Math.abs(v) <= 1 && Math.abs(row.rou_tie_out) <= 1 ? t("reports.disclosure_tied", language) : t("reports.disclosure_not_tied", language)}</StatusTag> },
     ],
     [language],
   );
@@ -437,9 +439,9 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
   return (
     <>
       {/* controls */}
-      <Card style={{ borderRadius: 10, marginBottom: 16 }} bodyStyle={{ padding: "16px 20px" }}>
+      <Card style={{ borderRadius: 10, marginBottom: 16 }} styles={{ body: { padding: "16px 20px" } }}>
         <Space wrap size={12}>
-          <span style={{ fontSize: 13, color: "#595959" }}>{t("reports.disclosure_period", language)}</span>
+          <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>{t("reports.disclosure_period", language)}</span>
           <RangePicker
             value={range}
             allowClear={false}
@@ -454,7 +456,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
             {t("reports.disclosure_export", language)}
           </Button>
         </Space>
-        <div style={{ marginTop: 8, fontSize: 12, color: "#8C8C8C" }}>
+        <div style={{ marginTop: 8, fontSize: 12, color: "var(--fg-muted)" }}>
           {t("reports.disclosure_as_of_hint", language, { date: range[1].format("YYYY-MM-DD") })}
         </div>
       </Card>
@@ -474,12 +476,12 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
         <Card size="small" style={{ borderRadius: 10, marginBottom: 16 }}>
           <Space direction="vertical" size={4} style={{ width: "100%" }}>
             <Space wrap>
-              <Tag color={data.report_basis.is_official ? "blue" : "gold"}>{data.report_basis.mode}</Tag>
+              <StatusTag kind={statusKindFromAntColor(data.report_basis.is_official ? "blue" : "gold")}>{data.report_basis.mode}</StatusTag>
               <span>{t("reports.disclosure_snapshot", language)}: {data.report_basis.snapshot_id}</span>
               <span>{t("reports.disclosure_policy_version", language)}: {data.report_basis.policy_version}</span>
               <span>{t("reports.disclosure_generated_at", language)}: {new Date(data.report_basis.generated_at).toLocaleString()}</span>
             </Space>
-            <span style={{ color: "#595959", fontSize: 12 }}>
+            <span style={{ color: "var(--fg-tertiary)", fontSize: 12 }}>
               {t("reports.disclosure_population", language)} {data.report_basis.population_count} · {t("reports.disclosure_computed", language)} {data.report_basis.computed_contract_count} · {t("reports.disclosure_skipped", language)} {data.report_basis.skipped_contract_count}
             </span>
           </Space>
@@ -492,7 +494,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
             {/* 1. Maturity analysis */}
             <SectionCard
               title={t("reports.disclosure_maturity_title", language)}
-              extra={<Tag style={{ fontSize: 11 }}>{t("reports.disclosure_as_of", language)} {data.as_of}</Tag>}
+              extra={<StatusTag style={{ fontSize: 11 }}>{t("reports.disclosure_as_of", language)} {data.as_of}</StatusTag>}
             >
               <StatRow
                 items={[
@@ -618,7 +620,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
             {/* 6. Contract-level audit workpaper */}
             <SectionCard
               title={t("reports.disclosure_audit_title", language)}
-              extra={<Tag>{data.audit_workpaper.totals.row_count} {t("reports.disclosure_rows", language)}</Tag>}
+              extra={<StatusTag>{data.audit_workpaper.totals.row_count} {t("reports.disclosure_rows", language)}</StatusTag>}
             >
               <Alert
                 type="info"

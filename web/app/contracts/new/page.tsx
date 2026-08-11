@@ -17,6 +17,7 @@ import {
 } from "antd";
 import { ArrowLeftOutlined, SaveOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
 import AppLayout from "../../components/AppLayout";
+import PageHeader from "../../components/PageHeader";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import { contractApi, legalEntityApi, masterDataApi, settingsApi } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
@@ -169,16 +170,20 @@ export default function NewContractPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <div style={{ marginBottom: 16 }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => router.push("/contracts")}
-          >
-            {t("contract_new.back", language)}
-          </Button>
-        </div>
+        <PageHeader
+          title={t("contract_new.title", language)}
+          subtitle={t("contract_new.subtitle", language)}
+          primaryAction={
+            <Button
+              icon={<ArrowLeftOutlined />}
+              onClick={() => router.push("/contracts")}
+            >
+              {t("contract_new.back", language)}
+            </Button>
+          }
+        />
 
-        <Card title={t("contract_new.title", language)}>
+        <Card>
           {drMissing && (
             <Alert
               message={t("contract_new.discount_rate_missing_title", language)}

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
+import { Suspense, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Card,
@@ -23,6 +25,7 @@ import {
   Empty,
   Skeleton,
   Select,
+  Steps,
 } from "antd";
 import {
   CalculatorOutlined,
@@ -38,12 +41,14 @@ import {
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { monthlyClosingApi } from "../lib/api";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { fmtMoney } from "../lib/format";
+import { useUrlState } from "../hooks/useUrlState";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -87,62 +92,52 @@ const ENTRY_TYPE_OPTIONS = [
   { value: "impairment", label: "减值" },
 ];
 
-// ─── Page Header ───────────────────────────────────────────────
-
-// The counts come from the server's summary of the whole period rather than
-// from the rows on screen, so paging through a period does not change what the
-// header says the period contains.
-function PageHeader({
-  selectedPeriod,
+function CloseProcessRail({
+  language,
+  period,
   summary,
+  result,
+  isLocked,
+  onNext,
 }: {
-  selectedPeriod: string;
+  language: Parameters<typeof t>[1];
+  period: string;
   summary: EntrySummary | null;
+  result: any;
+  isLocked: boolean;
+  onNext: () => void;
 }) {
-  const { language } = useLanguage();
-  const draftCount = summary?.draft_count ?? 0;
-  const approvedCount = summary?.approved_count ?? 0;
-  const postedCount = summary?.posted_count ?? 0;
-
+  const current = isLocked ? 5 : summary?.posted_count ? 4 : summary?.approved_count ? 3 : summary?.total ? 2 : result ? 1 : 0;
+  const nextLabel = current === 0 ? t("monthly.process_generate", language) : current === 1 ? t("monthly.process_review", language) : current === 2 ? t("monthly.process_approve", language) : current === 3 ? t("monthly.process_post", language) : current === 4 ? t("monthly.process_lock", language) : t("monthly.process_complete", language);
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        marginBottom: 32,
-      }}
-    >
-      <div>
-        <h1 style={{ marginBottom: 4, fontSize: 28, letterSpacing: "-0.04em", fontWeight: 700 }}>
-          {t("monthly.title", language)}
-        </h1>
-        <p style={{ color: "var(--fg-muted)", fontSize: 14, margin: 0 }}>
-          {t("monthly.subtitle", language)}
-        </p>
-        {selectedPeriod && (
-          <Space size={12} style={{ marginTop: 8 }}>
-            <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>
-              {t("monthly.current_period", language)}：<strong style={{ color: "var(--fg-primary)" }}>{selectedPeriod}</strong>
-            </span>
-            <span style={{ color: "var(--border-strong)" }}>·</span>
-            <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-              {t("monthly.status_summary", language, {
-                draftCount: String(draftCount),
-                approvedCount: String(approvedCount),
-                postedCount: String(postedCount),
-              })}
-            </span>
-          </Space>
-        )}
+    <Card styles={{ body: { padding: "16px 20px" } }} style={{ marginBottom: 16, borderRadius: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 12 }}>
+        <div>
+          <div style={{ fontSize: 12, color: "var(--fg-tertiary)", marginBottom: 4 }}>{period || t("monthly.process_select_period", language)}</div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{t("monthly.process_title", language)}</div>
+        </div>
+        <Button type="primary" onClick={onNext} disabled={!period && current > 0}>{nextLabel}</Button>
       </div>
-    </div>
+      <Steps
+        size="small"
+        current={current}
+        responsive
+        items={[
+          { title: t("monthly.process_readiness", language) },
+          { title: t("monthly.process_generate", language) },
+          { title: t("monthly.process_review", language) },
+          { title: t("monthly.process_approve", language) },
+          { title: t("monthly.process_post", language) },
+          { title: t("monthly.process_lock", language) },
+        ]}
+      />
+    </Card>
   );
 }
 
 // ─── Main Component ────────────────────────────────────────────
 
-export default function MonthlyClosingPage() {
+function MonthlyClosingPage() {
   const { language } = useLanguage();
   const { token, user } = useAuth();
   const router = useRouter();
@@ -161,8 +156,8 @@ export default function MonthlyClosingPage() {
   const [entryPage, setEntryPage] = useState(1);
   const [entryPageSize, setEntryPageSize] = useState(20);
   const [batches, setBatches] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState("generate");
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("");
+  const [activeTab, setActiveTab] = useUrlState("tab", "generate");
+  const [selectedPeriod, setSelectedPeriod] = useUrlState("period", "");
   const [isLocked, setIsLocked] = useState(false);
   const [lockLoading, setLockLoading] = useState(false);
   const [lockStatusLoading, setLockStatusLoading] = useState(false);
@@ -573,7 +568,7 @@ export default function MonthlyClosingPage() {
           // the filter can never disagree about what a type is called.
           ...Object.fromEntries(ENTRY_TYPE_OPTIONS.map((o) => [o.value, o.label])),
         };
-        return <Tag color="processing">{labels[v] || v}</Tag>;
+        return <StatusTag kind="processing">{labels[v] || v}</StatusTag>;
       },
     },
     { title: t("monthly.col_debit_account", language), dataIndex: "debit_account", width: 150 },
@@ -607,14 +602,14 @@ export default function MonthlyClosingPage() {
         };
         return (
           <Space direction="vertical" size={2}>
-            <Tag color={colors[v] || "default"}>
+            <StatusTag kind={statusKindFromAntColor(colors[v] || "default")}>
               {statusLabels[v] || t("monthly.status_draft", language)}
-            </Tag>
+            </StatusTag>
             {/* A reversing entry is only readable next to what it cancels. */}
             {record.reversal_of_entry_id && (
-              <Tag color="warning" style={{ fontSize: 11 }}>
+              <StatusTag kind="warning" style={{ fontSize: 11 }}>
                 {t("monthly.is_reversal_entry", language)}
-              </Tag>
+              </StatusTag>
             )}
           </Space>
         );
@@ -702,7 +697,7 @@ export default function MonthlyClosingPage() {
       title: t("monthly.col_status", language),
       dataIndex: "status",
       render: (v: string) => (
-        <Tag color={v === "completed" ? "processing" : "warning"}>{v}</Tag>
+        <StatusTag kind={statusKindFromAntColor(v === "completed" ? "processing" : "warning")}>{v}</StatusTag>
       ),
     },
     { title: t("monthly.col_total_contracts", language), dataIndex: "total_contracts" },
@@ -846,9 +841,9 @@ export default function MonthlyClosingPage() {
                   </span>
                   <span>
                     {t("monthly.status", language)}:{" "}
-                    <Tag color={result.status === "completed" ? "processing" : "warning"}>
+                    <StatusTag kind={statusKindFromAntColor(result.status === "completed" ? "processing" : "warning")}>
                       {result.status}
-                    </Tag>
+                    </StatusTag>
                   </span>
                   <span>
                     {t("monthly.processed_contracts", language)}: {result.processed_contracts} / {result.total_contracts}
@@ -1169,15 +1164,15 @@ export default function MonthlyClosingPage() {
                 </div>
                 <div style={{ flexShrink: 0 }}>
                   {isLocked ? (
-                    <Tag color="error" style={{ margin: 0, fontSize: 13 }}>
+                    <StatusTag kind="error" style={{ margin: 0, fontSize: 13 }}>
                       <LockOutlined style={{ marginRight: 4 }} />
                       {t("monthly.locked", language)}
-                    </Tag>
+                    </StatusTag>
                   ) : (
-                    <Tag color="success" style={{ margin: 0, fontSize: 13 }}>
+                    <StatusTag kind="success" style={{ margin: 0, fontSize: 13 }}>
                       <UnlockOutlined style={{ marginRight: 4 }} />
                       {t("monthly.unlocked", language)}
-                    </Tag>
+                    </StatusTag>
                   )}
                 </div>
               </div>
@@ -1233,11 +1228,47 @@ export default function MonthlyClosingPage() {
     <ProtectedRoute>
       <AppLayout>
         <motion.div
-          initial={{ opacity: 0, y: 4 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, ease: "easeOut" }}
         >
-          <PageHeader selectedPeriod={selectedPeriod} summary={entrySummary} />
+          <PageHeader
+            title={t("monthly.title", language)}
+            subtitle={t("monthly.subtitle", language)}
+            meta={selectedPeriod ? (
+              <Space size={12} style={{ marginTop: 8 }}>
+                <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>
+                  {t("monthly.current_period", language)}：<strong style={{ color: "var(--fg-primary)" }}>{selectedPeriod}</strong>
+                </span>
+                <span style={{ color: "var(--border-strong)" }}>·</span>
+                <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+                  {t("monthly.status_summary", language, {
+                    draftCount: String(entrySummary?.draft_count ?? 0),
+                    approvedCount: String(entrySummary?.approved_count ?? 0),
+                    postedCount: String(entrySummary?.posted_count ?? 0),
+                  })}
+                </span>
+              </Space>
+            ) : undefined}
+          />
+
+          <CloseProcessRail
+            language={language}
+            period={selectedPeriod}
+            summary={entrySummary}
+            result={result}
+            isLocked={isLocked}
+            onNext={() => {
+              if (!selectedPeriod) {
+                setActiveTab("generate");
+                return;
+              }
+              const nextTab = isLocked ? "lock" : entrySummary?.posted_count ? "lock" : entrySummary?.approved_count ? "entries" : entrySummary?.total ? "entries" : "generate";
+              setActiveTab(nextTab);
+              if (nextTab === "entries") openEntriesTab();
+              if (nextTab === "lock") checkLockStatus(selectedPeriod);
+            }}
+          />
 
           <Tabs
             activeKey={activeTab}
@@ -1300,7 +1331,7 @@ export default function MonthlyClosingPage() {
             {postingEntry && (
               <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
                 <Descriptions.Item label={t("monthly.entry_type", language)}>
-                  <Tag color="processing">{postingEntry.entry_type}</Tag>
+                  <StatusTag kind="processing">{postingEntry.entry_type}</StatusTag>
                 </Descriptions.Item>
                 <Descriptions.Item label={t("monthly.amount", language)}>
                   {fmtMoney(postingEntry.amount, postingEntry.currency)}
@@ -1335,7 +1366,7 @@ export default function MonthlyClosingPage() {
             {rejectingEntry && (
               <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
                 <Descriptions.Item label={t("monthly.entry_type", language)}>
-                  <Tag color="processing">{rejectingEntry.entry_type}</Tag>
+                  <StatusTag kind="processing">{rejectingEntry.entry_type}</StatusTag>
                 </Descriptions.Item>
                 <Descriptions.Item label={t("monthly.amount", language)}>
                   {rejectingEntry.amount?.toLocaleString(undefined, {
@@ -1371,7 +1402,7 @@ export default function MonthlyClosingPage() {
             {reversingEntry && (
               <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
                 <Descriptions.Item label={t("monthly.entry_type", language)}>
-                  <Tag color="processing">{reversingEntry.entry_type}</Tag>
+                  <StatusTag kind="processing">{reversingEntry.entry_type}</StatusTag>
                 </Descriptions.Item>
                 <Descriptions.Item label={t("monthly.amount", language)}>
                   {reversingEntry.amount?.toLocaleString(undefined, {
@@ -1409,5 +1440,13 @@ export default function MonthlyClosingPage() {
         </motion.div>
       </AppLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function MonthlyClosingPageWithUrlState() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+      <MonthlyClosingPage />
+    </Suspense>
   );
 }

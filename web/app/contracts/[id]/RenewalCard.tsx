@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
+
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, Col, Input, InputNumber, Row, Space, Statistic, Table, Tag, message } from "antd";
 import { contractApi } from "../../lib/api";
@@ -183,15 +185,15 @@ export function RenewalCard({ contractId }: { contractId: string }) {
       style={{ borderRadius: 10, marginTop: 16 }}
       extra={
         <Space size={8}>
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>{t("renewal.term", language)}</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.term", language)}</span>
           <InputNumber style={{ width: 90 }} min={1} value={term} onChange={(v) => setTerm(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>{t("renewal.uplift", language)}</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.uplift", language)}</span>
           <InputNumber style={{ width: 90 }} value={uplift} onChange={(v) => setUplift(v == null ? null : Number(v))} addonAfter="%" />
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>{t("renewal.rent_free", language)}</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.rent_free", language)}</span>
           <InputNumber style={{ width: 90 }} min={0} value={rentFreeMonths} onChange={(v) => setRentFreeMonths(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>{t("renewal.escalation", language)}</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.escalation", language)}</span>
           <InputNumber style={{ width: 90 }} value={annualEscalation} onChange={(v) => setAnnualEscalation(v == null ? null : Number(v))} addonAfter="%" />
-          <span style={{ fontSize: 12, color: "#8C8C8C" }}>{t("renewal.exit_penalty", language)}</span>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.exit_penalty", language)}</span>
           <InputNumber style={{ width: 90 }} min={0} value={exitPenaltyMonths} onChange={(v) => setExitPenaltyMonths(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
         </Space>
       }
@@ -210,7 +212,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                 title={t("renewal.expiry_date", language)}
                 value={card.lease_end_date}
                 valueStyle={{ fontSize: 18 }}
-                suffix={<span style={{ fontSize: 12, color: "#8C8C8C" }}>（{card.days_to_expiry} {t("renewal.day", language)}）</span>}
+                suffix={<span style={{ fontSize: 12, color: "var(--fg-muted)" }}>（{card.days_to_expiry} {t("renewal.day", language)}）</span>}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -231,7 +233,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
               <Statistic
                 title={t("renewal.uplift_cost", language, { percent: String(uplift ?? 0) })}
                 value={card.uplift_cost_over_term ?? 0}
-                valueStyle={{ color: (card.uplift_cost_over_term ?? 0) > 0 ? "#CF1322" : undefined }}
+                valueStyle={{ color: (card.uplift_cost_over_term ?? 0) > 0 ? "var(--state-error-text)" : undefined }}
                 formatter={() => fmtMoney(card.uplift_cost_over_term ?? 0, currency)}
               />
             </Col>
@@ -282,7 +284,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
             <Card
               type="inner"
               title={t("renewal.scenarios", language)}
-              extra={<Tag color="gold">{t("renewal.scenario_notice", language)}</Tag>}
+              extra={<StatusTag kind="warning">{t("renewal.scenario_notice", language)}</StatusTag>}
               style={{ marginBottom: 16 }}
             >
               <Table
@@ -329,12 +331,12 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                 }}
                 columns={[
                   { title: t("renewal.decision", language), dataIndex: "name", render: (value: string) => <strong>{scenarioLabel(value)}</strong> },
-                  { title: t("renewal.type", language), dataIndex: "decision", render: (value: string) => <Tag color={value === "terminate" ? "red" : value === "renegotiate" ? "gold" : "green"}>{value === "terminate" ? t("renewal.type_terminate", language) : value === "renegotiate" ? t("renewal.type_renegotiate", language) : t("renewal.type_renew", language)}</Tag> },
+                  { title: t("renewal.type", language), dataIndex: "decision", render: (value: string) => <StatusTag kind={statusKindFromAntColor(value === "terminate" ? "red" : value === "renegotiate" ? "gold" : "green")}>{value === "terminate" ? t("renewal.type_terminate", language) : value === "renegotiate" ? t("renewal.type_renegotiate", language) : t("renewal.type_renew", language)}</StatusTag> },
                   { title: t("renewal.monthly_rent", language), dataIndex: "monthly_rent", align: "right" as const, render: (value: number) => fmtMoney(value, currency) },
                   { title: t("renewal.term", language), dataIndex: "term_months", align: "right" as const, render: (value: number) => value ? `${value} ${t("renewal.month", language)}` : "—" },
                   { title: t("renewal.total_cash_outflow", language), dataIndex: "total_cash_outflow", align: "right" as const, render: (value: number) => <strong>{fmtMoney(value, currency)}</strong> },
                   { title: t("renewal.total_ifrs16_expense", language), dataIndex: "total_ifrs16_expense", align: "right" as const, render: (value: number) => fmtMoney(value, currency) },
-                  { title: t("renewal.source", language), dataIndex: "assumption_source", render: (value: string) => <Tag>{value === "scenario_assumption" ? t("renewal.scenario_assumption", language) : value}</Tag> },
+                  { title: t("renewal.source", language), dataIndex: "assumption_source", render: (value: string) => <StatusTag>{value === "scenario_assumption" ? t("renewal.scenario_assumption", language) : value}</StatusTag> },
                 ]}
               />
               <Row gutter={[12, 12]} style={{ marginTop: 14 }}>
@@ -344,7 +346,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
               </Row>
               <Space style={{ marginTop: 12 }}>
                 <Button type="primary" loading={savingDecision} onClick={saveDecision}>{t("renewal.save_snapshot", language)}</Button>
-                {historyCount > 0 && <Tag color="blue">{t("renewal.saved_count", language, { count: String(historyCount) })}</Tag>}
+                {historyCount > 0 && <StatusTag kind="processing">{t("renewal.saved_count", language, { count: String(historyCount) })}</StatusTag>}
               </Space>
             </Card>
           )}
@@ -365,7 +367,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                   )}
                   {health.gross_profit != null && <span>毛利 {fmtNum(health.gross_profit)}</span>}
                   {health.sales_per_sqm != null && <span>坪效 {fmtNum(health.sales_per_sqm)}</span>}
-                  {healthMeta && <Tag color={healthMeta.color}>{t(healthMeta.label, language)}</Tag>}
+                  {healthMeta && <StatusTag kind={statusKindFromAntColor(healthMeta.color)}>{t(healthMeta.label, language)}</StatusTag>}
                 </Space>
               }
               description={

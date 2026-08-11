@@ -55,12 +55,12 @@ export default function AdminLoginPage() {
     <Row
       justify="center"
       align="middle"
-      style={{ minHeight: "100vh", background: "#001529" }}
+      style={{ minHeight: "100vh", background: "var(--admin-surface)" }}
     >
       <Col xs={24} sm={16} md={12} lg={8} xl={6}>
         <Card>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <SafetyOutlined style={{ fontSize: 48, color: "#cf1322" }} />
+            <SafetyOutlined style={{ fontSize: 48, color: "var(--state-error-text)" }} />
               <Title level={3} style={{ marginTop: 16 }}>
                 {t("admin_login.title", language)}
               </Title>

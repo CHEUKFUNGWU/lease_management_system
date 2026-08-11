@@ -7,30 +7,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Monochrome scale: 12 levels from #000 to #fff
-        // Designed for maximum hierarchy clarity in a no-color system
+        // Monochrome scale: only levels consumed by the application
         mono: {
           0: "#000000",   // Primary text, key actions
-          5: "#0A0A0A",   // Deep surface (modal overlay)
-          10: "#141414",  // Primary buttons, active states
           20: "#262626",  // Secondary text, hover on dark
-          30: "#434343",  // Strong borders, icons default
           40: "#595959",  // Body text, descriptions
-          50: "#737373",  // Muted text, placeholders
-          60: "#8C8C8C",  // Disabled text, subtle icons
-          70: "#A6A6A6",  // Borders on dark backgrounds
-          80: "#BFBFBF",  // Light borders, dividers
+          60: "#737373",  // Muted text, placeholders
+          70: "#A6A6A6",  // Strong borders, scrollbar hover
           90: "#D9D9D9",  // Hover borders, active borders
           95: "#F0F0F0",  // Secondary backgrounds, table headers
           98: "#F7F7F7",  // Card backgrounds, subtle surfaces
           100: "#FFFFFF", // Page background, input backgrounds
         },
-        // Semantic colors — extremely desaturated, almost monochrome
-        // Used only when state MUST be distinguished (error forms, success toast)
-        success: "#1A1A1A",   // Black — minimal success indication
-        warning: "#333333",   // Dark gray — warning is important but not alarming
-        error: "#000000",     // Black — errors are critical, use bold weight + icon
-        info: "#595959",      // Medium gray — informational
+        // Semantic colors — paired with labels/icons and AA-safe text colors.
+        success: "#216E39",
+        warning: "#8A5300",
+        error: "#A8071A",
+        info: "#1F4E9C",
       },
       fontFamily: {
         sans: [

@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
 import { useState, useRef, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -176,25 +178,25 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
         <div
           key={artifact.id}
           style={{
-            border: "1px solid #d9e2f2",
+            border: "1px solid var(--state-info-border)",
             borderRadius: 8,
             padding: 12,
-            background: "#f7faff",
+            background: "var(--state-info-bg)",
           }}
         >
           <Space wrap>
-            <FileTextOutlined style={{ color: "#1677ff" }} />
+            <FileTextOutlined style={{ color: "var(--chart-blue)" }} />
             <Text strong>{artifact.title || artifact.artifact_type}</Text>
-            <Tag color={artifact.status === "confirmed" ? "green" : "blue"}>{artifact.status || "ready"}</Tag>
-            {artifact.evidence_complete ? <Tag color="green">证据完整</Tag> : <Tag color="orange">需补证据</Tag>}
+            <StatusTag kind={statusKindFromAntColor(artifact.status === "confirmed" ? "green" : "blue")}>{artifact.status || "ready"}</StatusTag>
+            {artifact.evidence_complete ? <StatusTag kind="success">证据完整</StatusTag> : <StatusTag kind="warning">需补证据</StatusTag>}
           </Space>
           {artifact.review_reasons && artifact.review_reasons.length > 0 && (
-            <div style={{ marginTop: 6, color: "#595959", fontSize: 12 }}>
+            <div style={{ marginTop: 6, color: "var(--fg-tertiary)", fontSize: 12 }}>
               复核项：{artifact.review_reasons.join("、")}
             </div>
           )}
           <details style={{ marginTop: 8 }}>
-            <summary style={{ cursor: "pointer", color: "#1677ff" }}>查看结构化 Artifact</summary>
+            <summary style={{ cursor: "pointer", color: "var(--chart-blue)" }}>查看结构化 Artifact</summary>
             <pre style={{ marginTop: 8, maxHeight: 260, overflow: "auto", fontSize: 11 }}>
               {JSON.stringify(artifact.data || {}, null, 2)}
             </pre>
@@ -241,20 +243,20 @@ function CodeBlock({ code, language, i18nLang }: { code: string; language: strin
           justifyContent: "space-between",
           alignItems: "center",
           padding: "4px 12px",
-          background: "#1E1E1E",
+          background: "var(--code-surface)",
           borderRadius: "8px 8px 0 0",
-          borderBottom: "1px solid #333",
+          borderBottom: "1px solid var(--border-strong)",
         }}
       >
-        <span style={{ fontSize: 11, color: "#888", fontFamily: "monospace" }}>
+        <span style={{ fontSize: 11, color: "var(--fg-muted)", fontFamily: "monospace" }}>
           {language || "code"}
         </span>
         <Button
           type="text"
           
-          icon={copied ? <CheckOutlined style={{ color: "#10B981" }} /> : <CopyOutlined />}
+          icon={copied ? <CheckOutlined style={{ color: "var(--state-success-text)" }} /> : <CopyOutlined />}
           onClick={handleCopy}
-          style={{ color: "#888", fontSize: 12, height: 24, padding: "0 8px" }}
+          style={{ color: "var(--fg-muted)", fontSize: 12, height: 24, padding: "0 8px" }}
         >
           {copied ? t("ai.copied", i18nLang) : t("ai.copy", i18nLang)}
         </Button>
@@ -294,7 +296,7 @@ function MessageContent({
   role?: "user" | "assistant";
 }) {
   const [showThinking, setShowThinking] = useState(false);
-  const textColor = role === "user" ? "#fff" : "#262626";
+  const textColor = role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)";
 
   // Parse markdown-like code blocks
   const parts = useMemo(() => {
@@ -330,7 +332,7 @@ function MessageContent({
             type="text"
            
             onClick={() => setShowThinking(!showThinking)}
-            style={{ fontSize: 12, color: "#8C8C8C", padding: 0, height: 24 }}
+            style={{ fontSize: 12, color: "var(--fg-muted)", padding: 0, height: 24 }}
           >
             <span style={{ marginRight: 4 }}>{showThinking ? "▼" : "▶"}</span>
             {t("ai.thinking_process", i18nLang)}
@@ -346,13 +348,13 @@ function MessageContent({
               >
                 <div
                   style={{
-                    background: "#F7F7F7",
-                    border: "1px solid #E5E5E5",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
                     borderRadius: 6,
                     padding: "8px 12px",
                     marginTop: 4,
                     fontSize: 12,
-                    color: "#595959",
+                    color: "var(--fg-tertiary)",
                     lineHeight: 1.6,
                     whiteSpace: "pre-wrap",
                   }}
@@ -389,14 +391,14 @@ function MessageContent({
             {t("ai.sources", i18nLang)}
           </Text>
           {sources.map((source, idx) => (
-            <Tag
+            <StatusTag
               key={idx}
               icon={<FileTextOutlined />}
              
               style={{ fontSize: 11, borderRadius: 4 }}
             >
               {source}
-            </Tag>
+            </StatusTag>
           ))}
         </div>
       )}
@@ -479,36 +481,36 @@ function AgentTracePanel({
     <div
       style={{
         marginTop: 12,
-        border: "1px solid #E5E5E5",
+        border: "1px solid var(--border-default)",
         borderRadius: 8,
         overflow: "hidden",
-        background: "#fff",
+        background: "var(--fg-inverse)",
       }}
     >
       <div
         style={{
           padding: "10px 12px",
-          borderBottom: "1px solid #F0F0F0",
+          borderBottom: "1px solid var(--bg-inset)",
           display: "flex",
           alignItems: "center",
           gap: 8,
         }}
       >
-        <ToolOutlined style={{ color: "#262626" }} />
+        <ToolOutlined style={{ color: "var(--fg-secondary)" }} />
         <Text strong style={{ fontSize: 13 }}>
           {t("ai.agent_trace_title", language)}
         </Text>
       </div>
 
       {plan.length > 0 && (
-        <div style={{ padding: "10px 12px", borderBottom: toolCalls.length > 0 ? "1px solid #F0F0F0" : "none" }}>
+        <div style={{ padding: "10px 12px", borderBottom: toolCalls.length > 0 ? "1px solid var(--bg-inset)" : "none" }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {plan.map((step) => {
               const meta = statusMeta(step.status, language);
               return (
-                <Tag key={step.id} color={meta.color as any} icon={meta.icon} style={{ borderRadius: 4, marginInlineEnd: 0 }}>
+                <StatusTag key={step.id} kind={statusKindFromAntColor(meta.color as any)} icon={meta.icon} style={{ borderRadius: 4, marginInlineEnd: 0 }}>
                   {step.title}
-                </Tag>
+                </StatusTag>
               );
             })}
           </div>
@@ -524,21 +526,21 @@ function AgentTracePanel({
                 key={`${call.tool}-${index}`}
                 style={{
                   padding: "10px 12px",
-                  borderBottom: index === toolCalls.length - 1 ? "none" : "1px solid #F5F5F5",
+                  borderBottom: index === toolCalls.length - 1 ? "none" : "1px solid var(--bg-inset)",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <Text strong style={{ fontSize: 12 }}>
                     {call.skill}
                   </Text>
-                  <Tag color={meta.color as any} style={{ borderRadius: 4, fontSize: 11 }}>
+                  <StatusTag kind={statusKindFromAntColor(meta.color as any)} style={{ borderRadius: 4, fontSize: 11 }}>
                     {meta.label}
-                  </Tag>
+                  </StatusTag>
                   <Text type="secondary" style={{ fontSize: 11 }}>
                     {call.tool}
                   </Text>
                 </div>
-                <Text style={{ display: "block", fontSize: 12, color: "#595959", marginTop: 4 }}>
+                <Text style={{ display: "block", fontSize: 12, color: "var(--fg-tertiary)", marginTop: 4 }}>
                   {call.output_summary || call.input_summary}
                 </Text>
               </div>
@@ -552,12 +554,12 @@ function AgentTracePanel({
 
 function reviewSeverityMeta(severity: string) {
   if (severity === "critical") {
-    return { color: "#CF1322", background: "#FFF1F0", border: "#FFA39E" };
+    return { color: "var(--state-error-text)", background: "var(--state-error-bg)", border: "var(--state-error-border)" };
   }
   if (severity === "warning") {
-    return { color: "#D46B08", background: "#FFF7E6", border: "#FFD591" };
+    return { color: "var(--state-warning-text)", background: "var(--state-warning-bg)", border: "var(--state-warning-border)" };
   }
-  return { color: "#0958D9", background: "#E6F4FF", border: "#91CAFF" };
+  return { color: "var(--state-info-text)", background: "var(--state-info-bg)", border: "var(--state-info-border)" };
 }
 
 function AgentReviewPanel({
@@ -573,22 +575,22 @@ function AgentReviewPanel({
     <div
       style={{
         marginTop: 12,
-        border: "1px solid #E5E5E5",
+        border: "1px solid var(--border-default)",
         borderRadius: 8,
         overflow: "hidden",
-        background: "#fff",
+        background: "var(--fg-inverse)",
       }}
     >
       <div
         style={{
           padding: "10px 12px",
-          borderBottom: "1px solid #F0F0F0",
+          borderBottom: "1px solid var(--bg-inset)",
           display: "flex",
           alignItems: "center",
           gap: 8,
         }}
       >
-        <ExclamationCircleOutlined style={{ color: "#D46B08" }} />
+        <ExclamationCircleOutlined style={{ color: "var(--state-warning-text)" }} />
         <Text strong style={{ fontSize: 13 }}>
           {t("ai.agent_review_title", language)}
         </Text>
@@ -602,7 +604,7 @@ function AgentReviewPanel({
               key={prompt.id || index}
               style={{
                 padding: "10px 12px",
-                borderBottom: index === prompts.length - 1 ? "none" : "1px solid #F5F5F5",
+                borderBottom: index === prompts.length - 1 ? "none" : "1px solid var(--bg-inset)",
                 background: meta.background,
               }}
             >
@@ -610,22 +612,22 @@ function AgentReviewPanel({
                 <Text strong style={{ fontSize: 12, color: meta.color }}>
                   {prompt.title}
                 </Text>
-                <Tag style={{ borderRadius: 4, color: meta.color, borderColor: meta.border, background: "#fff", fontSize: 11 }}>
+                <StatusTag style={{ borderRadius: 4, color: meta.color, borderColor: meta.border, background: "var(--fg-inverse)", fontSize: 11 }}>
                   {prompt.severity === "critical" ? t("ai.agent_severity_critical", language) : prompt.severity === "warning" ? t("ai.agent_severity_warning", language) : t("ai.agent_severity_info", language)}
-                </Tag>
+                </StatusTag>
               </div>
-              <Text style={{ display: "block", fontSize: 12, color: "#595959", marginTop: 4 }}>
+              <Text style={{ display: "block", fontSize: 12, color: "var(--fg-tertiary)", marginTop: 4 }}>
                 {prompt.description}
               </Text>
-              <Text style={{ display: "block", fontSize: 12, color: "#262626", marginTop: 4 }}>
+              <Text style={{ display: "block", fontSize: 12, color: "var(--fg-secondary)", marginTop: 4 }}>
                 {prompt.action}
               </Text>
               {prompt.contract_numbers && prompt.contract_numbers.length > 0 && (
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
                   {prompt.contract_numbers.map((contractNumber) => (
-                    <Tag key={contractNumber} style={{ borderRadius: 4, marginInlineEnd: 0, fontSize: 11 }}>
+                    <StatusTag key={contractNumber} style={{ borderRadius: 4, marginInlineEnd: 0, fontSize: 11 }}>
                       {contractNumber}
-                    </Tag>
+                    </StatusTag>
                   ))}
                 </div>
               )}
@@ -652,22 +654,22 @@ function ReviewActionHistoryPanel({
     <div
       style={{
         marginTop: 12,
-        border: "1px solid #E5E5E5",
+        border: "1px solid var(--border-default)",
         borderRadius: 8,
         overflow: "hidden",
-        background: "#fff",
+        background: "var(--fg-inverse)",
       }}
     >
       <div
         style={{
           padding: "10px 12px",
-          borderBottom: "1px solid #F0F0F0",
+          borderBottom: "1px solid var(--bg-inset)",
           display: "flex",
           alignItems: "center",
           gap: 8,
         }}
       >
-        <ClockCircleOutlined style={{ color: "#595959" }} />
+        <ClockCircleOutlined style={{ color: "var(--fg-tertiary)" }} />
         <Text strong style={{ fontSize: 13 }}>
           {t("ai.review_action_history", language)}
         </Text>
@@ -679,7 +681,7 @@ function ReviewActionHistoryPanel({
             key={action.id}
             style={{
               padding: "10px 12px",
-              borderBottom: index === actions.length - 1 ? "none" : "1px solid #F5F5F5",
+              borderBottom: index === actions.length - 1 ? "none" : "1px solid var(--bg-inset)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -688,14 +690,14 @@ function ReviewActionHistoryPanel({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <Tag style={{ borderRadius: 4, marginInlineEnd: 0 }}>
+              <StatusTag style={{ borderRadius: 4, marginInlineEnd: 0 }}>
                 {reviewActionLabel(action.actionType, language)}
-              </Tag>
+              </StatusTag>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {formatTime(action.actedAt)}
               </Text>
               {action.comment && (
-                <Text style={{ fontSize: 12, color: "#595959" }}>
+                <Text style={{ fontSize: 12, color: "var(--fg-tertiary)" }}>
                   {action.comment}
                 </Text>
               )}
@@ -706,7 +708,7 @@ function ReviewActionHistoryPanel({
               size="small"
               icon={<MessageOutlined />}
               onClick={() => onContinue(action)}
-              style={{ paddingInline: 8, color: "#595959" }}
+              style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
             >
               {t("ai.continue_from_action", language)}
             </Button>
@@ -738,8 +740,8 @@ function SessionSidebar({
     <div
       style={{
         width: 260,
-        borderRight: "1px solid #E5E5E5",
-        background: "#FAFAFA",
+        borderRight: "1px solid var(--border-default)",
+        background: "var(--bg-surface)",
         display: "flex",
         flexDirection: "column",
         height: "100%",
@@ -749,13 +751,13 @@ function SessionSidebar({
       <div
         style={{
           padding: "16px 12px",
-          borderBottom: "1px solid #E5E5E5",
+          borderBottom: "1px solid var(--border-default)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
         }}
       >
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#000" }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-primary)" }}>
           {t("nav.ai_chat", language)}
         </span>
          <Tooltip title={t("ai.new_session_btn", language)}>
@@ -763,7 +765,7 @@ function SessionSidebar({
             type="text"
             icon={<PlusOutlined />}
             onClick={onNew}
-            style={{ color: "#000" }}
+            style={{ color: "var(--fg-primary)" }}
           />
         </Tooltip>
       </div>
@@ -790,8 +792,8 @@ function SessionSidebar({
                     padding: "10px 12px",
                     borderRadius: 8,
                     cursor: "pointer",
-                    background: activeSessionId === session.id ? "#000" : "transparent",
-                    color: activeSessionId === session.id ? "#fff" : "#262626",
+                    background: activeSessionId === session.id ? "var(--fg-primary)" : "transparent",
+                    color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-secondary)",
                     transition: "all 0.15s",
                     display: "flex",
                     alignItems: "center",
@@ -800,7 +802,7 @@ function SessionSidebar({
                   }}
                   onMouseEnter={(e) => {
                     if (activeSessionId !== session.id) {
-                      e.currentTarget.style.background = "#F0F0F0";
+                      e.currentTarget.style.background = "var(--bg-inset)";
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -813,7 +815,7 @@ function SessionSidebar({
                     style={{
                       fontSize: 14,
                       flexShrink: 0,
-                      color: activeSessionId === session.id ? "#fff" : "#8C8C8C",
+                      color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-muted)",
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -832,7 +834,7 @@ function SessionSidebar({
                     <div
                       style={{
                         fontSize: 11,
-                        color: activeSessionId === session.id ? "rgba(255,255,255,0.6)" : "#8C8C8C",
+                        color: activeSessionId === session.id ? "rgba(255,255,255,0.6)" : "var(--fg-muted)",
                         marginTop: 2,
                         display: "flex",
                         alignItems: "center",
@@ -871,7 +873,7 @@ function SessionSidebar({
                       style={{
                         opacity: 0,
                         transition: "opacity 0.15s",
-                        color: activeSessionId === session.id ? "#fff" : "#8C8C8C",
+                        color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-muted)",
                         padding: 0,
                         width: 24,
                         height: 24,
@@ -954,9 +956,9 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
     c.confidence < 0.8 || (c.scope_confidence ?? 1) < 0.8 || c.missing_fields.length > 0;
 
   return (
-    <div style={{ marginTop: 12, border: "1px solid #E5E5E5", borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ marginTop: 12, border: "1px solid var(--border-default)", borderRadius: 12, overflow: "hidden" }}>
       {/* Header */}
-      <div style={{ padding: "12px 16px", background: "#FAFAFA", borderBottom: "1px solid #E5E5E5" }}>
+      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderBottom: "1px solid var(--border-default)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <Text strong style={{ fontSize: 14 }}>
@@ -976,8 +978,8 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
           </div>
         </div>
         {summary.requires_human_confirmation && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "#FFF7E6", borderRadius: 6, border: "1px solid #FFD591" }}>
-            <Text style={{ fontSize: 12, color: "#D46B08" }}>
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--state-warning-bg)", borderRadius: 6, border: "1px solid var(--state-warning-border)" }}>
+            <Text style={{ fontSize: 12, color: "var(--state-warning-text)" }}>
               ⚠️ {t("ai.draft_warning", language)}
             </Text>
           </div>
@@ -985,7 +987,7 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
         {summary.warnings.length > 0 && (
           <div style={{ marginTop: 8 }}>
             {summary.warnings.slice(0, 3).map((w, i) => (
-              <Text key={i} style={{ fontSize: 11, color: "#CF1322", display: "block" }}>
+              <Text key={i} style={{ fontSize: 11, color: "var(--state-error-text)", display: "block" }}>
                 • {w}
               </Text>
             ))}
@@ -1000,8 +1002,8 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
             key={index}
             style={{
               padding: "12px 16px",
-              borderBottom: "1px solid #F0F0F0",
-              background: selectedIndices.has(index) ? "#F6FFED" : "#fff",
+              borderBottom: "1px solid var(--bg-inset)",
+              background: selectedIndices.has(index) ? "var(--state-success-bg)" : "var(--fg-inverse)",
               opacity: selectedIndices.has(index) ? 1 : 0.6,
             }}
           >
@@ -1184,22 +1186,22 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
                 {/* Warnings & Confidence */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   {hasLowConfidence(contract) && (
-                    <Tag color="warning" style={{ fontSize: 11 }}>
+                    <StatusTag kind="warning" style={{ fontSize: 11 }}>
                       {t("ai.draft_confidence", language, { value: String((contract.confidence * 100).toFixed(0)) })}
-                    </Tag>
+                    </StatusTag>
                   )}
                   {contract.lease_scope && (
-                    <Tag color={contract.lease_scope === "in_scope" ? "blue" : "orange"} style={{ fontSize: 11 }}>
+                    <StatusTag kind={statusKindFromAntColor(contract.lease_scope === "in_scope" ? "blue" : "orange")} style={{ fontSize: 11 }}>
                       Scope: {contract.lease_scope}
-                    </Tag>
+                    </StatusTag>
                   )}
                   {contract.missing_fields.length > 0 && (
-                    <Tag color="error" style={{ fontSize: 11 }}>
+                    <StatusTag kind="error" style={{ fontSize: 11 }}>
                       {t("ai.draft_missing_fields", language, { fields: contract.missing_fields.join(", ") })}
-                    </Tag>
+                    </StatusTag>
                   )}
                   {contract.warnings.slice(0, 2).map((w, i) => (
-                    <Text key={i} style={{ fontSize: 11, color: "#CF1322" }}>
+                    <Text key={i} style={{ fontSize: 11, color: "var(--state-error-text)" }}>
                       {w}
                     </Text>
                   ))}
@@ -1211,7 +1213,7 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "12px 16px", background: "#FAFAFA", borderTop: "1px solid #E5E5E5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderTop: "1px solid var(--border-default)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
           {t("ai.draft_selected_count", language, { selected: String(selectedIndices.size), total: String(editedContracts.length) })}
         </Text>
@@ -1220,7 +1222,7 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
           loading={creating}
           disabled={selectedIndices.size === 0}
           onClick={handleConfirm}
-          style={{ background: "#000", borderColor: "#000" }}
+          style={{ background: "var(--fg-primary)", borderColor: "var(--fg-primary)" }}
         >
           {t("ai.draft_confirm_import", language)}
         </Button>
@@ -1305,8 +1307,8 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
   };
 
   return (
-    <div style={{ marginTop: 12, border: "1px solid #E5E5E5", borderRadius: 12, overflow: "hidden" }}>
-      <div style={{ padding: "12px 16px", background: "#FAFAFA", borderBottom: "1px solid #E5E5E5" }}>
+    <div style={{ marginTop: 12, border: "1px solid var(--border-default)", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderBottom: "1px solid var(--border-default)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div>
             <Text strong style={{ fontSize: 14 }}>
@@ -1326,15 +1328,15 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
           </div>
         </div>
         {!summary.can_import && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "#FFF1F0", borderRadius: 6, border: "1px solid #FFA39E" }}>
-            <Text style={{ fontSize: 12, color: "#CF1322" }}>
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--state-error-bg)", borderRadius: 6, border: "1px solid var(--state-error-border)" }}>
+            <Text style={{ fontSize: 12, color: "var(--state-error-text)" }}>
               {t("ai.schedule_bind_contract_first", language)}
             </Text>
           </div>
         )}
         {(summary.requires_human_confirmation || summary.warnings.length > 0) && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "#FFF7E6", borderRadius: 6, border: "1px solid #FFD591" }}>
-            <Text style={{ fontSize: 12, color: "#D46B08" }}>
+          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--state-warning-bg)", borderRadius: 6, border: "1px solid var(--state-warning-border)" }}>
+            <Text style={{ fontSize: 12, color: "var(--state-warning-text)" }}>
               {t("ai.schedule_review_warning", language)}
             </Text>
           </div>
@@ -1347,8 +1349,8 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
             key={index}
             style={{
               padding: "12px 16px",
-              borderBottom: "1px solid #F0F0F0",
-              background: selectedIndices.has(index) ? "#F6FFED" : "#fff",
+              borderBottom: "1px solid var(--bg-inset)",
+              background: selectedIndices.has(index) ? "var(--state-success-bg)" : "var(--fg-inverse)",
               opacity: selectedIndices.has(index) ? 1 : 0.6,
             }}
           >
@@ -1401,11 +1403,11 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <Tag color={schedule.confidence < 0.8 ? "warning" : "green"} style={{ fontSize: 11 }}>
+                  <StatusTag kind={statusKindFromAntColor(schedule.confidence < 0.8 ? "warning" : "green")} style={{ fontSize: 11 }}>
                     {t("ai.draft_confidence", language, { value: String((schedule.confidence * 100).toFixed(0)) })}
-                  </Tag>
-                  {!schedule.is_fixed && <Tag color="orange" style={{ fontSize: 11 }}>{t("ai.schedule_variable_rent", language)}</Tag>}
-                  {!schedule.is_lease_component && <Tag color="orange" style={{ fontSize: 11 }}>{t("ai.schedule_non_lease_component", language)}</Tag>}
+                  </StatusTag>
+                  {!schedule.is_fixed && <StatusTag kind="warning" style={{ fontSize: 11 }}>{t("ai.schedule_variable_rent", language)}</StatusTag>}
+                  {!schedule.is_lease_component && <StatusTag kind="warning" style={{ fontSize: 11 }}>{t("ai.schedule_non_lease_component", language)}</StatusTag>}
                 </div>
               </div>
             </div>
@@ -1413,7 +1415,7 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
         ))}
       </div>
 
-      <div style={{ padding: "12px 16px", background: "#FAFAFA", borderTop: "1px solid #E5E5E5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderTop: "1px solid var(--border-default)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
           {t("ai.draft_selected_count", language, { selected: String(selectedIndices.size), total: String(editedSchedules.length) })}
         </Text>
@@ -1422,7 +1424,7 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
           loading={creating}
           disabled={selectedIndices.size === 0 || !summary.can_import}
           onClick={handleConfirm}
-          style={{ background: "#000", borderColor: "#000" }}
+          style={{ background: "var(--fg-primary)", borderColor: "var(--fg-primary)" }}
         >
           {t("ai.schedule_confirm_import", language)}
         </Button>
@@ -1504,10 +1506,10 @@ function AIChatPageContent() {
   };
 
   const getFileIcon = (type: string) => {
-    if (type.includes("pdf")) return <FilePdfOutlined style={{ color: "#EF4444" }} />;
+    if (type.includes("pdf")) return <FilePdfOutlined style={{ color: "var(--state-error-text)" }} />;
     if (type.includes("excel") || type.includes("sheet"))
-      return <FileExcelOutlined style={{ color: "#10B981" }} />;
-    return <FileImageOutlined style={{ color: "#666" }} />;
+      return <FileExcelOutlined style={{ color: "var(--state-success-text)" }} />;
+    return <FileImageOutlined style={{ color: "var(--fg-tertiary)" }} />;
   };
 
   const getSkillIcon = (icon: string) => {
@@ -1556,8 +1558,7 @@ function AIChatPageContent() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `${t("ai.upload_failed", language, { name: "file" })}: ${response.status}`);
+        throw new Error(t("ai.upload_failed", language, { name: "file" }));
       }
 
       const data = await response.json();
@@ -1787,18 +1788,18 @@ function AIChatPageContent() {
             <div
               style={{
                 height: 56,
-                borderBottom: "1px solid #E5E5E5",
+                borderBottom: "1px solid var(--border-default)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "0 20px",
-                background: "#fff",
+                background: "var(--fg-inverse)",
                 flexShrink: 0,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <RobotOutlined style={{ fontSize: 18, color: "#000" }} />
-                <span style={{ fontSize: 15, fontWeight: 600, color: "#000" }}>
+                <RobotOutlined style={{ fontSize: 18, color: "var(--fg-primary)" }} />
+                <span style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)" }}>
                   {activeSession?.title || t("ai.assistant_name", language)}
                 </span>
               </div>
@@ -1817,7 +1818,7 @@ function AIChatPageContent() {
                   <Button
                     type="text"
                    
-                    style={{ fontSize: 13, color: "#595959" }}
+                    style={{ fontSize: 13, color: "var(--fg-tertiary)" }}
                   >
                     {MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}
                     <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />
@@ -1829,7 +1830,7 @@ function AIChatPageContent() {
                     type="text"
                     icon={<PlusOutlined />}
                     onClick={createNewSession}
-                    style={{ color: "#000" }}
+                    style={{ color: "var(--fg-primary)" }}
                   />
                 </Tooltip>
               </div>
@@ -1841,19 +1842,19 @@ function AIChatPageContent() {
                 flex: 1,
                 overflowY: "auto",
                 padding: "20px 20%",
-                background: "#fff",
+                background: "var(--fg-inverse)",
               }}
             >
               {/* Context strip */}
               {pageContext && (
                 <motion.div
-                  initial={{ opacity: 0, y: -4 }}
+                  initial={false}
                   animate={{ opacity: 1, y: 0 }}
                   style={{
                     padding: "8px 12px",
                     borderRadius: 8,
-                    background: "#F7F7F7",
-                    border: "1px solid #E5E5E5",
+                    background: "var(--bg-surface)",
+                    border: "1px solid var(--border-default)",
                     marginBottom: 16,
                     display: "flex",
                     alignItems: "center",
@@ -1864,18 +1865,18 @@ function AIChatPageContent() {
                   <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>
                     {t("ai.context", language)}
                   </Text>
-                  <Tag style={{ borderRadius: 4 }}>
+                  <StatusTag style={{ borderRadius: 4 }}>
                     {pageContext.title || pageContext.page}
-                  </Tag>
+                  </StatusTag>
                   {pageContext.contract_id && (
-                    <Tag style={{ borderRadius: 4 }}>
+                    <StatusTag style={{ borderRadius: 4 }}>
                       {pageContext.contract_id}
-                    </Tag>
+                    </StatusTag>
                   )}
                   {pageContext.period && (
-                    <Tag style={{ borderRadius: 4 }}>
+                    <StatusTag style={{ borderRadius: 4 }}>
                       {pageContext.period}
-                    </Tag>
+                    </StatusTag>
                   )}
                 </motion.div>
               )}
@@ -1883,7 +1884,7 @@ function AIChatPageContent() {
               {/* Agent skill starters */}
               {currentMessages.length <= 1 && (
                 <motion.div
-                  initial={{ opacity: 0 }}
+                  initial={false}
                   animate={{ opacity: 1 }}
                   style={{
                     display: "flex",
@@ -1906,8 +1907,8 @@ function AIChatPageContent() {
                       style={{
                         fontSize: 12,
                         borderRadius: 6,
-                        borderColor: "#D9D9D9",
-                        color: "#262626",
+                        borderColor: "var(--border-strong)",
+                        color: "var(--fg-secondary)",
                       }}
                     >
                       {t(skill.labelKey, language)}
@@ -1919,7 +1920,7 @@ function AIChatPageContent() {
               {/* Quick chips */}
               {currentMessages.length <= 1 && (
                 <motion.div
-                  initial={{ opacity: 0 }}
+                  initial={false}
                   animate={{ opacity: 1 }}
                   style={{
                     display: "flex",
@@ -1942,8 +1943,8 @@ function AIChatPageContent() {
                       style={{
                         fontSize: 12,
                         borderRadius: 9999,
-                        borderColor: "#E5E5E5",
-                        color: "#595959",
+                        borderColor: "var(--border-default)",
+                        color: "var(--fg-tertiary)",
                       }}
                     >
                       {t(chipKey, language)}
@@ -1957,7 +1958,7 @@ function AIChatPageContent() {
                 {currentMessages.map((msg, index) => (
                   <motion.div
                     key={msg.id}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, delay: index === currentMessages.length - 1 ? 0 : 0 }}
                     style={{
@@ -1976,7 +1977,7 @@ function AIChatPageContent() {
                       <Avatar
                         icon={msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
                         style={{
-                          backgroundColor: msg.role === "user" ? "#262626" : "#000",
+                          backgroundColor: msg.role === "user" ? "var(--fg-secondary)" : "var(--fg-primary)",
                           flexShrink: 0,
                         }}
                         size={32}
@@ -1986,9 +1987,9 @@ function AIChatPageContent() {
                         style={{
                           padding: "12px 16px",
                           borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                          backgroundColor: msg.role === "user" ? "#000" : "#F7F7F7",
-                          border: msg.role === "user" ? "none" : "1px solid #E5E5E5",
-                          color: msg.role === "user" ? "#fff" : "#262626",
+                          backgroundColor: msg.role === "user" ? "var(--fg-primary)" : "var(--bg-surface)",
+                          border: msg.role === "user" ? "none" : "1px solid var(--border-default)",
+                          color: msg.role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)",
                         }}
                       >
                         {msg.role === "assistant" && typingMessageId === msg.id ? (
@@ -2048,19 +2049,19 @@ function AIChatPageContent() {
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {msg.attachments.map((att, idx) => (
-                              <Tag
+                              <StatusTag
                                 key={idx}
                                 icon={getFileIcon(att.content_type)}
                                
                                 style={{
                                   borderRadius: 4,
-                                  background: msg.role === "user" ? "rgba(255,255,255,0.1)" : "#fff",
-                                  border: msg.role === "user" ? "1px solid rgba(255,255,255,0.2)" : "1px solid #E5E5E5",
-                                  color: msg.role === "user" ? "#fff" : "#262626",
+                                  background: msg.role === "user" ? "rgba(255,255,255,0.1)" : "var(--fg-inverse)",
+                                  border: msg.role === "user" ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--border-default)",
+                                  color: msg.role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)",
                                 }}
                               >
                                 {att.original_name}
-                              </Tag>
+                              </StatusTag>
                             ))}
                           </div>
                         )}
@@ -2257,7 +2258,7 @@ function AIChatPageContent() {
                             style={{
                               marginTop: 12,
                               paddingTop: 10,
-                              borderTop: msg.role === "user" ? "1px solid rgba(255,255,255,0.15)" : "1px solid #EAEAEA",
+                              borderTop: msg.role === "user" ? "1px solid rgba(255,255,255,0.15)" : "1px solid var(--border-default)",
                               display: "flex",
                               gap: 8,
                               flexWrap: "wrap",
@@ -2271,7 +2272,7 @@ function AIChatPageContent() {
                               onClick={() => triggerRuntimeContinuation({ type: "message", id: msg.id })}
                               style={{
                                 paddingInline: 8,
-                                color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
                               }}
                             >
                               {t("ai.continue_from_message", language)}
@@ -2287,7 +2288,7 @@ function AIChatPageContent() {
                                   onClick={() => triggerRuntimeContinuation({ type: "run", id: msg.runId! })}
                                   style={{
                                     paddingInline: 8,
-                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
                                   }}
                                 >
                                   {t("ai.continue_from_run", language)}
@@ -2299,7 +2300,7 @@ function AIChatPageContent() {
                                   onClick={() => handleOpenTrace(msg.runId!)}
                                   style={{
                                     paddingInline: 8,
-                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
                                   }}
                                 >
                                   {t("ai.view_trace", language)}
@@ -2323,7 +2324,7 @@ function AIChatPageContent() {
                                       icon={<MessageOutlined />}
                                       disabled={loading === false}
                                       onClick={() => handleRunControl(msg.runId!, "steer")}
-                                      style={{ paddingInline: 8, color: "#595959" }}
+                                      style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
                                     >
                                       {t("ai.run_steer", language)}
                                     </Button>
@@ -2333,7 +2334,7 @@ function AIChatPageContent() {
                                       icon={<MessageOutlined />}
                                       disabled={loading}
                                       onClick={() => handleRunControl(msg.runId!, "follow-up")}
-                                      style={{ paddingInline: 8, color: "#595959" }}
+                                      style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
                                     >
                                       {t("ai.run_follow_up", language)}
                                     </Button>
@@ -2343,7 +2344,7 @@ function AIChatPageContent() {
                                       icon={<ClockCircleOutlined />}
                                       disabled={loading}
                                       onClick={() => handleRunControl(msg.runId!, "branch")}
-                                      style={{ paddingInline: 8, color: "#595959" }}
+                                      style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
                                     >
                                       {t("ai.run_branch", language)}
                                     </Button>
@@ -2366,7 +2367,7 @@ function AIChatPageContent() {
                                 }
                                 style={{
                                   paddingInline: 8,
-                                  color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "#595959",
+                                  color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
                                 }}
                               >
                                 {t("ai.continue_from_artifact", language)}
@@ -2382,25 +2383,25 @@ function AIChatPageContent() {
 
               {loading && !typingMessageId && (
                 <motion.div
-                  initial={{ opacity: 0 }}
+                  initial={false}
                   animate={{ opacity: 1 }}
                   style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}
                 >
                   <Avatar
                     icon={<RobotOutlined />}
-                    style={{ background: "#000", flexShrink: 0 }}
+                    style={{ background: "var(--fg-primary)", flexShrink: 0 }}
                     size={32}
                   />
                   <div
                     style={{
                       padding: "12px 16px",
                       borderRadius: "16px 16px 16px 4px",
-                      background: "#F7F7F7",
-                      border: "1px solid #E5E5E5",
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border-default)",
                     }}
                   >
                     <Spin />
-                    <span style={{ marginLeft: 8, fontSize: 13, color: "#8C8C8C" }}>
+                    <span style={{ marginLeft: 8, fontSize: 13, color: "var(--fg-muted)" }}>
                       {t("ai.thinking", language)}
                     </span>
                   </div>
@@ -2414,8 +2415,8 @@ function AIChatPageContent() {
             <div
               style={{
                 padding: "16px 20%",
-                borderTop: "1px solid #E5E5E5",
-                background: "#fff",
+                borderTop: "1px solid var(--border-default)",
+                background: "var(--fg-inverse)",
                 flexShrink: 0,
               }}
             >
@@ -2427,10 +2428,10 @@ function AIChatPageContent() {
                     gap: 8,
                     marginBottom: 8,
                     padding: "6px 12px",
-                    background: "#F0F0F0",
+                    background: "var(--bg-inset)",
                     borderRadius: 8,
                     fontSize: 13,
-                    color: "#595959",
+                    color: "var(--fg-tertiary)",
                   }}
                 >
                   <PaperClipOutlined style={{ fontSize: 14 }} />
@@ -2440,7 +2441,7 @@ function AIChatPageContent() {
                   <Button
                     type="text"
                     size="small"
-                    icon={<CloseCircleOutlined style={{ fontSize: 14, color: "#8C8C8C" }} />}
+                    icon={<CloseCircleOutlined style={{ fontSize: 14, color: "var(--fg-muted)" }} />}
                     onClick={() => activeSessionId && setPendingUpload(activeSessionId, null)}
                     style={{ padding: 0, height: 22, width: 22 }}
                   />
@@ -2451,10 +2452,10 @@ function AIChatPageContent() {
                   display: "flex",
                   alignItems: "flex-end",
                   gap: 8,
-                  background: "#F7F7F7",
+                  background: "var(--bg-surface)",
                   borderRadius: 24,
                   padding: "8px 16px",
-                  border: "1px solid #E5E5E5",
+                  border: "1px solid var(--border-default)",
                   transition: "border-color 0.15s",
                 }}
                 className="chat-input-wrapper"
@@ -2487,7 +2488,7 @@ function AIChatPageContent() {
                   <Tooltip title={t("ai.upload_file_tooltip", language)}>
                     <Button
                       type="text"
-                      icon={<PaperClipOutlined style={{ fontSize: 18, color: "#8C8C8C" }} />}
+                      icon={<PaperClipOutlined style={{ fontSize: 18, color: "var(--fg-muted)" }} />}
                       disabled={loading}
                       style={{ height: 36, width: 36, padding: 0 }}
                     />
@@ -2511,10 +2512,10 @@ function AIChatPageContent() {
                     padding: "6px 0",
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.parentElement!.parentElement!.style.borderColor = "#000";
+                    e.currentTarget.parentElement!.parentElement!.style.borderColor = "var(--fg-primary)";
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.parentElement!.parentElement!.style.borderColor = "#E5E5E5";
+                    e.currentTarget.parentElement!.parentElement!.style.borderColor = "var(--border-default)";
                   }}
                 />
 
@@ -2529,8 +2530,8 @@ function AIChatPageContent() {
                     width: 36,
                     height: 36,
                     flexShrink: 0,
-                    background: input.trim() || activePendingUpload ? "#000" : "#D9D9D9",
-                    borderColor: input.trim() || activePendingUpload ? "#000" : "#D9D9D9",
+                    background: input.trim() || activePendingUpload ? "var(--fg-primary)" : "var(--border-strong)",
+                    borderColor: input.trim() || activePendingUpload ? "var(--fg-primary)" : "var(--border-strong)",
                   }}
                 />
               </div>
@@ -2542,7 +2543,7 @@ function AIChatPageContent() {
                   textAlign: "center",
                   display: "block",
                   marginTop: 8,
-                  color: "#BFBFBF",
+                  color: "var(--fg-muted)",
                 }}
               >
                 {t("ai.disclaimer", language)}
@@ -2567,18 +2568,18 @@ function AIChatPageContent() {
           ) : traceData ? (
             <div>
               <Space wrap style={{ marginBottom: 12 }}>
-                <Tag color="blue">{String(traceData.run?.status || "unknown")}</Tag>
-                <Tag>{`events: ${Array.isArray(traceData.events) ? traceData.events.length : 0}`}</Tag>
-                <Tag>{`artifacts: ${Array.isArray(traceData.artifacts) ? traceData.artifacts.length : 0}`}</Tag>
-                <Tag>{`reviews: ${Array.isArray(traceData.review_actions) ? traceData.review_actions.length : 0}`}</Tag>
-                <Tag>{`audits: ${traceData.audit_total ?? 0}`}</Tag>
+                <StatusTag kind="processing">{String(traceData.run?.status || "unknown")}</StatusTag>
+                <StatusTag>{`events: ${Array.isArray(traceData.events) ? traceData.events.length : 0}`}</StatusTag>
+                <StatusTag>{`artifacts: ${Array.isArray(traceData.artifacts) ? traceData.artifacts.length : 0}`}</StatusTag>
+                <StatusTag>{`reviews: ${Array.isArray(traceData.review_actions) ? traceData.review_actions.length : 0}`}</StatusTag>
+                <StatusTag>{`audits: ${traceData.audit_total ?? 0}`}</StatusTag>
                 {traceData.summary && (
                   <>
-                    <Tag color={traceData.summary.terminal ? "green" : "gold"}>
+                    <StatusTag kind={statusKindFromAntColor(traceData.summary.terminal ? "green" : "gold")}>
                       {`summary events: ${traceData.summary.event_count ?? 0}`}
-                    </Tag>
-                    <Tag>{`tools: ${traceData.summary.tool_event_count ?? 0}`}</Tag>
-                    <Tag>{`failed: ${traceData.summary.failed_event_count ?? 0}`}</Tag>
+                    </StatusTag>
+                    <StatusTag>{`tools: ${traceData.summary.tool_event_count ?? 0}`}</StatusTag>
+                    <StatusTag>{`failed: ${traceData.summary.failed_event_count ?? 0}`}</StatusTag>
                   </>
                 )}
               </Space>
@@ -2588,8 +2589,8 @@ function AIChatPageContent() {
                   overflow: "auto",
                   padding: 12,
                   margin: 0,
-                  background: "#111",
-                  color: "#E6E6E6",
+                  background: "var(--fg-secondary)",
+                  color: "var(--border-default)",
                   borderRadius: 6,
                   fontSize: 11,
                   lineHeight: 1.5,

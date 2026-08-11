@@ -1,3 +1,5 @@
+import { t, type Language } from "./i18n";
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL || "http://localhost:8081";
 
@@ -6,6 +8,36 @@ interface RequestOptions extends RequestInit {
 }
 
 let refreshPromise: Promise<string | null> | null = null;
+let apiLanguage: Language = "zh-CN";
+
+export function setApiLanguage(language: Language) {
+  apiLanguage = language;
+}
+
+export class ApiError extends Error {
+  readonly code: string;
+  readonly status: number;
+  readonly detail?: unknown;
+
+  constructor(code: string, status: number, detail?: unknown) {
+    super(ApiError.userMessage(code, status));
+    this.name = "ApiError";
+    this.code = code;
+    this.status = status;
+    this.detail = detail;
+  }
+
+  private static userMessage(code: string, status: number): string {
+    if (status === 401 || code === "invalid_token" || code === "unauthorized") {
+      return t("api.session_expired", apiLanguage);
+    }
+    if (status === 403 || code === "forbidden") return t("api.forbidden", apiLanguage);
+    if (status === 404 || code === "not_found") return t("api.not_found", apiLanguage);
+    if (status >= 500) return t("api.server_unavailable", apiLanguage);
+    if (code === "network_error") return t("api.network_error", apiLanguage);
+    return t("api.request_failed", apiLanguage);
+  }
+}
 
 async function refreshAccessToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
@@ -57,7 +89,12 @@ export async function apiRequest(
     return fetch(url, { ...options, headers: requestHeaders });
   };
 
-  let response = await fetchRequest(options.token);
+  let response: Response;
+  try {
+    response = await fetchRequest(options.token);
+  } catch {
+    throw new ApiError("network_error", 0);
+  }
   if (
     response.status === 401 &&
     options.token &&
@@ -65,12 +102,22 @@ export async function apiRequest(
     (options.body === undefined || typeof options.body === "string")
   ) {
     const refreshedToken = await refreshAccessToken();
-    if (refreshedToken) response = await fetchRequest(refreshedToken);
+    if (refreshedToken) {
+      try {
+        response = await fetchRequest(refreshedToken);
+      } catch {
+        throw new ApiError("network_error", 0);
+      }
+    }
   }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const code = typeof error?.code === "string" ? error.code : typeof error?.error === "string" ? error.error : `http_${response.status}`;
+    if (response.status === 401 && typeof window !== "undefined" && !endpoint.startsWith("/api/v1/auth/")) {
+      window.dispatchEvent(new Event("auth-session-expired"));
+    }
+    throw new ApiError(code, response.status, error);
   }
 
   return response.json();
@@ -90,17 +137,44 @@ export async function aiRequest(
     headers["Authorization"] = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch {
+    throw new ApiError("network_error", 0);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || `HTTP ${response.status}`);
+    const code = typeof error?.code === "string" ? error.code : typeof error?.error === "string" ? error.error : `http_${response.status}`;
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("auth-session-expired"));
+    }
+    throw new ApiError(code, response.status, error);
   }
 
   return response.json();
+}
+
+async function downloadBlob(endpoint: string, token: string): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new ApiError("network_error", 0);
+  }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const code = typeof error?.code === "string" ? error.code : typeof error?.error === "string" ? error.error : `http_${response.status}`;
+    if (response.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event("auth-session-expired"));
+    throw new ApiError(code, response.status, error);
+  }
+  return response.blob();
 }
 
 // Auth APIs
@@ -179,6 +253,10 @@ export const contractApi = {
     params?: {
       search?: string;
       status?: string;
+      discount_rate_missing?: boolean;
+      lease_scope?: string;
+      asset_type?: string;
+      lease_end_before?: string;
       sort_by?: string;
       sort_order?: string;
       page?: number;
@@ -188,6 +266,10 @@ export const contractApi = {
     const qs = new URLSearchParams();
     if (params?.search) qs.append("search", params.search);
     if (params?.status) qs.append("status", params.status);
+    if (params?.discount_rate_missing) qs.append("discount_rate_missing", "true");
+    if (params?.lease_scope) qs.append("lease_scope", params.lease_scope);
+    if (params?.asset_type) qs.append("asset_type", params.asset_type);
+    if (params?.lease_end_before) qs.append("lease_end_before", params.lease_end_before);
     if (params?.sort_by) qs.append("sort_by", params.sort_by);
     if (params?.sort_order) qs.append("sort_order", params.sort_order);
     if (params?.page) qs.append("page", String(params.page));
@@ -518,14 +600,7 @@ export const monthlyClosingApi = {
     if (params.period) qs.append("period", params.period);
     if (params.status) qs.append("status", params.status);
     if (params.template) qs.append("template", params.template);
-    const response = await fetch(`${API_BASE_URL}/api/v1/monthly-closing/entries/export?${qs.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
-    return response.blob();
+    return downloadBlob(`/api/v1/monthly-closing/entries/export?${qs.toString()}`, token);
   },
   getMeasurementResults: (contractId: string, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/measurement-results`, { token }),
@@ -972,9 +1047,7 @@ export const performanceApi = {
   exportActions: async (params: { period?: string; status?: string; category?: string }, token: string) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
-    const response = await fetch(`${API_BASE_URL}/api/v1/performance/actions/export?${qs}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.blob();
+    return downloadBlob(`/api/v1/performance/actions/export?${qs}`, token);
   },
   assumptions: (key: string | undefined, token: string) => {
     const qs = key ? `?key=${encodeURIComponent(key)}` : "";
@@ -1074,9 +1147,7 @@ export const performanceApi = {
     return apiRequest(`/api/v1/performance/report-packs?${qs}`, { method: "POST", token });
   },
   downloadReportPack: async (id: string, token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/performance/report-packs/${encodeURIComponent(id)}/download`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.blob();
+    return downloadBlob(`/api/v1/performance/report-packs/${encodeURIComponent(id)}/download`, token);
   },
 };
 
@@ -1096,9 +1167,7 @@ export const operatingFactsApi = {
     return apiRequest(`/api/v1/operating-facts/stores/import-xlsx`, { method: "POST", body: form, token, headers: {} });
   },
   downloadStoreCSVTemplate: async (token: string) => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/operating-facts/stores/template`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.blob();
+    return downloadBlob(`/api/v1/operating-facts/stores/template`, token);
   },
   listStores: (params: { period?: string; store_id?: string }, token: string) => {
     const qs = new URLSearchParams();

@@ -1,5 +1,7 @@
 "use client";
 
+import { StatusTag } from "../../../components/StatusTag";
+
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -634,7 +636,7 @@ export function ContractWorkspaceDialogs({
                           dataIndex: "delta",
                           align: "right" as const,
                           render: (value: number) => (
-                            <span style={{ color: value > 0 ? "#CF1322" : undefined }}>
+                            <span style={{ color: value > 0 ? "var(--state-error-text)" : undefined }}>
                               {fmtMoney(value, contract?.currency)}
                             </span>
                           ),
@@ -1025,7 +1027,7 @@ export function ContractWorkspaceDialogs({
           {adjustmentModalData && (
             <Descriptions column={1} bordered size="small">
               <Descriptions.Item label={t("contract_detail.adjustment_type_label", language)}>
-                <Tag color="processing">{adjustmentModalData.adjustment_type || "-"}</Tag>
+                <StatusTag kind="processing">{adjustmentModalData.adjustment_type || "-"}</StatusTag>
               </Descriptions.Item>
               <Descriptions.Item label={t("contract.effective_date", language)}>
                 {adjustmentModalData.effective_date ? dayjs(adjustmentModalData.effective_date).format("YYYY-MM-DD") : "-"}
@@ -1038,12 +1040,12 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_after", language)}>
                 {adjustmentModalData.liability_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "#000" }}>{fmtMoney(adjustmentModalData.liability_after, adjustmentCurrency)}</span>
+                  <span style={{ fontWeight: "bold", color: "var(--fg-primary)" }}>{fmtMoney(adjustmentModalData.liability_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_change", language)}>
                 {adjustmentModalData.liability_change != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.liability_change >= 0 ? "#000" : "#000" }}>
+                  <span style={{ fontWeight: "bold", color: adjustmentModalData.liability_change >= 0 ? "var(--fg-primary)" : "var(--fg-primary)" }}>
                     {adjustmentModalData.liability_change >= 0 ? "+" : ""}
                     {fmtMoney(adjustmentModalData.liability_change, adjustmentCurrency)}
                   </span>
@@ -1054,12 +1056,12 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_after", language)}>
                 {adjustmentModalData.asset_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "#000" }}>{fmtMoney(adjustmentModalData.asset_after, adjustmentCurrency)}</span>
+                  <span style={{ fontWeight: "bold", color: "var(--fg-primary)" }}>{fmtMoney(adjustmentModalData.asset_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_change", language)}>
                 {adjustmentModalData.asset_change != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.asset_change >= 0 ? "#000" : "#000" }}>
+                  <span style={{ fontWeight: "bold", color: adjustmentModalData.asset_change >= 0 ? "var(--fg-primary)" : "var(--fg-primary)" }}>
                     {adjustmentModalData.asset_change >= 0 ? "+" : ""}
                     {fmtMoney(adjustmentModalData.asset_change, adjustmentCurrency)}
                   </span>
@@ -1067,7 +1069,7 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.pnl_impact", language)}>
                 {adjustmentModalData.pnl_impact != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.pnl_impact >= 0 ? "#000" : "#000" }}>
+                  <span style={{ fontWeight: "bold", color: adjustmentModalData.pnl_impact >= 0 ? "var(--fg-primary)" : "var(--fg-primary)" }}>
                     {adjustmentModalData.pnl_impact >= 0 ? "+" : ""}
                     {fmtMoney(adjustmentModalData.pnl_impact, adjustmentCurrency)}
                   </span>

@@ -32,12 +32,16 @@ import {
 } from "recharts";
 import { motion } from "framer-motion";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
+
+const DEFAULT_DISCOUNT_RATE = 0.0485;
+const DEFAULT_DISCOUNT_RATE_SOURCE = "集团 IBR · 5 年期 · 2026-07 版";
 
 interface YearlyImpact {
   year: number;
@@ -92,6 +96,9 @@ export default function PreDealPage() {
   const [form] = Form.useForm();
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loading, setLoading] = useState(false);
+  const selectedDiscountRate = Form.useWatch("discount_rate", form);
+  const discountRateOverridden =
+    selectedDiscountRate != null && Math.abs(Number(selectedDiscountRate) - DEFAULT_DISCOUNT_RATE) > 0.000001;
 
   const handleBuild = async (values: any) => {
     if (!token) return;
@@ -127,19 +134,16 @@ export default function PreDealPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
-          <div style={{ marginBottom: 24 }}>
-            <Title level={2} style={{ marginBottom: 4, letterSpacing: "-0.04em" }}>
-              签约前决策
-            </Title>
-            <Text type="secondary">
-              签长期租约前，财务要回答的不是「IFRS 16 怎么记账」，而是「这个决定如何影响未来几年的经营结果」。
-            </Text>
-          </div>
+        <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+          <PageHeader
+            title="签约前决策"
+            subtitle={briefing ? `最近测算：${currency || "未定币种"} · ${briefing.yearly?.length || 0} 个年度期间` : "尚未生成方案 · 填写条款参数后开始测算"}
+          />
 
           <Form
             form={form}
             layout="vertical"
+            initialValues={{ discount_rate: DEFAULT_DISCOUNT_RATE }}
             onFinish={handleBuild}
           >
             <Card title="条款草案" style={{ borderRadius: 10, marginBottom: 16 }}>
@@ -169,7 +173,11 @@ export default function PreDealPage() {
                     label="折现率"
                     name="discount_rate"
                     rules={[{ required: true, message: "请填写折现率" }]}
-                    extra="入表金额取决于它"
+                    extra={
+                      <span>
+                        {DEFAULT_DISCOUNT_RATE_SOURCE} · {discountRateOverridden ? "已覆盖默认值" : "当前使用默认值"} · 仅用于本次情景测算
+                      </span>
+                    }
                   >
                     <InputNumber style={{ width: "100%" }} min={0.0001} max={1} step={0.005} precision={4} />
                   </Form.Item>
@@ -274,9 +282,9 @@ export default function PreDealPage() {
                       <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 10000)}万`} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value), currency)} />
                       <Legend />
-                      <Line type="monotone" dataKey="ifrs16_expense" name="IFRS 16 费用" stroke="#CF1322" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="straight_line_rent" name="直线租金" stroke="#1677FF" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                      <Line type="monotone" dataKey="cash_rent" name="现金租金" stroke="#8C8C8C" strokeWidth={1} dot={false} />
+                      <Line isAnimationActive={false} type="monotone" dataKey="ifrs16_expense" name="IFRS 16 费用" stroke="var(--state-error-text)" strokeWidth={2} dot={false} />
+                      <Line isAnimationActive={false} type="monotone" dataKey="straight_line_rent" name="直线租金" stroke="var(--chart-blue)" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                      <Line isAnimationActive={false} type="monotone" dataKey="cash_rent" name="现金租金" stroke="var(--fg-muted)" strokeWidth={1} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -295,11 +303,11 @@ export default function PreDealPage() {
                       <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 10000)}万`} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value), currency)} />
                       <Legend />
-                      <ReferenceLine y={0} stroke="#000" />
-                      <Bar dataKey="ebitda_uplift" name="EBITDA 抬升" fill="#389E0D" />
-                      <Bar dataKey="depreciation_below_ebitda" name="折旧（线下）" fill="#1677FF" />
-                      <Bar dataKey="interest_below_ebit" name="利息（EBIT 之下）" fill="#D48806" />
-                      <Bar dataKey="net_profit_impact" name="净利润影响" fill="#CF1322" />
+                      <ReferenceLine y={0} stroke="var(--fg-primary)" />
+                      <Bar isAnimationActive={false} dataKey="ebitda_uplift" name="EBITDA 抬升" fill="var(--state-success-text)" />
+                      <Bar isAnimationActive={false} dataKey="depreciation_below_ebitda" name="折旧（线下）" fill="var(--chart-blue)" />
+                      <Bar isAnimationActive={false} dataKey="interest_below_ebit" name="利息（EBIT 之下）" fill="var(--state-warning-text)" />
+                      <Bar isAnimationActive={false} dataKey="net_profit_impact" name="净利润影响" fill="var(--state-error-text)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -347,7 +355,7 @@ export default function PreDealPage() {
                       dataIndex: "pnl_impact",
                       align: "right" as const,
                       render: (value: number) => (
-                        <strong style={{ color: value > 0 ? "#CF1322" : "#389E0D" }}>
+                        <strong style={{ color: value > 0 ? "var(--state-error-text)" : "var(--state-success-text)" }}>
                           {fmtMoney(value, currency)}
                         </strong>
                       ),

@@ -2,12 +2,15 @@
 
 import React from "react";
 import { ConfigProvider } from "antd";
+import { MotionConfig } from "framer-motion";
 import { antdTheme } from "../design-system/theme";
 
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
-    <ConfigProvider theme={antdTheme}>
-      {children}
-    </ConfigProvider>
+    <MotionConfig reducedMotion="user">
+      <ConfigProvider theme={antdTheme}>
+        {children}
+      </ConfigProvider>
+    </MotionConfig>
   );
 }

@@ -1,10 +1,13 @@
 "use client";
 
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Typography, message } from "antd";
 import { ReloadOutlined, RobotOutlined, CheckCircleOutlined, DownloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
 import { performanceApi } from "../lib/api";
@@ -96,7 +99,7 @@ export default function PerformancePage() {
     { title: "四墙 EBITDA", dataIndex: "four_wall_ebitda", render: (value: number, row: FourWall) => money(value, row.currency) },
     { title: "租售比", dataIndex: "rent_to_sales", render: (value: number) => pct(value) },
     { title: "坪效", dataIndex: "sales_per_sqm", render: (value: number, row: FourWall) => value == null ? "—" : `${value.toLocaleString()} ${row.currency}/㎡` },
-    { title: "数据状态", key: "status", render: (_: unknown, row: FourWall) => row.data_ready ? <Tag color="success">可用于决策</Tag> : <Tag color="warning">缺口：{(row.data_gaps || []).join(", ") || row.reconciliation_status}</Tag> },
+    { title: "数据状态", key: "status", render: (_: unknown, row: FourWall) => row.data_ready ? <StatusTag kind="success">可用于决策</StatusTag> : <StatusTag kind="warning">缺口：{(row.data_gaps || []).join(", ") || row.reconciliation_status}</StatusTag> },
   ], []);
 
   const equipmentColumns = useMemo(() => [
@@ -105,23 +108,23 @@ export default function PerformancePage() {
     { title: "利用率", render: (_: unknown, row: EquipmentItem) => pct(row.fact.utilization_pct) },
     { title: "成本差异", render: (_: unknown, row: EquipmentItem) => row.bridge ? money(row.bridge.variance, row.fact.currency) : "—" },
     { title: "残差", render: (_: unknown, row: EquipmentItem) => row.bridge ? money(row.bridge.residual, row.fact.currency) : "—" },
-    { title: "数据状态", render: (_: unknown, row: EquipmentItem) => row.bridge?.ties_out ? <Tag color="success">桥接平衡</Tag> : <Tag color="warning">证据不足</Tag> },
+    { title: "数据状态", render: (_: unknown, row: EquipmentItem) => row.bridge?.ties_out ? <StatusTag kind="success">桥接平衡</StatusTag> : <StatusTag kind="warning">证据不足</StatusTag> },
   ], []);
 
   const actionColumns = useMemo(() => [
     { title: "异常 / 行动", key: "title", render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><strong>{row.title}</strong><Typography.Text type="secondary">{row.category} · {row.source_table}:{row.source_record_id}</Typography.Text></Space> },
     { title: "影响", render: (_: unknown, row: Action) => money(row.impact_amount, row.currency) },
-    { title: "优先级", dataIndex: "severity", render: (value: string) => <Tag color={value === "critical" || value === "high" ? "error" : "warning"}>{value}</Tag> },
-    { title: "状态", dataIndex: "status", render: (value: string) => <Tag>{value}</Tag> },
+    { title: "优先级", dataIndex: "severity", render: (value: string) => <StatusTag kind={statusKindFromAntColor(value === "critical" || value === "high" ? "error" : "warning")}>{value}</StatusTag> },
+    { title: "状态", dataIndex: "status", render: (value: string) => <StatusTag>{value}</StatusTag> },
     { title: "负责人 / 到期", render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><span>{row.owner_name || "未分配"}</span><Typography.Text type="secondary">{row.due_date || "无日期"}</Typography.Text></Space> },
     { title: "操作", key: "action", render: (_: unknown, row: Action) => row.status === "open" ? <Button size="small" icon={<CheckCircleOutlined />} onClick={() => acknowledge(row)}>确认</Button> : null },
   ], [token]);
 
-  return <ProtectedRoute><AppLayout><div style={{ padding: "24px 28px" }}>
-    <Space direction="vertical" size={4} style={{ width: "100%", marginBottom: 20 }}>
-      <Typography.Title level={2} style={{ margin: 0 }}>经营驾驶舱</Typography.Title>
-      <Typography.Text type="secondary">FP&A / Finance BP：发现偏差 → 核实证据 → 解释驱动 → 形成行动。当前输出为 Working 经营事实，不替代 Official 关账。</Typography.Text>
-    </Space>
+  return <ProtectedRoute><AppLayout><div>
+    <PageHeader
+      title="经营驾驶舱"
+      subtitle={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
+    />
     <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={period} onChange={event => setPeriod(event.target.value)} onPressEnter={load} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={load} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button></Space></Card>
     {overview && <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="门店事实" value={overview.store_fact_count} suffix={<Typography.Text type="secondary">/ {overview.store_fact_ready_count} 已对账</Typography.Text>} /></Card></Col>

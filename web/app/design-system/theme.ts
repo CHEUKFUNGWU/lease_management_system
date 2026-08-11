@@ -11,10 +11,22 @@ export const antdTheme = {
   token: {
     // ── Core Colors ──
     colorPrimary: colors.foreground.primary,      // #000000
-    colorInfo: colors.foreground.tertiary,        // #595959
-    colorSuccess: colors.foreground.primary,      // Black — success is conveyed through icons + weight
-    colorWarning: colors.foreground.secondary,    // Dark gray
-    colorError: colors.foreground.primary,        // Black — errors are bold + icon
+    colorInfo: colors.state.info,
+    colorInfoBg: colors.status.processing.bg,
+    colorInfoBorder: colors.status.processing.border,
+    colorInfoText: colors.status.processing.text,
+    colorSuccess: colors.state.success,
+    colorSuccessBg: colors.status.success.bg,
+    colorSuccessBorder: colors.status.success.border,
+    colorSuccessText: colors.status.success.text,
+    colorWarning: colors.state.warning,
+    colorWarningBg: colors.status.warning.bg,
+    colorWarningBorder: colors.status.warning.border,
+    colorWarningText: colors.status.warning.text,
+    colorError: colors.state.error,
+    colorErrorBg: colors.status.error.bg,
+    colorErrorBorder: colors.status.error.border,
+    colorErrorText: colors.status.error.text,
 
     // ── Base ──
     colorBgBase: colors.background.page,          // #FFFFFF
@@ -353,11 +365,10 @@ export const antdTheme = {
 
     // ── Skeleton ──
     Skeleton: {
-      color: colors.background.inset,
-      colorGradientEnd: colors.background.surface,
+      gradientFromColor: colors.background.inset,
+      gradientToColor: colors.background.surface,
       paragraphLiHeight: 22,
       titleHeight: 16,
     },
   },
 } as const;
-

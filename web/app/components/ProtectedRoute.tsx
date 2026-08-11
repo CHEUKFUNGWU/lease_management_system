@@ -29,7 +29,10 @@ export default function ProtectedRoute({
           height: "100vh",
         }}
       >
-        <Spin size="large" tip="加载中..." />
+        <>
+          <Spin size="large" />
+          <span className="sr-only">加载中...</span>
+        </>
       </div>
     );
   }

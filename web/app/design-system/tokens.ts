@@ -1,8 +1,9 @@
 /**
  * Design Tokens — IFRS 16 Monochrome System
  *
- * The entire visual language is built on a 12-level grayscale.
- * In a no-color system, hierarchy is created through:
+ * The entire visual language is built on a grayscale-first system.
+ * Semantic color is reserved for state tags and is always paired with an icon
+ * and text so color is never the only signal. Hierarchy is created through:
  * 1. Contrast (darkness levels)
  * 2. Typography (weight, size, tracking)
  * 3. Spacing (density, breathing room)
@@ -26,7 +27,7 @@ export const colors = {
     primary: "#000000",     // Headlines, primary actions, key data
     secondary: "#262626",   // Body text, important labels
     tertiary: "#595959",    // Descriptions, metadata
-    muted: "#8C8C8C",       // Placeholders, disabled, hints
+    muted: "#737373",       // Placeholders, disabled, hints (AA on white)
     inverse: "#FFFFFF",     // Text on dark backgrounds
   },
 
@@ -37,12 +38,20 @@ export const colors = {
     inverse: "rgba(255,255,255,0.1)", // Borders on dark elements
   },
 
-  // State colors — extremely minimal, almost monochrome
+  // State colors — restrained semantic accents, all text passes WCAG AA.
   state: {
-    success: "#000000",     // Use with check icon, bold weight
-    warning: "#333333",     // Use with alert icon
-    error: "#000000",       // Use with x icon, bold weight + underline
-    info: "#595959",        // Use with info icon
+    success: "#216E39",
+    warning: "#8A5300",
+    error: "#A8071A",
+    info: "#1F4E9C",
+  },
+
+  status: {
+    success: { bg: "#ECF5EE", text: "#216E39", border: "#CFE5D6" },
+    processing: { bg: "#EDF2FA", text: "#1F4E9C", border: "#CFDDF2" },
+    warning: { bg: "#FDF3E3", text: "#8A5300", border: "#F0DCB8" },
+    error: { bg: "#FDEDED", text: "#A8071A", border: "#F5C9C9" },
+    neutral: { bg: "#F0F0F0", text: "#595959", border: "#E0E0E0" },
   },
 } as const;
 
@@ -101,7 +110,7 @@ export const depth = {
   // 3. Shadows (extremely subtle, only for floating elements)
 
   static: {
-    border: "1px solid #E5E5E5",
+    border: "1px solid #D9D9D9",
     background: "#FFFFFF",
   },
 
@@ -111,7 +120,7 @@ export const depth = {
   },
 
   card: {
-    border: "1px solid #E5E5E5",
+    border: "1px solid #D9D9D9",
     shadow: "0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04)",
   },
 

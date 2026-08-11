@@ -13,7 +13,6 @@
   --mono-40: #595959;
   --mono-60: #737373;
   --mono-70: #A6A6A6;
-  --mono-80: #A6A6A6;
   --mono-90: #D9D9D9;
   --mono-95: #F0F0F0;
   --mono-98: #F7F7F7;
@@ -35,7 +34,7 @@
 
   /* Border */
   --border-default: var(--mono-90);
-  --border-strong: var(--mono-80);
+  --border-strong: var(--mono-70);
   --border-subtle: var(--mono-95);
 
   /* Semantic and visualization tokens. Status colors are always paired with

@@ -11,11 +11,9 @@ module.exports = {
         mono: {
           0: "#000000",   // Primary text, key actions
           20: "#262626",  // Secondary text, hover on dark
-          30: "#434343",  // Strong borders, icons default
           40: "#595959",  // Body text, descriptions
           60: "#737373",  // Muted text, placeholders
-          70: "#A6A6A6",  // Borders on dark backgrounds
-          80: "#A6A6A6",  // Light borders, dividers
+          70: "#A6A6A6",  // Strong borders, scrollbar hover
           90: "#D9D9D9",  // Hover borders, active borders
           95: "#F0F0F0",  // Secondary backgrounds, table headers
           98: "#F7F7F7",  // Card backgrounds, subtle surfaces

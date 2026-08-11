@@ -9,6 +9,38 @@ interface TranslationDict {
 }
 
 const dict: TranslationDict = {
+  // API error messages
+  "api.session_expired": {
+    "zh-CN": "登录已过期，请重新登录。",
+    "zh-HK": "登入已過期，請重新登入。",
+    en: "Your session has expired. Please sign in again.",
+  },
+  "api.forbidden": {
+    "zh-CN": "当前账号没有执行此操作的权限。",
+    "zh-HK": "目前帳號沒有執行此操作的權限。",
+    en: "This account does not have permission to perform this action.",
+  },
+  "api.not_found": {
+    "zh-CN": "请求的数据不存在或已被移除。",
+    "zh-HK": "請求的資料不存在或已被移除。",
+    en: "The requested data does not exist or has been removed.",
+  },
+  "api.server_unavailable": {
+    "zh-CN": "服务暂时不可用，请稍后重试。",
+    "zh-HK": "服務暫時不可用，請稍後重試。",
+    en: "The service is temporarily unavailable. Please try again later.",
+  },
+  "api.network_error": {
+    "zh-CN": "网络连接失败，请检查服务状态后重试。",
+    "zh-HK": "網絡連線失敗，請檢查服務狀態後重試。",
+    en: "The network connection failed. Check the service status and try again.",
+  },
+  "api.request_failed": {
+    "zh-CN": "操作未完成，请检查输入后重试。",
+    "zh-HK": "操作未完成，請檢查輸入後重試。",
+    en: "The request could not be completed. Check the input and try again.",
+  },
+
   // AppLayout
   "nav.home": {
     "zh-CN": "首页",
@@ -494,6 +526,7 @@ const dict: TranslationDict = {
     "zh-HK": "暫無數據",
     en: "No data",
   },
+  "reports.empty_hint": { "zh-CN": "当前查询没有可展示的数据。可以先录入合同，或使用 AI 解析文件。", "zh-HK": "當前查詢沒有可展示的數據。可以先錄入合同，或使用 AI 解析文件。", en: "There is no data for this query. Add a contract or parse a file with AI to get started." },
   "reports.export_csv": {
     "zh-CN": "导出 CSV",
     "zh-HK": "導出 CSV",
@@ -890,6 +923,23 @@ const dict: TranslationDict = {
     "zh-HK": "全部狀態",
     en: "All Status",
   },
+  "contracts.filter_risk": { "zh-CN": "风险筛选", "zh-HK": "風險篩選", en: "Risk filter" },
+  "contracts.risk_missing_discount_rate": { "zh-CN": "缺折现率", "zh-HK": "缺折現率", en: "Discount rate missing" },
+  "contracts.filter_scope": { "zh-CN": "租赁范围", "zh-HK": "租賃範圍", en: "Lease scope" },
+  "contracts.filter_asset_type": { "zh-CN": "资产类型", "zh-HK": "資產類型", en: "Asset type" },
+  "contracts.filter_expiry": { "zh-CN": "到期区间", "zh-HK": "到期區間", en: "Expiry window" },
+  "contracts.expiry_90": { "zh-CN": "90 天内到期", "zh-HK": "90 天內到期", en: "Due within 90 days" },
+  "contracts.expiry_180": { "zh-CN": "180 天内到期", "zh-HK": "180 天內到期", en: "Due within 180 days" },
+  "contracts.scope_in_scope": { "zh-CN": "资本化", "zh-HK": "資本化", en: "In scope" },
+  "contracts.scope_short_term_exempt": { "zh-CN": "短期豁免", "zh-HK": "短期豁免", en: "Short-term exempt" },
+  "contracts.scope_low_value_exempt": { "zh-CN": "低价值豁免", "zh-HK": "低價值豁免", en: "Low-value exempt" },
+  "contracts.scope_not_a_lease": { "zh-CN": "非租赁", "zh-HK": "非租賃", en: "Not a lease" },
+  "contracts.asset_real_estate": { "zh-CN": "不动产", "zh-HK": "不動產", en: "Real estate" },
+  "contracts.asset_vehicle": { "zh-CN": "车辆", "zh-HK": "車輛", en: "Vehicle" },
+  "contracts.asset_it_equipment": { "zh-CN": "IT 设备", "zh-HK": "IT 設備", en: "IT equipment" },
+  "contracts.asset_machinery": { "zh-CN": "机器设备", "zh-HK": "機器設備", en: "Machinery" },
+  "contracts.asset_other": { "zh-CN": "其他", "zh-HK": "其他", en: "Other" },
+  "contracts.open": { "zh-CN": "打开合同", "zh-HK": "打開合同", en: "Open contract" },
   "contracts.col_number": {
     "zh-CN": "合同编号",
     "zh-HK": "合同編號",
@@ -950,6 +1000,7 @@ const dict: TranslationDict = {
     "zh-HK": "未找到匹配的合同",
     en: "No matching contracts found",
   },
+  "contracts.clear_filters": { "zh-CN": "清除筛选", "zh-HK": "清除篩選", en: "Clear filters" },
   "contracts.load_failed": {
     "zh-CN": "加载合同失败",
     "zh-HK": "加載合同失敗",
@@ -2385,6 +2436,11 @@ const dict: TranslationDict = {
     "zh-HK": "新增合同",
     en: "New Contract",
   },
+  "contract_new.subtitle": {
+    "zh-CN": "手工录入 · 也可改用 AI 上传解析",
+    "zh-HK": "手工錄入 · 也可改用 AI 上載解析",
+    en: "Manual entry · or use AI upload and parsing",
+  },
   "contract_new.back": {
     "zh-CN": "返回",
     "zh-HK": "返回",
@@ -3155,6 +3211,9 @@ const dict: TranslationDict = {
     "zh-HK": "這一類已清空",
     en: "Nothing waiting here",
   },
+  "todo.all_clear": { "zh-CN": "当前没有待处理事项", "zh-HK": "當前沒有待處理事項", en: "There is nothing waiting for you" },
+  "todo.start_contract": { "zh-CN": "新增合同", "zh-HK": "新增合同", en: "Add a contract" },
+  "todo.start_ai": { "zh-CN": "用 AI 解析合同", "zh-HK": "用 AI 解析合同", en: "Parse a contract with AI" },
   "todo.contracts_pending_review": {
     "zh-CN": "待复核合同",
     "zh-HK": "待覆核合同",
@@ -4618,6 +4677,11 @@ const dict: TranslationDict = {
     "zh-HK": "審計日誌",
     en: "Audit Logs",
   },
+  "audit.subtitle": {
+    "zh-CN": "共 {total} 条记录 · 最近 30 天",
+    "zh-HK": "共 {total} 條記錄 · 最近 30 天",
+    en: "{total} records · Last 30 days",
+  },
   "audit.filter_table": {
     "zh-CN": "表名",
     "zh-HK": "表名",
@@ -4849,6 +4913,11 @@ const dict: TranslationDict = {
     "zh-CN": "用户管理",
     "zh-HK": "用戶管理",
     en: "User Management",
+  },
+  "admin_users.subtitle": {
+    "zh-CN": "共 {count} 个用户 · 管理员可创建和维护账号",
+    "zh-HK": "共 {count} 個用戶 · 管理員可建立及維護帳號",
+    en: "{count} users · Admins can create and maintain accounts",
   },
   "admin_users.new_user": {
     "zh-CN": "新建用户",
@@ -6671,12 +6740,106 @@ const dict: TranslationDict = {
     "zh-HK": "搜尋中...",
     en: "Searching...",
   },
+  "search.action_new_contract": { "zh-CN": "新增合同", "zh-HK": "新增合同", en: "New contract" },
+  "search.action_ai_entry": { "zh-CN": "用 AI 录入合同", "zh-HK": "用 AI 錄入合同", en: "Enter contract with AI" },
+  "search.action_todo": { "zh-CN": "打开我的待办", "zh-HK": "打開我的待辦", en: "Open my work" },
+  "search.action_reports": { "zh-CN": "打开报表查询", "zh-HK": "打開報表查詢", en: "Open reports" },
+  "search.open_command_palette": { "zh-CN": "打开命令面板", "zh-HK": "打開命令面板", en: "Open command palette" },
+  "search.placeholder_short": { "zh-CN": "搜索", "zh-HK": "搜尋", en: "Search" },
+  "search.command_title": { "zh-CN": "搜索与快捷操作", "zh-HK": "搜尋與快捷操作", en: "Search and quick actions" },
+  "search.command_placeholder": { "zh-CN": "搜索合同、页面或操作…", "zh-HK": "搜尋合同、頁面或操作…", en: "Search contracts, pages, or actions…" },
+  "search.command_keyboard_hint": { "zh-CN": "↑↓ 选择 · Enter 打开 · Esc 关闭", "zh-HK": "↑↓ 選擇 · Enter 打開 · Esc 關閉", en: "↑↓ select · Enter open · Esc close" },
+  "search.command_scope_hint": { "zh-CN": "合同搜索走服务端筛选", "zh-HK": "合同搜尋走服務端篩選", en: "Contract search uses server-side filtering" },
+  "search.group_contracts": { "zh-CN": "合同", "zh-HK": "合同", en: "Contracts" },
+  "search.group_pages": { "zh-CN": "页面", "zh-HK": "頁面", en: "Pages" },
+  "search.group_actions": { "zh-CN": "操作", "zh-HK": "操作", en: "Actions" },
+  "search.group_daily": { "zh-CN": "日常作业", "zh-HK": "日常作業", en: "Daily work" },
+  "search.group_accounting": { "zh-CN": "会计与合规", "zh-HK": "會計與合規", en: "Accounting & compliance" },
+  "search.group_analysis": { "zh-CN": "分析与决策", "zh-HK": "分析與決策", en: "Analysis & decisions" },
+  "search.group_system": { "zh-CN": "系统", "zh-HK": "系統", en: "System" },
+
+  // Dashboard / report hand-off copy. Keep these labels stable because some
+  // are also embedded in the structured context sent to the AI assistant.
+  "dashboard.upcoming_critical_dates": { "zh-CN": "未来关键日期", "zh-HK": "未來關鍵日期", en: "Upcoming critical dates" },
+  "dashboard.reminder_days": { "zh-CN": "提醒提前 {days} 天", "zh-HK": "提醒提前 {days} 天", en: "Reminder {days} days ahead" },
+  "dashboard.overdue_days": { "zh-CN": "已逾期 {days} 天", "zh-HK": "已逾期 {days} 天", en: "Overdue by {days} days" },
+  "dashboard.within_days": { "zh-CN": "{days} 天内", "zh-HK": "{days} 天內", en: "Within {days} days" },
+  "dashboard.remaining_days": { "zh-CN": "剩余 {days} 天", "zh-HK": "剩餘 {days} 天", en: "{days} days remaining" },
+  "dashboard.no_upcoming_dates": { "zh-CN": "未来 90 天没有待处理关键日期", "zh-HK": "未來 90 天沒有待處理關鍵日期", en: "No critical dates due in the next 90 days" },
+  "critical_date.renewal_deadline": { "zh-CN": "续租截止", "zh-HK": "續租截止", en: "Renewal deadline" },
+  "critical_date.break_notice": { "zh-CN": "Break 通知", "zh-HK": "Break 通知", en: "Break notice" },
+  "critical_date.rent_review": { "zh-CN": "租金 Review", "zh-HK": "租金 Review", en: "Rent review" },
+  "critical_date.lease_expiry": { "zh-CN": "租约到期", "zh-HK": "租約到期", en: "Lease expiry" },
+  "critical_date.insurance_renewal": { "zh-CN": "保险续保", "zh-HK": "保險續保", en: "Insurance renewal" },
+  "critical_date.other": { "zh-CN": "其他", "zh-HK": "其他", en: "Other" },
+  "reports.ai_chat_mode": { "zh-CN": "报表口径", "zh-HK": "報表口徑", en: "Report basis" },
+  "reports.ai_chat_working": { "zh-CN": "Working 工作版", "zh-HK": "Working 工作版", en: "Working" },
+  "reports.ai_chat_official": { "zh-CN": "Official 正式版", "zh-HK": "Official 正式版", en: "Official" },
+  "reports.ai_chat_view": { "zh-CN": "视图", "zh-HK": "視圖", en: "View" },
+  "reports.ai_chat_granularity": { "zh-CN": "粒度", "zh-HK": "粒度", en: "Granularity" },
+  "reports.ai_chat_period": { "zh-CN": "期间", "zh-HK": "期間", en: "Period" },
+  "reports.ai_chat_interest": { "zh-CN": "利息", "zh-HK": "利息", en: "Interest" },
+  "reports.ai_chat_depreciation": { "zh-CN": "折旧", "zh-HK": "折舊", en: "Depreciation" },
+  "reports.ai_chat_closing_liability": { "zh-CN": "期末租赁负债", "zh-HK": "期末租賃負債", en: "Closing lease liability" },
+  "reports.ai_chat_closing_rou": { "zh-CN": "期末使用权资产", "zh-HK": "期末使用權資產", en: "Closing ROU asset" },
+  "reports.ai_chat_report_title": { "zh-CN": "报表", "zh-HK": "報表", en: "Report" },
+  "reports.amortization_group": { "zh-CN": "分组", "zh-HK": "分組", en: "Group" },
+  "ai.draft_select_at_least_one": { "zh-CN": "请至少选择一条草稿", "zh-HK": "請至少選擇一條草稿", en: "Select at least one draft" },
+  "settings.journal_policy_saved": { "zh-CN": "分录政策已保存", "zh-HK": "分錄政策已保存", en: "Journal policy saved" },
+  "nav.performance": { "zh-CN": "经营驾驶舱", "zh-HK": "經營駕駛艙", en: "Performance cockpit" },
+  "nav.portfolio": { "zh-CN": "组合分析", "zh-HK": "組合分析", en: "Portfolio analysis" },
+  "nav.sensitivity": { "zh-CN": "敏感性分析", "zh-HK": "敏感性分析", en: "Sensitivity analysis" },
+  "nav.deal_compare": { "zh-CN": "条款比价", "zh-HK": "條款比價", en: "Deal comparison" },
+  "nav.pre_deal": { "zh-CN": "签约前决策", "zh-HK": "簽約前決策", en: "Pre-deal decision" },
+  "nav.standards": { "zh-CN": "多准则对比", "zh-HK": "多準則對比", en: "Standards comparison" },
+  "nav.roi": { "zh-CN": "ROI 测算", "zh-HK": "ROI 測算", en: "ROI model" },
+  "nav.users": { "zh-CN": "用户管理", "zh-HK": "用戶管理", en: "User management" },
+  "nav.new": { "zh-CN": "新增", "zh-HK": "新增", en: "New" },
+  "nav.group_daily": { "zh-CN": "日常作业", "zh-HK": "日常作業", en: "Daily work" },
+  "nav.group_analysis": { "zh-CN": "分析与决策", "zh-HK": "分析與決策", en: "Analysis & decisions" },
+  "nav.group_accounting": { "zh-CN": "会计与合规", "zh-HK": "會計與合規", en: "Accounting & compliance" },
+  "nav.group_system": { "zh-CN": "系统", "zh-HK": "系統", en: "System" },
+  "nav.collapse": { "zh-CN": "折叠导航", "zh-HK": "摺疊導航", en: "Collapse navigation" },
+  "nav.expand": { "zh-CN": "展开导航", "zh-HK": "展開導航", en: "Expand navigation" },
+  "nav.language": { "zh-CN": "切换语言", "zh-HK": "切換語言", en: "Change language" },
+  "user.menu": { "zh-CN": "打开用户菜单", "zh-HK": "打開用戶選單", en: "Open user menu" },
+  "notif.pending": { "zh-CN": "待处理", "zh-HK": "待處理", en: "Pending" },
+  "notif.work_queue_item": { "zh-CN": "工作队列事项", "zh-HK": "工作隊列事項", en: "Work queue item" },
+  "notif.view_all": { "zh-CN": "查看全部待办 →", "zh-HK": "查看全部待辦 →", en: "View all work →" },
+  "dashboard.todo_title": { "zh-CN": "今日待办", "zh-HK": "今日待辦", en: "Today’s work" },
+  "dashboard.data_as_of": { "zh-CN": "数据截至", "zh-HK": "數據截至", en: "Data as of" },
+  "dashboard.multi_currency_note": { "zh-CN": "按币种拆分展示，未做跨币种相加", "zh-HK": "按幣種拆分展示，未做跨幣種相加", en: "Shown by currency; currencies are not added together" },
+  "dashboard.kpi_closing_basis": { "zh-CN": "按各币种最近一期期末余额", "zh-HK": "按各幣種最近一期期末餘額", en: "Latest closing balance by currency" },
+  "dashboard.work_queue_title": { "zh-CN": "需要你处理", "zh-HK": "需要你處理", en: "Needs your attention" },
+  "dashboard.open_work_queue": { "zh-CN": "去处理", "zh-HK": "去處理", en: "Open work queue" },
+  "dashboard.close_readiness": { "zh-CN": "本月结账就绪度", "zh-HK": "本月結賬就緒度", en: "Close readiness" },
+  "dashboard.blocking_items": { "zh-CN": "阻断项", "zh-HK": "阻斷項", en: "Blocking items" },
+  "dashboard.readiness_not_evaluated": { "zh-CN": "尚未执行就绪检查", "zh-HK": "尚未執行就緒檢查", en: "Readiness has not been evaluated" },
+  "contracts.col_identity": { "zh-CN": "合同标识", "zh-HK": "合同標識", en: "Contract" },
+  "contracts.col_liability": { "zh-CN": "租赁负债余额", "zh-HK": "租賃負債餘額", en: "Lease liability" },
+  "contracts.col_rou": { "zh-CN": "ROU 余额", "zh-HK": "ROU 餘額", en: "ROU balance" },
+  "contracts.col_current_rent": { "zh-CN": "当期租金", "zh-HK": "當期租金", en: "Current rent" },
+  "contracts.col_lease_scope": { "zh-CN": "租赁范围", "zh-HK": "租賃範圍", en: "Lease scope" },
+  "contracts.col_asset": { "zh-CN": "资产类型", "zh-HK": "資產類型", en: "Asset type" },
+  "contracts.discount_rate_missing": { "zh-CN": "缺折现率", "zh-HK": "缺折現率", en: "Discount rate missing" },
+  "monthly.process_title": { "zh-CN": "结账流程", "zh-HK": "結賬流程", en: "Close process" },
+  "monthly.process_select_period": { "zh-CN": "请选择会计期间", "zh-HK": "請選擇會計期間", en: "Select an accounting period" },
+  "monthly.process_readiness": { "zh-CN": "就绪检查", "zh-HK": "就緒檢查", en: "Readiness" },
+  "monthly.process_generate": { "zh-CN": "生成分录", "zh-HK": "生成分錄", en: "Generate entries" },
+  "monthly.process_review": { "zh-CN": "复核", "zh-HK": "覆核", en: "Review" },
+  "monthly.process_approve": { "zh-CN": "审批", "zh-HK": "審批", en: "Approve" },
+  "monthly.process_post": { "zh-CN": "过账", "zh-HK": "過賬", en: "Post" },
+  "monthly.process_lock": { "zh-CN": "锁定期间", "zh-HK": "鎖定期間", en: "Lock period" },
+  "monthly.process_complete": { "zh-CN": "本期已锁定", "zh-HK": "本期已鎖定", en: "Period locked" },
 };
 
 export function t(key: string, lang: Language, replacements?: Record<string, string>): string {
   const entry = dict[key];
   if (!entry) {
-    return key;
+    if (process.env.NODE_ENV !== "production") {
+      console.error(`[i18n] Missing translation key: ${key}`);
+    }
+    return "";
   }
   let text = entry[lang] || entry["zh-CN"];
   if (replacements) {

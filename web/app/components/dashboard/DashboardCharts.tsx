@@ -11,7 +11,7 @@ import { fmtNum } from "../../lib/format";
 import { ChartCard } from "./DashboardCards";
 import type { DashboardStatusDatum, DashboardTooltipDatum, LiabilityTrendPoint } from "./types";
 
-const PIE_COLORS = ["#000000", "#595959", "#BFBFBF", "#E5E5E5"];
+const PIE_COLORS = ["var(--fg-primary)", "var(--fg-tertiary)", "var(--fg-muted)", "var(--border-default)"];
 
 interface TooltipProps {
   active?: boolean;
@@ -27,8 +27,8 @@ function StatusPieTooltip({ active, payload, language }: TooltipProps & { langua
   return (
     <div
       style={{
-        background: "#fff",
-        border: "1px solid #E5E5E5",
+        background: "var(--fg-inverse)",
+        border: "1px solid var(--border-default)",
         borderRadius: 8,
         padding: "8px 12px",
         boxShadow: "0 0 0 1px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)",
@@ -36,7 +36,7 @@ function StatusPieTooltip({ active, payload, language }: TooltipProps & { langua
       }}
     >
       <span style={{ fontWeight: 600 }}>{data.name}</span>
-      <span style={{ marginLeft: 8, color: "#595959" }}>
+      <span style={{ marginLeft: 8, color: "var(--fg-tertiary)" }}>
         {data.value} {t("dashboard.copies", language)}
       </span>
     </div>
@@ -65,8 +65,8 @@ function TrendTooltip({
   return (
     <div
       style={{
-        background: "#fff",
-        border: "1px solid #E5E5E5",
+        background: "var(--fg-inverse)",
+        border: "1px solid var(--border-default)",
         borderRadius: 8,
         padding: "8px 12px",
         boxShadow: "0 0 0 1px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)",
@@ -77,7 +77,7 @@ function TrendTooltip({
       {payload.map((item) => (
         <div key={item.name} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ width: 8, height: 8, borderRadius: 2, background: item.color }} />
-          <span style={{ color: "#595959" }}>{item.name}</span>
+          <span style={{ color: "var(--fg-tertiary)" }}>{item.name}</span>
           <span style={{ fontWeight: 600, marginLeft: "auto", paddingLeft: 12 }}>{fmtNum(item.value)}</span>
         </div>
       ))}
@@ -113,16 +113,16 @@ export function LiabilityTrendCard({
         ) : hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-inset)" vertical={false} />
               <XAxis
                 dataKey="period"
-                tick={{ fontSize: 11, fill: "#8C8C8C" }}
+                tick={{ fontSize: 11, fill: "var(--fg-muted)" }}
                 tickLine={false}
-                axisLine={{ stroke: "#E5E5E5" }}
+                axisLine={{ stroke: "var(--border-default)" }}
                 minTickGap={24}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "#8C8C8C" }}
+                tick={{ fontSize: 11, fill: "var(--fg-muted)" }}
                 tickLine={false}
                 axisLine={false}
                 width={56}
@@ -135,20 +135,20 @@ export function LiabilityTrendCard({
                 iconType="plainline"
                 wrapperStyle={{ fontSize: 12 }}
               />
-              <Line
+              <Line isAnimationActive={false}
                 type="monotone"
                 dataKey="liability"
                 name={t("dashboard.trend_liability", language)}
-                stroke="#000000"
+                stroke="var(--fg-primary)"
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
               />
-              <Line
+              <Line isAnimationActive={false}
                 type="monotone"
                 dataKey="rou"
                 name={t("dashboard.trend_rou", language)}
-                stroke="#8C8C8C"
+                stroke="var(--fg-muted)"
                 strokeWidth={2}
                 strokeDasharray="5 4"
                 dot={false}
@@ -181,7 +181,7 @@ export function ContractStatusCard({
         {hasStatusData ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie
+              <Pie isAnimationActive={false}
                 data={statusData}
                 cx="50%"
                 cy="50%"
@@ -223,7 +223,7 @@ export function ContractStatusCard({
                   background: PIE_COLORS[index],
                 }}
               />
-              <span style={{ fontSize: 12, color: "#595959" }}>
+              <span style={{ fontSize: 12, color: "var(--fg-tertiary)" }}>
                 {item.name} ({item.value})
               </span>
             </div>

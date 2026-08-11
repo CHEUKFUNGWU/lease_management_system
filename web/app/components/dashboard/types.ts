@@ -18,11 +18,9 @@ export interface DashboardTooltipDatum {
   value?: number;
 }
 
-export interface DashboardQuickAction {
-  icon: ReactNode;
-  label: string;
-  description: string;
-  onClick: () => void;
+export interface MoneySlice {
+  currency: string;
+  value: number;
 }
 
 export interface DashboardRecentContract {
@@ -58,8 +56,16 @@ export interface LiabilityTrendPoint {
 }
 
 export interface DashboardMoneyKPIs {
-  totalLiability: number;
-  totalROU: number;
-  monthExpense: number;
-  next12mCashOut: number;
+  totalLiability: MoneySlice[];
+  monthExpense: MoneySlice[];
+}
+
+export interface DashboardWorkQueue {
+  total: number;
+  contracts_pending_review: number;
+  contracts_pending_approval: number;
+  events_pending: number;
+  entries_pending_approval: number;
+  entries_pending_posting: number;
+  critical_dates_due: number;
 }

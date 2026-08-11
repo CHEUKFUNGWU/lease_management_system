@@ -1,77 +1,69 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { Button, Col, Row, Spin, Tag } from "antd";
-import {
-  BarChartOutlined,
-  FileTextOutlined,
-  PlusOutlined,
-  RobotOutlined,
-} from "@ant-design/icons";
+import { Button, Col, Row, Skeleton, Spin } from "antd";
+import { PlusOutlined, RobotOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { DashboardHeader, MoneyKPICard } from "./components/dashboard/DashboardCards";
-import { ContractStatusCard, LiabilityTrendCard } from "./components/dashboard/DashboardCharts";
-import {
-  QuickActionsCard,
-  RecentContractsCard,
-  UpcomingDatesCard,
-} from "./components/dashboard/DashboardLists";
-import type {
-  DashboardMoneyKPIs,
-  DashboardQuickAction,
-  DashboardRecentContract,
-  DashboardStats,
-  DashboardStatusDatum,
-  DashboardUpcomingDate,
-  LiabilityTrendPoint,
-} from "./components/dashboard/types";
-import { staggerContainer } from "./design-system/animations";
+import { UpcomingDatesCard, WorkQueueSummaryCard } from "./components/dashboard/DashboardLists";
+import type { DashboardMoneyKPIs, DashboardUpcomingDate, DashboardWorkQueue, MoneySlice } from "./components/dashboard/types";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
-import { contractApi, leaseAdminApi, reportApi } from "./lib/api";
-import { t, type Language } from "./lib/i18n";
+import { leaseAdminApi, monthlyClosingApi, reportApi, workQueueApi } from "./lib/api";
+import { t } from "./lib/i18n";
 
-const APPROVAL_STATUS_COLORS: Record<string, string> = {
-  draft: "default",
-  submitted: "processing",
-  reviewed: "processing",
-  pending_review: "processing",
-  pending_approval: "warning",
-  approved: "success",
-  rejected: "error",
-  returned_to_editor: "orange",
+const emptyMoney = (): MoneySlice[] => [];
+const emptyKpis = (): DashboardMoneyKPIs => ({
+  totalLiability: emptyMoney(),
+  monthExpense: emptyMoney(),
+});
+const emptyQueue: DashboardWorkQueue = {
+  total: 0,
+  contracts_pending_review: 0,
+  contracts_pending_approval: 0,
+  events_pending: 0,
+  entries_pending_approval: 0,
+  entries_pending_posting: 0,
+  critical_dates_due: 0,
 };
 
-const APPROVAL_STATUS_I18N_KEYS: Record<string, string> = {
-  draft: "status.draft",
-  submitted: "status.submitted",
-  reviewed: "status.reviewed",
-  pending_review: "status.submitted",
-  pending_approval: "status.pending_approval",
-  approved: "status.approved",
-  rejected: "status.rejected",
-  returned_to_editor: "status.returned_to_editor",
-};
-
-function getApprovalStatusColor(status: string): string {
-  return APPROVAL_STATUS_COLORS[status] || "default";
+function summedMoney(rows: any[], valueKeys: string[], predicate?: (row: any) => boolean): MoneySlice[] {
+  const currencies = new Set(
+    rows.filter((row) => !predicate || predicate(row)).map((row) => String(row.currency || "—").toUpperCase())
+  );
+  return Array.from(currencies)
+    .map((currency) => ({
+      currency,
+      value: rows
+        .filter((row) => String(row.currency || "—").toUpperCase() === currency && (!predicate || predicate(row)))
+        .reduce((sum, row) => sum + valueKeys.reduce((rowSum, key) => rowSum + Number(row[key] || 0), 0), 0),
+    }))
+    .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
-function getApprovalStatusLabel(status: string, language: Language): string {
-  const key = APPROVAL_STATUS_I18N_KEYS[status];
-  return key ? t(key, language) : status || t("status.draft", language);
-}
-
-function getErrorMessage(error: unknown): string | undefined {
-  if (typeof error === "object" && error !== null && "message" in error) {
-    const candidate = (error as { message?: unknown }).message;
-    return typeof candidate === "string" ? candidate : undefined;
-  }
-  return undefined;
+function latestPerCurrency(rows: any[], currentKey: string, valueKey: string): MoneySlice[] {
+  const byCurrencyPeriod = new Map<string, { currency: string; period: string; value: number }>();
+  rows.forEach((row) => {
+    const currency = String(row.currency || "—").toUpperCase();
+    const period = String(row.period_key || "");
+    if (period > currentKey) return;
+    const key = `${currency}|${period}`;
+    const existing = byCurrencyPeriod.get(key);
+    byCurrencyPeriod.set(key, {
+      currency,
+      period,
+      value: (existing?.value || 0) + Number(row[valueKey] || 0),
+    });
+  });
+  const latest = new Map<string, { currency: string; period: string; value: number }>();
+  byCurrencyPeriod.forEach((row) => {
+    const existing = latest.get(row.currency);
+    if (!existing || row.period > existing.period) latest.set(row.currency, row);
+  });
+  return Array.from(latest.values()).map(({ currency, value }) => ({ currency, value }));
 }
 
 export default function HomePage() {
@@ -79,284 +71,131 @@ export default function HomePage() {
   const { language } = useLanguage();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<DashboardStats>({
-    total: 0,
-    approved: 0,
-    pending: 0,
-    draft: 0,
-  });
-  const [recentContracts, setRecentContracts] = useState<DashboardRecentContract[]>([]);
+  const [financialLoading, setFinancialLoading] = useState(true);
+  const [moneyKpis, setMoneyKpis] = useState<DashboardMoneyKPIs>(emptyKpis());
   const [upcomingDates, setUpcomingDates] = useState<DashboardUpcomingDate[]>([]);
-  const [moneyKpis, setMoneyKpis] = useState<DashboardMoneyKPIs>({
-    totalLiability: 0,
-    totalROU: 0,
-    monthExpense: 0,
-    next12mCashOut: 0,
-  });
-  const [trendData, setTrendData] = useState<LiabilityTrendPoint[]>([]);
-  const [trendLoading, setTrendLoading] = useState(true);
+  const [queue, setQueue] = useState<DashboardWorkQueue>(emptyQueue);
+  const [readiness, setReadiness] = useState<{ status?: string; blocking_count?: number; evaluated_at?: string } | null>(null);
 
-  const statusData = useMemo<DashboardStatusDatum[]>(() => {
-    const items: DashboardStatusDatum[] = [
-      { name: t("dashboard.approved", language), value: stats.approved, key: "approved" },
-      { name: t("dashboard.pending", language), value: stats.pending, key: "pending" },
-      { name: t("dashboard.draft", language), value: stats.draft, key: "draft" },
-      {
-        name: t("status.rejected", language),
-        value: stats.total - stats.approved - stats.pending - stats.draft,
-        key: "rejected",
-      },
-    ];
-    return items.filter((item) => item.value > 0);
-  }, [language, stats]);
-
-  const quickActions = useMemo<DashboardQuickAction[]>(
-    () => [
-      {
-        icon: <PlusOutlined />,
-        label: t("dashboard.add_contract", language),
-        description: t("dashboard.add_contract_desc", language),
-        onClick: () => router.push("/contracts/new"),
-      },
-      {
-        icon: <RobotOutlined />,
-        label: t("dashboard.upload_file", language),
-        description: t("dashboard.upload_file_desc", language),
-        onClick: () => router.push("/ai-chat"),
-      },
-      {
-        icon: <BarChartOutlined />,
-        label: t("dashboard.view_report", language),
-        description: t("dashboard.view_report_desc", language),
-        onClick: () => router.push("/reports"),
-      },
-    ],
-    [language, router]
+  const period = dayjs().format("YYYY-MM");
+  const subtitle = useMemo(
+    () => `${period} · ${t("reports.working", language)} · ${t("dashboard.data_as_of", language)} ${dayjs().format("YYYY-MM-DD HH:mm")}`,
+    [language, period]
   );
 
   useEffect(() => {
-    if (!token) {
-      return;
-    }
-
-    const loadDashboard = async () => {
+    if (!token) return;
+    let cancelled = false;
+    const load = async () => {
       setLoading(true);
       try {
-        const contractResponse = await contractApi.list(token);
-        const contracts: DashboardRecentContract[] = contractResponse.data || [];
-        const total = contractResponse.total || contracts.length;
-
-        const approved = contracts.filter((contract) => contract.approval_status === "approved").length;
-        const pending = contracts.filter((contract) =>
-          contract.approval_status === "pending_review" ||
-          contract.approval_status === "pending_approval" ||
-          contract.approval_status === "submitted"
-        ).length;
-        const draft = contracts.filter(
-          (contract) => contract.approval_status === "draft" || !contract.approval_status
-        ).length;
-
-        setStats({ total, approved, pending, draft });
-        setRecentContracts(contracts.slice(0, 6));
-
-        const reminderResponse = await leaseAdminApi.listUpcomingCriticalDates(token, { days: 90, limit: 8 });
-        setUpcomingDates(reminderResponse.data || []);
-      } catch (error) {
-        console.error("Failed to load dashboard data:", error);
-        const message = getErrorMessage(error);
-        if (message) {
-          console.warn(message);
-        }
+        const [queueRes, datesRes, readinessRes] = await Promise.all([
+          workQueueApi.get(token),
+          leaseAdminApi.listUpcomingCriticalDates(token, { days: 90, limit: 8 }),
+          monthlyClosingApi.getReadiness(period, token),
+        ]);
+        if (cancelled) return;
+        const source = queueRes || {};
+        setQueue({
+          ...emptyQueue,
+          total: Number(source.total || 0),
+          ...Object.fromEntries(Object.keys(emptyQueue).filter((key) => key !== "total").map((key) => [key, Array.isArray(source[key]) ? source[key].length : Number(source[key] || 0)])),
+        });
+        setUpcomingDates(datesRes.data || []);
+        setReadiness(readinessRes);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+    load().catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [period, token]);
 
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
     const loadFinancials = async () => {
-      setTrendLoading(true);
+      setFinancialLoading(true);
       try {
         const start = dayjs().subtract(6, "month").startOf("month");
         const end = dayjs().add(12, "month").endOf("month");
-        const res = await reportApi.amortization(
-          {
-            mode: "working",
-            view: "summary",
-            granularity: "month",
-            start_date: start.format("YYYY-MM-DD"),
-            end_date: end.format("YYYY-MM-DD"),
-          },
-          token
-        );
-        const rows: any[] = (res.data || []).slice().sort((a: any, b: any) =>
-          String(a.period_key).localeCompare(String(b.period_key))
-        );
-
-        setTrendData(
-          rows.map((row) => ({
-            period: row.period_key,
-            liability: row.closing_liability || 0,
-            rou: row.closing_rou_asset || 0,
-          }))
-        );
-
+        const response = await reportApi.amortization({ mode: "working", view: "summary", granularity: "month", start_date: start.format("YYYY-MM-DD"), end_date: end.format("YYYY-MM-DD") }, token);
+        if (cancelled) return;
+        const rows: any[] = (response.data || []).slice();
         const currentKey = dayjs().format("YYYY-MM");
-        const pastRows = rows.filter((row) => String(row.period_key) <= currentKey);
-        const currentRow = pastRows.length ? pastRows[pastRows.length - 1] : null;
-        const currentMonthRow = rows.find((row) => String(row.period_key) === currentKey);
-
-        const next12mEnd = dayjs().add(11, "month").format("YYYY-MM");
-        const next12mCashOut = rows
-          .filter((row) => String(row.period_key) >= currentKey && String(row.period_key) <= next12mEnd)
-          .reduce(
-            (sum, row) =>
-              sum + (row.payment || 0) + (row.variable_rent_expense || 0) + (row.non_lease_expense || 0),
-            0
-          );
-
+        const expenseRows = rows.filter((row) => String(row.period_key) === currentKey);
         setMoneyKpis({
-          totalLiability: currentRow?.closing_liability || 0,
-          totalROU: currentRow?.closing_rou_asset || 0,
-          monthExpense: (currentMonthRow?.interest_expense || 0) + (currentMonthRow?.depreciation || 0),
-          next12mCashOut,
+          totalLiability: latestPerCurrency(rows, currentKey, "closing_liability"),
+          monthExpense: summedMoney(expenseRows, ["interest_expense", "depreciation"]),
         });
-      } catch (error) {
-        console.error("Failed to load dashboard financials:", error);
       } finally {
-        setTrendLoading(false);
+        if (!cancelled) setFinancialLoading(false);
       }
     };
-
-    loadDashboard();
-    loadFinancials();
+    loadFinancials().catch(() => { if (!cancelled) setFinancialLoading(false); });
+    return () => { cancelled = true; };
   }, [token]);
 
-  const getDateUrgency = (targetDate: string) => {
-    const days = dayjs(targetDate).startOf("day").diff(dayjs().startOf("day"), "day");
-    if (days < 0) {
-      return { color: "error", text: t("dashboard.overdue_days", language, { days: String(Math.abs(days)) }) };
-    }
-    if (days <= 7) {
-      return { color: "warning", text: t("dashboard.within_days", language, { days: String(days) }) };
-    }
-    return { color: "processing", text: t("dashboard.remaining_days", language, { days: String(days) }) };
-  };
-
-  const getStatusTag = (status: string) => (
-    <Tag color={getApprovalStatusColor(status)}>{getApprovalStatusLabel(status, language)}</Tag>
-  );
+  const readinessLabel = readiness?.status === "blocked"
+    ? t("todo.readiness_blocked", language)
+    : readiness?.status === "ready" ? t("todo.readiness_ready", language) : t("todo.readiness_not_run", language);
 
   return (
     <ProtectedRoute>
       <AppLayout>
         <DashboardHeader
-          title={t("dashboard.title", language)}
-          subtitle={t("dashboard.subtitle", language)}
-          primaryAction={
-            <Button
-              icon={<PlusOutlined />}
-              onClick={() => router.push("/contracts/new")}
-              style={{ borderRadius: 9999, fontWeight: 500 }}
-            >
-              {t("dashboard.add_contract", language)}
-            </Button>
-          }
-          secondaryAction={
-            <Button
-              icon={<RobotOutlined />}
-              onClick={() => router.push("/ai-chat")}
-              style={{ borderRadius: 9999, fontWeight: 500 }}
-            >
-              {t("dashboard.upload_file", language)}
-            </Button>
-          }
+          title={t("dashboard.todo_title", language)}
+          subtitle={subtitle}
+          primaryAction={<Button icon={<PlusOutlined />} onClick={() => router.push("/contracts/new")}>{t("dashboard.add_contract", language)}</Button>}
+          secondaryAction={<Button icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>}
         />
 
-        <Spin spinning={loading} tip={t("dashboard.loading", language)}>
-          <motion.div variants={staggerContainer} initial="initial" animate="animate">
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12} lg={6}>
-                <MoneyKPICard
-                  title={t("dashboard.kpi_total_liability", language)}
-                  value={moneyKpis.totalLiability}
-                  loading={trendLoading}
-                />
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <MoneyKPICard
-                  title={t("dashboard.kpi_total_rou", language)}
-                  value={moneyKpis.totalROU}
-                  loading={trendLoading}
-                />
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <MoneyKPICard
-                  title={t("dashboard.kpi_month_expense", language)}
-                  value={moneyKpis.monthExpense}
-                  subtitle={t("dashboard.kpi_month_expense_sub", language)}
-                  loading={trendLoading}
-                />
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <MoneyKPICard
-                  title={t("dashboard.kpi_next12m_cashout", language)}
-                  value={moneyKpis.next12mCashOut}
-                  loading={trendLoading}
-                />
-              </Col>
-            </Row>
+        <Spin spinning={loading}>
+          <div className="dashboard-work-queue" style={{ marginBottom: 16 }}>
+            <WorkQueueSummaryCard queue={queue} language={language} onOpen={() => router.push("/todo")} />
+          </div>
 
-            {!loading && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#8C8C8C" }}>
-                <FileTextOutlined style={{ marginRight: 6, fontSize: 12 }} />
-                {t("dashboard.kpi_contracts_sub", language, {
-                  total: String(stats.total),
-                  approved: String(stats.approved),
-                  pending: String(stats.pending),
-                  draft: String(stats.draft),
-                })}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <MoneyKPICard title={t("dashboard.kpi_total_liability", language)} value={moneyKpis.totalLiability} subtitle={moneyKpis.totalLiability.length > 1 ? t("dashboard.multi_currency_note", language) : t("dashboard.kpi_closing_basis", language)} loading={financialLoading} />
+            </Col>
+            <Col xs={24} lg={12}>
+              <MoneyKPICard title={t("dashboard.kpi_month_expense", language)} value={moneyKpis.monthExpense} subtitle={t("dashboard.kpi_month_expense_sub", language)} loading={financialLoading} />
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} lg={16}>
+              <UpcomingDatesCard
+                dates={upcomingDates}
+                language={language}
+                getDateUrgency={(targetDate) => {
+                  const days = dayjs(targetDate).startOf("day").diff(dayjs().startOf("day"), "day");
+                  return days < 0
+                    ? { kind: "error", text: t("dashboard.overdue_days", language, { days: String(Math.abs(days)) }) }
+                    : days <= 7
+                      ? { kind: "warning", text: t("dashboard.within_days", language, { days: String(days) }) }
+                      : { kind: "processing", text: t("dashboard.remaining_days", language, { days: String(days) }) };
+                }}
+                onOpenContract={(contractId) => router.push(`/contracts/${contractId}`)}
+              />
+            </Col>
+            <Col xs={24} lg={8}>
+              <div className="dashboard-readiness-card" style={{ minHeight: 188, padding: 20, border: "1px solid var(--border-strong)", borderRadius: 10, background: "var(--bg-surface)" }}>
+                <div style={{ fontSize: 12, color: "var(--fg-tertiary)", marginBottom: 8 }}>{t("dashboard.close_readiness", language)}</div>
+                {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
+                  <>
+                    <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{readinessLabel}</div>
+                    <div style={{ color: "var(--fg-tertiary)", fontSize: 13 }}>{t("dashboard.blocking_items", language)}: <strong>{readiness?.blocking_count ?? 0}</strong></div>
+                    <div style={{ color: "var(--fg-muted)", fontSize: 12, marginTop: 8 }}>{readiness?.evaluated_at ? `${t("dashboard.data_as_of", language)} ${dayjs(readiness.evaluated_at).format("YYYY-MM-DD HH:mm")}` : t("dashboard.readiness_not_evaluated", language)}</div>
+                    <Button type="link" size="small" style={{ padding: 0, marginTop: 12 }} onClick={() => router.push("/todo")}>{t("dashboard.open_work_queue", language)} <span aria-hidden="true">→</span></Button>
+                  </>
+                )}
               </div>
-            )}
-
-            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-              <Col xs={24} lg={16}>
-                <LiabilityTrendCard
-                  language={language}
-                  data={trendData}
-                  loading={trendLoading}
-                  onOpenReports={() => router.push("/reports")}
-                />
-              </Col>
-              <Col xs={24} lg={8}>
-                <ContractStatusCard statusData={statusData} language={language} />
-              </Col>
-            </Row>
-
-            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-              <Col xs={24} lg={16}>
-                <RecentContractsCard
-                  contracts={recentContracts}
-                  language={language}
-                  getStatusTag={getStatusTag}
-                  onOpenAll={() => router.push("/contracts")}
-                  onOpenContract={(contractId) => router.push(`/contracts/${contractId}`)}
-                />
-              </Col>
-              <Col xs={24} lg={8}>
-                <QuickActionsCard actions={quickActions} language={language} />
-              </Col>
-            </Row>
-
-            <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-              <Col span={24}>
-                <UpcomingDatesCard
-                  dates={upcomingDates}
-                  language={language}
-                  getDateUrgency={getDateUrgency}
-                  onOpenContract={(contractId) => router.push(`/contracts/${contractId}`)}
-                />
-              </Col>
-            </Row>
-          </motion.div>
+            </Col>
+          </Row>
         </Spin>
       </AppLayout>
     </ProtectedRoute>

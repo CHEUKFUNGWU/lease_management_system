@@ -6,15 +6,16 @@ import { ArrowRightOutlined, BellOutlined } from "@ant-design/icons";
 import { Button, Card, Empty, List, Space, Tag } from "antd";
 import dayjs from "dayjs";
 import { t, type Language } from "../../lib/i18n";
-import type { DashboardQuickAction, DashboardRecentContract, DashboardUpcomingDate } from "./types";
+import type { DashboardRecentContract, DashboardUpcomingDate, DashboardWorkQueue } from "./types";
+import { StatusTag, type StatusKind } from "../StatusTag";
 
-const CRITICAL_DATE_LABELS: Record<string, string> = {
-  renewal_deadline: "续租截止",
-  break_notice: "Break 通知",
-  rent_review: "租金 Review",
-  lease_expiry: "租约到期",
-  insurance_renewal: "保险续保",
-  other: "其他",
+const CRITICAL_DATE_KEYS: Record<string, string> = {
+  renewal_deadline: "critical_date.renewal_deadline",
+  break_notice: "critical_date.break_notice",
+  rent_review: "critical_date.rent_review",
+  lease_expiry: "critical_date.lease_expiry",
+  insurance_renewal: "critical_date.insurance_renewal",
+  other: "critical_date.other",
 };
 
 interface RecentContractsCardProps {
@@ -40,7 +41,7 @@ export function RecentContractsCard({
           {t("dashboard.view_all", language)} <ArrowRightOutlined />
         </Button>
       }
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
       style={{ borderRadius: 10 }}
     >
       {contracts.length === 0 ? (
@@ -52,19 +53,19 @@ export function RecentContractsCard({
           dataSource={contracts}
           renderItem={(contract, index) => (
             <motion.div
-              initial={{ opacity: 0, y: 4 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.04, duration: 0.2 }}
             >
               <List.Item
                 style={{
                   padding: "14px 24px",
-                  borderBottom: "1px solid #F0F0F0",
+                  borderBottom: "1px solid var(--bg-inset)",
                   cursor: "pointer",
                   transition: "background 0.1s",
                 }}
                 onMouseEnter={(event) => {
-                  event.currentTarget.style.background = "#FAFAFA";
+                  event.currentTarget.style.background = "var(--bg-surface)";
                 }}
                 onMouseLeave={(event) => {
                   event.currentTarget.style.background = "transparent";
@@ -72,17 +73,17 @@ export function RecentContractsCard({
                 onClick={() => onOpenContract(contract.id)}
                 actions={[
                   getStatusTag(contract.approval_status),
-                  <ArrowRightOutlined key="arrow" style={{ color: "#BFBFBF", fontSize: 12 }} />,
+                  <ArrowRightOutlined key="arrow" style={{ color: "var(--fg-muted)", fontSize: 12 }} />,
                 ]}
               >
                 <List.Item.Meta
                   title={
-                    <span style={{ fontWeight: 600, fontSize: 14, color: "#000" }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: "var(--fg-primary)" }}>
                       {contract.contract_number || contract.contract_name}
                     </span>
                   }
                   description={
-                    <span style={{ color: "#8C8C8C", fontSize: 13 }}>
+                    <span style={{ color: "var(--fg-muted)", fontSize: 13 }}>
                       {contract.store_name || contract.lessor_name || contract.store_id || contract.legal_entity_id}
                     </span>
                   }
@@ -96,67 +97,28 @@ export function RecentContractsCard({
   );
 }
 
-interface QuickActionsCardProps {
-  actions: DashboardQuickAction[];
-  language: Language;
-}
-
-export function QuickActionsCard({ actions, language }: QuickActionsCardProps) {
+export function WorkQueueSummaryCard({ queue, language, onOpen }: { queue: DashboardWorkQueue; language: Language; onOpen: () => void }) {
+  const rows = [
+    ["todo.contracts_pending_review", queue.contracts_pending_review],
+    ["todo.contracts_pending_approval", queue.contracts_pending_approval],
+    ["todo.events_pending", queue.events_pending],
+    ["todo.entries_pending_approval", queue.entries_pending_approval],
+    ["todo.entries_pending_posting", queue.entries_pending_posting],
+    ["todo.critical_dates_due", queue.critical_dates_due],
+  ] as const;
   return (
     <Card
-      title={<span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>{t("dashboard.quick_actions", language)}</span>}
-      bodyStyle={{ padding: "12px 24px 24px" }}
-      style={{ borderRadius: 10, height: "100%" }}
+      title={<span style={{ fontSize: 15, fontWeight: 600 }}>{t("dashboard.work_queue_title", language)}</span>}
+      extra={<Button type="link" size="small" onClick={onOpen}>{t("dashboard.open_work_queue", language)} <ArrowRightOutlined /></Button>}
+      styles={{ body: { padding: "12px 20px 20px" } }}
+      style={{ borderRadius: 10 }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {actions.map((item, index) => (
-          <motion.div
-            key={item.label}
-            initial={{ opacity: 0, x: -4 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 + index * 0.05 }}
-            onClick={item.onClick}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-              padding: "12px 14px",
-              borderRadius: 8,
-              cursor: "pointer",
-              transition: "background 0.1s",
-              border: "1px solid transparent",
-            }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.background = "#FAFAFA";
-              event.currentTarget.style.borderColor = "#E5E5E5";
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.background = "transparent";
-              event.currentTarget.style.borderColor = "transparent";
-            }}
-          >
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 8,
-                background: "#F0F0F0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 16,
-                color: "#000",
-                flexShrink: 0,
-              }}
-            >
-              {item.icon}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 14, color: "#000", marginBottom: 2 }}>{item.label}</div>
-              <div style={{ fontSize: 12, color: "#8C8C8C" }}>{item.description}</div>
-            </div>
-            <ArrowRightOutlined style={{ marginLeft: "auto", color: "#BFBFBF", fontSize: 12, flexShrink: 0 }} />
-          </motion.div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+        {rows.map(([key, count]) => (
+          <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", background: "var(--bg-surface)", border: "1px solid var(--bg-inset)", borderRadius: 6 }}>
+            <span style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t(key, language)}</span>
+            <strong style={{ fontSize: 18, fontVariantNumeric: "tabular-nums" }}>{count}</strong>
+          </div>
         ))}
       </div>
     </Card>
@@ -166,7 +128,7 @@ export function QuickActionsCard({ actions, language }: QuickActionsCardProps) {
 interface UpcomingDatesCardProps {
   dates: DashboardUpcomingDate[];
   language: Language;
-  getDateUrgency: (targetDate: string) => { color: string; text: string };
+  getDateUrgency: (targetDate: string) => { kind: StatusKind; text: string };
   onOpenContract: (contractId: string) => void;
 }
 
@@ -184,10 +146,10 @@ export function UpcomingDatesCard({
           <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
             {t("dashboard.upcoming_critical_dates", language)}
           </span>
-          {dates.length > 0 && <Tag color="processing">{dates.length}</Tag>}
+          {dates.length > 0 && <StatusTag kind="processing">{dates.length}</StatusTag>}
         </Space>
       }
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
       style={{ borderRadius: 10 }}
     >
       {dates.length === 0 ? (
@@ -204,15 +166,15 @@ export function UpcomingDatesCard({
                 style={{ padding: "14px 24px", cursor: "pointer" }}
                 onClick={() => onOpenContract(item.contract_id)}
                 actions={[
-                  <Tag key="type">{CRITICAL_DATE_LABELS[item.date_type] || item.date_type}</Tag>,
-                  <Tag key="urgency" color={urgency.color}>{urgency.text}</Tag>,
-                  <ArrowRightOutlined key="arrow" style={{ color: "#BFBFBF", fontSize: 12 }} />,
+                  <StatusTag key="type">{t(CRITICAL_DATE_KEYS[item.date_type] || "critical_date.other", language)}</StatusTag>,
+                  <StatusTag key="urgency" kind={urgency.kind}>{urgency.text}</StatusTag>,
+                  <ArrowRightOutlined key="arrow" style={{ color: "var(--fg-muted)", fontSize: 12 }} />,
                 ]}
               >
                 <List.Item.Meta
                   title={<span style={{ fontWeight: 600 }}>{item.title}</span>}
                   description={
-                    <span style={{ color: "#8C8C8C" }}>
+                    <span style={{ color: "var(--fg-muted)" }}>
                       {dayjs(item.target_date).format("YYYY-MM-DD")} · {t("dashboard.reminder_days", language, { days: String(item.reminder_days) })}
                       {item.description ? ` · ${item.description}` : ""}
                     </span>

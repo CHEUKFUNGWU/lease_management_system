@@ -1,0 +1,88 @@
+import type { RetailBridge, RetailKPIValue, RetailStore360Option, RetailStore360SummaryMetric, RetailStoreDiagnosticsResponse, RetailSummaryMetric } from "../lib/api";
+import { formatKPIValue, formatSignalValue, KPI_LABELS, metricStatusLabel, metricUnitLabel } from "../operating-pulse/logic";
+
+export const STORE360_CODES = ["revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "store_contribution"] as const;
+export const STORE360_AUX_CODES = ["average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution_margin", "sales_per_sqm"] as const;
+export const WINDOW_OPTIONS = [7, 14, 28] as const;
+
+export function validWindow(value: number): value is 7 | 14 | 28 {
+  return WINDOW_OPTIONS.includes(value as 7 | 14 | 28);
+}
+
+export function optionFields(option: RetailStore360Option) {
+  return {
+    storeID: option.store_id,
+    storeCode: option.store_code,
+    storeName: option.store_name,
+    brand: option.brand,
+    region: option.region,
+  };
+}
+
+export function diagnosticQueryKey(params: { storeID: string; classification: string; datasetVersion: string; asOf: string; windowDays: number; sourceSystem: string }): string {
+  return [params.storeID, params.classification, params.datasetVersion, params.asOf, params.windowDays, params.sourceSystem].join("|");
+}
+
+export function returnPulseQuery(params: URLSearchParams): string {
+  const encodedReturn = params.get("return_query");
+  if (encodedReturn) {
+    return `/operating-pulse?${encodedReturn}`;
+  }
+  const next = new URLSearchParams();
+  ["data_classification", "dataset_version", "as_of", "window_days", "source_system"].forEach((key) => {
+    const value = params.get(key);
+    if (value) next.set(key, value);
+  });
+  params.getAll("store_id").filter(Boolean).forEach((id) => next.append("store_id", id));
+  return `/operating-pulse${next.toString() ? `?${next.toString()}` : ""}`;
+}
+
+export function bridgeTone(value: number | null): "positive" | "negative" | "neutral" {
+  if (value == null || Math.abs(value) < 0.005) return "neutral";
+  return value > 0 ? "positive" : "negative";
+}
+
+export function formatBridgeItem(value: number | null, unit: string, currency: string): string {
+  return formatSignalValue(value, unit, currency);
+}
+
+export function bridgeConservation(bridge: RetailBridge): number | null {
+  if (bridge.total_change == null) return null;
+  const sum = bridge.items.reduce((total, item) => total + (item.contribution || 0), 0);
+  return sum + (bridge.rounding_residual || 0) - bridge.total_change;
+}
+
+export function trendValue(row: RetailStoreDiagnosticsResponse["daily_trend"][number], code: string): number | null {
+	if (row.gap) return null;
+	return row.target_kpis[code]?.value ?? null;
+}
+
+export function formatPeerBenchmarkStatus(status: string, reason?: string): string {
+	const labels: Record<string, string> = {
+		complete: "可用",
+		insufficient_peers: "同群样本不足",
+		unavailable: "不可用",
+	};
+	const label = labels[status] || status;
+	return reason ? `${label} · ${reason}` : label;
+}
+
+export function formatTrendTooltip(value: number | null, series: string, gap: boolean, unit: string, currency: string): [string, string] {
+	const label = series === "target" ? "目标门店" : "同群中位数";
+	if (series === "target" && gap) return ["数据缺口", label];
+	return [formatSignalValue(value, unit, currency), label];
+}
+
+export function summaryStatus(metric: RetailStore360SummaryMetric | undefined): { label: string; reason?: string } {
+  return metricStatusLabel(metric as RetailSummaryMetric | undefined);
+}
+
+export function displayMetric(metric: RetailStore360SummaryMetric | undefined, currency: string): string {
+  return metric ? formatKPIValue(metric.current, currency) : "—";
+}
+
+export function signalUnit(unit: string, currency: string): string {
+  return metricUnitLabel(unit, currency);
+}
+
+export { KPI_LABELS };

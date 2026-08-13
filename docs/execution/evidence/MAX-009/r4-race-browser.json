@@ -1,0 +1,78 @@
+{
+  "browser": "in-app",
+  "page": "/operating-pulse",
+  "same_tab": true,
+  "network_evidence_status": "historical_invalid_not_browser_request",
+  "network_evidence_note": "The old/new paths below are normalized Core endpoint records, not captured browser URLs or HTTP response timings. Current valid race evidence is r5-race-gate.json.",
+  "old_request": {
+    "request_key": "simulated|retail-sim-v1-2853d9537f358baf|2026-06-05|28|||1",
+    "normalized_core_endpoint": "/api/v1/retail/operating-pulse?data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&as_of=2026-06-05&window_days=28&source_system=retail_simulator",
+    "click_promise_status": "fulfilled",
+    "cancelled": false
+  },
+  "new_request": {
+    "request_key": "simulated|retail-sim-v1-2853d9537f358baf|2026-06-05|7|||2",
+    "normalized_core_endpoint": "/api/v1/retail/operating-pulse?data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&as_of=2026-06-05&window_days=7&source_system=retail_simulator",
+    "click_promise_status": "fulfilled",
+    "cancelled": false
+  },
+  "old_started_at": "2026-08-13T05:34:33.578Z",
+  "new_started_at": "2026-08-13T05:34:33.599Z",
+  "overlap_ms": 21,
+  "settled": [
+    {
+      "status": "fulfilled"
+    },
+    {
+      "status": "fulfilled"
+    }
+  ],
+  "final_url": "http://localhost:3000/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&window_days=7",
+  "final_dom": " /url: /\n    - generic: L16\n    - generic: 租赁管理系统\n  - button \"折叠导航\" [expanded]:\n    - img \"menu-fold\":\n  - navigation:\n    - list:\n      - link \"home\":\n        - /url: /\n        - img \"home\":\n      - listitem: /\n      - link \"经营脉搏\":\n        - /url: /operating-pulse\n  - button \"打开命令面板\":\n    - img \"search\":\n    - generic: 搜索\n    - generic: ⌘K\n  - button \"关键日期提醒\":\n    - img \"bell\":\n    - superscript:\n      - generic: \"3\"\n  - button \"打开用户菜单\":\n    - img \"user\":\n    - generic: MAX009R4B_LE001\n- complementary:\n  - menu:\n    - text: 分析与决策\n    - menuitem \"line-chart 经营脉搏\":\n      - img \"line-chart\":\n      - link \"经营脉搏\":\n        - /url: /operating-pulse\n    - menuitem \"line-chart 门店 360\":\n      - img \"line-chart\":\n      - link \"门店 360\":\n        - /url: /store-360\n    - menuitem \"line-chart 情景工作台\":\n      - img \"line-chart\":\n      - link \"情景工作台\":\n        - /url: /scenario-workbench\n    - menuitem \"dashboard 经营驾驶舱\":\n      - img \"dashboard\":\n      - link \"经营驾驶舱\":\n        - /url: /performance\n    - menuitem \"pie-chart 组合分析\":\n      - img \"pie-chart\":\n      - link \"组合分析\":\n        - /url: /portfolio\n    - menuitem \"file-search 签约前决策\":\n      - img \"file-search\":\n      - link \"签约前决策\":\n        - /url: /pre-deal\n    - menuitem \"swap 条款比价\":\n      - img \"swap\":\n      - link \"条款比价\":\n        - /url: /deal-compare\n    - menuitem \"line-chart 敏感性分析\":\n      - img \"line-chart\":\n      - link \"敏感性分析\":\n        - /url: /sensitivity\n    - menuitem \"dollar 现金流预测\":\n      - img \"dollar\":\n      - link \"现金流预测\":\n        - /url: /cashflow-forecast\n    - menuitem \"calculator ROI 测算\":\n      - img \"calculator\":\n      - link \"ROI 测算\":\n        - /url: /roi\n    - text: 日常作业\n    - menuitem \"check-square 我的待办\":\n      - img \"check-square\":\n      - link \"我的待办\":\n        - /url: /todo\n    - menuitem \"file-text 合同台账\":\n      - img \"file-text\":\n      - link \"合同台账\":\n        - /url: /contracts\n    - menuitem \"robot AI Chat\":\n      - img \"robot\":\n      - link \"AI Chat\":\n        - /url: /ai-chat\n    - text: 会计与合规\n    - menuitem \"bar-chart 报表查询\":\n      - img \"bar-chart\":\n      - link \"报表查询\":\n        - /url: /reports\n    - menuitem \"calculator 结账中心\":\n      - img \"calculator\":\n      - link \"结账中心\":\n        - /url: /monthly-closing\n    - menuitem \"safety 多准则对比\":\n      - img \"safety\":\n      - link \"多准则对比\":\n        - /url: /standards\n    - menuitem \"audit 审计日志\":\n      - img \"audit\":\n      - link \"审计日志\":\n        - /url: /audit-logs\n    - text: 系统\n    - menuitem \"bar-chart Agent 运营\":\n      - img \"bar-chart\":\n      - link \"Agent 运营\":\n        - /url: /agent-metrics\n    - menuitem \"setting 设置\":\n      - img \"setting\":\n      - link \"设置\":\n        - /url: /settings\n    - menuitem \"safety 管理后台\":\n      - img \"safety\":\n      - link \"管理后台\":\n        - /url: /admin/users\n  - generic: 租赁管理系统\n  - generic: v0.1.0\n- main:\n  - heading \"经营脉搏\" [level=1]\n  - paragraph: 两分钟完成整体表现、数据可信度与优先门店晨检。\n  - button \"reload 刷新\":\n    - img \"reload\":\n    - generic: 刷新\n  - button \"交给 AI 分析\":\n    - generic: 交给 AI 分析\n  - radio \"模拟数据\" [checked]\n  - text: 模拟数据\n  - radio \"正式数据\"\n  - text: 正式数据\n  - textbox \"截至日期\":\n    - /placeholder: Select date\n    - text: 2026-06-05\n  - img \"calendar\":\n  - textbox \"来源系统\":\n    - /placeholder: source_system（可选）\n    - text: retail_simulator\n  - button \"close-circle\":\n    - img \"close-circle\":\n  - radiogroup \"窗口\" [active]:\n    - radio \"7天\" [checked]\n    - generic \"7天\"\n    - radio \"14天\"\n    - generic \"14天\"\n    - radio \"28天\"\n    - generic \"28天\"\n  - generic: 全部授权门店\n  - alert:\n    - img \"info-circle\":\n    - text: 模拟数据 · 不进入 Official\n    - text: Working\n    - generic: 2026-05-30 – 2026-06-05 · 对比 2026-05-23 – 2026-05-29\n    - generic: 420/420 store-days · 100.0% current · 420/420 store-days · 100.0% comparison\n    - generic: \"source: retail_simulator\"\n    - generic: \"formula: retail-kpi-v1\"\n    - generic: \"dataset: retail-sim-v1-2853d9537f358baf\"\n    - generic: \"generator: —\"\n    - generic: \"pulse: retail-pulse-v1\"\n    - generic: \"fact version: 1–1\"\n    - generic: \"decision-ready: 是\"\n    - generic: 最高事实截至 2026-08-13 15:17\n  - generic: 销售额\n  - text: 完整\n  - heading \"1,801,064.11 CNY\" [level=3]\n  - img \"arrow-up\":\n  - text: +0.36%\n  - generic: 对比 1,794,566.35 CNY\n  - generic: 毛利额\n  - text: 完整\n  - heading \"558,645.20 CNY\" [level=3]\n  - img \"arrow-up\":\n  - text: +0.14%\n  - generic: 对比 557,857.53 CNY\n  - generic: 毛利率\n  - text: 完整\n  - heading \"31.02%\" [level=3]\n  - img \"arrow-down\":\n  - text: \"-0.07pp\"\n  - generic: 对比 31.09%\n  - generic: 客流\n  - text: 完整\n  - heading \"153,522 笔/人次\" [level=3]\n  - img \"arrow-down\":\n  - text: \"-0.30%\"\n  - generic: 对比 153,988 笔/人次\n  - generic: 转化率\n  - text: 完整\n  - heading \"14.82%\" [level=3]\n  - img \"arrow-up\":\n  - text: +0.09pp\n  - generic: 对比 14.73%\n  - generic: 门店贡献\n  - text: 完整\n  - heading \"79,444.20 CNY\" [level=3]\n  - img \"arrow-down\":\n  - text: \"-3.14%\"\n  - generic: 对比 82,019.21 CNY\n  - generic: 每日趋势\n  - radiogroup \"segmented control\":\n    - radio \"销售额\" [checked]\n    - generic \"销售额\"\n    - radio \"毛利额\"\n    - generic \"毛利额\"\n    - radio \"毛利率\"\n    - generic \"毛利率\"\n    - radio \"客流\"\n    - generic \"客流\"\n    - radio \"转化率\"\n    - generic \"转化率\"\n    - radio \"门店贡献\"\n    - generic \"门店贡献\"\n  - application:\n    - generic: 05-30\n    - generic: 05-31\n    - generic: 06-01\n    - generic: 06-02\n    - generic: 06-03\n    - generic: 06-04\n    - generic: 06-05\n    - generic: \"0\"\n    - generic: 75,000\n    - generic: 150,000\n    - generic: 225,000\n    - generic: 300,000\n  - generic: 辅助指标\n  - text: 客单价\n  - text: 完整\n  - strong: 79.16 CNY\n  - generic: 对比 79.13 CNY\n  - generic: +0.04%\n  - text: 人工成本率\n  - text: 完整\n  - strong: 11.76%\n  - generic: 对比 11.80%\n  - generic: \"-0.04pp\"\n  - text: 经营占用成本率\n  - text: 完整\n  - strong: 9.35%\n  - generic: 对比 9.21%\n  - generic: +0.14pp\n  - text: 门店贡献率\n  - text: 完整\n  - strong: 4.41%\n  - generic: 对比 4.57%\n  - generic: \"-0.16pp\"\n  - text: 期间坪效\n  - text: 完整\n  - strong: 170.07 CNY/㎡\n  - generic: 对比 169.46 CNY/㎡\n  - generic: +0.36%\n  - alert:\n    - img \"info-circle\":\n    - generic: 经营现金口径\n    - generic: 经营占用现金成本不等于 IFRS 16 折旧、利息、ROU 或租赁负债变动。\n  - generic: 优先关注门店\n  - generic: 按 API rank 原序 · 不在前端重算评分\n  - table:\n    - rowgroup:\n      - row \"优先 门店 信号 变化 评分 数据来源 操作\":\n        - columnheader \"优先\"\n        - columnheader \"门店\"\n        - columnheader \"信号\"\n        - columnheader \"变化\"\n        - columnheader \"评分\"\n        - columnheader \"数据来源\"\n        - columnheader \"操作\"\n    - rowgroup:\n      - row \"#1 SIM-2853D953-007 · Simulation Store 007 Mosaic · South 门店贡献转负 经营占用成本率上升 门店贡献转负 -2,440.41 CNY · 阈值 0.00 CNY 经营占用成本率上升 10.08pp · 阈值 5.00pp high 3.02 retail_simulator eye 查看门店脉搏 门店 360\":\n        - cell \"#1\":\n          - strong: \"#1\"\n        - cell \"SIM-2853D953-007 · Simulation Store 007 Mosaic · South\":\n          - strong: SIM-2853D953-007 · Simulation Store 007\n          - generic: Mosaic · South\n        - cell \"门店贡献转负 经营占用成本率上升\":\n          - generic: 门店贡献转负\n          - generic: 经营占用成本率上升\n        - cell \"门店贡献转负 -2,440.41 CNY · 阈值 0.00 CNY 经营占用成本率上升 10.08pp · 阈值 5.00pp\":\n          - generic: 门店贡献转负 -2,440.41 CNY · 阈值 0.00 CNY\n          - generic: 经营占用成本率上升 10.08pp · 阈值 5.00pp\n        - cell \"high 3.02\":\n          - text: high\n          - generic: \"3.02\"\n        - cell \"retail_simulator\"\n        - cell \"eye 查看门店脉搏 门店 360\":\n          - button \"eye 查看门店脉搏\":\n            - img \"eye\":\n            - generic: 查看门店脉搏\n          - button \"门店 360\":\n            - generic: 门店 360\n      - row \"#2 SIM-2853D953-025 · Simulation Store 025 Northwind · North 门店贡献转负 门店贡献转负 -438.94 CNY · 阈值 0.00 CNY medium 1.00 retail_simulator eye 查看门店脉搏 门店 360\":\n        - cell \"#2\":\n          - strong: \"#2\"\n        - cell \"SIM-2853D953-025 · Simulation Store 025 Northwind · North\":\n          - strong: SIM-2853D953-025 · Simulation Store 025\n          - generic: Northwind · North\n        - cell \"门店贡献转负\":\n          - generic: 门店贡献转负\n        - cell \"门店贡献转负 -438.94 CNY · 阈值 0.00 CNY\":\n          - generic: 门店贡献转负 -438.94 CNY · 阈值 0.00 CNY\n        - cell \"medium 1.00\":\n          - text: medium\n          - generic: \"1.00\"\n        - cell \"retail_simulator\"\n        - cell \"eye 查看门店脉搏 门店 360\":\n          - button \"eye 查看门店脉搏\":\n            - img \"eye\":\n            - generic: 查看门店脉搏\n          - button \"门店 360\":\n            - generic: 门店 360\n      - row \"#3 SIM-2853D953-054 · Simulation Store 054 Harbor · East 门店贡献转负 门店贡献转负 -404.28 CNY · 阈值 0.00 CNY medium 1.00 retail_simulator eye 查看门店脉搏 门店 360\":\n        - cell \"#3\":\n          - strong: \"#3\"\n        - cell \"SIM-2853D953-054 · Simulation Store 054 Harbor · East\":\n          - strong: SIM-2853D953-054 · Simulation Store 054\n          - generic: Harbor · East\n        - cell \"门店贡献转负\":\n          - generic: 门店贡献转负\n        - cell \"门店贡献转负 -404.28 CNY · 阈值 0.00 CNY\":\n          - generic: 门店贡献转负 -404.28 CNY · 阈值 0.00 CNY\n        - cell \"medium 1.00\":\n          - text: medium\n          - generic: \"1.00\"\n        - cell \"retail_simulator\"\n        - cell \"eye 查看门店脉搏 门店 360\":\n          - button \"eye 查看门店脉搏\":\n            - img \"eye\":\n            - generic: 查看门店脉搏\n          - button \"门店 360\":\n            - generic: 门店 360\n- generic: \"0\"",
+  "console": [
+    {
+      "level": "error",
+      "message": "Failed to load critical date notifications: ApiError: 当前账号没有执行此操作的权限。\n    at l (http://localhost:3000/_next/static/chunks/940-64f7b8f1f5adf1a4.js:1:4857)\n    at async n (http://localhost:3000/_next/static/chunks/9845-852ecbf0532d9341.js:1:5741)",
+      "timestamp": "2026-08-13T05:15:42.874Z",
+      "url": "http://localhost:3000/_next/static/chunks/2117-89ee9fd804123828.js"
+    },
+    {
+      "level": "warn",
+      "message": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "timestamp": "2026-08-13T05:18:31.272Z",
+      "url": "http://localhost:3000/_next/static/chunks/9799-22481a0cd517c0c1.js"
+    },
+    {
+      "level": "warn",
+      "message": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "timestamp": "2026-08-13T05:30:41.680Z",
+      "url": "http://localhost:3000/_next/static/chunks/9799-22481a0cd517c0c1.js"
+    },
+    {
+      "level": "warn",
+      "message": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "timestamp": "2026-08-13T05:30:44.686Z",
+      "url": "http://localhost:3000/_next/static/chunks/9799-22481a0cd517c0c1.js"
+    },
+    {
+      "level": "warn",
+      "message": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "timestamp": "2026-08-13T05:31:00.843Z",
+      "url": "http://localhost:3000/_next/static/chunks/9799-22481a0cd517c0c1.js"
+    },
+    {
+      "level": "warn",
+      "message": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "timestamp": "2026-08-13T05:34:15.541Z",
+      "url": "http://localhost:3000/_next/static/chunks/9799-22481a0cd517c0c1.js"
+    },
+    {
+      "level": "warn",
+      "message": "The width(-1) and height(-1) of chart should be greater than 0,\n       please check the style of container, or the props width(100%) and height(100%),\n       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the\n       height and width.",
+      "timestamp": "2026-08-13T05:34:33.455Z",
+      "url": "http://localhost:3000/_next/static/chunks/9799-22481a0cd517c0c1.js"
+    }
+  ],
+  "completion_observation": "Browser click Promise 逐项均 fulfilled；控制面没有逐请求 response-end/cancel 事件或 HAR 导出，因此未伪造网络结束顺序。",
+  "interpretation": "同一页面 28天旧上下文先发起，21ms 后 7天新上下文发起；最终 URL/DOM 为 7天且 420/420。页面 requestID gate（operating-pulse/page.tsx:148-162）只允许最新 key 提交，旧结果即使晚到也不会覆盖新 context。Browser wrapper 不提供 HAR/网络时序导出，status 使用 click Promise/最终 UI 结果记录；无外部 curl 证据。"
+}

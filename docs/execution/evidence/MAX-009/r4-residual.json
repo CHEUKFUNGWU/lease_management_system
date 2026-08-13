@@ -1,0 +1,81 @@
+{
+  "run": "MAX-009 Review 4 exact residual after teardown",
+  "generated_at": "2026-08-13T05:38:20Z",
+  "selectors": [
+    {
+      "selector": "retail_simulation_datasets.id IN (238d70cc-5e71-4bbc-8bab-75490f80102c,8d3523fb-e117-4fec-a9a7-cbaa52213eab)",
+      "actual": 0,
+      "query_time_ms": 0.009
+    },
+    {
+      "selector": "retail_store_day_facts.import_batch_id IN (00b4e9be-baab-4583-98e9-9027b23c2475,73a5b4c9-b0e1-4799-8294-a64dfc6e4e8e)",
+      "actual": 0,
+      "query_time_ms": 0.006
+    },
+    {
+      "selector": "stores.legal_entity_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890 AND simulation_dataset_version IN (retail-sim-v1-2853d9537f358baf,retail-sim-v1-ae0d5ed4c52444d2)",
+      "actual": 0,
+      "query_time_ms": 0.007
+    },
+    {
+      "selector": "operating_fact_batches.id IN (00b4e9be-baab-4583-98e9-9027b23c2475,73a5b4c9-b0e1-4799-8294-a64dfc6e4e8e)",
+      "actual": 0,
+      "query_time_ms": 0.009
+    },
+    {
+      "selector": "retail_store_day_fact_requests.legal_entity_id=a1b2c3d4-e5f6-7890-abcd-ef1234567890 AND idempotency_key IN (MAX009R4-fixed-seed-004,MAX009R4-partial-001)",
+      "actual": 0,
+      "query_time_ms": 0.011
+    },
+    {
+      "selector": "fpna_action_items.id=b4d6f5ed-bf8a-4d4f-9231-c7f2026b3566 OR idempotency_key=MAX009R4-action-001",
+      "actual": 0,
+      "query_time_ms": 0.015
+    },
+    {
+      "selector": "users.id='855251ac-a318-49d4-b0cd-04198b9770a6' AND username='MAX009R4B_LE001'",
+      "actual": 0,
+      "query_time_ms": 0.012
+    },
+    {
+      "selector": "users.username IN ('MAX009R4_LE001','MAX009R4_LE002','MAX009R4B_LE001','MAX009R4B_LE002')",
+      "actual": 0,
+      "query_time_ms": 0.013
+    },
+    {
+      "selector": "auth_refresh_sessions.user_id='855251ac-a318-49d4-b0cd-04198b9770a6'",
+      "actual": 0,
+      "query_time_ms": 0.020
+    },
+    {
+      "selector": "auth_refresh_sessions.user_id IN (SELECT id FROM users WHERE username IN ('MAX009R4_LE001','MAX009R4_LE002','MAX009R4B_LE001','MAX009R4B_LE002'))",
+      "actual": 0,
+      "query_time_ms": 0.021
+    },
+    {
+      "selector": "ai_chat_sessions.id IN ('269f4a85-f319-4d88-a9d0-d992572cb1a3','45d38e5a-5867-4cc6-b8b5-8f27b6bb0298','7c9ce3f1-b139-441c-b3ba-c4bbd6849e26','be15cf64-561e-4e9a-ad1c-d3e3c238a070')",
+      "actual": 0,
+      "query_time_ms": 0.008
+    },
+    {
+      "selector": "ai_chat_runs.id IN ('b0b09899-f037-4b35-acec-135f3aec54fe','6493a7b2-336e-47b1-87e5-11710718c4dd','ac070c79-3785-46e2-8d46-95ae7a36c11a','ad354146-5147-48d7-bd94-a3656de5da94')",
+      "actual": 0,
+      "query_time_ms": 0.065
+    },
+    {
+      "selector": "ai_chat_sessions.id='66fbe25c-e12e-46b1-b7d0-a02c6c74199e'",
+      "actual": 0,
+      "query_time_ms": 0.008
+    },
+    {
+      "selector": "ai_chat_runs.id='19dee11e-2090-4987-9416-c555b6255ea2'",
+      "actual": 0,
+      "query_time_ms": 0.008
+    },
+    {
+      "selector": "ai_chat_artifacts.id=0c285f6f-46c6-4e45-bdd9-3a2898db1482 AND session_id=66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+      "actual": 0,
+      "query_time_ms": 0.055
+    }
+  ]
+}

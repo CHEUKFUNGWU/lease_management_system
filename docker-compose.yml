@@ -122,12 +122,12 @@ services:
       context: ./web
       dockerfile: Dockerfile
       args:
-        # The browser runs outside the Web container, so client-side requests
-        # must target the host loopback address exposed by Docker. These are
-        # build args rather than runtime env because Next inlines NEXT_PUBLIC_*
-        # into the client bundle at build time — changing them needs a rebuild.
-        NEXT_PUBLIC_API_URL: http://127.0.0.1:${CORE_PORT:-8080}
-        NEXT_PUBLIC_AI_URL: http://127.0.0.1:${AI_PORT:-8081}
+        # Client requests stay same-origin and are proxied by Next rewrites;
+        # server-side destinations remain Docker-internal. These are build
+        # args because Next inlines NEXT_PUBLIC_* into the client bundle —
+        # changing them needs a rebuild.
+        NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_AI_URL: /api/ai
     container_name: lease-web
     environment:
       # Server-side only: read at startup by next.config.js rewrites().

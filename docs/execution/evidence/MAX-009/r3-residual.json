@@ -1,0 +1,21 @@
+{
+  "evidence": "MAX009R3 exact teardown residual check",
+  "checked_at": "2026-08-13",
+  "selector_policy": "Every selector is an explicit ID/version/key list; no wildcard or broad prefix deletion/query.",
+  "checks": [
+    {"selector": "retail_store_day_facts.import_batch_id IN (3bc04d06-d809-463b-9ef4-fc7046d11d5a,c08ef853-3371-4335-922e-fe608bc5ea6f)", "actual": 0, "query_time_ms": 2.106},
+    {"selector": "stores.legal_entity_id=LE001 AND simulation_dataset_version IN (retail-sim-v1-2853d9537f358baf,retail-sim-v1-ae0d5ed4c52444d2)", "actual": 0, "query_time_ms": 1.137},
+    {"selector": "retail_simulation_datasets.id IN (1b8dbcb3-a59c-48f1-957c-0237cc5d1344,9820828b-039b-4daa-afff-76ff71dcd05b)", "actual": 0, "query_time_ms": 0.436},
+    {"selector": "operating_fact_batches.id IN (3bc04d06-d809-463b-9ef4-fc7046d11d5a,c08ef853-3371-4335-922e-fe608bc5ea6f)", "actual": 0, "query_time_ms": 0.280},
+    {"selector": "retail_store_day_fact_requests.idempotency_key IN (MAX009R3-fixed-seed-001,MAX009R3-partial-seed-003,MAX009R3-partial-seed-001)", "actual": 0, "query_time_ms": 0.330},
+    {"selector": "fpna_action_items.id IN (c99c8cf4-b496-4934-b9b7-fc782b08bc71,85204259-f794-4a14-bcb0-3496ff2e9136,3f98f288-dfe7-4fe2-851e-fafc328d8221)", "actual": 0, "query_time_ms": 0.376},
+    {"selector": "users.id IN (d973d347-ec0b-4f85-9948-8ebf3b915046,335e1cd7-dac2-4f39-ae3b-a052768f74df)", "actual": 0, "query_time_ms": 0.274},
+    {"selector": "auth_refresh_sessions.user_id IN (d973d347-ec0b-4f85-9948-8ebf3b915046,335e1cd7-dac2-4f39-ae3b-a052768f74df)", "actual": 0, "query_time_ms": 0.301},
+    {"selector": "ai_chat_sessions.id IN (58b5574c-5ca0-4db8-8f90-af272747aaed,a67741bc-288c-49f5-bc46-5f57b515c5e2,564a3bf0-7664-49f5-bded-fb1a253229f0,4e871d8f-a63a-42fc-8c34-f146bb9fa520)", "actual": 0, "query_time_ms": 0.342},
+    {"selector": "ai_chat_runs.id IN (12490458-e75d-4694-8f09-7bc9614fc73e,d0b2d86b-09d9-4413-beb2-d869c44e9c7e,48e5866a-28b1-4691-b9c0-a8664875cc2e,0c866dfb-89c3-428d-bcf2-55ca52183231)", "actual": 0, "query_time_ms": 0.351},
+    {"selector": "ai_chat_artifacts.id=bfc5d14e-4450-4b22-80ca-ae2c517511af", "actual": 0, "query_time_ms": 0.390},
+    {"selector": "retail_simulation_datasets.dataset_version=retail-sim-v1-2853d9537f358baf (R2 historical exact version)", "actual": 0, "query_time_ms": 3.713},
+    {"selector": "fpna_action_items.id=3f98f288-dfe7-4fe2-851e-fafc328d8221 (R2 historical exact action)", "actual": 0, "query_time_ms": 1.233}
+  ],
+  "formal_tables": "unchanged versus r2-formal-before/after.json"
+}

@@ -19,6 +19,7 @@ import {
   Dropdown,
   Empty,
   Modal,
+  Drawer,
 } from "antd";
 import {
   SendOutlined,
@@ -64,9 +65,12 @@ import {
   type PaymentScheduleParseSummary,
   type RuntimeReviewAction,
   type RuntimeArtifact,
+  type RuntimeSource,
   type UploadedFile,
 } from "./runtime";
 import { notifyError } from "../lib/notify";
+import { safeInternalAIURL } from "../lib/retailAI";
+import { AI_CHAT_SESSION_ITEM_CLASS, AI_CHAT_SESSION_MORE_CLASS, getAIChatResponsiveState, getAIChatSessionButtonProps, getAIChatSessionRowProps, transitionAIChatDrawer, type AIChatDrawerEvent } from "./responsive";
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -109,24 +113,40 @@ const agentSkillStarters = [
     labelKey: "ai.skill_excel_ledger",
     promptKey: "ai.skill_excel_ledger_prompt",
     icon: "excel",
+    skillId: undefined,
+    skillVersion: undefined,
   },
   {
     key: "contract-review",
     labelKey: "ai.skill_contract_review",
     promptKey: "ai.skill_contract_review_prompt",
     icon: "pdf",
+    skillId: undefined,
+    skillVersion: undefined,
   },
   {
     key: "payment-schedule",
     labelKey: "ai.skill_payment_schedule",
     promptKey: "ai.skill_payment_schedule_prompt",
     icon: "file",
+    skillId: undefined,
+    skillVersion: undefined,
   },
   {
     key: "audit-pack",
     labelKey: "ai.skill_audit_pack",
     promptKey: "ai.skill_audit_pack_prompt",
     icon: "tool",
+    skillId: undefined,
+    skillVersion: undefined,
+  },
+  {
+    key: "retail-operations",
+    labelKey: "ai.skill_retail_operations",
+    promptKey: "ai.skill_retail_operations_prompt",
+    icon: "retail",
+    skillId: "retail_operations",
+    skillVersion: "v1",
   },
 ];
 
@@ -194,6 +214,19 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
           {artifact.review_reasons && artifact.review_reasons.length > 0 && (
             <div style={{ marginTop: 6, color: "var(--fg-tertiary)", fontSize: 12 }}>
               复核项：{artifact.review_reasons.join("、")}
+            </div>
+          )}
+          {artifact.artifact_type === "retail_action_proposal" && (
+            <div style={{ marginTop: 8 }}>
+              <Text type="secondary" style={{ display: "block", marginBottom: 6 }}>仅为行动提议：不会写入行动清单或正式台账。</Text>
+              <Space wrap>
+                <StatusTag kind="warning">待情景工作台确认</StatusTag>
+                {artifact.data?.data_classification && <StatusTag kind="neutral">{artifact.data.data_classification}</StatusTag>}
+                {artifact.data?.dataset_version && <StatusTag kind="neutral">dataset: {artifact.data.dataset_version}</StatusTag>}
+                <StatusTag kind="neutral">Owner: {artifact.data?.owner_name || "—"}</StatusTag>
+                <StatusTag kind="neutral">Due: {artifact.data?.due_date || "—"}</StatusTag>
+                {artifact.data?.next_url && String(artifact.data.next_url).startsWith("/") && <a href={artifact.data.next_url}>前往情景工作台</a>}
+              </Space>
             </div>
           )}
           <details style={{ marginTop: 8 }}>
@@ -290,7 +323,7 @@ function MessageContent({
   role = "assistant",
 }: {
   content: string;
-  sources?: string[];
+  sources?: Array<string | RuntimeSource>;
   model?: string;
   thinking?: string;
   i18nLang: Language;
@@ -391,16 +424,13 @@ function MessageContent({
           <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>
             {t("ai.sources", i18nLang)}
           </Text>
-          {sources.map((source, idx) => (
-            <StatusTag
-              key={idx}
-              icon={<FileTextOutlined />}
-             
-              style={{ fontSize: 11, borderRadius: 4 }}
-            >
-              {source}
-            </StatusTag>
-          ))}
+          {sources.map((source, idx) => {
+            const label = typeof source === "string" ? source : source.title || source.id || source.type || "系统来源";
+            const link = typeof source === "string" ? undefined : source.url;
+            const tag = <StatusTag icon={<FileTextOutlined />} style={{ fontSize: 11, borderRadius: 4 }}>{label}</StatusTag>;
+            const safeLink = safeInternalAIURL(link);
+            return safeLink ? <a key={idx} href={safeLink} style={{ textDecoration: "none" }}>{tag}</a> : <span key={idx}>{tag}</span>;
+          })}
         </div>
       )}
 
@@ -415,7 +445,7 @@ function MessageContent({
 
 // ─── Typewriter Effect ─────────────────────────────────────────
 
-function TypewriterMessage({ content, sources, model, thinking, i18nLang }: { content: string; sources?: string[]; model?: string; thinking?: string; i18nLang: Language }) {
+function TypewriterMessage({ content, sources, model, thinking, i18nLang }: { content: string; sources?: Array<string | RuntimeSource>; model?: string; thinking?: string; i18nLang: Language }) {
   const [displayedContent, setDisplayedContent] = useState("");
   const contentRef = useRef(content);
   const indexRef = useRef(0);
@@ -476,6 +506,8 @@ function AgentTracePanel({
   toolCalls?: AgentToolCall[];
   language: Language;
 }) {
+  plan = Array.isArray(plan) ? plan : [];
+  toolCalls = Array.isArray(toolCalls) ? toolCalls : [];
   if (plan.length === 0 && toolCalls.length === 0) return null;
 
   return (
@@ -570,6 +602,7 @@ function AgentReviewPanel({
   prompts?: AgentReviewPrompt[];
   language: Language;
 }) {
+  prompts = Array.isArray(prompts) ? prompts : [];
   if (prompts.length === 0) return null;
 
   return (
@@ -649,6 +682,7 @@ function ReviewActionHistoryPanel({
   language: Language;
   onContinue: (action: RuntimeReviewAction) => void;
 }) {
+  actions = Array.isArray(actions) ? actions : [];
   if (actions.length === 0) return null;
 
   return (
@@ -739,6 +773,7 @@ function SessionSidebar({
 
   return (
     <div
+      className="ai-chat-session-sidebar"
       style={{
         width: 260,
         borderRight: "1px solid var(--border-default)",
@@ -784,22 +819,37 @@ function SessionSidebar({
             {sessions.map((session) => (
               <motion.div
                 key={session.id}
+                {...getAIChatSessionRowProps(activeSessionId === session.id)}
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.99 }}
+                style={{
+                  display: "flex",
+                  minWidth: 0,
+                  borderRadius: 8,
+                  background: activeSessionId === session.id ? "var(--fg-primary)" : "transparent",
+                }}
               >
-                <div
+                <button
+                  {...getAIChatSessionButtonProps(activeSessionId === session.id)}
+                  className={AI_CHAT_SESSION_ITEM_CLASS}
+                  aria-label={`选择会话 ${session.title}`}
                   onClick={() => onSelect(session.id)}
                   style={{
+                    border: 0,
+                    font: "inherit",
+                    textAlign: "left",
                     padding: "10px 12px",
                     borderRadius: 8,
                     cursor: "pointer",
-                    background: activeSessionId === session.id ? "var(--fg-primary)" : "transparent",
+                    background: "transparent",
                     color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-secondary)",
                     transition: "all 0.15s",
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
                     position: "relative",
+                    flex: 1,
+                    minWidth: 0,
                   }}
                   onMouseEnter={(e) => {
                     if (activeSessionId !== session.id) {
@@ -847,42 +897,43 @@ function SessionSidebar({
                     </div>
                   </div>
 
-                  {/* Delete button - only show on hover */}
-                  <Dropdown
-                    menu={{
-                      items: [
-                        {
-                          key: "delete",
-                          label: t("ai.delete_session", language),
-                          icon: <DeleteOutlined />,
-                          danger: true,
-                          onClick: (e) => {
-                            e.domEvent.stopPropagation();
-                            onDelete(session.id);
-                          },
+                </button>
+                {/* Delete button is a sibling, so the session selector has one interactive target. */}
+                <Dropdown
+                  menu={{
+                    items: [
+                      {
+                        key: "delete",
+                        label: t("ai.delete_session", language),
+                        icon: <DeleteOutlined />,
+                        danger: true,
+                        onClick: (e) => {
+                          e.domEvent.stopPropagation();
+                          onDelete(session.id);
                         },
-                      ],
+                      },
+                    ],
+                  }}
+                  trigger={["click"]}
+                  placement="bottomRight"
+                >
+                  <Button
+                    type="text"
+                    aria-label={`删除会话 ${session.title}`}
+                    icon={<MoreOutlined />}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      opacity: 0,
+                      transition: "opacity 0.15s",
+                      color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-muted)",
+                      padding: 0,
+                      width: 24,
+                      height: 24,
+                      flexShrink: 0,
                     }}
-                    trigger={["click"]}
-                    placement="bottomRight"
-                  >
-                    <Button
-                      type="text"
-                     
-                      icon={<MoreOutlined />}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        opacity: 0,
-                        transition: "opacity 0.15s",
-                        color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-muted)",
-                        padding: 0,
-                        width: 24,
-                        height: 24,
-                      }}
-                      className="session-more-btn"
-                    />
-                  </Dropdown>
-                </div>
+                    className={AI_CHAT_SESSION_MORE_CLASS}
+                  />
+                </Dropdown>
               </motion.div>
             ))}
           </div>
@@ -1441,23 +1492,59 @@ function AIChatPageContent() {
   const { language } = useLanguage();
   const searchParams = useSearchParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sessionDrawerTriggerRef = useRef<HTMLButtonElement>(null);
+  // Keep server and first client render identical; update after mount.
+  const [viewportWidth, setViewportWidth] = useState(768);
+  const [sessionDrawerOpen, setSessionDrawerOpen] = useState(false);
+  const responsiveState = getAIChatResponsiveState(viewportWidth);
+  const isMobileChat = responsiveState.isMobile;
+
+  useEffect(() => {
+    const updateViewportWidth = () => setViewportWidth(window.innerWidth);
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+    return () => window.removeEventListener("resize", updateViewportWidth);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileChat) setSessionDrawerOpen(false);
+  }, [isMobileChat]);
 
   // Page context from URL
   const pageContext = useMemo(() => {
     const page = searchParams.get("page");
     if (!page) return undefined;
+    const filterKeys = [
+      "as_of", "window_days", "classification", "data_classification", "dataset_version", "source_system",
+      "store_id", "store_ids", "horizon_months", "revenue_change_pct", "gross_margin_rate_change_pp",
+      "labor_cost_change_pct", "fixed_rent_change_pct", "variable_rent_rate_change_pp",
+      "non_lease_cost_change_pct", "other_controllable_cost_change_pct",
+    ];
+    const filters: Record<string, string> = {};
+    for (const key of filterKeys) {
+      const values = searchParams.getAll(key);
+      if (values.length > 0) filters[key] = key === "store_ids" ? values.join(",") : values[0];
+    }
     return {
       page,
       title: searchParams.get("title") || undefined,
+      tags: searchParams.getAll("tags"),
       contract_id: searchParams.get("contract_id") || undefined,
       period: searchParams.get("period") || undefined,
       report_view: searchParams.get("report_view") || undefined,
-      tags: searchParams.getAll("tags"),
+      filters,
       summary: searchParams.get("summary") || undefined,
     };
   }, [searchParams]);
 
   const [input, setInput] = useState("");
+  const [selectedSkill, setSelectedSkill] = useState<{ id: string; version: string } | undefined>(undefined);
+
+  useEffect(() => {
+    if (pageContext?.page === "operating-pulse" || pageContext?.page === "store-360" || pageContext?.page === "scenario-workbench") {
+      setSelectedSkill({ id: "retail_operations", version: "v1" });
+    }
+  }, [pageContext?.page]);
   const [selectedModel, setSelectedModel] = useState("deepseek-v4-flash");
   const [traceRunId, setTraceRunId] = useState<string | null>(null);
   const [traceData, setTraceData] = useState<any>(null);
@@ -1506,6 +1593,31 @@ function AIChatPageContent() {
     setInput("");
   };
 
+  const transitionSessionDrawer = (event: AIChatDrawerEvent) => {
+    const next = transitionAIChatDrawer(sessionDrawerOpen, event);
+    setSessionDrawerOpen(next.open);
+    if (next.restoreFocus) {
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => sessionDrawerTriggerRef.current?.focus());
+      } else {
+        sessionDrawerTriggerRef.current?.focus();
+      }
+    }
+  };
+
+  const closeSessionDrawer = () => transitionSessionDrawer("close");
+
+  const confirmDeleteSession = (id: string) => {
+    Modal.confirm({
+      title: t("ai.delete_session_title", language),
+      content: t("ai.delete_session_content", language),
+      okText: t("ai.delete", language),
+      okType: "danger",
+      cancelText: t("ai.cancel", language),
+      onOk: () => deleteSession(id),
+    });
+  };
+
   const getFileIcon = (type: string) => {
     if (type.includes("pdf")) return <FilePdfOutlined style={{ color: "var(--state-error-text)" }} />;
     if (type.includes("excel") || type.includes("sheet"))
@@ -1517,6 +1629,7 @@ function AIChatPageContent() {
     if (icon === "excel") return <FileExcelOutlined />;
     if (icon === "pdf") return <FilePdfOutlined />;
     if (icon === "tool") return <ToolOutlined />;
+    if (icon === "retail") return <RobotOutlined />;
     return <FileTextOutlined />;
   };
 
@@ -1690,19 +1803,25 @@ function AIChatPageContent() {
       const serverSessionId = await ensureServerSession(activeSessionId, {
           title: currentSession?.title || getSessionTitle([userMessage], language),
           bound_contract_id: searchParams.get("contract_id") || undefined,
-          context_snapshot: pageContext
+        context_snapshot: pageContext
             ? {
                 page: pageContext.page,
                 title: pageContext.title,
+                tags: pageContext.tags,
                 contract_id: pageContext.contract_id,
                 period: pageContext.period,
                 report_view: pageContext.report_view,
+                filters: pageContext.filters,
                 summary: pageContext.summary,
               }
             : undefined,
         });
 
       const chatData: any = { message: messageText, history, language };
+      if (selectedSkill) {
+        chatData.skill_id = selectedSkill.id;
+        chatData.skill_version = selectedSkill.version;
+      }
       if (fileForRequest) {
         chatData.file_id = fileForRequest.file_id;
         chatData.object_name = fileForRequest.object_name;
@@ -1713,9 +1832,11 @@ function AIChatPageContent() {
         chatData.page_context = {
           page: pageContext.page,
           title: pageContext.title,
+          tags: pageContext.tags,
           contract_id: pageContext.contract_id,
           period: pageContext.period,
           report_view: pageContext.report_view,
+          filters: pageContext.filters,
           summary: pageContext.summary,
         };
       }
@@ -1758,6 +1879,7 @@ function AIChatPageContent() {
     <ProtectedRoute>
       <AppLayout>
         <div
+          className="ai-chat-shell"
           style={{
             display: "flex",
             height: "calc(100vh - 64px)",
@@ -1766,22 +1888,15 @@ function AIChatPageContent() {
           }}
         >
           {/* Session Sidebar */}
-          <SessionSidebar
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onSelect={setActiveSessionId}
-            onNew={createNewSession}
-            onDelete={(id) => {
-              Modal.confirm({
-                title: t("ai.delete_session_title", language),
-                content: t("ai.delete_session_content", language),
-                okText: t("ai.delete", language),
-                okType: "danger",
-                cancelText: t("ai.cancel", language),
-                onOk: () => deleteSession(id),
-              });
-            }}
-          />
+          {responsiveState.showDesktopSidebar && (
+            <SessionSidebar
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelect={setActiveSessionId}
+              onNew={createNewSession}
+              onDelete={confirmDeleteSession}
+            />
+          )}
 
           {/* Chat Area */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -1798,14 +1913,24 @@ function AIChatPageContent() {
                 flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <RobotOutlined style={{ fontSize: 18, color: "var(--fg-primary)" }} />
-                <span style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)" }}>
+              <div className="ai-chat-header-left" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+                {responsiveState.showMobileSessionTrigger && (
+                  <Button
+                    ref={sessionDrawerTriggerRef}
+                    type="text"
+                    aria-label="打开会话"
+                    icon={<MessageOutlined />}
+                    onClick={() => transitionSessionDrawer("open")}
+                    style={{ color: "var(--fg-primary)" }}
+                  />
+                )}
+                <RobotOutlined style={{ fontSize: 18, color: "var(--fg-primary)", flexShrink: 0 }} />
+                <span className="ai-chat-header-title" style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {activeSession?.title || t("ai.assistant_name", language)}
                 </span>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div className="ai-chat-header-actions" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                 {/* Model Selector */}
                 <Dropdown
                   menu={{
@@ -1818,10 +1943,12 @@ function AIChatPageContent() {
                 >
                   <Button
                     type="text"
-                   
+                    className="ai-chat-model-button"
+                    aria-label={`选择模型，当前 ${MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}`}
                     style={{ fontSize: 13, color: "var(--fg-tertiary)" }}
                   >
-                    {MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}
+                    <span className="ai-chat-model-label">{MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}</span>
+                    <span className="ai-chat-model-short" aria-hidden="true">AI</span>
                     <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />
                   </Button>
                 </Dropdown>
@@ -1839,6 +1966,7 @@ function AIChatPageContent() {
 
             {/* Messages Area */}
             <div
+              className="ai-chat-messages"
               style={{
                 flex: 1,
                 overflowY: "auto",
@@ -1879,6 +2007,11 @@ function AIChatPageContent() {
                       {pageContext.period}
                     </StatusTag>
                   )}
+                  {pageContext.filters?.classification && <StatusTag kind={pageContext.filters.classification === "simulated" ? "warning" : "processing"}>{pageContext.filters.classification === "simulated" ? "模拟 · Working" : "正式 · Working"}</StatusTag>}
+                  {pageContext.filters?.dataset_version && <StatusTag style={{ borderRadius: 4 }}>dataset: {pageContext.filters.dataset_version}</StatusTag>}
+                  {pageContext.filters?.source_system && <StatusTag style={{ borderRadius: 4 }}>source: {pageContext.filters.source_system}</StatusTag>}
+                  {pageContext.filters?.as_of && <StatusTag style={{ borderRadius: 4 }}>as of: {pageContext.filters.as_of}</StatusTag>}
+                  {pageContext.filters?.window_days && <StatusTag style={{ borderRadius: 4 }}>window: {pageContext.filters.window_days}天</StatusTag>}
                 </motion.div>
               )}
 
@@ -1903,7 +2036,10 @@ function AIChatPageContent() {
                       key={skill.key}
                       type="default"
                       icon={getSkillIcon(skill.icon)}
-                      onClick={() => setInput(t(skill.promptKey, language))}
+                      onClick={() => {
+                        setInput(t(skill.promptKey, language));
+                        setSelectedSkill(skill.skillId ? { id: skill.skillId, version: skill.skillVersion || "v1" } : undefined);
+                      }}
                       disabled={loading}
                       style={{
                         fontSize: 12,
@@ -2414,6 +2550,7 @@ function AIChatPageContent() {
 
             {/* Input Area */}
             <div
+              className="ai-chat-input"
               style={{
                 padding: "16px 20%",
                 borderTop: "1px solid var(--border-default)",
@@ -2552,6 +2689,31 @@ function AIChatPageContent() {
             </div>
           </div>
         </div>
+        {responsiveState.showMobileSessionTrigger && (
+          <Drawer
+            title={t("nav.ai_chat", language)}
+            placement="left"
+            width={280}
+            open={sessionDrawerOpen}
+            onClose={closeSessionDrawer}
+            bodyStyle={{ padding: 0 }}
+            destroyOnClose={false}
+          >
+            <SessionSidebar
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelect={(id) => {
+                setActiveSessionId(id);
+                transitionSessionDrawer("selection");
+              }}
+              onNew={() => {
+                createNewSession();
+                transitionSessionDrawer("new");
+              }}
+              onDelete={confirmDeleteSession}
+            />
+          </Drawer>
+        )}
         <Modal
           open={Boolean(traceRunId)}
           title={t("ai.agent_trace_title", language)}

@@ -65,6 +65,21 @@ const dict: TranslationDict = {
     "zh-HK": "報表查詢",
     en: "Reports",
   },
+  "nav.operating_pulse": {
+    "zh-CN": "经营脉搏",
+    "zh-HK": "經營脈搏",
+    en: "Operating Pulse",
+  },
+  "nav.store_360": {
+    "zh-CN": "门店 360",
+    "zh-HK": "門店 360",
+    en: "Store 360",
+  },
+  "nav.scenario_workbench": {
+    "zh-CN": "情景工作台",
+    "zh-HK": "情景工作台",
+    en: "Scenario Workbench",
+  },
   "nav.cashflow": {
     "zh-CN": "现金流预测",
     "zh-HK": "現金流預測",
@@ -5425,6 +5440,16 @@ const dict: TranslationDict = {
     "zh-CN": "请为当前合同、法人或期间整理审计包清单，包含原始文件、AI 提取字段、人工确认事项、计量结果、分录和审批留痕。",
     "zh-HK": "請為當前合同、法人或期間整理審計包清單，包含原始文件、AI 提取字段、人工確認事項、計量結果、分錄和審批留痕。",
     en: "Prepare an audit pack checklist for the current contract, legal entity, or period, including source files, AI extracted fields, human confirmations, measurement results, journal entries, and approval trail.",
+  },
+  "ai.skill_retail_operations": {
+    "zh-CN": "零售经营分析",
+    "zh-HK": "零售經營分析",
+    en: "Retail Operations",
+  },
+  "ai.skill_retail_operations_prompt": {
+    "zh-CN": "请读取当前经营脉搏；如有关注门店，再给出门店诊断或确定性经营情景。所有数字请保留来源、覆盖和数据集上下文，不要写入业务行动。",
+    "zh-HK": "請讀取當前經營脈搏；如有關注門店，再給出門店診斷或確定性經營情景。所有數字請保留來源、覆蓋和數據集上下文，不要寫入業務行動。",
+    en: "Read the current operating pulse, then inspect an attention store or evaluate a deterministic operating scenario when requested. Keep source, coverage, and dataset context; do not write a business action.",
   },
   "ai.agent_review_title": {
     "zh-CN": "需要你确认的问题",

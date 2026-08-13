@@ -1,0 +1,3104 @@
+{
+  "positive": {
+    "legal_entity": "LE001",
+    "source_status": 200,
+    "source_response": {
+      "as_of": "2026-08-13T05:17:20.077698Z",
+      "basis": "Working",
+      "coverage": {
+        "requested_date_from": "2026-05-30",
+        "requested_date_to": "2026-06-05",
+        "observed_date_from": "2026-05-30",
+        "observed_date_to": "2026-06-05",
+        "observed_store_days": 7,
+        "expected_store_days": 7,
+        "coverage_rate": 100
+      },
+      "data": [
+        {
+          "group_by": "store",
+          "group_key": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+          "group_label": "SIM-2853D953-007 - Simulation Store 007",
+          "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+          "store_code": "SIM-2853D953-007",
+          "store_name": "Simulation Store 007",
+          "brand": "Mosaic",
+          "region": "South",
+          "currency": "CNY",
+          "observed_store_days": 7,
+          "distinct_business_days": 7,
+          "average_daily_area_sqm": 132,
+          "kpis": {
+            "average_daily_area_sqm": {
+              "value": 132,
+              "unit": "sqm",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "area_sqm"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "average_transaction_value": {
+              "value": 77.96,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "revenue",
+                "transactions"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "conversion_rate": {
+              "value": 14.71,
+              "unit": "percent",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "transactions",
+                "footfall"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "fixed_rent": {
+              "value": 4408.12,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "fixed_rent"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "footfall": {
+              "value": 2420,
+              "unit": "count",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "footfall"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "gross_margin_rate": {
+              "value": 31.49,
+              "unit": "percent",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "gross_profit",
+                "revenue"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "gross_profit": {
+              "value": 8740.31,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "gross_profit"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "labor_cost": {
+              "value": 3311.76,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "labor_cost"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "labor_cost_rate": {
+              "value": 11.93,
+              "unit": "percent",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "labor_cost",
+                "revenue"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "non_lease_cost": {
+              "value": 249.76,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "non_lease_cost"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "occupancy_cash_cost": {
+              "value": 4990.91,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "fixed_rent",
+                "variable_rent",
+                "non_lease_cost"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "occupancy_cash_cost_rate": {
+              "value": 17.98,
+              "unit": "percent",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "fixed_rent",
+                "variable_rent",
+                "non_lease_cost",
+                "revenue"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "other_controllable_cost": {
+              "value": 1526.38,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "other_controllable_cost"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "rent_to_sales_rate": {
+              "value": 17.08,
+              "unit": "percent",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "fixed_rent",
+                "variable_rent",
+                "revenue"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "revenue": {
+              "value": 27752.21,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "revenue"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "revenue_per_store_day": {
+              "value": 3964.6,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "revenue"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "sales_per_sqm": {
+              "value": 210.24,
+              "unit": "currency_per_sqm",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "revenue",
+                "area_sqm"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "store_contribution": {
+              "value": -1088.74,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "gross_profit",
+                "labor_cost",
+                "fixed_rent",
+                "variable_rent",
+                "non_lease_cost",
+                "other_controllable_cost"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "store_contribution_margin": {
+              "value": -3.92,
+              "unit": "percent",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "gross_profit",
+                "labor_cost",
+                "fixed_rent",
+                "variable_rent",
+                "non_lease_cost",
+                "other_controllable_cost",
+                "revenue"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "transactions": {
+              "value": 356,
+              "unit": "count",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "transactions"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            },
+            "variable_rent": {
+              "value": 333.03,
+              "unit": "currency",
+              "status": "complete",
+              "formula_version": "retail-kpi-v1",
+              "required_fields": [
+                "variable_rent"
+              ],
+              "available_fact_count": 7,
+              "fact_count": 7
+            }
+          },
+          "decision_ready": true
+        }
+      ],
+      "data_classification": "simulated",
+      "dataset_version": "retail-sim-v1-2853d9537f358baf",
+      "definition_url": "/api/v1/retail/kpis/definitions",
+      "fact_version_max": 1,
+      "fact_version_min": 1,
+      "formula_version": "retail-kpi-v1",
+      "group_by": "store",
+      "multi_currency": false,
+      "requested_scope": {
+        "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "store_ids": [
+          "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+        ]
+      },
+      "simulation_dataset_versions": [
+        "retail-sim-v1-2853d9537f358baf"
+      ],
+      "source": {
+        "dataset_versions": [
+          "retail-sim-v1-2853d9537f358baf"
+        ],
+        "fact_version_range": {
+          "max": 1,
+          "min": 1
+        },
+        "highest_as_of": "2026-08-13T05:17:20.077698Z",
+        "selected_fact_count": 7,
+        "source_systems": [
+          "retail_simulator"
+        ],
+        "table": "retail_store_day_facts"
+      },
+      "source_system": "retail_simulator",
+      "total_rows": 1
+    },
+    "action_status": 200,
+    "action_id": "b4d6f5ed-bf8a-4d4f-9231-c7f2026b3566",
+    "action_response": {
+      "basis": "Scenario",
+      "data": {
+        "id": "b4d6f5ed-bf8a-4d4f-9231-c7f2026b3566",
+        "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "period": "2026-06",
+        "category": "retail_store_scenario",
+        "severity": "medium",
+        "status": "open",
+        "title": "R4 scoped action",
+        "description": "Scenario plan is a deterministic working draft; verify before action.",
+        "rule_code": "retail_store_scenario_v1:945b690310da1263b50bfa2aa4bd7522aeeeb5f3fe43558e3ff8cdfe42add615",
+        "source_table": "retail_store_day_facts",
+        "source_record_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+        "data_version": "retail-store-scenario-v1",
+        "idempotency_key": "MAX009R4-action-001",
+        "currency": "CNY",
+        "baseline_amount": -4666.03,
+        "target_amount": -3246.7,
+        "expected_benefit": 17031.91,
+        "verification_period": "2026-06",
+        "verification_status": "not_due",
+        "planned_action": "Review staffing plan",
+        "evidence": {
+          "baseline": {
+            "key": "baseline",
+            "name": "Baseline",
+            "assumptions": {
+              "revenue_change_pct": 0,
+              "gross_margin_rate_change_pp": 0,
+              "labor_cost_change_pct": 0,
+              "fixed_rent_change_pct": 0,
+              "variable_rent_rate_change_pp": 0,
+              "non_lease_cost_change_pct": 0,
+              "other_controllable_cost_change_pct": 0
+            },
+            "metrics": {
+              "fixed_rent": {
+                "baseline": 18891.94,
+                "result": 18891.94,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "gross_margin_rate": {
+                "baseline": 31.4941,
+                "result": 31.4941,
+                "delta": 0,
+                "unit": "percent",
+                "status": "complete"
+              },
+              "gross_profit": {
+                "baseline": 37458.47,
+                "result": 37458.47,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "labor_cost": {
+                "baseline": 14193.26,
+                "result": 14193.26,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "non_lease_cost": {
+                "baseline": 1070.4,
+                "result": 1070.4,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "occupancy_cash_cost": {
+                "baseline": 21389.61,
+                "result": 21389.61,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "other_controllable_cost": {
+                "baseline": 6541.63,
+                "result": 6541.63,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "revenue": {
+                "baseline": 118938.04,
+                "result": 118938.04,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "store_contribution": {
+                "baseline": -4666.03,
+                "result": -4666.03,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "store_contribution_margin": {
+                "baseline": -3.9231,
+                "result": -3.9231,
+                "delta": 0,
+                "unit": "percent",
+                "status": "complete"
+              },
+              "variable_rent": {
+                "baseline": 1427.27,
+                "result": 1427.27,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "variable_rent_rate": {
+                "baseline": 1.2,
+                "result": 1.2,
+                "delta": 0,
+                "unit": "percent",
+                "status": "complete"
+              }
+            },
+            "monthly_contribution_change": 0,
+            "horizon_contribution_change": 0,
+            "bridge": {
+              "items": [
+                {
+                  "code": "gross_profit",
+                  "label": "毛利额",
+                  "contribution": 0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "labor_cost",
+                  "label": "人工成本",
+                  "contribution": -0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "fixed_rent",
+                  "label": "固定现金租金",
+                  "contribution": -0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "variable_rent",
+                  "label": "变动租金",
+                  "contribution": -0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "non_lease_cost",
+                  "label": "非租赁占用成本",
+                  "contribution": -0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "other_controllable_cost",
+                  "label": "其他可控成本",
+                  "contribution": -0,
+                  "unit": "currency"
+                }
+              ],
+              "total_change": 0,
+              "rounding_residual": 0,
+              "status": "complete"
+            }
+          },
+          "current": {
+            "date_from": "2026-05-30",
+            "date_to": "2026-06-05"
+          },
+          "data_classification": "simulated",
+          "dataset_version": "retail-sim-v1-2853d9537f358baf",
+          "fact_version_max": 1,
+          "fact_version_min": 1,
+          "formal_execution": false,
+          "formula_version": "retail-kpi-v1",
+          "kpi_drilldown_url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+          "request_fingerprint": "3477319e1001766cacd90f234c5e20ca1ecade5dda16d828410397c114043746",
+          "scenario_version": "retail-store-scenario-v1",
+          "selected_scenario": {
+            "key": "plan",
+            "name": "Labor -10%",
+            "assumptions": {
+              "revenue_change_pct": 0,
+              "gross_margin_rate_change_pp": 0,
+              "labor_cost_change_pct": -10,
+              "fixed_rent_change_pct": 0,
+              "variable_rent_rate_change_pp": 0,
+              "non_lease_cost_change_pct": 0,
+              "other_controllable_cost_change_pct": 0
+            },
+            "metrics": {
+              "fixed_rent": {
+                "baseline": 18891.94,
+                "result": 18891.94,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "gross_margin_rate": {
+                "baseline": 31.4941,
+                "result": 31.4941,
+                "delta": 0,
+                "unit": "percent",
+                "status": "complete"
+              },
+              "gross_profit": {
+                "baseline": 37458.47,
+                "result": 37458.47,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "labor_cost": {
+                "baseline": 14193.26,
+                "result": 12773.93,
+                "delta": -1419.33,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "non_lease_cost": {
+                "baseline": 1070.4,
+                "result": 1070.4,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "occupancy_cash_cost": {
+                "baseline": 21389.61,
+                "result": 21389.61,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "other_controllable_cost": {
+                "baseline": 6541.63,
+                "result": 6541.63,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "revenue": {
+                "baseline": 118938.04,
+                "result": 118938.04,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "store_contribution": {
+                "baseline": -4666.03,
+                "result": -3246.7,
+                "delta": 1419.33,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "store_contribution_margin": {
+                "baseline": -3.9231,
+                "result": -2.7297,
+                "delta": 1.1933,
+                "unit": "percent",
+                "status": "complete"
+              },
+              "variable_rent": {
+                "baseline": 1427.27,
+                "result": 1427.27,
+                "delta": 0,
+                "unit": "currency",
+                "status": "complete"
+              },
+              "variable_rent_rate": {
+                "baseline": 1.2,
+                "result": 1.2,
+                "delta": 0,
+                "unit": "percent",
+                "status": "complete"
+              }
+            },
+            "monthly_contribution_change": 1419.33,
+            "horizon_contribution_change": 17031.91,
+            "bridge": {
+              "items": [
+                {
+                  "code": "gross_profit",
+                  "label": "毛利额",
+                  "contribution": 0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "labor_cost",
+                  "label": "人工成本",
+                  "contribution": 1419.33,
+                  "unit": "currency"
+                },
+                {
+                  "code": "fixed_rent",
+                  "label": "固定现金租金",
+                  "contribution": -0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "variable_rent",
+                  "label": "变动租金",
+                  "contribution": -0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "non_lease_cost",
+                  "label": "非租赁占用成本",
+                  "contribution": -0,
+                  "unit": "currency"
+                },
+                {
+                  "code": "other_controllable_cost",
+                  "label": "其他可控成本",
+                  "contribution": -0,
+                  "unit": "currency"
+                }
+              ],
+              "total_change": 1419.33,
+              "rounding_residual": 0,
+              "status": "complete"
+            }
+          },
+          "source_system": "retail_simulator",
+          "store": {
+            "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+            "store_code": "SIM-2853D953-007",
+            "store_name": "Simulation Store 007",
+            "brand": "Mosaic",
+            "region": "South"
+          }
+        },
+        "created_at": "2026-08-13T05:31:41.093205Z",
+        "updated_at": "2026-08-13T05:31:41.093205Z"
+      },
+      "formal_execution": false,
+      "idempotent_replay": false,
+      "review_required": true
+    },
+    "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+    "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+    "artifact_id": "0c285f6f-46c6-4e45-bdd9-3a2898db1482",
+    "ai_trace": {
+      "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+      "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+      "session_create_response": {
+        "session": {
+          "id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+          "user_id": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          "title": "MAX009R4 positive proposal",
+          "status": "active",
+          "bound_contract_id": null,
+          "context_snapshot": null,
+          "created_at": "2026-08-13T05:32:21.692615709Z",
+          "updated_at": "2026-08-13T05:32:21.692615709Z",
+          "last_message_at": null,
+          "archived_at": null
+        }
+      },
+      "run_create_response": {
+        "agent_plan": [
+          {
+            "id": "load_retail_context",
+            "title": "读取经营事实与来源",
+            "status": "pending"
+          },
+          {
+            "id": "check_retail_quality",
+            "title": "核对覆盖、币种和来源冲突",
+            "status": "pending"
+          },
+          {
+            "id": "prepare_review",
+            "title": "输出可复核结论或情景提议",
+            "status": "pending"
+          }
+        ],
+        "review_prompts": [
+          {
+            "id": "retail_source_review",
+            "title": "复核零售事实与来源",
+            "description": "请在经营页面核对法人、日期、分类、数据集和公式版本；情景提议需回到情景工作台二次确认。",
+            "severity": "warning",
+            "action": "review_retail_sources"
+          }
+        ],
+        "run": {
+          "id": "19dee11e-2090-4987-9416-c555b6255ea2",
+          "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+          "trigger_message_id": null,
+          "parent_run_id": null,
+          "status": "running",
+          "agent_mode": true,
+          "skill_id": "retail_operations",
+          "skill_version": "v1",
+          "page_context": {
+            "page": "scenario-workbench",
+            "filters": {
+              "as_of": "2026-06-05",
+              "data_classification": "simulated",
+              "dataset_version": "retail-sim-v1-2853d9537f358baf",
+              "fixed_rent_change_pct": "0",
+              "gross_margin_rate_change_pp": "0",
+              "horizon_months": "12",
+              "labor_cost_change_pct": "-10",
+              "non_lease_cost_change_pct": "0",
+              "other_controllable_cost_change_pct": "0",
+              "revenue_change_pct": "0",
+              "source_system": "retail_simulator",
+              "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+              "variable_rent_rate_change_pp": "0",
+              "window_days": "7"
+            }
+          },
+          "review_required": true,
+          "summary_text": null,
+          "error_message": null,
+          "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "created_at": "2026-08-13T05:32:21.710715834Z",
+          "started_at": "2026-08-13T05:32:21.722929209Z",
+          "completed_at": null
+        },
+        "stream_url": "/api/v1/ai/chat/runs/19dee11e-2090-4987-9416-c555b6255ea2/stream",
+        "tool_calls": null,
+        "trigger_message": {
+          "id": "e17ad960-3e31-421b-a3dc-eadc6e556684",
+          "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+          "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+          "role": "user",
+          "message_type": "text",
+          "sequence_no": 1,
+          "content": "请生成行动提议，人工成本下降10%，返回确定性来源和待复核草稿",
+          "content_json": null,
+          "sources": null,
+          "attachments": null,
+          "model": null,
+          "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "created_at": "2026-08-13T05:32:21.716080293Z"
+        }
+      },
+      "trace_response": {
+        "run": {
+          "id": "19dee11e-2090-4987-9416-c555b6255ea2",
+          "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+          "trigger_message_id": "e17ad960-3e31-421b-a3dc-eadc6e556684",
+          "parent_run_id": null,
+          "status": "waiting_review",
+          "agent_mode": true,
+          "skill_id": "retail_operations",
+          "skill_version": "v1",
+          "page_context": {
+            "page": "scenario-workbench",
+            "filters": {
+              "as_of": "2026-06-05",
+              "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+              "window_days": "7",
+              "source_system": "retail_simulator",
+              "horizon_months": "12",
+              "dataset_version": "retail-sim-v1-2853d9537f358baf",
+              "revenue_change_pct": "0",
+              "data_classification": "simulated",
+              "fixed_rent_change_pct": "0",
+              "labor_cost_change_pct": "-10",
+              "non_lease_cost_change_pct": "0",
+              "gross_margin_rate_change_pp": "0",
+              "variable_rent_rate_change_pp": "0",
+              "other_controllable_cost_change_pct": "0"
+            }
+          },
+          "review_required": true,
+          "summary_text": "零售经营分析使用已验收的确定性服务；AI 不重算经营数字，不写入业务台账。\n\n数据上下文：simulated · dataset=retail-sim-v1-2853d9537f358baf · source=retail_simulator · as_of=2026-06-05 · window=7天 · scenario=retail-store-scenario-v1 · formula=retail-kpi-v1 · evidence=complete · confidence=0.90。\nSIM-2853D953-007 情景使用 12 个月 run-rate 和服务端 Baseline/Plan 计算，覆盖 7/7 store-days (100.0%)；Baseline 门店贡献额=-4666.03 (complete)，Plan 月度变化=1419.33，Plan 期内变化=17031.91，贡献桥=gross_profit=0.00；labor_cost=1419.33；fixed_rent=-0.00；variable_rent=-0.00；non_lease_cost=-0.00；other_controllable_cost=-0.00；经营占用现金成本是 Working 经营口径，不是 IFRS 16 会计费用；结果不触达 IFRS 16 或 Official。 已生成待人工确认的行动提议；请前往情景工作台二次确认。",
+          "error_message": null,
+          "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "created_at": "2026-08-13T05:32:21.710715Z",
+          "started_at": "2026-08-13T05:32:21.722929Z",
+          "completed_at": "2026-08-13T05:32:21.785425Z"
+        },
+        "summary": {
+          "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+          "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+          "event_count": 16,
+          "tool_event_count": 10,
+          "failed_event_count": 0,
+          "review_event_count": 2,
+          "artifact_count": 1,
+          "last_sequence": 16,
+          "last_event_type": "run_end",
+          "terminal": true,
+          "checkpoint_count": 0,
+          "terminal_error": "{\"artifact_present\":true,\"review_required\":true,\"status\":\"waiting_review\"}",
+          "last_event_at": "2026-08-13T05:32:21.785862Z",
+          "updated_at": "2026-08-13T05:32:21.78575Z"
+        },
+        "events": [
+          {
+            "id": "12096f0d-437e-44c0-86de-3c5b5723eae6",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 1,
+            "event_type": "message_start",
+            "payload": {
+              "role": "user",
+              "content": "请生成行动提议，人工成本下降10%，返回确定性来源和待复核草稿",
+              "has_file": false,
+              "message_id": "e17ad960-3e31-421b-a3dc-eadc6e556684",
+              "contract_id": "",
+              "page_context": {
+                "page": "scenario-workbench",
+                "filters": {
+                  "as_of": "2026-06-05",
+                  "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "window_days": "7",
+                  "source_system": "retail_simulator",
+                  "horizon_months": "12",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "revenue_change_pct": "0",
+                  "data_classification": "simulated",
+                  "fixed_rent_change_pct": "0",
+                  "labor_cost_change_pct": "-10",
+                  "non_lease_cost_change_pct": "0",
+                  "gross_margin_rate_change_pp": "0",
+                  "variable_rent_rate_change_pp": "0",
+                  "other_controllable_cost_change_pct": "0"
+                }
+              }
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.719944Z"
+          },
+          {
+            "id": "4f4aa9e6-a01a-4072-9455-b32237556d7c",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 2,
+            "event_type": "run_status",
+            "payload": {
+              "status": "running",
+              "skill_id": "retail_operations",
+              "agent_mode": true,
+              "review_required": true
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.723598Z"
+          },
+          {
+            "id": "392bfe99-992e-4a93-b283-80826cc5b053",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 3,
+            "event_type": "tool_start",
+            "payload": {
+              "tool": "retail.operating_pulse.read",
+              "status": "running"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.725665Z"
+          },
+          {
+            "id": "44d3d0f1-57a1-4bc0-8abf-e84b758832e7",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 4,
+            "event_type": "tool_execution",
+            "payload": {
+              "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+              "status": "completed",
+              "call_id": "retail.operating_pulse.read-19dee11e-2090-4987-9416-c555b6255ea2",
+              "user_id": "855251ac-a318-49d4-b0cd-04198b9770a6",
+              "skill_id": "retail_operations",
+              "tool_name": "retail.operating_pulse.read",
+              "started_at": "2026-08-13T05:32:21.726611459Z",
+              "completed_at": "2026-08-13T05:32:21.729028793Z",
+              "subject_type": "web_ai_agent",
+              "tool_version": "v1",
+              "skill_version": "v1",
+              "duration_millis": 2,
+              "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "review_required": false,
+              "arguments_sha256": "a825ac22e14d018d40cf67510c7bd9906932705e8c1da4cbd3ae62923a5bc193"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.729473Z"
+          },
+          {
+            "id": "fad51f7e-845f-4f54-837a-9891ae9e6fbe",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 5,
+            "event_type": "tool_end",
+            "payload": {
+              "tool": "retail.operating_pulse.read",
+              "status": "completed"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.730887Z"
+          },
+          {
+            "id": "67f3cf63-a153-4f3b-9ed9-c4e790486b2e",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 6,
+            "event_type": "tool_start",
+            "payload": {
+              "tool": "retail.store_diagnostics.read",
+              "status": "running"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.731817Z"
+          },
+          {
+            "id": "c6b088ff-0a47-4523-bbe8-1befb2508318",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 7,
+            "event_type": "tool_execution",
+            "payload": {
+              "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+              "status": "completed",
+              "call_id": "retail.store_diagnostics.read-19dee11e-2090-4987-9416-c555b6255ea2",
+              "user_id": "855251ac-a318-49d4-b0cd-04198b9770a6",
+              "skill_id": "retail_operations",
+              "tool_name": "retail.store_diagnostics.read",
+              "started_at": "2026-08-13T05:32:21.732457209Z",
+              "completed_at": "2026-08-13T05:32:21.770071251Z",
+              "subject_type": "web_ai_agent",
+              "tool_version": "v1",
+              "skill_version": "v1",
+              "duration_millis": 37,
+              "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "review_required": false,
+              "arguments_sha256": "e11e8c4993c033937e89d239836f1eac7aa496451f8b2625ca2709961f5cd302"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.770554Z"
+          },
+          {
+            "id": "8f3885ab-1552-4c61-ba50-87270363c8af",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 8,
+            "event_type": "tool_end",
+            "payload": {
+              "tool": "retail.store_diagnostics.read",
+              "status": "completed"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.77155Z"
+          },
+          {
+            "id": "950194ac-6360-4acb-867a-c0a8c74ed67b",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 9,
+            "event_type": "tool_start",
+            "payload": {
+              "tool": "retail.store.scenario.evaluate",
+              "status": "running"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.772229Z"
+          },
+          {
+            "id": "add60e27-9d3a-49fa-b0c1-6fc8a8c42625",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 10,
+            "event_type": "tool_execution",
+            "payload": {
+              "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+              "status": "completed",
+              "call_id": "retail.store.scenario.evaluate-19dee11e-2090-4987-9416-c555b6255ea2",
+              "user_id": "855251ac-a318-49d4-b0cd-04198b9770a6",
+              "skill_id": "retail_operations",
+              "tool_name": "retail.store.scenario.evaluate",
+              "started_at": "2026-08-13T05:32:21.772632543Z",
+              "completed_at": "2026-08-13T05:32:21.776407334Z",
+              "subject_type": "web_ai_agent",
+              "tool_version": "v1",
+              "skill_version": "v1",
+              "duration_millis": 3,
+              "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "review_required": false,
+              "arguments_sha256": "c2ef5bd57ea1cfebce4443a15c3c71064713b280c51a75a5a87feaeec2ebba29"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.776801Z"
+          },
+          {
+            "id": "febf325e-253b-4bcd-b387-e5d6a6df4287",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 11,
+            "event_type": "tool_end",
+            "payload": {
+              "tool": "retail.store.scenario.evaluate",
+              "status": "completed"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.777815Z"
+          },
+          {
+            "id": "7cf6c326-d141-4edc-a97e-3ee111a073cc",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 12,
+            "event_type": "message_end",
+            "payload": {
+              "role": "assistant",
+              "model": "deterministic-fallback",
+              "content": "零售经营分析使用已验收的确定性服务；AI 不重算经营数字，不写入业务台账。\n\n数据上下文：simulated · dataset=retail-sim-v1-2853d9537f358baf · source=retail_simulator · as_of=2026-06-05 · window=7天 · scenario=retail-store-scenario-v1 · formula=retail-kpi-v1 · evidence=complete · confidence=0.90。\nSIM-2853D953-007 情景使用 12 个月 run-rate 和服务端 Baseline/Plan 计算，覆盖 7/7 store-days (100.0%)；Baseline 门店贡献额=-4666.03 (complete)，Plan 月度变化=1419.33，Plan 期内变化=17031.91，贡献桥=gross_profit=0.00；labor_cost=1419.33；fixed_rent=-0.00；variable_rent=-0.00；non_lease_cost=-0.00；other_controllable_cost=-0.00；经营占用现金成本是 Working 经营口径，不是 IFRS 16 会计费用；结果不触达 IFRS 16 或 Official。 已生成待人工确认的行动提议；请前往情景工作台二次确认。",
+              "sources": [
+                {
+                  "id": "retail-pulse-v1",
+                  "url": "/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                  "type": "retail_pulse",
+                  "as_of": "2026-06-05",
+                  "title": "经营脉搏确定性摘要",
+                  "snippet": "/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                  "classification": "simulated",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1"
+                },
+                {
+                  "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "url": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                  "type": "retail_store",
+                  "as_of": "2026-06-05",
+                  "title": "SIM-2853D953-007 门店脉搏",
+                  "snippet": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                  "classification": "simulated",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1"
+                },
+                {
+                  "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "url": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                  "type": "retail_store_diagnostics",
+                  "as_of": "2026-06-05",
+                  "title": "SIM-2853D953-007 门店诊断",
+                  "snippet": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                  "classification": "simulated",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1"
+                },
+                {
+                  "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                  "type": "retail_kpi",
+                  "as_of": "2026-06-05",
+                  "title": "KPI 事实下钻",
+                  "snippet": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                  "classification": "simulated",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1"
+                },
+                {
+                  "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "url": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                  "type": "retail_store_scenario",
+                  "as_of": "2026-06-05",
+                  "title": "SIM-2853D953-007 经营情景证据",
+                  "snippet": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                  "classification": "simulated",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1"
+                },
+                {
+                  "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "url": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                  "type": "retail_store",
+                  "as_of": "2026-06-05",
+                  "title": "SIM-2853D953-007 门店 360",
+                  "snippet": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                  "classification": "simulated",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1"
+                },
+                {
+                  "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                  "type": "retail_kpi",
+                  "as_of": "2026-06-05",
+                  "title": "KPI 事实下钻",
+                  "snippet": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                  "classification": "simulated",
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1"
+                }
+              ],
+              "message_id": "65681ba4-eb61-4b6a-bfa9-59246556bcb4"
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.779258Z"
+          },
+          {
+            "id": "ee208a15-cdd0-4e1b-8192-5250f0a84314",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 13,
+            "event_type": "tool_end",
+            "payload": [
+              {
+                "tool": "retail.operating_pulse.read",
+                "skill": "零售经营分析 Agent",
+                "status": "completed",
+                "input_summary": "读取服务端零售事实",
+                "output_summary": "确定性服务结果",
+                "requires_review": false
+              },
+              {
+                "tool": "retail.store_diagnostics.read",
+                "skill": "零售经营分析 Agent",
+                "status": "completed",
+                "input_summary": "读取服务端零售事实",
+                "output_summary": "确定性服务结果",
+                "requires_review": false
+              },
+              {
+                "tool": "retail.store.scenario.evaluate",
+                "skill": "零售经营分析 Agent",
+                "status": "completed",
+                "input_summary": "读取服务端零售事实",
+                "output_summary": "确定性服务结果",
+                "requires_review": false
+              }
+            ],
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.780262Z"
+          },
+          {
+            "id": "db916f42-890c-42d0-b5ef-67c5d28a7089",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 14,
+            "event_type": "review_prompt",
+            "payload": [
+              {
+                "id": "retail_source_review",
+                "title": "复核零售事实与来源",
+                "action": "review_retail_sources",
+                "severity": "warning",
+                "description": "请在经营页面核对法人、日期、分类、数据集和公式版本；情景提议需回到情景工作台二次确认。"
+              }
+            ],
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.781439Z"
+          },
+          {
+            "id": "9f7f9c8d-4cd5-4018-987f-7b810f66ec97",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 15,
+            "event_type": "artifact_ready",
+            "payload": {
+              "data": {
+                "type": "retail_action_proposal",
+                "store": {
+                  "brand": "Mosaic",
+                  "region": "South",
+                  "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "store_code": "SIM-2853D953-007",
+                  "store_name": "Simulation Store 007"
+                },
+                "title": "门店经营情景行动提议",
+                "status": "proposal",
+                "evidence": {
+                  "current": {
+                    "date_to": "2026-06-05",
+                    "date_from": "2026-05-30"
+                  },
+                  "coverage_rate": 100,
+                  "highest_as_of": "2026-08-13T05:17:20.077698Z",
+                  "source_systems": [
+                    "retail_simulator"
+                  ],
+                  "required_fields": [
+                    "revenue",
+                    "gross_profit",
+                    "labor_cost",
+                    "fixed_rent",
+                    "variable_rent",
+                    "non_lease_cost",
+                    "other_controllable_cost"
+                  ],
+                  "dataset_versions": [
+                    "retail-sim-v1-2853d9537f358baf"
+                  ],
+                  "fact_version_max": 1,
+                  "fact_version_min": 1,
+                  "kpi_drilldown_url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                  "expected_store_days": 7,
+                  "observed_store_days": 7,
+                  "request_assumptions": {
+                    "scenarios": [
+                      {
+                        "key": "baseline",
+                        "name": "Baseline",
+                        "assumptions": {
+                          "revenue_change_pct": 0,
+                          "fixed_rent_change_pct": 0,
+                          "labor_cost_change_pct": 0,
+                          "non_lease_cost_change_pct": 0,
+                          "gross_margin_rate_change_pp": 0,
+                          "variable_rent_rate_change_pp": 0,
+                          "other_controllable_cost_change_pct": 0
+                        }
+                      },
+                      {
+                        "key": "plan",
+                        "name": "Plan",
+                        "assumptions": {
+                          "revenue_change_pct": 0,
+                          "fixed_rent_change_pct": 0,
+                          "labor_cost_change_pct": -10,
+                          "non_lease_cost_change_pct": 0,
+                          "gross_margin_rate_change_pp": 0,
+                          "variable_rent_rate_change_pp": 0,
+                          "other_controllable_cost_change_pct": 0
+                        }
+                      }
+                    ],
+                    "horizon_months": 12
+                  }
+                },
+                "next_url": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                "scenario": {
+                  "basis": "Scenario",
+                  "store": {
+                    "brand": "Mosaic",
+                    "region": "South",
+                    "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                    "store_code": "SIM-2853D953-007",
+                    "store_name": "Simulation Store 007"
+                  },
+                  "current": {
+                    "date_to": "2026-06-05",
+                    "date_from": "2026-05-30"
+                  },
+                  "baseline": {
+                    "key": "baseline",
+                    "name": "Baseline",
+                    "bridge": {
+                      "items": [
+                        {
+                          "code": "gross_profit",
+                          "unit": "currency",
+                          "label": "毛利额",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "labor_cost",
+                          "unit": "currency",
+                          "label": "人工成本",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "fixed_rent",
+                          "unit": "currency",
+                          "label": "固定现金租金",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "variable_rent",
+                          "unit": "currency",
+                          "label": "变动租金",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "non_lease_cost",
+                          "unit": "currency",
+                          "label": "非租赁占用成本",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "other_controllable_cost",
+                          "unit": "currency",
+                          "label": "其他可控成本",
+                          "contribution": 0
+                        }
+                      ],
+                      "status": "complete",
+                      "total_change": 0,
+                      "rounding_residual": 0
+                    },
+                    "metrics": {
+                      "revenue": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 118938.04,
+                        "status": "complete",
+                        "baseline": 118938.04
+                      },
+                      "fixed_rent": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 18891.94,
+                        "status": "complete",
+                        "baseline": 18891.94
+                      },
+                      "labor_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 14193.26,
+                        "status": "complete",
+                        "baseline": 14193.26
+                      },
+                      "gross_profit": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 37458.47,
+                        "status": "complete",
+                        "baseline": 37458.47
+                      },
+                      "variable_rent": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 1427.27,
+                        "status": "complete",
+                        "baseline": 1427.27
+                      },
+                      "non_lease_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 1070.4,
+                        "status": "complete",
+                        "baseline": 1070.4
+                      },
+                      "gross_margin_rate": {
+                        "unit": "percent",
+                        "delta": 0,
+                        "result": 31.4941,
+                        "status": "complete",
+                        "baseline": 31.4941
+                      },
+                      "store_contribution": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": -4666.03,
+                        "status": "complete",
+                        "baseline": -4666.03
+                      },
+                      "variable_rent_rate": {
+                        "unit": "percent",
+                        "delta": 0,
+                        "result": 1.2,
+                        "status": "complete",
+                        "baseline": 1.2
+                      },
+                      "occupancy_cash_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 21389.61,
+                        "status": "complete",
+                        "baseline": 21389.61
+                      },
+                      "other_controllable_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 6541.63,
+                        "status": "complete",
+                        "baseline": 6541.63
+                      },
+                      "store_contribution_margin": {
+                        "unit": "percent",
+                        "delta": 0,
+                        "result": -3.9231,
+                        "status": "complete",
+                        "baseline": -3.9231
+                      }
+                    },
+                    "assumptions": {
+                      "revenue_change_pct": 0,
+                      "fixed_rent_change_pct": 0,
+                      "labor_cost_change_pct": 0,
+                      "non_lease_cost_change_pct": 0,
+                      "gross_margin_rate_change_pp": 0,
+                      "variable_rent_rate_change_pp": 0,
+                      "other_controllable_cost_change_pct": 0
+                    },
+                    "horizon_contribution_change": 0,
+                    "monthly_contribution_change": 0
+                  },
+                  "currency": "CNY",
+                  "evidence": {
+                    "current": {
+                      "date_to": "2026-06-05",
+                      "date_from": "2026-05-30"
+                    },
+                    "coverage_rate": 100,
+                    "highest_as_of": "2026-08-13T05:17:20.077698Z",
+                    "source_systems": [
+                      "retail_simulator"
+                    ],
+                    "required_fields": [
+                      "revenue",
+                      "gross_profit",
+                      "labor_cost",
+                      "fixed_rent",
+                      "variable_rent",
+                      "non_lease_cost",
+                      "other_controllable_cost"
+                    ],
+                    "dataset_versions": [
+                      "retail-sim-v1-2853d9537f358baf"
+                    ],
+                    "fact_version_max": 1,
+                    "fact_version_min": 1,
+                    "kpi_drilldown_url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                    "expected_store_days": 7,
+                    "observed_store_days": 7,
+                    "request_assumptions": {
+                      "scenarios": [
+                        {
+                          "key": "baseline",
+                          "name": "Baseline",
+                          "assumptions": {
+                            "revenue_change_pct": 0,
+                            "fixed_rent_change_pct": 0,
+                            "labor_cost_change_pct": 0,
+                            "non_lease_cost_change_pct": 0,
+                            "gross_margin_rate_change_pp": 0,
+                            "variable_rent_rate_change_pp": 0,
+                            "other_controllable_cost_change_pct": 0
+                          }
+                        },
+                        {
+                          "key": "plan",
+                          "name": "Plan",
+                          "assumptions": {
+                            "revenue_change_pct": 0,
+                            "fixed_rent_change_pct": 0,
+                            "labor_cost_change_pct": -10,
+                            "non_lease_cost_change_pct": 0,
+                            "gross_margin_rate_change_pp": 0,
+                            "variable_rent_rate_change_pp": 0,
+                            "other_controllable_cost_change_pct": 0
+                          }
+                        }
+                      ],
+                      "horizon_months": 12
+                    }
+                  },
+                  "scenarios": [
+                    {
+                      "key": "plan",
+                      "name": "Plan",
+                      "bridge": {
+                        "items": [
+                          {
+                            "code": "gross_profit",
+                            "unit": "currency",
+                            "label": "毛利额",
+                            "contribution": 0
+                          },
+                          {
+                            "code": "labor_cost",
+                            "unit": "currency",
+                            "label": "人工成本",
+                            "contribution": 1419.33
+                          },
+                          {
+                            "code": "fixed_rent",
+                            "unit": "currency",
+                            "label": "固定现金租金",
+                            "contribution": 0
+                          },
+                          {
+                            "code": "variable_rent",
+                            "unit": "currency",
+                            "label": "变动租金",
+                            "contribution": 0
+                          },
+                          {
+                            "code": "non_lease_cost",
+                            "unit": "currency",
+                            "label": "非租赁占用成本",
+                            "contribution": 0
+                          },
+                          {
+                            "code": "other_controllable_cost",
+                            "unit": "currency",
+                            "label": "其他可控成本",
+                            "contribution": 0
+                          }
+                        ],
+                        "status": "complete",
+                        "total_change": 1419.33,
+                        "rounding_residual": 0
+                      },
+                      "metrics": {
+                        "revenue": {
+                          "unit": "currency",
+                          "delta": 0,
+                          "result": 118938.04,
+                          "status": "complete",
+                          "baseline": 118938.04
+                        },
+                        "fixed_rent": {
+                          "unit": "currency",
+                          "delta": 0,
+                          "result": 18891.94,
+                          "status": "complete",
+                          "baseline": 18891.94
+                        },
+                        "labor_cost": {
+                          "unit": "currency",
+                          "delta": -1419.33,
+                          "result": 12773.93,
+                          "status": "complete",
+                          "baseline": 14193.26
+                        },
+                        "gross_profit": {
+                          "unit": "currency",
+                          "delta": 0,
+                          "result": 37458.47,
+                          "status": "complete",
+                          "baseline": 37458.47
+                        },
+                        "variable_rent": {
+                          "unit": "currency",
+                          "delta": 0,
+                          "result": 1427.27,
+                          "status": "complete",
+                          "baseline": 1427.27
+                        },
+                        "non_lease_cost": {
+                          "unit": "currency",
+                          "delta": 0,
+                          "result": 1070.4,
+                          "status": "complete",
+                          "baseline": 1070.4
+                        },
+                        "gross_margin_rate": {
+                          "unit": "percent",
+                          "delta": 0,
+                          "result": 31.4941,
+                          "status": "complete",
+                          "baseline": 31.4941
+                        },
+                        "store_contribution": {
+                          "unit": "currency",
+                          "delta": 1419.33,
+                          "result": -3246.7,
+                          "status": "complete",
+                          "baseline": -4666.03
+                        },
+                        "variable_rent_rate": {
+                          "unit": "percent",
+                          "delta": 0,
+                          "result": 1.2,
+                          "status": "complete",
+                          "baseline": 1.2
+                        },
+                        "occupancy_cash_cost": {
+                          "unit": "currency",
+                          "delta": 0,
+                          "result": 21389.61,
+                          "status": "complete",
+                          "baseline": 21389.61
+                        },
+                        "other_controllable_cost": {
+                          "unit": "currency",
+                          "delta": 0,
+                          "result": 6541.63,
+                          "status": "complete",
+                          "baseline": 6541.63
+                        },
+                        "store_contribution_margin": {
+                          "unit": "percent",
+                          "delta": 1.1933,
+                          "result": -2.7297,
+                          "status": "complete",
+                          "baseline": -3.9231
+                        }
+                      },
+                      "assumptions": {
+                        "revenue_change_pct": 0,
+                        "fixed_rent_change_pct": 0,
+                        "labor_cost_change_pct": -10,
+                        "non_lease_cost_change_pct": 0,
+                        "gross_margin_rate_change_pp": 0,
+                        "variable_rent_rate_change_pp": 0,
+                        "other_controllable_cost_change_pct": 0
+                      },
+                      "horizon_contribution_change": 17031.91,
+                      "monthly_contribution_change": 1419.33
+                    }
+                  ],
+                  "generated_at": "2026-08-13T05:32:21.776384001Z",
+                  "side_effects": false,
+                  "ifrs16_impact": false,
+                  "source_system": "retail_simulator",
+                  "horizon_months": 12,
+                  "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                  "formula_version": "retail-kpi-v1",
+                  "official_impact": false,
+                  "review_required": true,
+                  "scenario_version": "retail-store-scenario-v1",
+                  "data_classification": "simulated",
+                  "diagnostics_version": "retail-store-diagnostics-v1"
+                },
+                "source_system": "retail_simulator",
+                "business_write": false,
+                "planned_action": "前往情景工作台复核 Baseline/Plan、证据和负责人后再保存",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1",
+                "formal_execution": false,
+                "evidence_complete": true,
+                "data_classification": "simulated"
+              },
+              "title": "门店经营情景行动提议",
+              "status": "ready",
+              "artifact_id": "0c285f6f-46c6-4e45-bdd9-3a2898db1482",
+              "rule_version": "retail-operations-rule.v1",
+              "artifact_type": "retail_action_proposal",
+              "evidence_refs": [
+                {
+                  "complete": true,
+                  "locators": [
+                    {
+                      "field": "record",
+                      "quote": "/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                      "source": "system:retail_pulse"
+                    }
+                  ],
+                  "reference_id": "retail-pulse-v1"
+                },
+                {
+                  "complete": true,
+                  "locators": [
+                    {
+                      "field": "record",
+                      "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                      "source": "system:retail_store"
+                    }
+                  ],
+                  "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+                },
+                {
+                  "complete": true,
+                  "locators": [
+                    {
+                      "field": "record",
+                      "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                      "source": "system:retail_store_diagnostics"
+                    }
+                  ],
+                  "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+                },
+                {
+                  "complete": true,
+                  "locators": [
+                    {
+                      "field": "record",
+                      "quote": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                      "source": "system:retail_kpi"
+                    }
+                  ],
+                  "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+                },
+                {
+                  "complete": true,
+                  "locators": [
+                    {
+                      "field": "record",
+                      "quote": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                      "source": "system:retail_store_scenario"
+                    }
+                  ],
+                  "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+                },
+                {
+                  "complete": true,
+                  "locators": [
+                    {
+                      "field": "record",
+                      "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                      "source": "system:retail_store"
+                    }
+                  ],
+                  "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+                },
+                {
+                  "complete": true,
+                  "locators": [
+                    {
+                      "field": "record",
+                      "quote": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                      "source": "system:retail_kpi"
+                    }
+                  ],
+                  "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+                }
+              ],
+              "model_version": "deterministic-fallback",
+              "review_reasons": [
+                "retail_action_review",
+                "scenario_workbench_confirmation"
+              ],
+              "schema_version": "agent-artifact.v1",
+              "review_required": true,
+              "evidence_complete": true
+            },
+            "is_terminal": false,
+            "created_at": "2026-08-13T05:32:21.783629Z"
+          },
+          {
+            "id": "baa1bf19-9c1f-4d2b-8bc3-f59c80b25e3a",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "sequence_no": 16,
+            "event_type": "run_end",
+            "payload": {
+              "status": "waiting_review",
+              "review_required": true,
+              "artifact_present": true
+            },
+            "is_terminal": true,
+            "created_at": "2026-08-13T05:32:21.785862Z"
+          }
+        ],
+        "artifacts": [
+          {
+            "id": "0c285f6f-46c6-4e45-bdd9-3a2898db1482",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "artifact_type": "retail_action_proposal",
+            "title": "门店经营情景行动提议",
+            "status": "ready",
+            "data": {
+              "type": "retail_action_proposal",
+              "store": {
+                "brand": "Mosaic",
+                "region": "South",
+                "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "store_code": "SIM-2853D953-007",
+                "store_name": "Simulation Store 007"
+              },
+              "title": "门店经营情景行动提议",
+              "status": "proposal",
+              "evidence": {
+                "current": {
+                  "date_to": "2026-06-05",
+                  "date_from": "2026-05-30"
+                },
+                "coverage_rate": 100,
+                "highest_as_of": "2026-08-13T05:17:20.077698Z",
+                "source_systems": [
+                  "retail_simulator"
+                ],
+                "required_fields": [
+                  "revenue",
+                  "gross_profit",
+                  "labor_cost",
+                  "fixed_rent",
+                  "variable_rent",
+                  "non_lease_cost",
+                  "other_controllable_cost"
+                ],
+                "dataset_versions": [
+                  "retail-sim-v1-2853d9537f358baf"
+                ],
+                "fact_version_max": 1,
+                "fact_version_min": 1,
+                "kpi_drilldown_url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                "expected_store_days": 7,
+                "observed_store_days": 7,
+                "request_assumptions": {
+                  "scenarios": [
+                    {
+                      "key": "baseline",
+                      "name": "Baseline",
+                      "assumptions": {
+                        "revenue_change_pct": 0,
+                        "fixed_rent_change_pct": 0,
+                        "labor_cost_change_pct": 0,
+                        "non_lease_cost_change_pct": 0,
+                        "gross_margin_rate_change_pp": 0,
+                        "variable_rent_rate_change_pp": 0,
+                        "other_controllable_cost_change_pct": 0
+                      }
+                    },
+                    {
+                      "key": "plan",
+                      "name": "Plan",
+                      "assumptions": {
+                        "revenue_change_pct": 0,
+                        "fixed_rent_change_pct": 0,
+                        "labor_cost_change_pct": -10,
+                        "non_lease_cost_change_pct": 0,
+                        "gross_margin_rate_change_pp": 0,
+                        "variable_rent_rate_change_pp": 0,
+                        "other_controllable_cost_change_pct": 0
+                      }
+                    }
+                  ],
+                  "horizon_months": 12
+                }
+              },
+              "next_url": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+              "scenario": {
+                "basis": "Scenario",
+                "store": {
+                  "brand": "Mosaic",
+                  "region": "South",
+                  "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "store_code": "SIM-2853D953-007",
+                  "store_name": "Simulation Store 007"
+                },
+                "current": {
+                  "date_to": "2026-06-05",
+                  "date_from": "2026-05-30"
+                },
+                "baseline": {
+                  "key": "baseline",
+                  "name": "Baseline",
+                  "bridge": {
+                    "items": [
+                      {
+                        "code": "gross_profit",
+                        "unit": "currency",
+                        "label": "毛利额",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "labor_cost",
+                        "unit": "currency",
+                        "label": "人工成本",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "fixed_rent",
+                        "unit": "currency",
+                        "label": "固定现金租金",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "variable_rent",
+                        "unit": "currency",
+                        "label": "变动租金",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "non_lease_cost",
+                        "unit": "currency",
+                        "label": "非租赁占用成本",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "other_controllable_cost",
+                        "unit": "currency",
+                        "label": "其他可控成本",
+                        "contribution": 0
+                      }
+                    ],
+                    "status": "complete",
+                    "total_change": 0,
+                    "rounding_residual": 0
+                  },
+                  "metrics": {
+                    "revenue": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 118938.04,
+                      "status": "complete",
+                      "baseline": 118938.04
+                    },
+                    "fixed_rent": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 18891.94,
+                      "status": "complete",
+                      "baseline": 18891.94
+                    },
+                    "labor_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 14193.26,
+                      "status": "complete",
+                      "baseline": 14193.26
+                    },
+                    "gross_profit": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 37458.47,
+                      "status": "complete",
+                      "baseline": 37458.47
+                    },
+                    "variable_rent": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 1427.27,
+                      "status": "complete",
+                      "baseline": 1427.27
+                    },
+                    "non_lease_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 1070.4,
+                      "status": "complete",
+                      "baseline": 1070.4
+                    },
+                    "gross_margin_rate": {
+                      "unit": "percent",
+                      "delta": 0,
+                      "result": 31.4941,
+                      "status": "complete",
+                      "baseline": 31.4941
+                    },
+                    "store_contribution": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": -4666.03,
+                      "status": "complete",
+                      "baseline": -4666.03
+                    },
+                    "variable_rent_rate": {
+                      "unit": "percent",
+                      "delta": 0,
+                      "result": 1.2,
+                      "status": "complete",
+                      "baseline": 1.2
+                    },
+                    "occupancy_cash_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 21389.61,
+                      "status": "complete",
+                      "baseline": 21389.61
+                    },
+                    "other_controllable_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 6541.63,
+                      "status": "complete",
+                      "baseline": 6541.63
+                    },
+                    "store_contribution_margin": {
+                      "unit": "percent",
+                      "delta": 0,
+                      "result": -3.9231,
+                      "status": "complete",
+                      "baseline": -3.9231
+                    }
+                  },
+                  "assumptions": {
+                    "revenue_change_pct": 0,
+                    "fixed_rent_change_pct": 0,
+                    "labor_cost_change_pct": 0,
+                    "non_lease_cost_change_pct": 0,
+                    "gross_margin_rate_change_pp": 0,
+                    "variable_rent_rate_change_pp": 0,
+                    "other_controllable_cost_change_pct": 0
+                  },
+                  "horizon_contribution_change": 0,
+                  "monthly_contribution_change": 0
+                },
+                "currency": "CNY",
+                "evidence": {
+                  "current": {
+                    "date_to": "2026-06-05",
+                    "date_from": "2026-05-30"
+                  },
+                  "coverage_rate": 100,
+                  "highest_as_of": "2026-08-13T05:17:20.077698Z",
+                  "source_systems": [
+                    "retail_simulator"
+                  ],
+                  "required_fields": [
+                    "revenue",
+                    "gross_profit",
+                    "labor_cost",
+                    "fixed_rent",
+                    "variable_rent",
+                    "non_lease_cost",
+                    "other_controllable_cost"
+                  ],
+                  "dataset_versions": [
+                    "retail-sim-v1-2853d9537f358baf"
+                  ],
+                  "fact_version_max": 1,
+                  "fact_version_min": 1,
+                  "kpi_drilldown_url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                  "expected_store_days": 7,
+                  "observed_store_days": 7,
+                  "request_assumptions": {
+                    "scenarios": [
+                      {
+                        "key": "baseline",
+                        "name": "Baseline",
+                        "assumptions": {
+                          "revenue_change_pct": 0,
+                          "fixed_rent_change_pct": 0,
+                          "labor_cost_change_pct": 0,
+                          "non_lease_cost_change_pct": 0,
+                          "gross_margin_rate_change_pp": 0,
+                          "variable_rent_rate_change_pp": 0,
+                          "other_controllable_cost_change_pct": 0
+                        }
+                      },
+                      {
+                        "key": "plan",
+                        "name": "Plan",
+                        "assumptions": {
+                          "revenue_change_pct": 0,
+                          "fixed_rent_change_pct": 0,
+                          "labor_cost_change_pct": -10,
+                          "non_lease_cost_change_pct": 0,
+                          "gross_margin_rate_change_pp": 0,
+                          "variable_rent_rate_change_pp": 0,
+                          "other_controllable_cost_change_pct": 0
+                        }
+                      }
+                    ],
+                    "horizon_months": 12
+                  }
+                },
+                "scenarios": [
+                  {
+                    "key": "plan",
+                    "name": "Plan",
+                    "bridge": {
+                      "items": [
+                        {
+                          "code": "gross_profit",
+                          "unit": "currency",
+                          "label": "毛利额",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "labor_cost",
+                          "unit": "currency",
+                          "label": "人工成本",
+                          "contribution": 1419.33
+                        },
+                        {
+                          "code": "fixed_rent",
+                          "unit": "currency",
+                          "label": "固定现金租金",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "variable_rent",
+                          "unit": "currency",
+                          "label": "变动租金",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "non_lease_cost",
+                          "unit": "currency",
+                          "label": "非租赁占用成本",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "other_controllable_cost",
+                          "unit": "currency",
+                          "label": "其他可控成本",
+                          "contribution": 0
+                        }
+                      ],
+                      "status": "complete",
+                      "total_change": 1419.33,
+                      "rounding_residual": 0
+                    },
+                    "metrics": {
+                      "revenue": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 118938.04,
+                        "status": "complete",
+                        "baseline": 118938.04
+                      },
+                      "fixed_rent": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 18891.94,
+                        "status": "complete",
+                        "baseline": 18891.94
+                      },
+                      "labor_cost": {
+                        "unit": "currency",
+                        "delta": -1419.33,
+                        "result": 12773.93,
+                        "status": "complete",
+                        "baseline": 14193.26
+                      },
+                      "gross_profit": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 37458.47,
+                        "status": "complete",
+                        "baseline": 37458.47
+                      },
+                      "variable_rent": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 1427.27,
+                        "status": "complete",
+                        "baseline": 1427.27
+                      },
+                      "non_lease_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 1070.4,
+                        "status": "complete",
+                        "baseline": 1070.4
+                      },
+                      "gross_margin_rate": {
+                        "unit": "percent",
+                        "delta": 0,
+                        "result": 31.4941,
+                        "status": "complete",
+                        "baseline": 31.4941
+                      },
+                      "store_contribution": {
+                        "unit": "currency",
+                        "delta": 1419.33,
+                        "result": -3246.7,
+                        "status": "complete",
+                        "baseline": -4666.03
+                      },
+                      "variable_rent_rate": {
+                        "unit": "percent",
+                        "delta": 0,
+                        "result": 1.2,
+                        "status": "complete",
+                        "baseline": 1.2
+                      },
+                      "occupancy_cash_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 21389.61,
+                        "status": "complete",
+                        "baseline": 21389.61
+                      },
+                      "other_controllable_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 6541.63,
+                        "status": "complete",
+                        "baseline": 6541.63
+                      },
+                      "store_contribution_margin": {
+                        "unit": "percent",
+                        "delta": 1.1933,
+                        "result": -2.7297,
+                        "status": "complete",
+                        "baseline": -3.9231
+                      }
+                    },
+                    "assumptions": {
+                      "revenue_change_pct": 0,
+                      "fixed_rent_change_pct": 0,
+                      "labor_cost_change_pct": -10,
+                      "non_lease_cost_change_pct": 0,
+                      "gross_margin_rate_change_pp": 0,
+                      "variable_rent_rate_change_pp": 0,
+                      "other_controllable_cost_change_pct": 0
+                    },
+                    "horizon_contribution_change": 17031.91,
+                    "monthly_contribution_change": 1419.33
+                  }
+                ],
+                "generated_at": "2026-08-13T05:32:21.776384001Z",
+                "side_effects": false,
+                "ifrs16_impact": false,
+                "source_system": "retail_simulator",
+                "horizon_months": 12,
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1",
+                "official_impact": false,
+                "review_required": true,
+                "scenario_version": "retail-store-scenario-v1",
+                "data_classification": "simulated",
+                "diagnostics_version": "retail-store-diagnostics-v1"
+              },
+              "source_system": "retail_simulator",
+              "business_write": false,
+              "planned_action": "前往情景工作台复核 Baseline/Plan、证据和负责人后再保存",
+              "dataset_version": "retail-sim-v1-2853d9537f358baf",
+              "formula_version": "retail-kpi-v1",
+              "formal_execution": false,
+              "evidence_complete": true,
+              "data_classification": "simulated"
+            },
+            "actions": null,
+            "evidence_refs": [
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                    "source": "system:retail_pulse"
+                  }
+                ],
+                "reference_id": "retail-pulse-v1"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                    "source": "system:retail_store"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                    "source": "system:retail_store_diagnostics"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                    "source": "system:retail_kpi"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                    "source": "system:retail_store_scenario"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                    "source": "system:retail_store"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                    "source": "system:retail_kpi"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              }
+            ],
+            "evidence_complete": true,
+            "review_required": true,
+            "review_reasons": [
+              "retail_action_review",
+              "scenario_workbench_confirmation"
+            ],
+            "schema_version": "agent-artifact.v1",
+            "model_version": "deterministic-fallback",
+            "rule_version": "retail-operations-rule.v1",
+            "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+            "created_at": "2026-08-13T05:32:21.781859Z",
+            "updated_at": "2026-08-13T05:32:21.781859Z"
+          }
+        ],
+        "review_actions": [],
+        "tool_audits": null,
+        "audit_links": null,
+        "checkpoint_audits": null,
+        "audit_total": 0
+      },
+      "session_detail_response": {
+        "artifacts": [
+          {
+            "id": "0c285f6f-46c6-4e45-bdd9-3a2898db1482",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "artifact_type": "retail_action_proposal",
+            "title": "门店经营情景行动提议",
+            "status": "ready",
+            "data": {
+              "type": "retail_action_proposal",
+              "store": {
+                "brand": "Mosaic",
+                "region": "South",
+                "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "store_code": "SIM-2853D953-007",
+                "store_name": "Simulation Store 007"
+              },
+              "title": "门店经营情景行动提议",
+              "status": "proposal",
+              "evidence": {
+                "current": {
+                  "date_to": "2026-06-05",
+                  "date_from": "2026-05-30"
+                },
+                "coverage_rate": 100,
+                "highest_as_of": "2026-08-13T05:17:20.077698Z",
+                "source_systems": [
+                  "retail_simulator"
+                ],
+                "required_fields": [
+                  "revenue",
+                  "gross_profit",
+                  "labor_cost",
+                  "fixed_rent",
+                  "variable_rent",
+                  "non_lease_cost",
+                  "other_controllable_cost"
+                ],
+                "dataset_versions": [
+                  "retail-sim-v1-2853d9537f358baf"
+                ],
+                "fact_version_max": 1,
+                "fact_version_min": 1,
+                "kpi_drilldown_url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                "expected_store_days": 7,
+                "observed_store_days": 7,
+                "request_assumptions": {
+                  "scenarios": [
+                    {
+                      "key": "baseline",
+                      "name": "Baseline",
+                      "assumptions": {
+                        "revenue_change_pct": 0,
+                        "fixed_rent_change_pct": 0,
+                        "labor_cost_change_pct": 0,
+                        "non_lease_cost_change_pct": 0,
+                        "gross_margin_rate_change_pp": 0,
+                        "variable_rent_rate_change_pp": 0,
+                        "other_controllable_cost_change_pct": 0
+                      }
+                    },
+                    {
+                      "key": "plan",
+                      "name": "Plan",
+                      "assumptions": {
+                        "revenue_change_pct": 0,
+                        "fixed_rent_change_pct": 0,
+                        "labor_cost_change_pct": -10,
+                        "non_lease_cost_change_pct": 0,
+                        "gross_margin_rate_change_pp": 0,
+                        "variable_rent_rate_change_pp": 0,
+                        "other_controllable_cost_change_pct": 0
+                      }
+                    }
+                  ],
+                  "horizon_months": 12
+                }
+              },
+              "next_url": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+              "scenario": {
+                "basis": "Scenario",
+                "store": {
+                  "brand": "Mosaic",
+                  "region": "South",
+                  "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                  "store_code": "SIM-2853D953-007",
+                  "store_name": "Simulation Store 007"
+                },
+                "current": {
+                  "date_to": "2026-06-05",
+                  "date_from": "2026-05-30"
+                },
+                "baseline": {
+                  "key": "baseline",
+                  "name": "Baseline",
+                  "bridge": {
+                    "items": [
+                      {
+                        "code": "gross_profit",
+                        "unit": "currency",
+                        "label": "毛利额",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "labor_cost",
+                        "unit": "currency",
+                        "label": "人工成本",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "fixed_rent",
+                        "unit": "currency",
+                        "label": "固定现金租金",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "variable_rent",
+                        "unit": "currency",
+                        "label": "变动租金",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "non_lease_cost",
+                        "unit": "currency",
+                        "label": "非租赁占用成本",
+                        "contribution": 0
+                      },
+                      {
+                        "code": "other_controllable_cost",
+                        "unit": "currency",
+                        "label": "其他可控成本",
+                        "contribution": 0
+                      }
+                    ],
+                    "status": "complete",
+                    "total_change": 0,
+                    "rounding_residual": 0
+                  },
+                  "metrics": {
+                    "revenue": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 118938.04,
+                      "status": "complete",
+                      "baseline": 118938.04
+                    },
+                    "fixed_rent": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 18891.94,
+                      "status": "complete",
+                      "baseline": 18891.94
+                    },
+                    "labor_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 14193.26,
+                      "status": "complete",
+                      "baseline": 14193.26
+                    },
+                    "gross_profit": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 37458.47,
+                      "status": "complete",
+                      "baseline": 37458.47
+                    },
+                    "variable_rent": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 1427.27,
+                      "status": "complete",
+                      "baseline": 1427.27
+                    },
+                    "non_lease_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 1070.4,
+                      "status": "complete",
+                      "baseline": 1070.4
+                    },
+                    "gross_margin_rate": {
+                      "unit": "percent",
+                      "delta": 0,
+                      "result": 31.4941,
+                      "status": "complete",
+                      "baseline": 31.4941
+                    },
+                    "store_contribution": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": -4666.03,
+                      "status": "complete",
+                      "baseline": -4666.03
+                    },
+                    "variable_rent_rate": {
+                      "unit": "percent",
+                      "delta": 0,
+                      "result": 1.2,
+                      "status": "complete",
+                      "baseline": 1.2
+                    },
+                    "occupancy_cash_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 21389.61,
+                      "status": "complete",
+                      "baseline": 21389.61
+                    },
+                    "other_controllable_cost": {
+                      "unit": "currency",
+                      "delta": 0,
+                      "result": 6541.63,
+                      "status": "complete",
+                      "baseline": 6541.63
+                    },
+                    "store_contribution_margin": {
+                      "unit": "percent",
+                      "delta": 0,
+                      "result": -3.9231,
+                      "status": "complete",
+                      "baseline": -3.9231
+                    }
+                  },
+                  "assumptions": {
+                    "revenue_change_pct": 0,
+                    "fixed_rent_change_pct": 0,
+                    "labor_cost_change_pct": 0,
+                    "non_lease_cost_change_pct": 0,
+                    "gross_margin_rate_change_pp": 0,
+                    "variable_rent_rate_change_pp": 0,
+                    "other_controllable_cost_change_pct": 0
+                  },
+                  "horizon_contribution_change": 0,
+                  "monthly_contribution_change": 0
+                },
+                "currency": "CNY",
+                "evidence": {
+                  "current": {
+                    "date_to": "2026-06-05",
+                    "date_from": "2026-05-30"
+                  },
+                  "coverage_rate": 100,
+                  "highest_as_of": "2026-08-13T05:17:20.077698Z",
+                  "source_systems": [
+                    "retail_simulator"
+                  ],
+                  "required_fields": [
+                    "revenue",
+                    "gross_profit",
+                    "labor_cost",
+                    "fixed_rent",
+                    "variable_rent",
+                    "non_lease_cost",
+                    "other_controllable_cost"
+                  ],
+                  "dataset_versions": [
+                    "retail-sim-v1-2853d9537f358baf"
+                  ],
+                  "fact_version_max": 1,
+                  "fact_version_min": 1,
+                  "kpi_drilldown_url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                  "expected_store_days": 7,
+                  "observed_store_days": 7,
+                  "request_assumptions": {
+                    "scenarios": [
+                      {
+                        "key": "baseline",
+                        "name": "Baseline",
+                        "assumptions": {
+                          "revenue_change_pct": 0,
+                          "fixed_rent_change_pct": 0,
+                          "labor_cost_change_pct": 0,
+                          "non_lease_cost_change_pct": 0,
+                          "gross_margin_rate_change_pp": 0,
+                          "variable_rent_rate_change_pp": 0,
+                          "other_controllable_cost_change_pct": 0
+                        }
+                      },
+                      {
+                        "key": "plan",
+                        "name": "Plan",
+                        "assumptions": {
+                          "revenue_change_pct": 0,
+                          "fixed_rent_change_pct": 0,
+                          "labor_cost_change_pct": -10,
+                          "non_lease_cost_change_pct": 0,
+                          "gross_margin_rate_change_pp": 0,
+                          "variable_rent_rate_change_pp": 0,
+                          "other_controllable_cost_change_pct": 0
+                        }
+                      }
+                    ],
+                    "horizon_months": 12
+                  }
+                },
+                "scenarios": [
+                  {
+                    "key": "plan",
+                    "name": "Plan",
+                    "bridge": {
+                      "items": [
+                        {
+                          "code": "gross_profit",
+                          "unit": "currency",
+                          "label": "毛利额",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "labor_cost",
+                          "unit": "currency",
+                          "label": "人工成本",
+                          "contribution": 1419.33
+                        },
+                        {
+                          "code": "fixed_rent",
+                          "unit": "currency",
+                          "label": "固定现金租金",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "variable_rent",
+                          "unit": "currency",
+                          "label": "变动租金",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "non_lease_cost",
+                          "unit": "currency",
+                          "label": "非租赁占用成本",
+                          "contribution": 0
+                        },
+                        {
+                          "code": "other_controllable_cost",
+                          "unit": "currency",
+                          "label": "其他可控成本",
+                          "contribution": 0
+                        }
+                      ],
+                      "status": "complete",
+                      "total_change": 1419.33,
+                      "rounding_residual": 0
+                    },
+                    "metrics": {
+                      "revenue": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 118938.04,
+                        "status": "complete",
+                        "baseline": 118938.04
+                      },
+                      "fixed_rent": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 18891.94,
+                        "status": "complete",
+                        "baseline": 18891.94
+                      },
+                      "labor_cost": {
+                        "unit": "currency",
+                        "delta": -1419.33,
+                        "result": 12773.93,
+                        "status": "complete",
+                        "baseline": 14193.26
+                      },
+                      "gross_profit": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 37458.47,
+                        "status": "complete",
+                        "baseline": 37458.47
+                      },
+                      "variable_rent": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 1427.27,
+                        "status": "complete",
+                        "baseline": 1427.27
+                      },
+                      "non_lease_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 1070.4,
+                        "status": "complete",
+                        "baseline": 1070.4
+                      },
+                      "gross_margin_rate": {
+                        "unit": "percent",
+                        "delta": 0,
+                        "result": 31.4941,
+                        "status": "complete",
+                        "baseline": 31.4941
+                      },
+                      "store_contribution": {
+                        "unit": "currency",
+                        "delta": 1419.33,
+                        "result": -3246.7,
+                        "status": "complete",
+                        "baseline": -4666.03
+                      },
+                      "variable_rent_rate": {
+                        "unit": "percent",
+                        "delta": 0,
+                        "result": 1.2,
+                        "status": "complete",
+                        "baseline": 1.2
+                      },
+                      "occupancy_cash_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 21389.61,
+                        "status": "complete",
+                        "baseline": 21389.61
+                      },
+                      "other_controllable_cost": {
+                        "unit": "currency",
+                        "delta": 0,
+                        "result": 6541.63,
+                        "status": "complete",
+                        "baseline": 6541.63
+                      },
+                      "store_contribution_margin": {
+                        "unit": "percent",
+                        "delta": 1.1933,
+                        "result": -2.7297,
+                        "status": "complete",
+                        "baseline": -3.9231
+                      }
+                    },
+                    "assumptions": {
+                      "revenue_change_pct": 0,
+                      "fixed_rent_change_pct": 0,
+                      "labor_cost_change_pct": -10,
+                      "non_lease_cost_change_pct": 0,
+                      "gross_margin_rate_change_pp": 0,
+                      "variable_rent_rate_change_pp": 0,
+                      "other_controllable_cost_change_pct": 0
+                    },
+                    "horizon_contribution_change": 17031.91,
+                    "monthly_contribution_change": 1419.33
+                  }
+                ],
+                "generated_at": "2026-08-13T05:32:21.776384001Z",
+                "side_effects": false,
+                "ifrs16_impact": false,
+                "source_system": "retail_simulator",
+                "horizon_months": 12,
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1",
+                "official_impact": false,
+                "review_required": true,
+                "scenario_version": "retail-store-scenario-v1",
+                "data_classification": "simulated",
+                "diagnostics_version": "retail-store-diagnostics-v1"
+              },
+              "source_system": "retail_simulator",
+              "business_write": false,
+              "planned_action": "前往情景工作台复核 Baseline/Plan、证据和负责人后再保存",
+              "dataset_version": "retail-sim-v1-2853d9537f358baf",
+              "formula_version": "retail-kpi-v1",
+              "formal_execution": false,
+              "evidence_complete": true,
+              "data_classification": "simulated"
+            },
+            "actions": null,
+            "evidence_refs": [
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                    "source": "system:retail_pulse"
+                  }
+                ],
+                "reference_id": "retail-pulse-v1"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                    "source": "system:retail_store"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                    "source": "system:retail_store_diagnostics"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                    "source": "system:retail_kpi"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                    "source": "system:retail_store_scenario"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                    "source": "system:retail_store"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              },
+              {
+                "complete": true,
+                "locators": [
+                  {
+                    "field": "record",
+                    "quote": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                    "source": "system:retail_kpi"
+                  }
+                ],
+                "reference_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+              }
+            ],
+            "evidence_complete": true,
+            "review_required": true,
+            "review_reasons": [
+              "retail_action_review",
+              "scenario_workbench_confirmation"
+            ],
+            "schema_version": "agent-artifact.v1",
+            "model_version": "deterministic-fallback",
+            "rule_version": "retail-operations-rule.v1",
+            "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+            "created_at": "2026-08-13T05:32:21.781859Z",
+            "updated_at": "2026-08-13T05:32:21.781859Z"
+          }
+        ],
+        "messages": [
+          {
+            "id": "e17ad960-3e31-421b-a3dc-eadc6e556684",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "role": "user",
+            "message_type": "text",
+            "sequence_no": 1,
+            "content": "请生成行动提议，人工成本下降10%，返回确定性来源和待复核草稿",
+            "content_json": null,
+            "sources": null,
+            "attachments": null,
+            "model": null,
+            "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+            "created_at": "2026-08-13T05:32:21.71608Z"
+          },
+          {
+            "id": "65681ba4-eb61-4b6a-bfa9-59246556bcb4",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "run_id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "role": "assistant",
+            "message_type": "text",
+            "sequence_no": 2,
+            "content": "零售经营分析使用已验收的确定性服务；AI 不重算经营数字，不写入业务台账。\n\n数据上下文：simulated · dataset=retail-sim-v1-2853d9537f358baf · source=retail_simulator · as_of=2026-06-05 · window=7天 · scenario=retail-store-scenario-v1 · formula=retail-kpi-v1 · evidence=complete · confidence=0.90。\nSIM-2853D953-007 情景使用 12 个月 run-rate 和服务端 Baseline/Plan 计算，覆盖 7/7 store-days (100.0%)；Baseline 门店贡献额=-4666.03 (complete)，Plan 月度变化=1419.33，Plan 期内变化=17031.91，贡献桥=gross_profit=0.00；labor_cost=1419.33；fixed_rent=-0.00；variable_rent=-0.00；non_lease_cost=-0.00；other_controllable_cost=-0.00；经营占用现金成本是 Working 经营口径，不是 IFRS 16 会计费用；结果不触达 IFRS 16 或 Official。 已生成待人工确认的行动提议；请前往情景工作台二次确认。",
+            "content_json": null,
+            "sources": [
+              {
+                "id": "retail-pulse-v1",
+                "url": "/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                "type": "retail_pulse",
+                "as_of": "2026-06-05",
+                "title": "经营脉搏确定性摘要",
+                "snippet": "/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                "classification": "simulated",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1"
+              },
+              {
+                "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "url": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                "type": "retail_store",
+                "as_of": "2026-06-05",
+                "title": "SIM-2853D953-007 门店脉搏",
+                "snippet": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                "classification": "simulated",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1"
+              },
+              {
+                "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "url": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                "type": "retail_store_diagnostics",
+                "as_of": "2026-06-05",
+                "title": "SIM-2853D953-007 门店诊断",
+                "snippet": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&window_days=7",
+                "classification": "simulated",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1"
+              },
+              {
+                "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                "type": "retail_kpi",
+                "as_of": "2026-06-05",
+                "title": "KPI 事实下钻",
+                "snippet": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                "classification": "simulated",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1"
+              },
+              {
+                "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "url": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                "type": "retail_store_scenario",
+                "as_of": "2026-06-05",
+                "title": "SIM-2853D953-007 经营情景证据",
+                "snippet": "/scenario-workbench?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                "classification": "simulated",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1"
+              },
+              {
+                "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "url": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                "type": "retail_store",
+                "as_of": "2026-06-05",
+                "title": "SIM-2853D953-007 门店 360",
+                "snippet": "/store-360?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&fixed_rent_change_pct=0&gross_margin_rate_change_pp=0&horizon_months=12&labor_cost_change_pct=-10&non_lease_cost_change_pct=0&other_controllable_cost_change_pct=0&revenue_change_pct=0&source_system=retail_simulator&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&variable_rent_rate_change_pp=0&window_days=7",
+                "classification": "simulated",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1"
+              },
+              {
+                "id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "url": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                "type": "retail_kpi",
+                "as_of": "2026-06-05",
+                "title": "KPI 事实下钻",
+                "snippet": "/api/v1/retail/kpis/store-days?group_by=store&store_id=9ef0134d-63f9-4c1f-9bd1-59ff80034640&date_from=2026-05-30&date_to=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+                "classification": "simulated",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "formula_version": "retail-kpi-v1"
+              }
+            ],
+            "attachments": null,
+            "model": "deterministic-fallback",
+            "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+            "created_at": "2026-08-13T05:32:21.77844Z"
+          }
+        ],
+        "review_actions": null,
+        "runs": [
+          {
+            "id": "19dee11e-2090-4987-9416-c555b6255ea2",
+            "session_id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+            "trigger_message_id": "e17ad960-3e31-421b-a3dc-eadc6e556684",
+            "parent_run_id": null,
+            "status": "waiting_review",
+            "agent_mode": true,
+            "skill_id": "retail_operations",
+            "skill_version": "v1",
+            "page_context": {
+              "page": "scenario-workbench",
+              "filters": {
+                "as_of": "2026-06-05",
+                "store_id": "9ef0134d-63f9-4c1f-9bd1-59ff80034640",
+                "window_days": "7",
+                "source_system": "retail_simulator",
+                "horizon_months": "12",
+                "dataset_version": "retail-sim-v1-2853d9537f358baf",
+                "revenue_change_pct": "0",
+                "data_classification": "simulated",
+                "fixed_rent_change_pct": "0",
+                "labor_cost_change_pct": "-10",
+                "non_lease_cost_change_pct": "0",
+                "gross_margin_rate_change_pp": "0",
+                "variable_rent_rate_change_pp": "0",
+                "other_controllable_cost_change_pct": "0"
+              }
+            },
+            "review_required": true,
+            "summary_text": "零售经营分析使用已验收的确定性服务；AI 不重算经营数字，不写入业务台账。\n\n数据上下文：simulated · dataset=retail-sim-v1-2853d9537f358baf · source=retail_simulator · as_of=2026-06-05 · window=7天 · scenario=retail-store-scenario-v1 · formula=retail-kpi-v1 · evidence=complete · confidence=0.90。\nSIM-2853D953-007 情景使用 12 个月 run-rate 和服务端 Baseline/Plan 计算，覆盖 7/7 store-days (100.0%)；Baseline 门店贡献额=-4666.03 (complete)，Plan 月度变化=1419.33，Plan 期内变化=17031.91，贡献桥=gross_profit=0.00；labor_cost=1419.33；fixed_rent=-0.00；variable_rent=-0.00；non_lease_cost=-0.00；other_controllable_cost=-0.00；经营占用现金成本是 Working 经营口径，不是 IFRS 16 会计费用；结果不触达 IFRS 16 或 Official。 已生成待人工确认的行动提议；请前往情景工作台二次确认。",
+            "error_message": null,
+            "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+            "created_at": "2026-08-13T05:32:21.710715Z",
+            "started_at": "2026-08-13T05:32:21.722929Z",
+            "completed_at": "2026-08-13T05:32:21.785425Z"
+          }
+        ],
+        "session": {
+          "id": "66fbe25c-e12e-46b1-b7d0-a02c6c74199e",
+          "user_id": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          "title": "MAX009R4 positive proposal",
+          "status": "active",
+          "bound_contract_id": null,
+          "context_snapshot": null,
+          "created_at": "2026-08-13T05:32:21.692615Z",
+          "updated_at": "2026-08-13T05:32:21.77844Z",
+          "last_message_at": "2026-08-13T05:32:21.77844Z",
+          "archived_at": null
+        }
+      }
+    }
+  },
+  "negative": {
+    "legal_entity": "LE002",
+    "source_status": 200,
+    "source_response": {
+      "as_of": null,
+      "basis": "Working",
+      "coverage": {
+        "requested_date_from": "2026-05-30",
+        "requested_date_to": "2026-06-05",
+        "observed_store_days": 0,
+        "expected_store_days": 0,
+        "coverage_rate": null
+      },
+      "data": [],
+      "data_classification": "simulated",
+      "dataset_version": "retail-sim-v1-2853d9537f358baf",
+      "definition_url": "/api/v1/retail/kpis/definitions",
+      "fact_version_max": 0,
+      "fact_version_min": 0,
+      "formula_version": "retail-kpi-v1",
+      "group_by": "store",
+      "multi_currency": false,
+      "requested_scope": {
+        "legal_entity_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "store_ids": [
+          "9ef0134d-63f9-4c1f-9bd1-59ff80034640"
+        ]
+      },
+      "simulation_dataset_versions": null,
+      "source": {
+        "dataset_versions": null,
+        "fact_version_range": {
+          "max": 0,
+          "min": 0
+        },
+        "highest_as_of": null,
+        "selected_fact_count": 0,
+        "source_systems": null,
+        "table": "retail_store_day_facts"
+      },
+      "source_system": "retail_simulator",
+      "total_rows": 0
+    },
+    "action_list_status": 200,
+    "action_list_response": {
+      "data": [],
+      "ranking": "impact_control_risk_deadline_recurrence_fixability_verification",
+      "total": 0
+    },
+    "trace_status": 404,
+    "trace_response": {
+      "error": "agent run not found"
+    },
+    "session_status": 404,
+    "session_response": {
+      "error": "ai chat session not found"
+    },
+    "artifact_status": 404,
+    "artifact_response_text": "404 page not found"
+  },
+  "contract": {
+    "source": "same store/date/dataset/source query; LE002 receives empty envelope",
+    "action": "owner-filtered performance action list; LE002 total=0",
+    "ai": "owner-filtered run/session detail; same run/session/artifact IDs return 404"
+  }
+}

@@ -134,6 +134,78 @@ body {
   gap: 8px;
 }
 
+/* MAX-005 additive operating-pulse layout; it uses the existing token
+   palette and card/grid language without changing global theme behavior. */
+.pulse-kpi-card {
+  min-height: 156px;
+}
+
+.pulse-kpi-null {
+  margin-top: 22px;
+  color: var(--fg-muted);
+  font-size: 28px;
+}
+
+.pulse-kpi-comparison {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.pulse-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-change-bad { color: var(--state-error-text); }
+.pulse-change-good { color: var(--state-success-text); }
+.pulse-change-neutral, .pulse-change-missing { color: var(--fg-muted); }
+
+.pulse-trust-strip {
+  border-radius: 8px;
+}
+
+.pulse-aux-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+
+.pulse-aux-row:last-child { border-bottom: 0; }
+.pulse-aux-row strong { font-variant-numeric: tabular-nums; }
+.pulse-aux-status { display: block; margin-top: 3px; font-size: 11px; }
+.pulse-aux-values { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; }
+
+/* MAX-006 keeps the established page/card/grid vocabulary and scopes all
+   additional styling to the new investigation route. */
+.store-360-page .store-360-filter-card,
+.store-360-page .store-360-trust-strip,
+.store-360-page .store-360-identity-card { margin-bottom: 16px; }
+.store-360-kpi-card { min-height: 156px; }
+.store-360-bridge-positive { color: var(--state-success-text); }
+.store-360-bridge-negative { color: var(--state-error-text); }
+.store-360-bridge-neutral { color: var(--fg-muted); }
+.store-360-page .ant-table-cell { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 767px) {
+  .operating-pulse-page .ant-card-body { padding: 16px !important; }
+  .operating-pulse-page .ant-segmented { max-width: 100%; overflow-x: auto; }
+  .pulse-filter-card .ant-picker { width: 100%; }
+  .pulse-trust-strip .ant-alert-message,
+  .pulse-trust-strip .ant-alert-description { font-size: 12px; }
+  .pulse-kpi-card { min-height: 136px; }
+  .store-360-page .ant-card-body { padding: 16px !important; }
+  .store-360-page .ant-segmented { max-width: 100%; overflow-x: auto; }
+  .store-360-filter-card .ant-picker { width: 100%; }
+}
+
 @media (max-width: 767px) {
   .page-header {
     flex-direction: column;
@@ -795,6 +867,15 @@ h3 {
   outline-offset: 2px;
 }
 
+.ai-chat-session-item:focus-visible {
+  outline: 2px solid var(--fg-primary);
+  outline-offset: 2px;
+}
+
+.ai-chat-model-short {
+  display: none;
+}
+
 /* ─── Smooth Scrolling ──────────────────────────────────────── */
 
 html {
@@ -812,6 +893,49 @@ html {
 }
 
 @media (max-width: 767px) {
+  .ai-chat-shell {
+    margin: -16px !important;
+    width: calc(100% + 32px);
+  }
+
+  .ai-chat-session-sidebar {
+    width: 260px !important;
+  }
+
+  .ai-chat-messages,
+  .ai-chat-input {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .ai-chat-header-left {
+    min-width: 0 !important;
+    overflow: hidden;
+  }
+
+  .ai-chat-header-title {
+    min-width: 0 !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ai-chat-header-actions {
+    gap: 4px !important;
+  }
+
+  .ai-chat-model-button {
+    padding-inline: 4px !important;
+  }
+
+  .ai-chat-model-label {
+    display: none !important;
+  }
+
+  .ai-chat-model-short {
+    display: inline !important;
+  }
+
   .ant-layout-header {
     height: 56px !important;
     padding: 0 12px !important;
@@ -919,9 +1043,23 @@ html {
   opacity: 0 !important;
 }
 
-*:hover > .session-more-btn,
-*:hover .session-more-btn {
+.ai-chat-session-row:hover .session-more-btn,
+.ai-chat-session-row:focus-within .session-more-btn {
   opacity: 1 !important;
+}
+
+.session-more-btn:focus,
+.session-more-btn:focus-visible {
+  opacity: 1 !important;
+}
+
+/* This mobile override intentionally follows the global hide rule so touch
+   drawers never lose the delete affordance. Desktop keeps hover/focus only. */
+@media (max-width: 767px) {
+  .ant-drawer .session-more-btn,
+  .ai-chat-session-sidebar .session-more-btn {
+    opacity: 1 !important;
+  }
 }
 
 @keyframes pulse-subtle {

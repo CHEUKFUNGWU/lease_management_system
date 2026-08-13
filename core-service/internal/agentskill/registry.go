@@ -119,6 +119,17 @@ func ProductionRegistry() *Registry {
 			ArtifactTypes: []agentartifact.ArtifactType{agentartifact.ArtifactReportExplanation},
 			Review:        ReviewPolicy{Required: true, Reasons: []string{"evidenced_management_explanation", "assist_mode"}, Blocking: []string{"insufficient_evidence", "out_of_scope"}, Completion: []string{"sources_reviewed", "human_confirmation"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_explanation"},
 		},
+		{
+			ID: "retail_operations", Version: "v1", Name: "零售经营分析 Agent", Priority: 70,
+			Description:    "基于 retail-pulse-v1、retail-store-diagnostics-v1 和 retail-store-scenario-v1 提供可追溯的零售经营事实与行动提议。",
+			IntentExamples: []string{"经营脉搏", "门店诊断", "分析 Store006", "人工下降 10% 情景", "生成行动提议"},
+			MatchTerms:     []string{"经营脉搏", "门店诊断", "门店分析", "经营情景", "零售经营", "客流", "转化", "客单", "人工", "占用现金成本", "门店贡献", "同群", "门店异常", "行动草稿", "retail operations", "store diagnostics", "operating pulse"},
+			AllowedRoles:   []string{"admin", "editor", "reviewer", "approver", "auditor", "readonly"},
+			RequiredInputs: []string{"message"}, RequiredContext: []string{"retail_filters"},
+			AllowedTools:  []string{"retail.operating_pulse.read", "retail.store_diagnostics.read", "retail.store.scenario.evaluate"},
+			ArtifactTypes: []agentartifact.ArtifactType{agentartifact.ArtifactRetailActionProposal},
+			Review:        ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "retail_data_confirmation"}, Blocking: []string{"missing_context", "insufficient_evidence", "source_conflict"}, Completion: []string{"sources_reviewed", "scenario_confirmed_in_workbench"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "open_scenario_workbench"},
+		},
 	} {
 		_ = registry.Register(definition)
 	}

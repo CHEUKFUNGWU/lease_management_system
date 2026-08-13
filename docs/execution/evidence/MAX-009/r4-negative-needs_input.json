@@ -1,0 +1,366 @@
+{
+  "case": "needs_input",
+  "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+  "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+  "http_status": {
+    "session_create": 201,
+    "run_create": 201,
+    "trace": 200,
+    "session_detail": 200
+  },
+  "run_status": "waiting_review",
+  "confidence": 0.4,
+  "evidence_status": "insufficient",
+  "reason": "missing_context",
+  "proposal_artifacts": [],
+  "business_action": {
+    "before": 0,
+    "after": 0
+  },
+  "raw_api_response": {
+    "session_create": {
+      "session": {
+        "id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+        "user_id": "855251ac-a318-49d4-b0cd-04198b9770a6",
+        "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "title": "MAX009R4 needs-input",
+        "status": "active",
+        "bound_contract_id": null,
+        "context_snapshot": {},
+        "created_at": "2026-08-13T05:22:32.296225668Z",
+        "updated_at": "2026-08-13T05:22:32.296225668Z",
+        "last_message_at": null,
+        "archived_at": null
+      }
+    },
+    "run_create": {
+      "agent_plan": [
+        {
+          "id": "load_retail_context",
+          "title": "读取经营事实与来源",
+          "status": "pending"
+        },
+        {
+          "id": "check_retail_quality",
+          "title": "核对覆盖、币种和来源冲突",
+          "status": "pending"
+        },
+        {
+          "id": "prepare_review",
+          "title": "输出可复核结论或情景提议",
+          "status": "pending"
+        }
+      ],
+      "review_prompts": [
+        {
+          "id": "retail_source_review",
+          "title": "复核零售事实与来源",
+          "description": "请在经营页面核对法人、日期、分类、数据集和公式版本；情景提议需回到情景工作台二次确认。",
+          "severity": "warning",
+          "action": "review_retail_sources"
+        }
+      ],
+      "run": {
+        "id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+        "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+        "trigger_message_id": null,
+        "parent_run_id": null,
+        "status": "running",
+        "agent_mode": true,
+        "skill_id": "retail_operations",
+        "skill_version": "v1",
+        "page_context": null,
+        "review_required": true,
+        "summary_text": null,
+        "error_message": null,
+        "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+        "created_at": "2026-08-13T05:22:32.442423293Z",
+        "started_at": "2026-08-13T05:22:32.450374334Z",
+        "completed_at": null
+      },
+      "stream_url": "/api/v1/ai/chat/runs/b0b09899-f037-4b35-acec-135f3aec54fe/stream",
+      "tool_calls": null,
+      "trigger_message": {
+        "id": "e9749aed-4f20-4b5b-8be8-680962c4b098",
+        "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+        "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+        "role": "user",
+        "message_type": "text",
+        "sequence_no": 1,
+        "content": "请分析经营脉搏",
+        "content_json": null,
+        "sources": null,
+        "attachments": null,
+        "model": null,
+        "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+        "created_at": "2026-08-13T05:22:32.444602918Z"
+      }
+    },
+    "trace": {
+      "run": {
+        "id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+        "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+        "trigger_message_id": "e9749aed-4f20-4b5b-8be8-680962c4b098",
+        "parent_run_id": null,
+        "status": "waiting_review",
+        "agent_mode": true,
+        "skill_id": "retail_operations",
+        "skill_version": "v1",
+        "page_context": null,
+        "review_required": true,
+        "summary_text": "零售经营分析需要补充可验证的数据上下文。\n\n请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。",
+        "error_message": null,
+        "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+        "created_at": "2026-08-13T05:22:32.442423Z",
+        "started_at": "2026-08-13T05:22:32.450374Z",
+        "completed_at": "2026-08-13T05:22:32.456375Z"
+      },
+      "summary": {
+        "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+        "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+        "event_count": 5,
+        "tool_event_count": 0,
+        "failed_event_count": 0,
+        "review_event_count": 1,
+        "artifact_count": 0,
+        "last_sequence": 5,
+        "last_event_type": "run_end",
+        "terminal": true,
+        "checkpoint_count": 0,
+        "terminal_error": "{\"artifact_present\":false,\"review_required\":true,\"status\":\"waiting_review\"}",
+        "last_event_at": "2026-08-13T05:22:32.456947Z",
+        "updated_at": "2026-08-13T05:22:32.456807Z"
+      },
+      "events": [
+        {
+          "id": "19825a3a-1b93-465a-9681-59437c43448c",
+          "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "sequence_no": 1,
+          "event_type": "message_start",
+          "payload": {
+            "role": "user",
+            "content": "请分析经营脉搏",
+            "has_file": false,
+            "message_id": "e9749aed-4f20-4b5b-8be8-680962c4b098",
+            "contract_id": "",
+            "page_context": null
+          },
+          "is_terminal": false,
+          "created_at": "2026-08-13T05:22:32.447183Z"
+        },
+        {
+          "id": "1b029605-0383-4fad-9754-b448b9c47d2a",
+          "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "sequence_no": 2,
+          "event_type": "run_status",
+          "payload": {
+            "status": "running",
+            "skill_id": "retail_operations",
+            "agent_mode": true,
+            "review_required": true
+          },
+          "is_terminal": false,
+          "created_at": "2026-08-13T05:22:32.45094Z"
+        },
+        {
+          "id": "fd5c03c3-8d32-4579-b2b0-e0820cd358cf",
+          "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "sequence_no": 3,
+          "event_type": "message_end",
+          "payload": {
+            "role": "assistant",
+            "model": "deterministic-fallback",
+            "content": "零售经营分析需要补充可验证的数据上下文。\n\n请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。",
+            "sources": null,
+            "message_id": "7812d8e6-eb9f-486a-8cb1-516753953c0f"
+          },
+          "is_terminal": false,
+          "created_at": "2026-08-13T05:22:32.455033Z"
+        },
+        {
+          "id": "9b1ab1f4-359d-4fd3-ac12-04d6b40460b0",
+          "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "sequence_no": 4,
+          "event_type": "review_prompt",
+          "payload": [
+            {
+              "id": "retail_context_required",
+              "title": "补充数据上下文",
+              "action": "provide_retail_context",
+              "severity": "warning",
+              "description": "请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。"
+            }
+          ],
+          "is_terminal": false,
+          "created_at": "2026-08-13T05:22:32.455898Z"
+        },
+        {
+          "id": "57464d2a-5df8-45c7-a008-c011acda6166",
+          "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "sequence_no": 5,
+          "event_type": "run_end",
+          "payload": {
+            "status": "waiting_review",
+            "review_required": true,
+            "artifact_present": false
+          },
+          "is_terminal": true,
+          "created_at": "2026-08-13T05:22:32.456947Z"
+        }
+      ],
+      "artifacts": [],
+      "review_actions": [],
+      "tool_audits": null,
+      "audit_links": null,
+      "checkpoint_audits": null,
+      "audit_total": 0
+    },
+    "session_detail": {
+      "artifacts": null,
+      "messages": [
+        {
+          "id": "e9749aed-4f20-4b5b-8be8-680962c4b098",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "role": "user",
+          "message_type": "text",
+          "sequence_no": 1,
+          "content": "请分析经营脉搏",
+          "content_json": null,
+          "sources": null,
+          "attachments": null,
+          "model": null,
+          "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "created_at": "2026-08-13T05:22:32.444602Z"
+        },
+        {
+          "id": "7812d8e6-eb9f-486a-8cb1-516753953c0f",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "run_id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "role": "assistant",
+          "message_type": "text",
+          "sequence_no": 2,
+          "content": "零售经营分析需要补充可验证的数据上下文。\n\n请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。",
+          "content_json": null,
+          "sources": null,
+          "attachments": null,
+          "model": "deterministic-fallback",
+          "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "created_at": "2026-08-13T05:22:32.4532Z"
+        }
+      ],
+      "review_actions": null,
+      "runs": [
+        {
+          "id": "b0b09899-f037-4b35-acec-135f3aec54fe",
+          "session_id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+          "trigger_message_id": "e9749aed-4f20-4b5b-8be8-680962c4b098",
+          "parent_run_id": null,
+          "status": "waiting_review",
+          "agent_mode": true,
+          "skill_id": "retail_operations",
+          "skill_version": "v1",
+          "page_context": null,
+          "review_required": true,
+          "summary_text": "零售经营分析需要补充可验证的数据上下文。\n\n请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。",
+          "error_message": null,
+          "created_by": "855251ac-a318-49d4-b0cd-04198b9770a6",
+          "created_at": "2026-08-13T05:22:32.442423Z",
+          "started_at": "2026-08-13T05:22:32.450374Z",
+          "completed_at": "2026-08-13T05:22:32.456375Z"
+        }
+      ],
+      "session": {
+        "id": "269f4a85-f319-4d88-a9d0-d992572cb1a3",
+        "user_id": "855251ac-a318-49d4-b0cd-04198b9770a6",
+        "legal_entity_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "title": "MAX009R4 needs-input",
+        "status": "active",
+        "bound_contract_id": null,
+        "context_snapshot": {},
+        "created_at": "2026-08-13T05:22:32.296225Z",
+        "updated_at": "2026-08-13T05:22:32.4532Z",
+        "last_message_at": "2026-08-13T05:22:32.4532Z",
+        "archived_at": null
+      }
+    }
+  },
+  "events_time_order": [
+    {
+      "sequence_no": 1,
+      "event_type": "message_start",
+      "created_at": "2026-08-13T05:22:32.447183Z",
+      "payload": {
+        "role": "user",
+        "content": "请分析经营脉搏",
+        "has_file": false,
+        "message_id": "e9749aed-4f20-4b5b-8be8-680962c4b098",
+        "contract_id": "",
+        "page_context": null
+      }
+    },
+    {
+      "sequence_no": 2,
+      "event_type": "run_status",
+      "created_at": "2026-08-13T05:22:32.45094Z",
+      "payload": {
+        "status": "running",
+        "skill_id": "retail_operations",
+        "agent_mode": true,
+        "review_required": true
+      }
+    },
+    {
+      "sequence_no": 3,
+      "event_type": "message_end",
+      "created_at": "2026-08-13T05:22:32.455033Z",
+      "payload": {
+        "role": "assistant",
+        "model": "deterministic-fallback",
+        "content": "零售经营分析需要补充可验证的数据上下文。\n\n请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。",
+        "sources": null,
+        "message_id": "7812d8e6-eb9f-486a-8cb1-516753953c0f"
+      }
+    },
+    {
+      "sequence_no": 4,
+      "event_type": "review_prompt",
+      "created_at": "2026-08-13T05:22:32.455898Z",
+      "payload": [
+        {
+          "id": "retail_context_required",
+          "title": "补充数据上下文",
+          "action": "provide_retail_context",
+          "severity": "warning",
+          "description": "请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。"
+        }
+      ]
+    },
+    {
+      "sequence_no": 5,
+      "event_type": "run_end",
+      "created_at": "2026-08-13T05:22:32.456947Z",
+      "payload": {
+        "status": "waiting_review",
+        "review_required": true,
+        "artifact_present": false
+      }
+    }
+  ],
+  "tool_results": [],
+  "assistant_messages": [
+    {
+      "role": "assistant",
+      "model": "deterministic-fallback",
+      "content": "零售经营分析需要补充可验证的数据上下文。\n\n请提供 as_of、window_days、data_classification；window_days 只支持 7、14 或 28；simulated 还需要 dataset_version，production 不应携带 dataset_version。",
+      "sources": null,
+      "message_id": "7812d8e6-eb9f-486a-8cb1-516753953c0f"
+    }
+  ]
+}

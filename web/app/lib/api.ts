@@ -39,6 +39,208 @@ export class ApiError extends Error {
   }
 }
 
+// Typed retail analytics contracts. These mirror the additive MAX-003/004
+// Working APIs; nullable values remain nullable so the UI cannot turn a
+// missing fact or zero denominator into a false zero.
+export type RetailKPIStatus = "complete" | "partial" | "unavailable";
+export type RetailDataClassification = "production" | "simulated";
+export type RetailKPIUnit = "currency" | "count" | "percent" | "currency_per_sqm" | string;
+
+export interface RetailSimulationAnomaly {
+  id: string;
+  type: string;
+  store_code: string;
+  date_from: string;
+  date_to: string;
+  expected_direction: string;
+  description: string;
+}
+
+export interface RetailSimulationDatasetData {
+  id: string;
+  dataset_version: string;
+  generator_version: string;
+  seed: number;
+  date_from: string;
+  date_to: string;
+  store_count: number;
+  fact_count: number;
+  status: "completed" | "generating" | "failed" | string;
+  anomaly_manifest: RetailSimulationAnomaly[];
+  completed_at?: string | null;
+  created_at: string;
+}
+
+export interface LatestSimulationDatasetResponse {
+  basis: "Working" | string;
+  data_classification: "simulated";
+  source_system: "retail_simulator" | string;
+  data: RetailSimulationDatasetData | null;
+}
+
+export interface SimulationGenerateResponse {
+  basis: "Working" | string;
+  data_classification: "simulated";
+  source_system: "retail_simulator" | string;
+  dataset_id: string;
+  dataset_version: string;
+  generator_version: string;
+  seed: number;
+  date_from: string;
+  date_to: string;
+  store_count: number;
+  fact_count: number;
+  parameters?: Record<string, unknown>;
+  anomaly_manifest: RetailSimulationAnomaly[];
+  payload_sha256?: string;
+  business_sha256?: string;
+  import_batch_id?: string | null;
+  idempotent_replay?: boolean;
+  source: { type: string; grain: string; dataset_id: string; created_at: string };
+}
+
+export interface RetailStoreScope {
+  store_id: string;
+  store_code: string;
+  store_name: string;
+  brand: string;
+  region: string;
+}
+
+export interface RetailCoverage {
+  requested_date_from: string;
+  requested_date_to: string;
+  observed_date_from?: string;
+  observed_date_to?: string;
+  observed_store_days: number;
+  expected_store_days: number;
+  coverage_rate: number | null;
+  missing_fields?: string[];
+}
+
+export interface RetailKPIValue {
+  value: number | null;
+  unit: RetailKPIUnit;
+  status: RetailKPIStatus;
+  formula_version: string;
+  required_fields: string[];
+  available_fact_count: number;
+  fact_count: number;
+  reason?: string;
+}
+
+export interface RetailSummaryMetric {
+  current: RetailKPIValue;
+  comparison: RetailKPIValue;
+  change_value: number | null;
+  change_type: "percent" | "percentage_point" | string;
+  change_margin_pp?: number | null;
+  status: string;
+  reason?: string;
+}
+
+export interface RetailDailyTrend {
+  date: string;
+  currency?: string;
+  currency_status?: string;
+  gap: boolean;
+  coverage: RetailCoverage;
+  kpis?: Record<string, RetailKPIValue>;
+}
+
+export interface RetailSignal {
+  signal_code: string;
+  observed_change: number | null;
+  threshold: number;
+  direction: string;
+  current: number | null;
+  comparison: number | null;
+  unit: string;
+  score_contribution: number;
+}
+
+export interface RetailEvidence {
+  current: { date_from: string; date_to: string };
+  comparison: { date_from: string; date_to: string };
+  current_fact_count: number;
+  comparison_fact_count: number;
+  source_systems: string[];
+  dataset_versions: string[];
+  formula_version: string;
+  pulse_version: string;
+}
+
+export interface RetailAttention {
+  rank: number;
+  store_id: string;
+  store_code: string;
+  store_name: string;
+  brand: string;
+  region: string;
+  currency: string;
+  currency_status?: string;
+  score: number;
+  severity: "critical" | "high" | "medium" | "low" | string;
+  observed_signals: RetailSignal[];
+  current_kpis: Record<string, RetailKPIValue>;
+  comparison_kpis: Record<string, RetailKPIValue>;
+  evidence: RetailEvidence;
+  drilldown: Record<string, string>;
+}
+
+export interface RetailSuppressedAttention {
+  store_id: string;
+  store_code: string;
+  store_name: string;
+  brand: string;
+  region: string;
+  currency: string;
+  currency_status?: string;
+  reason: string;
+  reasons?: string[];
+  current_coverage: RetailCoverage;
+  comparison_coverage: RetailCoverage;
+}
+
+export interface RetailPulsePartition {
+  currency?: string;
+  currency_status?: string;
+  current: { date_from: string; date_to: string };
+  comparison: { date_from: string; date_to: string };
+  current_coverage: RetailCoverage;
+  comparison_coverage: RetailCoverage;
+  decision_ready: boolean;
+  summary?: Record<string, RetailSummaryMetric>;
+  daily_trend: RetailDailyTrend[];
+  attention: RetailAttention[];
+  suppressed_attention?: RetailSuppressedAttention[];
+  attention_count: number;
+}
+
+export interface RetailPulseResponse extends RetailPulsePartition {
+  basis: "Working" | string;
+  pulse_version: string;
+  formula_version: string;
+  data_classification: RetailDataClassification;
+  dataset_version?: string;
+  simulation_dataset_versions?: string[];
+  requested_scope: { legal_entity_id: string; store_ids?: string[] };
+  requested_stores?: RetailStoreScope[];
+  source_systems: string[];
+  fact_version_min: number;
+  fact_version_max: number;
+  highest_as_of?: string;
+  multi_currency: boolean;
+  currency_status?: string;
+  generated_at: string;
+  definitions_url: string;
+  kpi_drilldown_url: string;
+  store_drilldown_url: string;
+  current_kpi_drilldown_url: string;
+  comparison_kpi_drilldown_url: string;
+  partitions?: RetailPulsePartition[];
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   const refreshToken = localStorage.getItem("refresh_token");
@@ -661,6 +863,8 @@ export const aiChatApi = {
     object_name?: string;
     content_type?: string;
     language?: string;
+    skill_id?: string;
+    skill_version?: string;
     page_context?: {
       page?: string;
       title?: string;
@@ -737,6 +941,8 @@ export const aiChatApi = {
     instruction?: string;
     contract_id?: string;
     language?: string;
+    skill_id?: string;
+    skill_version?: string;
     page_context?: {
       page?: string;
       title?: string;
@@ -762,6 +968,8 @@ export const aiChatApi = {
     object_name?: string;
     content_type?: string;
     language?: string;
+    skill_id?: string;
+    skill_version?: string;
     page_context?: {
       page?: string;
       title?: string;
@@ -1148,6 +1356,299 @@ export const performanceApi = {
   },
   downloadReportPack: async (id: string, token: string) => {
     return downloadBlob(`/api/v1/performance/report-packs/${encodeURIComponent(id)}/download`, token);
+  },
+};
+
+export interface RetailPulseQueryParams {
+  data_classification: RetailDataClassification;
+  dataset_version?: string;
+  as_of: string;
+  window_days: 7 | 14 | 28;
+  store_ids?: string[];
+  source_system?: string;
+  attention_limit?: number;
+}
+
+export interface RetailStore360Option {
+  store_id: string;
+  store_code: string;
+  store_name: string;
+  brand: string;
+  region: string;
+}
+
+export interface RetailStore360SummaryMetric {
+  current: RetailKPIValue;
+  comparison: RetailKPIValue;
+  change_value: number | null;
+  change_type: string;
+  status: string;
+  reason?: string;
+}
+
+export interface RetailStore360Trend {
+  date: string;
+  gap: boolean;
+  target_kpis: Record<string, RetailKPIValue>;
+  peer_median: Record<string, number | null>;
+  peer_count: Record<string, number>;
+}
+
+export interface RetailPeerBenchmark {
+  code: string;
+  unit: string;
+  target: number | null;
+  peer_count: number;
+  median: number | null;
+  p25: number | null;
+  p75: number | null;
+  percentile: number | null;
+  target_minus_median: number | null;
+  status: string;
+  reason?: string;
+}
+
+export interface RetailBridgeItem {
+  code: string;
+  label: string;
+  contribution: number | null;
+  unit: string;
+}
+
+export interface RetailBridge {
+  code: string;
+  method: string;
+  version: string;
+  status: string;
+  current: number | null;
+  comparison: number | null;
+  total_change: number | null;
+  items: RetailBridgeItem[];
+  rounding_residual: number | null;
+  reason?: string;
+}
+
+export interface RetailStoreObservation {
+  code: string;
+  label: string;
+  statement: string;
+  reference: string;
+  status: string;
+  evidence_ids: string[];
+}
+
+export interface RetailStoreEvidence {
+  current: { date_from: string; date_to: string };
+  comparison: { date_from: string; date_to: string };
+  observed_store_days: number;
+  expected_store_days: number;
+  required_fields: string[];
+  formula_version: string;
+  source_systems: string[];
+  dataset_versions: string[];
+  fact_version_min: number;
+  fact_version_max: number;
+  highest_as_of?: string;
+  data_quality_issues?: string[];
+  kpi_drilldown_url: string;
+}
+
+export interface RetailStoreDiagnosticsResponse {
+  basis: "Working" | string;
+  diagnostics_version: string;
+  formula_version: string;
+  pulse_version: string;
+  data_classification: RetailDataClassification;
+  dataset_version?: string;
+  generated_at: string;
+  store: { store_id: string; store_code: string; store_name: string; brand: string; region: string };
+  current: { date_from: string; date_to: string };
+  comparison: { date_from: string; date_to: string };
+  target_coverage: RetailCoverage;
+  comparison_coverage: RetailCoverage;
+  decision_ready: boolean;
+  currency: string;
+  currency_status: string;
+  summary: Record<string, RetailStore360SummaryMetric>;
+  daily_trend: RetailStore360Trend[];
+  peer_definition: string;
+  minimum_peer_count: number;
+  peer_benchmark: RetailPeerBenchmark[];
+  bridges: RetailBridge[];
+  observations: RetailStoreObservation[];
+  evidence: RetailStoreEvidence;
+  source_systems: string[];
+  dataset_versions: string[];
+  fact_version_min: number;
+  fact_version_max: number;
+  highest_as_of?: string;
+  data_quality_issues?: string[];
+  kpi_drilldown_url: string;
+}
+
+export interface RetailStore360QueryParams {
+  store_id: string;
+  data_classification: RetailDataClassification;
+  dataset_version?: string;
+  as_of: string;
+  window_days: 7 | 14 | 28;
+  source_system?: string;
+}
+
+export interface RetailScenarioAssumptions {
+  revenue_change_pct: number;
+  gross_margin_rate_change_pp: number;
+  labor_cost_change_pct: number;
+  fixed_rent_change_pct: number;
+  variable_rent_rate_change_pp: number;
+  non_lease_cost_change_pct: number;
+  other_controllable_cost_change_pct: number;
+}
+
+export interface RetailScenarioInput {
+  key: string;
+  name: string;
+  assumptions: RetailScenarioAssumptions;
+}
+
+export interface RetailScenarioMetric {
+  baseline: number | null;
+  result: number | null;
+  delta: number | null;
+  unit: string;
+  status: string;
+  reason?: string;
+}
+
+export interface RetailScenarioBridge {
+  items: Array<{ code: string; label: string; contribution: number | null; unit: string }>;
+  total_change: number | null;
+  rounding_residual: number | null;
+  status: string;
+  reason?: string;
+}
+
+export interface RetailScenarioResult {
+  key: string;
+  name: string;
+  assumptions: RetailScenarioAssumptions;
+  metrics: Record<string, RetailScenarioMetric>;
+  monthly_contribution_change: number | null;
+  horizon_contribution_change: number | null;
+  bridge: RetailScenarioBridge;
+}
+
+export interface RetailScenarioResponse {
+  basis: "Scenario" | string;
+  scenario_version: string;
+  formula_version: string;
+  diagnostics_version: string;
+  side_effects: boolean;
+  review_required: boolean;
+  official_impact: boolean;
+  ifrs16_impact: boolean;
+  generated_at: string;
+  store: RetailStoreScope;
+  data_classification: RetailDataClassification;
+  dataset_version?: string;
+  source_system?: string;
+  currency: string;
+  current: { date_from: string; date_to: string };
+  horizon_months: number;
+  baseline: RetailScenarioResult;
+  scenarios: RetailScenarioResult[];
+  evidence: {
+    current: { date_from: string; date_to: string };
+    observed_store_days: number;
+    expected_store_days: number;
+    coverage_rate: number | null;
+    required_fields: string[];
+    source_systems: string[];
+    dataset_versions: string[];
+    fact_version_min: number;
+    fact_version_max: number;
+    highest_as_of?: string;
+    kpi_drilldown_url: string;
+    request_assumptions: unknown;
+  };
+}
+
+export interface RetailScenarioActionRequest {
+  horizon_months: number;
+  selected_scenario: RetailScenarioInput;
+  title: string;
+  planned_action: string;
+  owner_name?: string;
+  due_date?: string | null;
+  verification_period?: string;
+}
+
+// Single typed client for the additive operating-pulse module. Query
+// parameters deliberately use URLSearchParams so repeated store_id values
+// remain unambiguous and encoded by the platform.
+export const retailAnalyticsApi = {
+  latestSimulationDataset: (token: string) =>
+    apiRequest("/api/v1/retail/simulations/store-days/latest", { token }) as Promise<LatestSimulationDatasetResponse>,
+
+  generateDefaultSimulation: (token: string) =>
+    apiRequest("/api/v1/retail/simulations/store-days/generate", {
+      method: "POST",
+      headers: { "Idempotency-Key": "max-005-retail-sim-v1-default" },
+      body: JSON.stringify({}),
+      token,
+    }) as Promise<SimulationGenerateResponse>,
+
+  operatingPulse: (params: RetailPulseQueryParams, token: string) => {
+    const query = new URLSearchParams();
+    query.set("data_classification", params.data_classification);
+    query.set("as_of", params.as_of);
+    query.set("window_days", String(params.window_days));
+    if (params.data_classification === "simulated") {
+      if (!params.dataset_version) throw new Error("simulated pulse requires dataset_version");
+      query.set("dataset_version", params.dataset_version);
+    } else if (params.dataset_version) {
+      throw new Error("production pulse cannot include dataset_version");
+    }
+    if (params.source_system) query.set("source_system", params.source_system);
+    if (params.attention_limit !== undefined) query.set("attention_limit", String(params.attention_limit));
+    (params.store_ids || []).forEach((storeID) => query.append("store_id", storeID));
+    return apiRequest(`/api/v1/retail/operating-pulse?${query.toString()}`, { token }) as Promise<RetailPulseResponse>;
+  },
+
+  storeOptions: (params: { data_classification: RetailDataClassification; dataset_version?: string }, token: string) => {
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated store options requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production store options cannot include dataset_version");
+    const query = new URLSearchParams({ data_classification: params.data_classification });
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    return apiRequest(`/api/v1/retail/store-options?${query.toString()}`, { token }) as Promise<{ basis: string; data_classification: RetailDataClassification; dataset_version?: string; data: RetailStore360Option[] }>;
+  },
+
+  storeDiagnostics: (params: RetailStore360QueryParams, token: string) => {
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated store diagnostics requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production store diagnostics cannot include dataset_version");
+    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    if (params.source_system) query.set("source_system", params.source_system);
+    return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/diagnostics?${query.toString()}`, { token }) as Promise<RetailStoreDiagnosticsResponse>;
+  },
+
+  evaluateStoreScenario: (params: RetailStore360QueryParams, body: { horizon_months: number; scenarios: RetailScenarioInput[] }, token: string) => {
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated scenario requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production scenario cannot include dataset_version");
+    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    if (params.source_system) query.set("source_system", params.source_system);
+    return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/scenarios/evaluate?${query.toString()}`, { method: "POST", body: JSON.stringify(body), token }) as Promise<RetailScenarioResponse>;
+  },
+
+  saveStoreScenarioAction: (params: RetailStore360QueryParams, body: RetailScenarioActionRequest, idempotencyKey: string, token: string) => {
+    if (!idempotencyKey) throw new Error("Idempotency-Key is required");
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated scenario action requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production scenario action cannot include dataset_version");
+    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    if (params.source_system) query.set("source_system", params.source_system);
+    return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/scenario-action-drafts?${query.toString()}`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(body), token }) as Promise<{ basis: string; formal_execution: boolean; review_required: boolean; data: Record<string, unknown>; idempotent_replay: boolean }>;
   },
 };
 

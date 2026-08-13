@@ -31,6 +31,7 @@ const (
 	ErrorCancelled        ErrorCode = "cancelled"
 	ErrorNotFound         ErrorCode = "not_found"
 	ErrorConflict         ErrorCode = "conflict"
+	ErrorDataUnavailable  ErrorCode = "data_unavailable"
 )
 
 // ToolError is safe to return to an Agent client. Internal database errors,

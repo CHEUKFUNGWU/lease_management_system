@@ -181,6 +181,24 @@ func NewAIChatHandlerWithOperationalReadersAndGovernance(
 	return newAIChatHandlerWithOperationalReadersAndGovernance(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, controls, governance, draftServices...)
 }
 
+// NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail is the
+// additive constructor used by production wiring for retail_operations@v1.
+// Existing constructors deliberately keep their old registry contents.
+func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
+	contractRepo *repository.ContractRepository,
+	mcRepo *repository.MonthlyClosingRepository,
+	eventRepo *repository.EventRepository,
+	runtimeRepo *repository.AIChatRuntimeRepository,
+	performance agenttooldefs.PerformanceReader,
+	closeReadiness agenttooldefs.CloseReadinessReader,
+	controls *agenttooldefs.ControlReaders,
+	governance agenttooldefs.DecisionMemoDraftWriter,
+	retail agenttooldefs.RetailOperationsReader,
+	draftServices ...*draftapp.Service,
+) *AIChatHandler {
+	return newAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, controls, governance, retail, draftServices...)
+}
+
 func newAIChatHandler(
 	contractRepo *repository.ContractRepository,
 	mcRepo *repository.MonthlyClosingRepository,
@@ -237,7 +255,22 @@ func newAIChatHandlerWithOperationalReadersAndGovernance(
 	governance agenttooldefs.DecisionMemoDraftWriter,
 	draftServices ...*draftapp.Service,
 ) *AIChatHandler {
-	agent := aiagent.NewWithOperationalReadersAndGovernance(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, draftServices...)
+	return newAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, controls, governance, nil, draftServices...)
+}
+
+func newAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
+	contractRepo *repository.ContractRepository,
+	mcRepo *repository.MonthlyClosingRepository,
+	eventRepo *repository.EventRepository,
+	runtimeRepo *repository.AIChatRuntimeRepository,
+	performance agenttooldefs.PerformanceReader,
+	closeReadiness agenttooldefs.CloseReadinessReader,
+	controls *agenttooldefs.ControlReaders,
+	governance agenttooldefs.DecisionMemoDraftWriter,
+	retail agenttooldefs.RetailOperationsReader,
+	draftServices ...*draftapp.Service,
+) *AIChatHandler {
+	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, draftServices...)
 	handler := &AIChatHandler{runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
 	handler.agentRuntime = aichat.NewRuntime(runtimeRepo, agent, agent, aiagent.ProjectResult, aichat.Options{ReviewCommit: handler.commitReviewTransaction})
 	return handler

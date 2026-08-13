@@ -46,6 +46,9 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     "ai-chat": t("nav.ai_chat", language as any),
     reports: t("nav.reports", language as any),
     performance: t("nav.performance", language as any),
+    "operating-pulse": t("nav.operating_pulse", language as any),
+    "store-360": t("nav.store_360", language as any),
+    "scenario-workbench": t("nav.scenario_workbench", language as any),
     portfolio: t("nav.portfolio", language as any),
     sensitivity: t("nav.sensitivity", language as any),
     "deal-compare": t("nav.deal_compare", language as any),
@@ -81,24 +84,16 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
   });
   return useMemo(
     () => {
-      const groups: any[] = [
-        {
-          type: "group",
-          key: "daily-work",
-          label: t("nav.group_daily", language as any),
-          children: [
-            item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
-            item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
-            item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
-          ],
-        },
-      ];
+      const groups: any[] = [];
       if (canViewAnalysis) {
         groups.push({
           type: "group",
           key: "analysis",
           label: t("nav.group_analysis", language as any),
           children: [
+            item("/operating-pulse", "/operating-pulse", <LineChartOutlined />, t("nav.operating_pulse", language as any)),
+            item("/store-360", "/store-360", <LineChartOutlined />, t("nav.store_360", language as any)),
+            item("/scenario-workbench", "/scenario-workbench", <LineChartOutlined />, t("nav.scenario_workbench", language as any)),
             item("/performance", "/performance", <DashboardOutlined />, t("nav.performance", language as any)),
             item("/portfolio", "/portfolio", <PieChartOutlined />, t("nav.portfolio", language as any)),
             item("/pre-deal", "/pre-deal", <FileSearchOutlined />, t("nav.pre_deal", language as any)),
@@ -109,6 +104,16 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
           ],
         });
       }
+      groups.push({
+        type: "group",
+        key: "daily-work",
+        label: t("nav.group_daily", language as any),
+        children: [
+          item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
+          item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
+          item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
+        ],
+      });
       if (canViewAccounting) {
         groups.push({
           type: "group",

@@ -1,0 +1,62 @@
+{
+  "evidence": "MAX009R3 negative deterministic Agent paths",
+  "confidence": 0.40,
+  "negative_cases_proposal_artifact_count_before": 0,
+  "negative_cases_proposal_artifact_count_after": 0,
+  "negative_cases_business_action_count_before": 0,
+  "negative_cases_business_action_count_after": 0,
+  "cases": [
+    {
+      "case": "needs_input",
+      "session_id": "58b5574c-5ca0-4db8-8f90-af272747aaed",
+      "run_id": "12490458-e75d-4694-8f09-7bc9614fc73e",
+      "http_status": 200,
+      "run_status": "waiting_review",
+      "reason": "missing_context",
+      "needs_input": true,
+      "evidence": "insufficient",
+      "tools_completed": ["retail.operating_pulse.read"],
+      "scenario_called": false,
+      "proposal_created": false
+    },
+    {
+      "case": "partial",
+      "session_id": "a67741bc-288c-49f5-bc46-5f57b515c5e2",
+      "run_id": "d0b2d86b-09d9-4413-beb2-d869c44e9c7e",
+      "http_status": 200,
+      "run_status": "waiting_review",
+      "reason": "partial_coverage",
+      "needs_input": true,
+      "evidence": "insufficient",
+      "coverage": {"current": "21/28", "comparison": "7/28"},
+      "tools_completed": ["retail.operating_pulse.read"],
+      "scenario_called": false,
+      "proposal_created": false
+    },
+    {
+      "case": "no_facts",
+      "session_id": "564a3bf0-7664-49f5-bded-fb1a253229f0",
+      "run_id": "48e5866a-28b1-4691-b9c0-a8664875cc2e",
+      "http_status": 200,
+      "run_status": "waiting_review",
+      "reason": "no_facts",
+      "needs_input": true,
+      "evidence": "insufficient",
+      "coverage": {"current": "0/0", "comparison": "0/0"},
+      "tools_completed": ["retail.operating_pulse.read"],
+      "scenario_called": false,
+      "proposal_created": false
+    },
+    {
+      "case": "invalid_resulting_rate",
+      "http_status": 422,
+      "reason": "resulting_rate_out_of_range",
+      "needs_input": true,
+      "evidence": "current coverage 7/7",
+      "scenario_called": true,
+      "proposal_created": false,
+      "business_action_before": 1,
+      "business_action_after": 1
+    }
+  ]
+}

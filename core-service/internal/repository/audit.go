@@ -96,6 +96,8 @@ func (r *AuditRepository) resolveRecordLegalEntity(ctx context.Context, tableNam
 		query = `SELECT c.legal_entity_id::text FROM lease_documents d JOIN lease_contracts c ON c.id = d.contract_id WHERE d.id = $1 AND c.legal_entity_id IS NOT NULL`
 	case "lease_obligations":
 		query = `SELECT c.legal_entity_id::text FROM lease_obligations o JOIN lease_contracts c ON c.id = o.contract_id WHERE o.id = $1 AND c.legal_entity_id IS NOT NULL`
+	case "retail_store_day_facts":
+		query = `SELECT s.legal_entity_id::text FROM retail_store_day_facts f JOIN stores s ON s.id = f.store_id WHERE f.id = $1 AND s.legal_entity_id IS NOT NULL`
 	case "close_exceptions":
 		query = `SELECT legal_entity_id::text FROM close_exceptions WHERE id = $1 AND legal_entity_id IS NOT NULL`
 	case "close_detection_events":
@@ -135,23 +137,31 @@ func appendAuditDimensionScope(scope access.Scope, conditions []string, args []i
 	}
 
 	predicates := make([]string, 0, 3)
+	retailPredicates := make([]string, 0, 3)
 	if len(scope.StoreIDs) > 0 {
-		predicates = append(predicates, fmt.Sprintf("c.store_id::text = ANY($%d)", argIdx))
+		placeholder := fmt.Sprintf("$%d", argIdx)
+		predicates = append(predicates, "c.store_id::text = ANY("+placeholder+")")
+		retailPredicates = append(retailPredicates, "f.store_id::text = ANY("+placeholder+")")
 		args = append(args, scope.StoreIDs)
 		argIdx++
 	}
 	if len(scope.Regions) > 0 {
-		predicates = append(predicates, fmt.Sprintf("s.region = ANY($%d)", argIdx))
+		placeholder := fmt.Sprintf("$%d", argIdx)
+		predicates = append(predicates, "s.region = ANY("+placeholder+")")
+		retailPredicates = append(retailPredicates, "s.region = ANY("+placeholder+")")
 		args = append(args, scope.Regions)
 		argIdx++
 	}
 	if len(scope.Brands) > 0 {
-		predicates = append(predicates, fmt.Sprintf("s.brand = ANY($%d)", argIdx))
+		placeholder := fmt.Sprintf("$%d", argIdx)
+		predicates = append(predicates, "s.brand = ANY("+placeholder+")")
+		retailPredicates = append(retailPredicates, "s.brand = ANY("+placeholder+")")
 		args = append(args, scope.Brands)
 		argIdx++
 	}
 	dimensionPredicate := strings.Join(predicates, " AND ")
-	contractTables := "'lease_contracts', 'lease_events', 'journal_entries', 'critical_dates', 'lease_documents', 'lease_obligations', 'monthly_closing_batches'"
+	retailDimensionPredicate := strings.Join(retailPredicates, " AND ")
+	contractTables := "'lease_contracts', 'lease_events', 'journal_entries', 'critical_dates', 'lease_documents', 'lease_obligations', 'monthly_closing_batches', 'retail_store_day_facts'"
 	conditions = append(conditions, fmt.Sprintf(`(
 		(a.table_name = 'lease_contracts' AND EXISTS (
 			SELECT 1 FROM lease_contracts c LEFT JOIN stores s ON s.id = c.store_id
@@ -181,9 +191,13 @@ func appendAuditDimensionScope(scope access.Scope, conditions []string, args []i
 			SELECT 1 FROM journal_entries e JOIN lease_contracts c ON c.id = e.contract_id LEFT JOIN stores s ON s.id = c.store_id
 			WHERE e.batch_id = a.record_id AND NOT (%s)
 		)) OR
+		(a.table_name = 'retail_store_day_facts' AND EXISTS (
+			SELECT 1 FROM retail_store_day_facts f JOIN stores s ON s.id = f.store_id
+			WHERE f.id = a.record_id AND %s
+		)) OR
 		a.table_name NOT IN (%s)
 	)`, dimensionPredicate, dimensionPredicate, dimensionPredicate, dimensionPredicate,
-		dimensionPredicate, dimensionPredicate, dimensionPredicate, contractTables))
+		dimensionPredicate, dimensionPredicate, dimensionPredicate, retailDimensionPredicate, contractTables))
 	return conditions, args, argIdx
 }
 

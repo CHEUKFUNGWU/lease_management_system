@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,13 +41,18 @@ func GetTenantID(c *gin.Context) string {
 	return ""
 }
 
-// RequireTenant ensures that a legal_entity_id is present in the context.
-// This should be used for routes where tenant isolation is mandatory.
+// RequireTenant guards legal-entity isolation at the single choke point of the
+// authenticated middleware chain (see cmd/api/main.go). A user with no legal
+// entity is legitimate only when they hold global (admin) access; any other
+// user without a legal entity would otherwise fall through the
+// `($N=” OR legal_entity_id::text=$N)` predicates and read every legal
+// entity's data. That state is a configuration error, not a legal one, so it
+// is rejected with 403 before any handler runs.
 func RequireTenant() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tenantID := GetTenantID(c)
-		if tenantID == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "tenant context required. please select a legal entity"})
+		scope, ok := GetAccessScope(c)
+		if !ok || (!scope.Global && strings.TrimSpace(scope.LegalEntityID) == "") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required for non-admin users"})
 			c.Abort()
 			return
 		}

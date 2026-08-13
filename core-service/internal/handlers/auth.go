@@ -7,9 +7,11 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/lease-management-system/core-service/internal/config"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
@@ -114,6 +116,15 @@ func isAssignableRole(role string) bool {
 	return ok
 }
 
+func hasRole(roles []string, role string) bool {
+	for _, candidate := range roles {
+		if candidate == role {
+			return true
+		}
+	}
+	return false
+}
+
 func requestedRoles(req AdminCreateUserRequest) []string {
 	seen := map[string]struct{}{}
 	roles := make([]string, 0, len(req.Roles)+1)
@@ -175,6 +186,19 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
 		return
+	}
+	// Legal-entity isolation (bottom line 1): a user without a legal entity
+	// is only legitimate when they hold the global admin role. Requiring a
+	// valid UUID here prevents silently creating a cross-legal-entity reader.
+	if !hasRole(roles, "admin") {
+		if req.LegalEntityID == nil || strings.TrimSpace(*req.LegalEntityID) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "legal_entity_id is required for non-admin users"})
+			return
+		}
+		if _, err := uuid.Parse(strings.TrimSpace(*req.LegalEntityID)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "legal_entity_id must be a valid UUID"})
+			return
+		}
 	}
 	sort.Strings(roles)
 

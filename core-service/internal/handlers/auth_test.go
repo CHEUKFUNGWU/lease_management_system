@@ -388,7 +388,7 @@ func TestAdminCreateUserAssignsEveryRequestedRole(t *testing.T) {
 		handler.AdminCreateUser(c)
 	})
 
-	body := []byte(`{"username":"finance_user","email":"finance@example.com","password":"password123","roles":["editor","reviewer"],"is_active":true}`)
+	body := []byte(`{"username":"finance_user","email":"finance@example.com","password":"password123","roles":["editor","reviewer"],"legal_entity_id":"11111111-1111-1111-1111-111111111111","is_active":true}`)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
@@ -405,5 +405,67 @@ func TestAdminCreateUserAssignsEveryRequestedRole(t *testing.T) {
 	}
 	if roles.assignedByID != "admin-1" {
 		t.Fatalf("expected admin-1 as assigner, got %q", roles.assignedByID)
+	}
+}
+
+func adminCreateUserRouter(t *testing.T, users *fakeAuthUserStore, roles *fakeRoleAssignmentStore, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	handler := NewAuthHandler(&config.Config{}, users, roles)
+	router := gin.New()
+	router.POST("/users", func(c *gin.Context) {
+		c.Set("role", "admin")
+		c.Set("user_id", "admin-1")
+		handler.AdminCreateUser(c)
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/users", bytes.NewReader([]byte(body)))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+	return recorder
+}
+
+// T5: creating a non-admin user without legal_entity_id must be refused with
+// 400; otherwise the user would silently become a cross-legal-entity reader.
+func TestAdminCreateUserRequiresLegalEntityForNonAdmin(t *testing.T) {
+	users := &fakeAuthUserStore{}
+	roles := &fakeRoleAssignmentStore{}
+	body := `{"username":"no_le_user","email":"no_le@example.com","password":"password123","roles":["editor"],"is_active":true}`
+
+	recorder := adminCreateUserRouter(t, users, roles, body)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected missing legal_entity_id to return %d, got %d: %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+	}
+	if users.created != nil {
+		t.Fatalf("expected no user to be created, got %#v", users.created)
+	}
+}
+
+// T6: a non-admin user with a malformed legal_entity_id must be refused with
+// 400 rather than storing a value that never matches any row.
+func TestAdminCreateUserRejectsInvalidLegalEntityUUID(t *testing.T) {
+	users := &fakeAuthUserStore{}
+	roles := &fakeRoleAssignmentStore{}
+	body := `{"username":"bad_le_user","email":"bad_le@example.com","password":"password123","roles":["editor"],"legal_entity_id":"not-a-uuid","is_active":true}`
+
+	recorder := adminCreateUserRouter(t, users, roles, body)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid UUID to return %d, got %d: %s", http.StatusBadRequest, recorder.Code, recorder.Body.String())
+	}
+	if users.created != nil {
+		t.Fatalf("expected no user to be created, got %#v", users.created)
+	}
+}
+
+// T7: the admin role is a legitimate cross-legal-entity role, so an admin
+// user without legal_entity_id must still be created.
+func TestAdminCreateUserAllowsMissingLegalEntityForAdmin(t *testing.T) {
+	users := &fakeAuthUserStore{}
+	roles := &fakeRoleAssignmentStore{}
+	body := `{"username":"admin_2","email":"admin2@example.com","password":"password123","roles":["admin"],"is_active":true}`
+
+	recorder := adminCreateUserRouter(t, users, roles, body)
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("expected admin user creation to succeed, got %d: %s", recorder.Code, recorder.Body.String())
 	}
 }

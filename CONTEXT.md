@@ -1,6 +1,11 @@
-# Lease Management System
+# Retail Performance Workstation
 
-This context defines the business language used to manage lease records, accounting workflows, and controlled access to them.
+This context defines the business language of the workstation. It spans two domains that must not be conflated:
+
+- **Retail Operations** — store-day operating facts, the metrics derived from them, and the analysis that turns them into actions.
+- **Lease Accounting** — contract records, IFRS 16 measurement, month-end close control, and general-ledger reconciliation.
+
+The two share stores and contracts but measure different things on different bases. Where a term exists in both, this document defines each meaning separately and says so. `Coverage` is the clearest case: it means three different things depending on the domain (see Evaluation Coverage, Transaction Currency Coverage, and Fact Coverage).
 
 ## Deep Modules
 
@@ -21,6 +26,21 @@ The client-side module that owns the contract-detail aggregate: contract, paymen
 
 **Report Projection**:
 A deterministic view derived from one controlled report snapshot. Projection policy owns IFRS calculations, time and currency buckets, tag and portfolio aggregation, sensitivity scenarios, response shapes, and export records; HTTP handlers only decode requests, acquire the snapshot, and encode the result.
+
+**Retail KPI Semantics**:
+The module behind `retail-kpi-v1` that turns Store-Day Facts into named operating metrics. It owns metric definitions, null and zero-denominator rules, Fact Coverage, Highest Fact Version selection, Source Conflict detection, and Currency Partitioning. Every consumer reads metrics from here; no caller recomputes a metric or a score.
+
+**Operating Pulse**:
+The module that composes one Retail KPI Semantics read into a group-region-store operating summary: current and comparison periods, daily trend, Attention ranking, Suppressed Attention, and the Fact Coverage and provenance needed to judge whether the summary is Decision Ready.
+
+**Store Diagnostics**:
+The module that explains one store's performance against itself over time and against its Peer Cohort, producing Contribution Bridges and the Store Evidence chain behind each Store Observation. It degrades explicitly when the peer sample or currency basis cannot support a comparison.
+
+**Retail Scenario**:
+The module that derives a transparent run-rate from the same facts a diagnosis used and applies Scenario Assumptions to it, producing a conservation-checked Contribution Bridge. It evaluates only; persisting an outcome is a separate, explicit Action Proposal.
+
+**Retail Simulation**:
+The module that generates a reproducible Simulated Dataset from a fixed seed, together with the Anomaly Manifest describing the operating anomalies it deliberately introduced.
 
 ## Access Control
 
@@ -56,6 +76,112 @@ _Avoid_: Role separation, four-eyes rule
 An exceptional, reasoned, and audited bypass of Segregation of Duties by a System Admin.
 _Avoid_: Admin exemption, superuser approval
 
+## Retail Operations
+
+**Operating Unit**:
+The subject of operating analysis, addressed as Legal Entity, region or brand, store, and date. A lease contract is a cost source and constraint attached to a store; it is not the root of operating analysis.
+_Avoid_: Contract, cost center
+
+**Store**:
+A physical operating location with a code, name, brand, region, currency, and optional area, against which operating facts are recorded and lease contracts are held.
+_Avoid_: Site, branch, location
+
+**Store-Day Fact**:
+One store's operating measures for one date in one currency: revenue, gross profit, transactions, footfall, labour cost, fixed rent, variable rent, non-lease cost, other controllable cost, and area. It is the atomic unit of operating analysis; monthly operating records cannot substitute for it.
+_Avoid_: Operating record, daily sales, store performance
+
+**Source Envelope**:
+The provenance carried by every Store-Day Fact: source system, import batch, Fact Version, as-of timestamp, and Data Classification. A fact without a complete envelope cannot be read into an operating conclusion.
+_Avoid_: Metadata, import info
+
+**Data Classification**:
+Whether a fact is `production` or `simulated`. A single fact is always exactly one of the two; a read spanning both reports `mixed` at the envelope level. Simulated facts remain labelled through database, API, export, and interface, and can never enter the Official posting chain.
+_Avoid_: Test data, environment, is_demo
+
+**Simulated Dataset**:
+A reproducible population of stores and Store-Day Facts generated from a fixed seed, identified by a dataset version and generator version. It exists so operating scenarios can be replayed without a design partner, and never so results can be presented as real performance.
+_Avoid_: Sample data, mock data, seed data
+
+**Anomaly Manifest**:
+The declared list of operating anomalies a Simulated Dataset deliberately contains, each with its store, date window, type, and expected direction. It is the expected answer against which analysis is checked.
+_Avoid_: Test case, known issue
+
+**Fact Version**:
+The monotonically increasing revision of a Store-Day Fact for one store, date, and currency. Restating a day adds a version; it never overwrites the prior one.
+_Avoid_: Update, correction, revision number
+
+**Highest Fact Version**:
+The rule that a read uses only the newest version of each Store-Day Fact in scope, so that a restatement is reflected without double counting the superseded value.
+_Avoid_: Latest record, dedup
+
+**Source Conflict**:
+The condition where more than one source system supplies facts for the same store, date, and currency, leaving no single defensible value. It is refused rather than resolved by guessing, and the caller must narrow to one source system.
+_Avoid_: Duplicate, merge conflict
+
+**Fact Coverage**:
+The comparison of Store-Day Facts actually observed against those expected for the authorized store population and date range, expressed as observed and expected store-days and a rate. Distinct from Evaluation Coverage, which concerns the month-end close population, and from Transaction Currency Coverage, which concerns reconciliation evidence.
+_Avoid_: Completeness, data quality, coverage
+
+**Decision Ready**:
+The conclusion that Fact Coverage, provenance, and currency basis are sufficient for the result to support a decision. When false, metrics remain viewable but must be presented as not sufficient to judge on, and the reason must be visible.
+_Avoid_: Valid, complete, healthy
+
+**Currency Partition**:
+The separation of a multi-currency result into one set of metrics per currency. Amounts in different currencies are never summed; there is no implicit conversion.
+_Avoid_: Base currency total, consolidated amount
+
+**Attention Signal**:
+One deterministic observation that a store's metric moved beyond a defined threshold, carrying the observed change, threshold, direction, unit, and its contribution to the store's score.
+_Avoid_: Alert, anomaly, exception
+
+**Attention Ranking**:
+The ordering of stores by a score computed from their Attention Signals, with a severity derived from that score. The ranking is produced once, server-side; consumers present the given order and never re-score.
+_Avoid_: Priority list, top issues, leaderboard
+
+**Suppressed Attention**:
+A store excluded from Attention Ranking because its evidence is insufficient rather than because it is performing acceptably, recorded with the reason and its Fact Coverage. Suppression is never silent.
+_Avoid_: Filtered, excluded, no data
+
+**Peer Cohort**:
+The set of stores sharing a target store's brand, region, and currency, used as the comparison basis for benchmarking. A cohort below the minimum sample size, or one spanning currencies, yields no benchmark rather than a weak one.
+_Avoid_: Similar stores, group average, comparison set
+
+**Peer Benchmark**:
+A target store's position within its Peer Cohort for one metric, expressed as median, quartiles, and percentile, with an explicit status and reason when it cannot be produced.
+_Avoid_: Ranking, average, score
+
+**Contribution Bridge**:
+A deterministic decomposition of a metric's change between two periods into named contributions that sum to the total change, retaining any rounding residual. A bridge that does not reconcile is reported as such rather than balanced by a plug.
+_Avoid_: Waterfall, variance analysis, attribution
+
+**Store Observation**:
+A statement about a store generated only from facts that passed the Decision Ready threshold, carrying the reference to the evidence supporting it. Observations are not produced for results that failed that threshold.
+_Avoid_: Insight, finding, conclusion
+
+**Store Evidence**:
+The traceable chain behind a Store Observation or Attention Signal: the periods compared, fact counts, source systems, dataset versions, and formula and semantic versions in force.
+_Avoid_: Context, details, backup
+
+**Scenario Assumptions**:
+The declared changes applied to a run-rate baseline across the seven supported levers: revenue, gross-margin rate, labour cost, fixed rent, variable-rent rate, non-lease cost, and other controllable cost.
+_Avoid_: Inputs, parameters, what-if values
+
+**Scenario Evaluation**:
+A read-only projection of Scenario Assumptions onto a transparent run-rate derived from the same facts a diagnosis used, reported on the `Scenario` basis with its own Contribution Bridge. It is never a forecast, a plan version, or an Official figure, and a stale evaluation cannot be saved.
+_Avoid_: Forecast, budget, plan, simulation
+
+**Action Proposal**:
+A suggested operating action produced from a Scenario Evaluation or by the retail agent, carrying its expected benefit, owner, due date, and evidence, and requiring explicit human confirmation. A proposal produced by the agent is an artifact and is written to no business table until a person confirms it.
+_Avoid_: Action, task, recommendation, decision
+
+**Occupancy Cost**:
+The operating-basis cost of holding a store for a period: base rent, service charge, property and marketing costs, and variable rent incurred in that period. It is deliberately **not** IFRS 16 depreciation, interest, right-of-use asset, or lease-liability movement; the two bases are maintained side by side and neither is a substitute for the other.
+_Avoid_: Rent expense, lease cost, lease expense
+
+**Store Contribution**:
+A store's operating result after the costs attributable to running it, including Occupancy Cost. It is an operating measure and does not tie to a statutory profit subtotal.
+_Avoid_: Profit, EBITDA, margin
+
 ## Month-End Close
 
 **Close Period**:
@@ -71,8 +197,8 @@ The complete set of lease contracts and related subjects required to be evaluate
 _Avoid_: Batch contracts, selected contracts
 
 **Evaluation Coverage**:
-The explicit comparison of the Close Population with the subjects actually evaluated, including a reason for every subject that was Not Evaluated.
-_Avoid_: Processed count, batch completion
+The explicit comparison of the Close Population with the subjects actually evaluated, including a reason for every subject that was Not Evaluated. Concerns close control, not operating data; for the operating sense see Fact Coverage.
+_Avoid_: Processed count, batch completion, coverage
 
 **Close Exception**:
 A specific lease-subledger problem discovered during a Close Period that requires investigation and a recorded disposition before the period can be completed.
@@ -123,8 +249,8 @@ The authoritative outcome produced by a Close Control Rule, distinct from any ex
 _Avoid_: AI conclusion, recommendation
 
 **Agent Signal**:
-A traceable, probabilistic indication from non-structured evidence that a human accounting judgment may be required; it is input to a Close Control Rule and is never itself a Control Conclusion.
-_Avoid_: Finding, exception, AI decision
+A traceable, probabilistic indication from non-structured evidence that a human accounting judgment may be required; it is input to a Close Control Rule and is never itself a Control Conclusion. Distinct from an Attention Signal, which is a deterministic threshold breach in operating data and carries no accounting authority.
+_Avoid_: Finding, exception, AI decision, signal
 
 **Agent Suggestion**:
 Non-authoritative assistance explaining evidence or proposing assignment, investigation, or remediation without changing a Control Conclusion or accounting record.
@@ -265,8 +391,8 @@ The primary currency in which a Legal Entity measures and presents its accountin
 _Avoid_: Base currency, reporting currency
 
 **Transaction Currency Coverage**:
-The additional reconciliation coverage available when both subledger and general-ledger evidence retain the original transaction currency and amount.
-_Avoid_: FX reconciliation, multi-currency mode
+The additional reconciliation coverage available when both subledger and general-ledger evidence retain the original transaction currency and amount. Concerns reconciliation evidence, not operating data; for the operating sense see Fact Coverage, and for the close sense see Evaluation Coverage.
+_Avoid_: FX reconciliation, multi-currency mode, coverage
 
 **Reconciliation Scope**:
 The dimensions actually supported by the imported general-ledger evidence for a reconciliation, explicitly distinguishing Functional Currency coverage from Transaction Currency Coverage.

@@ -168,6 +168,7 @@ func main() {
 	api.Use(middleware.LoadUserPermissions(roleRepo))
 	api.Use(middleware.DataScopeMiddleware())
 	api.Use(middleware.TenantMiddleware())
+	api.Use(middleware.RequireTenant())
 	{
 		protected := middleware.NewProtectedRouter(api)
 		permission := func(resource, action string) middleware.Permission {

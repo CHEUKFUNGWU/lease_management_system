@@ -1,5 +1,5 @@
 /**
- * Design Tokens — IFRS 16 Monochrome System
+ * Design Tokens — Monochrome System
  *
  * The entire visual language is built on a grayscale-first system.
  * Semantic color is reserved for state tags and is always paired with an icon
@@ -9,6 +9,14 @@
  * 3. Spacing (density, breathing room)
  * 4. Depth (subtle borders vs shadows)
  * 5. Motion (timing, easing)
+ *
+ * This file is the single source of truth for design tokens: Ant Design reads
+ * it through theme.ts -> ThemeProvider, so the values have to live in TS.
+ * The `:root` block in globals.css must mirror it. Changing one side only is
+ * how the two drifted apart in the first place — see DESIGN.md section 1 for
+ * the divergences that still need reconciling.
+ *
+ * Rules that govern how these tokens may be used: DESIGN.md
  */
 
 // ─── Color Tokens ──────────────────────────────────────────────

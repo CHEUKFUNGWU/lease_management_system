@@ -390,6 +390,7 @@ English:
 
 **UI / UX**
 
+- [DESIGN.md](DESIGN.md) — 设计系统与前端约束（写前端代码前先读这份）
 - [UIUX 改善方案](docs/UIUX改善方案.md) — 当前设计系统诊断与分阶段改进计划
 - [UIUX 设计与交互提升评估报告](docs/UIUX_设计与交互提升评估报告.md)
 

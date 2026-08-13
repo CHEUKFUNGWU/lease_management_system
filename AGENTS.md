@@ -13,6 +13,7 @@
 | 想知道什么 | 看哪份 |
 |---|---|
 | 产品有什么功能、怎么跑起来、目录结构、测试账号 | [README.md](README.md) |
+| **改前端代码必须遵守的设计与样式约束** | **[DESIGN.md](DESIGN.md)** |
 | 为什么做这次转型、边界在哪、ICP 与产品蓝图 | [docs/线下零售经营分析工作站_产品转型可行性报告与规划.md](docs/线下零售经营分析工作站_产品转型可行性报告与规划.md) |
 | 零售 MVP 每一票的任务、评审与验收记录 | [docs/execution/转型执行看板.md](docs/execution/转型执行看板.md) |
 | 端到端验收证据（截图、trace、residual） | [docs/execution/evidence/MAX-009/index.md](docs/execution/evidence/MAX-009/index.md) |
@@ -41,7 +42,7 @@
 零售经营分析是**叠加**上去的，不是替换。
 
 - **不得删除、重命名、隐藏或破坏**任何既有功能、页面、导航入口、API、合同管理、IFRS 16、月结、报表或既有 Agent 能力
-- 新增页面沿用既有 `AppLayout`、视觉体系、栅格与交互范式
+- 新增页面沿用既有 `AppLayout`、栅格与交互范式；视觉与样式约束见 [DESIGN.md](DESIGN.md)，其 §13 止血条款对新代码强制生效
 - 所有原路由继续可访问，改动需提供兼容回归证据
 
 ## 五条不可突破的底线

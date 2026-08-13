@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 // ErrRetailStoreDayFactIdempotencyConflict is returned when an idempotency key
@@ -85,12 +86,12 @@ const retailStoreDayFactColumns = `f.id,f.store_id,s.code,s.name,COALESCE(s.bran
 // data scope before writing. It also verifies that an import batch belongs to
 // the same legal entity as the store. The database uniqueness key makes a
 // business-key replay deterministic.
-func (r *OperatingFactsRepository) UpsertRetailStoreDayFact(ctx context.Context, legalEntityID string, fact *RetailStoreDayFact) (*RetailStoreDayFact, error) {
+func (r *OperatingFactsRepository) UpsertRetailStoreDayFact(ctx context.Context, entity access.EntityFilter, fact *RetailStoreDayFact) (*RetailStoreDayFact, error) {
 	if fact == nil {
 		return nil, fmt.Errorf("upsert retail store-day fact: fact is nil")
 	}
 	r.prepareRetailStoreDayFact(fact)
-	resolvedLegalEntity, err := r.resolveRetailStoreDayFactStore(ctx, legalEntityID, fact)
+	resolvedLegalEntity, err := r.resolveRetailStoreDayFactStore(ctx, entity, fact)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +135,7 @@ func (r *OperatingFactsRepository) UpsertRetailStoreDayFact(ctx context.Context,
 // audit callback again.
 func (r *OperatingFactsRepository) UpsertRetailStoreDayFactsAtomic(
 	ctx context.Context,
-	legalEntityID string,
+	entity access.EntityFilter,
 	facts []*RetailStoreDayFact,
 	idempotencyKey, payloadSHA256 string,
 	createdBy *string,
@@ -158,9 +159,9 @@ func (r *OperatingFactsRepository) UpsertRetailStoreDayFactsAtomic(
 	}()
 
 	txRepo := NewOperatingFactsRepository(tx)
-	scopeKey := strings.TrimSpace(legalEntityID)
-	if scopeKey == "" {
-		scopeKey = "global"
+	scopeKey := "global"
+	if entityID, idErr := entity.LegalEntityID(); idErr == nil {
+		scopeKey = entityID
 	}
 	if strings.TrimSpace(idempotencyKey) != "" {
 		if strings.TrimSpace(payloadSHA256) == "" {
@@ -168,8 +169,9 @@ func (r *OperatingFactsRepository) UpsertRetailStoreDayFactsAtomic(
 		}
 		var requestID string
 		var legalEntityArg any
-		if strings.TrimSpace(legalEntityID) != "" {
-			legalEntityArg = legalEntityID
+		if !entity.IsGlobal() {
+			scopedID, _ := entity.LegalEntityID()
+			legalEntityArg = scopedID
 		}
 		insertErr := tx.QueryRow(ctx, `
 			INSERT INTO retail_store_day_fact_requests (scope_key,legal_entity_id,idempotency_key,payload_sha256,created_by)
@@ -192,7 +194,7 @@ func (r *OperatingFactsRepository) UpsertRetailStoreDayFactsAtomic(
 			if err := json.Unmarshal(rawFactIDs, &factIDs); err != nil {
 				return nil, fmt.Errorf("decode retail store-day idempotency fact ids: %w", err)
 			}
-			loaded, err := txRepo.listRetailStoreDayFactsByIDs(ctx, legalEntityID, factIDs)
+			loaded, err := txRepo.listRetailStoreDayFactsByIDs(ctx, entity, factIDs)
 			if err != nil {
 				return nil, err
 			}
@@ -215,11 +217,11 @@ func (r *OperatingFactsRepository) UpsertRetailStoreDayFactsAtomic(
 			return nil, fmt.Errorf("retail store-day fact at index %d is nil", index)
 		}
 		txRepo.prepareRetailStoreDayFact(fact)
-		old, err := txRepo.getRetailStoreDayFactByBusinessKey(ctx, legalEntityID, fact)
+		old, err := txRepo.getRetailStoreDayFactByBusinessKey(ctx, entity, fact)
 		if err != nil {
 			return nil, fmt.Errorf("load old retail store-day fact at index %d: %w", index, err)
 		}
-		result, err := txRepo.UpsertRetailStoreDayFact(ctx, legalEntityID, fact)
+		result, err := txRepo.UpsertRetailStoreDayFact(ctx, entity, fact)
 		if err != nil {
 			return nil, fmt.Errorf("upsert retail store-day fact at index %d: %w", index, err)
 		}
@@ -252,11 +254,11 @@ func (r *OperatingFactsRepository) UpsertRetailStoreDayFactsAtomic(
 }
 
 // ListRetailStoreDayFactsPage returns a bounded page and a reliable total.
-func (r *OperatingFactsRepository) ListRetailStoreDayFactsPage(ctx context.Context, legalEntityID, dateFrom, dateTo string, storeIDs []string, pageSize, offset int) (*RetailStoreDayFactsPage, error) {
+func (r *OperatingFactsRepository) ListRetailStoreDayFactsPage(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string, pageSize, offset int) (*RetailStoreDayFactsPage, error) {
 	if pageSize < 0 || offset < 0 {
 		return nil, fmt.Errorf("retail store-day page size and offset must not be negative")
 	}
-	fromWhere, args, nextArg := retailStoreDayFactFilter(ctx, legalEntityID, dateFrom, dateTo, storeIDs)
+	fromWhere, args, nextArg := retailStoreDayFactFilter(ctx, entity, dateFrom, dateTo, storeIDs)
 	var total int
 	if err := r.db.QueryRow(ctx, "SELECT COUNT(*)"+fromWhere, args...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("count retail store-day facts: %w", err)
@@ -288,8 +290,8 @@ func (r *OperatingFactsRepository) ListRetailStoreDayFactsPage(ctx context.Conte
 
 // ListRetailStoreDayFacts remains source-compatible with the first MAX-001
 // implementation but no longer silently truncates at 50,000 rows.
-func (r *OperatingFactsRepository) ListRetailStoreDayFacts(ctx context.Context, legalEntityID, dateFrom, dateTo string, storeIDs []string) ([]*RetailStoreDayFact, error) {
-	page, err := r.ListRetailStoreDayFactsPage(ctx, legalEntityID, dateFrom, dateTo, storeIDs, 0, 0)
+func (r *OperatingFactsRepository) ListRetailStoreDayFacts(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string) ([]*RetailStoreDayFact, error) {
+	page, err := r.ListRetailStoreDayFactsPage(ctx, entity, dateFrom, dateTo, storeIDs, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -317,11 +319,17 @@ func (r *OperatingFactsRepository) prepareRetailStoreDayFact(fact *RetailStoreDa
 	}
 }
 
-func (r *OperatingFactsRepository) resolveRetailStoreDayFactStore(ctx context.Context, legalEntityID string, fact *RetailStoreDayFact) (string, error) {
+func (r *OperatingFactsRepository) resolveRetailStoreDayFactStore(ctx context.Context, entity access.EntityFilter, fact *RetailStoreDayFact) (string, error) {
 	storeQuery := `SELECT s.legal_entity_id::text,s.code,s.name,COALESCE(s.brand,''),COALESCE(s.region,'')
-		FROM stores s WHERE s.id=$1 AND ($2='' OR s.legal_entity_id::text=$2)`
-	storeArgs := []any{fact.StoreID, legalEntityID}
-	storeQuery, storeArgs, _ = appendStoreScopePredicate(ctx, storeQuery, storeArgs, 3, "s")
+		FROM stores s WHERE s.id=$1`
+	storeArgs := []any{fact.StoreID}
+	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(storeArgs)+1); err != nil {
+		return "", err
+	} else if clause != "" {
+		storeQuery += " AND " + clause
+		storeArgs = append(storeArgs, arg)
+	}
+	storeQuery, storeArgs, _ = appendStoreScopePredicate(ctx, storeQuery, storeArgs, len(storeArgs)+1, "s")
 	var resolvedLegalEntity string
 	if err := r.db.QueryRow(ctx, storeQuery, storeArgs...).Scan(&resolvedLegalEntity, &fact.StoreCode, &fact.StoreName, &fact.Brand, &fact.Region); err != nil {
 		if err == pgx.ErrNoRows {
@@ -349,12 +357,17 @@ func (r *OperatingFactsRepository) validateRetailStoreDayFactImportBatch(ctx con
 	return nil
 }
 
-func (r *OperatingFactsRepository) getRetailStoreDayFactByBusinessKey(ctx context.Context, legalEntityID string, fact *RetailStoreDayFact) (*RetailStoreDayFact, error) {
+func (r *OperatingFactsRepository) getRetailStoreDayFactByBusinessKey(ctx context.Context, entity access.EntityFilter, fact *RetailStoreDayFact) (*RetailStoreDayFact, error) {
 	query := "SELECT " + retailStoreDayFactColumns + ` FROM retail_store_day_facts f JOIN stores s ON s.id=f.store_id
-		WHERE f.store_id=$1 AND f.business_date=$2::date AND f.version=$3 AND f.source_system=$4
-		AND ($5='' OR s.legal_entity_id::text=$5)`
-	args := []any{fact.StoreID, fact.BusinessDate, fact.Version, fact.SourceSystem, legalEntityID}
-	query, args, _ = appendStoreScopePredicate(ctx, query, args, 6, "s")
+		WHERE f.store_id=$1 AND f.business_date=$2::date AND f.version=$3 AND f.source_system=$4`
+	args := []any{fact.StoreID, fact.BusinessDate, fact.Version, fact.SourceSystem}
+	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendStoreScopePredicate(ctx, query, args, len(args)+1, "s")
 	row := r.db.QueryRow(ctx, query, args...)
 	item, scanErr := scanRetailStoreDayFact(row)
 	if scanErr == pgx.ErrNoRows {
@@ -366,14 +379,20 @@ func (r *OperatingFactsRepository) getRetailStoreDayFactByBusinessKey(ctx contex
 	return item, nil
 }
 
-func (r *OperatingFactsRepository) listRetailStoreDayFactsByIDs(ctx context.Context, legalEntityID string, factIDs []string) ([]*RetailStoreDayFact, error) {
+func (r *OperatingFactsRepository) listRetailStoreDayFactsByIDs(ctx context.Context, entity access.EntityFilter, factIDs []string) ([]*RetailStoreDayFact, error) {
 	if len(factIDs) == 0 {
 		return []*RetailStoreDayFact{}, nil
 	}
 	query := "SELECT " + retailStoreDayFactColumns + ` FROM retail_store_day_facts f JOIN stores s ON s.id=f.store_id
-		WHERE f.id::text=ANY($1::text[]) AND ($2='' OR s.legal_entity_id::text=$2)`
-	args := []any{factIDs, legalEntityID}
-	query, args, _ = appendStoreScopePredicate(ctx, query, args, 3, "s")
+		WHERE f.id::text=ANY($1::text[])`
+	args := []any{factIDs}
+	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendStoreScopePredicate(ctx, query, args, len(args)+1, "s")
 	query += ` ORDER BY f.business_date,s.code,f.version DESC`
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -397,16 +416,23 @@ func (r *OperatingFactsRepository) listRetailStoreDayFactsByIDs(ctx context.Cont
 	return result, nil
 }
 
-func retailStoreDayFactFilter(ctx context.Context, legalEntityID, dateFrom, dateTo string, storeIDs []string) (string, []any, int) {
+func retailStoreDayFactFilter(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string) (string, []any, int) {
 	if storeIDs == nil {
 		storeIDs = []string{}
 	}
 	fromWhere := ` FROM retail_store_day_facts f JOIN stores s ON s.id=f.store_id
-		WHERE ($1='' OR s.legal_entity_id::text=$1)
-		AND f.business_date BETWEEN $2::date AND $3::date
-		AND (cardinality($4::text[])=0 OR f.store_id::text=ANY($4::text[]))`
-	args := []any{legalEntityID, dateFrom, dateTo, storeIDs}
-	fromWhere, args, nextArg := appendStoreScopePredicate(ctx, fromWhere, args, 5, "s")
+		WHERE f.business_date BETWEEN $1::date AND $2::date
+		AND (cardinality($3::text[])=0 OR f.store_id::text=ANY($3::text[]))`
+	args := []any{dateFrom, dateTo, storeIDs}
+	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(args)+1); err != nil {
+		// The filter helper is only reachable with a constructed filter; a
+		// zero value must never degrade into unfiltered access.
+		return "", nil, 0
+	} else if clause != "" {
+		fromWhere += " AND " + clause
+		args = append(args, arg)
+	}
+	fromWhere, args, nextArg := appendStoreScopePredicate(ctx, fromWhere, args, len(args)+1, "s")
 	return fromWhere, args, nextArg
 }
 

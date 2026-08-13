@@ -84,14 +84,14 @@ func TestRetailStoreDayFactsPostgresConstraintsIdempotencyAndTenantScope(t *test
 		StoreID: storeA, BusinessDate: "2026-08-01", Currency: "CNY", Revenue: 100,
 		SourceSystem: "postgres-test", DataClassification: "production", Version: 1,
 	}
-	first, err := repo.UpsertRetailStoreDayFact(ctx, entityA, production)
+	first, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityA), production)
 	if err != nil {
 		t.Fatalf("first production upsert: %v", err)
 	}
 	second := *production
 	second.ID = ""
 	second.Revenue = 200
-	replayed, err := repo.UpsertRetailStoreDayFact(ctx, entityA, &second)
+	replayed, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityA), &second)
 	if err != nil {
 		t.Fatalf("replayed production upsert: %v", err)
 	}
@@ -106,14 +106,14 @@ func TestRetailStoreDayFactsPostgresConstraintsIdempotencyAndTenantScope(t *test
 		t.Fatalf("idempotent row count = %d, want 1", count)
 	}
 
-	rowsA, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), entityA, "2026-08-01", "2026-08-01", nil)
+	rowsA, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-08-01", "2026-08-01", nil)
 	if err != nil {
 		t.Fatalf("list tenant A facts: %v", err)
 	}
 	if len(rowsA) != 1 || rowsA[0].StoreID != storeA || rowsA[0].StoreCode == "" || rowsA[0].Brand == "" || rowsA[0].Region == "" {
 		t.Fatalf("tenant A rows = %+v; expected one row with store metadata", rowsA)
 	}
-	rowsB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), entityB, "2026-08-01", "2026-08-01", nil)
+	rowsB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-08-01", "2026-08-01", nil)
 	if err != nil {
 		t.Fatalf("list tenant B facts: %v", err)
 	}
@@ -124,28 +124,28 @@ func TestRetailStoreDayFactsPostgresConstraintsIdempotencyAndTenantScope(t *test
 		StoreID: storeB, BusinessDate: "2026-08-01", Currency: "CNY", Revenue: 300,
 		SourceSystem: "postgres-test-b", DataClassification: "production", Version: 1,
 	}
-	if _, err := repo.UpsertRetailStoreDayFact(ctx, entityB, productionB); err != nil {
+	if _, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityB), productionB); err != nil {
 		t.Fatalf("tenant B own production upsert: %v", err)
 	}
-	rowsAAfterB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), entityA, "2026-08-01", "2026-08-01", nil)
+	rowsAAfterB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-08-01", "2026-08-01", nil)
 	if err != nil {
 		t.Fatalf("list tenant A after tenant B write: %v", err)
 	}
 	if len(rowsAAfterB) != 1 || rowsAAfterB[0].StoreID != storeA {
 		t.Fatalf("tenant A isolation after tenant B write failed: %+v", rowsAAfterB)
 	}
-	rowsBOwn, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), entityB, "2026-08-01", "2026-08-01", nil)
+	rowsBOwn, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-08-01", "2026-08-01", nil)
 	if err != nil || len(rowsBOwn) != 1 || rowsBOwn[0].StoreID != storeB {
 		t.Fatalf("tenant B own fact visibility = %+v, err=%v", rowsBOwn, err)
 	}
-	if _, err := repo.UpsertRetailStoreDayFact(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), entityB, &RetailStoreDayFact{StoreID: storeA, BusinessDate: "2026-08-02", Currency: "CNY", Revenue: 10, SourceSystem: "postgres-test", DataClassification: "production"}); err == nil {
+	if _, err := repo.UpsertRetailStoreDayFact(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), &RetailStoreDayFact{StoreID: storeA, BusinessDate: "2026-08-02", Currency: "CNY", Revenue: 10, SourceSystem: "postgres-test", DataClassification: "production"}); err == nil {
 		t.Fatal("tenant B write to tenant A store unexpectedly succeeded")
 	}
-	if _, err := repo.UpsertRetailStoreDayFact(ctx, entityA, &RetailStoreDayFact{StoreID: storeA, BusinessDate: "2026-08-06", Currency: "CNY", Revenue: 10, SourceSystem: "postgres-test-batch", ImportBatchID: &batchB, DataClassification: "production"}); err == nil {
+	if _, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityA), &RetailStoreDayFact{StoreID: storeA, BusinessDate: "2026-08-06", Currency: "CNY", Revenue: 10, SourceSystem: "postgres-test-batch", ImportBatchID: &batchB, DataClassification: "production"}); err == nil {
 		t.Fatal("cross-entity import batch unexpectedly succeeded")
 	}
 	validBatchFact := &RetailStoreDayFact{StoreID: storeA, BusinessDate: "2026-08-07", Currency: "CNY", Revenue: 11, SourceSystem: "postgres-test-batch", ImportBatchID: &batchA, DataClassification: "production"}
-	if _, err := repo.UpsertRetailStoreDayFact(ctx, entityA, validBatchFact); err != nil {
+	if _, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityA), validBatchFact); err != nil {
 		t.Fatalf("same-entity import batch rejected: %v", err)
 	}
 	var productionRows int
@@ -236,12 +236,12 @@ func TestRetailStoreDayFactsPostgresAtomicAuditIdempotencyAndRollback(t *testing
 
 	repo := NewOperatingFactsRepository(pool)
 	first := &RetailStoreDayFact{StoreID: storeID, BusinessDate: "2026-08-10", Currency: "CNY", Revenue: 100, SourceSystem: "atomic-test", DataClassification: "production"}
-	result, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, entityID, []*RetailStoreDayFact{first}, "", "", nil, audit(false))
+	result, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, mustEntityFilter(t, entityID), []*RetailStoreDayFact{first}, "", "", nil, audit(false))
 	if err != nil || result.Replayed || len(result.Facts) != 1 {
 		t.Fatalf("atomic first write = result %+v, err %v", result, err)
 	}
 	updated := &RetailStoreDayFact{StoreID: storeID, BusinessDate: "2026-08-10", Currency: "CNY", Revenue: 200, SourceSystem: "atomic-test", DataClassification: "production"}
-	if _, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, entityID, []*RetailStoreDayFact{updated}, "", "", nil, audit(false)); err != nil {
+	if _, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, mustEntityFilter(t, entityID), []*RetailStoreDayFact{updated}, "", "", nil, audit(false)); err != nil {
 		t.Fatalf("atomic update: %v", err)
 	}
 	var oldRevenue, newRevenue float64
@@ -256,7 +256,7 @@ func TestRetailStoreDayFactsPostgresAtomicAuditIdempotencyAndRollback(t *testing
 	}
 
 	failed := &RetailStoreDayFact{StoreID: storeID, BusinessDate: "2026-08-11", Currency: "CNY", Revenue: 300, SourceSystem: "atomic-failure", DataClassification: "production"}
-	if _, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, entityID, []*RetailStoreDayFact{failed}, "", "", nil, audit(true)); err == nil {
+	if _, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, mustEntityFilter(t, entityID), []*RetailStoreDayFact{failed}, "", "", nil, audit(true)); err == nil {
 		t.Fatal("audit failure unexpectedly committed")
 	}
 	var factCount, auditCount int
@@ -273,13 +273,13 @@ func TestRetailStoreDayFactsPostgresAtomicAuditIdempotencyAndRollback(t *testing
 	key := "atomic-idem-" + uuid.NewString()
 	hash := strings.Repeat("a", 64)
 	idem := &RetailStoreDayFact{StoreID: storeID, BusinessDate: "2026-08-12", Currency: "CNY", Revenue: 123, SourceSystem: "atomic-idem", DataClassification: "production"}
-	firstIdem, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, entityID, []*RetailStoreDayFact{idem}, key, hash, nil, audit(false))
+	firstIdem, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, mustEntityFilter(t, entityID), []*RetailStoreDayFact{idem}, key, hash, nil, audit(false))
 	if err != nil || firstIdem.Replayed {
 		t.Fatalf("first idempotent write = %+v, err %v", firstIdem, err)
 	}
 	replay := &RetailStoreDayFact{StoreID: storeID, BusinessDate: "2026-08-12", Currency: "CNY", Revenue: 999, SourceSystem: "atomic-idem", DataClassification: "production"}
 	beforeReplayAudits := auditCalls
-	replayed, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, entityID, []*RetailStoreDayFact{replay}, key, hash, nil, audit(false))
+	replayed, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, mustEntityFilter(t, entityID), []*RetailStoreDayFact{replay}, key, hash, nil, audit(false))
 	if err != nil || !replayed.Replayed || auditCalls != beforeReplayAudits {
 		t.Fatalf("idempotent replay = %+v, err %v, audit calls %d->%d", replayed, err, beforeReplayAudits, auditCalls)
 	}
@@ -290,7 +290,7 @@ func TestRetailStoreDayFactsPostgresAtomicAuditIdempotencyAndRollback(t *testing
 	if storedRevenue != 123 {
 		t.Fatalf("idempotent replay changed revenue to %.2f", storedRevenue)
 	}
-	if _, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, entityID, []*RetailStoreDayFact{replay}, key, strings.Repeat("b", 64), nil, audit(false)); !errors.Is(err, ErrRetailStoreDayFactIdempotencyConflict) {
+	if _, err := repo.UpsertRetailStoreDayFactsAtomic(ctx, mustEntityFilter(t, entityID), []*RetailStoreDayFact{replay}, key, strings.Repeat("b", 64), nil, audit(false)); !errors.Is(err, ErrRetailStoreDayFactIdempotencyConflict) {
 		t.Fatalf("idempotency conflict error = %v, want %v", err, ErrRetailStoreDayFactIdempotencyConflict)
 	}
 }
@@ -307,15 +307,15 @@ func TestRetailStoreDayFactsPostgresPaginationHasReliableTotal(t *testing.T) {
 	repo := NewOperatingFactsRepository(pool)
 	for index, date := range []string{"2026-08-20", "2026-08-21", "2026-08-22"} {
 		fact := &RetailStoreDayFact{StoreID: storeID, BusinessDate: date, Currency: "CNY", Revenue: float64(index + 1), SourceSystem: "pagination-test", DataClassification: "production"}
-		if _, err := repo.UpsertRetailStoreDayFact(ctx, entityID, fact); err != nil {
+		if _, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityID), fact); err != nil {
 			t.Fatalf("seed page fact %s: %v", date, err)
 		}
 	}
-	first, err := repo.ListRetailStoreDayFactsPage(ctx, entityID, "2026-08-20", "2026-08-22", nil, 2, 0)
+	first, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, entityID), "2026-08-20", "2026-08-22", nil, 2, 0)
 	if err != nil || first.Total != 3 || first.Returned != 2 {
 		t.Fatalf("first page = %+v, err %v", first, err)
 	}
-	second, err := repo.ListRetailStoreDayFactsPage(ctx, entityID, "2026-08-20", "2026-08-22", nil, 2, 2)
+	second, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, entityID), "2026-08-20", "2026-08-22", nil, 2, 2)
 	if err != nil || second.Total != 3 || second.Returned != 1 {
 		t.Fatalf("second page = %+v, err %v", second, err)
 	}
@@ -342,7 +342,7 @@ func TestRetailStoreDayFactsPostgresAuditDimensionScope(t *testing.T) {
 	auditRepo := NewAuditRepository(pool)
 	for index, storeID := range []string{storeA, storeB} {
 		fact := &RetailStoreDayFact{StoreID: storeID, BusinessDate: "2026-08-30", Currency: "CNY", Revenue: float64(index + 1), SourceSystem: "scope-test", DataClassification: "production"}
-		written, err := repo.UpsertRetailStoreDayFact(ctx, entityID, fact)
+		written, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityID), fact)
 		if err != nil {
 			t.Fatalf("seed scoped fact: %v", err)
 		}

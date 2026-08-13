@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/budget"
@@ -21,11 +22,11 @@ func NewBudgetVarianceReader(repo *repository.BudgetRepository, settings *reposi
 	return &BudgetVarianceReader{Repo: repo, Settings: settings}
 }
 
-func (r *BudgetVarianceReader) ReadVariance(ctx context.Context, legalEntityID, versionID, period string) (any, error) {
+func (r *BudgetVarianceReader) ReadVariance(ctx context.Context, entity access.EntityFilter, versionID, period string) (any, error) {
 	if r == nil || r.Repo == nil {
 		return nil, fmt.Errorf("budget variance reader unavailable")
 	}
-	version, err := r.Repo.GetVersion(ctx, versionID, legalEntityID)
+	version, err := r.Repo.GetVersion(ctx, versionID, entity)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func (r *BudgetVarianceReader) ReadVariance(ctx context.Context, legalEntityID, 
 	if err != nil {
 		return nil, err
 	}
-	actual, err := r.Repo.ActualsForPeriod(ctx, legalEntityID, period)
+	actual, err := r.Repo.ActualsForPeriod(ctx, entity, period)
 	if err != nil {
 		return nil, err
 	}
@@ -127,10 +128,11 @@ func NewRenewalDecisionReader(contracts *repository.ContractRepository, decision
 	return &RenewalDecisionReader{Contracts: contracts, Decisions: decisions}
 }
 
-func (r *RenewalDecisionReader) ReadDecisions(ctx context.Context, legalEntityID, contractID string) (any, error) {
+func (r *RenewalDecisionReader) ReadDecisions(ctx context.Context, entity access.EntityFilter, contractID string) (any, error) {
 	if r == nil || r.Contracts == nil || r.Decisions == nil {
 		return nil, fmt.Errorf("renewal decision reader unavailable")
 	}
+	legalEntityID, _ := entity.LegalEntityID()
 	contract, err := r.Contracts.GetByID(ctx, contractID, legalEntityID)
 	if err != nil {
 		return nil, err
@@ -138,7 +140,7 @@ func (r *RenewalDecisionReader) ReadDecisions(ctx context.Context, legalEntityID
 	if contract == nil {
 		return nil, fmt.Errorf("contract not found")
 	}
-	items, err := r.Decisions.List(ctx, contractID, legalEntityID)
+	items, err := r.Decisions.List(ctx, contractID, entity)
 	if err != nil {
 		return nil, err
 	}

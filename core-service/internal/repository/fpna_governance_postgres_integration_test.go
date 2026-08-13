@@ -28,24 +28,24 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed plan version: %v", err)
 	}
-	versionsA, err := repo.ListPlanVersions(ctx, pair.entityA, "")
+	versionsA, err := repo.ListPlanVersions(ctx, mustEntityFilter(t, pair.entityA), "")
 	if err != nil || len(versionsA) != 1 {
 		t.Fatalf("entity A plan versions = %d, err %v; want 1", len(versionsA), err)
 	}
-	versionsB, err := repo.ListPlanVersions(ctx, pair.entityB, "")
+	versionsB, err := repo.ListPlanVersions(ctx, mustEntityFilter(t, pair.entityB), "")
 	if err != nil || len(versionsB) != 0 {
 		t.Fatalf("entity B saw entity A plan versions: %d, err %v", len(versionsB), err)
 	}
-	if got, err := repo.GetPlanVersion(ctx, createdVersion.ID, pair.entityA); err != nil || got == nil {
+	if got, err := repo.GetPlanVersion(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityA)); err != nil || got == nil {
 		t.Fatalf("entity A GetPlanVersion = %+v, err %v; want found", got, err)
 	}
-	if got, err := repo.GetPlanVersion(ctx, createdVersion.ID, pair.entityB); err != nil || got != nil {
+	if got, err := repo.GetPlanVersion(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityB)); err != nil || got != nil {
 		t.Fatalf("entity B GetPlanVersion = %+v, err %v; want nil", got, err)
 	}
-	if frozen, err := repo.FreezePlanVersion(ctx, createdVersion.ID, pair.entityB, "user-b", false); err != nil || frozen != nil {
+	if frozen, err := repo.FreezePlanVersion(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityB), "user-b", false); err != nil || frozen != nil {
 		t.Fatalf("entity B froze entity A plan version: %+v, err %v; want nil", frozen, err)
 	}
-	if frozen, err := repo.FreezePlanVersion(ctx, createdVersion.ID, pair.entityA, "user-a", false); err != nil || frozen == nil {
+	if frozen, err := repo.FreezePlanVersion(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityA), "user-a", false); err != nil || frozen == nil {
 		t.Fatalf("entity A freeze = %+v, err %v; want updated", frozen, err)
 	}
 
@@ -60,11 +60,11 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 		t.Fatalf("seed plan line: %v", err)
 	}
 	_ = planLineID
-	linesA, err := repo.ListPlanLinesFiltered(ctx, createdVersion.ID, pair.entityA, "", "", nil)
+	linesA, err := repo.ListPlanLinesFiltered(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityA), "", "", nil)
 	if err != nil || len(linesA) != 1 {
 		t.Fatalf("entity A plan lines = %d, err %v; want 1", len(linesA), err)
 	}
-	linesB, err := repo.ListPlanLinesFiltered(ctx, createdVersion.ID, pair.entityB, "", "", nil)
+	linesB, err := repo.ListPlanLinesFiltered(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityB), "", "", nil)
 	if err != nil || len(linesB) != 0 {
 		t.Fatalf("entity B saw entity A plan lines: %d, err %v", len(linesB), err)
 	}
@@ -80,18 +80,18 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 		t.Fatalf("seed mapping: %v", err)
 	}
 	_ = createdMapping
-	mappingsA, err := repo.ListMappings(ctx, pair.entityA, "", "")
+	mappingsA, err := repo.ListMappings(ctx, mustEntityFilter(t, pair.entityA), "", "")
 	if err != nil || len(mappingsA) != 1 {
 		t.Fatalf("entity A mappings = %d, err %v; want 1", len(mappingsA), err)
 	}
-	mappingsB, err := repo.ListMappings(ctx, pair.entityB, "", "")
+	mappingsB, err := repo.ListMappings(ctx, mustEntityFilter(t, pair.entityB), "", "")
 	if err != nil || len(mappingsB) != 0 {
 		t.Fatalf("entity B saw entity A mappings: %d, err %v", len(mappingsB), err)
 	}
-	if resolved, err := repo.ResolveMapping(ctx, pair.entityA, "store", "pos", "ext-store-a", "2026-06-01"); err != nil || resolved == nil {
+	if resolved, err := repo.ResolveMapping(ctx, mustEntityFilter(t, pair.entityA), "store", "pos", "ext-store-a", "2026-06-01"); err != nil || resolved == nil {
 		t.Fatalf("entity A ResolveMapping = %+v, err %v; want found", resolved, err)
 	}
-	if resolved, err := repo.ResolveMapping(ctx, pair.entityB, "store", "pos", "ext-store-a", "2026-06-01"); err != nil || resolved != nil {
+	if resolved, err := repo.ResolveMapping(ctx, mustEntityFilter(t, pair.entityB), "store", "pos", "ext-store-a", "2026-06-01"); err != nil || resolved != nil {
 		t.Fatalf("entity B ResolveMapping = %+v, err %v; want nil", resolved, err)
 	}
 
@@ -104,11 +104,11 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed data-quality item: %v", err)
 	}
-	dqA, err := repo.ListDataQuality(ctx, pair.entityA, "", "")
+	dqA, err := repo.ListDataQuality(ctx, mustEntityFilter(t, pair.entityA), "", "")
 	if err != nil || len(dqA) != 1 {
 		t.Fatalf("entity A data-quality = %d, err %v; want 1", len(dqA), err)
 	}
-	dqB, err := repo.ListDataQuality(ctx, pair.entityB, "", "")
+	dqB, err := repo.ListDataQuality(ctx, mustEntityFilter(t, pair.entityB), "", "")
 	if err != nil || len(dqB) != 0 {
 		t.Fatalf("entity B saw entity A data-quality items: %d, err %v", len(dqB), err)
 	}
@@ -117,10 +117,10 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	// varchar in the SET clause and text in the CASE WHEN IN list). Pre-existing
 	// defect, recorded in the SEC-002/003 report; the refactor must not make it
 	// worse, and err != nil must hold after it for both entities.
-	if updated, err := repo.UpdateDataQualityStatus(ctx, createdDQ.ID, pair.entityB, "resolved"); err == nil && updated != nil {
+	if updated, err := repo.UpdateDataQualityStatus(ctx, createdDQ.ID, mustEntityFilter(t, pair.entityB), "resolved"); err == nil && updated != nil {
 		t.Fatalf("entity B updated entity A data-quality item: %+v; want nil", updated)
 	}
-	if updated, err := repo.UpdateDataQualityStatus(ctx, createdDQ.ID, pair.entityA, "resolved"); err == nil && updated == nil {
+	if updated, err := repo.UpdateDataQualityStatus(ctx, createdDQ.ID, mustEntityFilter(t, pair.entityA), "resolved"); err == nil && updated == nil {
 		t.Fatalf("entity A data-quality update = nil with no error; unexpected")
 	}
 
@@ -133,24 +133,24 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed memo: %v", err)
 	}
-	if got, err := repo.GetMemoByIdempotency(ctx, &pair.entityA, "memo-key-a"); err != nil || got == nil {
+	if got, err := repo.GetMemoByIdempotency(ctx, mustEntityFilter(t, pair.entityA), "memo-key-a"); err != nil || got == nil {
 		t.Fatalf("entity A memo idempotency lookup = %+v, err %v; want found", got, err)
 	}
-	if got, err := repo.GetMemoByIdempotency(ctx, &pair.entityB, "memo-key-a"); err != nil || got != nil {
+	if got, err := repo.GetMemoByIdempotency(ctx, mustEntityFilter(t, pair.entityB), "memo-key-a"); err != nil || got != nil {
 		t.Fatalf("entity B memo idempotency lookup = %+v, err %v; want nil", got, err)
 	}
-	memosA, err := repo.ListMemos(ctx, pair.entityA, "", "")
+	memosA, err := repo.ListMemos(ctx, mustEntityFilter(t, pair.entityA), "", "")
 	if err != nil || len(memosA) != 1 {
 		t.Fatalf("entity A memos = %d, err %v; want 1", len(memosA), err)
 	}
-	memosB, err := repo.ListMemos(ctx, pair.entityB, "", "")
+	memosB, err := repo.ListMemos(ctx, mustEntityFilter(t, pair.entityB), "", "")
 	if err != nil || len(memosB) != 0 {
 		t.Fatalf("entity B saw entity A memos: %d, err %v", len(memosB), err)
 	}
-	if updated, err := repo.UpdateMemoStatus(ctx, createdMemo.ID, pair.entityB, "", "review"); err != nil || updated != nil {
+	if updated, err := repo.UpdateMemoStatus(ctx, createdMemo.ID, mustEntityFilter(t, pair.entityB), "", "review"); err != nil || updated != nil {
 		t.Fatalf("entity B updated entity A memo: %+v, err %v; want nil", updated, err)
 	}
-	if updated, err := repo.UpdateMemoStatus(ctx, createdMemo.ID, pair.entityA, "", "review"); err != nil || updated == nil {
+	if updated, err := repo.UpdateMemoStatus(ctx, createdMemo.ID, mustEntityFilter(t, pair.entityA), "", "review"); err != nil || updated == nil {
 		t.Fatalf("entity A memo update = %+v, err %v; want updated", updated, err)
 	}
 
@@ -162,18 +162,18 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed report artifact: %v", err)
 	}
-	artifactsA, err := repo.ListReportArtifacts(ctx, pair.entityA, "", "", "")
+	artifactsA, err := repo.ListReportArtifacts(ctx, mustEntityFilter(t, pair.entityA), "", "", "")
 	if err != nil || len(artifactsA) != 1 {
 		t.Fatalf("entity A report artifacts = %d, err %v; want 1", len(artifactsA), err)
 	}
-	artifactsB, err := repo.ListReportArtifacts(ctx, pair.entityB, "", "", "")
+	artifactsB, err := repo.ListReportArtifacts(ctx, mustEntityFilter(t, pair.entityB), "", "", "")
 	if err != nil || len(artifactsB) != 0 {
 		t.Fatalf("entity B saw entity A report artifacts: %d, err %v", len(artifactsB), err)
 	}
-	if got, err := repo.GetReportArtifact(ctx, createdArtifact.ID, pair.entityA); err != nil || got == nil {
+	if got, err := repo.GetReportArtifact(ctx, createdArtifact.ID, mustEntityFilter(t, pair.entityA)); err != nil || got == nil {
 		t.Fatalf("entity A GetReportArtifact = %+v, err %v; want found", got, err)
 	}
-	if got, err := repo.GetReportArtifact(ctx, createdArtifact.ID, pair.entityB); err != nil || got != nil {
+	if got, err := repo.GetReportArtifact(ctx, createdArtifact.ID, mustEntityFilter(t, pair.entityB)); err != nil || got != nil {
 		t.Fatalf("entity B GetReportArtifact = %+v, err %v; want nil", got, err)
 	}
 
@@ -185,11 +185,11 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if _, err := repo.CreateAgentSignal(ctx, signal); err != nil {
 		t.Fatalf("seed agent signal: %v", err)
 	}
-	signalsA, err := repo.ListAgentSignals(ctx, pair.entityA, "", "")
+	signalsA, err := repo.ListAgentSignals(ctx, mustEntityFilter(t, pair.entityA), "", "")
 	if err != nil || len(signalsA) != 1 {
 		t.Fatalf("entity A agent signals = %d, err %v; want 1", len(signalsA), err)
 	}
-	signalsB, err := repo.ListAgentSignals(ctx, pair.entityB, "", "")
+	signalsB, err := repo.ListAgentSignals(ctx, mustEntityFilter(t, pair.entityB), "", "")
 	if err != nil || len(signalsB) != 0 {
 		t.Fatalf("entity B saw entity A agent signals: %d, err %v", len(signalsB), err)
 	}
@@ -203,10 +203,10 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed action: %v", err)
 	}
-	if inScope, err := repo.ActionInScope(ctx, createdAction.ID, pair.entityA); err != nil || !inScope {
+	if inScope, err := repo.ActionInScope(ctx, createdAction.ID, mustEntityFilter(t, pair.entityA)); err != nil || !inScope {
 		t.Fatalf("entity A ActionInScope = %v, err %v; want true", inScope, err)
 	}
-	if inScope, err := repo.ActionInScope(ctx, createdAction.ID, pair.entityB); err != nil || inScope {
+	if inScope, err := repo.ActionInScope(ctx, createdAction.ID, mustEntityFilter(t, pair.entityB)); err != nil || inScope {
 		t.Fatalf("entity B ActionInScope = %v, err %v; want false", inScope, err)
 	}
 }

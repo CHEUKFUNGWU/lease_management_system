@@ -86,16 +86,20 @@ func (h *OperatingFactsHandler) UpsertStores(c *gin.Context) {
 }
 
 func (h *OperatingFactsHandler) upsertStores(c *gin.Context, req storeOperatingFactRequest) {
-	legalEntityID := middleware.GetTenantID(c)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
 	uid, _ := c.Get("user_id")
 	userID, _ := uid.(string)
-	var entity *string
-	if legalEntityID != "" {
-		entity = &legalEntityID
+	var legalEntityPayload *string
+	if scopedID, idErr := entity.LegalEntityID(); idErr == nil {
+		legalEntityPayload = &scopedID
 	}
 	sourceSystem := defaultString(req.SourceSystem, "api")
 	idempotencyKey := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
-	batch := &repository.OperatingFactBatch{LegalEntityID: entity, SourceSystem: sourceSystem, SourceFile: req.SourceFile, TotalRows: len(req.Items), AsOfAt: nowUTC(), CreatedBy: optionalString(userID), ReconciliationStatus: "unreconciled", IdempotencyKey: idempotencyKey, FactVersion: defaultString(c.GetHeader("X-Fact-Version"), nowUTC().Format(time.RFC3339))}
+	batch := &repository.OperatingFactBatch{LegalEntityID: legalEntityPayload, SourceSystem: sourceSystem, SourceFile: req.SourceFile, TotalRows: len(req.Items), AsOfAt: nowUTC(), CreatedBy: optionalString(userID), ReconciliationStatus: "unreconciled", IdempotencyKey: idempotencyKey, FactVersion: defaultString(c.GetHeader("X-Fact-Version"), nowUTC().Format(time.RFC3339))}
 	if _, err := h.repo.CreateBatch(c.Request.Context(), batch); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -110,7 +114,7 @@ func (h *OperatingFactsHandler) upsertStores(c *gin.Context, req storeOperatingF
 	for i, item := range req.Items {
 		if strings.TrimSpace(item.StoreID) == "" && h.governance != nil {
 			key := defaultString(item.StoreExternalID, item.StoreAlias)
-			mapping, resolveErr := h.governance.ResolveMapping(c.Request.Context(), legalEntityID, "store", item.ExternalSystem, key, strings.TrimSpace(item.Period)+"-01")
+			mapping, resolveErr := h.governance.ResolveMapping(c.Request.Context(), entity, "store", item.ExternalSystem, key, strings.TrimSpace(item.Period)+"-01")
 			if resolveErr != nil {
 				failures = append(failures, gin.H{"index": i, "error": resolveErr.Error()})
 				h.recordDataQuality(c, batch, item.SourceRecordID, item.Period, "ambiguous_mapping", resolveErr.Error(), i)
@@ -119,7 +123,7 @@ func (h *OperatingFactsHandler) upsertStores(c *gin.Context, req storeOperatingF
 			if mapping != nil && mapping.TargetID != nil {
 				item.StoreID = *mapping.TargetID
 			} else if mapping != nil && mapping.TargetCode != "" {
-				item.StoreID, _ = h.repo.ResolveStoreIDByCode(c.Request.Context(), legalEntityID, mapping.TargetCode)
+				item.StoreID, _ = h.repo.ResolveStoreIDByCode(c.Request.Context(), entity, mapping.TargetCode)
 			}
 		}
 		if _, parseErr := uuid.Parse(strings.TrimSpace(item.StoreID)); parseErr != nil {
@@ -297,7 +301,12 @@ func parseCSVFloat(value string) *float64 {
 }
 
 func (h *OperatingFactsHandler) ListStores(c *gin.Context) {
-	rows, err := h.repo.ListStores(c.Request.Context(), middleware.GetTenantID(c), c.Query("period"), c.Query("store_id"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListStores(c.Request.Context(), entity, c.Query("period"), c.Query("store_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -306,7 +315,12 @@ func (h *OperatingFactsHandler) ListStores(c *gin.Context) {
 }
 
 func (h *OperatingFactsHandler) ListBatches(c *gin.Context) {
-	rows, err := h.repo.ListBatches(c.Request.Context(), middleware.GetTenantID(c), c.Query("status"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListBatches(c.Request.Context(), entity, c.Query("status"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -320,7 +334,12 @@ func (h *OperatingFactsHandler) StorePerformance(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "period is required in YYYY-MM format"})
 		return
 	}
-	rows, err := h.repo.ListStores(c.Request.Context(), middleware.GetTenantID(c), period, c.Query("store_id"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListStores(c.Request.Context(), entity, period, c.Query("store_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -344,7 +363,12 @@ func (h *OperatingFactsHandler) StoreBenchmarks(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "period is required in YYYY-MM format"})
 		return
 	}
-	rows, err := h.repo.ListStores(c.Request.Context(), middleware.GetTenantID(c), period, "")
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListStores(c.Request.Context(), entity, period, "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -362,7 +386,12 @@ func (h *OperatingFactsHandler) StoreCohorts(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "period is required in YYYY-MM format"})
 		return
 	}
-	rows, err := h.repo.ListStores(c.Request.Context(), middleware.GetTenantID(c), period, "")
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListStores(c.Request.Context(), entity, period, "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -462,7 +491,12 @@ func (h *OperatingFactsHandler) UpsertEquipment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": result})
 }
 func (h *OperatingFactsHandler) ListEquipment(c *gin.Context) {
-	rows, err := h.repo.ListEquipment(c.Request.Context(), middleware.GetTenantID(c), c.Query("plant"), c.Query("line"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListEquipment(c.Request.Context(), entity, c.Query("plant"), c.Query("line"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -510,7 +544,12 @@ func (h *OperatingFactsHandler) UpsertEquipmentFact(c *gin.Context) {
 		return
 	}
 	f := &repository.EquipmentOperatingFact{EquipmentID: input.EquipmentID, Period: input.Period, Currency: input.Currency, OutputQty: input.OutputQty, YieldPct: input.YieldPct, ScrapQty: input.ScrapQty, DowntimeHours: input.DowntimeHours, OEEPct: input.OEEPct, UtilizationPct: input.UtilizationPct, LaborCost: input.LaborCost, EnergyCost: input.EnergyCost, MaintenanceCost: input.MaintenanceCost, StandardCost: input.StandardCost, ActualCost: input.ActualCost, MaterialUsageCost: input.MaterialUsageCost, OverheadAbsorption: input.OverheadAbsorption, PurchasePrice: input.PurchasePrice, PurchasePriceVariance: input.PurchasePriceVariance, CapacityAvailable: input.CapacityAvailable, LeaseCost: input.LeaseCost, ContractualRent: input.ContractualRent, DataQualityStatus: input.DataQualityStatus, SourceSystem: input.SourceSystem, SourceRecordID: input.SourceRecordID, Version: input.Version, ReconciliationStatus: input.ReconciliationStatus, CreatedBy: optionalString(userIDFromContext(c))}
-	result, err := h.repo.UpsertEquipmentFact(c.Request.Context(), f)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	result, err := h.repo.UpsertEquipmentFact(c.Request.Context(), entity, f)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
@@ -523,7 +562,12 @@ func (h *OperatingFactsHandler) EquipmentPerformance(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "period is required in YYYY-MM format"})
 		return
 	}
-	rows, err := h.repo.ListEquipmentFacts(c.Request.Context(), middleware.GetTenantID(c), period, c.Query("plant"), c.Query("line"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListEquipmentFacts(c.Request.Context(), entity, period, c.Query("plant"), c.Query("line"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -569,12 +613,17 @@ func (h *OperatingFactsHandler) EquipmentCandidates(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "period is required in YYYY-MM format"})
 		return
 	}
-	assets, err := h.repo.ListEquipment(c.Request.Context(), middleware.GetTenantID(c), c.Query("plant"), c.Query("line"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	assets, err := h.repo.ListEquipment(c.Request.Context(), entity, c.Query("plant"), c.Query("line"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	facts, err := h.repo.ListEquipmentFacts(c.Request.Context(), middleware.GetTenantID(c), period, c.Query("plant"), c.Query("line"))
+	facts, err := h.repo.ListEquipmentFacts(c.Request.Context(), entity, period, c.Query("plant"), c.Query("line"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -629,7 +678,12 @@ func (h *OperatingFactsHandler) Overview(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "period must be YYYY-MM"})
 		return
 	}
-	result, err := h.repo.Overview(c.Request.Context(), middleware.GetTenantID(c), period)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	result, err := h.repo.Overview(c.Request.Context(), entity, period)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -649,23 +703,27 @@ func (h *OperatingFactsHandler) ManagementBrief(c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
-	legal := middleware.GetTenantID(c)
-	overview, err := h.repo.Overview(ctx, legal, period)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	overview, err := h.repo.Overview(ctx, entity, period)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	actions, err := h.repo.ListActions(ctx, legal, period, "", "")
+	actions, err := h.repo.ListActions(ctx, entity, period, "", "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	stores, err := h.repo.ListStores(ctx, legal, period, "")
+	stores, err := h.repo.ListStores(ctx, entity, period, "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	equipment, err := h.repo.ListEquipmentFacts(ctx, legal, period, "", "")
+	equipment, err := h.repo.ListEquipmentFacts(ctx, entity, period, "", "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -676,7 +734,7 @@ func (h *OperatingFactsHandler) ManagementBrief(c *gin.Context) {
 	} else if cadence == "qbr" {
 		deadlineWindow = 180
 	}
-	leaseDeadlines, err := h.repo.ListCriticalDateBrief(ctx, legal, period, deadlineWindow)
+	leaseDeadlines, err := h.repo.ListCriticalDateBrief(ctx, entity, period, deadlineWindow)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -752,7 +810,12 @@ type actionInput struct {
 }
 
 func (h *OperatingFactsHandler) ListActions(c *gin.Context) {
-	rows, err := h.repo.ListActions(c.Request.Context(), middleware.GetTenantID(c), c.Query("period"), c.Query("status"), c.Query("category"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListActions(c.Request.Context(), entity, c.Query("period"), c.Query("status"), c.Query("category"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -826,7 +889,12 @@ func (h *OperatingFactsHandler) UpdateAction(c *gin.Context) {
 	} else if input.Status == "completed" {
 		verificationStatus = "pending"
 	}
-	result, err := h.repo.UpdateAction(c.Request.Context(), c.Param("id"), middleware.GetTenantID(c), userIDFromContext(c), repository.FPnAActionItem{Status: input.Status, OwnerName: input.OwnerName, DueDate: parseDatePointer(input.DueDate), HumanRootCause: input.HumanRootCause, PlannedAction: input.PlannedAction, ExpectedBenefit: input.ExpectedBenefit, VerificationPeriod: input.VerificationPeriod, VerifiedAmount: input.VerifiedAmount, VerificationStatus: verificationStatus})
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	result, err := h.repo.UpdateAction(c.Request.Context(), c.Param("id"), entity, userIDFromContext(c), repository.FPnAActionItem{Status: input.Status, OwnerName: input.OwnerName, DueDate: parseDatePointer(input.DueDate), HumanRootCause: input.HumanRootCause, PlannedAction: input.PlannedAction, ExpectedBenefit: input.ExpectedBenefit, VerificationPeriod: input.VerificationPeriod, VerifiedAmount: input.VerifiedAmount, VerificationStatus: verificationStatus})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -863,8 +931,13 @@ func (h *OperatingFactsHandler) BulkUpdateActions(c *gin.Context) {
 		return
 	}
 	updated := make([]*repository.FPnAActionItem, 0, len(input.IDs))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
 	for _, id := range input.IDs {
-		item, err := h.repo.UpdateAction(c.Request.Context(), id, middleware.GetTenantID(c), userIDFromContext(c), repository.FPnAActionItem{Status: input.Status, OwnerName: input.OwnerName, DueDate: parseDatePointer(input.DueDate), VerificationStatus: func() string {
+		item, err := h.repo.UpdateAction(c.Request.Context(), id, entity, userIDFromContext(c), repository.FPnAActionItem{Status: input.Status, OwnerName: input.OwnerName, DueDate: parseDatePointer(input.DueDate), VerificationStatus: func() string {
 			if input.Status == "completed" {
 				return "pending"
 			}
@@ -885,7 +958,12 @@ func (h *OperatingFactsHandler) BulkUpdateActions(c *gin.Context) {
 }
 
 func (h *OperatingFactsHandler) ExportActions(c *gin.Context) {
-	rows, err := h.repo.ListActions(c.Request.Context(), middleware.GetTenantID(c), c.Query("period"), c.Query("status"), c.Query("category"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListActions(c.Request.Context(), entity, c.Query("period"), c.Query("status"), c.Query("category"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -939,7 +1017,12 @@ type assumptionInput struct {
 }
 
 func (h *OperatingFactsHandler) ListAssumptions(c *gin.Context) {
-	rows, err := h.repo.ListAssumptions(c.Request.Context(), middleware.GetTenantID(c), c.Query("key"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListAssumptions(c.Request.Context(), entity, c.Query("key"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

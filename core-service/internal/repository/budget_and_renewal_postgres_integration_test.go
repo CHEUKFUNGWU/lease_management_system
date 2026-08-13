@@ -26,24 +26,24 @@ func TestBudgetTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed budget version: %v", err)
 	}
-	versionsA, err := repo.ListVersions(ctx, pair.entityA)
+	versionsA, err := repo.ListVersions(ctx, mustEntityFilter(t, pair.entityA))
 	if err != nil || len(versionsA) != 1 {
 		t.Fatalf("entity A budget versions = %d, err %v; want 1", len(versionsA), err)
 	}
-	versionsB, err := repo.ListVersions(ctx, pair.entityB)
+	versionsB, err := repo.ListVersions(ctx, mustEntityFilter(t, pair.entityB))
 	if err != nil || len(versionsB) != 0 {
 		t.Fatalf("entity B saw entity A budget versions: %d, err %v", len(versionsB), err)
 	}
-	if got, err := repo.GetVersion(ctx, createdVersion.ID, pair.entityA); err != nil || got == nil {
+	if got, err := repo.GetVersion(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityA)); err != nil || got == nil {
 		t.Fatalf("entity A GetVersion = %+v, err %v; want found", got, err)
 	}
-	if got, err := repo.GetVersion(ctx, createdVersion.ID, pair.entityB); err != nil || got != nil {
+	if got, err := repo.GetVersion(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityB)); err != nil || got != nil {
 		t.Fatalf("entity B GetVersion = %+v, err %v; want nil", got, err)
 	}
-	if allowed, err := repo.ContractAllowedForVersion(ctx, createdVersion.ID, pair.contractA, pair.entityA); err != nil || !allowed {
+	if allowed, err := repo.ContractAllowedForVersion(ctx, createdVersion.ID, pair.contractA, mustEntityFilter(t, pair.entityA)); err != nil || !allowed {
 		t.Fatalf("entity A ContractAllowedForVersion = %v, err %v; want true", allowed, err)
 	}
-	if allowed, err := repo.ContractAllowedForVersion(ctx, createdVersion.ID, pair.contractA, pair.entityB); err != nil || allowed {
+	if allowed, err := repo.ContractAllowedForVersion(ctx, createdVersion.ID, pair.contractA, mustEntityFilter(t, pair.entityB)); err != nil || allowed {
 		t.Fatalf("entity B ContractAllowedForVersion = %v, err %v; want false", allowed, err)
 	}
 
@@ -57,11 +57,11 @@ func TestBudgetTenantIsolationCharacterization(t *testing.T) {
 	`, pair.contractA).Scan(&ignored); err != nil {
 		t.Fatalf("seed measurement result: %v", err)
 	}
-	actualsA, err := repo.ActualsForPeriod(ctx, pair.entityA, "2026-07")
+	actualsA, err := repo.ActualsForPeriod(ctx, mustEntityFilter(t, pair.entityA), "2026-07")
 	if err != nil || len(actualsA) != 1 {
 		t.Fatalf("entity A actuals = %d, err %v; want 1", len(actualsA), err)
 	}
-	actualsB, err := repo.ActualsForPeriod(ctx, pair.entityB, "2026-07")
+	actualsB, err := repo.ActualsForPeriod(ctx, mustEntityFilter(t, pair.entityB), "2026-07")
 	if err != nil || len(actualsB) != 0 {
 		t.Fatalf("entity B saw entity A actuals: %d, err %v", len(actualsB), err)
 	}
@@ -85,19 +85,19 @@ func TestRenewalDecisionTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed renewal decision: %v", err)
 	}
-	rowsA, err := repo.List(ctx, pair.contractA, pair.entityA)
+	rowsA, err := repo.List(ctx, pair.contractA, mustEntityFilter(t, pair.entityA))
 	if err != nil || len(rowsA) != 1 || rowsA[0].ID != created.ID {
 		t.Fatalf("entity A renewal decisions = %d (id %s), err %v; want 1 matching row", len(rowsA), firstID(rowsA), err)
 	}
-	rowsB, err := repo.List(ctx, pair.contractA, pair.entityB)
+	rowsB, err := repo.List(ctx, pair.contractA, mustEntityFilter(t, pair.entityB))
 	if err != nil || len(rowsB) != 0 {
 		t.Fatalf("entity B saw entity A renewal decisions: %d, err %v", len(rowsB), err)
 	}
-	existsA, err := repo.Exists(ctx, pair.contractA, pair.entityA)
+	existsA, err := repo.Exists(ctx, pair.contractA, mustEntityFilter(t, pair.entityA))
 	if err != nil || !existsA {
 		t.Fatalf("entity A Exists = %v, err %v; want true", existsA, err)
 	}
-	existsB, err := repo.Exists(ctx, pair.contractA, pair.entityB)
+	existsB, err := repo.Exists(ctx, pair.contractA, mustEntityFilter(t, pair.entityB))
 	if err != nil || existsB {
 		t.Fatalf("entity B Exists = %v, err %v; want false", existsB, err)
 	}

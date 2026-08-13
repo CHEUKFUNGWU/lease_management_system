@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/closereadiness"
@@ -12,10 +13,10 @@ import (
 )
 
 type PerformanceReader interface {
-	Overview(context.Context, string, string) (*repository.PerformanceOverview, error)
-	ListStores(context.Context, string, string, string) ([]*repository.StoreOperatingFact, error)
-	ListEquipmentFacts(context.Context, string, string, string, string) ([]*repository.EquipmentOperatingFact, error)
-	ListActions(context.Context, string, string, string, string) ([]*repository.FPnAActionItem, error)
+	Overview(context.Context, access.EntityFilter, string) (*repository.PerformanceOverview, error)
+	ListStores(context.Context, access.EntityFilter, string, string) ([]*repository.StoreOperatingFact, error)
+	ListEquipmentFacts(context.Context, access.EntityFilter, string, string, string) ([]*repository.EquipmentOperatingFact, error)
+	ListActions(context.Context, access.EntityFilter, string, string, string) ([]*repository.FPnAActionItem, error)
 }
 
 type ActionDraftWriter interface {
@@ -305,7 +306,11 @@ func readPerformanceDefinition(name, display, description string, schema json.Ra
 
 func portfolioSummaryHandler(ctx context.Context, call agenttools.ToolCall, reader PerformanceReader, args PerformanceArguments) agenttools.ToolResult {
 	execution, _ := agenttools.RequireExecutionContext(ctx)
-	data, err := reader.Overview(ctx, execution.Principal.Scope.LegalEntityID, strings.TrimSpace(args.Period))
+	entity, ok := filterFromExecution(execution)
+	if !ok {
+		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "legal entity scope is required")
+	}
+	data, err := reader.Overview(ctx, entity, strings.TrimSpace(args.Period))
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to load portfolio summary")
 	}
@@ -314,11 +319,15 @@ func portfolioSummaryHandler(ctx context.Context, call agenttools.ToolCall, read
 
 func managementPreReadHandler(ctx context.Context, call agenttools.ToolCall, reader PerformanceReader, args PerformanceArguments) agenttools.ToolResult {
 	execution, _ := agenttools.RequireExecutionContext(ctx)
-	overview, err := reader.Overview(ctx, execution.Principal.Scope.LegalEntityID, args.Period)
+	entity, ok := filterFromExecution(execution)
+	if !ok {
+		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "legal entity scope is required")
+	}
+	overview, err := reader.Overview(ctx, entity, args.Period)
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to load management pre-read")
 	}
-	actions, err := reader.ListActions(ctx, execution.Principal.Scope.LegalEntityID, args.Period, "", "")
+	actions, err := reader.ListActions(ctx, entity, args.Period, "", "")
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to load pre-read actions")
 	}
@@ -334,7 +343,11 @@ func managementPreReadHandler(ctx context.Context, call agenttools.ToolCall, rea
 
 func storePerformanceHandler(ctx context.Context, call agenttools.ToolCall, reader PerformanceReader, args PerformanceArguments) agenttools.ToolResult {
 	execution, _ := agenttools.RequireExecutionContext(ctx)
-	rows, err := reader.ListStores(ctx, execution.Principal.Scope.LegalEntityID, args.Period, args.StoreID)
+	entity, ok := filterFromExecution(execution)
+	if !ok {
+		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "legal entity scope is required")
+	}
+	rows, err := reader.ListStores(ctx, entity, args.Period, args.StoreID)
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to load store performance")
 	}
@@ -349,7 +362,11 @@ func storePerformanceHandler(ctx context.Context, call agenttools.ToolCall, read
 
 func rentToSalesHandler(ctx context.Context, call agenttools.ToolCall, reader PerformanceReader, args PerformanceArguments) agenttools.ToolResult {
 	execution, _ := agenttools.RequireExecutionContext(ctx)
-	rows, err := reader.ListStores(ctx, execution.Principal.Scope.LegalEntityID, args.Period, args.StoreID)
+	entity, ok := filterFromExecution(execution)
+	if !ok {
+		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "legal entity scope is required")
+	}
+	rows, err := reader.ListStores(ctx, entity, args.Period, args.StoreID)
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to load rent-to-sales facts")
 	}
@@ -365,7 +382,11 @@ func rentToSalesHandler(ctx context.Context, call agenttools.ToolCall, reader Pe
 
 func equipmentPerformanceHandler(ctx context.Context, call agenttools.ToolCall, reader PerformanceReader, args PerformanceArguments) agenttools.ToolResult {
 	execution, _ := agenttools.RequireExecutionContext(ctx)
-	rows, err := reader.ListEquipmentFacts(ctx, execution.Principal.Scope.LegalEntityID, args.Period, args.Plant, args.Line)
+	entity, ok := filterFromExecution(execution)
+	if !ok {
+		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "legal entity scope is required")
+	}
+	rows, err := reader.ListEquipmentFacts(ctx, entity, args.Period, args.Plant, args.Line)
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to load equipment performance")
 	}
@@ -386,7 +407,11 @@ func equipmentPerformanceHandler(ctx context.Context, call agenttools.ToolCall, 
 
 func actionListHandler(ctx context.Context, call agenttools.ToolCall, reader PerformanceReader, args PerformanceArguments) agenttools.ToolResult {
 	execution, _ := agenttools.RequireExecutionContext(ctx)
-	rows, err := reader.ListActions(ctx, execution.Principal.Scope.LegalEntityID, args.Period, args.Status, args.Category)
+	entity, ok := filterFromExecution(execution)
+	if !ok {
+		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "legal entity scope is required")
+	}
+	rows, err := reader.ListActions(ctx, entity, args.Period, args.Status, args.Category)
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to load FP&A actions")
 	}
@@ -414,4 +439,15 @@ func performanceDefault(value, fallback string) string {
 		return fallback
 	}
 	return strings.TrimSpace(value)
+}
+
+// filterFromExecution derives the legal-entity filter from the agent's
+// execution scope. It fails closed: a missing scope or a non-global scope
+// without a legal entity must never degrade into an unfiltered query.
+func filterFromExecution(execution agenttools.ExecutionContext) (access.EntityFilter, bool) {
+	filter, err := access.FromScope(execution.Principal.Scope)
+	if err != nil {
+		return access.EntityFilter{}, false
+	}
+	return filter, true
 }

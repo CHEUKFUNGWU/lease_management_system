@@ -212,11 +212,17 @@ func NewFPnAGovernanceRepository(db DBTX) *FPnAGovernanceRepository {
 	return &FPnAGovernanceRepository{db: db}
 }
 
-func (r *FPnAGovernanceRepository) ActionInScope(ctx context.Context, actionID, legalEntityID string) (bool, error) {
+func (r *FPnAGovernanceRepository) ActionInScope(ctx context.Context, actionID string, entity access.EntityFilter) (bool, error) {
 	var exists bool
-	query := `SELECT EXISTS (SELECT 1 FROM fpna_action_items WHERE id=$1 AND ($2='' OR legal_entity_id::text=$2)`
-	args := []any{actionID, legalEntityID}
-	query, args, _ = appendActionScopePredicate(ctx, query, args, 3)
+	args := []any{actionID}
+	query := `SELECT EXISTS (SELECT 1 FROM fpna_action_items WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return false, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendActionScopePredicate(ctx, query, args, len(args)+1)
 	query += `)`
 	err := r.db.QueryRow(ctx, query, args...).Scan(&exists)
 	return exists, err
@@ -242,8 +248,17 @@ func (r *FPnAGovernanceRepository) CreatePlanVersion(ctx context.Context, item *
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListPlanVersions(ctx context.Context, legalEntityID, versionType string) ([]*FPnAPlanVersion, error) {
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR version_type=$2) ORDER BY as_of_period DESC,created_at DESC LIMIT 500`, legalEntityID, versionType)
+func (r *FPnAGovernanceRepository) ListPlanVersions(ctx context.Context, entity access.EntityFilter, versionType string) ([]*FPnAPlanVersion, error) {
+	args := []any{versionType}
+	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE ($1='' OR version_type=$1)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY as_of_period DESC,created_at DESC LIMIT 500`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list FP&A plan versions: %w", err)
 	}
@@ -259,9 +274,17 @@ func (r *FPnAGovernanceRepository) ListPlanVersions(ctx context.Context, legalEn
 	return result, rows.Err()
 }
 
-func (r *FPnAGovernanceRepository) GetPlanVersion(ctx context.Context, id, legalEntityID string) (*FPnAPlanVersion, error) {
+func (r *FPnAGovernanceRepository) GetPlanVersion(ctx context.Context, id string, entity access.EntityFilter) (*FPnAPlanVersion, error) {
 	item := &FPnAPlanVersion{}
-	err := r.db.QueryRow(ctx, `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE id=$1 AND ($2='' OR legal_entity_id::text=$2)`, id, legalEntityID).Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
+	args := []any{id}
+	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -271,13 +294,22 @@ func (r *FPnAGovernanceRepository) GetPlanVersion(ctx context.Context, id, legal
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) FreezePlanVersion(ctx context.Context, id, legalEntityID, userID string, official bool) (*FPnAPlanVersion, error) {
+func (r *FPnAGovernanceRepository) FreezePlanVersion(ctx context.Context, id string, entity access.EntityFilter, userID string, official bool) (*FPnAPlanVersion, error) {
 	item := &FPnAPlanVersion{}
 	status := "approved"
 	if official {
 		status = "official"
 	}
-	err := r.db.QueryRow(ctx, `UPDATE fpna_plan_versions SET status=$3,is_official=$4,frozen_at=NOW(),approved_at=NOW() WHERE id=$1 AND ($2='' OR legal_entity_id::text=$2) AND status IN ('draft','review','approved') RETURNING id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at`, id, legalEntityID, status, official).Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
+	args := []any{id, status, official}
+	query := `UPDATE fpna_plan_versions SET status=$2,is_official=$3,frozen_at=NOW(),approved_at=NOW() WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` AND status IN ('draft','review','approved') RETURNING id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -310,14 +342,20 @@ func (r *FPnAGovernanceRepository) CreatePlanLine(ctx context.Context, item *FPn
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListPlanLines(ctx context.Context, planID, legalEntityID, period, grain string) ([]*FPnAPlanLine, error) {
-	return r.ListPlanLinesFiltered(ctx, planID, legalEntityID, period, grain, nil)
+func (r *FPnAGovernanceRepository) ListPlanLines(ctx context.Context, planID string, entity access.EntityFilter, period, grain string) ([]*FPnAPlanLine, error) {
+	return r.ListPlanLinesFiltered(ctx, planID, entity, period, grain, nil)
 }
 
-func (r *FPnAGovernanceRepository) ListPlanLinesFiltered(ctx context.Context, planID, legalEntityID, period, grain string, filters map[string]string) ([]*FPnAPlanLine, error) {
-	args := []any{planID, legalEntityID, period, grain}
-	query := `SELECT l.id,l.plan_version_id,l.period,l.grain,l.legal_entity_id,COALESCE(l.business_segment,''),COALESCE(l.brand,''),COALESCE(l.region,''),l.store_id,COALESCE(l.plant_code,''),COALESCE(l.production_line_code,''),l.equipment_id,COALESCE(l.asset_type,''),l.currency,l.revenue,l.gross_profit,l.labor_cost,l.fixed_rent,l.variable_rent,l.non_lease_cost,l.four_wall_ebitda,l.cash_flow,l.net_debt,l.operational_kpis,l.source_system,COALESCE(l.source_record_id,''),l.as_of_at,l.actual_flag,l.forecast_flag,l.scenario_inputs FROM fpna_plan_lines l JOIN fpna_plan_versions v ON v.id=l.plan_version_id WHERE l.plan_version_id=$1 AND ($2='' OR v.legal_entity_id::text=$2) AND ($3='' OR l.period=$3) AND ($4='' OR l.grain=$4)`
-	query, args, _ = appendPlanScopePredicate(ctx, query, args, 5)
+func (r *FPnAGovernanceRepository) ListPlanLinesFiltered(ctx context.Context, planID string, entity access.EntityFilter, period, grain string, filters map[string]string) ([]*FPnAPlanLine, error) {
+	args := []any{planID, period, grain}
+	query := `SELECT l.id,l.plan_version_id,l.period,l.grain,l.legal_entity_id,COALESCE(l.business_segment,''),COALESCE(l.brand,''),COALESCE(l.region,''),l.store_id,COALESCE(l.plant_code,''),COALESCE(l.production_line_code,''),l.equipment_id,COALESCE(l.asset_type,''),l.currency,l.revenue,l.gross_profit,l.labor_cost,l.fixed_rent,l.variable_rent,l.non_lease_cost,l.four_wall_ebitda,l.cash_flow,l.net_debt,l.operational_kpis,l.source_system,COALESCE(l.source_record_id,''),l.as_of_at,l.actual_flag,l.forecast_flag,l.scenario_inputs FROM fpna_plan_lines l JOIN fpna_plan_versions v ON v.id=l.plan_version_id WHERE l.plan_version_id=$1 AND ($2='' OR l.period=$2) AND ($3='' OR l.grain=$3)`
+	if clause, arg, err := entity.SQLClause("v.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendPlanScopePredicate(ctx, query, args, len(args)+1)
 	for _, filter := range []struct{ key, column string }{{"business_segment", "l.business_segment"}, {"brand", "l.brand"}, {"region", "l.region"}, {"store_id", "l.store_id::text"}, {"plant", "l.plant_code"}, {"line", "l.production_line_code"}, {"equipment_id", "l.equipment_id::text"}, {"asset_type", "l.asset_type"}, {"currency", "l.currency"}} {
 		if value := strings.TrimSpace(filters[filter.key]); value != "" {
 			query += fmt.Sprintf(" AND %s=$%d", filter.column, len(args)+1)
@@ -396,11 +434,17 @@ func (r *FPnAGovernanceRepository) CreateMapping(ctx context.Context, item *FPnA
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListMappings(ctx context.Context, legalEntityID, mappingType, effectiveDate string) ([]*FPnAMasterDataMapping, error) {
-	args := []any{legalEntityID, mappingType}
-	query := `SELECT id,legal_entity_id,mapping_type,external_system,external_id,COALESCE(external_name,''),COALESCE(alias,''),target_id,COALESCE(target_code,''),effective_from,effective_to,status,evidence,created_by,created_at FROM fpna_master_data_mappings WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR mapping_type=$2)`
+func (r *FPnAGovernanceRepository) ListMappings(ctx context.Context, entity access.EntityFilter, mappingType, effectiveDate string) ([]*FPnAMasterDataMapping, error) {
+	args := []any{mappingType}
+	query := `SELECT id,legal_entity_id,mapping_type,external_system,external_id,COALESCE(external_name,''),COALESCE(alias,''),target_id,COALESCE(target_code,''),effective_from,effective_to,status,evidence,created_by,created_at FROM fpna_master_data_mappings WHERE ($1='' OR mapping_type=$1)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
 	if effectiveDate != "" {
-		query += ` AND effective_from <= $3 AND (effective_to IS NULL OR effective_to >= $3)`
+		query += fmt.Sprintf(" AND effective_from <= $%d AND (effective_to IS NULL OR effective_to >= $%d)", len(args)+1, len(args)+1)
 		args = append(args, effectiveDate)
 	}
 	query += ` ORDER BY mapping_type,effective_from DESC,external_id LIMIT 2000`
@@ -423,15 +467,23 @@ func (r *FPnAGovernanceRepository) ListMappings(ctx context.Context, legalEntity
 // ResolveMapping is used by controlled fact imports. It accepts an external
 // id or governed alias, applies the effective-date window, and refuses
 // ambiguous matches instead of silently choosing one.
-func (r *FPnAGovernanceRepository) ResolveMapping(ctx context.Context, legalEntityID, mappingType, externalSystem, key, effectiveDate string) (*FPnAMasterDataMapping, error) {
+func (r *FPnAGovernanceRepository) ResolveMapping(ctx context.Context, entity access.EntityFilter, mappingType, externalSystem, key, effectiveDate string) (*FPnAMasterDataMapping, error) {
 	if strings.TrimSpace(key) == "" {
 		return nil, nil
 	}
 	if effectiveDate == "" {
 		effectiveDate = time.Now().UTC().Format("2006-01-02")
 	}
-	args := []any{legalEntityID, mappingType, externalSystem, key, effectiveDate}
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,mapping_type,external_system,external_id,COALESCE(external_name,''),COALESCE(alias,''),target_id,COALESCE(target_code,''),effective_from,effective_to,status,evidence,created_by,created_at FROM fpna_master_data_mappings WHERE ($1='' OR legal_entity_id::text=$1) AND mapping_type=$2 AND ($3='' OR external_system=$3) AND (external_id=$4 OR alias=$4 OR external_name=$4) AND effective_from <= $5::date AND (effective_to IS NULL OR effective_to >= $5::date) AND status IN ('approved','active') ORDER BY effective_from DESC,created_at DESC LIMIT 2`, args...)
+	args := []any{mappingType, externalSystem, key, effectiveDate}
+	query := `SELECT id,legal_entity_id,mapping_type,external_system,external_id,COALESCE(external_name,''),COALESCE(alias,''),target_id,COALESCE(target_code,''),effective_from,effective_to,status,evidence,created_by,created_at FROM fpna_master_data_mappings WHERE mapping_type=$1 AND ($2='' OR external_system=$2) AND (external_id=$3 OR alias=$3 OR external_name=$3) AND effective_from <= $4::date AND (effective_to IS NULL OR effective_to >= $4::date) AND status IN ('approved','active')`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY effective_from DESC,created_at DESC LIMIT 2`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve master-data mapping: %w", err)
 	}
@@ -476,8 +528,17 @@ func (r *FPnAGovernanceRepository) CreateDataQuality(ctx context.Context, item *
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListDataQuality(ctx context.Context, legalEntityID, period, status string) ([]*FPnADataQualityItem, error) {
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,batch_id,COALESCE(period,''),dimension,category,severity,source_table,source_record_id,data_version,description,status,evidence,created_by,created_at,resolved_at FROM fpna_data_quality_items WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR period=$2) AND ($3='' OR status=$3) ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,created_at DESC LIMIT 2000`, legalEntityID, period, status)
+func (r *FPnAGovernanceRepository) ListDataQuality(ctx context.Context, entity access.EntityFilter, period, status string) ([]*FPnADataQualityItem, error) {
+	args := []any{period, status}
+	query := `SELECT id,legal_entity_id,batch_id,COALESCE(period,''),dimension,category,severity,source_table,source_record_id,data_version,description,status,evidence,created_by,created_at,resolved_at FROM fpna_data_quality_items WHERE ($1='' OR period=$1) AND ($2='' OR status=$2)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,created_at DESC LIMIT 2000`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list data-quality items: %w", err)
 	}
@@ -493,9 +554,18 @@ func (r *FPnAGovernanceRepository) ListDataQuality(ctx context.Context, legalEnt
 	return result, rows.Err()
 }
 
-func (r *FPnAGovernanceRepository) UpdateDataQualityStatus(ctx context.Context, id, legalEntityID, status string) (*FPnADataQualityItem, error) {
+func (r *FPnAGovernanceRepository) UpdateDataQualityStatus(ctx context.Context, id string, entity access.EntityFilter, status string) (*FPnADataQualityItem, error) {
 	item := &FPnADataQualityItem{}
-	err := r.db.QueryRow(ctx, `UPDATE fpna_data_quality_items SET status=$3,resolved_at=CASE WHEN $3 IN ('resolved','accepted') THEN NOW() ELSE NULL END WHERE id=$1 AND ($2='' OR legal_entity_id::text=$2) AND status IN ('open','acknowledged') RETURNING id,legal_entity_id,batch_id,COALESCE(period,''),dimension,category,severity,source_table,source_record_id,data_version,description,status,evidence,created_by,created_at,resolved_at`, id, legalEntityID, status).Scan(&item.ID, &item.LegalEntityID, &item.BatchID, &item.Period, &item.Dimension, &item.Category, &item.Severity, &item.SourceTable, &item.SourceRecordID, &item.DataVersion, &item.Description, &item.Status, &item.Evidence, &item.CreatedBy, &item.CreatedAt, &item.ResolvedAt)
+	args := []any{id, status}
+	query := `UPDATE fpna_data_quality_items SET status=$2,resolved_at=CASE WHEN $2 IN ('resolved','accepted') THEN NOW() ELSE NULL END WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` AND status IN ('open','acknowledged') RETURNING id,legal_entity_id,batch_id,COALESCE(period,''),dimension,category,severity,source_table,source_record_id,data_version,description,status,evidence,created_by,created_at,resolved_at`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.BatchID, &item.Period, &item.Dimension, &item.Category, &item.Severity, &item.SourceTable, &item.SourceRecordID, &item.DataVersion, &item.Description, &item.Status, &item.Evidence, &item.CreatedBy, &item.CreatedAt, &item.ResolvedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -550,7 +620,11 @@ func (r *FPnAGovernanceRepository) CreateMemo(ctx context.Context, item *FPnADec
 		item.Status = "draft"
 	}
 	if item.IdempotencyKey != "" {
-		existing, existingErr := r.GetMemoByIdempotency(ctx, item.LegalEntityID, item.IdempotencyKey)
+		filter, filterErr := entityFilterForOptional(item.LegalEntityID)
+		if filterErr != nil {
+			return nil, filterErr
+		}
+		existing, existingErr := r.GetMemoByIdempotency(ctx, filter, item.IdempotencyKey)
 		if existingErr != nil {
 			return nil, existingErr
 		}
@@ -570,13 +644,18 @@ func (r *FPnAGovernanceRepository) CreateMemo(ctx context.Context, item *FPnADec
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) GetMemoByIdempotency(ctx context.Context, legalEntityID *string, key string) (*FPnADecisionMemo, error) {
+func (r *FPnAGovernanceRepository) GetMemoByIdempotency(ctx context.Context, entity access.EntityFilter, key string) (*FPnADecisionMemo, error) {
 	item := &FPnADecisionMemo{}
-	entity := ""
-	if legalEntityID != nil {
-		entity = *legalEntityID
+	args := []any{key}
+	query := `SELECT id,legal_entity_id,memo_type,title,basis,status,scenario_draft_id,system_facts,deterministic_calculations,human_inputs,ai_narrative,source_references,data_version,assumption_version,metric_definition_version,COALESCE(idempotency_key,''),created_by,created_at,updated_at,reviewed_by,reviewed_at FROM fpna_decision_memos WHERE idempotency_key=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
 	}
-	err := r.db.QueryRow(ctx, `SELECT id,legal_entity_id,memo_type,title,basis,status,scenario_draft_id,system_facts,deterministic_calculations,human_inputs,ai_narrative,source_references,data_version,assumption_version,metric_definition_version,COALESCE(idempotency_key,''),created_by,created_at,updated_at,reviewed_by,reviewed_at FROM fpna_decision_memos WHERE ($1='' OR legal_entity_id::text=$1) AND idempotency_key=$2 LIMIT 1`, entity, key).Scan(&item.ID, &item.LegalEntityID, &item.MemoType, &item.Title, &item.Basis, &item.Status, &item.ScenarioDraftID, &item.SystemFacts, &item.DeterministicCalculations, &item.HumanInputs, &item.AINarrative, &item.SourceReferences, &item.DataVersion, &item.AssumptionVersion, &item.MetricDefinitionVersion, &item.IdempotencyKey, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt, &item.ReviewedBy, &item.ReviewedAt)
+	query += ` LIMIT 1`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.MemoType, &item.Title, &item.Basis, &item.Status, &item.ScenarioDraftID, &item.SystemFacts, &item.DeterministicCalculations, &item.HumanInputs, &item.AINarrative, &item.SourceReferences, &item.DataVersion, &item.AssumptionVersion, &item.MetricDefinitionVersion, &item.IdempotencyKey, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt, &item.ReviewedBy, &item.ReviewedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -586,8 +665,17 @@ func (r *FPnAGovernanceRepository) GetMemoByIdempotency(ctx context.Context, leg
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListMemos(ctx context.Context, legalEntityID, memoType, status string) ([]*FPnADecisionMemo, error) {
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,memo_type,title,basis,status,scenario_draft_id,system_facts,deterministic_calculations,human_inputs,ai_narrative,source_references,data_version,assumption_version,metric_definition_version,COALESCE(idempotency_key,''),created_by,created_at,updated_at,reviewed_by,reviewed_at FROM fpna_decision_memos WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR memo_type=$2) AND ($3='' OR status=$3) ORDER BY created_at DESC LIMIT 500`, legalEntityID, memoType, status)
+func (r *FPnAGovernanceRepository) ListMemos(ctx context.Context, entity access.EntityFilter, memoType, status string) ([]*FPnADecisionMemo, error) {
+	args := []any{memoType, status}
+	query := `SELECT id,legal_entity_id,memo_type,title,basis,status,scenario_draft_id,system_facts,deterministic_calculations,human_inputs,ai_narrative,source_references,data_version,assumption_version,metric_definition_version,COALESCE(idempotency_key,''),created_by,created_at,updated_at,reviewed_by,reviewed_at FROM fpna_decision_memos WHERE ($1='' OR memo_type=$1) AND ($2='' OR status=$2)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY created_at DESC LIMIT 500`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -603,9 +691,18 @@ func (r *FPnAGovernanceRepository) ListMemos(ctx context.Context, legalEntityID,
 	return result, rows.Err()
 }
 
-func (r *FPnAGovernanceRepository) UpdateMemoStatus(ctx context.Context, id, legalEntityID, userID, status string) (*FPnADecisionMemo, error) {
+func (r *FPnAGovernanceRepository) UpdateMemoStatus(ctx context.Context, id string, entity access.EntityFilter, userID, status string) (*FPnADecisionMemo, error) {
 	item := &FPnADecisionMemo{}
-	err := r.db.QueryRow(ctx, `UPDATE fpna_decision_memos SET status=$3,reviewed_by=NULLIF($4,'')::uuid,reviewed_at=NOW(),updated_at=NOW() WHERE id=$1 AND ($2='' OR legal_entity_id::text=$2) AND status IN ('draft','review') RETURNING id,legal_entity_id,memo_type,title,basis,status,scenario_draft_id,system_facts,deterministic_calculations,human_inputs,ai_narrative,source_references,data_version,assumption_version,metric_definition_version,COALESCE(idempotency_key,''),created_by,created_at,updated_at,reviewed_by,reviewed_at`, id, legalEntityID, status, userID).Scan(&item.ID, &item.LegalEntityID, &item.MemoType, &item.Title, &item.Basis, &item.Status, &item.ScenarioDraftID, &item.SystemFacts, &item.DeterministicCalculations, &item.HumanInputs, &item.AINarrative, &item.SourceReferences, &item.DataVersion, &item.AssumptionVersion, &item.MetricDefinitionVersion, &item.IdempotencyKey, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt, &item.ReviewedBy, &item.ReviewedAt)
+	args := []any{id, status, userID}
+	query := `UPDATE fpna_decision_memos SET status=$2,reviewed_by=NULLIF($3,'')::uuid,reviewed_at=NOW(),updated_at=NOW() WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` AND status IN ('draft','review') RETURNING id,legal_entity_id,memo_type,title,basis,status,scenario_draft_id,system_facts,deterministic_calculations,human_inputs,ai_narrative,source_references,data_version,assumption_version,metric_definition_version,COALESCE(idempotency_key,''),created_by,created_at,updated_at,reviewed_by,reviewed_at`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.MemoType, &item.Title, &item.Basis, &item.Status, &item.ScenarioDraftID, &item.SystemFacts, &item.DeterministicCalculations, &item.HumanInputs, &item.AINarrative, &item.SourceReferences, &item.DataVersion, &item.AssumptionVersion, &item.MetricDefinitionVersion, &item.IdempotencyKey, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt, &item.ReviewedBy, &item.ReviewedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -638,8 +735,17 @@ func (r *FPnAGovernanceRepository) CreateReportArtifact(ctx context.Context, ite
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListReportArtifacts(ctx context.Context, legalEntityID, reportType, period, basis string) ([]*FPnAReportArtifact, error) {
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,report_type,view_type,period,basis,format,status,payload,source_metadata,COALESCE(manifest_sha256,''),data_version,assumption_version,metric_definition_version,generated_by,generated_at FROM fpna_report_artifacts WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR report_type=$2) AND ($3='' OR period=$3) AND ($4='' OR basis=$4) ORDER BY generated_at DESC LIMIT 500`, legalEntityID, reportType, period, basis)
+func (r *FPnAGovernanceRepository) ListReportArtifacts(ctx context.Context, entity access.EntityFilter, reportType, period, basis string) ([]*FPnAReportArtifact, error) {
+	args := []any{reportType, period, basis}
+	query := `SELECT id,legal_entity_id,report_type,view_type,period,basis,format,status,payload,source_metadata,COALESCE(manifest_sha256,''),data_version,assumption_version,metric_definition_version,generated_by,generated_at FROM fpna_report_artifacts WHERE ($1='' OR report_type=$1) AND ($2='' OR period=$2) AND ($3='' OR basis=$3)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY generated_at DESC LIMIT 500`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -655,9 +761,17 @@ func (r *FPnAGovernanceRepository) ListReportArtifacts(ctx context.Context, lega
 	return result, rows.Err()
 }
 
-func (r *FPnAGovernanceRepository) GetReportArtifact(ctx context.Context, id, legalEntityID string) (*FPnAReportArtifact, error) {
+func (r *FPnAGovernanceRepository) GetReportArtifact(ctx context.Context, id string, entity access.EntityFilter) (*FPnAReportArtifact, error) {
 	item := &FPnAReportArtifact{}
-	err := r.db.QueryRow(ctx, `SELECT id,legal_entity_id,report_type,view_type,period,basis,format,status,payload,source_metadata,COALESCE(manifest_sha256,''),data_version,assumption_version,metric_definition_version,generated_by,generated_at FROM fpna_report_artifacts WHERE id=$1 AND ($2='' OR legal_entity_id::text=$2)`, id, legalEntityID).Scan(&item.ID, &item.LegalEntityID, &item.ReportType, &item.ViewType, &item.Period, &item.Basis, &item.Format, &item.Status, &item.Payload, &item.SourceMetadata, &item.ManifestSHA256, &item.DataVersion, &item.AssumptionVersion, &item.MetricDefinitionVersion, &item.GeneratedBy, &item.GeneratedAt)
+	args := []any{id}
+	query := `SELECT id,legal_entity_id,report_type,view_type,period,basis,format,status,payload,source_metadata,COALESCE(manifest_sha256,''),data_version,assumption_version,metric_definition_version,generated_by,generated_at FROM fpna_report_artifacts WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.ReportType, &item.ViewType, &item.Period, &item.Basis, &item.Format, &item.Status, &item.Payload, &item.SourceMetadata, &item.ManifestSHA256, &item.DataVersion, &item.AssumptionVersion, &item.MetricDefinitionVersion, &item.GeneratedBy, &item.GeneratedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -721,8 +835,17 @@ func (r *FPnAGovernanceRepository) CreateAgentSignal(ctx context.Context, item *
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListAgentSignals(ctx context.Context, legalEntityID, period, status string) ([]*FPnAAgentSignal, error) {
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,COALESCE(period,''),rule_code,severity,source_table,source_record_id,data_version,signal,status,created_at FROM fpna_agent_signals WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR period=$2) AND ($3='' OR status=$3) ORDER BY created_at DESC LIMIT 1000`, legalEntityID, period, status)
+func (r *FPnAGovernanceRepository) ListAgentSignals(ctx context.Context, entity access.EntityFilter, period, status string) ([]*FPnAAgentSignal, error) {
+	args := []any{period, status}
+	query := `SELECT id,legal_entity_id,COALESCE(period,''),rule_code,severity,source_table,source_record_id,data_version,signal,status,created_at FROM fpna_agent_signals WHERE ($1='' OR period=$1) AND ($2='' OR status=$2)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY created_at DESC LIMIT 1000`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

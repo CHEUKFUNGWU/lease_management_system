@@ -52,7 +52,11 @@ func (r *OperatingFactsRepository) CreateScenarioAction(ctx context.Context, ite
 	if item.IdempotencyKey == "" {
 		return nil, false, ErrRetailScenarioActionScopeConflict
 	}
-	existing, lookupErr := r.GetActionByIdempotency(ctx, item.LegalEntityID, item.IdempotencyKey)
+	filter, filterErr := entityFilterForOptional(item.LegalEntityID)
+	if filterErr != nil {
+		return nil, false, filterErr
+	}
+	existing, lookupErr := r.GetActionByIdempotency(ctx, filter, item.IdempotencyKey)
 	if lookupErr != nil {
 		return nil, false, lookupErr
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 // BudgetVersion is a frozen measurement snapshot used as the plan to compare
@@ -105,16 +106,23 @@ func (r *BudgetRepository) CreateVersion(ctx context.Context, version *BudgetVer
 }
 
 // ListVersions returns budget versions, newest first.
-func (r *BudgetRepository) ListVersions(ctx context.Context, legalEntityID string) ([]*BudgetVersion, error) {
+func (r *BudgetRepository) ListVersions(ctx context.Context, entity access.EntityFilter) ([]*BudgetVersion, error) {
 	query := `
 		SELECT id, name, legal_entity_id, version_type, source, coverage_scope, is_official,
 			as_of_period, from_period, to_period, contract_count, created_by, created_at
-		FROM budget_versions
-		WHERE ($1 = '' OR legal_entity_id::text = $1)
+		FROM budget_versions`
+	args := []any{}
+	if clause, arg, err := entity.SQLClause("legal_entity_id", 1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " WHERE " + clause
+		args = append(args, arg)
+	}
+	query += `
 		ORDER BY created_at DESC
 		LIMIT 100
 	`
-	rows, err := r.db.Query(ctx, query, legalEntityID)
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list budget versions: %w", err)
 	}
@@ -134,14 +142,21 @@ func (r *BudgetRepository) ListVersions(ctx context.Context, legalEntityID strin
 }
 
 // GetVersion returns a version inside the caller's legal-entity scope.
-func (r *BudgetRepository) GetVersion(ctx context.Context, versionID, legalEntityID string) (*BudgetVersion, error) {
+func (r *BudgetRepository) GetVersion(ctx context.Context, versionID string, entity access.EntityFilter) (*BudgetVersion, error) {
 	version := &BudgetVersion{}
-	err := r.db.QueryRow(ctx, `
+	args := []any{versionID}
+	query := `
 		SELECT id, name, legal_entity_id, version_type, source, coverage_scope, is_official,
 			as_of_period, from_period, to_period, contract_count, created_by, created_at
 		FROM budget_versions
-		WHERE id = $1 AND ($2 = '' OR legal_entity_id::text = $2)
-	`, versionID, legalEntityID).Scan(
+		WHERE id = $1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&version.ID, &version.Name, &version.LegalEntityID, &version.VersionType,
 		&version.Source, &version.CoverageScope, &version.IsOfficial,
 		&version.AsOfPeriod, &version.FromPeriod, &version.ToPeriod,
@@ -195,7 +210,7 @@ func (r *BudgetRepository) LinesForPeriod(ctx context.Context, versionID, period
 
 // ActualsForPeriod returns the measured lease cost per contract for one period,
 // which is what the close actually produced.
-func (r *BudgetRepository) ActualsForPeriod(ctx context.Context, legalEntityID, period string) ([]BudgetContractPeriod, error) {
+func (r *BudgetRepository) ActualsForPeriod(ctx context.Context, entity access.EntityFilter, period string) ([]BudgetContractPeriod, error) {
 	query := `
 		SELECT mr.contract_id, COALESCE(c.contract_number, ''), COALESCE(c.contract_name, ''),
 			COALESCE(c.currency, ''), mr.interest_expense + mr.depreciation, mr.total_payment
@@ -204,13 +219,13 @@ func (r *BudgetRepository) ActualsForPeriod(ctx context.Context, legalEntityID, 
 		WHERE mr.accounting_period = $1
 	`
 	args := []interface{}{period}
-	argIdx := 2
-	if legalEntityID != "" {
-		query += fmt.Sprintf(" AND c.legal_entity_id = $%d", argIdx)
-		args = append(args, legalEntityID)
-		argIdx++
+	if clause, arg, err := entity.SQLClause("c.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
 	}
-	query, args, _ = appendContractScopePredicate(ctx, query, args, argIdx, "c")
+	query, args, _ = appendContractScopePredicate(ctx, query, args, len(args)+1, "c")
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -260,18 +275,26 @@ func (r *BudgetRepository) ListVarianceActions(ctx context.Context, versionID, p
 // explanation to a contract outside the version's tenant scope. New leases
 // may not have a budget line, so the check is intentionally about the legal
 // entity rather than line membership.
-func (r *BudgetRepository) ContractAllowedForVersion(ctx context.Context, versionID, contractID, legalEntityID string) (bool, error) {
+func (r *BudgetRepository) ContractAllowedForVersion(ctx context.Context, versionID, contractID string, entity access.EntityFilter) (bool, error) {
 	var allowed bool
-	err := r.db.QueryRow(ctx, `
+	args := []any{versionID, contractID}
+	query := `
 		SELECT EXISTS (
 			SELECT 1
 			FROM budget_versions v
 			JOIN lease_contracts c ON c.id = $2
-			WHERE v.id = $1
-			  AND ($3 = '' OR v.legal_entity_id::text = $3)
-			  AND (v.legal_entity_id IS NULL OR c.legal_entity_id = v.legal_entity_id)
+			WHERE v.id = $1`
+	if clause, arg, err := entity.SQLClause("v.legal_entity_id", len(args)+1); err != nil {
+		return false, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += `
+		  AND (v.legal_entity_id IS NULL OR c.legal_entity_id = v.legal_entity_id)
 		)
-	`, versionID, contractID, legalEntityID).Scan(&allowed)
+	`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&allowed)
 	if err != nil {
 		return false, fmt.Errorf("failed to validate variance action scope: %w", err)
 	}

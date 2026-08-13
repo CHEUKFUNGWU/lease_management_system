@@ -29,11 +29,11 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 		t.Fatalf("seed batch: %v", err)
 	}
 	_ = createdBatch
-	batchesA, err := repo.ListBatches(ctx, pair.entityA, "")
+	batchesA, err := repo.ListBatches(ctx, mustEntityFilter(t, pair.entityA), "")
 	if err != nil || len(batchesA) != 1 {
 		t.Fatalf("entity A batches = %d, err %v; want 1", len(batchesA), err)
 	}
-	batchesB, err := repo.ListBatches(ctx, pair.entityB, "")
+	batchesB, err := repo.ListBatches(ctx, mustEntityFilter(t, pair.entityB), "")
 	if err != nil || len(batchesB) != 0 {
 		t.Fatalf("entity B saw entity A batches: %d, err %v", len(batchesB), err)
 	}
@@ -46,11 +46,11 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 	if _, err := repo.UpsertStore(ctx, storeFact); err != nil {
 		t.Fatalf("seed store fact: %v", err)
 	}
-	storesA, err := repo.ListStores(ctx, pair.entityA, "2026-07", "")
+	storesA, err := repo.ListStores(ctx, mustEntityFilter(t, pair.entityA), "2026-07", "")
 	if err != nil || len(storesA) != 1 {
 		t.Fatalf("entity A store facts = %d, err %v; want 1", len(storesA), err)
 	}
-	storesB, err := repo.ListStores(ctx, pair.entityB, "2026-07", "")
+	storesB, err := repo.ListStores(ctx, mustEntityFilter(t, pair.entityB), "2026-07", "")
 	if err != nil || len(storesB) != 0 {
 		t.Fatalf("entity B saw entity A store facts: %d, err %v", len(storesB), err)
 	}
@@ -58,11 +58,11 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT code FROM stores WHERE id = $1`, pair.storeA).Scan(&storeACode); err != nil {
 		t.Fatalf("read store code: %v", err)
 	}
-	resolvedA, err := repo.ResolveStoreIDByCode(ctx, pair.entityA, storeACode)
+	resolvedA, err := repo.ResolveStoreIDByCode(ctx, mustEntityFilter(t, pair.entityA), storeACode)
 	if err != nil || resolvedA == "" {
 		t.Fatalf("entity A ResolveStoreIDByCode = %q, err %v; want store id", resolvedA, err)
 	}
-	resolvedB, err := repo.ResolveStoreIDByCode(ctx, pair.entityB, storeACode)
+	resolvedB, err := repo.ResolveStoreIDByCode(ctx, mustEntityFilter(t, pair.entityB), storeACode)
 	if err != nil || resolvedB != "" {
 		t.Fatalf("entity B ResolveStoreIDByCode = %q, err %v; want empty", resolvedB, err)
 	}
@@ -76,11 +76,11 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed equipment: %v", err)
 	}
-	equipmentA, err := repo.ListEquipment(ctx, pair.entityA, "", "")
+	equipmentA, err := repo.ListEquipment(ctx, mustEntityFilter(t, pair.entityA), "", "")
 	if err != nil || len(equipmentA) != 1 {
 		t.Fatalf("entity A equipment = %d, err %v; want 1", len(equipmentA), err)
 	}
-	equipmentB, err := repo.ListEquipment(ctx, pair.entityB, "", "")
+	equipmentB, err := repo.ListEquipment(ctx, mustEntityFilter(t, pair.entityB), "", "")
 	if err != nil || len(equipmentB) != 0 {
 		t.Fatalf("entity B saw entity A equipment: %d, err %v", len(equipmentB), err)
 	}
@@ -88,19 +88,19 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 		EquipmentID: createdEquipment.ID, Period: "2026-07", Currency: "CNY", OutputQty: float64Ptr(5),
 		SourceSystem: "char-test",
 	}
-	if _, err := repo.UpsertEquipmentFact(access.WithScope(ctx, access.Scope{LegalEntityID: pair.entityA}), equipmentFact); err != nil {
+	if _, err := repo.UpsertEquipmentFact(access.WithScope(ctx, access.Scope{LegalEntityID: pair.entityA}), mustEntityFilter(t, pair.entityA), equipmentFact); err != nil {
 		t.Fatalf("seed equipment fact as entity A: %v", err)
 	}
-	if _, err := repo.UpsertEquipmentFact(access.WithScope(ctx, access.Scope{LegalEntityID: pair.entityB}), &EquipmentOperatingFact{
+	if _, err := repo.UpsertEquipmentFact(access.WithScope(ctx, access.Scope{LegalEntityID: pair.entityB}), mustEntityFilter(t, pair.entityB), &EquipmentOperatingFact{
 		EquipmentID: createdEquipment.ID, Period: "2026-07", Currency: "CNY", SourceSystem: "char-test-b",
 	}); err == nil {
 		t.Fatal("entity B wrote an equipment fact for entity A's equipment")
 	}
-	eqFactsA, err := repo.ListEquipmentFacts(ctx, pair.entityA, "2026-07", "", "")
+	eqFactsA, err := repo.ListEquipmentFacts(ctx, mustEntityFilter(t, pair.entityA), "2026-07", "", "")
 	if err != nil || len(eqFactsA) != 1 {
 		t.Fatalf("entity A equipment facts = %d, err %v; want 1", len(eqFactsA), err)
 	}
-	eqFactsB, err := repo.ListEquipmentFacts(ctx, pair.entityB, "2026-07", "", "")
+	eqFactsB, err := repo.ListEquipmentFacts(ctx, mustEntityFilter(t, pair.entityB), "2026-07", "", "")
 	if err != nil || len(eqFactsB) != 0 {
 		t.Fatalf("entity B saw entity A equipment facts: %d, err %v", len(eqFactsB), err)
 	}
@@ -116,24 +116,24 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed action: %v", err)
 	}
-	actionsA, err := repo.ListActions(ctx, pair.entityA, "", "", "")
+	actionsA, err := repo.ListActions(ctx, mustEntityFilter(t, pair.entityA), "", "", "")
 	if err != nil || len(actionsA) != 1 {
 		t.Fatalf("entity A actions = %d, err %v; want 1", len(actionsA), err)
 	}
-	actionsB, err := repo.ListActions(ctx, pair.entityB, "", "", "")
+	actionsB, err := repo.ListActions(ctx, mustEntityFilter(t, pair.entityB), "", "", "")
 	if err != nil || len(actionsB) != 0 {
 		t.Fatalf("entity B saw entity A actions: %d, err %v", len(actionsB), err)
 	}
-	if got, err := repo.GetActionByIdempotency(ctx, &pair.entityA, "action-key-a"); err != nil || got == nil {
+	if got, err := repo.GetActionByIdempotency(ctx, mustEntityFilter(t, pair.entityA), "action-key-a"); err != nil || got == nil {
 		t.Fatalf("entity A action idempotency lookup = %+v, err %v; want found", got, err)
 	}
-	if got, err := repo.GetActionByIdempotency(ctx, &pair.entityB, "action-key-a"); err != nil || got != nil {
+	if got, err := repo.GetActionByIdempotency(ctx, mustEntityFilter(t, pair.entityB), "action-key-a"); err != nil || got != nil {
 		t.Fatalf("entity B action idempotency lookup = %+v, err %v; want nil", got, err)
 	}
-	if updated, err := repo.UpdateAction(ctx, createdAction.ID, pair.entityB, "", FPnAActionItem{Status: "acknowledged"}); err != nil || updated != nil {
+	if updated, err := repo.UpdateAction(ctx, createdAction.ID, mustEntityFilter(t, pair.entityB), "", FPnAActionItem{Status: "acknowledged"}); err != nil || updated != nil {
 		t.Fatalf("entity B updated entity A action: %+v, err %v; want nil", updated, err)
 	}
-	if updated, err := repo.UpdateAction(ctx, createdAction.ID, pair.entityA, "", FPnAActionItem{Status: "acknowledged"}); err != nil || updated == nil {
+	if updated, err := repo.UpdateAction(ctx, createdAction.ID, mustEntityFilter(t, pair.entityA), "", FPnAActionItem{Status: "acknowledged"}); err != nil || updated == nil {
 		t.Fatalf("entity A action update = %+v, err %v; want updated", updated, err)
 	}
 
@@ -146,11 +146,11 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 	if _, err := repo.CreateAssumption(ctx, assumption); err != nil {
 		t.Fatalf("seed assumption: %v", err)
 	}
-	assumptionsA, err := repo.ListAssumptions(ctx, pair.entityA, "")
+	assumptionsA, err := repo.ListAssumptions(ctx, mustEntityFilter(t, pair.entityA), "")
 	if err != nil || len(assumptionsA) != 1 {
 		t.Fatalf("entity A assumptions = %d, err %v; want 1", len(assumptionsA), err)
 	}
-	assumptionsB, err := repo.ListAssumptions(ctx, pair.entityB, "")
+	assumptionsB, err := repo.ListAssumptions(ctx, mustEntityFilter(t, pair.entityB), "")
 	if err != nil || len(assumptionsB) != 0 {
 		t.Fatalf("entity B saw entity A assumptions: %d, err %v", len(assumptionsB), err)
 	}
@@ -164,17 +164,17 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 	`, pair.contractA).Scan(&ignoredDate); err != nil {
 		t.Fatalf("seed critical date: %v", err)
 	}
-	briefA, err := repo.ListCriticalDateBrief(ctx, pair.entityA, "2026-07", 30)
+	briefA, err := repo.ListCriticalDateBrief(ctx, mustEntityFilter(t, pair.entityA), "2026-07", 30)
 	if err != nil || len(briefA) != 1 {
 		t.Fatalf("entity A critical-date brief = %d, err %v; want 1", len(briefA), err)
 	}
-	briefB, err := repo.ListCriticalDateBrief(ctx, pair.entityB, "2026-07", 30)
+	briefB, err := repo.ListCriticalDateBrief(ctx, mustEntityFilter(t, pair.entityB), "2026-07", 30)
 	if err != nil || len(briefB) != 0 {
 		t.Fatalf("entity B saw entity A critical dates: %d, err %v", len(briefB), err)
 	}
 
 	// Overview counts every dimension and must be empty for entity B.
-	overviewA, err := repo.Overview(ctx, pair.entityA, "2026-07")
+	overviewA, err := repo.Overview(ctx, mustEntityFilter(t, pair.entityA), "2026-07")
 	if err != nil {
 		t.Fatalf("entity A overview: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestOperatingFactsTenantIsolationCharacterization(t *testing.T) {
 		t.Fatalf("entity A overview counts = store %d, equipment %d, actions %d; want 1/1/1",
 			overviewA.StoreFactCount, overviewA.EquipmentFactCount, overviewA.OpenActionCount)
 	}
-	overviewB, err := repo.Overview(ctx, pair.entityB, "2026-07")
+	overviewB, err := repo.Overview(ctx, mustEntityFilter(t, pair.entityB), "2026-07")
 	if err != nil {
 		t.Fatalf("entity B overview: %v", err)
 	}

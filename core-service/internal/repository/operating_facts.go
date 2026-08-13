@@ -261,8 +261,17 @@ func (r *OperatingFactsRepository) FinalizeBatch(ctx context.Context, id string,
 	return item, nil
 }
 
-func (r *OperatingFactsRepository) ListBatches(ctx context.Context, legalEntityID, status string) ([]*OperatingFactBatch, error) {
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,source_system,COALESCE(source_file,''),as_of_at,status,total_rows,accepted_rows,rejected_rows,reconciliation_status,error_summary,created_by,created_at,COALESCE(idempotency_key,''),COALESCE(fact_version,''),retry_of_batch_id FROM operating_fact_batches WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR status=$2) ORDER BY created_at DESC LIMIT 200`, legalEntityID, status)
+func (r *OperatingFactsRepository) ListBatches(ctx context.Context, entity access.EntityFilter, status string) ([]*OperatingFactBatch, error) {
+	args := []any{status}
+	query := `SELECT id,legal_entity_id,source_system,COALESCE(source_file,''),as_of_at,status,total_rows,accepted_rows,rejected_rows,reconciliation_status,error_summary,created_by,created_at,COALESCE(idempotency_key,''),COALESCE(fact_version,''),retry_of_batch_id FROM operating_fact_batches WHERE ($1='' OR status=$1)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY created_at DESC LIMIT 200`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list operating fact batches: %w", err)
 	}
@@ -324,12 +333,18 @@ func (r *OperatingFactsRepository) UpsertStore(ctx context.Context, fact *StoreO
 	return fact, nil
 }
 
-func (r *OperatingFactsRepository) ListStores(ctx context.Context, legalEntityID, period, storeID string) ([]*StoreOperatingFact, error) {
+func (r *OperatingFactsRepository) ListStores(ctx context.Context, entity access.EntityFilter, period, storeID string) ([]*StoreOperatingFact, error) {
 	query := `SELECT f.id,f.store_id,s.code,s.name,COALESCE(s.brand,''),COALESCE(s.region,''),f.period,f.period_basis,f.currency,f.revenue,f.gross_profit,f.transactions,f.footfall,f.area_sqm,f.labor_cost,f.fixed_rent,f.variable_rent,f.non_lease_cost,f.other_controllable_cost,f.source_system,COALESCE(f.source_record_id,''),f.import_batch_id,f.as_of_at,f.version,f.reconciliation_status,f.mapping_status,COALESCE(f.business_segment,''),COALESCE(f.fiscal_year,''),f.store_age_months,COALESCE(f.cohort_code,''),COALESCE(f.data_quality_status,'unassessed'),f.note,f.created_by,f.created_at,f.updated_at
 		FROM store_operating_facts f JOIN stores s ON s.id=f.store_id
-		WHERE ($1='' OR s.legal_entity_id::text=$1) AND ($2='' OR f.period=$2) AND ($3='' OR f.store_id::text=$3)`
-	args := []any{legalEntityID, period, storeID}
-	query, args, _ = appendStoreScopePredicate(ctx, query, args, 4, "s")
+		WHERE ($1='' OR f.period=$1) AND ($2='' OR f.store_id::text=$2)`
+	args := []any{period, storeID}
+	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendStoreScopePredicate(ctx, query, args, len(args)+1, "s")
 	query += ` ORDER BY f.period DESC,s.code,f.version DESC LIMIT 2000`
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -347,10 +362,16 @@ func (r *OperatingFactsRepository) ListStores(ctx context.Context, legalEntityID
 	return result, rows.Err()
 }
 
-func (r *OperatingFactsRepository) ResolveStoreIDByCode(ctx context.Context, legalEntityID, code string) (string, error) {
-	query := `SELECT s.id::text FROM stores s WHERE s.code=$1 AND ($2='' OR s.legal_entity_id::text=$2)`
-	args := []any{strings.TrimSpace(code), legalEntityID}
-	query, args, _ = appendStoreScopePredicate(ctx, query, args, 3, "s")
+func (r *OperatingFactsRepository) ResolveStoreIDByCode(ctx context.Context, entity access.EntityFilter, code string) (string, error) {
+	query := `SELECT s.id::text FROM stores s WHERE s.code=$1`
+	args := []any{strings.TrimSpace(code)}
+	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(args)+1); err != nil {
+		return "", err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendStoreScopePredicate(ctx, query, args, len(args)+1, "s")
 	var id string
 	if err := r.db.QueryRow(ctx, query, args...).Scan(&id); err != nil {
 		if err == pgx.ErrNoRows {
@@ -386,10 +407,16 @@ func (r *OperatingFactsRepository) UpsertEquipment(ctx context.Context, asset *E
 	return asset, nil
 }
 
-func (r *OperatingFactsRepository) ListEquipment(ctx context.Context, legalEntityID, plant, line string) ([]*EquipmentAsset, error) {
-	query := `SELECT id,legal_entity_id,plant_code,COALESCE(production_line_code,''),equipment_code,equipment_name,COALESCE(cost_center,''),COALESCE(asset_identifier,''),contract_id,COALESCE(asset_type,''),capacity,COALESCE(capacity_unit,''),COALESCE(currency,''),COALESCE(external_system,''),COALESCE(external_id,''),effective_from::text,effective_to::text,active FROM equipment_assets WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR plant_code=$2) AND ($3='' OR production_line_code=$3) AND active=true`
-	args := []any{legalEntityID, plant, line}
-	query, args, _ = appendEquipmentScopePredicate(ctx, query, args, 4, "equipment_assets")
+func (r *OperatingFactsRepository) ListEquipment(ctx context.Context, entity access.EntityFilter, plant, line string) ([]*EquipmentAsset, error) {
+	query := `SELECT id,legal_entity_id,plant_code,COALESCE(production_line_code,''),equipment_code,equipment_name,COALESCE(cost_center,''),COALESCE(asset_identifier,''),contract_id,COALESCE(asset_type,''),capacity,COALESCE(capacity_unit,''),COALESCE(currency,''),COALESCE(external_system,''),COALESCE(external_id,''),effective_from::text,effective_to::text,active FROM equipment_assets WHERE ($1='' OR plant_code=$1) AND ($2='' OR production_line_code=$2) AND active=true`
+	args := []any{plant, line}
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendEquipmentScopePredicate(ctx, query, args, len(args)+1, "equipment_assets")
 	query += ` ORDER BY plant_code,production_line_code,equipment_code LIMIT 2000`
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -407,7 +434,7 @@ func (r *OperatingFactsRepository) ListEquipment(ctx context.Context, legalEntit
 	return result, rows.Err()
 }
 
-func (r *OperatingFactsRepository) UpsertEquipmentFact(ctx context.Context, fact *EquipmentOperatingFact) (*EquipmentOperatingFact, error) {
+func (r *OperatingFactsRepository) UpsertEquipmentFact(ctx context.Context, entity access.EntityFilter, fact *EquipmentOperatingFact) (*EquipmentOperatingFact, error) {
 	if fact.ID == "" {
 		fact.ID = uuid.New().String()
 	}
@@ -420,14 +447,16 @@ func (r *OperatingFactsRepository) UpsertEquipmentFact(ctx context.Context, fact
 	if fact.ReconciliationStatus == "" {
 		fact.ReconciliationStatus = "unreconciled"
 	}
-	legalEntityID := ""
-	if scope, scoped := scopeFromOperatingContext(ctx); scoped && !scope.Global {
-		legalEntityID = scope.LegalEntityID
-	}
 	var allowed bool
-	query := `SELECT EXISTS (SELECT 1 FROM equipment_assets a WHERE a.id=$1 AND ($2='' OR a.legal_entity_id::text=$2)`
-	args := []any{fact.EquipmentID, legalEntityID}
-	query, args, _ = appendEquipmentScopePredicate(ctx, query, args, 3, "a")
+	args := []any{fact.EquipmentID}
+	query := `SELECT EXISTS (SELECT 1 FROM equipment_assets a WHERE a.id=$1`
+	if clause, arg, err := entity.SQLClause("a.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendEquipmentScopePredicate(ctx, query, args, len(args)+1, "a")
 	query += `)`
 	if err := r.db.QueryRow(ctx, query, args...).Scan(&allowed); err != nil {
 		return nil, fmt.Errorf("failed to validate equipment scope: %w", err)
@@ -465,10 +494,16 @@ func matchesEquipmentDimension(allowed []string, actual string) bool {
 	return false
 }
 
-func (r *OperatingFactsRepository) ListEquipmentFacts(ctx context.Context, legalEntityID, period, plant, line string) ([]*EquipmentOperatingFact, error) {
-	query := `SELECT f.id,f.equipment_id,a.plant_code,COALESCE(a.production_line_code,''),a.equipment_code,a.equipment_name,a.capacity,COALESCE(a.capacity_unit,''),f.period,f.currency,f.output_qty,f.yield_pct,f.scrap_qty,f.downtime_hours,f.oee_pct,f.utilization_pct,f.labor_cost,f.energy_cost,f.maintenance_cost,f.standard_cost,f.actual_cost,f.material_usage_cost,f.overhead_absorption,f.purchase_price,f.purchase_price_variance,f.capacity_available,f.lease_cost,f.contractual_rent,f.source_system,COALESCE(f.source_record_id,''),f.import_batch_id,f.as_of_at,f.version,f.reconciliation_status,COALESCE(f.data_quality_status,'unassessed') FROM equipment_operating_facts f JOIN equipment_assets a ON a.id=f.equipment_id WHERE ($1='' OR a.legal_entity_id::text=$1) AND ($2='' OR f.period=$2) AND ($3='' OR a.plant_code=$3) AND ($4='' OR a.production_line_code=$4)`
-	args := []any{legalEntityID, period, plant, line}
-	query, args, _ = appendEquipmentScopePredicate(ctx, query, args, 5, "a")
+func (r *OperatingFactsRepository) ListEquipmentFacts(ctx context.Context, entity access.EntityFilter, period, plant, line string) ([]*EquipmentOperatingFact, error) {
+	query := `SELECT f.id,f.equipment_id,a.plant_code,COALESCE(a.production_line_code,''),a.equipment_code,a.equipment_name,a.capacity,COALESCE(a.capacity_unit,''),f.period,f.currency,f.output_qty,f.yield_pct,f.scrap_qty,f.downtime_hours,f.oee_pct,f.utilization_pct,f.labor_cost,f.energy_cost,f.maintenance_cost,f.standard_cost,f.actual_cost,f.material_usage_cost,f.overhead_absorption,f.purchase_price,f.purchase_price_variance,f.capacity_available,f.lease_cost,f.contractual_rent,f.source_system,COALESCE(f.source_record_id,''),f.import_batch_id,f.as_of_at,f.version,f.reconciliation_status,COALESCE(f.data_quality_status,'unassessed') FROM equipment_operating_facts f JOIN equipment_assets a ON a.id=f.equipment_id WHERE ($1='' OR f.period=$1) AND ($2='' OR a.plant_code=$2) AND ($3='' OR a.production_line_code=$3)`
+	args := []any{period, plant, line}
+	if clause, arg, err := entity.SQLClause("a.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendEquipmentScopePredicate(ctx, query, args, len(args)+1, "a")
 	query += ` ORDER BY f.period DESC,a.plant_code,a.production_line_code,a.equipment_code,f.version DESC LIMIT 2000`
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -486,10 +521,16 @@ func (r *OperatingFactsRepository) ListEquipmentFacts(ctx context.Context, legal
 	return result, rows.Err()
 }
 
-func (r *OperatingFactsRepository) ListActions(ctx context.Context, legalEntityID, period, status, category string) ([]*FPnAActionItem, error) {
-	query := `SELECT id,legal_entity_id,COALESCE(period,''),category,severity,status,title,description,rule_code,source_table,source_record_id,data_version,COALESCE(idempotency_key,''),impact_amount,COALESCE(currency,''),owner_id,COALESCE(owner_name,''),due_date,baseline_amount,target_amount,expected_benefit,COALESCE(verification_period,''),verified_amount,verification_status,COALESCE(human_root_cause,''),COALESCE(planned_action,''),COALESCE(ai_suggestion,''),evidence,created_by,updated_by,created_at,updated_at,acknowledged_at,completed_at,verified_at FROM fpna_action_items WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR period=$2) AND ($3='' OR status=$3) AND ($4='' OR category=$4)`
-	args := []any{legalEntityID, period, status, category}
-	query, args, _ = appendActionScopePredicate(ctx, query, args, 5)
+func (r *OperatingFactsRepository) ListActions(ctx context.Context, entity access.EntityFilter, period, status, category string) ([]*FPnAActionItem, error) {
+	query := `SELECT id,legal_entity_id,COALESCE(period,''),category,severity,status,title,description,rule_code,source_table,source_record_id,data_version,COALESCE(idempotency_key,''),impact_amount,COALESCE(currency,''),owner_id,COALESCE(owner_name,''),due_date,baseline_amount,target_amount,expected_benefit,COALESCE(verification_period,''),verified_amount,verification_status,COALESCE(human_root_cause,''),COALESCE(planned_action,''),COALESCE(ai_suggestion,''),evidence,created_by,updated_by,created_at,updated_at,acknowledged_at,completed_at,verified_at FROM fpna_action_items WHERE ($1='' OR period=$1) AND ($2='' OR status=$2) AND ($3='' OR category=$3)`
+	args := []any{period, status, category}
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query, args, _ = appendActionScopePredicate(ctx, query, args, len(args)+1)
 	query += ` ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,due_date NULLS LAST,created_at DESC LIMIT 1000`
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -520,7 +561,7 @@ type FPnACriticalDateBrief struct {
 	DaysToDue  int       `json:"days_to_due"`
 }
 
-func (r *OperatingFactsRepository) ListCriticalDateBrief(ctx context.Context, legalEntityID, period string, windowDays int) ([]FPnACriticalDateBrief, error) {
+func (r *OperatingFactsRepository) ListCriticalDateBrief(ctx context.Context, entity access.EntityFilter, period string, windowDays int) ([]FPnACriticalDateBrief, error) {
 	start, err := time.Parse("2006-01", period)
 	if err != nil {
 		return nil, fmt.Errorf("invalid brief period: %w", err)
@@ -530,9 +571,15 @@ func (r *OperatingFactsRepository) ListCriticalDateBrief(ctx context.Context, le
 	}
 	from := start.AddDate(0, 0, -30)
 	to := start.AddDate(0, 0, windowDays)
-	query := `SELECT cd.id::text,cd.contract_id::text,cd.date_type,cd.target_date,cd.status,cd.title FROM critical_dates cd JOIN lease_contracts lc ON lc.id=cd.contract_id WHERE ($1='' OR lc.legal_entity_id::text=$1) AND cd.status IN ('open','snoozed') AND cd.target_date BETWEEN $2::date AND $3::date`
-	args := []any{legalEntityID, from, to}
-	argIdx := 4
+	query := `SELECT cd.id::text,cd.contract_id::text,cd.date_type,cd.target_date,cd.status,cd.title FROM critical_dates cd JOIN lease_contracts lc ON lc.id=cd.contract_id WHERE cd.status IN ('open','snoozed') AND cd.target_date BETWEEN $1::date AND $2::date`
+	args := []any{from, to}
+	if clause, arg, err := entity.SQLClause("lc.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	argIdx := len(args) + 1
 	if scope, scoped := access.ScopeFromContext(ctx); scoped && !scope.Global {
 		if scope.LegalEntityID == "" {
 			query += " AND false"
@@ -631,7 +678,11 @@ func (r *OperatingFactsRepository) CreateAction(ctx context.Context, item *FPnAA
 		item.VerificationStatus = "not_due"
 	}
 	if item.IdempotencyKey != "" {
-		existing, lookupErr := r.GetActionByIdempotency(ctx, item.LegalEntityID, item.IdempotencyKey)
+		filter, filterErr := entityFilterForOptional(item.LegalEntityID)
+		if filterErr != nil {
+			return nil, filterErr
+		}
+		existing, lookupErr := r.GetActionByIdempotency(ctx, filter, item.IdempotencyKey)
 		if lookupErr != nil {
 			return nil, lookupErr
 		}
@@ -646,13 +697,18 @@ func (r *OperatingFactsRepository) CreateAction(ctx context.Context, item *FPnAA
 	return item, nil
 }
 
-func (r *OperatingFactsRepository) GetActionByIdempotency(ctx context.Context, legalEntityID *string, key string) (*FPnAActionItem, error) {
+func (r *OperatingFactsRepository) GetActionByIdempotency(ctx context.Context, entity access.EntityFilter, key string) (*FPnAActionItem, error) {
 	item := &FPnAActionItem{}
-	entity := ""
-	if legalEntityID != nil {
-		entity = *legalEntityID
+	args := []any{key}
+	query := `SELECT id,legal_entity_id,COALESCE(period,''),category,severity,status,title,description,rule_code,source_table,source_record_id,data_version,COALESCE(idempotency_key,''),impact_amount,COALESCE(currency,''),owner_id,COALESCE(owner_name,''),due_date,baseline_amount,target_amount,expected_benefit,COALESCE(verification_period,''),verified_amount,verification_status,COALESCE(human_root_cause,''),COALESCE(planned_action,''),COALESCE(ai_suggestion,''),evidence,created_by,updated_by,created_at,updated_at,acknowledged_at,completed_at,verified_at FROM fpna_action_items WHERE idempotency_key=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
 	}
-	err := r.db.QueryRow(ctx, `SELECT id,legal_entity_id,COALESCE(period,''),category,severity,status,title,description,rule_code,source_table,source_record_id,data_version,COALESCE(idempotency_key,''),impact_amount,COALESCE(currency,''),owner_id,COALESCE(owner_name,''),due_date,baseline_amount,target_amount,expected_benefit,COALESCE(verification_period,''),verified_amount,verification_status,COALESCE(human_root_cause,''),COALESCE(planned_action,''),COALESCE(ai_suggestion,''),evidence,created_by,updated_by,created_at,updated_at,acknowledged_at,completed_at,verified_at FROM fpna_action_items WHERE ($1='' OR legal_entity_id::text=$1) AND idempotency_key=$2 LIMIT 1`, entity, key).Scan(&item.ID, &item.LegalEntityID, &item.Period, &item.Category, &item.Severity, &item.Status, &item.Title, &item.Description, &item.RuleCode, &item.SourceTable, &item.SourceRecordID, &item.DataVersion, &item.IdempotencyKey, &item.ImpactAmount, &item.Currency, &item.OwnerID, &item.OwnerName, &item.DueDate, &item.BaselineAmount, &item.TargetAmount, &item.ExpectedBenefit, &item.VerificationPeriod, &item.VerifiedAmount, &item.VerificationStatus, &item.HumanRootCause, &item.PlannedAction, &item.AISuggestion, &item.Evidence, &item.CreatedBy, &item.UpdatedBy, &item.CreatedAt, &item.UpdatedAt, &item.AcknowledgedAt, &item.CompletedAt, &item.VerifiedAt)
+	query += ` LIMIT 1`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.Period, &item.Category, &item.Severity, &item.Status, &item.Title, &item.Description, &item.RuleCode, &item.SourceTable, &item.SourceRecordID, &item.DataVersion, &item.IdempotencyKey, &item.ImpactAmount, &item.Currency, &item.OwnerID, &item.OwnerName, &item.DueDate, &item.BaselineAmount, &item.TargetAmount, &item.ExpectedBenefit, &item.VerificationPeriod, &item.VerifiedAmount, &item.VerificationStatus, &item.HumanRootCause, &item.PlannedAction, &item.AISuggestion, &item.Evidence, &item.CreatedBy, &item.UpdatedBy, &item.CreatedAt, &item.UpdatedAt, &item.AcknowledgedAt, &item.CompletedAt, &item.VerifiedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -663,9 +719,18 @@ func (r *OperatingFactsRepository) GetActionByIdempotency(ctx context.Context, l
 	return item, nil
 }
 
-func (r *OperatingFactsRepository) UpdateAction(ctx context.Context, id, legalEntityID, userID string, patch FPnAActionItem) (*FPnAActionItem, error) {
+func (r *OperatingFactsRepository) UpdateAction(ctx context.Context, id string, entity access.EntityFilter, userID string, patch FPnAActionItem) (*FPnAActionItem, error) {
 	item := &FPnAActionItem{}
-	err := r.db.QueryRow(ctx, `UPDATE fpna_action_items SET status=COALESCE(NULLIF($3,''),status),owner_name=COALESCE(NULLIF($4,''),owner_name),due_date=COALESCE($6,due_date),human_root_cause=COALESCE(NULLIF($7,''),human_root_cause),planned_action=COALESCE(NULLIF($8,''),planned_action),expected_benefit=COALESCE($9,expected_benefit),verification_period=COALESCE(NULLIF($10,''),verification_period),verified_amount=COALESCE($11,verified_amount),verification_status=COALESCE(NULLIF($12,''),verification_status),updated_by=NULLIF($5,'')::uuid,acknowledged_at=CASE WHEN $3='acknowledged' AND acknowledged_at IS NULL THEN NOW() ELSE acknowledged_at END,completed_at=CASE WHEN $3='completed' AND completed_at IS NULL THEN NOW() ELSE completed_at END,verified_at=CASE WHEN $3='verified' AND verified_at IS NULL THEN NOW() ELSE verified_at END,updated_at=NOW() WHERE id=$1 AND ($2='' OR legal_entity_id::text=$2) RETURNING id,legal_entity_id,COALESCE(period,''),category,severity,status,title,description,rule_code,source_table,source_record_id,data_version,COALESCE(idempotency_key,''),impact_amount,COALESCE(currency,''),owner_id,COALESCE(owner_name,''),due_date,baseline_amount,target_amount,expected_benefit,COALESCE(verification_period,''),verified_amount,verification_status,COALESCE(human_root_cause,''),COALESCE(planned_action,''),COALESCE(ai_suggestion,''),evidence,created_by,updated_by,created_at,updated_at,acknowledged_at,completed_at,verified_at`, id, legalEntityID, patch.Status, patch.OwnerName, userID, patch.DueDate, patch.HumanRootCause, patch.PlannedAction, patch.ExpectedBenefit, patch.VerificationPeriod, patch.VerifiedAmount, patch.VerificationStatus).Scan(&item.ID, &item.LegalEntityID, &item.Period, &item.Category, &item.Severity, &item.Status, &item.Title, &item.Description, &item.RuleCode, &item.SourceTable, &item.SourceRecordID, &item.DataVersion, &item.IdempotencyKey, &item.ImpactAmount, &item.Currency, &item.OwnerID, &item.OwnerName, &item.DueDate, &item.BaselineAmount, &item.TargetAmount, &item.ExpectedBenefit, &item.VerificationPeriod, &item.VerifiedAmount, &item.VerificationStatus, &item.HumanRootCause, &item.PlannedAction, &item.AISuggestion, &item.Evidence, &item.CreatedBy, &item.UpdatedBy, &item.CreatedAt, &item.UpdatedAt, &item.AcknowledgedAt, &item.CompletedAt, &item.VerifiedAt)
+	args := []any{id, patch.Status, patch.OwnerName, userID, patch.DueDate, patch.HumanRootCause, patch.PlannedAction, patch.ExpectedBenefit, patch.VerificationPeriod, patch.VerifiedAmount, patch.VerificationStatus}
+	query := `UPDATE fpna_action_items SET status=COALESCE(NULLIF($2,''),status),owner_name=COALESCE(NULLIF($3,''),owner_name),due_date=COALESCE($5,due_date),human_root_cause=COALESCE(NULLIF($6,''),human_root_cause),planned_action=COALESCE(NULLIF($7,''),planned_action),expected_benefit=COALESCE($8,expected_benefit),verification_period=COALESCE(NULLIF($9,''),verification_period),verified_amount=COALESCE($10,verified_amount),verification_status=COALESCE(NULLIF($11,''),verification_status),updated_by=NULLIF($4,'')::uuid,acknowledged_at=CASE WHEN $2='acknowledged' AND acknowledged_at IS NULL THEN NOW() ELSE acknowledged_at END,completed_at=CASE WHEN $2='completed' AND completed_at IS NULL THEN NOW() ELSE completed_at END,verified_at=CASE WHEN $2='verified' AND verified_at IS NULL THEN NOW() ELSE verified_at END,updated_at=NOW() WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` RETURNING id,legal_entity_id,COALESCE(period,''),category,severity,status,title,description,rule_code,source_table,source_record_id,data_version,COALESCE(idempotency_key,''),impact_amount,COALESCE(currency,''),owner_id,COALESCE(owner_name,''),due_date,baseline_amount,target_amount,expected_benefit,COALESCE(verification_period,''),verified_amount,verification_status,COALESCE(human_root_cause,''),COALESCE(planned_action,''),COALESCE(ai_suggestion,''),evidence,created_by,updated_by,created_at,updated_at,acknowledged_at,completed_at,verified_at`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.Period, &item.Category, &item.Severity, &item.Status, &item.Title, &item.Description, &item.RuleCode, &item.SourceTable, &item.SourceRecordID, &item.DataVersion, &item.IdempotencyKey, &item.ImpactAmount, &item.Currency, &item.OwnerID, &item.OwnerName, &item.DueDate, &item.BaselineAmount, &item.TargetAmount, &item.ExpectedBenefit, &item.VerificationPeriod, &item.VerifiedAmount, &item.VerificationStatus, &item.HumanRootCause, &item.PlannedAction, &item.AISuggestion, &item.Evidence, &item.CreatedBy, &item.UpdatedBy, &item.CreatedAt, &item.UpdatedAt, &item.AcknowledgedAt, &item.CompletedAt, &item.VerifiedAt)
 	if err == pgx.ErrNoRows {
 		return nil, nil
 	}
@@ -675,8 +740,17 @@ func (r *OperatingFactsRepository) UpdateAction(ctx context.Context, id, legalEn
 	return item, nil
 }
 
-func (r *OperatingFactsRepository) ListAssumptions(ctx context.Context, legalEntityID, key string) ([]*FPnAAssumptionVersion, error) {
-	rows, err := r.db.Query(ctx, `SELECT id,legal_entity_id,assumption_key,category,value,COALESCE(unit,''),source,COALESCE(owner_name,''),effective_from,effective_to,version,status,created_by,created_at FROM fpna_assumption_versions WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR assumption_key=$2) ORDER BY assumption_key,effective_from DESC,version DESC LIMIT 500`, legalEntityID, key)
+func (r *OperatingFactsRepository) ListAssumptions(ctx context.Context, entity access.EntityFilter, key string) ([]*FPnAAssumptionVersion, error) {
+	args := []any{key}
+	query := `SELECT id,legal_entity_id,assumption_key,category,value,COALESCE(unit,''),source,COALESCE(owner_name,''),effective_from,effective_to,version,status,created_by,created_at FROM fpna_assumption_versions WHERE ($1='' OR assumption_key=$1)`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY assumption_key,effective_from DESC,version DESC LIMIT 500`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list assumptions: %w", err)
 	}
@@ -748,28 +822,58 @@ type PerformanceOverview struct {
 	LatestEquipmentAsOf            *time.Time `json:"latest_equipment_as_of,omitempty"`
 }
 
-func (r *OperatingFactsRepository) Overview(ctx context.Context, legalEntityID, period string) (*PerformanceOverview, error) {
+func (r *OperatingFactsRepository) Overview(ctx context.Context, entity access.EntityFilter, period string) (*PerformanceOverview, error) {
 	o := &PerformanceOverview{Period: period}
-	storeArgs := []any{legalEntityID, period}
-	storeQuery := `SELECT COUNT(*),COUNT(*) FILTER (WHERE reconciliation_status='matched' AND mapping_status='mapped' AND gross_profit IS NOT NULL AND labor_cost IS NOT NULL AND fixed_rent IS NOT NULL AND variable_rent IS NOT NULL AND non_lease_cost IS NOT NULL AND area_sqm > 0),COUNT(*) FILTER (WHERE gross_profit IS NULL OR labor_cost IS NULL OR fixed_rent IS NULL OR variable_rent IS NULL OR non_lease_cost IS NULL OR area_sqm IS NULL OR area_sqm <= 0),COUNT(*) FILTER (WHERE mapping_status <> 'mapped'),COUNT(*) FILTER (WHERE reconciliation_status <> 'matched'),MAX(as_of_at) FROM store_operating_facts f JOIN stores s ON s.id=f.store_id WHERE ($1='' OR s.legal_entity_id::text=$1) AND ($2='' OR f.period=$2)`
-	storeQuery, storeArgs, _ = appendStoreScopePredicate(ctx, storeQuery, storeArgs, 3, "s")
+	storeArgs := []any{period}
+	storeQuery := `SELECT COUNT(*),COUNT(*) FILTER (WHERE reconciliation_status='matched' AND mapping_status='mapped' AND gross_profit IS NOT NULL AND labor_cost IS NOT NULL AND fixed_rent IS NOT NULL AND variable_rent IS NOT NULL AND non_lease_cost IS NOT NULL AND area_sqm > 0),COUNT(*) FILTER (WHERE gross_profit IS NULL OR labor_cost IS NULL OR fixed_rent IS NULL OR variable_rent IS NULL OR non_lease_cost IS NULL OR area_sqm IS NULL OR area_sqm <= 0),COUNT(*) FILTER (WHERE mapping_status <> 'mapped'),COUNT(*) FILTER (WHERE reconciliation_status <> 'matched'),MAX(as_of_at) FROM store_operating_facts f JOIN stores s ON s.id=f.store_id WHERE ($1='' OR f.period=$1)`
+	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(storeArgs)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		storeQuery += " AND " + clause
+		storeArgs = append(storeArgs, arg)
+	}
+	storeQuery, storeArgs, _ = appendStoreScopePredicate(ctx, storeQuery, storeArgs, len(storeArgs)+1, "s")
 	err := r.db.QueryRow(ctx, storeQuery, storeArgs...).Scan(&o.StoreFactCount, &o.StoreFactReadyCount, &o.StoreFactMissingCount, &o.StoreFactUnmappedCount, &o.StoreFactUnreconciledCount, &o.LatestStoreAsOf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load store fact overview: %w", err)
 	}
-	equipmentArgs := []any{legalEntityID, period}
-	equipmentQuery := `SELECT COUNT(*),COUNT(*) FILTER (WHERE reconciliation_status <> 'matched'),MAX(f.as_of_at) FROM equipment_operating_facts f JOIN equipment_assets a ON a.id=f.equipment_id WHERE ($1='' OR a.legal_entity_id::text=$1) AND ($2='' OR f.period=$2)`
-	equipmentQuery, equipmentArgs, _ = appendEquipmentScopePredicate(ctx, equipmentQuery, equipmentArgs, 3, "a")
+	equipmentArgs := []any{period}
+	equipmentQuery := `SELECT COUNT(*),COUNT(*) FILTER (WHERE reconciliation_status <> 'matched'),MAX(f.as_of_at) FROM equipment_operating_facts f JOIN equipment_assets a ON a.id=f.equipment_id WHERE ($1='' OR f.period=$1)`
+	if clause, arg, err := entity.SQLClause("a.legal_entity_id", len(equipmentArgs)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		equipmentQuery += " AND " + clause
+		equipmentArgs = append(equipmentArgs, arg)
+	}
+	equipmentQuery, equipmentArgs, _ = appendEquipmentScopePredicate(ctx, equipmentQuery, equipmentArgs, len(equipmentArgs)+1, "a")
 	err = r.db.QueryRow(ctx, equipmentQuery, equipmentArgs...).Scan(&o.EquipmentFactCount, &o.EquipmentFactUnreconciledCount, &o.LatestEquipmentAsOf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load equipment fact overview: %w", err)
 	}
-	actionArgs := []any{legalEntityID, period}
-	actionQuery := `SELECT COUNT(*),COALESCE(SUM(impact_amount),0) FROM fpna_action_items WHERE ($1='' OR legal_entity_id::text=$1) AND ($2='' OR period=$2) AND status NOT IN ('verified','accepted','dismissed')`
-	actionQuery, actionArgs, _ = appendActionScopePredicate(ctx, actionQuery, actionArgs, 3)
+	actionArgs := []any{period}
+	actionQuery := `SELECT COUNT(*),COALESCE(SUM(impact_amount),0) FROM fpna_action_items WHERE ($1='' OR period=$1) AND status NOT IN ('verified','accepted','dismissed')`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(actionArgs)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		actionQuery += " AND " + clause
+		actionArgs = append(actionArgs, arg)
+	}
+	actionQuery, actionArgs, _ = appendActionScopePredicate(ctx, actionQuery, actionArgs, len(actionArgs)+1)
 	err = r.db.QueryRow(ctx, actionQuery, actionArgs...).Scan(&o.OpenActionCount, &o.OpenActionImpact)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load action overview: %w", err)
 	}
 	return o, nil
+}
+
+// entityFilterForOptional builds a scoped filter from a nullable payload id,
+// defaulting to the global filter when the payload carries none. It preserves
+// the historical "no idempotency row was ever entity-scoped" lookup semantics
+// while making the unrestricted case an explicit choice rather than an empty
+// string.
+func entityFilterForOptional(legalEntityID *string) (access.EntityFilter, error) {
+	if legalEntityID == nil || strings.TrimSpace(*legalEntityID) == "" {
+		return access.GlobalEntityFilter(), nil
+	}
+	return access.EntityFilterFor(*legalEntityID)
 }

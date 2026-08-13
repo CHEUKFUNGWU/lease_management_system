@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 // postgresTestPool connects to the real test database named by
@@ -85,6 +86,19 @@ func seedTenantPair(t *testing.T, ctx context.Context, pool *pgxpool.Pool, label
 		t.Fatalf("seed contract A: %v", err)
 	}
 	return pair
+}
+
+// mustEntityFilter builds a scoped filter for the characterization tests. The
+// SEC-003 refactor changed the repository signatures from a bare legalEntityID
+// string to access.EntityFilter; this helper keeps the call-site adaptation
+// mechanical while the assertions below stay untouched.
+func mustEntityFilter(t *testing.T, id string) access.EntityFilter {
+	t.Helper()
+	filter, err := access.EntityFilterFor(id)
+	if err != nil {
+		t.Fatalf("build entity filter: %v", err)
+	}
+	return filter
 }
 
 func uuidSuffix() string {

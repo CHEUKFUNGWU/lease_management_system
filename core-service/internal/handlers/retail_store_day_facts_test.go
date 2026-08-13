@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -34,7 +35,7 @@ type fakeRetailStoreDayFactRepo struct {
 	}
 }
 
-func (f *fakeRetailStoreDayFactRepo) UpsertRetailStoreDayFactsAtomic(ctx context.Context, _ string, facts []*repository.RetailStoreDayFact, key, hash string, _ *string, auditFn repository.RetailStoreDayFactAuditFunc) (*repository.RetailStoreDayFactWriteResult, error) {
+func (f *fakeRetailStoreDayFactRepo) UpsertRetailStoreDayFactsAtomic(ctx context.Context, _ access.EntityFilter, facts []*repository.RetailStoreDayFact, key, hash string, _ *string, auditFn repository.RetailStoreDayFactAuditFunc) (*repository.RetailStoreDayFactWriteResult, error) {
 	if f.upsertErr != nil {
 		return nil, f.upsertErr
 	}
@@ -100,8 +101,8 @@ func (f *fakeRetailStoreDayFactRepo) UpsertRetailStoreDayFactsAtomic(ctx context
 	return &repository.RetailStoreDayFactWriteResult{Facts: saved}, nil
 }
 
-func (f *fakeRetailStoreDayFactRepo) ListRetailStoreDayFactsPage(_ context.Context, legalEntityID, _, _ string, _ []string, pageSize, offset int) (*repository.RetailStoreDayFactsPage, error) {
-	f.listTenant = legalEntityID
+func (f *fakeRetailStoreDayFactRepo) ListRetailStoreDayFactsPage(_ context.Context, entity access.EntityFilter, _, _ string, _ []string, pageSize, offset int) (*repository.RetailStoreDayFactsPage, error) {
+	f.listTenant, _ = entity.LegalEntityID()
 	f.pageSize, f.pageOffset = pageSize, offset
 	if f.listErr != nil {
 		return nil, f.listErr
@@ -156,6 +157,7 @@ func retailStoreDayTestContext(method, target string, payload any) (*gin.Context
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = request
 	c.Set("legal_entity_id", "legal-entity-a")
+	c.Set("access_scope", access.Scope{LegalEntityID: "legal-entity-a"})
 	c.Set("user_id", "user-a")
 	return c, recorder
 }

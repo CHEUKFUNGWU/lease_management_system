@@ -178,7 +178,12 @@ func (h *BudgetHandler) CreateVersion(c *gin.Context) {
 }
 
 func (h *BudgetHandler) ListVersions(c *gin.Context) {
-	versions, err := h.budgetRepo.ListVersions(c.Request.Context(), middleware.GetTenantID(c))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	versions, err := h.budgetRepo.ListVersions(c.Request.Context(), entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -197,8 +202,12 @@ func (h *BudgetHandler) Variance(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	legalEntityID := middleware.GetTenantID(c)
-	version, err := h.budgetRepo.GetVersion(ctx, versionID, legalEntityID)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	version, err := h.budgetRepo.GetVersion(ctx, versionID, entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -213,7 +222,7 @@ func (h *BudgetHandler) Variance(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	actuals, err := h.budgetRepo.ActualsForPeriod(ctx, legalEntityID, period)
+	actuals, err := h.budgetRepo.ActualsForPeriod(ctx, entity, period)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -310,7 +319,12 @@ func (h *BudgetHandler) VarianceActions(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请至少提供一条差异行动项"})
 		return
 	}
-	if version, err := h.budgetRepo.GetVersion(c.Request.Context(), versionID, middleware.GetTenantID(c)); err != nil {
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	if version, err := h.budgetRepo.GetVersion(c.Request.Context(), versionID, entity); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	} else if version == nil {
@@ -320,7 +334,7 @@ func (h *BudgetHandler) VarianceActions(c *gin.Context) {
 
 	items := make([]repository.VarianceAction, 0, len(req.Items))
 	for _, item := range req.Items {
-		allowed, err := h.budgetRepo.ContractAllowedForVersion(c.Request.Context(), versionID, item.ContractID, middleware.GetTenantID(c))
+		allowed, err := h.budgetRepo.ContractAllowedForVersion(c.Request.Context(), versionID, item.ContractID, entity)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -370,8 +384,12 @@ func (h *BudgetHandler) CompareVersions(c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
-	legalEntityID := middleware.GetTenantID(c)
-	leftVersion, err := h.budgetRepo.GetVersion(ctx, leftID, legalEntityID)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	leftVersion, err := h.budgetRepo.GetVersion(ctx, leftID, entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -392,7 +410,7 @@ func (h *BudgetHandler) CompareVersions(c *gin.Context) {
 	rightBasis := gin.H{"kind": "version"}
 	rightLabel := "Actual"
 	if rightID == "actual" {
-		actuals, err := h.budgetRepo.ActualsForPeriod(ctx, legalEntityID, period)
+		actuals, err := h.budgetRepo.ActualsForPeriod(ctx, entity, period)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -401,7 +419,7 @@ func (h *BudgetHandler) CompareVersions(c *gin.Context) {
 		right = toContractPeriods(actuals)
 		rightBasis = gin.H{"kind": "actual", "source": "measurement_results"}
 	} else {
-		rightVersion, err := h.budgetRepo.GetVersion(ctx, rightID, legalEntityID)
+		rightVersion, err := h.budgetRepo.GetVersion(ctx, rightID, entity)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -452,13 +470,17 @@ func (h *BudgetHandler) ManagementBrief(c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
-	legalEntityID := middleware.GetTenantID(c)
-	budgetVersion, err := h.budgetRepo.GetVersion(ctx, budgetID, legalEntityID)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	budgetVersion, err := h.budgetRepo.GetVersion(ctx, budgetID, entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	forecastVersion, err := h.budgetRepo.GetVersion(ctx, forecastID, legalEntityID)
+	forecastVersion, err := h.budgetRepo.GetVersion(ctx, forecastID, entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -477,7 +499,7 @@ func (h *BudgetHandler) ManagementBrief(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	actuals, err := h.budgetRepo.ActualsForPeriod(ctx, legalEntityID, period)
+	actuals, err := h.budgetRepo.ActualsForPeriod(ctx, entity, period)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

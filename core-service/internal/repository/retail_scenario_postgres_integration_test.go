@@ -110,10 +110,12 @@ func TestRetailScenarioPostgresGoldenIsolationAndZeroTouch(t *testing.T) {
 	actionRouter := gin.New()
 	actionRouter.POST("/stores/:store_id/scenario-action-drafts", func(c *gin.Context) {
 		c.Set("legal_entity_id", entityA)
+		c.Set("access_scope", access.Scope{LegalEntityID: entityA})
 		actionHandler.SaveAction(c)
 	})
 	actionRouter.POST("/b/stores/:store_id/scenario-action-drafts", func(c *gin.Context) {
 		c.Set("legal_entity_id", entityB)
+		c.Set("access_scope", access.Scope{LegalEntityID: entityB})
 		actionHandler.SaveAction(c)
 	})
 	actionPath := "/stores/" + storeA + "/scenario-action-drafts?data_classification=simulated&dataset_version=" + planA.DatasetVersion + "&as_of=2026-06-30&window_days=28&source_system=retail_simulator"

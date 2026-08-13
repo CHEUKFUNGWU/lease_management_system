@@ -12,16 +12,16 @@ import (
 
 type fakePerformanceReader struct{}
 
-func (fakePerformanceReader) Overview(context.Context, string, string) (*repository.PerformanceOverview, error) {
+func (fakePerformanceReader) Overview(context.Context, access.EntityFilter, string) (*repository.PerformanceOverview, error) {
 	return &repository.PerformanceOverview{Period: "2026-07", OpenActionCount: 2}, nil
 }
-func (fakePerformanceReader) ListStores(context.Context, string, string, string) ([]*repository.StoreOperatingFact, error) {
+func (fakePerformanceReader) ListStores(context.Context, access.EntityFilter, string, string) ([]*repository.StoreOperatingFact, error) {
 	return []*repository.StoreOperatingFact{{ID: "fact-1", StoreID: "store-1", StoreCode: "S-1", Period: "2026-07", Currency: "CNY", Revenue: 10}}, nil
 }
-func (fakePerformanceReader) ListEquipmentFacts(context.Context, string, string, string, string) ([]*repository.EquipmentOperatingFact, error) {
+func (fakePerformanceReader) ListEquipmentFacts(context.Context, access.EntityFilter, string, string, string) ([]*repository.EquipmentOperatingFact, error) {
 	return []*repository.EquipmentOperatingFact{{ID: "fact-2", EquipmentID: "equipment-1", EquipmentCode: "EQ-1", Period: "2026-07", Currency: "CNY"}}, nil
 }
-func (fakePerformanceReader) ListActions(context.Context, string, string, string, string) ([]*repository.FPnAActionItem, error) {
+func (fakePerformanceReader) ListActions(context.Context, access.EntityFilter, string, string, string) ([]*repository.FPnAActionItem, error) {
 	return []*repository.FPnAActionItem{{ID: "action-1", Title: "缺少对账", SourceTable: "store_operating_facts", SourceRecordID: "fact-1"}}, nil
 }
 
@@ -87,7 +87,7 @@ func TestActionDraftIsReviewableAndCarriesAssistEvidence(t *testing.T) {
 
 type fakeBudgetReader struct{}
 
-func (fakeBudgetReader) ReadVariance(context.Context, string, string, string) (any, error) {
+func (fakeBudgetReader) ReadVariance(context.Context, access.EntityFilter, string, string) (any, error) {
 	return map[string]any{"result": "ok"}, nil
 }
 
@@ -99,7 +99,7 @@ func (fakeCashflowReader) ReadScenario(context.Context, string, CashflowScenario
 
 type fakeRenewalReader struct{}
 
-func (fakeRenewalReader) ReadDecisions(context.Context, string, string) (any, error) {
+func (fakeRenewalReader) ReadDecisions(context.Context, access.EntityFilter, string) (any, error) {
 	return map[string]any{"total": 1}, nil
 }
 

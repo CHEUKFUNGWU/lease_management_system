@@ -314,16 +314,39 @@ xs sm md  lg  xl  2xl 3xl 4xl
 
 | 偏离 | 规模 | 整改 |
 |---|---|---|
-| `globals.css` 的 `!important` | 142 处 | 改善方案阶段一 |
+| 内联 `style={{}}` | **906 处**（全 `web/app`，其中 `AppLayout.tsx` 30 处） | 改善方案阶段一 |
+| `globals.css` 的 `!important` | 142 处 | 阶段一 |
 | `.ant-` 覆盖 | 91 处 | 阶段一 |
-| `AppLayout.tsx` 内联样式 | 30 处 | 阶段一 |
-| JS hover handler | 6 处 | 阶段一 |
+| 字重 700 / 800 | 13 处 | 阶段一 |
 | `border: 1px solid` | 11 处 | 阶段一 |
-| 字重 700 / 800 | 页面标题、Logo | 阶段一 |
+| JS hover handler | 6 处 | 阶段一 |
 | `tokens.ts` 与 `:root` 漂移 | 见 §1 表 | 阶段一 |
 | 字体走 Google Fonts `@import`，未用 `next/font` | 全仓 0 处 `next/font` | 阶段一 |
+| 单环 focus，深色面上不可见 | 全站 | 阶段一 |
 | 三个零售页无 `t()` | 3 页 | 阶段四 |
 | 无暗色模式 | 全站 | 阶段四 |
-| 单环 focus，深色面上不可见 | 全站 | 阶段一 |
 
 整改排期与验收标准见 [docs/UIUX改善方案.md](docs/UIUX改善方案.md)。
+
+## 15. 这份文档目前没有牙齿
+
+必须写在最后，否则前面 13 节会被误读为「已经在执行的规则」：
+
+| 执行机制 | 状态 |
+|---|---|
+| ESLint 配置文件 | ❌ **不存在**。`web/package.json` 有 `"lint": "next lint"`，但没有配置文件，CI 也不跑 |
+| §1 要求的 `tokens.ts` ↔ `:root` 对齐测试 | ❌ **从未写过** |
+| 组件测试 | ❌ 未安装 `@testing-library`，61 个用例全是纯逻辑 |
+| §13 止血条款的自动拦截 | ❌ 无 |
+
+**906 处内联样式说明「自觉遵守」从来没有奏效过。** 在补上执行机制之前，本文的效力仅限于人工 code review。
+
+最小执行机制（当天可落，列为阶段一的第一项）：
+
+```
+1. ESLint 配置 + 内联样式规则（新文件 error，存量 warn）
+2. CI 检查：新增 !important / fontWeight>600 / 硬编码 CJK 即失败
+3. tokens.ts ↔ globals.css 对齐测试
+```
+
+来源：[docs/架构改善方案.md](docs/架构改善方案.md) §3。

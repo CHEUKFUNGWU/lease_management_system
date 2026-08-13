@@ -1,7 +1,8 @@
 # UI/UX 改善方案 / UI-UX Improvement Plan
 
-> 版本：v1.1（v1.0 为设计系统诊断；v1.1 追加转型主线错配问题清单与 Agent 首页方案）
+> 版本：v1.2（v1.0 设计系统诊断；v1.1 追加主线错配清单与 Agent 首页方案；v1.2 并入架构评审的前端结论）
 > 日期：2026-08-13
+> **前端排期以 [架构改善方案](./架构改善方案.md) §4 的合并排期为准** —— 该文纳入了外部架构评审，把法人隔离与执行机制排到了样式收敛之前。
 > 适用产品：线下零售经营分析工作站 / Retail Performance Workstation
 > 参考基准：[Beautiful UI（AI-native primitives）](https://www.beautifului.dev/)、[Vercel Design System](https://github.com/educlopez/design-bites/blob/main/design-mds/vercel.com/DESIGN.md)
 > 前序文档：[UIUX 设计与交互提升评估报告](./UIUX_设计与交互提升评估报告.md)、[产品转型可行性报告与规划](./线下零售经营分析工作站_产品转型可行性报告与规划.md)
@@ -285,6 +286,18 @@ D15 有三重代价：CSS 内的 `@import` 是渲染阻塞的；产生对 Google
 5. **不引入位移类动效。** 数据密集界面里的 transform/scale 会干扰读数，交互反馈只用颜色 —— 这一条与 Vercel 一致。
 
 ---
+
+## 5.5 架构评审补充的前端问题（2026-08-13）
+
+来自外部架构评审，详见 [架构改善方案](./架构改善方案.md)。这三条改变了本方案的规模判断：
+
+| ID | 问题 | 与本方案的关系 |
+|---|---|---|
+| **D22** | **没有 fetch 模块。** `lib/api.ts` 175 个传输方法（62 个已死）被 30 个文件直接调用；29 个页面手搓 loading/error，58 个 loading 标志，3 种不同的竞态策略，169 处 token 当参数传。`notify.ts:15` 那个 3 秒去重是因为并行 loader 叠出重复 toast —— 在错误的层打了补丁 | 新增，归入阶段三。`contracts/[id]` 和 `ai-chat` 是仅有的两个已有此接缝的页面，也是仅有的两个有像样测试的页面 |
+| **D23** | **三个零售页对同样五个问题给出三种答案**：竞态（requestGate / `let active` / `useRef`）、403（一个处理两个漏）、`formula_version`（一个从响应取两个硬编码）、Decision Ready（三种渲染）、`t()`（三个都没有）。而 `operating-pulse/logic.ts` 已经事实上成了共享模块，另两页都从页面目录里 import 它 | 强化了阶段二、三的必要性；`changeTone` 在浏览器里硬编码「哪个方向算坏」，而 `retailpulse:465` 的 `direction` 从未被透出 |
+| **D24** | **本方案与 DESIGN.md 都没有执行机制。** 无 ESLint 配置、无组件测试、token 对齐测试从未写过 | **阶段一的第一项**，见 DESIGN.md §15 |
+
+**并且修正一处低估**：内联样式不是 30 处，是**全仓 906 处**（30 处是 `AppLayout.tsx` 的数字）。阶段一的工作量需要按这个量级重估。
 
 ## 6. 附：为什么这些阶段的顺序不能换
 

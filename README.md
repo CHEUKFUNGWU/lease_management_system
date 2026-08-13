@@ -252,12 +252,20 @@ If 8080 / 8081 are taken locally, change `CORE_PORT` / `AI_PORT` in `.env`; in-c
 
 ### 4. 测试账号 / Test accounts
 
+> ⚠️ **仓库不种任何用户，以下账号仅存在于历史环境中。**
+> `db/init/01_init.sql`、`db/migrations/` 和 `scripts/` 中都没有创建用户的语句。下表列的是既有开发环境里手工建出来的账号，**新环境不会有**。
+>
+> **不要执行 `make reset-db` 或 `docker compose down -v`。** 重置后数据库将没有任何用户，而 `POST /api/v1/auth/register` 无条件返回 403（公开注册已关闭）、`POST /api/v1/admin/users` 又需要一个已认证的管理员——系统会进入**无法登录且无法引导**的状态。首个管理员引导路径是已知缺口，见 [SEC-001 Review 1](docs/execution/reviews/SEC-001_review_1.md) §5。
+>
+> The repository seeds no users. The accounts below exist only in long-lived dev environments where they were created by hand. Do not run `make reset-db` or `docker compose down -v`: the database would end up with no users at all, public registration returns 403 unconditionally, and creating one requires an already-authenticated admin — leaving the stack unbootstrappable.
+
 | 用户名 / Username | 密码 / Password | 角色 / Role | 说明 / Notes |
 |--------|------|------|------|
 | `admin_user` | `password123` | admin | 管理员，跨租户 / cross-tenant admin |
 | `testuser` | `password123` | user | 普通测试用户 / general test user |
-| `user_le001` | `password123` | user | LE001 法人 / legal entity LE001 |
-| `user_le002` | `password123` | user | LE002 法人 / legal entity LE002 |
+
+需要按法人隔离测试时，用管理员通过 `POST /api/v1/admin/users` 新建带 `legal_entity_id` 的用户（该字段对非管理员角色现为必填）。
+To test legal-entity isolation, create a user with a `legal_entity_id` through `POST /api/v1/admin/users` as an admin; that field is now required for non-admin roles.
 
 ### 5. 生成演示数据并跑一次经营晨检 / Generate demo data and run a morning check
 

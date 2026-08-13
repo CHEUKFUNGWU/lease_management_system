@@ -1,0 +1,18 @@
+{
+  "pulse_version": "retail-pulse-v1",
+  "formula_version": "retail-kpi-v1",
+  "window_days": 7,
+  "cases": [
+    {"as_of":"2026-01-31","store_index":1,"signal_code":"footfall_decline","rank":1,"severity":"high","score":4.01,"observed_change":-29.27,"threshold":-15.0,"current_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"comparison_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"summary":{"revenue_current":1616874.93,"revenue_comparison":1604605.24,"store_contribution_current":59720.09,"store_contribution_comparison":56731.72}},
+    {"as_of":"2026-02-25","store_index":2,"signal_code":"conversion_drop","rank":1,"severity":"critical","score":8.96,"observed_change":-8.65,"threshold":-3.0,"current_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"comparison_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"summary":{"revenue_current":1677877.50,"revenue_comparison":1681365.40,"store_contribution_current":63480.90,"store_contribution_comparison":65603.57}},
+    {"as_of":"2026-03-22","store_index":3,"signal_code":"average_ticket_drop","rank":1,"severity":"critical","score":7.77,"observed_change":-42.92,"threshold":-15.0,"current_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"comparison_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"summary":{"revenue_current":1731717.94,"revenue_comparison":1734680.46,"store_contribution_current":73257.70,"store_contribution_comparison":73544.73}},
+    {"as_of":"2026-04-16","store_index":4,"signal_code":"gross_margin_compression","rank":1,"severity":"high","score":4.00,"observed_change":-16.22,"threshold":-5.0,"current_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"comparison_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"summary":{"revenue_current":1788130.82,"revenue_comparison":1778659.26,"store_contribution_current":71244.81,"store_contribution_comparison":82115.77}},
+    {"as_of":"2026-05-11","store_index":5,"signal_code":"labor_cost_rate_spike","rank":1,"severity":"high","score":4.00,"observed_change":19.34,"threshold":5.0,"current_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"comparison_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"summary":{"revenue_current":1810911.22,"revenue_comparison":1810834.87,"store_contribution_current":78966.99,"store_contribution_comparison":84365.14}},
+    {"as_of":"2026-06-05","store_index":6,"signal_code":"occupancy_cost_rate_spike","rank":1,"severity":"high","score":3.02,"observed_change":10.08,"threshold":5.0,"current_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"comparison_coverage":{"observed_store_days":420,"expected_store_days":420,"coverage_rate":100.0},"summary":{"revenue_current":1801064.11,"revenue_comparison":1794566.35,"store_contribution_current":79444.20,"store_contribution_comparison":82019.21}}
+  ],
+  "control_store_index": 0,
+  "coverage_suppression_reason": "incomplete_store_day_coverage",
+  "empty_population_suppression_reason": "no_facts_in_requested_range",
+  "severity_thresholds": {"critical":6.0,"high":3.0,"medium":1.0},
+  "contribution_turns_negative": {"threshold":0.0,"score_contribution":1.0,"severity":"medium"}
+}

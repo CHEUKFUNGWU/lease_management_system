@@ -8,6 +8,7 @@ import type {
   RuntimeEvent,
   RuntimeArtifact,
   RuntimeReviewAction,
+  RuntimeSource,
   UploadedFile,
 } from "./types";
 
@@ -38,7 +39,11 @@ export function mapServerMessage(message: any): Message {
     timestamp: toTimestamp(message.created_at),
     runId: message.run_id || undefined,
     sources: runtimeSources
-      .map((source) => source?.title || source?.id || source?.type)
+      .map((source) => typeof source === "string" ? source : ({
+        type: source?.type, id: source?.id, title: source?.title, snippet: source?.snippet,
+        url: source?.url, classification: source?.classification, dataset_version: source?.dataset_version,
+        as_of: source?.as_of, formula_version: source?.formula_version,
+      } satisfies RuntimeSource))
       .filter(Boolean),
     attachments: parseRuntimeField<UploadedFile[]>(message.attachments),
     model: message.model || undefined,
@@ -130,8 +135,12 @@ export function applyRuntimeEvent(message: Message, event: RuntimeEvent): Runtim
         model: payload.model,
         sources: Array.isArray(payload.sources)
           ? payload.sources
-              .map((source: any) => source.title || source.id || source.type)
-              .filter(Boolean)
+              .map((source: any) => typeof source === "string" ? source : ({
+                type: source?.type, id: source?.id, title: source?.title, snippet: source?.snippet,
+                url: source?.url, classification: source?.classification, dataset_version: source?.dataset_version,
+                as_of: source?.as_of, formula_version: source?.formula_version,
+              } satisfies RuntimeSource))
+              .filter((source: any) => typeof source === "string" || source.title || source.id || source.type)
           : undefined,
       };
       startsTyping = true;

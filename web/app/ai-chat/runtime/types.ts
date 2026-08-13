@@ -118,6 +118,18 @@ export interface RuntimeArtifact {
   rule_version?: string;
 }
 
+export interface RuntimeSource {
+  type?: string;
+  id?: string;
+  title?: string;
+  snippet?: string;
+  url?: string;
+  classification?: string;
+  dataset_version?: string;
+  as_of?: string;
+  formula_version?: string;
+}
+
 export interface RuntimeReviewAction {
   id: string;
   actionType: string;
@@ -142,7 +154,7 @@ export interface Message {
   content: string;
   timestamp: number;
   runId?: string;
-  sources?: string[];
+  sources?: Array<string | RuntimeSource>;
   attachments?: UploadedFile[];
   model?: string;
   thinking?: string;
@@ -190,6 +202,7 @@ export interface RuntimeSnapshot {
 export interface PageContext {
   page?: string;
   title?: string;
+  tags?: string[];
   contract_id?: string;
   period?: string;
   report_view?: string;
@@ -206,5 +219,7 @@ export interface RunRequest {
   object_name?: string;
   content_type?: string;
   language?: string;
+  skill_id?: string;
+  skill_version?: string;
   page_context?: PageContext;
 }

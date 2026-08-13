@@ -57,8 +57,15 @@ CREATE TABLE IF NOT EXISTS stores (
     region VARCHAR(100),
     address TEXT,
     is_active BOOLEAN NOT NULL DEFAULT true,
+    data_classification VARCHAR(20) NOT NULL DEFAULT 'production',
+    simulation_dataset_version VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (data_classification IN ('production', 'simulated')),
+    CHECK (
+        (data_classification = 'simulated' AND NULLIF(BTRIM(simulation_dataset_version), '') IS NOT NULL)
+        OR (data_classification = 'production' AND simulation_dataset_version IS NULL)
+    )
 );
 
 CREATE TABLE IF NOT EXISTS landlords (
@@ -564,6 +571,7 @@ CREATE TABLE IF NOT EXISTS ai_chat_artifacts (
         'data_quality_issue_list',
         'report_explanation',
         'monthly_close_blockers',
+        'retail_action_proposal',
         'generic'
     )),
     CHECK (status IN ('draft', 'ready', 'confirmed', 'rejected', 'archived'))
@@ -1286,6 +1294,7 @@ ALTER TABLE ai_chat_artifacts
         'data_quality_issue_list',
         'report_explanation',
         'monthly_close_blockers',
+        'retail_action_proposal',
         'generic'
     ));
 
@@ -1660,5 +1669,137 @@ INSERT INTO permissions (role_id,resource,action) VALUES
  ('22222222-2222-2222-2222-222222222222','fpna_reports','write'),('33333333-3333-3333-3333-333333333333','fpna_reports','write'),('44444444-4444-4444-4444-444444444444','fpna_reports','write'),('55555555-5555-5555-5555-555555555555','fpna_reports','read'),
  ('22222222-2222-2222-2222-222222222222','fpna_mappings','write'),('33333333-3333-3333-3333-333333333333','fpna_mappings','write'),('44444444-4444-4444-4444-444444444444','fpna_mappings','write'),('55555555-5555-5555-5555-555555555555','fpna_data_quality','read'),('22222222-2222-2222-2222-222222222222','fpna_data_quality','write'),('33333333-3333-3333-3333-333333333333','fpna_data_quality','write'),('44444444-4444-4444-4444-444444444444','fpna_data_quality','write')
 ON CONFLICT (role_id,resource,action) DO NOTHING;
+
+-- ============================================================================
+-- Migration 038: daily retail operating facts with explicit simulated source.
+CREATE TABLE IF NOT EXISTS retail_store_day_facts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    business_date DATE NOT NULL,
+    currency VARCHAR(3) NOT NULL,
+    revenue DECIMAL(18,2) NOT NULL DEFAULT 0,
+    gross_profit DECIMAL(18,2),
+    transactions DECIMAL(18,2),
+    footfall DECIMAL(18,2),
+    area_sqm DECIMAL(18,2),
+    labor_cost DECIMAL(18,2),
+    fixed_rent DECIMAL(18,2),
+    variable_rent DECIMAL(18,2),
+    non_lease_cost DECIMAL(18,2),
+    other_controllable_cost DECIMAL(18,2),
+    source_system VARCHAR(100) NOT NULL,
+    source_record_id VARCHAR(150),
+    import_batch_id UUID REFERENCES operating_fact_batches(id),
+    as_of_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    version INTEGER NOT NULL DEFAULT 1,
+    reconciliation_status VARCHAR(30) NOT NULL DEFAULT 'unreconciled',
+    mapping_status VARCHAR(30) NOT NULL DEFAULT 'mapped',
+    data_quality_status VARCHAR(30) NOT NULL DEFAULT 'unassessed',
+    data_classification VARCHAR(20) NOT NULL,
+    simulation_dataset_version VARCHAR(100),
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (currency ~ '^[A-Z]{3}$'),
+    CHECK (version > 0),
+    CHECK (BTRIM(source_system) <> ''),
+    CHECK (reconciliation_status IN ('unreconciled', 'matched', 'warning', 'failed')),
+    CHECK (mapping_status IN ('mapped', 'unmapped', 'ambiguous')),
+    CHECK (data_quality_status IN ('unassessed', 'valid', 'warning', 'invalid')),
+    CHECK (data_classification IN ('production', 'simulated')),
+    CHECK (
+        (data_classification = 'simulated' AND NULLIF(BTRIM(simulation_dataset_version), '') IS NOT NULL)
+        OR (data_classification = 'production' AND simulation_dataset_version IS NULL)
+    ),
+    CHECK (revenue >= 0),
+    CHECK (gross_profit IS NULL OR gross_profit >= 0),
+    CHECK (transactions IS NULL OR transactions >= 0),
+    CHECK (footfall IS NULL OR footfall >= 0),
+    CHECK (area_sqm IS NULL OR area_sqm >= 0),
+    CHECK (labor_cost IS NULL OR labor_cost >= 0),
+    CHECK (fixed_rent IS NULL OR fixed_rent >= 0),
+    CHECK (variable_rent IS NULL OR variable_rent >= 0),
+    CHECK (non_lease_cost IS NULL OR non_lease_cost >= 0),
+    CHECK (other_controllable_cost IS NULL OR other_controllable_cost >= 0),
+    UNIQUE (store_id, business_date, version, source_system)
+);
+CREATE INDEX IF NOT EXISTS idx_retail_store_day_facts_lookup
+    ON retail_store_day_facts(store_id, business_date, version DESC);
+
+-- Request-level idempotency is separate from the fact business key.  A
+-- replay must not re-run an upsert or append another audit event, while a
+-- different payload under the same key is a deterministic conflict.
+CREATE TABLE IF NOT EXISTS retail_store_day_fact_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    scope_key VARCHAR(100) NOT NULL,
+    legal_entity_id UUID REFERENCES legal_entities(id),
+    idempotency_key VARCHAR(255) NOT NULL,
+    payload_sha256 VARCHAR(64) NOT NULL,
+    fact_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (BTRIM(scope_key) <> ''),
+    CHECK (BTRIM(idempotency_key) <> ''),
+    CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
+    UNIQUE (scope_key, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS idx_retail_store_day_fact_requests_entity
+    ON retail_store_day_fact_requests(legal_entity_id, created_at DESC);
+
+-- ============================================================================
+-- Migration 039: deterministic retail simulation datasets and store source flags.
+ALTER TABLE stores
+    ADD COLUMN IF NOT EXISTS data_classification VARCHAR(20) NOT NULL DEFAULT 'production',
+    ADD COLUMN IF NOT EXISTS simulation_dataset_version VARCHAR(100);
+UPDATE stores SET data_classification = 'production'
+WHERE data_classification IS NULL OR BTRIM(data_classification) = '';
+ALTER TABLE stores
+    ALTER COLUMN data_classification SET DEFAULT 'production',
+    ALTER COLUMN data_classification SET NOT NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'stores'::regclass AND conname = 'stores_data_classification_check') THEN
+        ALTER TABLE stores ADD CONSTRAINT stores_data_classification_check CHECK (data_classification IN ('production', 'simulated'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'stores'::regclass AND conname = 'stores_simulation_version_check') THEN
+        ALTER TABLE stores ADD CONSTRAINT stores_simulation_version_check CHECK (
+            (data_classification = 'simulated' AND NULLIF(BTRIM(simulation_dataset_version), '') IS NOT NULL)
+            OR (data_classification = 'production' AND simulation_dataset_version IS NULL)
+        );
+    END IF;
+END $$;
+CREATE TABLE IF NOT EXISTS retail_simulation_datasets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_entity_id UUID NOT NULL REFERENCES legal_entities(id),
+    dataset_version VARCHAR(100) NOT NULL,
+    generator_version VARCHAR(100) NOT NULL,
+    seed BIGINT NOT NULL,
+    date_from DATE NOT NULL,
+    date_to DATE NOT NULL,
+    store_count INTEGER NOT NULL,
+    fact_count INTEGER NOT NULL DEFAULT 0,
+    parameters JSONB NOT NULL DEFAULT '{}'::jsonb,
+    anomaly_manifest JSONB NOT NULL DEFAULT '[]'::jsonb,
+    payload_sha256 VARCHAR(64) NOT NULL,
+    business_sha256 VARCHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'generating',
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE,
+    idempotency_key VARCHAR(255),
+    import_batch_id UUID REFERENCES operating_fact_batches(id),
+    CHECK (date_to >= date_from),
+    CHECK (store_count BETWEEN 10 AND 100),
+    CHECK (fact_count >= 0),
+    CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
+    CHECK (business_sha256 ~ '^[0-9a-f]{64}$'),
+    CHECK (status IN ('generating', 'completed', 'failed')),
+    UNIQUE (legal_entity_id, dataset_version)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_retail_simulation_datasets_idempotency
+    ON retail_simulation_datasets(legal_entity_id, idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_retail_simulation_datasets_entity_created
+    ON retail_simulation_datasets(legal_entity_id, created_at DESC);
 
 -- End of init script

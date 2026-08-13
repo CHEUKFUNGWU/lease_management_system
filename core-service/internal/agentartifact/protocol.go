@@ -22,6 +22,7 @@ const (
 	ArtifactDataQualityIssues    ArtifactType = "data_quality_issue_list"
 	ArtifactReportExplanation    ArtifactType = "report_explanation"
 	ArtifactMonthlyCloseBlockers ArtifactType = "monthly_close_blockers"
+	ArtifactRetailActionProposal ArtifactType = "retail_action_proposal"
 	ArtifactGeneric              ArtifactType = "generic"
 )
 
@@ -111,7 +112,7 @@ func knownArtifactType(artifactType ArtifactType) bool {
 	switch artifactType {
 	case ArtifactContractDraft, ArtifactPaymentScheduleDraft, ArtifactEventDraft,
 		ArtifactAuditPack, ArtifactDataQualityIssues, ArtifactReportExplanation,
-		ArtifactMonthlyCloseBlockers, ArtifactGeneric:
+		ArtifactMonthlyCloseBlockers, ArtifactRetailActionProposal, ArtifactGeneric:
 		return true
 	default:
 		return false

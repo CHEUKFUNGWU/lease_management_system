@@ -1,0 +1,67 @@
+{
+  "formula_version": "retail-kpi-v1",
+  "fixture": "MAX-002 default seed=20260812 date=2026-01-01..2026-06-30 stores=60",
+  "default_overall": {
+    "fact_count": 10860,
+    "expected_store_days": 10860,
+    "coverage_rate": 100.0,
+    "kpis": {
+      "revenue": 44645082.59,
+      "gross_profit": 13828135.35,
+      "footfall": 3835504.0,
+      "transactions": 564990.0,
+      "labor_cost": 5246877.18,
+      "fixed_rent": 3306674.90,
+      "variable_rent": 535741.53,
+      "non_lease_cost": 401805.53,
+      "other_controllable_cost": 2455479.91,
+      "occupancy_cash_cost": 4244221.96,
+      "store_contribution": 1881556.30,
+      "gross_margin_rate": 30.97,
+      "conversion_rate": 14.73,
+      "average_transaction_value": 79.02,
+      "labor_cost_rate": 11.75,
+      "rent_to_sales_rate": 8.61,
+      "occupancy_cash_cost_rate": 9.51,
+      "store_contribution_margin": 4.21,
+      "average_daily_area_sqm": 10590.0,
+      "sales_per_sqm": 4215.78,
+      "revenue_per_store_day": 4110.97
+    }
+  },
+  "control_store_001": {
+    "fact_count": 181,
+    "kpis": {
+      "revenue": 604550.98,
+      "gross_profit": 188567.87,
+      "footfall": 54165.0,
+      "transactions": 8032.0,
+      "store_contribution": 43417.97,
+      "gross_margin_rate": 31.19,
+      "conversion_rate": 14.83,
+      "average_transaction_value": 75.27
+    }
+  },
+  "anomalies": [
+    {"id":"traffic-decline", "type":"footfall_continuous_decline", "date_from":"2026-01-25", "date_to":"2026-01-31", "kpis":{"revenue":19134.82,"gross_profit":6005.05,"footfall":1624.0,"transactions":243.0,"store_contribution":779.47,"gross_margin_rate":31.38,"conversion_rate":14.96,"average_transaction_value":78.74,"occupancy_cash_cost_rate":9.74}},
+    {"id":"conversion-drop", "type":"conversion_rate_drop", "date_from":"2026-02-19", "date_to":"2026-02-25", "kpis":{"revenue":10138.07,"gross_profit":3216.48,"footfall":2099.0,"transactions":129.0,"store_contribution":-628.67,"gross_margin_rate":31.73,"conversion_rate":6.15,"average_transaction_value":78.59,"occupancy_cash_cost_rate":20.78}},
+    {"id":"aov-drop", "type":"average_ticket_drop", "date_from":"2026-03-16", "date_to":"2026-03-22", "kpis":{"revenue":18357.68,"gross_profit":5666.75,"footfall":2634.0,"transactions":391.0,"store_contribution":-341.57,"gross_margin_rate":30.87,"conversion_rate":14.84,"average_transaction_value":46.95,"occupancy_cash_cost_rate":15.51}},
+    {"id":"margin-compression", "type":"gross_margin_compression", "date_from":"2026-04-10", "date_to":"2026-04-16", "kpis":{"revenue":27499.38,"gross_profit":4100.39,"footfall":2291.0,"transactions":334.0,"store_contribution":-4099.70,"gross_margin_rate":14.91,"conversion_rate":14.58,"average_transaction_value":82.33,"occupancy_cash_cost_rate":12.48}},
+    {"id":"labor-spike", "type":"labor_cost_spike", "date_from":"2026-05-05", "date_to":"2026-05-11", "kpis":{"revenue":31954.08,"gross_profit":9904.84,"footfall":2798.0,"transactions":422.0,"store_contribution":-3545.01,"gross_margin_rate":31.00,"conversion_rate":15.08,"average_transaction_value":75.72,"occupancy_cash_cost_rate":5.79}},
+    {"id":"occupancy-burden", "type":"occupancy_cost_burden", "date_from":"2026-05-30", "date_to":"2026-06-05", "kpis":{"revenue":27752.21,"gross_profit":8740.31,"footfall":2420.0,"transactions":356.0,"store_contribution":-1088.74,"gross_margin_rate":31.49,"conversion_rate":14.71,"average_transaction_value":77.96,"occupancy_cash_cost_rate":17.98}}
+  ],
+  "zero_denominator": {
+    "gross_margin_rate": {"value": null, "status":"unavailable", "reason":"zero_denominator"},
+    "conversion_rate": {"value": null, "status":"unavailable", "reason":"zero_denominator"},
+    "average_transaction_value": {"value": null, "status":"unavailable", "reason":"zero_denominator"},
+    "labor_cost_rate": {"value": null, "status":"unavailable", "reason":"zero_denominator"},
+    "rent_to_sales_rate": {"value": null, "status":"unavailable", "reason":"zero_denominator"},
+    "occupancy_cash_cost_rate": {"value": null, "status":"unavailable", "reason":"zero_denominator"},
+    "store_contribution_margin": {"value": null, "status":"unavailable", "reason":"zero_denominator"},
+    "sales_per_sqm": {"value": null, "status":"unavailable", "reason":"zero_denominator"}
+  },
+  "missing_field": {
+    "gross_profit": {"value": null, "status":"partial", "reason":"missing_required_field"},
+    "decision_ready": false
+  }
+}

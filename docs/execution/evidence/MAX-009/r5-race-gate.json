@@ -1,0 +1,19 @@
+{
+  "case": "latest-response-race",
+  "browser_same_tab": {
+    "page": "/operating-pulse",
+    "switch_sequence": "window_days=28 -> window_days=7",
+    "final_url": "/operating-pulse?data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&as_of=2026-06-05&window_days=7",
+    "final_dom_scope": {"window_days": 7, "current_coverage": "420/420", "comparison_coverage": "420/420"},
+    "network_timing_export": "unavailable in the Browser control surface; no HTTP timing is claimed here",
+    "client_route_pattern": "/api/api/v1/retail/operating-pulse (same-origin Next rewrite; not presented as a captured request URL)",
+    "normalized_core_endpoint": "/api/v1/retail/operating-pulse"
+  },
+  "deterministic_gate_test": {
+    "command": "cd web && npm test -- --run app/operating-pulse/requestGate.test.ts",
+    "result": "PASS",
+    "contract": "page.tsx loadPulse uses createLatestRequestGate(); request 7 commits first, then deferred request 28 attempts commit and is rejected",
+    "assertions": ["newer commit returns true", "late older commit returns false", "final state remains new-7"],
+    "evidence_source": "web/app/operating-pulse/requestGate.ts and the page import/use of the same gate"
+  }
+}

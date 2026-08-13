@@ -65,6 +65,8 @@ func main() {
 	storeMetricsRepo := repository.NewStoreMetricsRepository(database.Pool)
 	renewalDecisionRepo := repository.NewRenewalDecisionRepository(database.Pool)
 	operatingFactsRepo := repository.NewOperatingFactsRepository(database.Pool)
+	retailSimulationRepo := repository.NewRetailSimulationRepository(database.Pool)
+	retailKPIRepo := repository.NewRetailKPIRepository(database.Pool)
 	fpnaGovernanceRepo := repository.NewFPnAGovernanceRepository(database.Pool)
 
 	// Initialize audit logger
@@ -106,7 +108,7 @@ func main() {
 		Cashflow: agentreaders.NewCashflowScenarioReader(contractRepo, psRepo),
 		Renewal:  agentreaders.NewRenewalDecisionReader(contractRepo, renewalDecisionRepo),
 	}
-	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernance(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo)
+	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
@@ -116,6 +118,12 @@ func main() {
 	budgetHandler := handlers.NewBudgetHandler(budgetRepo, contractRepo, psRepo, systemSettingRepo)
 	storeMetricsHandler := handlers.NewStoreMetricsHandler(storeMetricsRepo, auditLogger, systemSettingRepo)
 	operatingFactsHandler := handlers.NewOperatingFactsHandler(operatingFactsRepo, auditLogger, fpnaGovernanceRepo)
+	retailStoreDayFactsHandler := handlers.NewRetailStoreDayFactsHandler(operatingFactsRepo, auditLogger)
+	retailSimulationHandler := handlers.NewRetailSimulationHandler(retailSimulationRepo, auditLogger)
+	retailKPIHandler := handlers.NewRetailKPIHandler(retailKPIRepo)
+	retailPulseHandler := handlers.NewRetailPulseHandler(retailKPIRepo)
+	retailStoreDiagnosticsHandler := handlers.NewRetailStoreDiagnosticsHandler(retailKPIRepo)
+	retailScenarioHandler := handlers.NewRetailScenarioHandler(retailKPIRepo, operatingFactsRepo)
 	fpnaGovernanceHandler := handlers.NewFPnAGovernanceHandler(fpnaGovernanceRepo, operatingFactsRepo, auditLogger)
 	decisionScenarioHandler := handlers.NewDecisionScenarioHandler(draftService)
 	agentGatewayHandler := handlers.NewAgentGatewayHandler(aiChatHandler.AgentToolRuntime(), handlers.NewAgentToolAuditRecorder(auditLogger)).WithCapabilityIssuer(capabilityIssuer).WithSkillRegistry(aiChatHandler.AgentSkillRegistry()).WithSessionStore(aiChatHandler.AgentSessionStore()).WithContractScopeReader(contractRepo).WithRunStore(aiChatHandler.AgentRunStore()).WithCheckpointStore(aiChatHandler.AgentRunCheckpointStore()).WithQueueStore(aiRunQueueRepo).WithWorkerRunStore(aiRunQueueRepo).WithTerminalAlertStore(aiChatRuntimeRepo).WithUsageStore(aiChatRuntimeRepo)
@@ -265,6 +273,17 @@ func main() {
 		protected.Handle(http.MethodPost, "/operating-facts/stores/import-xlsx", permission("master_data", "manage"), operatingFactsHandler.ImportStoresXLSX)
 		protected.Handle(http.MethodGet, "/operating-facts/stores/template", permission("reports", "read"), operatingFactsHandler.StoreCSVTemplate)
 		protected.Handle(http.MethodGet, "/operating-facts/stores", permission("reports", "read"), operatingFactsHandler.ListStores)
+		protected.Handle(http.MethodPost, "/retail/operating-facts/store-days", permission("master_data", "manage"), retailStoreDayFactsHandler.Upsert)
+		protected.Handle(http.MethodGet, "/retail/operating-facts/store-days", permission("reports", "read"), retailStoreDayFactsHandler.List)
+		protected.Handle(http.MethodGet, "/retail/kpis/definitions", permission("reports", "read"), retailKPIHandler.Definitions)
+		protected.Handle(http.MethodGet, "/retail/kpis/store-days", permission("reports", "read"), retailKPIHandler.StoreDays)
+		protected.Handle(http.MethodGet, "/retail/operating-pulse", permission("reports", "read"), retailPulseHandler.OperatingPulse)
+		protected.Handle(http.MethodGet, "/retail/store-options", permission("reports", "read"), retailStoreDiagnosticsHandler.StoreOptions)
+		protected.Handle(http.MethodGet, "/retail/stores/:store_id/diagnostics", permission("reports", "read"), retailStoreDiagnosticsHandler.Diagnostics)
+		protected.Handle(http.MethodPost, "/retail/stores/:store_id/scenarios/evaluate", permission("reports", "read"), retailScenarioHandler.Evaluate)
+		protected.Handle(http.MethodPost, "/retail/stores/:store_id/scenario-action-drafts", permission("fpna_actions", "write"), retailScenarioHandler.SaveAction)
+		protected.Handle(http.MethodPost, "/retail/simulations/store-days/generate", permission("master_data", "manage"), retailSimulationHandler.GenerateStoreDays)
+		protected.Handle(http.MethodGet, "/retail/simulations/store-days/latest", permission("reports", "read"), retailSimulationHandler.LatestStoreDays)
 		protected.Handle(http.MethodGet, "/operating-facts/batches", permission("reports", "read"), operatingFactsHandler.ListBatches)
 		protected.Handle(http.MethodGet, "/reports/store-performance", permission("reports", "read"), operatingFactsHandler.StorePerformance)
 		protected.Handle(http.MethodGet, "/reports/store-performance/benchmarks", permission("reports", "read"), operatingFactsHandler.StoreBenchmarks)

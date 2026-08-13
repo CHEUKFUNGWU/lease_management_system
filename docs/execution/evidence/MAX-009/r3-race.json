@@ -1,0 +1,27 @@
+{
+  "evidence": "MAX009R3 scope/filter cancellation race",
+  "old": {
+    "request_key": "MAX009R3-race-old",
+    "url": "http://127.0.0.1:18080/api/v1/retail/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=c36a3983-cb2a-4248-927b-2ae56000e995&window_days=28",
+    "process_status": 143,
+    "result_committed_to_dom": false
+  },
+  "new": {
+    "request_key": "MAX009R3-race-new",
+    "url": "http://127.0.0.1:18080/api/v1/retail/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=c36a3983-cb2a-4248-927b-2ae56000e995&window_days=7",
+    "http_status": 200,
+    "dom_scope": {
+      "window_days": 7,
+      "store_id": "c36a3983-cb2a-4248-927b-2ae56000e995",
+      "current_store_days": "420/420",
+      "comparison_store_days": "420/420"
+    }
+  },
+  "browser": {
+    "final_url": "http://localhost:3000/operating-pulse?as_of=2026-06-05&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator&store_id=c36a3983-cb2a-4248-927b-2ae56000e995&window_days=7",
+    "inner_width": 1440,
+    "inner_height": 900,
+    "console_errors": 0,
+    "note": "Only pre-existing Recharts width/height warnings were observed; no stale old-scope DOM commit."
+  }
+}

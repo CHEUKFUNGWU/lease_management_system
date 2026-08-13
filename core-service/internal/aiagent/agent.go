@@ -78,11 +78,22 @@ func NewWithOperationalReadersAndGovernance(contractRepo *repository.ContractRep
 	return newAgentWithGovernance(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, draftServices...)
 }
 
+// NewWithOperationalReadersAndGovernanceAndRetail is the additive production
+// constructor for retail_operations@v1. The historical constructors remain
+// unchanged so legacy skills/tools keep their original registry contract.
+func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, draftServices ...*draftapp.Service) *Agent {
+	return newAgentWithGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, draftServices...)
+}
+
 func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, draftServices ...*draftapp.Service) *Agent {
 	return newAgentWithGovernance(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, nil, draftServices...)
 }
 
 func newAgentWithGovernance(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, draftServices ...*draftapp.Service) *Agent {
+	return newAgentWithGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, nil, draftServices...)
+}
+
+func newAgentWithGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
@@ -183,6 +194,17 @@ func newAgentWithGovernance(contractRepo *repository.ContractRepository, mcRepo 
 			}
 		}
 	}
+	if retail != nil {
+		for _, definition := range []agenttools.ToolDefinition{
+			agenttooldefs.NewRetailOperatingPulseDefinition(retail),
+			agenttooldefs.NewRetailStoreDiagnosticsDefinition(retail),
+			agenttooldefs.NewRetailScenarioEvaluateDefinition(retail),
+		} {
+			if err := registry.Register(definition); err == nil {
+				registered = true
+			}
+		}
+	}
 	if registered {
 		agent.toolRuntime = agenttools.NewRuntime(registry, agenttools.RuntimeOptions{})
 	}
@@ -256,6 +278,8 @@ func runbookForSkillID(skillID string, req Request, effectiveContractID string) 
 		return buildAuditPackRunbook()
 	case "fpna_copilot", "retail_performance", "manufacturing_performance":
 		return buildPerformanceRunbook(skillID, req)
+	case "retail_operations":
+		return buildRetailOperationsRunbook(req)
 	default:
 		return nil
 	}
@@ -412,6 +436,20 @@ func ProjectResult(response Response) aichat.Result {
 			Data: map[string]any{"event": response.EventDraft},
 		})
 	}
+	if response.RetailActionProposal != nil {
+		proposal := response.RetailActionProposal
+		evidenceRefs := response.EvidenceRefs
+		if len(evidenceRefs) == 0 {
+			evidenceRefs = evidenceReferencesFromSources(response.Sources)
+		}
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type: "retail_action_proposal", Title: proposal.Title, ReviewRequired: true,
+			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
+			EvidenceComplete: proposal.EvidenceComplete && len(evidenceRefs) > 0,
+			ReviewReasons:    []string{"retail_action_review", "scenario_workbench_confirmation"},
+			ModelVersion:     response.Model, RuleVersion: "retail-operations-rule.v1", Data: proposal,
+		})
+	}
 	appendDataQualityArtifacts(&result, response)
 	return result
 }
@@ -473,7 +511,7 @@ func requestFromRuntimeInput(input aichat.Input) Request {
 		SessionID: input.SessionID, Message: input.Message,
 		ContractID: input.ContractID, History: input.History,
 		FileID: input.FileID, ObjectName: input.ObjectName, ContentType: input.ContentType,
-		PageContext: input.PageContext, Language: input.Language,
+		PageContext: input.PageContext, Language: input.Language, SkillID: input.SkillID, SkillVersion: input.SkillVersion,
 	}
 }
 
@@ -516,6 +554,8 @@ type Response struct {
 	AuditPack              *AuditPackData                    `json:"audit_pack,omitempty"`
 	ReportExplanation      *ReportExplanationData            `json:"report_explanation,omitempty"`
 	EventDraft             *EventDraftData                   `json:"event_draft,omitempty"`
+	RetailOperations       *RetailOperationsData             `json:"retail_operations,omitempty"`
+	RetailActionProposal   *RetailActionProposal             `json:"retail_action_proposal,omitempty"`
 }
 
 type AuditPackData struct {
@@ -640,10 +680,15 @@ type PaymentScheduleParseSummary struct {
 }
 
 type Source struct {
-	Type    string `json:"type"`
-	ID      string `json:"id"`
-	Title   string `json:"title"`
-	Snippet string `json:"snippet"`
+	Type           string `json:"type"`
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	Snippet        string `json:"snippet"`
+	URL            string `json:"url,omitempty"`
+	Classification string `json:"classification,omitempty"`
+	DatasetVersion string `json:"dataset_version,omitempty"`
+	AsOf           string `json:"as_of,omitempty"`
+	FormulaVersion string `json:"formula_version,omitempty"`
 }
 
 func effectiveContractIDFromRequest(req Request) string {
@@ -655,6 +700,9 @@ func effectiveContractIDFromRequest(req Request) string {
 }
 
 func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req Request, legalEntityID, userIDStr, roleStr string, emit func(context.Context, string, any) error, agentRunbook *AgentRunbook, toolRuntime *agenttools.Runtime) (Response, error) {
+	if agentRunbook != nil && agentRunbook.SkillID == "retail_operations" {
+		return h.executeRetailOperations(ctx, req, emit, toolRuntime)
+	}
 	var sources []Source
 	var contextData strings.Builder
 	effectiveContractID := effectiveContractIDFromRequest(req)

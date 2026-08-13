@@ -1,0 +1,40 @@
+{
+  "evidence": "Scoped LE002 cannot read LE001 MAX-009 objects",
+  "viewer": "MAX009R3_LE002",
+  "target_legal_entity": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "checks": [
+    {
+      "resource": "kpi_source",
+      "method": "GET",
+      "path": "/api/v1/retail/kpis/store-days?group_by=store&store_id=c36a3983-cb2a-4248-927b-2ae56000e995&data_classification=simulated&dataset_version=retail-sim-v1-2853d9537f358baf&source_system=retail_simulator",
+      "http_status": 200,
+      "response_shape": {"data": [], "total_rows": 0, "requested_scope_legal_entity": "b2c3d4e5-f6a7-8901-bcde-f12345678901"},
+      "target_visible": false
+    },
+    {
+      "resource": "action_queue",
+      "method": "GET",
+      "path": "/api/v1/performance/actions?period=2026-06&category=retail_store_scenario",
+      "http_status": 200,
+      "response_shape": {"data": [], "ranking": [], "total": 0},
+      "target_visible": false
+    },
+    {
+      "resource": "ai_run_trace",
+      "method": "GET",
+      "path": "/api/v1/ai/chat/runs/0c866dfb-89c3-428d-bcf2-55ca52183231/trace",
+      "http_status": 404,
+      "response_shape": {"error": "agent run not found"},
+      "target_visible": false
+    },
+    {
+      "resource": "ai_session",
+      "method": "GET",
+      "path": "/api/v1/ai/chat/sessions/4e871d8f-a63a-42fc-8c34-f146bb9fa520",
+      "http_status": 404,
+      "response_shape": {"error": "ai chat session not found"},
+      "target_visible": false
+    }
+  ],
+  "artifact_route_note": "No direct artifact GET route exists; owner-filtered run/session envelopes are the product contract."
+}

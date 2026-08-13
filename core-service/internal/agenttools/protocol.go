@@ -157,10 +157,15 @@ func (c ToolCall) Validate() error {
 }
 
 type ToolSource struct {
-	Type    string `json:"type"`
-	ID      string `json:"id"`
-	Title   string `json:"title,omitempty"`
-	Locator string `json:"locator,omitempty"`
+	Type           string `json:"type"`
+	ID             string `json:"id"`
+	Title          string `json:"title,omitempty"`
+	Locator        string `json:"locator,omitempty"`
+	URL            string `json:"url,omitempty"`
+	Classification string `json:"classification,omitempty"`
+	DatasetVersion string `json:"dataset_version,omitempty"`
+	AsOf           string `json:"as_of,omitempty"`
+	FormulaVersion string `json:"formula_version,omitempty"`
 }
 
 type ReviewResult struct {

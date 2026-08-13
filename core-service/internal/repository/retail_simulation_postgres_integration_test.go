@@ -56,10 +56,15 @@ func TestRetailSimulationPostgresDefaultScaleIsolationIdempotencyAndIFRSBoundary
 	if first.Replayed || first.Dataset.StoreCount != 60 || first.Dataset.FactCount != 10860 || first.Dataset.Status != "completed" {
 		t.Fatalf("first result = %+v", first)
 	}
+	// Fixture timestamps are relative to NOW() on purpose. Generate() above
+	// wrote a row at NOW(), and LatestCompleted orders by completed_at DESC,
+	// so an absolute literal stops being "latest" the moment the wall clock
+	// passes it and the assertion below fails forever after. Only the relative
+	// order between these fixtures carries meaning, never the absolute dates.
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO retail_simulation_datasets
 			(legal_entity_id,dataset_version,generator_version,seed,date_from,date_to,store_count,fact_count,payload_sha256,business_sha256,status,created_at,completed_at)
-		VALUES ($1,'sim-latest-fixture','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$2,$3,'completed',TIMESTAMPTZ '2026-08-13 10:00:00+00',TIMESTAMPTZ '2026-08-13 11:00:00+00')`, entityA, strings.Repeat("a", 64), strings.Repeat("b", 64)); err != nil {
+		VALUES ($1,'sim-latest-fixture','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$2,$3,'completed',NOW() + INTERVAL '1 day',NOW() + INTERVAL '1 day 1 hour')`, entityA, strings.Repeat("a", 64), strings.Repeat("b", 64)); err != nil {
 		t.Fatalf("insert latest completed fixture: %v", err)
 	}
 	latestA, err := repo.LatestCompleted(ctx, entityA)
@@ -70,8 +75,8 @@ func TestRetailSimulationPostgresDefaultScaleIsolationIdempotencyAndIFRSBoundary
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO retail_simulation_datasets
 			(legal_entity_id,dataset_version,generator_version,seed,date_from,date_to,store_count,fact_count,payload_sha256,business_sha256,status,created_at,completed_at)
-		VALUES ($1,'sim-generating-newer','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$2,$3,'generating',TIMESTAMPTZ '2026-08-15 11:00:00+00',TIMESTAMPTZ '2026-08-15 12:00:00+00'),
-		       ($1,'sim-failed-newer','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$4,$5,'failed',TIMESTAMPTZ '2026-08-15 11:01:00+00',TIMESTAMPTZ '2026-08-15 12:01:00+00')`, entityA, strings.Repeat("c", 64), strings.Repeat("d", 64), strings.Repeat("e", 64), strings.Repeat("f", 64)); err != nil {
+		VALUES ($1,'sim-generating-newer','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$2,$3,'generating',NOW() + INTERVAL '3 days',NOW() + INTERVAL '3 days 1 hour'),
+		       ($1,'sim-failed-newer','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$4,$5,'failed',NOW() + INTERVAL '3 days 1 minute',NOW() + INTERVAL '3 days 1 hour 1 minute')`, entityA, strings.Repeat("c", 64), strings.Repeat("d", 64), strings.Repeat("e", 64), strings.Repeat("f", 64)); err != nil {
 		t.Fatalf("insert non-completed fixtures: %v", err)
 	}
 	latestA, err = repo.LatestCompleted(ctx, entityA)
@@ -83,9 +88,9 @@ func TestRetailSimulationPostgresDefaultScaleIsolationIdempotencyAndIFRSBoundary
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO retail_simulation_datasets
 			(id,legal_entity_id,dataset_version,generator_version,seed,date_from,date_to,store_count,fact_count,payload_sha256,business_sha256,status,created_at,completed_at)
-		VALUES ($1,$2,'sim-tie-low','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$3,$4,'completed',TIMESTAMPTZ '2026-08-14 09:00:00+00',TIMESTAMPTZ '2026-08-14 10:00:00+00'),
-		       ($5,$2,'sim-tie-high','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$6,$7,'completed',TIMESTAMPTZ '2026-08-14 09:00:00+00',TIMESTAMPTZ '2026-08-14 10:00:00+00'),
-		       ($8,$2,'sim-created-later','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$9,$10,'completed',TIMESTAMPTZ '2026-08-14 11:00:00+00',TIMESTAMPTZ '2026-08-14 10:00:00+00')`,
+		VALUES ($1,$2,'sim-tie-low','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$3,$4,'completed',NOW() + INTERVAL '2 days',NOW() + INTERVAL '2 days 1 hour'),
+		       ($5,$2,'sim-tie-high','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$6,$7,'completed',NOW() + INTERVAL '2 days',NOW() + INTERVAL '2 days 1 hour'),
+		       ($8,$2,'sim-created-later','retail-simulator-v1',20260813,'2026-01-01','2026-06-30',60,10860,$9,$10,'completed',NOW() + INTERVAL '2 days 2 hours',NOW() + INTERVAL '2 days 1 hour')`,
 		"00000000-0000-0000-0000-000000000001", entityA, strings.Repeat("1", 64), strings.Repeat("2", 64),
 		"00000000-0000-0000-0000-000000000002", strings.Repeat("3", 64), strings.Repeat("4", 64),
 		"00000000-0000-0000-0000-000000000003", strings.Repeat("5", 64), strings.Repeat("6", 64)); err != nil {

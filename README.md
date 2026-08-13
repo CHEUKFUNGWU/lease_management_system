@@ -1,148 +1,233 @@
-# Lease Management System
+# 线下零售经营分析工作站 / Retail Performance Workstation
 
-零售集团统一租赁管理平台。产品定位是：以 AI 录入为入口、以租赁全生命周期管理为日常、以 IFRS 16 合规计量为核心会计能力。系统覆盖合同台账、附件文档、关键日期提醒、条款义务、付款计划、范围判定、租赁计量、事件重算、月结分录、ERP 导出/回写、披露报表、审计留痕和 AI Agent 辅助录入。
+> 中文：面向线下连锁零售承租方的经营分析工作站。把门店销售、毛利、客流、人工、占用成本与承租合同连接起来，完成「发现问题 — 解释原因 — 模拟方案 — 形成行动」的闭环。IFRS 16 租赁会计从产品全部下沉为一个高价值合规模块。
+>
+> English: An operations-analytics workstation for offline retail chains that lease their stores. It connects store sales, gross profit, footfall, labour and occupancy cost with the underlying lease contracts, closing the loop from *detect → explain → simulate → act*. IFRS 16 lease accounting is no longer the whole product — it is now one high-value compliance module inside it.
 
-## 当前状态
+**一句话定位 / Positioning:** 从门店经营信号到可验证行动 · From store signals to verifiable actions.
 
-- MVP 与商业进阶路线图已落地。
-- Docker Compose 默认运行 5 个基础服务：PostgreSQL、MinIO、Core Service、AI Service、Web；`worker` profile 可额外启动独立 `agent-runner`。
-- 数据库初始化 schema 包含租赁业务表、AI Runtime 表、版本化 Agent Artifact/Evidence 表和草稿批次/幂等表，增量迁移位于 `db/migrations/`。
-- IFRS 16 计量回归：22 个用例、148 条断言，自动生成对数报告。
-- 注意：回归报告中的标准答案仍标记为 `pending_third_party_review`，正式审计背书需要第三方会计师复核。
+---
 
-## 核心能力
+## 目录 / Table of Contents
 
-### Lease Administration
+- [当前状态 / Current Status](#当前状态--current-status)
+- [产品功能 / Product Capabilities](#产品功能--product-capabilities)
+- [五条不可突破的底线 / Five Non-Negotiable Boundaries](#五条不可突破的底线--five-non-negotiable-boundaries)
+- [技术栈 / Tech Stack](#技术栈--tech-stack)
+- [项目结构 / Repository Layout](#项目结构--repository-layout)
+- [快速开始 / Getting Started](#快速开始--getting-started)
+- [关键页面 / Key Screens](#关键页面--key-screens)
+- [验证命令 / Verification](#验证命令--verification)
+- [开发约束 / Development Constraints](#开发约束--development-constraints)
+- [关键文档 / Key Documents](#关键文档--key-documents)
 
-- 集中合同库：合同基础信息、门店/资产、出租方、承租方、标签、状态。
-- 附件文档：主合同、补充协议、side letter 等文档元数据。
-- 关键日期提醒：续租截止、break notice、租金 review、到期日、保险续保。
-- 条款/义务管理：维修、CAM、保险、指数调整、恢复义务、押金、通知义务。
-- 组合分析：按资产类型、区域/品牌、租赁范围查看合同组合与承诺租金。
+---
 
-### IFRS 16 Accounting
+## 当前状态 / Current Status
 
-- 初始计量：租赁负债现值、使用权资产、初始直接成本、激励、恢复成本。
-- 后续计量：利息摊销、折旧、付款冲减、负债滚动。
-- 范围闸门：`in_scope` 资本化，`short_term_exempt` / `low_value_exempt` 直线法费用化，`not_a_lease` 跳过资本化。
-- 会计区分：先付/后付租金、变量租金费用化、非租赁成分费用化。
-- 事件驱动：modification、reassessment、impairment 等事件批准后触发重算。
-- 月结闭环：生成计量结果和分录，复核、审批、过账、锁账/解锁。
+转型采用**增量叠加**方式：新增零售经营分析能力，既有租赁台账、IFRS 16、月结、报表和 Agent 能力全部保留且继续可用。
 
-### AI Intake And Agent
+The transformation is **additive**. Retail operations analytics was layered on top; every pre-existing lease-administration, IFRS 16, month-end close, reporting and Agent capability remains in place and reachable.
 
-- AI 录入主入口：在 `/ai-chat` 上传合同或台账文件，自动解析并生成结构化草稿卡片。
-- AI 文件解析：PDF/Excel/图片上传到 MinIO，PaddleOCR 优先，PyMuPDF fallback，LLM 抽取字段。
-- Human-in-the-loop：AI 草稿必须人工确认后才能创建合同草稿，正式入库仍走审批。
-- 折现率控制：AI 不得猜测折现率，缺失时标记 `discount_rate_missing`。
-- 范围初判：AI 输出 `lease_scope`、豁免/排除原因和 scope confidence，低置信度人工复核。
-- AI 问答：按权限检索合同、计量、分录、事件和报表上下文，返回引用来源。
-- Agent Tool Runtime：Web、CLI 和 Pi-like Runner 共用 Tool Registry、Scope Guard、Review Gate、幂等和审计接缝。
-- Skill Registry：合同台账、合同复核、租金表和审计包 Skill 均以版本化描述注册，并按角色过滤。
-- `lease-agent` CLI：支持 Skill/Tool discovery、合同搜索/只读查询、Draft 命令、Capability 签发/撤销、Run Trace、worker lease 和机器可读退出码。
-- `agent-runner`：独立 Pi-like Worker 进程，只通过 Agent Gateway 执行受控 Tool，并把 Run Event/Checkpoint/lease heartbeat 回写 Core；Worker 数据面按 `worker_id + lease_token` 绑定已领取 Run，SSE 控制流也沿用同一 lease 校验，不能读取或控制其他 Run；支持 `--worker-loop --plan <file>` 持续领取队列任务，旧 Gateway 无 SSE 时回退轮询。
-- 生产 Worker：`docker compose --profile worker up -d --build agent-runner` 启动独立 Runner；使用 `--planner-url http://ai-service:8000` 调用 AI Service 生成受 Descriptor 约束的结构化 Tool plan，不挂载数据库或 MinIO 凭证。
-- Tool Runtime 监控：`GET /api/v1/agent/metrics`（JSON）和 `GET /api/v1/agent/metrics/prometheus`（Prometheus，需 `agent_runtime:metrics` 或 `audit_logs:read`）提供低基数调用、失败、Review Gate 和延迟指标；`GET /api/v1/agent/usage` 与 Web `/agent-metrics` 提供按当前身份/法人范围的跨 Run Planner 用量汇总。Prometheus recording/alert rules 与最小权限 Token 采集模板见 [`ops/prometheus/README.md`](ops/prometheus/README.md)。AI Planner 返回的 `llm-usage.v1` 会以 `planner_usage` Run Event 写入统一 Trace；只有 token 完整且配置了 `LLM_PRICING_VERSION` 与价格时才计算成本，否则明确标记 unavailable。
-- 认证刷新：登录返回 access/refresh token；Core 以哈希形式持久化 refresh session，轮换为一次性使用，并提供 `/api/v1/auth/refresh`、`/api/v1/auth/logout`、受保护的 `/api/v1/auth/logout-all` 和设备会话列表/撤销 API；CLI 提供 `lease-agent auth refresh`，Web API 在 401 时自动刷新并重试，过期 session 由 Core maintenance 按配置自动清理。
-- 运维资料：Agent 健康检查、Prometheus recording/alert rules、最小权限 scrape 模板、LLM usage/cost 语义、发布 Smoke Run 和回滚边界见 [`docs/AI_Agent_运行运维手册.md`](docs/AI_Agent_运行运维手册.md) 与 [`ops/prometheus/README.md`](ops/prometheus/README.md)。
-- 外部验收：生产监控、回滚演练、PaddleOCR、ERP、会计复核和 Worker 生产身份的责任人与证据要求见 [`docs/AI_Agent_外部验收清单.md`](docs/AI_Agent_外部验收清单.md)。
+| 事项 / Item | 状态 / Status |
+|---|---|
+| 零售经营分析 MVP（MAX-001 → MAX-009）<br>Retail analytics MVP (MAX-001 → MAX-009) | ✅ 全部验收通过（2026-08-13）<br>All nine tickets accepted (2026-08-13) |
+| 端到端演示链路<br>End-to-end demo chain | ✅ 固定 seed 数据 → 晨检 → 门店下钻 → 情景 → 行动草稿，真实浏览器复演通过<br>Fixed-seed data → morning check → store drill-down → scenario → action draft, replayed in a real browser |
+| 既有租赁 / IFRS 16 能力<br>Existing lease & IFRS 16 capability | ✅ 零删除、零重命名、零隐藏；旧路由 smoke 通过<br>Nothing deleted, renamed or hidden; legacy route smoke passed |
+| 客户与商业验证<br>Customer & commercial validation | ⚠️ **未验证**。当前只完成固定 seed 的内部模拟验证，不能表述为客户采用、真实 ROI 或 PMF<br>**Unvalidated.** Only internal fixed-seed simulation has been done. This must not be presented as customer adoption, realised ROI or product-market fit |
+| 真实 POS / ERP 数据接入<br>Live POS / ERP integration | ⚠️ 未完成，是试点第一阻塞项<br>Not done; the number-one blocker for a pilot |
+| IFRS 16 计量回归<br>IFRS 16 measurement regression | ⚠️ 22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，正式审计背书需第三方会计师复核<br>22 cases / 148 assertions pass, but the golden answers remain `pending_third_party_review`; formal audit endorsement requires a third-party accountant |
 
-### Reporting And Integration
+**关于命名 / On naming:** 仓库、容器、数据库和 JWT 仍使用 `lease_*` 命名。产品定位已经调整，但底层大规模物理重命名要等内部技术门槛通过后再决定 —— 2026-05 已经改过一次名，不再频繁变更。
+The repository, containers, database and JWT still use the `lease_*` namespace. Positioning has moved; a second large physical rename is deliberately deferred until the internal validation gate is passed (the project was already renamed once in 2026-05).
 
-- Working / Official 双模式报表。
-- 负债滚动表、合同汇总表、摊销表、现金流预测、标签汇总。
-- ROI 测算页：估算传统 Excel 工时与系统处理工时差异。
-- 敏感性分析：折现率冲击对负债和 ROU 的影响。
-- 多准则对比：IFRS 16 / ASC 842 / 本地准则管理视角差异。
-- ERP/总账：会计分录 CSV 导出 + ERP 凭证号回写。
-- 审计日志：合同、事件、审批、月结、锁账等关键动作留痕。
+---
 
-## 技术栈
+## 产品功能 / Product Capabilities
 
-- **前端**: Next.js 14 + TypeScript + Ant Design
-- **核心后端**: Go 1.23 + Gin
-- **数据访问**: pgx（手写 SQL）
-- **数据库**: PostgreSQL 16
-- **AI / 文档解析服务**: Python 3.11 + FastAPI
-- **OCR / 文档结构化**: PaddleOCR-VL-1.5（AI Studio 异步 API）/ PyMuPDF fallback
-- **大模型能力**: DeepSeek API（默认）/ OpenAI API（备用）
-- **对象存储**: MinIO
-- **认证授权**: Go 自建 JWT + 基础 RBAC + 多租户行级过滤（`legal_entity_id`）；Agent Gateway 支持短时效、Run 绑定的 Capability Token
-- **部署**: Docker Compose
+### 一、零售经营分析 / Retail Operations Analytics
 
-## 项目结构
+转型新增的核心能力。数据粒度为 **store-day（门店 × 日）**，指标语义版本为 `retail-kpi-v1`。
+The capabilities added by the transformation. Grain is **store-day**; the metric semantics are versioned as `retail-kpi-v1`.
+
+| 功能 / Feature | 说明 / Description |
+|---|---|
+| **经营脉搏**<br>Operating Pulse<br>`/operating-pulse` | 两分钟晨检：六张核心 KPI 卡（销售、毛利、交易数、客流、转化、客单价）、每日趋势、辅助指标、按影响排序的优先关注门店榜，以及数据可信条（覆盖率、来源系统、公式版本、事实版本、decision-ready 判定）。<br>A two-minute morning check: six core KPI cards (revenue, gross profit, transactions, footfall, conversion, average transaction value), a daily trend, auxiliary metrics, an impact-ranked attention list, and a data-trust strip (coverage, source systems, formula version, fact version, decision-ready verdict). |
+| **门店 360 与异常下钻**<br>Store 360 & drill-down<br>`/store-360` | 单店趋势、同群对比（同 brand + region + currency 分位）、销售 / 毛利 / 门店贡献三组确定性变化桥，以及每个结论背后的证据链。同群样本不足或币种混杂时明确降级，不编造对比。<br>Single-store trends, peer-cohort benchmarking (same brand + region + currency percentiles), three deterministic change bridges (sales, gross profit, store contribution), and the evidence chain behind each conclusion. Degrades explicitly when the peer sample is too small or currencies are mixed — it never fabricates a comparison. |
+| **情景工作台**<br>Scenario Workbench<br>`/scenario-workbench` | 基于同一批事实生成透明的 30 日 run-rate，对销售、毛利率、人工、固定租金、变量租金率、非租赁成本和其他成本七个杠杆做 What-if；输出守恒的贡献变化桥，并可生成待确认的 open action。结果过期或数据不足时会阻断保存。<br>Builds a transparent 30-day run-rate from the same facts and runs what-if on seven levers (sales, gross-margin rate, labour, fixed rent, variable-rent rate, non-lease cost, other cost). Produces a conservation-checked contribution bridge and can raise an open action for confirmation. Saving is blocked when the result is stale or the data is insufficient. |
+| **AI 经营分析 Agent**<br>AI operations analyst<br>`/ai-chat` | `retail_operations@v1` Skill，只允许调用经营脉搏、门店诊断和确定性情景三个**只读** Tool。回答带引用来源、口径说明、置信度和建议下一步；行动建议以 Artifact 形式产出，**不直接写入任何业务表**。权限拒绝保持 `scope_denied` 原因，不被改写成「无数据」。<br>The `retail_operations@v1` skill may call exactly three **read-only** tools: operating pulse, store diagnostics and deterministic scenario. Answers carry citations, metric definitions, a confidence value and a suggested next step. Action suggestions are emitted as artifacts and **never written straight into business tables**. A permission denial keeps its `scope_denied` reason rather than being masked as "no data". |
+| **零售 KPI 语义层**<br>Retail KPI semantic layer<br>`retail-kpi-v1` | 统一的日粒度指标定义与中文数据字典，配 Golden 对数。严格的 null / 零分母语义、覆盖率门槛、最高事实版本选择、来源冲突保护（409）和多币种分区。指标由后端计算，前端不重算评分。<br>One day-grain metric definition set with a data dictionary and golden datasets. Strict null / zero-denominator semantics, coverage thresholds, highest-fact-version selection, source-conflict protection (HTTP 409) and multi-currency partitioning. Metrics are computed server-side; the frontend never re-scores. |
+| **固定 seed 模拟数据生成器**<br>Fixed-seed simulation generator | 一键生成可重复复演的 60 店 / 181 天数据集，内含六类固定经营异常。模拟数据在数据库、API、导出和 UI 中全程带标识，**永不进入 Official 过账链路**。<br>Generates a reproducible 60-store / 181-day dataset containing six fixed anomaly types. Simulated data is labelled end-to-end in the database, API, exports and UI, and **can never enter the Official posting chain**. |
+| **Store-day 事实底座**<br>Store-day fact foundation | production / simulated / mixed 来源信封、批次、版本、as-of 与请求幂等，支持安全导入、重复提交保护和按法人读取。<br>A production / simulated / mixed source envelope with batches, versions, as-of stamps and request idempotency — enabling safe import, duplicate-submission protection and per-legal-entity reads. |
+
+### 二、租赁台账管理 / Lease Administration
+
+| 功能 / Feature | 说明 / Description |
+|---|---|
+| 集中合同库<br>Central contract ledger | 合同基础信息、门店 / 资产、出租方、承租方、标签、状态、余额与当前生效租金。<br>Contract master data, store/asset, lessor, lessee, tags, status, balances and the rent actually in force. |
+| 附件文档<br>Document management | 主合同、补充协议、side letter 等文档元数据。<br>Metadata for master agreements, amendments, side letters and similar documents. |
+| 关键日期提醒<br>Critical-date alerts | 续租截止、break notice、租金 review、到期日、保险续保。<br>Renewal deadlines, break notices, rent reviews, expiry and insurance renewal. |
+| 条款 / 义务管理<br>Clause & obligation tracking | 维修、CAM、保险、指数调整、恢复义务、押金、通知义务。<br>Repair, CAM, insurance, index adjustment, make-good, deposits and notification obligations. |
+| 组合分析<br>Portfolio analysis | 按资产类型、区域 / 品牌、租赁范围查看合同组合、承诺租金与到期分布。<br>Contract mix, committed rent and expiry distribution by asset type, region/brand and lease scope. |
+
+### 三、IFRS 16 租赁会计 / IFRS 16 Lease Accounting
+
+| 功能 / Feature | 说明 / Description |
+|---|---|
+| 初始计量<br>Initial measurement | 租赁负债现值、使用权资产、初始直接成本、激励、恢复成本。<br>Lease-liability present value, right-of-use asset, initial direct costs, incentives and restoration cost. |
+| 后续计量<br>Subsequent measurement | 利息摊销、折旧、付款冲减、负债滚动。<br>Interest accretion, depreciation, payment offset and liability roll-forward. |
+| 范围闸门<br>Scope gate | `in_scope` 资本化；`short_term_exempt` / `low_value_exempt` 直线法费用化；`not_a_lease` 跳过资本化。<br>`in_scope` capitalises; `short_term_exempt` / `low_value_exempt` expense straight-line; `not_a_lease` skips capitalisation. |
+| 会计区分<br>Accounting distinctions | 先付 / 后付租金、变量租金费用化、非租赁成分费用化。<br>Rent in advance vs in arrears, variable rent expensed, non-lease components expensed. |
+| 事件驱动重算<br>Event-driven remeasurement | modification、reassessment、impairment 等事件批准后触发重算。<br>Modification, reassessment and impairment events trigger remeasurement once approved. |
+| 月结闭环<br>Month-end close | 生成计量结果与分录，复核、审批、过账、锁账 / 解锁。<br>Generate measurements and journal entries, then review, approve, post, lock and unlock. |
+| 双口径并列<br>Dual basis | 财务报告口径（ROU / 负债 / 利息 / 折旧）与经营占用口径（基本租金 + 服务费 + 当期变量租金）分开维护，互不替代。<br>The financial-reporting basis (ROU, liability, interest, depreciation) and the operating-occupancy basis (base rent + service charge + in-period variable rent) are maintained side by side and never substituted for each other. |
+
+### 四、经营决策与 FP&A / Decision Support & FP&A
+
+| 功能 / Feature | 说明 / Description |
+|---|---|
+| 经营驾驶舱 `/performance`<br>Performance cockpit | 门店四墙利润、租售比、效率指标与 cohort 视角。<br>Four-wall profit, rent-to-sales ratio, efficiency metrics and cohort views. |
+| 预算 / 实际差异 `/reports`<br>Budget vs actual variance | 版本化计划、冻结、比较、准确率，及六类差异归因。<br>Versioned plans, freezing, comparison, accuracy tracking and six-category variance attribution. |
+| 开店前测算 `/pre-deal`<br>Pre-deal appraisal | 新店经济性测算与门槛判定。<br>Store-level economics and hurdle assessment for a prospective site. |
+| 方案比价 `/deal-compare`<br>Deal comparison | 多份报价 / 条款方案的有效租金与经营影响比较。<br>Effective-rent and operating-impact comparison across competing offers or term sheets. |
+| 现金流预测 `/cashflow-forecast`<br>Cash-flow forecast | 租赁现金流出预测与情景。<br>Lease cash-outflow forecasting and scenarios. |
+| 敏感性分析 `/sensitivity`<br>Sensitivity analysis | 折现率冲击对负债和 ROU 的影响。<br>Discount-rate shocks against liability and ROU. |
+| 多准则对比 `/standards`<br>Multi-standard comparison | IFRS 16 / ASC 842 / 本地准则的管理视角差异。<br>Management-view differences across IFRS 16, ASC 842 and local GAAP. |
+| ROI 测算 `/roi`<br>ROI calculator | 传统 Excel 工时与系统处理工时的差异测算。<br>Estimated effort difference between spreadsheet workflows and the system. |
+
+### 五、AI 录入与 Agent 运行时 / AI Intake & Agent Runtime
+
+| 功能 / Feature | 说明 / Description |
+|---|---|
+| AI 录入<br>AI intake | `/ai-chat` 上传合同或台账文件，PaddleOCR 优先、PyMuPDF fallback，LLM 抽取字段并生成结构化草稿卡片。<br>Upload contracts or ledgers at `/ai-chat`; PaddleOCR first with a PyMuPDF fallback, then LLM field extraction into structured draft cards. |
+| Human-in-the-loop | AI 草稿必须人工确认才能创建合同草稿，正式入库仍走审批。AI 不得猜测折现率，缺失时标记 `discount_rate_missing`。<br>An AI draft only becomes a contract draft after human confirmation, and formal entry still goes through approval. The AI may not guess a discount rate; a missing one is flagged `discount_rate_missing`. |
+| Agent Tool Runtime | Web、CLI 与 Pi-like Runner 共用 Tool Registry、Scope Guard、Review Gate、幂等与审计接缝。<br>Web, CLI and the Pi-like runner share one tool registry, scope guard, review gate, idempotency layer and audit seam. |
+| Skill Registry | 合同台账、合同复核、租金表、审计包与 `retail_operations@v1` 均以版本化描述注册，并按角色过滤。<br>Contract ledger, contract review, rent schedule, audit pack and `retail_operations@v1` are all registered as versioned descriptors and filtered by role. |
+| `lease-agent` CLI | Skill / Tool discovery、合同搜索与只读查询、Draft 命令、Capability 签发与撤销、Run Trace、worker lease 和机器可读退出码。<br>Skill/tool discovery, contract search and read-only queries, draft commands, capability issue/revoke, run traces, worker leases and machine-readable exit codes. |
+| `agent-runner` | 独立 Worker 进程，只通过 Agent Gateway 执行受控 Tool，不挂载数据库或 MinIO 凭证；Run 按 `worker_id + lease_token` 绑定。<br>A standalone worker that executes controlled tools only through the Agent Gateway, with no database or MinIO credentials mounted; runs are bound by `worker_id + lease_token`. |
+| Agent 可观测性 `/agent-metrics`<br>Agent observability | JSON 与 Prometheus 指标、跨 Run Planner 用量、Token 与成本状态；价格未配置时明确标记 unavailable，不臆造成本。<br>JSON and Prometheus metrics, cross-run planner usage, token and cost status. When pricing is not configured, cost is explicitly marked unavailable rather than invented. |
+
+### 六、平台与治理 / Platform & Governance
+
+| 功能 / Feature | 说明 / Description |
+|---|---|
+| 多租户与数据范围<br>Multi-tenancy & data scope | 法人（`legal_entity_id`）行级过滤，扩展到区域 / 品牌 / 门店范围。<br>Row-level filtering by legal entity, extended to region / brand / store scope. |
+| 认证与会话<br>Auth & sessions | JWT access / refresh，refresh session 哈希持久化、一次性轮换、设备会话列表与撤销、过期自动清理。<br>JWT access/refresh with hashed refresh sessions, single-use rotation, device session listing and revocation, and automatic expiry cleanup. |
+| Working / Official 双模式<br>Dual reporting mode | Working 可含草稿与待审批数据；Official 只含已审批正式数据。<br>Working may contain drafts and pending items; Official contains only approved, formal data. |
+| ERP / 总账集成<br>ERP & GL integration | 会计分录 CSV 导出与 ERP 凭证号回写。<br>Journal-entry CSV export and ERP voucher-number write-back. |
+| 审计留痕 `/audit-logs`<br>Audit trail | 合同、事件、审批、月结、锁账等关键动作全链路留痕。<br>End-to-end trail across contracts, events, approvals, month-end close and ledger locking. |
+
+---
+
+## 五条不可突破的底线 / Five Non-Negotiable Boundaries
+
+零售转型期间，任何改动都不得降低以下五条。它们在 MAX-001 → MAX-009 每一轮评审中被独立验证。
+
+No change made during the retail transformation may weaken these five. Each was independently verified in every MAX-001 → MAX-009 review round.
+
+| # | 底线 / Boundary | 含义 / What it means |
+|---|---|---|
+| 1 | 跨法人隔离<br>Cross-entity isolation | 法人 A 的账号无法读取或写入法人 B 的门店、事实、行动、Run 或 Artifact。<br>An account in entity A can neither read nor write entity B's stores, facts, actions, runs or artifacts. |
+| 2 | 模拟 / 正式数据区分<br>Simulated vs production | 模拟数据在库、API、导出、UI 全程带标识，且永不进入 Official。<br>Simulated data is labelled everywhere and can never reach Official. |
+| 3 | 来源追溯<br>Source provenance | 每条事实都可追溯到来源系统、批次、版本与 as-of 时点。<br>Every fact traces back to a source system, batch, version and as-of timestamp. |
+| 4 | 重复导入保护<br>Duplicate-import protection | 请求级与业务级幂等，重放不产生第二条记录。<br>Request-level and business-level idempotency; a replay never creates a second record. |
+| 5 | IFRS 16 正式台账隔离<br>Official ledger isolation | 经营分析与 AI 路径对 IFRS 16 正式表零写入。<br>The analytics and AI paths perform zero writes against the IFRS 16 official tables. |
+
+---
+
+## 技术栈 / Tech Stack
+
+| 层 / Layer | 技术 / Technology |
+|---|---|
+| 前端 / Frontend | Next.js 14 + TypeScript + Ant Design + Recharts |
+| 核心后端 / Core backend | Go 1.23 + Gin |
+| 数据访问 / Data access | pgx（手写 SQL / hand-written SQL） |
+| 数据库 / Database | PostgreSQL 16 |
+| AI 服务 / AI service | Python 3.11 + FastAPI |
+| OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）/ PyMuPDF fallback |
+| 大模型 / LLM | DeepSeek API（默认 / default）、OpenAI API（备用 / fallback） |
+| 对象存储 / Object storage | MinIO |
+| 认证授权 / Auth | 自建 JWT + RBAC + 多租户行级过滤；Agent Gateway 支持短时效、Run 绑定的 Capability Token |
+| 部署 / Deployment | Docker Compose |
+
+---
+
+## 项目结构 / Repository Layout
 
 ```text
 lease_management_system/
 ├── db/
-│   ├── init/                     # PostgreSQL 容器首次初始化 schema
-│   └── migrations/               # 增量迁移 SQL
-├── core-service/                 # Go + Gin 核心 API
-│   ├── cmd/api/                  # API 服务入口
-│   ├── cmd/ifrs16-regression/    # IFRS 16 回归报告生成命令
+│   ├── init/                      # PostgreSQL 首次初始化 schema / first-run schema
+│   └── migrations/                # 增量迁移 SQL / incremental migrations
+├── core-service/                  # Go + Gin 核心 API
+│   ├── cmd/api/                   # API 服务入口
+│   ├── cmd/ifrs16-regression/     # IFRS 16 回归报告生成命令
 │   ├── cmd/lease-agent/           # 只调用 Agent Gateway 的 CLI Adapter
-│   ├── cmd/agent-runner/           # Pi-like Worker 进程入口（无 DB/MinIO 凭证）
+│   ├── cmd/agent-runner/          # Pi-like Worker 进程入口（无 DB/MinIO 凭证）
 │   └── internal/
-│       ├── agentartifact/         # Artifact/Evidence 协议
+│       ├── agentartifact/         # Artifact / Evidence 协议
 │       ├── agentskill/            # Skill Registry
-│       ├── agentrunner/           # Pi-like Runner Adapter
-│       ├── agenttools/            # Tool Registry/Runtime/Policy
-│       ├── handlers/             # HTTP handlers
+│       ├── agenttools/            # Tool Registry / Runtime / Policy（含 retail_operations）
+│       ├── handlers/              # HTTP handlers（含 retail_* 系列）
 │       ├── middleware/            # JWT、tenant、CORS
 │       ├── repository/            # pgx 数据访问层
-│       └── services/              # audit、ifrs16 等业务服务
-├── ai-service/                   # Python + FastAPI AI 服务
+│       └── services/
+│           ├── retailkpi/         # retail-kpi-v1 指标语义层
+│           ├── retailpulse/       # 经营脉搏聚合
+│           ├── retailstore360/    # 门店 360 与同群对比
+│           ├── retailscenario/    # 确定性情景计算
+│           ├── retailsimulation/  # 固定 seed 模拟数据生成器
+│           └── ifrs16/            # IFRS 16 计量
+├── ai-service/                    # Python + FastAPI AI 服务
+├── web/                           # Next.js 前端
 │   └── app/
-│       ├── routers/              # files、parse、chat
-│       └── services/             # OCR、LLM、storage、extractor
-├── web/                          # Next.js 前端
-│   └── app/
-│       ├── ai-chat/              # AI 录入主入口
-│       ├── contracts/            # 合同台账与详情
-│       ├── monthly-closing/      # 月结跑批
-│       ├── reports/              # 报表
-│       ├── portfolio/            # 组合分析
-│       ├── roi/                  # ROI 测算
-│       ├── sensitivity/          # 敏感性分析
-│       └── standards/            # 多准则对比
-├── docs/                         # 需求、架构、进阶方案、回归报告、白皮书
-├── scripts/                      # 辅助脚本
+│       ├── operating-pulse/       # 经营脉搏 / Operating Pulse
+│       ├── store-360/             # 门店 360 / Store 360
+│       ├── scenario-workbench/    # 情景工作台 / Scenario Workbench
+│       ├── ai-chat/               # AI 录入与经营问答
+│       ├── contracts/             # 合同台账与详情
+│       ├── monthly-closing/       # 月结跑批
+│       ├── reports/               # 报表
+│       ├── performance/           # 经营驾驶舱
+│       ├── portfolio/             # 组合分析
+│       ├── sensitivity/           # 敏感性分析
+│       └── standards/             # 多准则对比
+├── docs/                          # 需求、架构、转型规划、执行看板、验收证据
+├── ops/                           # Prometheus 规则与采集模板
+├── scripts/
 ├── docker-compose.yml
 ├── Makefile
 └── AGENTS.md
 ```
 
-## 快速开始
+---
 
-### 1. 准备环境
+## 快速开始 / Getting Started
 
-需要安装：
+### 1. 准备环境 / Prerequisites
 
-- Docker / Docker Compose
-- Make
-- Go 1.23+
-- Node.js 20+
-- Python 3.11+
+Docker / Docker Compose、Make、Go 1.23+、Node.js 20+、Python 3.11+
 
-### 2. 配置环境变量
+### 2. 配置环境变量 / Configure environment
 
 ```bash
 make setup
 ```
 
-编辑 `.env`，重点配置：
+编辑 `.env`，重点配置 / Then edit `.env`, in particular:
 
 - `DEEPSEEK_API_KEY`
-- `OPENAI_API_KEY`（备用）
-- `PADDLEOCR_ACCESS_TOKEN`（启用 PaddleOCR 时需要）
+- `OPENAI_API_KEY`（备用 / fallback）
+- `PADDLEOCR_ACCESS_TOKEN`（启用 PaddleOCR 时 / when PaddleOCR is enabled）
 
-### 3. 启动服务
+### 3. 启动服务 / Start services
 
 ```bash
 docker compose up -d --build
 ```
 
-如需启动 Pi-like Worker，先将一个短时效、受限的 Gateway JWT 放入当前 shell 的 `AGENT_GATEWAY_TOKEN`，再执行：
+如需启动 Pi-like Worker，先把一个短时效、受限的 Gateway JWT 放入当前 shell，再启动 `worker` profile。
+To run the Pi-like worker, put a short-lived, scoped Gateway JWT into your shell first, then start the `worker` profile:
 
 ```bash
 export AGENT_CORE_URL="${AGENT_CORE_URL:-http://localhost:8080}"
@@ -152,17 +237,12 @@ export AGENT_GATEWAY_TOKEN="$(curl -fsS -X POST "$AGENT_CORE_URL/api/v1/auth/log
 docker compose --profile worker up -d --build agent-runner
 ```
 
-本地如遇 8080/8081 已被占用，可在 `.env` 将 `CORE_PORT`/`AI_PORT` 改为可用宿主机端口；容器内部地址仍固定为 Core `8080`、AI `8000`。不要把 Worker JWT 写入 Git 或提交到 `.env.example`。
+本地如遇 8080 / 8081 被占用，可在 `.env` 改 `CORE_PORT` / `AI_PORT`；容器内部地址仍固定为 Core `8080`、AI `8000`。**不要把 Worker JWT 写入 Git 或 `.env.example`。**
+If 8080 / 8081 are taken locally, change `CORE_PORT` / `AI_PORT` in `.env`; in-container addresses stay at Core `8080` and AI `8000`. **Never commit a worker JWT to Git or `.env.example`.**
 
-或：
+服务地址 / Service endpoints:
 
-```bash
-make up
-```
-
-服务地址：
-
-| 服务 | 地址 |
+| 服务 / Service | 地址 / Address |
 |------|------|
 | Web | http://localhost:3000 |
 | Core Service | http://localhost:8080 |
@@ -170,155 +250,164 @@ make up
 | MinIO Console | http://localhost:9001 |
 | PostgreSQL | localhost:5432 |
 
-健康检查：
+### 4. 测试账号 / Test accounts
 
-```bash
-curl http://localhost:8080/health
-curl http://localhost:8081/health
-```
-
-### 4. 测试账号
-
-| 用户名 | 密码 | 角色 | 说明 |
+| 用户名 / Username | 密码 / Password | 角色 / Role | 说明 / Notes |
 |--------|------|------|------|
-| `admin_user` | `password123` | admin | 管理员，跨租户 |
-| `testuser` | `password123` | user | 普通测试用户 |
-| `user_le001` | `password123` | user | LE001 法人 |
-| `user_le002` | `password123` | user | LE002 法人 |
+| `admin_user` | `password123` | admin | 管理员，跨租户 / cross-tenant admin |
+| `testuser` | `password123` | user | 普通测试用户 / general test user |
+| `user_le001` | `password123` | user | LE001 法人 / legal entity LE001 |
+| `user_le002` | `password123` | user | LE002 法人 / legal entity LE002 |
 
-## 数据库说明
+### 5. 生成演示数据并跑一次经营晨检 / Generate demo data and run a morning check
 
-`db/init/01_init.sql` 只会在 PostgreSQL volume 首次为空时自动执行。已有旧 volume 时，新加字段不会自动补齐，需要执行增量迁移：
+以管理员登录后打开 `/operating-pulse`。当前法人若还没有模拟数据集，页面会提示「生成固定演示数据」，一键生成 60 店 / 181 天、含六类固定异常的可复演数据集，然后按 **经营脉搏 → 门店 360 → 情景工作台 → 行动草稿** 走完整条链路。
+
+Sign in as an admin and open `/operating-pulse`. If the legal entity has no simulated dataset yet, the page offers **生成固定演示数据**, which creates a reproducible 60-store / 181-day dataset containing six fixed anomalies. Then walk the full chain: **Operating Pulse → Store 360 → Scenario Workbench → action draft**.
+
+演示脚本 / Demo script: [`docs/execution/MAX-009_演示脚本.md`](docs/execution/MAX-009_演示脚本.md)
+
+### 6. 数据库迁移 / Database migrations
+
+`db/init/01_init.sql` 只在 PostgreSQL volume 首次为空时执行。已有旧 volume 时需要手动跑增量迁移。
+`db/init/01_init.sql` runs only when the PostgreSQL volume is empty. Existing volumes need the incremental migrations applied by hand.
+
+零售转型相关的迁移 / Migrations introduced by the retail transformation:
 
 ```bash
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/005_lease_scope_gate.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/006_lease_admin_platform.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/007_obligations_portfolio.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/022_agent_draft_idempotency.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/023_agent_artifact_protocol.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/024_agent_draft_batches.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/025_agent_capability_revocations.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/026_event_draft_evidence.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/027_agent_run_checkpoints.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/028_agent_run_event_types.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/029_agent_run_worker_leases.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/030_auth_refresh_sessions.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/031_agent_run_audit_summaries.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/032_agent_run_checkpoint_audit_and_terminal_alerts.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/033_agent_run_audit_links.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/036_close_exception_governance_repair.sql
+docker exec -i lease-postgres psql -U lease -d lease < db/migrations/037_budget_versions_source_backfill.sql
+docker exec -i lease-postgres psql -U lease -d lease < db/migrations/038_retail_store_day_facts.sql
+docker exec -i lease-postgres psql -U lease -d lease < db/migrations/039_retail_simulation_datasets.sql
+docker exec -i lease-postgres psql -U lease -d lease < db/migrations/040_agent_artifact_retail_proposal.sql
 ```
 
-如果要清空数据库并按最新 schema 重建：
+早期迁移（005–036）见 [`db/migrations/`](db/migrations/)；要清空并按最新 schema 重建：
+For the earlier migrations (005–036) see [`db/migrations/`](db/migrations/). To wipe and rebuild on the latest schema:
 
 ```bash
 make reset-db
 make up
 ```
 
-## 常用命令
+---
 
-```bash
-make help                 # 查看命令
-make up                   # 启动服务
-make down                 # 停止服务
-make restart              # 重启服务
-make logs                 # 查看日志
-make db                   # 进入 PostgreSQL
-make web                  # 进入 Web 容器
-make core                 # 进入 Core Service 容器
-make ai                   # 进入 AI Service 容器
-make ifrs16-regression    # 运行 IFRS 16 回归并生成报告
-```
+## 关键页面 / Key Screens
 
-Agent Gateway / CLI：
+| 页面 / Screen | 路径 / Path | 说明 / Description |
+|------|------|------|
+| 经营脉搏 / Operating Pulse | `/operating-pulse` | 每日经营晨检、KPI、趋势、优先门店与数据可信度 |
+| 门店 360 / Store 360 | `/store-360` | 单店趋势、同群对比、驱动拆解与证据链 |
+| 情景工作台 / Scenario Workbench | `/scenario-workbench` | 七杠杆 What-if、贡献变化桥与行动草稿 |
+| 经营驾驶舱 / Performance | `/performance` | 四墙利润、租售比与效率指标 |
+| AI 助手 / AI assistant | `/ai-chat` | 文件录入、草稿确认、经营问答与行动建议 |
+| 待办 / To-do | `/todo` | 关键日期、审批与异常待办 |
+| 合同台账 / Contracts | `/contracts` | 合同列表、搜索、筛选、排序、余额与在租金额 |
+| 月结跑批 / Month-end close | `/monthly-closing` | 生成、审批、过账、锁账、ERP 导出与回写 |
+| 报表 / Reports | `/reports` | Working / Official 报表、披露报表包、预算差异与 CSV 导出 |
+| 组合分析 / Portfolio | `/portfolio` | 资产类型、范围、租金承诺与到期分布 |
+| 开店前测算 / Pre-deal | `/pre-deal` | 新店经济性测算 |
+| 方案比价 / Deal compare | `/deal-compare` | 多方案有效租金比较 |
+| 现金流预测 / Cash-flow forecast | `/cashflow-forecast` | 租赁现金流出预测 |
+| 敏感性分析 / Sensitivity | `/sensitivity` | 折现率冲击分析 |
+| 多准则对比 / Standards | `/standards` | IFRS 16 / ASC 842 / 本地准则对比 |
+| ROI 测算 / ROI | `/roi` | 人力工时与成本节省测算 |
+| Agent 运营 / Agent metrics | `/agent-metrics` | Planner 用量、Token 与成本（管理员 / 审计） |
+| 审计日志 / Audit logs | `/audit-logs` | 全链路操作留痕查询 |
 
-```bash
-cd core-service
-go build -o /private/tmp/lease-agent ./cmd/lease-agent
-/private/tmp/lease-agent skills --token "$LEASE_AGENT_TOKEN"
-/private/tmp/lease-agent session create --token "$LEASE_AGENT_TOKEN" --title "CLI review"
-/private/tmp/lease-agent tools --token "$LEASE_AGENT_TOKEN" --level read
-/private/tmp/lease-agent contract search --token "$LEASE_AGENT_TOKEN" --search "上海" --status approved
-/private/tmp/lease-agent contract get --token "$LEASE_AGENT_TOKEN" --id CONTRACT_ID
-/private/tmp/lease-agent run create --token "$LEASE_AGENT_TOKEN" --session-id SESSION_ID --message "审阅合同"
-/private/tmp/lease-agent run events --token "$LEASE_AGENT_TOKEN" --run-id RUN_ID
-/private/tmp/lease-agent run trace --token "$LEASE_AGENT_TOKEN" --run-id RUN_ID
-/private/tmp/lease-agent run claim --token "$LEASE_AGENT_TOKEN" --worker-id WORKER_ID
-/private/tmp/lease-agent run heartbeat --token "$LEASE_AGENT_TOKEN" --worker-id WORKER_ID --run-id RUN_ID --lease-token LEASE_TOKEN
-/private/tmp/lease-agent run release --token "$LEASE_AGENT_TOKEN" --worker-id WORKER_ID --run-id RUN_ID --lease-token LEASE_TOKEN
-/private/tmp/lease-agent run steer --token "$LEASE_AGENT_TOKEN" --run-id RUN_ID --instruction "只关注租赁期限"
-/private/tmp/lease-agent run branch --token "$LEASE_AGENT_TOKEN" --run-id RUN_ID --instruction "从 checkpoint 分支分析付款时点"
-/private/tmp/lease-agent draft-batch get --token "$LEASE_AGENT_TOKEN" --id BATCH_ID
-/private/tmp/lease-agent draft-batch retry --token "$LEASE_AGENT_TOKEN" --id BATCH_ID --artifact-id ARTIFACT_ID --input failed-items.json
+---
 
-# 受控 Pi-like Worker；plan.json 是 ToolCall 数组，生产环境可替换为受控 LLM Planner
-go run ./cmd/agent-runner --token "$LEASE_AGENT_TOKEN" --message "审阅合同" --skill contract_review --plan plan.json
-
-# 持续 Worker（plan 文件由受控 Planner/未来 Pi Planner 生成，Worker 不接触数据库）
-go run ./cmd/agent-runner --token "$LEASE_AGENT_TOKEN" --worker-id lease-worker-01 --worker-loop --plan plan.json
-```
-
-核心 Gateway 路由：`GET /api/v1/agent/skills`、`GET /api/v1/agent/tools`、`POST /api/v1/agent/tools/execute`、`POST /api/v1/agent/capabilities`、`POST /api/v1/agent/capabilities/revoke`、`POST /api/v1/agent/sessions`、`POST /api/v1/agent/runs`、`GET/POST /api/v1/agent/runs/:id/events`、`GET/POST /api/v1/agent/runs/:id/checkpoint`、`GET /api/v1/agent/runs/:id/stream`、`POST /api/v1/agent/runs/:id/cancel`、`POST /api/v1/agent/runs/:id/steer`、`POST /api/v1/agent/runs/:id/follow-up` 和 `POST /api/v1/agent/runs/:id/branch`。终态告警为 `GET /api/v1/agent/alerts/terminal`、`POST /api/v1/agent/alerts/terminal/:id/ack`。草稿批次恢复路由为 `GET/POST /api/v1/ai/chat/draft-batches/:id`（POST 使用 `/retry`）。CLI/Pi-like Runner 不拥有数据库、MinIO 或任意 Shell 权限；Runner 到达终态后会请求撤销 Run Capability，并优先通过带 lease 的 Run Event SSE 消费取消/steer 控制事件，旧 Gateway 回退轮询，checkpoint 和 branch 由 Core Run 的 owner 校验保护。
-
-## 验证命令
+## 验证命令 / Verification
 
 ```bash
 cd core-service
 GOCACHE=$(pwd)/.gocache go test ./...
+go vet ./...
 
 cd ../web
 npm run type-check
 npm run build
+npm test
 
 cd ..
 make ifrs16-regression
 PYTHONPYCACHEPREFIX=$(pwd)/.pycache python3 -m py_compile ai-service/app/routers/parse.py
 ```
 
-最近一次完整验证通过：
+真实 PostgreSQL 集成测试需要设置 `TEST_DATABASE_URL`，未设置时相关用例会正常 skip。
+The real-PostgreSQL integration tests require `TEST_DATABASE_URL`; without it those cases skip cleanly.
 
-- `go test ./...`
-- `npm run type-check`
-- `npm run build`
-- `make ifrs16-regression`
-- `python3 -m py_compile ai-service/app/routers/parse.py`
+常用命令 / Common commands:
 
-## 关键页面
+```bash
+make help                 # 查看命令 / list commands
+make up                   # 启动服务 / start
+make down                 # 停止服务 / stop
+make restart              # 重启 / restart
+make logs                 # 日志 / logs
+make db                   # 进入 PostgreSQL
+make ifrs16-regression    # IFRS 16 回归 / regression report
+```
 
-| 页面 | 路径 | 说明 |
-|------|------|------|
-| 仪表板 | `/` | 合同统计、趋势、关键日期提醒 |
-| AI 录入 | `/ai-chat` | 上传文件、自动解析、草稿卡片确认、AI 问答 |
-| 合同台账 | `/contracts` | 合同列表、搜索、筛选、排序 |
-| 新增合同 | `/contracts/new` | 手动创建合同草稿 |
-| 传统上传 | `/upload` | 批量上传备用入口 |
-| 月结跑批 | `/monthly-closing` | 生成、审批、过账、锁账、ERP 导出/回写 |
-| 报表 | `/reports` | Working / Official 报表与 CSV 导出 |
-| 组合分析 | `/portfolio` | 资产类型、范围、租金承诺与到期分布 |
-| ROI 测算 | `/roi` | 人力工时与成本节省测算 |
-| Agent 运营 | `/agent-metrics` | 跨 Run Planner 用量、Token 和成本状态（管理员/审计） |
-| 敏感性分析 | `/sensitivity` | 折现率冲击分析 |
-| 多准则对比 | `/standards` | IFRS 16 / ASC 842 / 本地准则对比 |
-| 审计日志 | `/audit-logs` | 全链路操作留痕查询 |
+---
 
-## 开发约束
+## 开发约束 / Development Constraints
 
+中文：
+
+- 转型采用增量叠加：不得删除、重命名、隐藏或破坏任何既有功能、页面、导航入口或 API。
 - 所有重大变更必须通过事件表处理，不得手工覆盖合同金额或日期。
 - AI 识别结果不得直接写入正式台账，必须进入草稿层并人工确认。
-- 正式入库、计量、月结过账仍由主系统规则、审批和锁账控制。
 - AI 不得猜测折现率，缺失时必须触发 human-in-the-loop。
 - 先付租金、后付租金、变量租金、非租赁成分必须严格区分。
-- Working Report 可包含草稿/待审批数据；Official Report 仅包含已审批正式数据。
+- Working Report 可包含草稿 / 待审批数据；Official Report 仅包含已审批正式数据。
+- 模拟数据必须在数据库、API、导出和 UI 中保持标识，不得进入 Official 过账链路。
+- 所有数据库变更必须同时提供增量迁移和 `db/init/01_init.sql` 空库初始化版本。
+- 经营口径的占用成本不等于 IFRS 16 折旧、利息、ROU 或租赁负债变动，两者不可互相替代。
 
-## 关键文档
+English:
 
-- [AGENTS.md](AGENTS.md)
-- [租赁平台进阶提升方案](docs/租赁平台进阶提升方案.md)
+- The transformation is additive: never delete, rename, hide or break an existing feature, page, navigation entry or API.
+- Material changes go through the event tables; contract amounts and dates are never overwritten by hand.
+- AI extraction results never land directly in the official ledger — they enter the draft layer and require human confirmation.
+- The AI must not guess a discount rate; a missing one triggers human-in-the-loop.
+- Rent in advance, rent in arrears, variable rent and non-lease components must stay strictly separated.
+- Working reports may include drafts and pending items; official reports contain approved data only.
+- Simulated data stays labelled across database, API, exports and UI, and never enters the Official posting chain.
+- Every database change ships both an incremental migration and an updated `db/init/01_init.sql`.
+- Operating-basis occupancy cost is not IFRS 16 depreciation, interest, ROU or lease-liability movement; the two are never substituted for each other.
+
+---
+
+## 关键文档 / Key Documents
+
+**转型 / Transformation**
+
+- [线下零售经营分析工作站：产品转型可行性报告与规划](docs/线下零售经营分析工作站_产品转型可行性报告与规划.md)
+- [转型执行看板](docs/execution/转型执行看板.md) — MAX-001 → MAX-009 任务、评审与验收记录
+- [转型实施任务清单与验收标准](docs/线下零售经营工作站_转型实施任务清单与验收标准.md)
+- [线下零售经营分析工作站 · 外部研究](docs/research/线下零售经营分析工作站_外部研究.md)
+- [MAX-009 端到端验收证据索引](docs/execution/evidence/MAX-009/index.md)
+
+**UI / UX**
+
+- [UIUX 改善方案](docs/UIUX改善方案.md) — 当前设计系统诊断与分阶段改进计划
+- [UIUX 设计与交互提升评估报告](docs/UIUX_设计与交互提升评估报告.md)
+
+**租赁与 IFRS 16 / Lease & IFRS 16**
+
 - [IFRS 16 计量回归对数报告](docs/IFRS16_计量回归对数报告.md)
 - [IFRS 16 计量方法与准则映射白皮书](docs/IFRS16_计量方法与准则映射白皮书.md)
 - [IFRS16 IT 需求文档](docs/IFRS16_IT_需求文档.md)
 - [IFRS16 MVP 技术架构方案](docs/IFRS16_MVP_技术架构方案.md)
+
+**Agent 与运维 / Agent & Operations**
+
+- [AGENTS.md](AGENTS.md)
+- [AI Agent 运行运维手册](docs/AI_Agent_运行运维手册.md)
+- [AI Agent 外部验收清单](docs/AI_Agent_外部验收清单.md)
+- [ops/prometheus/README.md](ops/prometheus/README.md)
+
+---
 
 ## License
 

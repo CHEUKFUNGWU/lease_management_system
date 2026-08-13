@@ -1,6 +1,6 @@
 # UI/UX 改善方案 / UI-UX Improvement Plan
 
-> 版本：v1.0
+> 版本：v1.1（v1.0 为设计系统诊断；v1.1 追加转型主线错配问题清单与 Agent 首页方案）
 > 日期：2026-08-13
 > 适用产品：线下零售经营分析工作站 / Retail Performance Workstation
 > 参考基准：[Beautiful UI（AI-native primitives）](https://www.beautifului.dev/)、[Vercel Design System](https://github.com/educlopez/design-bites/blob/main/design-mds/vercel.com/DESIGN.md)
@@ -262,6 +262,7 @@ D15 有三重代价：CSS 内的 `@import` 是渲染阻塞的；产生对 Google
 
 | 阶段 | 内容 | 工期 | 验收标准 |
 |---|---|---|---|
+| **零** | 主线错配速修：命令面板补齐零售页面与门店搜索、品牌文案、AI Chat 开场白与快捷提问；定位 D21 弹窗缺陷 | 2–3 天 | 见 §7 各条验收；D21 成因确认并记录 |
 | **一** | Token 层、三档字重、状态点、清理 `!important` / 内联样式 / JS hover、字体自托管 | 1 周 | `!important` ≤ 20；AppLayout 内联样式 = 0；JS hover handler = 0；`1px solid` = 0；无 `fontWeight > 600`；Lighthouse 无渲染阻塞字体请求 |
 | **二** | `<DataTrustBar />`、`<StateBlock />`，四个页面接入 | 1.5 周 | 可信度信息一行可读、可展开全量；`decision_ready=false` 在 KPI 卡上可见；空/载/错三态全站同一组件 |
 | **三** | 六个 AI-native 组件；AI 从跳页改为同页 Drawer | 2 周 | 每条 AI 结论可点开工具链与来源；proposal 走统一 `<ApprovalCard />`；`/store-360` 提问不离开页面 |
@@ -285,10 +286,122 @@ D15 有三重代价：CSS 内的 `@import` 是渲染阻塞的；产生对 Google
 
 ---
 
-## 6. 附：为什么这四个阶段的顺序不能换
+## 6. 附：为什么这些阶段的顺序不能换
 
-- 阶段一不先做 → 阶段二三的新组件会被 142 处 `!important` 随机覆盖，重演 MAX-009 Review 2 的缺陷；
+- 阶段零是纯文案与配置，不碰布局，所以可以插在最前面先止血；
+- 阶段一不先做 → 阶段二三五的新组件会被 142 处 `!important` 随机覆盖，重演 MAX-009 Review 2 的缺陷；
 - 阶段二不先做 → 阶段三的 AI 组件无法复用统一的可信度与来源展示，会各写一套；
-- 阶段四的暗色模式依赖阶段一的 token 化，依赖阶段二三不再产生新的内联样式。
+- 阶段四的暗色模式依赖阶段一的 token 化，依赖阶段二三不再产生新的内联样式；
+- 阶段五（§8 三栏首页）依赖阶段二的 `<DataTrustBar />` 和阶段三的 `<ApprovalCard />`，提前做等于把这两个组件在首页再写一遍。
 
 **一句话：先让样式系统可预测，再谈让它好看。**
+
+---
+
+## 7. 转型主线错配问题清单（2026-08-13 追加）
+
+> 来源：转型合并后第一次真实使用巡检（登录首屏、命令面板、AI Chat）。
+> 与 §2 的区别：§2 是**设计系统**问题（怎么长的），本节是**产品主线**问题（说的还是旧产品）。
+> 状态口径：`OPEN` = 已确认未修；`UNDIAGNOSED` = 现象确认但成因未定位。
+
+### 7.1 问题总表
+
+| ID | 严重度 | 问题 | 证据 | 状态 |
+|---|---|---|---|---|
+| **D16** | P0 | **登录第一屏与转型主线完全不符。** 主页卡片为待复核合同、待过账分录、临近关键日期、总租赁负债、本月租赁费用、月结就绪度 —— 零个零售经营指标，没有 pulse、没有 attention 门店、没有任何进入 `/operating-pulse` 的入口 | [`web/app/page.tsx`](../web/app/page.tsx) L149–193 | OPEN |
+| **D17** | P0 | **命令面板搜不到零售功能。** 可搜页面仅 todo / contracts / reports / monthly-closing / cashflow-forecast / sensitivity / settings 七项；`/operating-pulse`、`/store-360`、`/scenario-workbench`、`/performance`、`/portfolio`、`/pre-deal`、`/deal-compare`、`/standards`、`/roi`、`/audit-logs`、`/agent-metrics` **全部缺失**。实体搜索也只查合同，**不能按门店编码或门店名搜索** | [`GlobalSearch.tsx:41`](../web/app/components/GlobalSearch.tsx#L41)（pageItems）、`:51`（actionItems）、`:81`（只调 `contractApi.list`） | OPEN |
+| **D18** | P0 | **AI Chat 自我介绍还是租赁助手。** 开场白称"我是租赁管理 AI Agent"，四条能力全部是 Excel 台账 / PDF 合同 / 计量结果 / 审批状态；三条快捷提问全部是租赁（折现率缺失合同、待审批事项、即将到期合同）；五个 skill chip 中"零售经营分析"排在最后一位 | [`i18n.ts:256`](../web/app/lib/i18n.ts#L256)、`:401`、`:406`、`:411`、`:5315` | OPEN |
+| **D19** | P1 | **品牌文案仍为旧产品。** `app.title` = "租赁管理系统"，Header 与 Sider footer 都用它；Logo 徽标硬编码字符串 `L16`（Lease + IFRS 16） | [`i18n.ts:224`](../web/app/lib/i18n.ts#L224)、[`AppLayout.tsx:279`](../web/app/components/AppLayout.tsx#L279) | OPEN |
+| **D20** | P1 | **首页没有任何 AI 入口。** 主页两个按钮是"新增合同"和"在 AI Chat 上传文件"（跳转到录入场景）。结合 §2 的 D8（三个零售页的"交给 AI 分析"也是跳走），**产品里不存在"在当前上下文里用 AI"的路径** | [`page.tsx:151`](../web/app/page.tsx#L151)–L152 | OPEN |
+| **D21** | P1 | **命令面板弹窗布局错乱。** JSX 顺序为 输入框 → 结果列表 → 键盘提示，但实际渲染是：标题浮在弹窗垂直中部、中间大片空白、输入框被挤到弹窗最底部且超出视口 | 用户截图（localhost:3000，⌘K 打开）；JSX 见 [`GlobalSearch.tsx:169`](../web/app/components/GlobalSearch.tsx#L169)–L206 | **UNDIAGNOSED** |
+
+### 7.2 D21 的调查记录
+
+已排除的可能：
+
+- `.command-palette-results`（`display:grid; max-height:420px; margin-top:12px`）、`.command-palette-item`、`.command-palette-hint` 无异常；
+- `.ant-modal-content` / `-header` / `-body` / `-footer` 四条覆盖只改圆角、内边距和阴影，**未设置任何 height / min-height / flex-direction**；
+- 全文件 `height:` / `min-height:` 逐条查过，无一命中弹窗；
+- 断点 media query（含 `.ant-layout-header .global-search { display:none }` 一段）不影响弹窗内部布局。
+
+**结论：静态读码无法定位，不做臆测归因。** 下一步需要真实复现后读计算样式（`.ant-modal`、`.ant-modal-content`、`.ant-modal-body` 的 computed `display` / `height` / `flex-direction`，以及 `.command-palette-results` 的实际高度）。复现需要登录，密码须由用户本人输入。
+
+**倾向性怀疑（待证实，不作为结论）：** 与 §2 的 D1 同源 —— 142 处 `!important` 中存在后位规则以相同 specificity 覆盖了弹窗布局。若证实，D21 应并入阶段一一起修，而不是单独打补丁。
+
+### 7.3 各条验收标准
+
+| ID | 验收标准 |
+|---|---|
+| D16 | 登录首屏包含当日经营简报与 attention 门店，且可一键进入 `/operating-pulse`；原有租赁 / 会计四张卡一张不少（增量叠加底线） |
+| D17 | 命令面板覆盖全部 18 个业务路由；支持按门店编码与门店名搜索；新增页面未登记时 CI 失败 |
+| D18 | 开场白、能力列表、快捷提问以零售经营为主，租赁 / IFRS 16 作为其中一类保留；skill chip 顺序反映主线 |
+| D19 | 显示名与徽标更新；**代码命名空间 `lease_*` 不变**（见下方红线） |
+| D20 | 首页与三个零售页均可在当前上下文唤起 AI，不跳走（与 §3.3 的 Drawer 改造合并验收） |
+| D21 | 成因写入本节；修复后 ⌘K 弹窗在 1440×900 与 390×844 下输入框均在标题正下方 |
+
+### 7.4 一条必须守住的区分：显示名 ≠ 命名空间
+
+D19 容易被扩大成一次全仓重命名，必须提前划清：
+
+| 可以改（文案层） | 不能改（代码层） |
+|---|---|
+| `app.title`、Logo 徽标、页面标题、开场白、README | repo 名、容器名、数据库名、JWT secret、`lease_*` 包名与路由、`lease-agent` CLI |
+
+依据：可行性报告明确「底层大规模物理重命名应等内部技术门槛通过后再决定」，且 2026-05 已经改过一次名。**把改文案的需求执行成改命名空间，是本条最大的风险。**
+
+---
+
+## 8. 追加方案：Agent 优先的三栏首页（阶段五）
+
+### 8.1 需求来源与判断
+
+用户提出：参照 Codex / Claude Code Desktop 的布局，让 AI Agent 成为主页面，最左仍是导航栏，Agent 右侧放待办卡片。
+
+**方向采纳，但形态需要调整：中间栏首屏不应是空的输入框。** 两条理由：
+
+1. **任务性质不同。** Claude Code 首页是空 prompt，因为编码任务每次都不一样。经营晨检相反 —— 每天问的是同一个问题（"昨天哪儿出问题了"）。让分析师每天早上重复打同一句话，比现在的仪表盘更低效。
+2. **会承诺后端给不了的能力。** `retail_operations@v1` 是**三个只读 tool**，action proposal 明确不落业务表（见五条底线第 5 条）。一个空 chat 首页会诱导用户下达执行类指令（"帮我把 A 店排班改了"），而系统只能回建议。这个预期落差比"首页不够新"伤害更大。
+
+**采纳形态：三栏骨架照办，中间栏首屏是 Agent 自动生成的「今日经营简报」。** 页面加载即由 Agent 调 `retail.pulse` 跑一次晨检，输出带引用编号的卡片流；底部常驻 composer 支持追问。既拿到 Agent 优先的心智，又不越过只读边界，还把可信度与引用摆在最显眼的位置。
+
+### 8.2 布局
+
+```
+┌──────────┬────────────────────────────────────┬─────────────────┐
+│ 导航      │  Agent 工作区                       │ 行动与待办       │
+│          │                                     │                 │
+│ 经营分析  │  ◈ 今日经营简报  ● 模拟 覆盖100% ⓘ  │ 待确认建议 (2)   │
+│  脉搏     │  ─────────────────────────────      │ ┌─────────────┐ │
+│  门店360  │  昨日销售 -8.2%，主要来自 3 家门店   │ │A店人工 -10% │ │
+│  情景     │  ⚙ retail.pulse · 420 store-days    │ │+2.1万/月 [1]│ │
+│          │                                     │ │ 采纳 改 拒  │ │
+│ 日常作业  │  ① SIM-006 占用成本率 +10.08pp [1]  │ └─────────────┘ │
+│  待办     │  ② SIM-023 客流连续下降 [2]         │                 │
+│  合同     │  ③ SIM-041 转化跌破同群 P25 [3]     │ 待我审批 (8)     │
+│          │                                     │ 待过账分录 (2)   │
+│ 会计合规  │  ▸ 展开推理轨迹                      │ 临近关键日期 (4) │
+│  报表     │                                     │ 月结阻塞项 (2)   │
+│  结账     │  ┌───────────────────────────────┐  │                 │
+│  审计     │  │ 追问，或让 Agent 起草行动…  ↑ │  │                 │
+│          │  └───────────────────────────────┘  │                 │
+└──────────┴────────────────────────────────────┴─────────────────┘
+```
+
+### 8.3 三条设计主张
+
+1. **首屏自动跑一次简报，不等提问。** 输出带引用编号的卡片流，可信度信息（模拟 / 正式、覆盖率、decision-ready）挂在简报头部，复用阶段二的 `<DataTrustBar />`。
+2. **中间产出 → 右栏沉淀。** Agent 提出的 action proposal 直接落到右栏"待确认建议"，用阶段三的 `<ApprovalCard />`。这把只读边界转成产品优势：Agent 只提议，人来确认，而"确认"有明确落点。
+3. **右栏是收敛区，不是第二个仪表盘。** 现有主页的待复核合同 / 待过账分录 / 临近关键日期 / 月结就绪度四张卡原样迁入，租赁与会计入口一个不少。
+
+### 8.4 依赖与风险
+
+- **硬依赖阶段一。** 三栏布局会大量新增布局 CSS，在 142 处 `!important` 未清理前落地，新组件会被随机覆盖 —— 这正是 MAX-009 Review 2 缺陷的复现条件。
+- **硬依赖阶段二、三。** `<DataTrustBar />` 与 `<ApprovalCard />` 必须先存在，否则会在首页重写一遍。
+- **不删旧首页组件。** `DashboardHeader`、`MoneyKPICard`、`UpcomingDatesCard`、`WorkQueueSummaryCard` 全部保留并在右栏复用。
+- **移动端需要单独设计。** 三栏在 390px 下不成立，需退化为"简报单栏 + 待办 Drawer"。
+
+### 8.5 建议执行顺序
+
+**阶段零（速修 D17/D18/D19 + 定位 D21）→ 阶段一（样式收敛）→ 阶段二、三（组件层）→ 阶段五（三栏首页，D16/D20 在此闭环）。**
+
+阶段零可以立即开始：全部是文案、路由登记和配置，不碰布局，与后续阶段无冲突，且能顺带验证样式系统的实际腐化程度。

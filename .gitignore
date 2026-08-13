@@ -46,3 +46,11 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Local-only document archive.
+# Superseded docs are moved here instead of being deleted, so the history of
+# the product is still reachable locally without shipping stale positioning to
+# collaborators. Nothing under this path is pushed.
+# Note: docs/archive/ is a different, still-tracked directory — do not confuse
+# the two.
+docs/archive-local/

@@ -11,22 +11,12 @@ import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
 import { useAuth } from "../context/AuthContext";
-import { ApiError, retailAnalyticsApi, type RetailDataClassification, type RetailSimulationDatasetData, type RetailStore360Option, type RetailStoreDiagnosticsResponse, type RetailSummaryMetric } from "../lib/api";
+import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailSimulationDatasetData, type RetailStore360Option, type RetailStoreDiagnosticsResponse, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, KPI_LABELS, latestAnomalyDate, type PulseMetricCode } from "../operating-pulse/logic";
 import { bridgeConservation, bridgeTone, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
 import { retailAIHref } from "../lib/retailAI";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
-
-function errorCopy(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 404) return "该门店不在当前法人或数据范围内。";
-    if (error.status === 409) return "事实存在多个来源，请在来源系统输入框指定唯一 source_system 后重试。";
-    if (error.status >= 500) return "门店诊断服务暂时不可用，请稍后重试。";
-    return error.message;
-  }
-  return "门店诊断加载失败，请检查网络后重试。";
-}
 
 function queryFromURL(searchParams: URLSearchParams) {
   const classification = searchParams.get("data_classification") as RetailDataClassification | null;
@@ -117,7 +107,7 @@ function Store360Inner() {
     setOptionsError(null);
     retailAnalyticsApi.storeOptions({ data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined }, token).then((result) => {
       if (active) setOptions(result.data);
-    }).catch((err) => { if (active) setOptionsError(errorCopy(err)); }).finally(() => { if (active) setOptionsLoading(false); });
+    }).catch((err) => { if (active) setOptionsError(apiErrorMessage(err)); }).finally(() => { if (active) setOptionsLoading(false); });
     return () => { active = false; };
   }, [token, query.classification, query.datasetVersion, retry]);
 
@@ -130,7 +120,7 @@ function Store360Inner() {
     setLoading(true);
     setError(null);
     setResponse(null);
-    retailAnalyticsApi.storeDiagnostics({ store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, window_days: query.windowDays, source_system: query.sourceSystem || undefined }, token).then((result) => { if (active) setResponse(result); }).catch((err) => { if (active) setError(errorCopy(err)); }).finally(() => { if (active) setLoading(false); });
+    retailAnalyticsApi.storeDiagnostics({ store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, window_days: query.windowDays, source_system: query.sourceSystem || undefined }, token).then((result) => { if (active) setResponse(result); }).catch((err) => { if (active) setError(apiErrorMessage(err)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [token, query.storeID, query.classification, query.datasetVersion, query.asOf, query.windowDays, query.sourceSystem, retry]);
 

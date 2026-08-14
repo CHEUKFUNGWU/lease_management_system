@@ -8,7 +8,7 @@ import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { ApiError, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioAssumptions, type RetailScenarioResponse, type RetailStore360Option } from "../lib/api";
+import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioAssumptions, type RetailScenarioResponse, type RetailStore360Option } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { latestAnomalyDate } from "../operating-pulse/logic";
 import { acceptsEvaluation, actionKey, bridgeConservation, canSaveScenario, defaultAssumptions, evaluationSnapshotKey, formatScenarioValue, responseHorizonLabel, returnScenarioQuery, SCENARIO_CODES, SCENARIO_LABELS } from "./logic";
@@ -51,17 +51,6 @@ function parseURL(params: { get(name: string): string | null }) {
     assumptions,
     returnQuery: params.get("return_query") || "",
   };
-}
-
-function errorCopy(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 404) return "门店不在当前法人或授权范围内。";
-    if (error.status === 409) return "事实存在多个来源，请指定 source_system 后重试。";
-    if (error.status === 422) return error.message || "当前门店事实不完整，无法进行情景计算。";
-    if (error.status >= 500) return "情景服务暂时不可用，请稍后重试。";
-    return error.message;
-  }
-  return error instanceof Error ? error.message : "情景计算失败，请稍后重试。";
 }
 
 function MetricTable({ response, selectedKey }: { response: RetailScenarioResponse; selectedKey: string }) {
@@ -114,7 +103,7 @@ function ScenarioPageInner() {
     if (query.classification === "simulated" && !query.datasetVersion) { setOptions([]); setOptionsError(null); return () => { active = false; }; }
     setLoadingOptions(true);
     setOptionsError(null);
-    retailAnalyticsApi.storeOptions({ data_classification: query.classification, dataset_version: query.datasetVersion || undefined }, token).then((result) => { if (active) setOptions(result.data); }).catch((err) => { if (active) { setOptions([]); setOptionsError(errorCopy(err)); } }).finally(() => { if (active) setLoadingOptions(false); });
+    retailAnalyticsApi.storeOptions({ data_classification: query.classification, dataset_version: query.datasetVersion || undefined }, token).then((result) => { if (active) setOptions(result.data); }).catch((err) => { if (active) { setOptions([]); setOptionsError(apiErrorMessage(err)); } }).finally(() => { if (active) setLoadingOptions(false); });
     return () => { active = false; };
   }, [token, query.classification, query.datasetVersion, optionsRetry]);
 
@@ -166,7 +155,7 @@ function ScenarioPageInner() {
         setResponseKey(requestKey);
       }
     } catch (err) {
-      if (sequence === requestSequence.current) setError(errorCopy(err));
+      if (sequence === requestSequence.current) setError(apiErrorMessage(err));
     } finally {
       if (sequence === requestSequence.current) setLoading(false);
     }
@@ -180,7 +169,7 @@ function ScenarioPageInner() {
     const key = actionKey({ evaluation: currentEvaluationKey, body });
     Modal.confirm({ title: "保存行动草稿？", content: "服务端会重新读取 Working 事实并只写入一条 open 行动草稿。", onOk: async () => {
       setSaving(true);
-      try { const result = await retailAnalyticsApi.saveStoreScenarioAction(currentScope, body, key, token); setActionResult({ data: result.data, idempotentReplay: result.idempotent_replay }); message.success(result.idempotent_replay ? "已安全重放现有草稿" : "行动草稿已保存"); } catch (err) { message.error(errorCopy(err)); } finally { setSaving(false); }
+      try { const result = await retailAnalyticsApi.saveStoreScenarioAction(currentScope, body, key, token); setActionResult({ data: result.data, idempotentReplay: result.idempotent_replay }); message.success(result.idempotent_replay ? "已安全重放现有草稿" : "行动草稿已保存"); } catch (err) { message.error(apiErrorMessage(err)); } finally { setSaving(false); }
     } });
   };
 

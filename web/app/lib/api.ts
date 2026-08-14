@@ -20,23 +20,74 @@ export class ApiError extends Error {
   readonly detail?: unknown;
 
   constructor(code: string, status: number, detail?: unknown) {
-    super(ApiError.userMessage(code, status));
+    super(ApiError.userMessage(code, status, detail));
     this.name = "ApiError";
     this.code = code;
     this.status = status;
     this.detail = detail;
   }
 
-  private static userMessage(code: string, status: number): string {
-    if (status === 401 || code === "invalid_token" || code === "unauthorized") {
-      return t("api.session_expired", apiLanguage);
+  // ERR-002: the mapping branches on the shared error-contract vocabulary
+  // (errcontract, see core-service/internal/errcontract) instead of invented
+  // client codes. Status codes remain only as a fallback for legacy
+  // endpoints that do not emit a code yet.
+  static userMessage(code: string, status: number, detail?: unknown): string {
+    switch (code) {
+      case "unauthenticated":
+        return t("api.session_expired", apiLanguage);
+      case "permission_denied":
+        return t("api.forbidden", apiLanguage);
+      case "scope_denied":
+        // Distinct from permission_denied: the object exists but is outside
+        // the caller's data scope. Never soften this into "no data".
+        return t("api.scope_denied", apiLanguage);
+      case "not_found":
+        return t("api.not_found", apiLanguage);
+      case "network_error":
+        return t("api.network_error", apiLanguage);
+      case "system_failure":
+        return t("api.server_unavailable", apiLanguage);
+      case "conflict":
+        if (isSourceConflict(detail)) return t("api.source_conflict", apiLanguage);
+        return t("api.request_failed", apiLanguage);
+      case "invalid_arguments":
+      case "business_failure":
+      case "data_unavailable":
+      case "review_required":
+      case "capability_denied":
+      case "timeout":
+      case "cancelled":
+        return t("api.request_failed", apiLanguage);
+      default:
+        // Legacy endpoints without a code: keep the historical status-based
+        // behaviour so nothing regresses while the rest of the seam converts.
+        if (status === 401) return t("api.session_expired", apiLanguage);
+        if (status === 403) return t("api.forbidden", apiLanguage);
+        if (status === 404) return t("api.not_found", apiLanguage);
+        if (status >= 500) return t("api.server_unavailable", apiLanguage);
+        return t("api.request_failed", apiLanguage);
     }
-    if (status === 403 || code === "forbidden") return t("api.forbidden", apiLanguage);
-    if (status === 404 || code === "not_found") return t("api.not_found", apiLanguage);
-    if (status >= 500) return t("api.server_unavailable", apiLanguage);
-    if (code === "network_error") return t("api.network_error", apiLanguage);
-    return t("api.request_failed", apiLanguage);
   }
+}
+
+// ERR-001 emits {"code","error","details":{...}}; source conflicts carry
+// details.reason = "source_conflict".
+function isSourceConflict(detail: unknown): boolean {
+  if (typeof detail !== "object" || detail === null) return false;
+  const details = (detail as { details?: { reason?: unknown } }).details;
+  return details?.reason === "source_conflict";
+}
+
+// Shared page-level helper (ERR-002): the three retail pages used to each
+// carry a local errorCopy that duplicated this mapping; they now call this
+// single place. Non-ApiError failures fall back to the error's own message
+// or the generic request-failed copy.
+export function apiErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return ApiError.userMessage(error.code, error.status, error.detail);
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return t("api.request_failed", apiLanguage);
 }
 
 // Typed retail analytics contracts. These mirror the additive MAX-003/004

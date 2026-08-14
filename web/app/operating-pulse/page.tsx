@@ -14,7 +14,7 @@ import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
 import { hasRole, useAuth } from "../context/AuthContext";
-import { ApiError, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
+import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, formatSignalValue, KPI_LABELS, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, switchClassification, trendValue, type PulseMetricCode } from "./logic";
 import { createLatestRequestGate } from "./requestGate";
 import { retailAIHref } from "../lib/retailAI";
@@ -40,16 +40,6 @@ function coverageText(coverage: RetailCoverage): string {
 
 function coverageRange(response: RetailPulseResponse): string {
   return `${coverageText(response.current_coverage)} current · ${coverageText(response.comparison_coverage)} comparison`;
-}
-
-function errorCopy(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 409) return "来源冲突：请指定唯一 source_system 后重试。";
-    if (error.status === 403) return "当前账号没有经营报表读取权限，请联系管理员。";
-    if (error.status >= 500) return "经营脉搏服务暂时不可用，请稍后刷新。";
-    return error.message;
-  }
-  return "经营脉搏加载失败，请检查网络后重试。";
 }
 
 function effectivePartition(response: RetailPulseResponse, selectedCurrency: string): RetailPulsePartition | null {
@@ -160,7 +150,7 @@ function OperatingPulseInner() {
         setSelectedCurrency((current) => current && partitions.some((item) => item.currency === current) ? current : (partitions[0]?.currency || ""));
       });
     } catch (loadError) {
-      requestGate.current.commit(id, () => setError(errorCopy(loadError)));
+      requestGate.current.commit(id, () => setError(apiErrorMessage(loadError)));
     } finally {
       requestGate.current.commit(id, () => setLoading(false));
     }
@@ -183,7 +173,7 @@ function OperatingPulseInner() {
       } else if (!result.data && !searchParams.toString()) {
         setLoading(false);
       }
-    }).catch((loadError) => { latestLoaded.current = false; setError(errorCopy(loadError)); setLoading(false); });
+    }).catch((loadError) => { latestLoaded.current = false; setError(apiErrorMessage(loadError)); setLoading(false); });
   }, [router, searchParams, token, storeIDs, validWindow, windowDays, latestRetryNonce]);
 
   const storeKey = storeIDs.join("\x1f");
@@ -226,7 +216,7 @@ function OperatingPulseInner() {
       };
       setLatest(generatedDataset);
       updateQuery(router, { classification: "simulated", datasetVersion: generated.dataset_version, asOf: latestAnomalyDate(generatedDataset), windowDays: 7, storeIDs: [], sourceSystem: "retail_simulator" });
-    } catch (generationError) { message.error(errorCopy(generationError)); } finally { setGenerating(false); }
+    } catch (generationError) { message.error(apiErrorMessage(generationError)); } finally { setGenerating(false); }
   };
 
   const partition = response ? effectivePartition(response, selectedCurrency) : null;

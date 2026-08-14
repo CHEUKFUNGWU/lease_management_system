@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/lease-management-system/core-service/internal/money"
 )
 
 func day(value string) time.Time {
@@ -24,7 +26,7 @@ func monthlySchedule(start time.Time, months int, amount float64) []LeasePayment
 		monthEnd := firstOfMonth.AddDate(0, i+1, 0).AddDate(0, 0, -1)
 		payments = append(payments, LeasePayment{
 			Date:   monthEnd,
-			Amount: amount,
+			Amount: money.NewFromFloat(amount),
 			Timing: "postpaid",
 			Type:   "fixed",
 		})
@@ -36,7 +38,7 @@ func amountsOn(t *testing.T, schedule RevisedSchedule, dates ...string) []float6
 	t.Helper()
 	byDate := map[string]float64{}
 	for _, change := range schedule.Changes {
-		byDate[change.Date.Format("2006-01-02")] = change.RevisedAmount
+		byDate[change.Date.Format("2006-01-02")] = change.RevisedAmount.Round("CNY").Float64()
 	}
 	result := make([]float64, 0, len(dates))
 	for _, date := range dates {
@@ -71,8 +73,8 @@ func TestDerive_FixedEscalationLeavesEarlierPaymentsAlone(t *testing.T) {
 	if schedule.ChangedCount != 6 {
 		t.Errorf("expected 6 changed payments, got %d", schedule.ChangedCount)
 	}
-	if schedule.Delta != 3000 {
-		t.Errorf("expected the revision to add 3000 over the remaining term, got %.2f", schedule.Delta)
+	if schedule.Delta.Round("CNY").Float64() != 3000 {
+		t.Errorf("expected the revision to add 3000 over the remaining term, got %.2f", schedule.Delta.Round("CNY").Float64())
 	}
 }
 
@@ -91,8 +93,8 @@ func TestDerive_IndexClauseUsesTheRatioOfReadings(t *testing.T) {
 
 	want := 10000 * (105.1 / 102.4)
 	got := amountsOn(t, schedule, "2026-01-31")[0]
-	if math.Abs(got-round(want)) > 0.01 {
-		t.Errorf("indexed payment: want %.2f, got %.2f", round(want), got)
+	if math.Abs(got-moneyRound(money.NewFromFloat(want))) > 0.01 {
+		t.Errorf("indexed payment: want %.2f, got %.2f", moneyRound(money.NewFromFloat(want)), got)
 	}
 	if schedule.CapApplied || schedule.FloorApplied {
 		t.Error("no cap or floor was stated, so neither should be reported as applied")
@@ -153,8 +155,8 @@ func TestDerive_SteppedLadderTakesTheRungInForce(t *testing.T) {
 		Kind: RevisionStepped,
 		Steps: []StepChange{
 			// Deliberately out of order: the derivation sorts them.
-			{FromDate: day("2027-01-01"), Amount: 13000},
-			{FromDate: day("2026-07-01"), Amount: 12000},
+			{FromDate: day("2027-01-01"), Amount: money.NewFromFloat(13000)},
+			{FromDate: day("2026-07-01"), Amount: money.NewFromFloat(12000)},
 		},
 	}, day("2026-01-01"))
 	if err != nil {
@@ -176,9 +178,9 @@ func TestDerive_SteppedLadderTakesTheRungInForce(t *testing.T) {
 func TestDerive_LeavesVariableAndServiceChargesAlone(t *testing.T) {
 	base := day("2026-06-30")
 	original := []LeasePayment{
-		{Date: base, Amount: 10000, Timing: "postpaid", Type: "fixed"},
-		{Date: base, Amount: 3000, Timing: "postpaid", Type: "variable"},
-		{Date: base, Amount: 1500, Timing: "postpaid", Type: "non_lease"},
+		{Date: base, Amount: money.NewFromFloat(10000), Timing: "postpaid", Type: "fixed"},
+		{Date: base, Amount: money.NewFromFloat(3000), Timing: "postpaid", Type: "variable"},
+		{Date: base, Amount: money.NewFromFloat(1500), Timing: "postpaid", Type: "non_lease"},
 	}
 
 	schedule, err := DeriveRevisedPayments(original, PaymentRevision{
@@ -191,7 +193,7 @@ func TestDerive_LeavesVariableAndServiceChargesAlone(t *testing.T) {
 
 	byType := map[string]float64{}
 	for _, change := range schedule.Changes {
-		byType[change.Type] = change.RevisedAmount
+		byType[change.Type] = change.RevisedAmount.Round("CNY").Float64()
 	}
 	if byType["fixed"] != 11000 {
 		t.Errorf("fixed rent should escalate to 11000, got %.2f", byType["fixed"])
@@ -237,7 +239,7 @@ func TestDerive_SetAmountReplacesTheRent(t *testing.T) {
 
 	schedule, err := DeriveRevisedPayments(original, PaymentRevision{
 		Kind:   RevisionSetAmount,
-		Amount: 8800,
+		Amount: money.NewFromFloat(8800),
 	}, day("2026-07-01"))
 	if err != nil {
 		t.Fatalf("derive: %v", err)
@@ -245,8 +247,8 @@ func TestDerive_SetAmountReplacesTheRent(t *testing.T) {
 	if got := amountsOn(t, schedule, "2026-07-31")[0]; got != 8800 {
 		t.Errorf("want 8800, got %.2f", got)
 	}
-	if schedule.Delta != -7200 {
-		t.Errorf("six payments falling by 1200 should total -7200, got %.2f", schedule.Delta)
+	if schedule.Delta.Round("CNY").Float64() != -7200 {
+		t.Errorf("six payments falling by 1200 should total -7200, got %.2f", schedule.Delta.Round("CNY").Float64())
 	}
 }
 
@@ -261,9 +263,9 @@ func TestDerive_RejectsTermsThatCannotBeMeant(t *testing.T) {
 		{"reduction past zero", PaymentRevision{Kind: RevisionPercentage, Percentage: -100}},
 		{"index without readings", PaymentRevision{Kind: RevisionIndex, BaseIndex: 100}},
 		{"negative index reading", PaymentRevision{Kind: RevisionIndex, BaseIndex: -1, NewIndex: 100}},
-		{"negative rent", PaymentRevision{Kind: RevisionSetAmount, Amount: -1}},
+		{"negative rent", PaymentRevision{Kind: RevisionSetAmount, Amount: money.NewFromFloat(-1)}},
 		{"stepped with no steps", PaymentRevision{Kind: RevisionStepped}},
-		{"step without a date", PaymentRevision{Kind: RevisionStepped, Steps: []StepChange{{Amount: 100}}}},
+		{"step without a date", PaymentRevision{Kind: RevisionStepped, Steps: []StepChange{{Amount: money.NewFromFloat(100)}}}},
 		{"window ends before it starts", PaymentRevision{
 			Kind: RevisionPercentage, Percentage: 5,
 			AppliesFrom: day("2026-06-01"), AppliesTo: day("2026-03-01"),

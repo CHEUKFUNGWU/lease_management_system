@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/lease-management-system/core-service/internal/money"
+	"github.com/shopspring/decimal"
 )
 
 // RegressionSuite is the file format for IFRS 16 calculation regression cases.
@@ -33,10 +36,10 @@ type RegressionInput struct {
 	LeaseEndDate      string              `json:"lease_end_date"`
 	LeaseScope        string              `json:"lease_scope"`
 	DiscountRate      float64             `json:"discount_rate"`
-	InitialDirectCost float64             `json:"initial_direct_cost"`
-	PrepaidRent       float64             `json:"prepaid_rent"`
-	IncentiveReceived float64             `json:"incentive_received"`
-	RestorationCost   float64             `json:"restoration_cost"`
+	InitialDirectCost money.Amount        `json:"initial_direct_cost"`
+	PrepaidRent       money.Amount        `json:"prepaid_rent"`
+	IncentiveReceived money.Amount        `json:"incentive_received"`
+	RestorationCost   money.Amount        `json:"restoration_cost"`
 	Payments          []RegressionPayment `json:"payments"`
 
 	// ForeignCurrency is set only by multi-currency cases. When present the
@@ -75,22 +78,22 @@ type RegressionForeignCurrency struct {
 }
 
 type RegressionPayment struct {
-	Date   string  `json:"date"`
-	Amount float64 `json:"amount"`
-	Timing string  `json:"timing"`
-	Type   string  `json:"type"`
+	Date   string       `json:"date"`
+	Amount money.Amount `json:"amount"`
+	Timing string       `json:"timing"`
+	Type   string       `json:"type"`
 }
 
 type RegressionExpected struct {
-	InitialLiability *float64                    `json:"initial_liability,omitempty"`
-	InitialROUAsset  *float64                    `json:"initial_rou_asset,omitempty"`
+	InitialLiability *money.Amount               `json:"initial_liability,omitempty"`
+	InitialROUAsset  *money.Amount               `json:"initial_rou_asset,omitempty"`
 	Monthly          []RegressionMonthlyExpected `json:"monthly,omitempty"`
 
 	// ExchangeDifference is the expected IAS 21 gain or loss on the lease
 	// liability for the period named in Input.ForeignCurrency; positive is a
 	// loss. That the right-of-use asset is *not* retranslated is asserted the
 	// ordinary way, through Monthly.ClosingROUAsset in the contract currency.
-	ExchangeDifference *float64 `json:"exchange_difference,omitempty"`
+	ExchangeDifference *money.Amount `json:"exchange_difference,omitempty"`
 
 	// Remeasured holds what the change in Input.Remeasurement should produce.
 	Remeasured *RegressionRemeasured `json:"remeasured,omitempty"`
@@ -101,31 +104,31 @@ type RegressionRemeasured struct {
 	// RevisedPaymentTotal is the sum of the payments still outstanding after
 	// the clause is applied. It pins the derivation itself, so a case that
 	// fails tells you whether the schedule or the measurement was wrong.
-	RevisedPaymentTotal *float64 `json:"revised_payment_total,omitempty"`
-	ChangedPaymentCount *int     `json:"changed_payment_count,omitempty"`
-	AppliedFactor       *float64 `json:"applied_factor,omitempty"`
+	RevisedPaymentTotal *money.Amount `json:"revised_payment_total,omitempty"`
+	ChangedPaymentCount *int          `json:"changed_payment_count,omitempty"`
+	AppliedFactor       *float64      `json:"applied_factor,omitempty"`
 
-	LiabilityBefore *float64 `json:"liability_before,omitempty"`
-	LiabilityAfter  *float64 `json:"liability_after,omitempty"`
-	ROUBefore       *float64 `json:"rou_before,omitempty"`
-	ROUAfter        *float64 `json:"rou_after,omitempty"`
-	PnLGain         *float64 `json:"pnl_gain,omitempty"`
-	PnLLoss         *float64 `json:"pnl_loss,omitempty"`
+	LiabilityBefore *money.Amount `json:"liability_before,omitempty"`
+	LiabilityAfter  *money.Amount `json:"liability_after,omitempty"`
+	ROUBefore       *money.Amount `json:"rou_before,omitempty"`
+	ROUAfter        *money.Amount `json:"rou_after,omitempty"`
+	PnLGain         *money.Amount `json:"pnl_gain,omitempty"`
+	PnLLoss         *money.Amount `json:"pnl_loss,omitempty"`
 }
 
 type RegressionMonthlyExpected struct {
-	Period              string   `json:"period"`
-	OpeningLiability    *float64 `json:"opening_liability,omitempty"`
-	InterestExpense     *float64 `json:"interest_expense,omitempty"`
-	TotalPayments       *float64 `json:"total_payments,omitempty"`
-	PrepaidPayment      *float64 `json:"prepaid_payment,omitempty"`
-	ClosingLiability    *float64 `json:"closing_liability,omitempty"`
-	OpeningROUAsset     *float64 `json:"opening_rou_asset,omitempty"`
-	Depreciation        *float64 `json:"depreciation,omitempty"`
-	ClosingROUAsset     *float64 `json:"closing_rou_asset,omitempty"`
-	ExemptLeaseExpense  *float64 `json:"exempt_lease_expense,omitempty"`
-	VariableRentExpense *float64 `json:"variable_rent_expense,omitempty"`
-	NonLeaseExpense     *float64 `json:"non_lease_expense,omitempty"`
+	Period              string        `json:"period"`
+	OpeningLiability    *money.Amount `json:"opening_liability,omitempty"`
+	InterestExpense     *money.Amount `json:"interest_expense,omitempty"`
+	TotalPayments       *money.Amount `json:"total_payments,omitempty"`
+	PrepaidPayment      *money.Amount `json:"prepaid_payment,omitempty"`
+	ClosingLiability    *money.Amount `json:"closing_liability,omitempty"`
+	OpeningROUAsset     *money.Amount `json:"opening_rou_asset,omitempty"`
+	Depreciation        *money.Amount `json:"depreciation,omitempty"`
+	ClosingROUAsset     *money.Amount `json:"closing_rou_asset,omitempty"`
+	ExemptLeaseExpense  *money.Amount `json:"exempt_lease_expense,omitempty"`
+	VariableRentExpense *money.Amount `json:"variable_rent_expense,omitempty"`
+	NonLeaseExpense     *money.Amount `json:"non_lease_expense,omitempty"`
 }
 
 type RegressionRun struct {
@@ -146,12 +149,12 @@ type RegressionCaseRun struct {
 }
 
 type RegressionAssert struct {
-	Name      string  `json:"name"`
-	Expected  float64 `json:"expected"`
-	Actual    float64 `json:"actual"`
-	Delta     float64 `json:"delta"`
-	Tolerance float64 `json:"tolerance"`
-	Passed    bool    `json:"passed"`
+	Name      string       `json:"name"`
+	Expected  money.Amount `json:"expected"`
+	Actual    money.Amount `json:"actual"`
+	Delta     money.Amount `json:"delta"`
+	Tolerance float64      `json:"tolerance"`
+	Passed    bool         `json:"passed"`
 }
 
 func LoadRegressionSuite(path string) (RegressionSuite, error) {
@@ -163,9 +166,9 @@ func LoadRegressionSuite(path string) (RegressionSuite, error) {
 	if err := json.Unmarshal(raw, &suite); err != nil {
 		return RegressionSuite{}, err
 	}
-	if suite.Tolerance <= 0 {
-		suite.Tolerance = 1
-	}
+	// MONEY-001: the suite tolerance is an explicit part of the fixture and
+	// must stay as written — an absent/zero value previously defaulted to 1,
+	// which would silently defeat a tolerance of 0.
 	return suite, nil
 }
 
@@ -214,19 +217,33 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 	addAssertWithin := func(name string, expected, actual, allowed float64) {
 		assertion := RegressionAssert{
 			Name:      name,
-			Expected:  expected,
-			Actual:    actual,
-			Delta:     math.Abs(actual - expected),
+			Expected:  money.NewFromFloat(expected),
+			Actual:    money.NewFromFloat(actual),
+			Delta:     money.NewFromFloat(math.Abs(actual - expected)),
 			Tolerance: allowed,
 		}
-		assertion.Passed = assertion.Delta <= allowed
+		assertion.Passed = assertion.Delta.Decimal().Cmp(decimal.NewFromFloat(allowed)) <= 0
 		if !assertion.Passed {
 			caseRun.Passed = false
 		}
 		caseRun.Assertions = append(caseRun.Assertions, assertion)
 	}
-	addAssert := func(name string, expected, actual float64) {
-		addAssertWithin(name, expected, round(actual), tolerance)
+	// Amount assertions compare exact money. The fixture golden values are
+	// stated to the cent and the tolerance is zero, so a deviation of any size
+	// fails — there is no float64 comparison left on this path.
+	addAssert := func(name string, expected, actual money.Amount) {
+		assertion := RegressionAssert{
+			Name:      name,
+			Expected:  expected,
+			Actual:    actual,
+			Delta:     actual.Sub(expected).Abs(),
+			Tolerance: tolerance,
+		}
+		assertion.Passed = assertion.Delta.Decimal().Cmp(decimal.NewFromFloat(tolerance)) <= 0
+		if !assertion.Passed {
+			caseRun.Passed = false
+		}
+		caseRun.Assertions = append(caseRun.Assertions, assertion)
 	}
 
 	if tc.Expected.InitialLiability != nil {
@@ -247,9 +264,9 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 			caseRun.Passed = false
 			caseRun.Assertions = append(caseRun.Assertions, RegressionAssert{
 				Name:      expectedMonth.Period + ".exists",
-				Expected:  1,
-				Actual:    0,
-				Delta:     1,
+				Expected:  money.NewFromInt64(1),
+				Actual:    money.NewFromInt64(0),
+				Delta:     money.NewFromInt64(1),
 				Tolerance: tolerance,
 				Passed:    false,
 			})
@@ -260,13 +277,13 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 			addAssert(prefix+"opening_liability", *expectedMonth.OpeningLiability, actualMonth.OpeningLiability)
 		}
 		if expectedMonth.InterestExpense != nil {
-			addAssert(prefix+"interest_expense", *expectedMonth.InterestExpense, round(actualMonth.InterestExpense))
+			addAssert(prefix+"interest_expense", *expectedMonth.InterestExpense, actualMonth.InterestExpense)
 		}
 		if expectedMonth.TotalPayments != nil {
-			addAssert(prefix+"total_payments", *expectedMonth.TotalPayments, round(actualMonth.TotalPayments))
+			addAssert(prefix+"total_payments", *expectedMonth.TotalPayments, actualMonth.TotalPayments)
 		}
 		if expectedMonth.PrepaidPayment != nil {
-			addAssert(prefix+"prepaid_payment", *expectedMonth.PrepaidPayment, round(actualMonth.PrepaidPayment))
+			addAssert(prefix+"prepaid_payment", *expectedMonth.PrepaidPayment, actualMonth.PrepaidPayment)
 		}
 		if expectedMonth.ClosingLiability != nil {
 			addAssert(prefix+"closing_liability", *expectedMonth.ClosingLiability, actualMonth.ClosingLiability)
@@ -275,19 +292,19 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 			addAssert(prefix+"opening_rou_asset", *expectedMonth.OpeningROUAsset, actualMonth.OpeningROUAsset)
 		}
 		if expectedMonth.Depreciation != nil {
-			addAssert(prefix+"depreciation", *expectedMonth.Depreciation, round(actualMonth.Depreciation))
+			addAssert(prefix+"depreciation", *expectedMonth.Depreciation, actualMonth.Depreciation)
 		}
 		if expectedMonth.ClosingROUAsset != nil {
 			addAssert(prefix+"closing_rou_asset", *expectedMonth.ClosingROUAsset, actualMonth.ClosingROUAsset)
 		}
 		if expectedMonth.ExemptLeaseExpense != nil {
-			addAssert(prefix+"exempt_lease_expense", *expectedMonth.ExemptLeaseExpense, round(actualMonth.ExemptLeaseExpense))
+			addAssert(prefix+"exempt_lease_expense", *expectedMonth.ExemptLeaseExpense, actualMonth.ExemptLeaseExpense)
 		}
 		if expectedMonth.VariableRentExpense != nil {
-			addAssert(prefix+"variable_rent_expense", *expectedMonth.VariableRentExpense, round(actualMonth.VariableRentExpense))
+			addAssert(prefix+"variable_rent_expense", *expectedMonth.VariableRentExpense, actualMonth.VariableRentExpense)
 		}
 		if expectedMonth.NonLeaseExpense != nil {
-			addAssert(prefix+"non_lease_expense", *expectedMonth.NonLeaseExpense, round(actualMonth.NonLeaseExpense))
+			addAssert(prefix+"non_lease_expense", *expectedMonth.NonLeaseExpense, actualMonth.NonLeaseExpense)
 		}
 	}
 
@@ -298,8 +315,8 @@ func runRegressionCase(tc RegressionCase, tolerance float64) RegressionCaseRun {
 		if !ok {
 			caseRun.Passed = false
 			caseRun.Assertions = append(caseRun.Assertions, RegressionAssert{
-				Name: fx.Period + ".exists", Expected: 1, Actual: 0,
-				Delta: 1, Tolerance: tolerance, Passed: false,
+				Name: fx.Period + ".exists", Expected: money.NewFromInt64(1), Actual: money.NewFromInt64(0),
+				Delta: money.NewFromInt64(1), Tolerance: tolerance, Passed: false,
 			})
 		} else {
 			difference, err := RemeasureForeignCurrencyLiability(FXRemeasurementInput{
@@ -346,7 +363,7 @@ func assertRemeasurement(
 	original LeaseCalculation,
 	change RegressionRemeasurement,
 	expected RegressionRemeasured,
-	addAssert func(name string, expected, actual float64),
+	addAssert func(name string, expected, actual money.Amount),
 	addAssertWithin func(name string, expected, actual, allowed float64),
 ) error {
 	effectiveDate, err := parseRegressionDate(change.EffectiveDate)
@@ -481,7 +498,7 @@ func (input RegressionInput) toCalculation() (LeaseCalculation, error) {
 	if calcInput.LeaseScope == "" {
 		calcInput.LeaseScope = LeaseScopeInScope
 	}
-	if calcInput.PrepaidRent == 0 {
+	if !calcInput.PrepaidRent.IsSet() || calcInput.PrepaidRent.IsZero() {
 		calcInput.PrepaidRent = CalculatePrepaidRent(calcInput)
 	}
 
@@ -521,8 +538,8 @@ func RenderRegressionMarkdown(run RegressionRun) string {
 			fmt.Fprintf(&b, "- 错误：%s\n", caseRun.Error)
 		}
 		if caseRun.Result != nil {
-			fmt.Fprintf(&b, "- 实际初始负债：%.2f\n", caseRun.Result.InitialLiability)
-			fmt.Fprintf(&b, "- 实际初始 ROU：%.2f\n", caseRun.Result.InitialROUAsset)
+			fmt.Fprintf(&b, "- 实际初始负债：%.2f\n", caseRun.Result.InitialLiability.Round("CNY").Float64())
+			fmt.Fprintf(&b, "- 实际初始 ROU：%.2f\n", caseRun.Result.InitialROUAsset.Round("CNY").Float64())
 			fmt.Fprintf(&b, "- 计量范围：%s\n", caseRun.Result.LeaseScope)
 			fmt.Fprintf(&b, "- 计量路径：%s\n", caseRun.Result.MeasurementBasis)
 			fmt.Fprintf(&b, "\n实际月度结果：\n\n")
@@ -540,17 +557,17 @@ func RenderRegressionMarkdown(run RegressionRun) string {
 					"| %04d-%02d | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f | %.2f |\n",
 					entry.Year,
 					entry.Month,
-					entry.OpeningLiability,
-					round(entry.InterestExpense),
-					round(entry.TotalPayments),
-					round(entry.PrepaidPayment),
-					entry.ClosingLiability,
-					entry.OpeningROUAsset,
-					round(entry.Depreciation),
-					entry.ClosingROUAsset,
-					round(entry.ExemptLeaseExpense),
-					round(entry.VariableRentExpense),
-					round(entry.NonLeaseExpense),
+					entry.OpeningLiability.Round("CNY").Float64(),
+					entry.InterestExpense.Round("CNY").Float64(),
+					entry.TotalPayments.Round("CNY").Float64(),
+					entry.PrepaidPayment.Round("CNY").Float64(),
+					entry.ClosingLiability.Round("CNY").Float64(),
+					entry.OpeningROUAsset.Round("CNY").Float64(),
+					entry.Depreciation.Round("CNY").Float64(),
+					entry.ClosingROUAsset.Round("CNY").Float64(),
+					entry.ExemptLeaseExpense.Round("CNY").Float64(),
+					entry.VariableRentExpense.Round("CNY").Float64(),
+					entry.NonLeaseExpense.Round("CNY").Float64(),
 				)
 			}
 		}
@@ -571,9 +588,9 @@ func RenderRegressionMarkdown(run RegressionRun) string {
 				&b,
 				"| %s | %.2f | %.2f | %.2f | %s |\n",
 				assertion.Name,
-				assertion.Expected,
-				assertion.Actual,
-				assertion.Delta,
+				assertion.Expected.Float64(),
+				assertion.Actual.Float64(),
+				assertion.Delta.Float64(),
 				assertStatus,
 			)
 		}

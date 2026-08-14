@@ -8,6 +8,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -102,8 +103,8 @@ func TestLeaseReadToolsProjectNarrowViews(t *testing.T) {
 		contract:   &repository.Contract{ID: "contract-1"},
 	}
 	measurementReader := &fakeMeasurementReader{results: []*repository.MeasurementResult{{
-		AccountingPeriod: "2026-01", OpeningLiability: 100, ClosingLiability: 90,
-		InterestExpense: 2, PrincipalRepayment: 12, Depreciation: 8, ClosingROUAsset: 80,
+		AccountingPeriod: "2026-01", OpeningLiability: money.NewFromInt64(100), ClosingLiability: money.NewFromInt64(90),
+		InterestExpense: money.NewFromInt64(2), PrincipalRepayment: money.NewFromInt64(12), Depreciation: money.NewFromInt64(8), ClosingROUAsset: money.NewFromInt64(80),
 	}}}
 	eventReader := &fakeEventReader{events: []*repository.LeaseEvent{{
 		EventType: "rent_change", EffectiveDate: effectiveDate, Status: "approved",
@@ -111,7 +112,7 @@ func TestLeaseReadToolsProjectNarrowViews(t *testing.T) {
 	}}}
 	journalReader := &fakeJournalReader{entries: []*repository.JournalEntry{{
 		AccountingPeriod: "2026-01", EntryType: "interest", DebitAccount: "6601",
-		CreditAccount: "2201", Amount: 2, Currency: "CNY", PostingStatus: "posted",
+		CreditAccount: "2201", Amount: money.NewFromInt64(2), Currency: "CNY", PostingStatus: "posted",
 		Description: &description,
 	}}}
 	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{

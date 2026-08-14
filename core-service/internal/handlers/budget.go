@@ -141,10 +141,10 @@ func (h *BudgetHandler) CreateVersion(c *gin.Context) {
 				ContractID:       contract.ID,
 				AccountingPeriod: period.Format("2006-01"),
 				Currency:         contract.Currency,
-				InterestExpense:  monthly.InterestExpense,
-				Depreciation:     monthly.Depreciation,
-				TotalPayment:     monthly.TotalPayments,
-				ClosingLiability: monthly.ClosingLiability,
+				InterestExpense:  monthly.InterestExpense.Float64(),
+				Depreciation:     monthly.Depreciation.Float64(),
+				TotalPayment:     monthly.TotalPayments.Float64(),
+				ClosingLiability: monthly.ClosingLiability.Float64(),
 			})
 		}
 	}

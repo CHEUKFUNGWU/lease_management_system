@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
 )
@@ -39,7 +40,7 @@ func TestClose_PostgresTransactionAndRerunContract(t *testing.T) {
 		ContractID: fixture.contractID, AccountingPeriod: fixture.period,
 		EntryDate: time.Date(2098, 1, 31, 0, 0, 0, 0, time.UTC),
 		EntryType: "modification", DebitAccount: "2801", CreditAccount: "1701",
-		Amount: 125, Currency: "CNY", PostingStatus: "draft",
+		Amount: money.NewFromInt64(125), Currency: "CNY", PostingStatus: "draft",
 	}
 	if err := mcRepo.CreateJournalEntry(ctx, eventEntry); err != nil {
 		t.Fatalf("create event entry: %v", err)
@@ -105,7 +106,7 @@ func assertBulkRerunRemovesIneligibleDrafts(t *testing.T, ctx context.Context, p
 		ContractID: f.contractID, AccountingPeriod: period,
 		EntryDate: time.Date(2098, 3, 31, 0, 0, 0, 0, time.UTC),
 		EntryType: "reassessment", DebitAccount: "2801", CreditAccount: "1701",
-		Amount: 50, Currency: "CNY", PostingStatus: "draft",
+		Amount: money.NewFromInt64(50), Currency: "CNY", PostingStatus: "draft",
 	}
 	if err := repo.CreateJournalEntry(ctx, eventEntry); err != nil {
 		t.Fatalf("create bulk event entry: %v", err)

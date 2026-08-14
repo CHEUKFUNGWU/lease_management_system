@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -24,7 +25,7 @@ func leaseEndingIn(id string, start time.Time, months int, rent float64) Lease {
 	for month := 0; month < months; month++ {
 		monthEnd := firstOfMonth.AddDate(0, month+1, 0).AddDate(0, 0, -1)
 		payments = append(payments, ifrs16.LeasePayment{
-			Date: monthEnd, Amount: rent, Timing: "postpaid", Type: "fixed",
+			Date: monthEnd, Amount: money.NewFromFloat(rent), Timing: "postpaid", Type: "fixed",
 		})
 	}
 	return Lease{
@@ -204,7 +205,7 @@ func TestProject_CaveatSeparatesCommitmentFromAssumption(t *testing.T) {
 func TestProject_VariableRentIsNotProjectedAsCash(t *testing.T) {
 	lease := leaseEndingIn("V", day("2026-01-01"), 12, 10000)
 	lease.Payments = append(lease.Payments, ifrs16.LeasePayment{
-		Date: day("2026-06-30"), Amount: 50000, Timing: "postpaid", Type: "variable",
+		Date: day("2026-06-30"), Amount: money.NewFromInt64(50000), Timing: "postpaid", Type: "variable",
 	})
 	input := baseInput()
 	input.Leases = []Lease{lease}

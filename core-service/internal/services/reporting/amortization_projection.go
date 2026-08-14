@@ -96,20 +96,20 @@ func projectAmortization(snapshot *Snapshot, request ProjectionRequest) (Project
 			key := projectionBucketKey(entry.Date, request.Granularity)
 			bucket := ensureAmortizationBucket(buckets, key, entry.Date, request.Granularity, contract)
 			if !bucket.seen {
-				bucket.openingLiability = entry.OpeningLiability
-				bucket.openingROU = entry.OpeningROUAsset
+				bucket.openingLiability = entry.OpeningLiability.Float64()
+				bucket.openingROU = entry.OpeningROUAsset.Float64()
 				bucket.seen = true
 			}
-			bucket.interest += entry.InterestExpense
-			bucket.payment += entry.Payment
-			bucket.prepaidPayment += entry.PrepaidPayment
-			bucket.liabilityAdjustment += entry.LiabilityAdjustment
-			bucket.closingLiability = entry.ClosingLiability
-			bucket.depreciation += entry.Depreciation
-			bucket.rouAdjustment += entry.ROUAdjustment
-			bucket.closingROU = entry.ClosingROUAsset
-			bucket.variableRent += entry.VariableRentExpense
-			bucket.nonLease += entry.NonLeaseExpense
+			bucket.interest += entry.InterestExpense.Float64()
+			bucket.payment += entry.Payment.Float64()
+			bucket.prepaidPayment += entry.PrepaidPayment.Float64()
+			bucket.liabilityAdjustment += entry.LiabilityAdjustment.Float64()
+			bucket.closingLiability = entry.ClosingLiability.Float64()
+			bucket.depreciation += entry.Depreciation.Float64()
+			bucket.rouAdjustment += entry.ROUAdjustment.Float64()
+			bucket.closingROU = entry.ClosingROUAsset.Float64()
+			bucket.variableRent += entry.VariableRentExpense.Float64()
+			bucket.nonLease += entry.NonLeaseExpense.Float64()
 		}
 		for _, adjustment := range fact.EventAdjustments {
 			if adjustment.EffectiveDate.Before(request.StartDate) || adjustment.EffectiveDate.After(request.EndDate) {

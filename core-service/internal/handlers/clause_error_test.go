@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -21,8 +22,8 @@ func TestClauseError_TranslatesWhatTheEngineActuallyReturns(t *testing.T) {
 	}{
 		{"index without readings", ifrs16.PaymentRevision{Kind: ifrs16.RevisionIndex, BaseIndex: 100}, "指数联动条款需要基期与现期两个指数，且均须为正数"},
 		{"stepped with no steps", ifrs16.PaymentRevision{Kind: ifrs16.RevisionStepped}, "阶梯租金条款至少需要一级阶梯"},
-		{"step without a date", ifrs16.PaymentRevision{Kind: ifrs16.RevisionStepped, Steps: []ifrs16.StepChange{{Amount: 100}}}, "每一级阶梯都需要填写起始日"},
-		{"negative rent", ifrs16.PaymentRevision{Kind: ifrs16.RevisionSetAmount, Amount: -1}, "调整后租金不能为负数"},
+		{"step without a date", ifrs16.PaymentRevision{Kind: ifrs16.RevisionStepped, Steps: []ifrs16.StepChange{{Amount: money.NewFromInt64(100)}}}, "每一级阶梯都需要填写起始日"},
+		{"negative rent", ifrs16.PaymentRevision{Kind: ifrs16.RevisionSetAmount, Amount: money.NewFromInt64(-1)}, "调整后租金不能为负数"},
 		{"unknown kind", ifrs16.PaymentRevision{Kind: "guesswork"}, "条款类型无法识别"},
 		{"reduction past zero", ifrs16.PaymentRevision{Kind: ifrs16.RevisionPercentage, Percentage: -100}, "降幅过大，租金将降至零或以下"},
 		{"window inverted", ifrs16.PaymentRevision{

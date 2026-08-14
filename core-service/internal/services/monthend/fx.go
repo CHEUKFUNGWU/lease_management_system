@@ -3,11 +3,12 @@ package monthend
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
+	"github.com/shopspring/decimal"
 )
 
 // FXInput aliases the engine's remeasurement input so the close reads in its own
@@ -16,15 +17,15 @@ type FXInput = ifrs16svc.FXRemeasurementInput
 
 // remeasureLiability delegates to the measurement engine, where the rule is
 // covered by the IFRS 16 regression suite.
-func remeasureLiability(input FXInput) (float64, error) {
+func remeasureLiability(input FXInput) (money.Amount, error) {
 	return ifrs16svc.RemeasureForeignCurrencyLiability(input)
 }
 
 // fxEntryAccounts returns the debit and credit accounts for an exchange
 // difference. A positive difference means the liability grew in functional
 // terms: an exchange loss.
-func fxEntryAccounts(difference float64) (debit, credit string) {
-	if difference > 0 {
+func fxEntryAccounts(difference money.Amount) (debit, credit string) {
+	if difference.Decimal().IsPositive() {
 		return "6603-财务费用-汇兑损益", "2801-租赁负债"
 	}
 	return "2801-租赁负债", "6603-财务费用-汇兑损益"
@@ -127,7 +128,10 @@ func buildFXEntry(
 	if err != nil {
 		return nil, err
 	}
-	if math.Abs(difference) <= store.GetFloat64(ctx, "journal_entry_materiality_threshold", 0) {
+	// The threshold is a policy float; the difference is exact money. An
+	// exchange difference at or below it is left unbooked, as before.
+	threshold := decimal.NewFromFloat(store.GetFloat64(ctx, "journal_entry_materiality_threshold", 0))
+	if difference.Abs().Decimal().Cmp(threshold) <= 0 {
 		return nil, nil
 	}
 
@@ -140,7 +144,7 @@ func buildFXEntry(
 		EntryType:        "fx_remeasurement",
 		DebitAccount:     debit,
 		CreditAccount:    credit,
-		Amount:           math.Abs(difference),
+		Amount:           difference.Abs(),
 		Currency:         functional,
 		Description:      &description,
 		PostingStatus:    "draft",

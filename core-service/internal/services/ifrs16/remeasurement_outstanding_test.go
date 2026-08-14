@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/lease-management-system/core-service/internal/money"
 )
 
 // A remeasured liability is the present value of what is left to pay. Payments
@@ -25,11 +27,11 @@ func TestRecalculateFromDate_PricesOnlyOutstandingPayments(t *testing.T) {
 		monthEnd := time.Date(2026, time.Month(month), 1, 0, 0, 0, 0, time.UTC).
 			AddDate(0, 1, 0).AddDate(0, 0, -1)
 		payments = append(payments, LeasePayment{
-			Date: monthEnd, Amount: 10000, Timing: "postpaid", Type: "fixed",
+			Date: monthEnd, Amount: money.NewFromInt64(10000), Timing: "postpaid", Type: "fixed",
 		})
 	}
 
-	output, err := RecalculateFromDate(59161.43, 58935.32, RemeasurementInput{
+	output, err := RecalculateFromDate(money.NewFromFloat(59161.43), money.NewFromFloat(58935.32), RemeasurementInput{
 		EffectiveDate:       effective,
 		LeaseEndDate:        end,
 		RevisedDiscountRate: 0.05,
@@ -40,17 +42,17 @@ func TestRecalculateFromDate_PricesOnlyOutstandingPayments(t *testing.T) {
 	}
 
 	// Six payments of 10,000 remain, so the liability is just under 60,000.
-	if output.NewLiability > 60000 {
+	if output.NewLiability.Round("CNY").Float64() > 60000 {
 		t.Errorf("liability %.2f exceeds the 60,000 still to be paid; past payments are being priced",
-			output.NewLiability)
+			output.NewLiability.Round("CNY").Float64())
 	}
-	if output.NewLiability < 57000 {
-		t.Errorf("liability %.2f is too low for six remaining payments of 10,000", output.NewLiability)
+	if output.NewLiability.Round("CNY").Float64() < 57000 {
+		t.Errorf("liability %.2f is too low for six remaining payments of 10,000", output.NewLiability.Round("CNY").Float64())
 	}
 
 	// Nothing about the lease changed, so the remeasurement should barely move.
-	if math.Abs(output.LiabilityDelta) > 100 {
-		t.Errorf("an unchanged schedule moved the liability by %.2f", output.LiabilityDelta)
+	if math.Abs(output.LiabilityDelta.Round("CNY").Float64()) > 100 {
+		t.Errorf("an unchanged schedule moved the liability by %.2f", output.LiabilityDelta.Round("CNY").Float64())
 	}
 }
 
@@ -69,11 +71,11 @@ func TestRecalculateFromDate_RentIncreaseMovesLiabilityByItsPresentValue(t *test
 			amount = 10200 // a 2% review from July
 		}
 		payments = append(payments, LeasePayment{
-			Date: monthEnd, Amount: amount, Timing: "postpaid", Type: "fixed",
+			Date: monthEnd, Amount: money.NewFromFloat(amount), Timing: "postpaid", Type: "fixed",
 		})
 	}
 
-	output, err := RecalculateFromDate(59161.43, 58935.32, RemeasurementInput{
+	output, err := RecalculateFromDate(money.NewFromFloat(59161.43), money.NewFromFloat(58935.32), RemeasurementInput{
 		EffectiveDate:       effective,
 		LeaseEndDate:        end,
 		RevisedDiscountRate: 0.05,
@@ -85,9 +87,9 @@ func TestRecalculateFromDate_RentIncreaseMovesLiabilityByItsPresentValue(t *test
 
 	// Six payments rise by 200 each: 1,200 undiscounted, a little less in
 	// present value. Anything far above that means past payments crept in.
-	if output.LiabilityDelta <= 0 || output.LiabilityDelta > 1200 {
+	if output.LiabilityDelta.Round("CNY").Float64() <= 0 || output.LiabilityDelta.Round("CNY").Float64() > 1200 {
 		t.Errorf("liability moved by %.2f, want a positive amount no greater than the 1,200 of extra rent",
-			output.LiabilityDelta)
+			output.LiabilityDelta.Round("CNY").Float64())
 	}
 }
 

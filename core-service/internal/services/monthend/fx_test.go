@@ -1,9 +1,11 @@
 package monthend
 
 import (
-	"math"
 	"strings"
 	"testing"
+
+	"github.com/lease-management-system/core-service/internal/money"
+	"github.com/shopspring/decimal"
 )
 
 func usdInput() FXInput {
@@ -12,10 +14,10 @@ func usdInput() FXInput {
 	return FXInput{
 		ContractCurrency:   "USD",
 		FunctionalCurrency: "CNY",
-		OpeningLiability:   100000,
-		Interest:           500,
-		Payments:           8500,
-		ClosingLiability:   92000,
+		OpeningLiability:   money.NewFromInt64(100000),
+		Interest:           money.NewFromInt64(500),
+		Payments:           money.NewFromInt64(8500),
+		ClosingLiability:   money.NewFromInt64(92000),
 		OpeningRate:        7.10,
 		ClosingRate:        7.20,
 		AverageRate:        7.15,
@@ -33,11 +35,11 @@ func TestRemeasureLiabilityIsolatesTheRateEffect(t *testing.T) {
 	// flows (500 - 8,500) x 7.15 = -57,200
 	// expected closing = 652,800; actual 92,000 x 7.20 = 662,400
 	want := 662400.0 - 652800.0
-	if math.Abs(difference-want) > 0.01 {
-		t.Errorf("difference = %.2f, want %.2f", difference, want)
+	if difference.Sub(money.NewFromFloat(want)).Abs().Decimal().Cmp(decimal.NewFromFloat(0.01)) > 0 {
+		t.Errorf("difference = %v, want %.2f", difference.Float64(), want)
 	}
 	// The dollar weakened the yuan holder's position: the liability costs more.
-	if difference <= 0 {
+	if !difference.Decimal().IsPositive() {
 		t.Error("a rising rate on a liability must produce an exchange loss")
 	}
 }
@@ -50,8 +52,8 @@ func TestRemeasureLiabilityIsZeroWhenRatesDoNotMove(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remeasure: %v", err)
 	}
-	if math.Abs(difference) > 0.01 {
-		t.Errorf("difference = %.2f, want 0 when the rate is unchanged", difference)
+	if difference.Abs().Decimal().Cmp(decimal.NewFromFloat(0.01)) > 0 {
+		t.Errorf("difference = %v, want 0 when the rate is unchanged", difference.Float64())
 	}
 }
 
@@ -64,8 +66,8 @@ func TestRemeasureLiabilitySkipsFunctionalCurrencyLeases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("remeasure: %v", err)
 	}
-	if difference != 0 {
-		t.Errorf("difference = %.2f, want 0", difference)
+	if !difference.IsZero() {
+		t.Errorf("difference = %v, want 0", difference.Float64())
 	}
 }
 
@@ -87,8 +89,8 @@ func TestRemeasureLiabilityRequiresRates(t *testing.T) {
 // A falling rate reduces the liability in functional terms: an exchange gain,
 // which reverses the entry's direction.
 func TestFXEntryDirectionFollowsTheSignOfTheDifference(t *testing.T) {
-	lossDebit, lossCredit := fxEntryAccounts(1000)
-	gainDebit, gainCredit := fxEntryAccounts(-1000)
+	lossDebit, lossCredit := fxEntryAccounts(money.NewFromInt64(1000))
+	gainDebit, gainCredit := fxEntryAccounts(money.NewFromInt64(-1000))
 
 	if lossDebit != gainCredit || lossCredit != gainDebit {
 		t.Errorf("a gain must mirror a loss: loss %s/%s vs gain %s/%s",

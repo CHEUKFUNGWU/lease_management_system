@@ -88,9 +88,9 @@ func (h *RenewalCardHandler) Card(c *gin.Context) {
 		if payment.Date.Before(asOf) || payment.Type == "variable" {
 			continue
 		}
-		remainingCommitment += payment.Amount
-		if payment.Amount > 0 {
-			lastRent = payment.Amount
+		remainingCommitment += payment.Amount.Float64()
+		if payment.Amount.Float64() > 0 {
+			lastRent = payment.Amount.Float64()
 		}
 	}
 
@@ -268,9 +268,9 @@ func (h *RenewalCardHandler) buildDecisionInput(ctx context.Context, contract *r
 		if payment.Date.Before(decisionDate) || payment.Type == "variable" {
 			continue
 		}
-		remainingCommitment += payment.Amount
-		if payment.Amount > 0 {
-			lastRent = payment.Amount
+		remainingCommitment += payment.Amount.Float64()
+		if payment.Amount.Float64() > 0 {
+			lastRent = payment.Amount.Float64()
 		}
 	}
 	var currentLiability, currentROU float64
@@ -281,8 +281,8 @@ func (h *RenewalCardHandler) buildDecisionInput(ctx context.Context, contract *r
 		}
 		if len(results) > 0 {
 			latest := results[len(results)-1]
-			currentLiability = latest.ClosingLiability
-			currentROU = latest.ClosingROUAsset
+			currentLiability = latest.ClosingLiability.Float64()
+			currentROU = latest.ClosingROUAsset.Float64()
 		}
 	}
 	remainingTermMonths := int(math.Ceil(contract.LeaseEndDate.Sub(decisionDate).Hours() / (24 * 30.4375)))

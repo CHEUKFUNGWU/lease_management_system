@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
 )
@@ -21,7 +22,7 @@ func postedEntry() *repository.JournalEntry {
 		EntryType:        "interest",
 		DebitAccount:     "6601-租赁利息费用",
 		CreditAccount:    "2801-租赁负债",
-		Amount:           1234.56,
+		Amount:           money.NewFromFloat(1234.56),
 		Currency:         "HKD",
 		Description:      &description,
 		PostingStatus:    "posted",
@@ -67,7 +68,7 @@ func TestReverse_CreatesOppositeEntryAndFlagsOriginal(t *testing.T) {
 	if reversal.DebitAccount != original.CreditAccount || reversal.CreditAccount != original.DebitAccount {
 		t.Errorf("accounts not swapped: debit=%q credit=%q", reversal.DebitAccount, reversal.CreditAccount)
 	}
-	if reversal.Amount != original.Amount {
+	if !reversal.Amount.Equal(original.Amount) {
 		t.Errorf("amount = %v, want %v", reversal.Amount, original.Amount)
 	}
 	if reversal.Currency != original.Currency {

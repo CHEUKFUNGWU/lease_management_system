@@ -3,6 +3,8 @@ package ifrs16
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/lease-management-system/core-service/internal/money"
 )
 
 func TestRegressionFixtures(t *testing.T) {
@@ -30,12 +32,15 @@ func TestRegressionFixtures(t *testing.T) {
 				t.Errorf(
 					"%s: expected %.2f, actual %.2f, delta %.2f, tolerance %.2f",
 					assertion.Name,
-					assertion.Expected,
-					assertion.Actual,
-					assertion.Delta,
+					assertion.Expected.Float64(),
+					assertion.Actual.Float64(),
+					assertion.Delta.Float64(),
 					assertion.Tolerance,
 				)
 			}
 		})
 	}
 }
+
+// moneyRound reproduces the historical cent rounding for test comparisons.
+func moneyRound(value money.Amount) float64 { return value.Round("CNY").Float64() }

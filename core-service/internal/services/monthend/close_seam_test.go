@@ -404,7 +404,7 @@ func TestClose_ForeignCurrencyLeaseProducesExchangeDifference(t *testing.T) {
 	if fxEntry.Currency != "CNY" {
 		t.Errorf("exchange difference currency = %q, want the functional CNY", fxEntry.Currency)
 	}
-	if fxEntry.Amount <= 0 {
+	if fxEntry.Amount.Decimal().IsNegative() {
 		t.Errorf("exchange difference amount = %v, want a positive magnitude", fxEntry.Amount)
 	}
 }

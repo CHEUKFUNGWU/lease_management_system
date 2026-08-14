@@ -3,6 +3,7 @@ package eventaccounting
 import (
 	"context"
 	"fmt"
+	"github.com/lease-management-system/core-service/internal/money"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -78,7 +79,7 @@ func (s *PersistenceService) Commit(ctx context.Context, result Result, actor au
 				ContractID: result.Adjustment.ContractID, AccountingPeriod: planned.AccountingPeriod,
 				EntryDate: planned.EntryDate, EntryType: planned.EntryType,
 				DebitAccount: planned.DebitAccount, CreditAccount: planned.CreditAccount,
-				Amount: planned.Amount, Currency: planned.Currency,
+				Amount: money.NewFromFloat(planned.Amount), Currency: planned.Currency,
 				Description: &description, PostingStatus: "draft",
 			}
 			if err := store.CreateJournalEntry(ctx, entry); err != nil {
@@ -126,16 +127,16 @@ func monthlyMeasurements(schedule []ifrs16.DailyEntry) []*repository.Measurement
 			}
 			measurements = append(measurements, current)
 		}
-		current.InterestExpense += daily.InterestExpense
-		current.TotalPayment += daily.Payment
-		current.Depreciation += daily.Depreciation
-		current.VariableRentExpense += daily.VariableRentExpense
-		current.NonLeaseExpense += daily.NonLeaseExpense
+		current.InterestExpense = current.InterestExpense.Add(daily.InterestExpense)
+		current.TotalPayment = current.TotalPayment.Add(daily.Payment)
+		current.Depreciation = current.Depreciation.Add(daily.Depreciation)
+		current.VariableRentExpense = current.VariableRentExpense.Add(daily.VariableRentExpense)
+		current.NonLeaseExpense = current.NonLeaseExpense.Add(daily.NonLeaseExpense)
 		current.ClosingLiability = daily.ClosingLiability
 		current.ClosingROUAsset = daily.ClosingROUAsset
 	}
 	for _, measurement := range measurements {
-		measurement.PrincipalRepayment = measurement.TotalPayment - measurement.InterestExpense
+		measurement.PrincipalRepayment = measurement.TotalPayment.Sub(measurement.InterestExpense)
 	}
 	return measurements
 }

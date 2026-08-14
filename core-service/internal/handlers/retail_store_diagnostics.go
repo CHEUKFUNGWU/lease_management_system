@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
@@ -33,7 +34,7 @@ func NewRetailStoreDiagnosticsHandler(repo retailStoreDiagnosticsReader) *Retail
 func (h *RetailStoreDiagnosticsHandler) StoreOptions(c *gin.Context) {
 	legalEntityID := strings.TrimSpace(middleware.GetTenantID(c))
 	if legalEntityID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "legal_entity_id is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "legal_entity_id is required", nil)
 		return
 	}
 	classification, datasetVersion, ok := parseRetailStore360Classification(c)
@@ -42,7 +43,7 @@ func (h *RetailStoreDiagnosticsHandler) StoreOptions(c *gin.Context) {
 	}
 	stores, err := h.repo.ListStorePopulation(c.Request.Context(), legalEntityID, classification, datasetVersion, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSystemFailure(c, http.StatusInternalServerError, err)
 		return
 	}
 	data := make([]gin.H, 0, len(stores))
@@ -58,24 +59,24 @@ func (h *RetailStoreDiagnosticsHandler) StoreOptions(c *gin.Context) {
 func (h *RetailStoreDiagnosticsHandler) Diagnostics(c *gin.Context) {
 	legalEntityID := strings.TrimSpace(middleware.GetTenantID(c))
 	if legalEntityID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "legal_entity_id is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "legal_entity_id is required", nil)
 		return
 	}
 	storeID := strings.TrimSpace(c.Param("store_id"))
 	if _, err := uuid.Parse(storeID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "store_id must be a UUID"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "store_id must be a UUID", nil)
 		return
 	}
 	asOf, err := time.Parse("2006-01-02", strings.TrimSpace(c.Query("as_of")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "as_of must be an ISO date (YYYY-MM-DD)"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "as_of must be an ISO date (YYYY-MM-DD)", nil)
 		return
 	}
 	windowDays := 14
 	if raw := strings.TrimSpace(c.Query("window_days")); raw != "" {
 		windowDays, err = strconv.Atoi(raw)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "window_days must be one of 7, 14 or 28"})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be one of 7, 14 or 28", nil)
 			return
 		}
 	}
@@ -91,13 +92,13 @@ func (h *RetailStoreDiagnosticsHandler) Diagnostics(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, retailstore360.ErrInvalidQuery):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		case errors.Is(err, retailstore360.ErrStoreNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, err.Error(), nil)
 		case errors.Is(err, repository.ErrRetailKPISourceConflict):
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error(), "reason": "source_conflict"})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeSystemFailure(c, http.StatusInternalServerError, err)
 		}
 		return
 	}
@@ -111,15 +112,15 @@ func parseRetailStore360Classification(c *gin.Context) (string, string, bool) {
 		datasetVersion = strings.TrimSpace(c.Query("simulation_dataset_version"))
 	}
 	if classification != "production" && classification != "simulated" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "data_classification must be explicitly production or simulated"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "data_classification must be explicitly production or simulated", nil)
 		return "", "", false
 	}
 	if classification == "simulated" && datasetVersion == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "dataset_version is required for simulated data"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "dataset_version is required for simulated data", nil)
 		return "", "", false
 	}
 	if classification == "production" && datasetVersion != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "dataset_version is not allowed for production data"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "dataset_version is not allowed for production data", nil)
 		return "", "", false
 	}
 	return classification, datasetVersion, true

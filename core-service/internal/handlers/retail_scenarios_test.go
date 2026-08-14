@@ -96,8 +96,9 @@ func TestRetailScenarioHandlerMapsValidationConflictAndUnavailable(t *testing.T)
 	if err := json.Unmarshal(unavailable.Body.Bytes(), &unavailableBody); err != nil {
 		t.Fatal(err)
 	}
-	if unavailableBody["reason"] != "no_facts" || unavailableBody["evidence"] == nil {
-		t.Fatalf("unavailable evidence=%v", unavailableBody)
+	unavailableDetails, _ := unavailableBody["details"].(map[string]any)
+	if unavailableBody["code"] != "data_unavailable" || unavailableDetails["reason"] != "no_facts" || unavailableDetails["evidence"] == nil {
+		t.Fatalf("unavailable body=%v", unavailableBody)
 	}
 	resultingRate := strings.Replace(scenarioBody(), `"gross_margin_rate_change_pp":2`, `"gross_margin_rate_change_pp":100`, 1)
 	rate := httptest.NewRecorder()
@@ -109,8 +110,9 @@ func TestRetailScenarioHandlerMapsValidationConflictAndUnavailable(t *testing.T)
 	if err := json.Unmarshal(rate.Body.Bytes(), &rateBody); err != nil {
 		t.Fatal(err)
 	}
-	if rateBody["reason"] != "resulting_rate_out_of_range" || rateBody["evidence"] == nil {
-		t.Fatalf("resulting rate evidence=%v", rateBody)
+	rateDetails, _ := rateBody["details"].(map[string]any)
+	if rateBody["code"] != "data_unavailable" || rateDetails["reason"] != "resulting_rate_out_of_range" || rateDetails["evidence"] == nil {
+		t.Fatalf("resulting rate body=%v", rateBody)
 	}
 	err500 := httptest.NewRecorder()
 	scenarioRouter(scenarioHandlerReader{err: errors.New("db down")}).ServeHTTP(err500, httptest.NewRequest(http.MethodPost, validPath, strings.NewReader(scenarioBody())))

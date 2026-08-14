@@ -93,25 +93,10 @@ function fail(file, line, message) {
   violations.push(`${file}:${line}: ${message}`);
 }
 
-// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-// ┃ ⚠️  豁免名单 — 看着难受就对了，这里每一条都是欠债                ┃
-// ┃ 三个零售页的硬编码中文（约 99 行）归 UIUX 改善方案阶段四整体      ┃
-// ┃ 整改。阶段四完成的那一天，删掉整个 Set，而不是往里面加一行。      ┃
-// ┃ 往这个名单里加页面 = 承认新页面不配被翻译、不配被维护。          ┃
-// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-const CJK_EXEMPT_PAGES = new Set([
-  "web/app/operating-pulse/page.tsx",
-  "web/app/store-360/page.tsx",
-  "web/app/scenario-workbench/page.tsx",
-]);
-
-// 内联样式对三个零售页豁免——它们整页都是存量内联样式（阶段四整体
-// 整改），任何触碰都会被行级 diff 误判为「新增静态样式」，页面将无法
-// 维护。与 CJK 豁免同一批文件、同一个理由：阶段四完成的那一天，
-// 两个 Set 一起删。!important 与 fontWeight 检查对这三页照常生效。
-const INLINE_STYLE_EXEMPT_PAGES = CJK_EXEMPT_PAGES;
-
 // t() 词典文件、测试文件里的中文是内容本身；守卫脚本自身也不扫描。
+// I18N-001：三个零售页的硬编码中文已全部走 t()，CJK_EXEMPT_PAGES 与
+// INLINE_STYLE_EXEMPT_PAGES 两个豁免名单已删除——计数守卫现在对这三页
+// 的硬编码中文与静态内联样式同样生效（收紧，见 I18N-001 守卫 commit）。
 const CJK_EXEMPT_SUFFIXES = [/\/lib\/i18n(\.\w+)*\.tsx?$/, /\.test\.(ts|tsx)$/, /\.spec\.(ts|tsx)$/];
 const SELF_EXEMPT = ["web/scripts/enforce-design.mjs"];
 
@@ -182,8 +167,7 @@ for (const file of changedFiles) {
       }
       // 「营」徽标只豁免内联样式一条（品牌 mark 的存量写法）；
       // !important 与 fontWeight 检查照常生效（上一批 Review §4）。
-      const styleExempt =
-        BRAND_BADGE_LINE.test(line) || INLINE_STYLE_EXEMPT_PAGES.has(file);
+      const styleExempt = BRAND_BADGE_LINE.test(line);
       if (!styleExempt && isNewStaticStyle(line, oldText)) {
         fail(file, number, "新增静态内联 style={{}}（DESIGN.md §13-2）：用类名 + CSS 变量");
       }
@@ -193,7 +177,7 @@ for (const file of changedFiles) {
     }
 
     if (file.startsWith("web/app/")) {
-      const exempt = CJK_EXEMPT_PAGES.has(file) || METADATA_EXEMPT_FILES.has(file) || CJK_EXEMPT_SUFFIXES.some((re) => re.test(file));
+      const exempt = METADATA_EXEMPT_FILES.has(file) || CJK_EXEMPT_SUFFIXES.some((re) => re.test(file));
       if (!exempt) {
         for (const { number, text: line, oldText } of lines) {
           const trimmed = line.trim();

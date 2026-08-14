@@ -1,7 +1,7 @@
 {
   "version": "2026-05-30-p0-seed",
   "currency": "CNY",
-  "tolerance": 1,
+  "tolerance": 0,
   "cases": [
     {
       "id": "TC-01",

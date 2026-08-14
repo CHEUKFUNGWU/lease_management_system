@@ -163,9 +163,9 @@ func LoadRegressionSuite(path string) (RegressionSuite, error) {
 	if err := json.Unmarshal(raw, &suite); err != nil {
 		return RegressionSuite{}, err
 	}
-	if suite.Tolerance <= 0 {
-		suite.Tolerance = 1
-	}
+	// MONEY-001: the suite tolerance is an explicit part of the fixture and
+	// must stay as written — an absent/zero value previously defaulted to 1,
+	// which would silently defeat a tolerance of 0.
 	return suite, nil
 }
 

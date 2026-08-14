@@ -47,6 +47,10 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import AppLayout from "../components/AppLayout";
 import DataTrustBar from "../components/DataTrustBar";
+import ToolChip from "../components/ToolChip";
+import ThinkingTrace from "../components/ThinkingTrace";
+import SourceCitation from "../components/SourceCitation";
+import ConfidenceBadge from "../components/ConfidenceBadge";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -319,6 +323,9 @@ function MessageContent({
   sources,
   model,
   thinking,
+  toolCalls,
+  confidence,
+  confidenceReason,
   i18nLang,
   role = "assistant",
 }: {
@@ -326,10 +333,12 @@ function MessageContent({
   sources?: Array<string | RuntimeSource>;
   model?: string;
   thinking?: string;
+  toolCalls?: AgentToolCall[];
+  confidence?: number;
+  confidenceReason?: string;
   i18nLang: Language;
   role?: "user" | "assistant";
 }) {
-  const [showThinking, setShowThinking] = useState(false);
   const textColor = role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)";
 
   // Parse markdown-like code blocks
@@ -362,42 +371,7 @@ function MessageContent({
     <div>
       {thinking && (
         <div style={{ marginBottom: 8 }}>
-          <Button
-            type="text"
-           
-            onClick={() => setShowThinking(!showThinking)}
-            style={{ fontSize: 12, color: "var(--fg-muted)", padding: 0, height: 24 }}
-          >
-            <span style={{ marginRight: 4 }}>{showThinking ? "▼" : "▶"}</span>
-            {t("ai.thinking_process", i18nLang)}
-          </Button>
-          <AnimatePresence>
-            {showThinking && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                style={{ overflow: "hidden" }}
-              >
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    marginTop: 4,
-                    fontSize: 12,
-                    color: "var(--fg-tertiary)",
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {thinking}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <ThinkingTrace thinking={thinking} />
         </div>
       )}
 
@@ -419,17 +393,26 @@ function MessageContent({
         )
       )}
 
+      {toolCalls && toolCalls.length > 0 && (
+        <div className="ai-tool-row">
+          {toolCalls.map((call, idx) => <ToolChip key={idx} call={call} />)}
+        </div>
+      )}
+
+      {typeof confidence === "number" && (
+        <div className="ai-confidence-row">
+          <ConfidenceBadge confidence={confidence} reason={confidenceReason} />
+        </div>
+      )}
+
       {sources && sources.length > 0 && (
         <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
           <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>
             {t("ai.sources", i18nLang)}
           </Text>
           {sources.map((source, idx) => {
-            const label = typeof source === "string" ? source : source.title || source.id || source.type || "系统来源";
-            const link = typeof source === "string" ? undefined : source.url;
-            const tag = <StatusTag icon={<FileTextOutlined />} style={{ fontSize: 11, borderRadius: 4 }}>{label}</StatusTag>;
-            const safeLink = safeInternalAIURL(link);
-            return safeLink ? <a key={idx} href={safeLink} style={{ textDecoration: "none" }}>{tag}</a> : <span key={idx}>{tag}</span>;
+            const value = typeof source === "string" ? source : { ...source, url: safeInternalAIURL(source.url) };
+            return <SourceCitation key={idx} source={value} />;
           })}
         </div>
       )}
@@ -445,7 +428,7 @@ function MessageContent({
 
 // ─── Typewriter Effect ─────────────────────────────────────────
 
-function TypewriterMessage({ content, sources, model, thinking, i18nLang }: { content: string; sources?: Array<string | RuntimeSource>; model?: string; thinking?: string; i18nLang: Language }) {
+function TypewriterMessage({ content, sources, model, thinking, toolCalls, confidence, i18nLang }: { content: string; sources?: Array<string | RuntimeSource>; model?: string; thinking?: string; toolCalls?: AgentToolCall[]; confidence?: number; i18nLang: Language }) {
   const [displayedContent, setDisplayedContent] = useState("");
   const contentRef = useRef(content);
   const indexRef = useRef(0);
@@ -473,6 +456,8 @@ function TypewriterMessage({ content, sources, model, thinking, i18nLang }: { co
       sources={displayedContent.length === content.length ? sources : undefined}
       model={displayedContent.length === content.length ? model : undefined}
       thinking={thinking}
+      toolCalls={toolCalls}
+      confidence={confidence}
       i18nLang={i18nLang}
       role="assistant"
     />
@@ -2135,6 +2120,8 @@ function AIChatPageContent() {
                             sources={msg.sources}
                             model={msg.model}
                             thinking={msg.thinking}
+                            toolCalls={msg.toolCalls}
+                            confidence={msg.confidence}
                             i18nLang={language}
                           />
                         ) : (
@@ -2143,6 +2130,8 @@ function AIChatPageContent() {
                             sources={msg.sources}
                             model={msg.model}
                             thinking={msg.thinking}
+                            toolCalls={msg.toolCalls}
+                            confidence={msg.confidence}
                             i18nLang={language}
                             role={msg.role}
                           />

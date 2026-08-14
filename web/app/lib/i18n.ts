@@ -1158,6 +1158,58 @@ const dict: TranslationDict = {
     en: "Open the performance workbench",
   },
 
+  // AI-001 — explainability components (DESIGN.md §9)
+  "ai.tool.completed": {
+    "zh-CN": "已完成",
+    "zh-HK": "已完成",
+    en: "Completed",
+  },
+  "ai.tool.failed": {
+    "zh-CN": "失败",
+    "zh-HK": "失敗",
+    en: "Failed",
+  },
+  "ai.tool.needs_review": {
+    "zh-CN": "需复核",
+    "zh-HK": "需覆核",
+    en: "Needs review",
+  },
+  "ai.tool.output_chars": {
+    "zh-CN": "输出 {n} 字符",
+    "zh-HK": "輸出 {n} 字符",
+    en: "{n} chars out",
+  },
+  "ai.tool.duration": {
+    "zh-CN": "{ms}ms",
+    "zh-HK": "{ms}ms",
+    en: "{ms}ms",
+  },
+  "ai.citation.anonymous": {
+    "zh-CN": "来源",
+    "zh-HK": "來源",
+    en: "Source",
+  },
+  "ai.confidence.low": {
+    "zh-CN": "低置信",
+    "zh-HK": "低置信",
+    en: "Low confidence",
+  },
+  "ai.confidence.medium": {
+    "zh-CN": "中置信",
+    "zh-HK": "中置信",
+    en: "Medium confidence",
+  },
+  "ai.confidence.high": {
+    "zh-CN": "高置信",
+    "zh-HK": "高置信",
+    en: "High confidence",
+  },
+  "ai.confidence.reason": {
+    "zh-CN": "降级原因",
+    "zh-HK": "降級原因",
+    en: "Degradation reason",
+  },
+
   // ENV-002 DataTrustBar — DESIGN.md §10 数据可信度展示
   "trust.classification_production": {
     "zh-CN": "正式数据 · Working",

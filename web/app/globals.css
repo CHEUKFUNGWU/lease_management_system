@@ -1341,3 +1341,73 @@ html {
   color: var(--state-warning-text);
   white-space: nowrap;
 }
+
+/* ── AI-001: explainability components (DESIGN.md §9) ─────────────── */
+.ai-tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: var(--bg-surface);
+  font-size: 12px;
+}
+.ai-tool-chip-status { font-size: 11px; }
+.ai-tool-chip-name { font-weight: 500; }
+.ai-tool-chip-meta { color: var(--fg-muted); font-size: 11px; }
+
+.ai-thinking-trace-toggle {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+  padding: 0 4px;
+  height: 24px;
+}
+.ai-thinking-trace-arrow { margin-right: 4px; }
+.ai-thinking-trace-body {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--fg-tertiary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.ai-source-citation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--fg-secondary);
+  background: var(--bg-surface);
+}
+.ai-source-citation-icon { color: var(--state-info-text); }
+.ai-source-citation-link { text-decoration: none; }
+.ai-source-citation-link:hover .ai-source-citation { border-color: var(--state-info-border); }
+
+.ai-confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 9999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  border: 1px solid;
+}
+.ai-confidence-dot { width: 8px; height: 8px; border-radius: 50%; }
+.ai-confidence-badge.is-low { border-color: var(--state-error-border); color: var(--state-error-text); }
+.ai-confidence-badge.is-low .ai-confidence-dot { background: var(--state-error-text); }
+.ai-confidence-badge.is-medium { border-color: var(--state-warning-border); color: var(--state-warning-text); }
+.ai-confidence-badge.is-medium .ai-confidence-dot { background: var(--state-warning-text); }
+.ai-confidence-badge.is-high { border-color: var(--state-success-border); color: var(--state-success-text); }
+.ai-confidence-badge.is-high .ai-confidence-dot { background: var(--state-success-text); }
+.ai-tool-row { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-confidence-row { margin-top: 8px; }

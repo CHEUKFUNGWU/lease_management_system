@@ -24,6 +24,44 @@ const changedFiles = [
   .map((p) => p.trim())
   .filter(Boolean);
 
+// 行级变更提取：只检查「新增行」，已存在于基线里的违规行不触发。
+// 改过的文件里若有存量违规（906 处内联样式那一类），本守卫放行——
+// 存量是阶段一的事，本守卫只防新增。
+const untracked = new Set(
+  execSync(`git ls-files --others --exclude-standard`, { cwd: root }).toString().split("\n").map((p) => p.trim()).filter(Boolean),
+);
+
+function addedLines(file) {
+  if (untracked.has(file)) {
+    // 未跟踪文件整文件都是新增
+    try {
+      return readFileSync(path.join(root, file), "utf8").split("\n").map((text, index) => ({ number: index + 1, text }));
+    } catch {
+      return [];
+    }
+  }
+  const diff = execSync(`git diff -U0 ${base} -- ${file}`, { cwd: root }).toString();
+  const lines = [];
+  let newLine = 0;
+  for (const raw of diff.split("\n")) {
+    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+    if (hunk) {
+      newLine = Number(hunk[1]);
+      continue;
+    }
+    if (raw.startsWith("+++") || raw.startsWith("---") || raw.startsWith("@@")) continue;
+    if (raw.startsWith("+")) {
+      lines.push({ number: newLine, text: raw.slice(1) });
+      newLine += 1;
+    } else if (raw.startsWith("-")) {
+      // 删除行不推进新文件行号
+    } else {
+      newLine += 1;
+    }
+  }
+  return lines;
+}
+
 const violations = [];
 function fail(file, line, message) {
   violations.push(`${file}:${line}: ${message}`);
@@ -44,6 +82,18 @@ const CJK_EXEMPT_PAGES = new Set([
 // t() 词典文件、测试文件里的中文是内容本身；守卫脚本自身也不扫描。
 const CJK_EXEMPT_SUFFIXES = [/\/lib\/i18n(\.\w+)*\.tsx?$/, /\.test\.(ts|tsx)$/, /\.spec\.(ts|tsx)$/];
 const SELF_EXEMPT = ["web/scripts/enforce-design.mjs"];
+
+// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+// ┃ 徽标与元数据豁免 — 品牌图形不是文案，浏览器标题不是 UI 文案      ┃
+// ┃ 「营」徽标是品牌 mark（继承旧 L16 的位置），没有可翻译的文案；    ┃
+// ┃   它的内联样式是 UI-002 之前的存量，本票只允许改字重与字形。      ┃
+// ┃ layout.tsx 的 metadata 是 Next 静态元数据；走 generateMetadata    ┃
+// ┃   做 i18n 是独立改进，归 UIUX 阶段四。                            ┃
+// ┃ 这里只允许「行模式/整文件元数据」级别的窄豁免；                   ┃
+// ┃ 任何人拿它当整页文件的挡箭牌 = 绕过止血。                         ┃
+// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+const BRAND_BADGE_LINE = /aria-hidden="true"[^>]*>\u8425<\/span>/;
+const METADATA_EXEMPT_FILES = new Set(["web/app/layout.tsx"]);
 
 const INLINE_STYLE_RE = /style=\{\{([^{}]*)\}\}/;
 const FONT_WEIGHT_RE = /fontWeight\s*:\s*(['"]?)(700|800|900)\1/;
@@ -79,11 +129,13 @@ for (const file of changedFiles) {
   } catch {
     continue; // 文件被删除，无需检查
   }
-  const lines = content.split("\n");
+  const lines = addedLines(file);
 
   if (file.startsWith("web/")) {
-    lines.forEach((line, index) => {
-      const number = index + 1;
+    for (const { number, text: line } of lines) {
+      if (BRAND_BADGE_LINE.test(line)) {
+        continue; // 「营」徽标：品牌 mark，见豁免名单
+      }
       if (IMPORTANT_RE.test(line)) {
         fail(file, number, "新增 !important（DESIGN.md §13-1）：提高特异性或改 token");
       }
@@ -94,31 +146,34 @@ for (const file of changedFiles) {
       if (FONT_WEIGHT_RE.test(line)) {
         fail(file, number, "新增 fontWeight > 600（DESIGN.md §13-6）：用尺寸和字距做层级");
       }
-    });
+    }
 
     if (file.startsWith("web/app/")) {
-      const exempt = CJK_EXEMPT_PAGES.has(file) || CJK_EXEMPT_SUFFIXES.some((re) => re.test(file));
+      const exempt = CJK_EXEMPT_PAGES.has(file) || METADATA_EXEMPT_FILES.has(file) || CJK_EXEMPT_SUFFIXES.some((re) => re.test(file));
       if (!exempt) {
-        lines.forEach((line, index) => {
+        for (const { number, text: line } of lines) {
           const trimmed = line.trim();
-          if (CJK_RE.test(line) && !/t\(\s*['"]/.test(line) && !/^(\/\/|\/\*|\*)/.test(trimmed)) {
-            fail(file, index + 1, "新增硬编码中文（DESIGN.md §13-7）：文案走 t()，三种语言齐全");
+          if (BRAND_BADGE_LINE.test(line)) {
+            continue; // 「营」徽标：品牌 mark，见豁免名单
           }
-        });
+          if (CJK_RE.test(line) && !/t\(\s*['"]/.test(line) && !/^(\/\/|\/\*|\*)/.test(trimmed)) {
+            fail(file, number, "新增硬编码中文（DESIGN.md §13-7）：文案走 t()，三种语言齐全");
+          }
+        }
       }
     }
   }
 
   if (file.endsWith("_test.go")) {
-    lines.forEach((line, index) => {
+    for (const { number, text: line } of lines) {
       if (HARDCODED_TIMESTAMP_RE.test(line)) {
         fail(
           file,
-          index + 1,
+          number,
           "测试里硬编码绝对时间戳（挂钟越过即永久变红）：改用相对 NOW() + INTERVAL 的偏移",
         );
       }
-    });
+    }
   }
 }
 

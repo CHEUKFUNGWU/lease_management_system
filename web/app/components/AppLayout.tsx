@@ -276,7 +276,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 justifyContent: "center",
               }}
             >
-              <span aria-hidden="true" style={{ fontSize: 11, fontWeight: 800, color: "var(--fg-inverse)", letterSpacing: "-0.5px" }}>L16</span>
+              <span aria-hidden="true" style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-inverse)", letterSpacing: "-0.5px" }}>营</span>
             </div>
             <span
               style={{

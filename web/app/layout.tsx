@@ -6,8 +6,8 @@ import ThemeProvider from "./components/ThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "租赁管理系统",
-  description: "零售集团租赁管理系统",
+  title: "零售经营分析工作站",
+  description: "线下零售经营分析工作站：经营脉搏、门店 360、情景工作台与承租合同分析",
 };
 
 export default function RootLayout({

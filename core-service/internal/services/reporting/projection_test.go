@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -40,7 +41,9 @@ func TestProjectCashflowClassifiesAndBucketsSnapshotPayments(t *testing.T) {
 		t.Fatalf("cashflow rows = %#v", result.Payload["data"])
 	}
 	row := rows[0]
-	if row.GroupKey != "summary" || row.PeriodKey != "2026-01" || row.FixedRent != 100 || row.VariableRent != 20 || row.TaxAmount != 5 || row.TotalCashOut != 125 || row.PaymentCount != 2 {
+	if row.GroupKey != "summary" || row.PeriodKey != "2026-01" ||
+		!row.FixedRent.Equal(money.NewFromInt64(100)) || !row.VariableRent.Equal(money.NewFromInt64(20)) ||
+		!row.TaxAmount.Equal(money.NewFromInt64(5)) || !row.TotalCashOut.Equal(money.NewFromInt64(125)) || row.PaymentCount != 2 {
 		t.Fatalf("cashflow row = %#v", row)
 	}
 	if result.Payload["snapshot_id"] != "snapshot-1" || result.Payload["total"] != 1 {
@@ -109,7 +112,9 @@ func TestProjectPortfolioAppliesDefaultsAndAccountingClassification(t *testing.T
 		t.Fatalf("portfolio rows = %#v", result.Payload["data"])
 	}
 	row := rows[0]
-	if row.AssetType != "" || row.LeaseScope != "" || row.Currency != "" || row.ActiveContractCount != 1 || row.MissingDiscountRateCount != 1 || row.FixedLeaseCommitment != 100 || row.VariableRentExposure != 20 || row.NonLeaseComponentAmount != 5 || row.PaymentCount != 3 {
+	if row.AssetType != "" || row.LeaseScope != "" || row.Currency != "" || row.ActiveContractCount != 1 || row.MissingDiscountRateCount != 1 ||
+		!row.FixedLeaseCommitment.Equal(money.NewFromInt64(100)) || !row.VariableRentExposure.Equal(money.NewFromInt64(20)) ||
+		!row.NonLeaseComponentAmount.Equal(money.NewFromInt64(5)) || row.PaymentCount != 3 {
 		t.Fatalf("portfolio row = %#v", row)
 	}
 }
@@ -141,7 +146,9 @@ func TestProjectSensitivityUsesControlledRateAndIFRSCalculation(t *testing.T) {
 	if !ok || len(rows) != 2 {
 		t.Fatalf("sensitivity rows = %#v", result.Payload["data"])
 	}
-	if result.Payload["base_rate"] != 0.05 || rows[0].DiscountRate != 0.05 || rows[0].LiabilityDelta != 0 || math.Abs(rows[1].DiscountRate-0.06) > 0.0000001 || rows[1].InitialLiability >= rows[0].InitialLiability || rows[1].LiabilityDelta >= 0 {
+	if result.Payload["base_rate"] != 0.05 || rows[0].DiscountRate != 0.05 || !rows[0].LiabilityDelta.IsZero() ||
+		math.Abs(rows[1].DiscountRate-0.06) > 0.0000001 ||
+		rows[1].InitialLiability.Cmp(rows[0].InitialLiability) >= 0 || !rows[1].LiabilityDelta.Decimal().IsNegative() {
 		t.Fatalf("sensitivity projection = %#v payload=%#v", rows, result.Payload)
 	}
 }
@@ -172,7 +179,8 @@ func TestProjectStandardComparisonPreservesExemptLeaseMeasurement(t *testing.T) 
 		t.Fatalf("standard rows = %#v", result.Payload["data"])
 	}
 	for _, row := range rows {
-		if row.MeasurementBasis != "straight_line_expense" || row.InitialLiability != 0 || row.InitialROUAsset != 0 || row.FirstPeriodExpense <= 0 || row.TotalRecognizedCost != 1200 {
+		if row.MeasurementBasis != "straight_line_expense" || !row.InitialLiability.IsZero() || !row.InitialROUAsset.IsZero() ||
+			!row.FirstPeriodExpense.Decimal().IsPositive() || !row.TotalRecognizedCost.Equal(money.NewFromInt64(1200)) {
 			t.Fatalf("exempt standard row = %#v", row)
 		}
 	}
@@ -210,7 +218,8 @@ func TestProjectAmortizationCombinesIFRSRowsAndSnapshotAdjustments(t *testing.T)
 	if !ok || len(rows) != 1 {
 		t.Fatalf("amortization rows = %#v", result.Payload["data"])
 	}
-	if rows[0].Currency != "USD" || rows[0].Impairment != 50 || rows[0].PnLAdjustment != -50 || rows[0].OpeningLiability <= 0 {
+	if rows[0].Currency != "USD" || !rows[0].Impairment.Equal(money.NewFromInt64(50)) ||
+		!rows[0].PnLAdjustment.Equal(money.NewFromInt64(-50)) || !rows[0].OpeningLiability.Decimal().IsPositive() {
 		t.Fatalf("amortization row = %#v", rows[0])
 	}
 }

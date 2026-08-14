@@ -1,12 +1,13 @@
 package reporting
 
 import (
-	"math"
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
+	"github.com/shopspring/decimal"
 )
 
 // monthlyRentSchedules builds `months` postpaid fixed payments of `amount`,
@@ -69,34 +70,34 @@ func TestDisclosureMaturityBandsReconcileToCarryingLiability(t *testing.T) {
 	row := rows[0]
 
 	// 24 of 36 payments remain after 2025-12-31.
-	if math.Abs(row.TotalUndiscounted-240000) > 0.01 {
-		t.Errorf("total undiscounted = %.2f, want 240000", row.TotalUndiscounted)
+	if !row.TotalUndiscounted.Equal(money.NewFromInt64(240000)) {
+		t.Errorf("total undiscounted = %v, want 240000", row.TotalUndiscounted)
 	}
 	// 12 fall within one year, 12 in the 1-2y band, none beyond.
-	if math.Abs(row.Bands[0]-120000) > 0.01 || math.Abs(row.Bands[1]-120000) > 0.01 {
+	if !row.Bands[0].Equal(money.NewFromInt64(120000)) || !row.Bands[1].Equal(money.NewFromInt64(120000)) {
 		t.Errorf("bands = %v, want [120000 120000 0 0 0 0]", row.Bands)
 	}
-	var bandSum float64
+	var bandSum money.Amount
 	for _, band := range row.Bands {
-		bandSum += band
+		bandSum = bandSum.Add(band)
 	}
-	if math.Abs(bandSum-row.TotalUndiscounted) > 0.01 {
-		t.Errorf("band sum %.2f != total %.2f", bandSum, row.TotalUndiscounted)
+	if !bandSum.Equal(row.TotalUndiscounted) {
+		t.Errorf("band sum %v != total %v", bandSum, row.TotalUndiscounted)
 	}
 
 	// The disclosure only holds up if undiscounted - unearned finance cost ties
 	// back to the carrying liability the ledger reports.
-	if math.Abs(row.TotalUndiscounted-row.UnearnedFinanceCost-row.CarryingLiability) > 0.01 {
-		t.Errorf("reconciliation does not tie: %.2f - %.2f != %.2f",
+	if !row.TotalUndiscounted.Sub(row.UnearnedFinanceCost).Equal(row.CarryingLiability) {
+		t.Errorf("reconciliation does not tie: %v - %v != %v",
 			row.TotalUndiscounted, row.UnearnedFinanceCost, row.CarryingLiability)
 	}
-	if row.CarryingLiability <= 0 || row.CarryingLiability >= row.TotalUndiscounted {
-		t.Errorf("carrying liability %.2f outside (0, %.2f)", row.CarryingLiability, row.TotalUndiscounted)
+	if row.CarryingLiability.IsZero() || row.CarryingLiability.Decimal().IsNegative() || row.CarryingLiability.Cmp(row.TotalUndiscounted) >= 0 {
+		t.Errorf("carrying liability %v outside (0, %v)", row.CarryingLiability, row.TotalUndiscounted)
 	}
 
 	totals := analysis["totals"].(MaturityRow)
-	if math.Abs(totals.TotalUndiscounted-row.TotalUndiscounted) > 0.01 {
-		t.Errorf("totals %.2f != single row %.2f", totals.TotalUndiscounted, row.TotalUndiscounted)
+	if !totals.TotalUndiscounted.Equal(row.TotalUndiscounted) {
+		t.Errorf("totals %v != single row %v", totals.TotalUndiscounted, row.TotalUndiscounted)
 	}
 }
 
@@ -106,16 +107,20 @@ func TestDisclosureLiabilityRollforwardTies(t *testing.T) {
 		time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC))
 
 	roll := payload["liability_rollforward"].(LiabilityRollforward)
-	if roll.Opening != 0 {
-		t.Errorf("opening = %.2f, want 0 for a lease commencing in period", roll.Opening)
+	if !roll.Opening.IsZero() {
+		t.Errorf("opening = %v, want 0 for a lease commencing in period", roll.Opening)
 	}
-	if roll.Additions <= 0 {
-		t.Errorf("additions = %.2f, want > 0", roll.Additions)
+	if !roll.Additions.Decimal().IsPositive() {
+		t.Errorf("additions = %v, want > 0", roll.Additions)
 	}
-	derived := roll.Opening + roll.Additions + roll.Interest - roll.Payments +
-		roll.Remeasurement + roll.OtherAdjustments
-	if math.Abs(derived-roll.Closing) > 1 {
-		t.Errorf("rollforward does not tie: derived %.2f vs closing %.2f", derived, roll.Closing)
+	derived := roll.Opening.Add(roll.Additions).Add(roll.Interest).Sub(roll.Payments).
+		Add(roll.Remeasurement).Add(roll.OtherAdjustments)
+	// The daily schedule quantises each entry at emission, so the sum of the
+	// rounded daily fields can sit a small spread from the closing carry. The
+	// spread is sub-currency-unit by construction; anything larger is a real
+	// break of the roll-forward.
+	if derived.Sub(roll.Closing).Abs().Cmp(money.NewFromInt64(1)) > 0 {
+		t.Errorf("rollforward does not tie: derived %v vs closing %v", derived, roll.Closing)
 	}
 }
 
@@ -130,13 +135,15 @@ func TestDisclosureROUReconciliationTies(t *testing.T) {
 		t.Fatalf("rou rows = %#v", rows)
 	}
 	row := rows[0]
-	derived := row.Opening + row.Additions - row.Depreciation + row.Remeasurement -
-		row.Impairment + row.OtherAdjustments
-	if math.Abs(derived-row.Closing) > 1 {
-		t.Errorf("ROU reconciliation does not tie: derived %.2f vs closing %.2f", derived, row.Closing)
+	derived := row.Opening.Add(row.Additions).Sub(row.Depreciation).Add(row.Remeasurement).
+		Sub(row.Impairment).Add(row.OtherAdjustments)
+	// See the roll-forward tie: per-entry quantisation leaves a sub-currency-
+	// unit spread between summed entries and the closing carry.
+	if derived.Sub(row.Closing).Abs().Cmp(money.NewFromInt64(1)) > 0 {
+		t.Errorf("ROU reconciliation does not tie: derived %v vs closing %v", derived, row.Closing)
 	}
-	if totals := reconciliation["totals"].(ROUReconciliationRow); math.Abs(totals.Closing-row.Closing) > 0.01 {
-		t.Errorf("totals closing %.2f != row closing %.2f", totals.Closing, row.Closing)
+	if totals := reconciliation["totals"].(ROUReconciliationRow); !totals.Closing.Equal(row.Closing) {
+		t.Errorf("totals closing %v != row closing %v", totals.Closing, row.Closing)
 	}
 }
 
@@ -146,15 +153,15 @@ func TestDisclosureExpenseAndCashOutflow(t *testing.T) {
 		time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC))
 
 	expenses := payload["expense_breakdown"].(ExpenseBreakdown)
-	if expenses.Depreciation <= 0 || expenses.Interest <= 0 {
-		t.Errorf("depreciation %.2f / interest %.2f, want both > 0", expenses.Depreciation, expenses.Interest)
+	if !expenses.Depreciation.Decimal().IsPositive() || !expenses.Interest.Decimal().IsPositive() {
+		t.Errorf("depreciation %v / interest %v, want both > 0", expenses.Depreciation, expenses.Interest)
 	}
-	if expenses.ShortTermExempt != 0 || expenses.LowValueExempt != 0 {
+	if !expenses.ShortTermExempt.IsZero() || !expenses.LowValueExempt.IsZero() {
 		t.Errorf("an in-scope lease must not report exempt expense: %#v", expenses)
 	}
 
 	cash := payload["cash_outflow"].(CashOutflowSummary)
-	if math.Abs(cash.FixedPayments-120000) > 0.01 || math.Abs(cash.Total-120000) > 0.01 {
+	if !cash.FixedPayments.Equal(money.NewFromInt64(120000)) || !cash.Total.Equal(money.NewFromInt64(120000)) {
 		t.Errorf("cash outflow = %#v, want 120000 fixed", cash)
 	}
 }
@@ -183,8 +190,8 @@ func TestDisclosureIncludesReportBasisAndContractAuditWorkpaper(t *testing.T) {
 	if row.ContractNumber != "LC-001" || row.PaymentScheduleCount != 36 || row.DiscountRate != 0.05 {
 		t.Fatalf("audit workpaper row = %#v", row)
 	}
-	if math.Abs(row.LiabilityTieOut) > 1 || math.Abs(row.ROUTieOut) > 1 {
-		t.Fatalf("audit workpaper tie-outs = liability %.4f rou %.4f", row.LiabilityTieOut, row.ROUTieOut)
+	if row.LiabilityTieOut.Abs().Cmp(money.NewFromInt64(1)) > 0 || row.ROUTieOut.Abs().Cmp(money.NewFromInt64(1)) > 0 {
+		t.Fatalf("audit workpaper tie-outs = liability %v rou %v", row.LiabilityTieOut, row.ROUTieOut)
 	}
 }
 
@@ -211,10 +218,12 @@ func TestDisclosureClassifiesExemptLeasesOutsideTheBalanceSheet(t *testing.T) {
 		time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC))
 
 	expenses := payload["expense_breakdown"].(ExpenseBreakdown)
-	if math.Abs(expenses.ShortTermExempt-18000) > 1 {
-		t.Errorf("short-term exempt expense = %.2f, want ~18000", expenses.ShortTermExempt)
+	// The straight-line daily expense is quantised per day, so the six-month
+	// sum can sit a cent or two either side of the nominal 18,000.
+	if expenses.ShortTermExempt.Sub(money.NewFromInt64(18000)).Abs().Decimal().Cmp(decimal.NewFromFloat(1)) > 0 {
+		t.Errorf("short-term exempt expense = %v, want ~18000", expenses.ShortTermExempt)
 	}
-	if expenses.Depreciation != 0 || expenses.Interest != 0 {
+	if !expenses.Depreciation.IsZero() || !expenses.Interest.IsZero() {
 		t.Errorf("an exempt lease must not produce depreciation or interest: %#v", expenses)
 	}
 

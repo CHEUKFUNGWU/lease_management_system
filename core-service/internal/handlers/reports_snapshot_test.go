@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
 )
@@ -138,7 +139,7 @@ func TestCashflowForecastOfficialUsesControlledSnapshotFacts(t *testing.T) {
 	if response.SnapshotID == "" || response.PolicyVersion != "report-snapshot-v1" || response.Mode != reporting.Official || !response.IsOfficial {
 		t.Fatalf("snapshot metadata = %#v", response)
 	}
-	if len(response.Data) != 1 || response.Data[0].FixedRent != 100 || response.Data[0].PaymentCount != 1 {
+	if len(response.Data) != 1 || !response.Data[0].FixedRent.Equal(money.NewFromInt64(100)) || response.Data[0].PaymentCount != 1 {
 		t.Fatalf("official cashflow rows = %#v", response.Data)
 	}
 }
@@ -179,7 +180,7 @@ func TestSensitivityAnalysisProjectsFromControlledSnapshot(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if response.SnapshotID == "" || response.BaseRate != 0.05 || len(response.Data) != 2 || response.Data[1].InitialLiability >= response.Data[0].InitialLiability {
+	if response.SnapshotID == "" || response.BaseRate != 0.05 || len(response.Data) != 2 || response.Data[1].InitialLiability.Cmp(response.Data[0].InitialLiability) >= 0 {
 		t.Fatalf("sensitivity response = %#v", response)
 	}
 }

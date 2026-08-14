@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
+	"github.com/shopspring/decimal"
 )
 
 type ProjectionKind string
@@ -99,62 +101,62 @@ type LiabilityRollingRow struct {
 }
 
 type CashflowRow struct {
-	GroupKey        string  `json:"group_key"`
-	GroupLabel      string  `json:"group_label"`
-	ContractID      string  `json:"contract_id,omitempty"`
-	ContractNumber  string  `json:"contract_number,omitempty"`
-	ContractName    string  `json:"contract_name,omitempty"`
-	StoreName       string  `json:"store_name,omitempty"`
-	Currency        string  `json:"currency,omitempty"`
-	PeriodKey       string  `json:"period_key"`
-	PeriodStart     string  `json:"period_start"`
-	PeriodEnd       string  `json:"period_end"`
-	FixedRent       float64 `json:"fixed_rent"`
-	VariableRent    float64 `json:"variable_rent"`
-	NonLeaseExpense float64 `json:"non_lease_expense"`
-	TaxAmount       float64 `json:"tax_amount"`
-	TotalCashOut    float64 `json:"total_cash_out"`
-	PaymentCount    int     `json:"payment_count"`
+	GroupKey        string       `json:"group_key"`
+	GroupLabel      string       `json:"group_label"`
+	ContractID      string       `json:"contract_id,omitempty"`
+	ContractNumber  string       `json:"contract_number,omitempty"`
+	ContractName    string       `json:"contract_name,omitempty"`
+	StoreName       string       `json:"store_name,omitempty"`
+	Currency        string       `json:"currency,omitempty"`
+	PeriodKey       string       `json:"period_key"`
+	PeriodStart     string       `json:"period_start"`
+	PeriodEnd       string       `json:"period_end"`
+	FixedRent       money.Amount `json:"fixed_rent"`
+	VariableRent    money.Amount `json:"variable_rent"`
+	NonLeaseExpense money.Amount `json:"non_lease_expense"`
+	TaxAmount       money.Amount `json:"tax_amount"`
+	TotalCashOut    money.Amount `json:"total_cash_out"`
+	PaymentCount    int          `json:"payment_count"`
 }
 
 type PortfolioRow struct {
-	AssetType                string  `json:"asset_type"`
-	LeaseScope               string  `json:"lease_scope"`
-	Currency                 string  `json:"currency"`
-	ContractCount            int     `json:"contract_count"`
-	ApprovedCount            int     `json:"approved_count"`
-	ActiveContractCount      int     `json:"active_contract_count"`
-	MissingDiscountRateCount int     `json:"missing_discount_rate_count"`
-	FixedLeaseCommitment     float64 `json:"fixed_lease_commitment"`
-	VariableRentExposure     float64 `json:"variable_rent_exposure"`
-	NonLeaseComponentAmount  float64 `json:"non_lease_component_amount"`
-	PaymentCount             int     `json:"payment_count"`
-	EarliestCommencementDate string  `json:"earliest_commencement_date,omitempty"`
-	LatestLeaseEndDate       string  `json:"latest_lease_end_date,omitempty"`
+	AssetType                string       `json:"asset_type"`
+	LeaseScope               string       `json:"lease_scope"`
+	Currency                 string       `json:"currency"`
+	ContractCount            int          `json:"contract_count"`
+	ApprovedCount            int          `json:"approved_count"`
+	ActiveContractCount      int          `json:"active_contract_count"`
+	MissingDiscountRateCount int          `json:"missing_discount_rate_count"`
+	FixedLeaseCommitment     money.Amount `json:"fixed_lease_commitment"`
+	VariableRentExposure     money.Amount `json:"variable_rent_exposure"`
+	NonLeaseComponentAmount  money.Amount `json:"non_lease_component_amount"`
+	PaymentCount             int          `json:"payment_count"`
+	EarliestCommencementDate string       `json:"earliest_commencement_date,omitempty"`
+	LatestLeaseEndDate       string       `json:"latest_lease_end_date,omitempty"`
 }
 
 type SensitivityRow struct {
-	ScenarioName          string  `json:"scenario_name"`
-	DiscountRate          float64 `json:"discount_rate"`
-	RateDelta             float64 `json:"rate_delta"`
-	InitialLiability      float64 `json:"initial_liability"`
-	InitialROUAsset       float64 `json:"initial_rou_asset"`
-	LiabilityDelta        float64 `json:"liability_delta"`
-	LiabilityDeltaPercent float64 `json:"liability_delta_percent"`
+	ScenarioName          string       `json:"scenario_name"`
+	DiscountRate          float64      `json:"discount_rate"`
+	RateDelta             float64      `json:"rate_delta"`
+	InitialLiability      money.Amount `json:"initial_liability"`
+	InitialROUAsset       money.Amount `json:"initial_rou_asset"`
+	LiabilityDelta        money.Amount `json:"liability_delta"`
+	LiabilityDeltaPercent float64      `json:"liability_delta_percent"`
 }
 
 type StandardComparisonRow struct {
-	Standard              string   `json:"standard"`
-	StandardName          string   `json:"standard_name"`
-	Classification        string   `json:"classification"`
-	MeasurementBasis      string   `json:"measurement_basis"`
-	InitialLiability      float64  `json:"initial_liability"`
-	InitialROUAsset       float64  `json:"initial_rou_asset"`
-	FirstPeriodExpense    float64  `json:"first_period_expense"`
-	TotalRecognizedCost   float64  `json:"total_recognized_cost"`
-	BalanceSheetTreatment string   `json:"balance_sheet_treatment"`
-	PnLPattern            string   `json:"pnl_pattern"`
-	KeyDifferences        []string `json:"key_differences"`
+	Standard              string       `json:"standard"`
+	StandardName          string       `json:"standard_name"`
+	Classification        string       `json:"classification"`
+	MeasurementBasis      string       `json:"measurement_basis"`
+	InitialLiability      money.Amount `json:"initial_liability"`
+	InitialROUAsset       money.Amount `json:"initial_rou_asset"`
+	FirstPeriodExpense    money.Amount `json:"first_period_expense"`
+	TotalRecognizedCost   money.Amount `json:"total_recognized_cost"`
+	BalanceSheetTreatment string       `json:"balance_sheet_treatment"`
+	PnLPattern            string       `json:"pnl_pattern"`
+	KeyDifferences        []string     `json:"key_differences"`
 }
 
 type TagSummaryRow struct {
@@ -294,8 +296,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 	rows := []StandardComparisonRow{
 		{
 			Standard: "ifrs16", StandardName: "IFRS 16", Classification: "single lessee model",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
-			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: financeExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
+			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: financeExpense,
 			TotalRecognizedCost:   totalCapitalizedCost,
 			BalanceSheetTreatment: "Recognize lease liability and right-of-use asset unless exempt or not a lease.",
 			PnLPattern:            "Front-loaded finance cost plus straight-line depreciation for capitalized leases.",
@@ -307,8 +309,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		},
 		{
 			Standard: "asc842_finance", StandardName: "ASC 842 - Finance Lease View", Classification: "finance lease",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
-			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: financeExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
+			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: financeExpense,
 			TotalRecognizedCost:   totalCapitalizedCost,
 			BalanceSheetTreatment: "Recognize lease liability and ROU asset; classification remains finance lease.",
 			PnLPattern:            "Interest and amortization are presented separately; expense pattern is generally front-loaded.",
@@ -320,8 +322,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		},
 		{
 			Standard: "asc842_operating", StandardName: "ASC 842 - Operating Lease View", Classification: "operating lease",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
-			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: straightLineExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
+			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: straightLineExpense,
 			TotalRecognizedCost:   totalFixedCost,
 			BalanceSheetTreatment: "Recognize lease liability and ROU asset for most operating leases.",
 			PnLPattern:            "Single lease cost is generally recognized on a straight-line basis.",
@@ -333,8 +335,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		},
 		{
 			Standard: "cas21", StandardName: "中国企业会计准则第21号 - 租赁", Classification: "new lease standard lessee model",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
-			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: financeExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
+			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: financeExpense,
 			TotalRecognizedCost:   totalCapitalizedCost,
 			BalanceSheetTreatment: "Recognize lease liability and right-of-use asset unless exempt or outside lease scope.",
 			PnLPattern:            "Generally aligned with IFRS 16 style lessee accounting for in-scope leases.",
@@ -345,20 +347,21 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 			},
 		},
 	}
+	zero := money.NewFromInt64(0)
 	if calculation.MeasurementBasis == "straight_line_expense" {
 		for index := range rows {
 			rows[index].FirstPeriodExpense = straightLineExpense
 			rows[index].TotalRecognizedCost = totalFixedCost
-			rows[index].InitialLiability = 0
-			rows[index].InitialROUAsset = 0
+			rows[index].InitialLiability = zero
+			rows[index].InitialROUAsset = zero
 		}
 	}
 	if calculation.MeasurementBasis == "skipped" {
 		for index := range rows {
-			rows[index].FirstPeriodExpense = 0
-			rows[index].TotalRecognizedCost = 0
-			rows[index].InitialLiability = 0
-			rows[index].InitialROUAsset = 0
+			rows[index].FirstPeriodExpense = zero
+			rows[index].TotalRecognizedCost = zero
+			rows[index].InitialLiability = zero
+			rows[index].InitialROUAsset = zero
 		}
 	}
 	contract := fact.Contract
@@ -369,32 +372,40 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 	})}, nil
 }
 
-func summarizeCapitalizedCost(result *ifrs16.CalculationResult) (float64, float64) {
-	firstPeriodExpense, totalCost := 0.0, 0.0
+func summarizeCapitalizedCost(result *ifrs16.CalculationResult) (money.Amount, money.Amount) {
+	firstPeriodExpense := money.NewFromInt64(0)
+	totalCost := money.NewFromInt64(0)
 	for index, row := range result.MonthlySummary {
-		periodCost := row.InterestExpense.Float64() + row.Depreciation.Float64() + row.VariableRentExpense.Float64() + row.NonLeaseExpense.Float64()
+		periodCost := row.InterestExpense.Add(row.Depreciation).Add(row.VariableRentExpense).Add(row.NonLeaseExpense)
 		if index == 0 {
 			firstPeriodExpense = periodCost
 		}
-		totalCost += periodCost
+		totalCost = totalCost.Add(periodCost)
 	}
 	return firstPeriodExpense, totalCost
 }
 
-func summarizeStraightLineCost(result *ifrs16.CalculationResult, payments []ifrs16.LeasePayment) (float64, float64) {
-	totalCost := 0.0
+func summarizeStraightLineCost(result *ifrs16.CalculationResult, payments []ifrs16.LeasePayment) (money.Amount, money.Amount) {
+	totalCost := money.NewFromInt64(0)
 	for _, payment := range payments {
 		if payment.Type == "fixed" || payment.Type == "" {
-			totalCost += payment.Amount.Float64()
+			totalCost = totalCost.Add(payment.Amount)
 		}
 	}
-	firstPeriodExpense := 0.0
+	firstPeriodExpense := money.NewFromInt64(0)
 	if len(result.MonthlySummary) > 0 {
-		firstPeriodExpense = totalCost / float64(len(result.MonthlySummary))
+		// The straight-line expense divides the commitment across the term;
+		// the quotient is quantised once, at the same half-up boundary the
+		// measurement engine uses.
+		firstPeriodExpense = money.New(totalCost.Decimal().Div(decimal.NewFromInt(int64(len(result.MonthlySummary))))).RoundTo(2)
 	}
-	return roundProjection(firstPeriodExpense), roundProjection(totalCost)
+	return firstPeriodExpense, totalCost
 }
 
+// roundProjection quantises a float64 projection field to two decimal places.
+// It remains only for the unit-price projection, which is not part of the
+// money migration batch; every migrated projection quantises through
+// money.Round at the boundary instead and no longer calls this.
 func roundProjection(value float64) float64 {
 	return math.Round(value*100) / 100
 }
@@ -424,7 +435,7 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 	if err != nil {
 		return ProjectionResult{}, err
 	}
-	baseLiability := baseResult.InitialLiability.Float64()
+	baseLiability := baseResult.InitialLiability
 	for _, shock := range shocks {
 		rate := baseRate + shock
 		if rate < 0 {
@@ -436,13 +447,15 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 		}
 		rows = append(rows, SensitivityRow{
 			ScenarioName: fmt.Sprintf("%+.2f%%", shock*100), DiscountRate: rate, RateDelta: shock,
-			InitialLiability: result.InitialLiability.Float64(), InitialROUAsset: result.InitialROUAsset.Float64(),
+			InitialLiability: result.InitialLiability, InitialROUAsset: result.InitialROUAsset,
 		})
 	}
 	for index := range rows {
-		rows[index].LiabilityDelta = rows[index].InitialLiability - baseLiability
-		if baseLiability != 0 {
-			rows[index].LiabilityDeltaPercent = rows[index].LiabilityDelta / baseLiability
+		rows[index].LiabilityDelta = rows[index].InitialLiability.Sub(baseLiability)
+		if !baseLiability.IsZero() {
+			// A percentage movement is a ratio, not a money amount: the
+			// carrying amounts are converted at the boundary for the division.
+			rows[index].LiabilityDeltaPercent = rows[index].LiabilityDelta.Float64() / baseLiability.Float64()
 		}
 	}
 	contract := fact.Contract
@@ -509,13 +522,16 @@ func projectPortfolio(snapshot *Snapshot) ProjectionResult {
 		}
 		for _, schedule := range fact.PaymentSchedules {
 			row.PaymentCount++
+			// PaymentSchedule amounts are stored decimals read as float64; the
+			// conversion happens once, at this seam.
+			amount := money.NewFromFloat(schedule.Amount)
 			switch {
 			case schedule.IsVariable:
-				row.VariableRentExposure += schedule.Amount
+				row.VariableRentExposure = row.VariableRentExposure.Add(amount)
 			case schedule.IsNonLeaseComponent:
-				row.NonLeaseComponentAmount += schedule.Amount
+				row.NonLeaseComponentAmount = row.NonLeaseComponentAmount.Add(amount)
 			case schedule.IsLeaseComponent && schedule.IsFixed:
-				row.FixedLeaseCommitment += schedule.Amount
+				row.FixedLeaseCommitment = row.FixedLeaseCommitment.Add(amount)
 			}
 		}
 	}
@@ -688,19 +704,19 @@ func projectCashflow(snapshot *Snapshot, request ProjectionRequest) (ProjectionR
 				}
 				rows[key] = row
 			}
-			amount := schedule.Amount
+			amount := money.NewFromFloat(schedule.Amount)
 			switch {
 			case schedule.IsVariable || schedule.AmountType == "turnover_rent":
-				row.VariableRent += amount
+				row.VariableRent = row.VariableRent.Add(amount)
 			case schedule.IsNonLeaseComponent || schedule.AmountType == "cam" || schedule.AmountType == "service_fee":
-				row.NonLeaseExpense += amount
+				row.NonLeaseExpense = row.NonLeaseExpense.Add(amount)
 			default:
-				row.FixedRent += amount
+				row.FixedRent = row.FixedRent.Add(amount)
 			}
 			if schedule.TaxAmount != nil {
-				row.TaxAmount += *schedule.TaxAmount
+				row.TaxAmount = row.TaxAmount.Add(money.NewFromFloat(*schedule.TaxAmount))
 			}
-			row.TotalCashOut = row.FixedRent + row.VariableRent + row.NonLeaseExpense + row.TaxAmount
+			row.TotalCashOut = row.FixedRent.Add(row.VariableRent).Add(row.NonLeaseExpense).Add(row.TaxAmount)
 			row.PaymentCount++
 		}
 	}

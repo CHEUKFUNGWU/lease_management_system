@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
 )
 
@@ -17,7 +18,7 @@ func TestClosePackFilesIncludesHashableAuditWorkpaper(t *testing.T) {
 			ContractID: "contract-1", ContractNumber: "LC-001", ContractName: "旗舰店",
 			LegalEntityID: "le-001", Currency: "CNY", LeaseScope: "in_scope",
 			ApprovalStatus: "approved", ReportMode: "official", DiscountRate: 0.05,
-			PaymentScheduleCount: 12, ClosingLiability: 1234.56, LiabilityTieOut: 0,
+			PaymentScheduleCount: 12, ClosingLiability: money.NewFromFloat(1234.56), LiabilityTieOut: money.NewFromInt64(0),
 		}},
 	}
 	files, err := closePackFiles(

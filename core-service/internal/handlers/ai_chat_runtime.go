@@ -142,17 +142,18 @@ func (h *AIChatHandler) ListSessions(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	status := c.Query("status")
-	legalEntityID := c.Query("legal_entity_id")
-	if legalEntityID == "" {
-		legalEntityID = middleware.GetTenantID(c)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
 	}
 
 	sessions, err := h.runtimeRepo.ListSessions(c.Request.Context(), repository.AIChatSessionFilter{
-		UserID:        userIDStr,
-		LegalEntityID: legalEntityID,
-		Status:        status,
-		Limit:         limit,
-		Offset:        offset,
+		UserID: userIDStr,
+		Entity: entity,
+		Status: status,
+		Limit:  limit,
+		Offset: offset,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat sessions: " + err.Error()})

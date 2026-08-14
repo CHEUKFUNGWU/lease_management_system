@@ -109,6 +109,14 @@ const defaultChips = [
 
 const agentSkillStarters = [
   {
+    key: "retail-operations",
+    labelKey: "ai.skill_retail_operations",
+    promptKey: "ai.skill_retail_operations_prompt",
+    icon: "retail",
+    skillId: "retail_operations",
+    skillVersion: "v1",
+  },
+  {
     key: "excel-ledger",
     labelKey: "ai.skill_excel_ledger",
     promptKey: "ai.skill_excel_ledger_prompt",
@@ -139,14 +147,6 @@ const agentSkillStarters = [
     icon: "tool",
     skillId: undefined,
     skillVersion: undefined,
-  },
-  {
-    key: "retail-operations",
-    labelKey: "ai.skill_retail_operations",
-    promptKey: "ai.skill_retail_operations_prompt",
-    icon: "retail",
-    skillId: "retail_operations",
-    skillVersion: "v1",
   },
 ];
 

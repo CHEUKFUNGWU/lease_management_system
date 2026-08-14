@@ -60,6 +60,7 @@ const dict: TranslationDict = {
     "zh-HK": "AI Chat",
     en: "AI Chat",
   },
+  "nav.upload": { "zh-CN": "批量上传", "zh-HK": "批量上傳", en: "Batch upload" },
   "nav.reports": {
     "zh-CN": "报表查询",
     "zh-HK": "報表查詢",
@@ -221,9 +222,9 @@ const dict: TranslationDict = {
     en: "Admin",
   },
   "app.title": {
-    "zh-CN": "租赁管理系统",
-    "zh-HK": "租賃管理系統",
-    en: "Lease Management",
+    "zh-CN": "零售经营分析工作站",
+    "zh-HK": "零售經營分析工作站",
+    en: "Retail Performance Workstation",
   },
   "user.profile": {
     "zh-CN": "个人资料",
@@ -253,9 +254,9 @@ const dict: TranslationDict = {
 
   // AI Chat
   "ai.welcome": {
-    "zh-CN": "你好！我是租赁管理 AI Agent。我可以把文件和数据作为工作入口，调用内置 skill 帮你完成任务：\n\n1. 读取非标准 Excel 台账、租金表和付款流水\n2. 解析 PDF/Word/图片合同并生成草稿\n3. 查询合同台账、计量结果、分录和审批状态\n4. 生成需要人工确认的缺失字段和风险提示\n\n上传合同文件或台账后，我会先生成草稿和工具执行轨迹，确认后才创建 draft 合同并进入审批流程。",
-    "zh-HK": "你好！我是租賃管理 AI Agent。我可以把文件和數據作為工作入口，調用內置 skill 幫你完成任務：\n\n1. 讀取非標準 Excel 台賬、租金表和付款流水\n2. 解析 PDF/Word/圖片合同並生成草稿\n3. 查詢合同台賬、計量結果、分錄和審批狀態\n4. 生成需要人工確認的缺失字段和風險提示\n\n上傳合同文件或台賬後，我會先生成草稿和工具執行軌跡，確認後才創建 draft 合同並進入審批流程。",
-    en: "Hello! I am the Lease Management AI Agent. I use files and system data as the working entrypoint and call built-in skills to complete tasks:\n\n1. Read non-standard Excel ledgers, rent schedules, and payment files\n2. Parse PDF/Word/image contracts and generate drafts\n3. Query contracts, measurements, journal entries, and approval status\n4. Surface missing fields and risk prompts for human review\n\nAfter you upload a contract or ledger, I will generate drafts and a tool execution trace first. Only confirmed items are created as draft contracts for approval.",
+    "zh-CN": "你好！我是零售经营分析助手。我可以读取经营数据并调用内置 skill 帮你完成任务：\n\n1. 读取经营脉搏，定位需要关注的门店与异常信号\n2. 对关注门店做门店 360 诊断，解释营收与贡献变化\n3. 评估确定性经营情景，生成待确认的行动建议\n4. 解析合同与台账文件并生成草稿（租赁与 IFRS 16 计量保留）\n\n上传文件或直接提问后，我会先生成草稿和工具执行轨迹，确认后才进入正式流程。",
+    "zh-HK": "你好！我是零售經營分析助手。我可以讀取經營數據並調用內置 skill 幫你完成任務：\n\n1. 讀取經營脈搏，定位需要關注的門店與異常訊號\n2. 對關注門店做門店 360 診斷，解釋營收與貢獻變化\n3. 評估確定性經營情景，生成待確認的行動建議\n4. 解析合同與台賬文件並生成草稿（租賃與 IFRS 16 計量保留）\n\n上傳文件或直接提問後，我會先生成草稿和工具執行軌跡，確認後才進入正式流程。",
+    en: "Hello! I am the Retail Performance Assistant. I read operating data and call built-in skills to help you:\n\n1. Read the operating pulse and surface stores that need attention\n2. Diagnose attention stores with Store 360, explaining revenue and contribution changes\n3. Evaluate deterministic operating scenarios and draft actions for confirmation\n4. Parse contracts and ledger files into drafts (lease and IFRS 16 measurement remain)\n\nAfter you upload a file or ask a question, I first produce drafts and a tool execution trace; only confirmed items enter the formal flow.",
   },
   "ai.context": {
     "zh-CN": "当前上下文：",
@@ -398,9 +399,9 @@ const dict: TranslationDict = {
     en: "What are the recommended next steps?",
   },
   "ai.chip_missing_dr": {
-    "zh-CN": "列出折现率缺失合同",
-    "zh-HK": "列出折現率缺失合同",
-    en: "List contracts with missing discount rates",
+    "zh-CN": "哪些门店数据覆盖不足？",
+    "zh-HK": "哪些門店數據覆蓋不足？",
+    en: "Which stores have insufficient fact coverage?",
   },
   "ai.chip_pending": {
     "zh-CN": "有哪些待审批事项？",
@@ -408,9 +409,9 @@ const dict: TranslationDict = {
     en: "What items are pending approval?",
   },
   "ai.chip_expiring": {
-    "zh-CN": "哪些合同即将到期？",
-    "zh-HK": "哪些合同即將到期？",
-    en: "Which contracts are expiring soon?",
+    "zh-CN": "哪些门店需要关注？",
+    "zh-HK": "哪些門店需要關注？",
+    en: "Which stores need attention?",
   },
 
   // Reports
@@ -2326,9 +2327,9 @@ const dict: TranslationDict = {
 
   // Login
   "login.title": {
-    "zh-CN": "租赁管理系统",
-    "zh-HK": "租賃管理系統",
-    en: "Lease Management",
+    "zh-CN": "零售经营分析工作站",
+    "zh-HK": "零售經營分析工作站",
+    en: "Retail Performance Workstation",
   },
   "login.username": {
     "zh-CN": "用户名",
@@ -5110,9 +5111,9 @@ const dict: TranslationDict = {
     en: "Admin Login",
   },
   "admin_login.subtitle": {
-    "zh-CN": "租赁管理系统 — 管理员通道",
-    "zh-HK": "租賃管理系統 — 管理員通道",
-    en: "Lease Management System — Admin Channel",
+    "zh-CN": "零售经营分析工作站 — 管理员通道",
+    "zh-HK": "零售經營分析工作站 — 管理員通道",
+    en: "Retail Performance Workstation — Admin Channel",
   },
   "admin_login.not_admin": {
     "zh-CN": "非管理员账号，请使用普通登录入口",
@@ -5312,9 +5313,9 @@ const dict: TranslationDict = {
     en: "Cancel",
   },
   "ai.assistant_name": {
-    "zh-CN": "租赁管理 AI Agent",
-    "zh-HK": "租賃管理 AI Agent",
-    en: "Lease Management AI Agent",
+    "zh-CN": "零售经营分析助手",
+    "zh-HK": "零售經營分析助手",
+    en: "Retail Performance Assistant",
   },
   "ai.agent_trace_title": {
     "zh-CN": "Agent 技能执行轨迹",
@@ -6781,6 +6782,7 @@ const dict: TranslationDict = {
   "search.group_contracts": { "zh-CN": "合同", "zh-HK": "合同", en: "Contracts" },
   "search.group_pages": { "zh-CN": "页面", "zh-HK": "頁面", en: "Pages" },
   "search.group_actions": { "zh-CN": "操作", "zh-HK": "操作", en: "Actions" },
+  "search.group_stores": { "zh-CN": "门店", "zh-HK": "門店", en: "Stores" },
   "search.group_daily": { "zh-CN": "日常作业", "zh-HK": "日常作業", en: "Daily work" },
   "search.group_accounting": { "zh-CN": "会计与合规", "zh-HK": "會計與合規", en: "Accounting & compliance" },
   "search.group_analysis": { "zh-CN": "分析与决策", "zh-HK": "分析與決策", en: "Analysis & decisions" },

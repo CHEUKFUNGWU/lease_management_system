@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
 )
 
@@ -150,11 +151,16 @@ type AIChatAttachment struct {
 }
 
 type AIChatSessionFilter struct {
-	UserID        string
-	LegalEntityID string
-	Status        string
-	Limit         int
-	Offset        int
+	UserID string
+	// Entity carries the legal-entity boundary as the closed value type:
+	// global (admin, no clause) or scoped to one legal entity. ai_chat_sessions
+	// has a nullable legal_entity_id; a scoped filter excludes NULL rows and a
+	// global filter includes them, matching the pre-SEC-004 behavior of the
+	// COALESCE-based predicate.
+	Entity access.EntityFilter
+	Status string
+	Limit  int
+	Offset int
 }
 
 type AIChatRuntimeRepository struct {
@@ -233,12 +239,20 @@ func (r *AIChatRuntimeRepository) ListSessions(ctx context.Context, filter AICha
 		       COALESCE(context_snapshot, 'null'::jsonb), created_at, updated_at, last_message_at, archived_at
 		FROM ai_chat_sessions
 		WHERE user_id = $1
-		  AND ($2 = '' OR COALESCE(legal_entity_id::text, '') = $2)
-		  AND ($3 = '' OR status = $3)
+		  AND ($2 = '' OR status = $2)`
+	args := []any{filter.UserID, filter.Status}
+	if clause, arg, err := filter.Entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += "\n  AND " + clause
+		args = append(args, arg)
+	}
+	query += `
 		ORDER BY COALESCE(last_message_at, updated_at) DESC
-		LIMIT $4 OFFSET $5
+		LIMIT $` + fmt.Sprint(len(args)+1) + ` OFFSET $` + fmt.Sprint(len(args)+2) + `
 	`
-	rows, err := r.db.Query(ctx, query, filter.UserID, filter.LegalEntityID, filter.Status, filter.Limit, filter.Offset)
+	args = append(args, filter.Limit, filter.Offset)
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ai chat sessions: %w", err)
 	}

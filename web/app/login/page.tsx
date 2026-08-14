@@ -100,7 +100,7 @@ export default function LoginPage() {
                   marginBottom: 20,
                 }}
               >
-                <span aria-hidden="true" style={{ fontSize: 18, fontWeight: 800, color: "var(--fg-inverse)", letterSpacing: "-0.8px" }}>L16</span>
+                <span aria-hidden="true" style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-inverse)", letterSpacing: "-0.8px" }}>营</span>
               </motion.div>
 
               <Title

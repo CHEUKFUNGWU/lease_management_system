@@ -294,8 +294,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 	rows := []StandardComparisonRow{
 		{
 			Standard: "ifrs16", StandardName: "IFRS 16", Classification: "single lessee model",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
-			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: financeExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
+			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: financeExpense,
 			TotalRecognizedCost:   totalCapitalizedCost,
 			BalanceSheetTreatment: "Recognize lease liability and right-of-use asset unless exempt or not a lease.",
 			PnLPattern:            "Front-loaded finance cost plus straight-line depreciation for capitalized leases.",
@@ -307,8 +307,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		},
 		{
 			Standard: "asc842_finance", StandardName: "ASC 842 - Finance Lease View", Classification: "finance lease",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
-			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: financeExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
+			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: financeExpense,
 			TotalRecognizedCost:   totalCapitalizedCost,
 			BalanceSheetTreatment: "Recognize lease liability and ROU asset; classification remains finance lease.",
 			PnLPattern:            "Interest and amortization are presented separately; expense pattern is generally front-loaded.",
@@ -320,8 +320,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		},
 		{
 			Standard: "asc842_operating", StandardName: "ASC 842 - Operating Lease View", Classification: "operating lease",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
-			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: straightLineExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
+			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: straightLineExpense,
 			TotalRecognizedCost:   totalFixedCost,
 			BalanceSheetTreatment: "Recognize lease liability and ROU asset for most operating leases.",
 			PnLPattern:            "Single lease cost is generally recognized on a straight-line basis.",
@@ -333,8 +333,8 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		},
 		{
 			Standard: "cas21", StandardName: "中国企业会计准则第21号 - 租赁", Classification: "new lease standard lessee model",
-			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability,
-			InitialROUAsset: calculation.InitialROUAsset, FirstPeriodExpense: financeExpense,
+			MeasurementBasis: calculation.MeasurementBasis, InitialLiability: calculation.InitialLiability.Float64(),
+			InitialROUAsset: calculation.InitialROUAsset.Float64(), FirstPeriodExpense: financeExpense,
 			TotalRecognizedCost:   totalCapitalizedCost,
 			BalanceSheetTreatment: "Recognize lease liability and right-of-use asset unless exempt or outside lease scope.",
 			PnLPattern:            "Generally aligned with IFRS 16 style lessee accounting for in-scope leases.",
@@ -372,7 +372,7 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 func summarizeCapitalizedCost(result *ifrs16.CalculationResult) (float64, float64) {
 	firstPeriodExpense, totalCost := 0.0, 0.0
 	for index, row := range result.MonthlySummary {
-		periodCost := row.InterestExpense + row.Depreciation + row.VariableRentExpense + row.NonLeaseExpense
+		periodCost := row.InterestExpense.Float64() + row.Depreciation.Float64() + row.VariableRentExpense.Float64() + row.NonLeaseExpense.Float64()
 		if index == 0 {
 			firstPeriodExpense = periodCost
 		}
@@ -385,7 +385,7 @@ func summarizeStraightLineCost(result *ifrs16.CalculationResult, payments []ifrs
 	totalCost := 0.0
 	for _, payment := range payments {
 		if payment.Type == "fixed" || payment.Type == "" {
-			totalCost += payment.Amount
+			totalCost += payment.Amount.Float64()
 		}
 	}
 	firstPeriodExpense := 0.0
@@ -424,7 +424,7 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 	if err != nil {
 		return ProjectionResult{}, err
 	}
-	baseLiability := baseResult.InitialLiability
+	baseLiability := baseResult.InitialLiability.Float64()
 	for _, shock := range shocks {
 		rate := baseRate + shock
 		if rate < 0 {
@@ -436,7 +436,7 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 		}
 		rows = append(rows, SensitivityRow{
 			ScenarioName: fmt.Sprintf("%+.2f%%", shock*100), DiscountRate: rate, RateDelta: shock,
-			InitialLiability: result.InitialLiability, InitialROUAsset: result.InitialROUAsset,
+			InitialLiability: result.InitialLiability.Float64(), InitialROUAsset: result.InitialROUAsset.Float64(),
 		})
 	}
 	for index := range rows {

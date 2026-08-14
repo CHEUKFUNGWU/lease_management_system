@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
@@ -143,8 +144,8 @@ func calculateFixtureResult(t *testing.T, fixture eventAccountingFixture) Result
 		LeaseEndDate: date("2099-01-01"), NewValue: &newEndDate,
 		Currency: "CNY", LeaseScope: ifrs16.LeaseScopeInScope, DiscountRate: 0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2098-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2098-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2098-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2098-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {

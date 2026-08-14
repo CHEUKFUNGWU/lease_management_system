@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -21,8 +22,8 @@ func TestCalculateEarlyTerminationReturnsOneReusableAccountingPlan(t *testing.T)
 		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {
@@ -83,8 +84,8 @@ func TestCalculateRentModificationUsesRevisedFuturePayments(t *testing.T) {
 		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {
@@ -119,8 +120,8 @@ func TestCalculateDiscountRateChangeIsReassessmentAtRevisedRate(t *testing.T) {
 		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {
@@ -151,8 +152,8 @@ func TestCalculateImpairmentReducesROUWithoutRemeasuringLiability(t *testing.T) 
 		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {
@@ -176,7 +177,7 @@ func TestCalculateImpairmentReducesROUWithoutRemeasuringLiability(t *testing.T) 
 	if entry.Amount != wantLoss || entry.DebitAccount != "6701-资产减值损失" || entry.CreditAccount != "1702-使用权资产减值准备" {
 		t.Fatalf("impairment journal = %#v, want amount %v", entry, wantLoss)
 	}
-	if len(result.ForwardSchedule) == 0 || result.ForwardSchedule[0].OpeningROUAsset != 50000 {
+	if len(result.ForwardSchedule) == 0 || !result.ForwardSchedule[0].OpeningROUAsset.Equal(money.NewFromInt64(50000)) {
 		t.Fatalf("forward schedule does not start from impaired ROU: %#v", result.ForwardSchedule)
 	}
 }

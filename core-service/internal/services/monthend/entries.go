@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
+	"github.com/shopspring/decimal"
 )
 
 // measurementResult maps a monthly IFRS 16 entry to the persistable measurement
@@ -13,13 +15,19 @@ import (
 func measurementResult(contractID, period string, periodStart, periodEnd time.Time, monthly *ifrs16svc.MonthlyEntry, discountRate float64, batchID string, now time.Time) *repository.MeasurementResult {
 	bid := batchID
 	return &repository.MeasurementResult{
-		ContractID:          contractID,
-		AccountingPeriod:    period,
-		PeriodStartDate:     periodStart,
-		PeriodEndDate:       periodEnd,
-		OpeningLiability:    monthly.OpeningLiability,
-		InterestExpense:     monthly.InterestExpense,
-		TotalPayment:        monthly.TotalPayments,
+		ContractID:       contractID,
+		AccountingPeriod: period,
+		PeriodStartDate:  periodStart,
+		PeriodEndDate:    periodEnd,
+		OpeningLiability: monthly.OpeningLiability,
+		InterestExpense:  monthly.InterestExpense,
+		TotalPayment:     monthly.TotalPayments,
+		// PrincipalRepayment stays zero exactly as the pre-migration code
+		// persisted (an unset money.Amount would now fail to save instead of
+		// silently writing 0). Computing TotalPayment − InterestExpense would
+		// change stored data and belongs to a behavior ticket, not the
+		// representation migration.
+		PrincipalRepayment:  money.NewFromInt64(0),
 		ClosingLiability:    monthly.ClosingLiability,
 		OpeningROUAsset:     monthly.OpeningROUAsset,
 		Depreciation:        monthly.Depreciation,
@@ -45,8 +53,10 @@ func measurementResult(contractID, period string, periodStart, periodEnd time.Ti
 func buildJournalEntries(contractID, currency, period string, entryDate time.Time, monthly *ifrs16svc.MonthlyEntry, batchID, measurementBasis string, materialityThreshold float64) []*repository.JournalEntry {
 	var entries []*repository.JournalEntry
 
-	add := func(entryType, debit, credit string, amount float64, desc string) {
-		if amount <= materialityThreshold {
+	add := func(entryType, debit, credit string, amount money.Amount, desc string) {
+		// The materiality threshold is a policy float; amounts are exact
+		// money. Only amounts above the threshold produce an entry.
+		if amount.Decimal().Cmp(decimal.NewFromFloat(materialityThreshold)) <= 0 {
 			return
 		}
 		entries = append(entries, &repository.JournalEntry{

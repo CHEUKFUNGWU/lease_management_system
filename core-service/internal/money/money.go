@@ -83,6 +83,9 @@ func (a Amount) Div(other Amount) (Amount, error) {
 }
 func (a Amount) Neg() Amount { return New(a.Decimal().Neg()) }
 
+// Abs returns the amount with a non-negative sign.
+func (a Amount) Abs() Amount { return New(a.Decimal().Abs()) }
+
 // Cmp compares two amounts: -1, 0 or 1.
 func (a Amount) Cmp(other Amount) int { return a.Decimal().Cmp(other.Decimal()) }
 
@@ -145,6 +148,26 @@ func (a *Amount) Scan(src any) error {
 		*a = New(source)
 		return nil
 	default:
+		// pgx hands NUMERIC columns to the scanner as pgtype.Numeric, which
+		// exposes its text form through driver.Valuer. Accept anything that
+		// can render itself as a decimal string so the Scan plan stays
+		// transport-agnostic.
+		if valuers, ok := src.(interface{ Value() (driver.Value, error) }); ok {
+			rendered, err := valuers.Value()
+			if err != nil {
+				return fmt.Errorf("money: scan value: %w", err)
+			}
+			text, ok := rendered.(string)
+			if !ok {
+				return fmt.Errorf("money: scan value rendered %T, want string", rendered)
+			}
+			parsed, err := decimal.NewFromString(strings.TrimSpace(text))
+			if err != nil {
+				return fmt.Errorf("money: scan %q: %w", text, err)
+			}
+			*a = New(parsed)
+			return nil
+		}
 		return fmt.Errorf("money: cannot scan %T", src)
 	}
 	parsed, err := decimal.NewFromString(strings.TrimSpace(value))
@@ -214,7 +237,10 @@ func (a Amount) Allocate(currency string, weights []int64) ([]Amount, error) {
 	// The exact parts already sum to `whole`; round each down and keep the
 	// remainders, then hand out the leftover units by largest remainder.
 	allocated := decimal.Zero
-	type remainder struct{ index int; value decimal.Decimal }
+	type remainder struct {
+		index int
+		value decimal.Decimal
+	}
 	remainders := make([]remainder, 0, len(weights))
 	for i, value := range exact {
 		floor := value.Floor()

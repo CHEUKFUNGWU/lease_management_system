@@ -195,10 +195,10 @@ func measurementListHandler(contractReader ContractReader, reader MeasurementRea
 				continue
 			}
 			data.Items = append(data.Items, MeasurementView{
-				AccountingPeriod: result.AccountingPeriod, OpeningLiability: result.OpeningLiability,
-				ClosingLiability: result.ClosingLiability, InterestExpense: result.InterestExpense,
-				PrincipalRepayment: result.PrincipalRepayment, Depreciation: result.Depreciation,
-				ClosingROUAsset: result.ClosingROUAsset,
+				AccountingPeriod: result.AccountingPeriod, OpeningLiability: result.OpeningLiability.Float64(),
+				ClosingLiability: result.ClosingLiability.Float64(), InterestExpense: result.InterestExpense.Float64(),
+				PrincipalRepayment: result.PrincipalRepayment.Float64(), Depreciation: result.Depreciation.Float64(),
+				ClosingROUAsset: result.ClosingROUAsset.Float64(),
 			})
 		}
 		data.Total = len(data.Items)
@@ -275,7 +275,7 @@ func journalListHandler(contractReader ContractReader, reader JournalReader) age
 			data.Items = append(data.Items, JournalView{
 				AccountingPeriod: entry.AccountingPeriod, EntryType: entry.EntryType,
 				DebitAccount: entry.DebitAccount, CreditAccount: entry.CreditAccount,
-				Amount: entry.Amount, Currency: entry.Currency, PostingStatus: entry.PostingStatus,
+				Amount: entry.Amount.Float64(), Currency: entry.Currency, PostingStatus: entry.PostingStatus,
 				Description: description,
 			})
 		}

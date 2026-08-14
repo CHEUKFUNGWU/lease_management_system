@@ -1587,7 +1587,7 @@ func (h *Agent) appendMonthlyClosingContext(ctx context.Context, pc *PageContext
 				}
 				contextData.WriteString(fmt.Sprintf("- 合同: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
 					e.ContractID, e.EntryType, e.DebitAccount, e.CreditAccount,
-					e.Amount, e.Currency, e.PostingStatus, desc))
+					e.Amount.Float64(), e.Currency, e.PostingStatus, desc))
 			}
 			contextData.WriteString(fmt.Sprintf("\n汇总: 共 %d 条分录，其中 %d 条已过账\n", len(entries), postedCount))
 			*sources = append(*sources, Source{

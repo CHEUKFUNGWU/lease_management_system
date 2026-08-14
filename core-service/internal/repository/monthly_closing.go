@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lease-management-system/core-service/internal/money"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,49 +25,49 @@ type DBTX interface {
 }
 
 type MeasurementResult struct {
-	ID                  string     `json:"id"`
-	ContractID          string     `json:"contract_id"`
-	AccountingPeriod    string     `json:"accounting_period"`
-	PeriodStartDate     time.Time  `json:"period_start_date"`
-	PeriodEndDate       time.Time  `json:"period_end_date"`
-	OpeningLiability    float64    `json:"opening_liability"`
-	InterestExpense     float64    `json:"interest_expense"`
-	PrincipalRepayment  float64    `json:"principal_repayment"`
-	TotalPayment        float64    `json:"total_payment"`
-	ClosingLiability    float64    `json:"closing_liability"`
-	OpeningROUAsset     float64    `json:"opening_rou_asset"`
-	Depreciation        float64    `json:"depreciation"`
-	ClosingROUAsset     float64    `json:"closing_rou_asset"`
-	VariableRentExpense float64    `json:"variable_rent_expense"`
-	NonLeaseExpense     float64    `json:"non_lease_expense"`
-	DiscountRate        float64    `json:"discount_rate"`
-	IsCalculated        bool       `json:"is_calculated"`
-	CalculationBatchID  *string    `json:"calculation_batch_id"`
-	CalculatedAt        *time.Time `json:"calculated_at"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  string       `json:"id"`
+	ContractID          string       `json:"contract_id"`
+	AccountingPeriod    string       `json:"accounting_period"`
+	PeriodStartDate     time.Time    `json:"period_start_date"`
+	PeriodEndDate       time.Time    `json:"period_end_date"`
+	OpeningLiability    money.Amount `json:"opening_liability"`
+	InterestExpense     money.Amount `json:"interest_expense"`
+	PrincipalRepayment  money.Amount `json:"principal_repayment"`
+	TotalPayment        money.Amount `json:"total_payment"`
+	ClosingLiability    money.Amount `json:"closing_liability"`
+	OpeningROUAsset     money.Amount `json:"opening_rou_asset"`
+	Depreciation        money.Amount `json:"depreciation"`
+	ClosingROUAsset     money.Amount `json:"closing_rou_asset"`
+	VariableRentExpense money.Amount `json:"variable_rent_expense"`
+	NonLeaseExpense     money.Amount `json:"non_lease_expense"`
+	DiscountRate        float64      `json:"discount_rate"`
+	IsCalculated        bool         `json:"is_calculated"`
+	CalculationBatchID  *string      `json:"calculation_batch_id"`
+	CalculatedAt        *time.Time   `json:"calculated_at"`
+	CreatedAt           time.Time    `json:"created_at"`
+	UpdatedAt           time.Time    `json:"updated_at"`
 }
 
 type JournalEntry struct {
-	ID                  string     `json:"id"`
-	ContractID          string     `json:"contract_id"`
-	MeasurementResultID *string    `json:"measurement_result_id"`
-	AccountingPeriod    string     `json:"accounting_period"`
-	EntryDate           time.Time  `json:"entry_date"`
-	EntryType           string     `json:"entry_type"`
-	DebitAccount        string     `json:"debit_account"`
-	CreditAccount       string     `json:"credit_account"`
-	Amount              float64    `json:"amount"`
-	Currency            string     `json:"currency"`
-	Description         *string    `json:"description"`
-	VoucherNumber       *string    `json:"voucher_number"`
-	PostingStatus       string     `json:"posting_status"`
-	PostedAt            *time.Time `json:"posted_at"`
-	PostedBy            *string    `json:"posted_by"`
-	ApprovedBy          *string    `json:"approved_by"`
-	ApprovedAt          *time.Time `json:"approved_at"`
-	ERPReference        *string    `json:"erp_reference"`
-	BatchID             *string    `json:"batch_id"`
+	ID                  string       `json:"id"`
+	ContractID          string       `json:"contract_id"`
+	MeasurementResultID *string      `json:"measurement_result_id"`
+	AccountingPeriod    string       `json:"accounting_period"`
+	EntryDate           time.Time    `json:"entry_date"`
+	EntryType           string       `json:"entry_type"`
+	DebitAccount        string       `json:"debit_account"`
+	CreditAccount       string       `json:"credit_account"`
+	Amount              money.Amount `json:"amount"`
+	Currency            string       `json:"currency"`
+	Description         *string      `json:"description"`
+	VoucherNumber       *string      `json:"voucher_number"`
+	PostingStatus       string       `json:"posting_status"`
+	PostedAt            *time.Time   `json:"posted_at"`
+	PostedBy            *string      `json:"posted_by"`
+	ApprovedBy          *string      `json:"approved_by"`
+	ApprovedAt          *time.Time   `json:"approved_at"`
+	ERPReference        *string      `json:"erp_reference"`
+	BatchID             *string      `json:"batch_id"`
 	// ReversalOfEntryID and ReversalReason are set on a reversing entry and
 	// identify the posted entry it cancels. ReversedAt/ReversedBy are set on the
 	// original entry when it is reversed.

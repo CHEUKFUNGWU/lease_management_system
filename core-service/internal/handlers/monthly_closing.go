@@ -317,7 +317,7 @@ func (h *MonthlyClosingHandler) ExportJournalEntries(c *gin.Context) {
 			entry.EntryType,
 			entry.DebitAccount,
 			entry.CreditAccount,
-			strconv.FormatFloat(entry.Amount, 'f', 2, 64),
+			strconv.FormatFloat(entry.Amount.Float64(), 'f', 2, 64),
 			entry.Currency,
 			desc,
 			entry.ContractID,

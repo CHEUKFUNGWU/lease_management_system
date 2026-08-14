@@ -245,7 +245,7 @@ func buildAuditWorkpaper(facts []disclosureFact, periodStart, periodEnd time.Tim
 			ReportMode: string(mode), CommencementDate: contract.CommencementDate.Format("2006-01-02"),
 			LeaseEndDate: contract.LeaseEndDate.Format("2006-01-02"), DiscountRate: roundProjection(fact.rate),
 			PaymentScheduleCount: len(fact.payments), EventAdjustmentCount: len(fact.adjustments),
-			InitialLiability: roundProjection(fact.calculation.InitialLiability), InitialROUAsset: roundProjection(fact.calculation.InitialROUAsset),
+			InitialLiability: roundProjection(fact.calculation.InitialLiability.Float64()), InitialROUAsset: roundProjection(fact.calculation.InitialROUAsset.Float64()),
 		}
 		if contract.LegalEntityID != nil {
 			row.LegalEntityID = *contract.LegalEntityID
@@ -266,18 +266,18 @@ func buildAuditWorkpaper(facts []disclosureFact, periodStart, periodEnd time.Tim
 		row.OpeningLiability, row.OpeningROU = carryingAmountsAt(fact.calculation.DailyAmortization, periodStart.AddDate(0, 0, -1))
 		row.ClosingLiability, row.ClosingROU = carryingAmountsAt(fact.calculation.DailyAmortization, periodEnd)
 		if !contract.CommencementDate.Before(periodStart) && !contract.CommencementDate.After(periodEnd) {
-			row.Additions = fact.calculation.InitialLiability
-			row.ROUAdditions = fact.calculation.InitialROUAsset
+			row.Additions = fact.calculation.InitialLiability.Float64()
+			row.ROUAdditions = fact.calculation.InitialROUAsset.Float64()
 		}
 		for _, entry := range fact.calculation.DailyAmortization {
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			row.Interest += entry.InterestExpense
-			row.Payments += entry.Payment
-			row.LiabilityOtherAdjustments += entry.LiabilityAdjustment
-			row.Depreciation += entry.Depreciation
-			row.ROUOtherAdjustments += entry.ROUAdjustment
+			row.Interest += entry.InterestExpense.Float64()
+			row.Payments += entry.Payment.Float64()
+			row.LiabilityOtherAdjustments += entry.LiabilityAdjustment.Float64()
+			row.Depreciation += entry.Depreciation.Float64()
+			row.ROUOtherAdjustments += entry.ROUAdjustment.Float64()
 		}
 		for _, adjustment := range fact.adjustments {
 			if adjustment.EffectiveDate.Before(periodStart) || adjustment.EffectiveDate.After(periodEnd) {
@@ -354,8 +354,8 @@ func carryingAmountsAt(entries []ifrs16.DailyEntry, date time.Time) (liability, 
 		if entry.Date.After(date) {
 			break
 		}
-		liability = entry.ClosingLiability
-		rou = entry.ClosingROUAsset
+		liability = entry.ClosingLiability.Float64()
+		rou = entry.ClosingROUAsset.Float64()
 	}
 	return liability, rou
 }
@@ -395,8 +395,8 @@ func buildMaturityAnalysis(facts []disclosureFact, asOf time.Time) ([]MaturityRo
 			if !payment.Date.After(asOf) {
 				continue
 			}
-			row.Bands[maturityBandIndex(payment.Date, asOf)] += payment.Amount
-			row.TotalUndiscounted += payment.Amount
+			row.Bands[maturityBandIndex(payment.Date, asOf)] += payment.Amount.Float64()
+			row.TotalUndiscounted += payment.Amount.Float64()
 		}
 
 		liability, _ := carryingAmountsAt(fact.calculation.DailyAmortization, asOf)
@@ -446,7 +446,7 @@ func buildROUReconciliation(facts []disclosureFact, periodStart, periodEnd time.
 
 		var additions float64
 		if !contract.CommencementDate.Before(periodStart) && !contract.CommencementDate.After(periodEnd) {
-			additions = fact.calculation.InitialROUAsset
+			additions = fact.calculation.InitialROUAsset.Float64()
 		}
 
 		var depreciation, engineAdjustment float64
@@ -454,8 +454,8 @@ func buildROUReconciliation(facts []disclosureFact, periodStart, periodEnd time.
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			depreciation += entry.Depreciation
-			engineAdjustment += entry.ROUAdjustment
+			depreciation += entry.Depreciation.Float64()
+			engineAdjustment += entry.ROUAdjustment.Float64()
 		}
 
 		var remeasurement, impairment float64
@@ -564,16 +564,16 @@ func buildLiabilityRollforward(facts []disclosureFact, periodStart, periodEnd ti
 		rollforward.Closing += closing
 
 		if !contract.CommencementDate.Before(periodStart) && !contract.CommencementDate.After(periodEnd) {
-			rollforward.Additions += fact.calculation.InitialLiability
+			rollforward.Additions += fact.calculation.InitialLiability.Float64()
 		}
 
 		for _, entry := range fact.calculation.DailyAmortization {
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			rollforward.Interest += entry.InterestExpense
-			rollforward.Payments += entry.Payment
-			rollforward.OtherAdjustments += entry.LiabilityAdjustment
+			rollforward.Interest += entry.InterestExpense.Float64()
+			rollforward.Payments += entry.Payment.Float64()
+			rollforward.OtherAdjustments += entry.LiabilityAdjustment.Float64()
 		}
 
 		for _, adjustment := range fact.adjustments {
@@ -605,15 +605,15 @@ func buildExpenseBreakdown(facts []disclosureFact, periodStart, periodEnd time.T
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			breakdown.Depreciation += entry.Depreciation
-			breakdown.Interest += entry.InterestExpense
-			breakdown.VariableRent += entry.VariableRentExpense
-			breakdown.NonLease += entry.NonLeaseExpense
+			breakdown.Depreciation += entry.Depreciation.Float64()
+			breakdown.Interest += entry.InterestExpense.Float64()
+			breakdown.VariableRent += entry.VariableRentExpense.Float64()
+			breakdown.NonLease += entry.NonLeaseExpense.Float64()
 			switch scope {
 			case ifrs16.LeaseScopeShortTermExempt:
-				breakdown.ShortTermExempt += entry.ExemptLeaseExpense
+				breakdown.ShortTermExempt += entry.ExemptLeaseExpense.Float64()
 			case ifrs16.LeaseScopeLowValueExempt:
-				breakdown.LowValueExempt += entry.ExemptLeaseExpense
+				breakdown.LowValueExempt += entry.ExemptLeaseExpense.Float64()
 			}
 		}
 	}
@@ -640,14 +640,14 @@ func buildCashOutflow(facts []disclosureFact, periodStart, periodEnd time.Time) 
 			}
 			switch payment.Type {
 			case "variable":
-				summary.VariablePayments += payment.Amount
+				summary.VariablePayments += payment.Amount.Float64()
 			case "non_lease":
-				summary.NonLeasePayments += payment.Amount
+				summary.NonLeasePayments += payment.Amount.Float64()
 			default:
 				if payment.Timing == "prepaid" && !payment.Date.After(fact.contract.CommencementDate) {
-					summary.PrepaidPayments += payment.Amount
+					summary.PrepaidPayments += payment.Amount.Float64()
 				} else {
-					summary.FixedPayments += payment.Amount
+					summary.FixedPayments += payment.Amount.Float64()
 				}
 			}
 		}

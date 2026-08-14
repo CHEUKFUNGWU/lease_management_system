@@ -21,6 +21,7 @@ package predeal
 
 import (
 	"fmt"
+	"github.com/lease-management-system/core-service/internal/money"
 	"math"
 	"time"
 
@@ -175,7 +176,7 @@ func Build(draft Draft) (Briefing, error) {
 		LeaseEndDate:      leaseEndDate,
 		DiscountRate:      draft.DiscountRate,
 		LeaseScope:        ifrs16.LeaseScopeInScope,
-		InitialDirectCost: draft.InitialDirectCost,
+		InitialDirectCost: money.NewFromFloat(draft.InitialDirectCost),
 		Payments:          payments,
 	}
 
@@ -191,13 +192,13 @@ func Build(draft Draft) (Briefing, error) {
 
 	var undiscounted float64
 	for _, payment := range payments {
-		undiscounted += payment.Amount
+		undiscounted += payment.Amount.Float64()
 	}
 	briefing.BalanceSheet = BalanceSheetImpact{
-		InitialLiability:       round2(measured.InitialLiability),
-		InitialROU:             round2(measured.InitialROUAsset),
+		InitialLiability:       round2(measured.InitialLiability.Float64()),
+		InitialROU:             round2(measured.InitialROUAsset.Float64()),
 		UndiscountedCommitment: round2(undiscounted),
-		DiscountingEffect:      round2(undiscounted - measured.InitialLiability),
+		DiscountingEffect:      round2(undiscounted - measured.InitialLiability.Float64()),
 	}
 
 	// A straight-line rent spreads the whole commitment evenly, which is the
@@ -232,7 +233,7 @@ func buildPayments(draft Draft) []ifrs16.LeasePayment {
 		}
 		monthEnd := firstOfMonth.AddDate(0, month+1, 0).AddDate(0, 0, -1)
 		payments = append(payments, ifrs16.LeasePayment{
-			Date: monthEnd, Amount: round2(amount), Timing: "postpaid", Type: "fixed",
+			Date: monthEnd, Amount: money.NewFromFloat(round2(amount)), Timing: "postpaid", Type: "fixed",
 		})
 	}
 	return payments
@@ -256,11 +257,11 @@ func summariseByYear(monthly []ifrs16.MonthlyEntry, draft Draft, straightLineMon
 			impact = &YearlyImpact{Year: year}
 			byYear[year] = impact
 		}
-		impact.CashRent += entry.TotalPayments
-		impact.Interest += entry.InterestExpense
-		impact.Depreciation += entry.Depreciation
-		impact.ClosingLiability = entry.ClosingLiability
-		impact.ClosingROU = entry.ClosingROUAsset
+		impact.CashRent += entry.TotalPayments.Float64()
+		impact.Interest += entry.InterestExpense.Float64()
+		impact.Depreciation += entry.Depreciation.Float64()
+		impact.ClosingLiability = entry.ClosingLiability.Float64()
+		impact.ClosingROU = entry.ClosingROUAsset.Float64()
 		monthsInYear[year]++
 	}
 
@@ -316,7 +317,7 @@ func buildExitCurve(draft Draft, calculation ifrs16.LeaseCalculation, payments [
 		var remaining float64
 		for _, payment := range payments {
 			if payment.Date.After(exitDate) {
-				remaining += payment.Amount
+				remaining += payment.Amount.Float64()
 			}
 		}
 
@@ -328,13 +329,13 @@ func buildExitCurve(draft Draft, calculation ifrs16.LeaseCalculation, payments [
 		// Full derecognition: the liability goes, the asset goes, and the
 		// difference is a gain or a loss. Positive PnLImpact is a cost, so a
 		// liability larger than the asset reduces it.
-		derecognition := rou - liability
+		derecognition := rou.Float64() - liability.Float64()
 
 		curve = append(curve, ExitPoint{
 			Year:                year,
 			RemainingCommitment: round2(remaining),
-			LiabilityReleased:   round2(liability),
-			ROUWrittenOff:       round2(rou),
+			LiabilityReleased:   round2(liability.Float64()),
+			ROUWrittenOff:       round2(rou.Float64()),
 			Penalty:             penalty,
 			PnLImpact:           round2(derecognition + penalty),
 			TotalCashToExit:     penalty,

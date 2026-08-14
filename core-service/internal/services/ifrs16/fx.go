@@ -2,7 +2,9 @@ package ifrs16
 
 import (
 	"fmt"
-	"math"
+
+	"github.com/lease-management-system/core-service/internal/money"
+	"github.com/shopspring/decimal"
 )
 
 // FXRemeasurementInput is one period's foreign-currency lease liability position,
@@ -12,10 +14,10 @@ type FXRemeasurementInput struct {
 	FunctionalCurrency string
 
 	// Balances and flows in the contract currency.
-	OpeningLiability float64
-	Interest         float64
-	Payments         float64
-	ClosingLiability float64
+	OpeningLiability money.Amount
+	Interest         money.Amount
+	Payments         money.Amount
+	ClosingLiability money.Amount
 
 	// OpeningRate is the closing rate of the prior period, at which the opening
 	// liability already sits in the books. ClosingRate remeasures the period-end
@@ -41,19 +43,19 @@ type FXRemeasurementInput struct {
 //
 // A positive result means the liability grew in functional-currency terms, which
 // is an exchange loss for the lessee.
-func RemeasureForeignCurrencyLiability(input FXRemeasurementInput) (float64, error) {
+func RemeasureForeignCurrencyLiability(input FXRemeasurementInput) (money.Amount, error) {
 	if input.ContractCurrency == input.FunctionalCurrency {
-		return 0, nil
+		return money.NewFromInt64(0), nil
 	}
 	if input.OpeningRate <= 0 || input.ClosingRate <= 0 || input.AverageRate <= 0 {
-		return 0, fmt.Errorf("exchange rates are required to remeasure a %s liability into %s",
+		return money.Amount{}, fmt.Errorf("exchange rates are required to remeasure a %s liability into %s",
 			input.ContractCurrency, input.FunctionalCurrency)
 	}
 
-	openingFunctional := input.OpeningLiability * input.OpeningRate
-	flowsFunctional := (input.Interest - input.Payments) * input.AverageRate
-	expectedClosing := openingFunctional + flowsFunctional
-	actualClosing := input.ClosingLiability * input.ClosingRate
+	openingFunctional := input.OpeningLiability.Decimal().Mul(decimal.NewFromFloat(input.OpeningRate))
+	flowsFunctional := input.Interest.Sub(input.Payments).Decimal().Mul(decimal.NewFromFloat(input.AverageRate))
+	expectedClosing := openingFunctional.Add(flowsFunctional)
+	actualClosing := input.ClosingLiability.Decimal().Mul(decimal.NewFromFloat(input.ClosingRate))
 
-	return math.Round((actualClosing-expectedClosing)*100) / 100, nil
+	return money.New(actualClosing.Sub(expectedClosing)).Round("CNY"), nil
 }

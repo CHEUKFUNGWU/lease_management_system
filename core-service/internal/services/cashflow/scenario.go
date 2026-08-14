@@ -145,13 +145,13 @@ func Project(input Input) (Result, error) {
 			if payment.Date.Before(input.AsOf) || payment.Type == "variable" {
 				continue
 			}
-			result.Ladder.Values[reporting.MaturityBandIndex(payment.Date, input.AsOf)] += payment.Amount
-			result.Committed += payment.Amount
+			result.Ladder.Values[reporting.MaturityBandIndex(payment.Date, input.AsOf)] += payment.Amount.Float64()
+			result.Committed += payment.Amount.Float64()
 			if entry := touch(payment.Date); entry != nil {
-				entry.Committed += payment.Amount
+				entry.Committed += payment.Amount.Float64()
 			}
-			if payment.Amount > 0 {
-				lastRent = payment.Amount
+			if payment.Amount.Float64() > 0 {
+				lastRent = payment.Amount.Float64()
 			}
 		}
 

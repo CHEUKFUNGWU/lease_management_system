@@ -2,6 +2,7 @@ package eventaccounting
 
 import (
 	"fmt"
+	"github.com/lease-management-system/core-service/internal/money"
 	"math"
 	"strconv"
 	"time"
@@ -96,7 +97,7 @@ func Calculate(input Input) (Result, error) {
 	}
 	treatment := Classify(input.EventType)
 	if treatment == "impairment" {
-		return calculateImpairment(input, liabilityBefore, rouBefore)
+		return calculateImpairment(input, liabilityBefore.Float64(), rouBefore.Float64())
 	}
 	revisedPayments, err := paymentsForEvent(input, leaseEndDate)
 	if err != nil {
@@ -117,11 +118,11 @@ func Calculate(input Input) (Result, error) {
 
 	adjustment := Adjustment{
 		EventID: input.EventID, ContractID: input.ContractID, Treatment: treatment,
-		EffectiveDate: input.EffectiveDate, LiabilityBefore: liabilityBefore,
-		LiabilityAfter: remeasurement.NewLiability, LiabilityAdjustment: remeasurement.LiabilityDelta,
-		ROUBefore: rouBefore, ROUAfter: remeasurement.NewROU,
-		ROUAdjustment: remeasurement.ROUAdjustment, PnLGain: remeasurement.PnLGain,
-		PnLLoss: remeasurement.PnLLoss, RevisedDiscountRate: revisedRate,
+		EffectiveDate: input.EffectiveDate, LiabilityBefore: liabilityBefore.Float64(),
+		LiabilityAfter: remeasurement.NewLiability.Float64(), LiabilityAdjustment: remeasurement.LiabilityDelta.Float64(),
+		ROUBefore: rouBefore.Float64(), ROUAfter: remeasurement.NewROU.Float64(),
+		ROUAdjustment: remeasurement.ROUAdjustment.Float64(), PnLGain: remeasurement.PnLGain.Float64(),
+		PnLLoss: remeasurement.PnLLoss.Float64(), RevisedDiscountRate: revisedRate,
 	}
 
 	return Result{
@@ -182,7 +183,7 @@ func paymentsForEvent(input Input, leaseEndDate time.Time) ([]ifrs16.LeasePaymen
 	for index := range payments {
 		payment := &payments[index]
 		if !payment.Date.Before(input.EffectiveDate) && payment.Type != "variable" && payment.Type != "non_lease" {
-			payment.Amount = revisedRent
+			payment.Amount = money.NewFromFloat(revisedRent)
 		}
 	}
 	return payments, nil
@@ -207,7 +208,7 @@ func calculateImpairment(input Input, liabilityBefore, rouBefore float64) (Resul
 	return Result{
 		Treatment: "impairment", LeaseEndDate: input.LeaseEndDate, Adjustment: adjustment,
 		ForwardSchedule: ifrs16.GenerateForwardSchedule(
-			input.EffectiveDate, input.LeaseEndDate, liabilityBefore, rouAfter,
+			input.EffectiveDate, input.LeaseEndDate, money.NewFromFloat(liabilityBefore), money.NewFromFloat(rouAfter),
 			input.DiscountRate, paymentsThrough(input.Payments, input.LeaseEndDate), input.EffectiveDate,
 		),
 		JournalEntries: buildJournalEntries(input, adjustment),

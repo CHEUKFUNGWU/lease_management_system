@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/lease-management-system/core-service/internal/money"
 	"strings"
 	"time"
 
@@ -50,14 +51,14 @@ type ReversalCommand struct {
 
 // ReversalResult describes the reversing entry that was created.
 type ReversalResult struct {
-	OriginalEntryID  string  `json:"original_entry_id"`
-	ReversalEntryID  string  `json:"reversal_entry_id"`
-	AccountingPeriod string  `json:"accounting_period"`
-	EntryType        string  `json:"entry_type"`
-	DebitAccount     string  `json:"debit_account"`
-	CreditAccount    string  `json:"credit_account"`
-	Amount           float64 `json:"amount"`
-	Currency         string  `json:"currency"`
+	OriginalEntryID  string       `json:"original_entry_id"`
+	ReversalEntryID  string       `json:"reversal_entry_id"`
+	AccountingPeriod string       `json:"accounting_period"`
+	EntryType        string       `json:"entry_type"`
+	DebitAccount     string       `json:"debit_account"`
+	CreditAccount    string       `json:"credit_account"`
+	Amount           money.Amount `json:"amount"`
+	Currency         string       `json:"currency"`
 }
 
 // Reverse cancels a posted journal entry by posting an opposite one and marking

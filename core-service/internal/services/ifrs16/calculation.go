@@ -3,7 +3,11 @@ package ifrs16
 import (
 	"fmt"
 	"math"
+	"sort"
 	"time"
+
+	"github.com/lease-management-system/core-service/internal/money"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -34,62 +38,62 @@ type LeaseCalculation struct {
 	DiscountRate      float64 // Annual discount rate (e.g., 0.05 for 5%)
 	PaymentFrequency  string  // monthly, quarterly, yearly
 	Payments          []LeasePayment
-	InitialDirectCost float64
-	PrepaidRent       float64 // Already paid at commencement
-	IncentiveReceived float64
-	RestorationCost   float64
+	InitialDirectCost money.Amount
+	PrepaidRent       money.Amount // Already paid at commencement
+	IncentiveReceived money.Amount
+	RestorationCost   money.Amount
 }
 
 type LeasePayment struct {
 	Date   time.Time
-	Amount float64 // Total payment amount
-	Timing string  // prepaid or postpaid
-	Type   string  // fixed, variable, non_lease
+	Amount money.Amount // Total payment amount
+	Timing string       // prepaid or postpaid
+	Type   string       // fixed, variable, non_lease
 }
 
 // CalculationResult holds all IFRS 16 outputs
 type CalculationResult struct {
 	LeaseScope        string
 	MeasurementBasis  string // capitalized, straight_line_expense, skipped
-	InitialLiability  float64
-	InitialROUAsset   float64
+	InitialLiability  money.Amount
+	InitialROUAsset   money.Amount
 	DailyAmortization []DailyEntry
 	MonthlySummary    []MonthlyEntry
 }
 
 type DailyEntry struct {
 	Date                time.Time
-	OpeningLiability    float64
-	InterestExpense     float64
-	Payment             float64
-	PrepaidPayment      float64 // Prepaid rent at/before commencement (capitalized into ROU, not reducing liability)
-	LiabilityAdjustment float64 // Rounding/settlement adjustment to force liability to zero at lease end
-	ClosingLiability    float64
-	OpeningROUAsset     float64
-	Depreciation        float64
-	ROUAdjustment       float64 // Rounding adjustment to force ROU to zero at lease end
-	ClosingROUAsset     float64
-	ExemptLeaseExpense  float64
-	VariableRentExpense float64
-	NonLeaseExpense     float64
+	OpeningLiability    money.Amount
+	InterestExpense     money.Amount
+	Payment             money.Amount
+	PrepaidPayment      money.Amount // Prepaid rent at/before commencement (capitalized into ROU, not reducing liability)
+	LiabilityAdjustment money.Amount // Rounding/settlement adjustment to force liability to zero at lease end
+	ClosingLiability    money.Amount
+	OpeningROUAsset     money.Amount
+	Depreciation        money.Amount
+	ROUAdjustment       money.Amount // Rounding adjustment to force ROU to zero at lease end
+	ClosingROUAsset     money.Amount
+	ExemptLeaseExpense  money.Amount
+	VariableRentExpense money.Amount
+	NonLeaseExpense     money.Amount
 }
 
 type MonthlyEntry struct {
 	Year                int
 	Month               int
-	OpeningLiability    float64
-	InterestExpense     float64
-	TotalPayments       float64
-	PrepaidPayment      float64 // Prepaid rent at/before commencement (capitalized into ROU)
-	LiabilityAdjustment float64
-	ClosingLiability    float64
-	OpeningROUAsset     float64
-	Depreciation        float64
-	ROUAdjustment       float64
-	ClosingROUAsset     float64
-	ExemptLeaseExpense  float64
-	VariableRentExpense float64
-	NonLeaseExpense     float64
+	OpeningLiability    money.Amount
+	InterestExpense     money.Amount
+	TotalPayments       money.Amount
+	PrepaidPayment      money.Amount // Prepaid rent at/before commencement (capitalized into ROU)
+	LiabilityAdjustment money.Amount
+	ClosingLiability    money.Amount
+	OpeningROUAsset     money.Amount
+	Depreciation        money.Amount
+	ROUAdjustment       money.Amount
+	ClosingROUAsset     money.Amount
+	ExemptLeaseExpense  money.Amount
+	VariableRentExpense money.Amount
+	NonLeaseExpense     money.Amount
 }
 
 // RemeasurementInput holds inputs for remeasuring a lease after a modification or reassessment event
@@ -98,8 +102,8 @@ type RemeasurementInput struct {
 	LeaseEndDate        time.Time
 	RevisedDiscountRate float64
 	RevisedPayments     []LeasePayment
-	InitialDirectCost   float64
-	LeaseIncentives     float64
+	InitialDirectCost   money.Amount
+	LeaseIncentives     money.Amount
 
 	// ScopeDecreaseProportion is the share of the lease given up, between 0 and
 	// 1, where 1 is a full termination. It selects IFRS 16.46(a): the ROU asset
@@ -117,29 +121,29 @@ type RemeasurementInput struct {
 
 // RemeasurementOutput holds the results of a lease remeasurement
 type RemeasurementOutput struct {
-	NewLiability    float64
-	LiabilityDelta  float64
-	ROUAdjustment   float64
-	PnLGain         float64
-	PnLLoss         float64
-	NewROU          float64
+	NewLiability    money.Amount
+	LiabilityDelta  money.Amount
+	ROUAdjustment   money.Amount
+	PnLGain         money.Amount
+	PnLLoss         money.Amount
+	NewROU          money.Amount
 	ForwardSchedule []DailyEntry
 }
 
 // CalculatePrepaidRent computes the total prepaid rent at or before commencement date.
 // Only fixed lease payments (not variable or non-lease) with Timing == "prepaid"
 // and Date <= CommencementDate are included.
-func CalculatePrepaidRent(input LeaseCalculation) float64 {
-	var prepaidRent float64
+func CalculatePrepaidRent(input LeaseCalculation) money.Amount {
+	prepaidRent := money.NewFromInt64(0)
 	for _, payment := range input.Payments {
 		if payment.Type == "variable" || payment.Type == "non_lease" {
 			continue
 		}
 		if payment.Timing == "prepaid" && !payment.Date.After(input.CommencementDate) {
-			prepaidRent += payment.Amount
+			prepaidRent = prepaidRent.Add(payment.Amount)
 		}
 	}
-	return round(prepaidRent)
+	return prepaidRent.Round("CNY")
 }
 
 // Calculate performs full IFRS 16 calculation with daily granularity
@@ -171,14 +175,14 @@ func calculateCapitalized(input LeaseCalculation, scope string) *CalculationResu
 	// 2. Calculate initial ROU asset
 	// If PrepaidRent is not explicitly set, compute it from payments
 	prepaidRent := input.PrepaidRent
-	if prepaidRent == 0 {
+	if !prepaidRent.IsSet() || prepaidRent.IsZero() {
 		prepaidRent = CalculatePrepaidRent(input)
 	}
-	result.InitialROUAsset = result.InitialLiability +
-		input.InitialDirectCost +
-		prepaidRent -
-		input.IncentiveReceived +
-		input.RestorationCost
+	result.InitialROUAsset = result.InitialLiability.
+		Add(input.InitialDirectCost).
+		Add(prepaidRent).
+		Sub(input.IncentiveReceived).
+		Add(input.RestorationCost)
 
 	// 3. Generate daily amortization schedule
 	result.DailyAmortization = generateDailySchedule(input, result.InitialLiability, result.InitialROUAsset)
@@ -208,10 +212,10 @@ func skipMeasurement(input LeaseCalculation, scope string) *CalculationResult {
 
 // GetCarryingAmount returns the lease liability and ROU asset carrying amounts as of the day before the given date.
 // It runs a full Calculate and finds the latest state on or before (asOfDate - 1 day).
-func GetCarryingAmount(input LeaseCalculation, asOfDate time.Time) (liability, rou float64, err error) {
+func GetCarryingAmount(input LeaseCalculation, asOfDate time.Time) (liability, rou money.Amount, err error) {
 	result, err := Calculate(input)
 	if err != nil {
-		return 0, 0, err
+		return money.Amount{}, money.Amount{}, err
 	}
 
 	// Find the state on the day BEFORE asOfDate
@@ -240,8 +244,8 @@ func paymentsAfter(payments []LeasePayment, from time.Time) []LeasePayment {
 	return outstanding
 }
 
-func calculateInitialLiability(input LeaseCalculation) float64 {
-	var liability float64
+func calculateInitialLiability(input LeaseCalculation) money.Amount {
+	liability := decimal.Zero
 
 	for _, payment := range input.Payments {
 		// Skip variable and non-lease payments for liability calculation
@@ -258,14 +262,18 @@ func calculateInitialLiability(input LeaseCalculation) float64 {
 		dailyRate := math.Pow(1+input.DiscountRate, 1.0/365.0) - 1
 		discountFactor := math.Pow(1+dailyRate, -daysFromCommencement)
 
-		liability += payment.Amount * discountFactor
+		// The discount factor is a float64 rate computation; the payment is
+		// exact money. The product is carried at full decimal precision and
+		// rounded once at the boundary (the result field serialises to the
+		// API) — never per step.
+		liability = liability.Add(payment.Amount.Decimal().Mul(decimal.NewFromFloat(discountFactor)))
 	}
 
-	return round(liability)
+	return money.New(liability).Round("CNY")
 }
 
 // generateDailySchedule creates daily-level amortization
-func generateDailySchedule(input LeaseCalculation, initialLiability, initialROUAsset float64) []DailyEntry {
+func generateDailySchedule(input LeaseCalculation, initialLiability, initialROUAsset money.Amount) []DailyEntry {
 	return GenerateForwardSchedule(input.CommencementDate, input.LeaseEndDate, initialLiability, initialROUAsset, input.DiscountRate, input.Payments, input.CommencementDate)
 }
 
@@ -277,47 +285,47 @@ func generateStraightLineSchedule(input LeaseCalculation) []DailyEntry {
 		return schedule
 	}
 
-	totalLeasePayments := 0.0
+	totalLeasePayments := money.NewFromInt64(0)
 	for _, payment := range input.Payments {
 		if payment.Type == "variable" || payment.Type == "non_lease" {
 			continue
 		}
-		totalLeasePayments += payment.Amount
+		totalLeasePayments = totalLeasePayments.Add(payment.Amount)
 	}
-	dailyExpense := totalLeasePayments / float64(leaseTermDays)
+	dailyExpense := totalLeasePayments.Decimal().Div(decimal.NewFromInt(int64(leaseTermDays)))
 
 	for day := 0; day < leaseTermDays; day++ {
 		currentDate := input.CommencementDate.Add(time.Duration(day) * 24 * time.Hour)
 
-		variableRent := 0.0
-		nonLeaseExpense := 0.0
-		payment := 0.0
-		prepaidPayment := 0.0
+		variableRent := money.NewFromInt64(0)
+		nonLeaseExpense := money.NewFromInt64(0)
+		payment := money.NewFromInt64(0)
+		prepaidPayment := money.NewFromInt64(0)
 		for _, p := range input.Payments {
 			if !isSameDay(p.Date, currentDate) {
 				continue
 			}
 			switch p.Type {
 			case "variable":
-				variableRent += p.Amount
+				variableRent = variableRent.Add(p.Amount)
 			case "non_lease":
-				nonLeaseExpense += p.Amount
+				nonLeaseExpense = nonLeaseExpense.Add(p.Amount)
 			default:
 				if p.Timing == "prepaid" && !p.Date.After(input.CommencementDate) {
-					prepaidPayment += p.Amount
+					prepaidPayment = prepaidPayment.Add(p.Amount)
 				} else {
-					payment += p.Amount
+					payment = payment.Add(p.Amount)
 				}
 			}
 		}
 
 		schedule = append(schedule, DailyEntry{
 			Date:                currentDate,
-			Payment:             round(payment),
-			PrepaidPayment:      round(prepaidPayment),
-			ExemptLeaseExpense:  round(dailyExpense),
-			VariableRentExpense: round(variableRent),
-			NonLeaseExpense:     round(nonLeaseExpense),
+			Payment:             payment.Round("CNY"),
+			PrepaidPayment:      prepaidPayment.Round("CNY"),
+			ExemptLeaseExpense:  money.New(dailyExpense).Round("CNY"),
+			VariableRentExpense: variableRent.Round("CNY"),
+			NonLeaseExpense:     nonLeaseExpense.Round("CNY"),
 		})
 	}
 
@@ -327,7 +335,7 @@ func generateStraightLineSchedule(input LeaseCalculation) []DailyEntry {
 // GenerateForwardSchedule creates a daily amortization schedule from startDate to endDate.
 // commencementDate is the original lease commencement (used to determine prepaid treatment).
 // The schedule starts from startDate (e.g., the effective date of a modification) not commencementDate.
-func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, initialROU, discountRate float64, payments []LeasePayment, commencementDate time.Time) []DailyEntry {
+func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, initialROU money.Amount, discountRate float64, payments []LeasePayment, commencementDate time.Time) []DailyEntry {
 	var schedule []DailyEntry
 
 	leaseTermDays := int(endDate.Sub(startDate).Hours() / 24)
@@ -335,9 +343,9 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 		return schedule
 	}
 
-	dailyDepreciation := initialROU / float64(leaseTermDays)
-	currentLiability := initialLiability
-	currentROUAsset := initialROU
+	dailyDepreciation := initialROU.Decimal().Div(decimal.NewFromInt(int64(leaseTermDays)))
+	currentLiability := initialLiability.Decimal()
+	currentROUAsset := initialROU.Decimal()
 	dailyRate := math.Pow(1+discountRate, 1.0/365.0) - 1
 
 	for day := 0; day < leaseTermDays; day++ {
@@ -346,12 +354,12 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 		openingLiability := currentLiability
 		openingROUAsset := currentROUAsset
 
-		interest := currentLiability * dailyRate
+		interest := currentLiability.Mul(decimal.NewFromFloat(dailyRate))
 
-		payment := 0.0
-		variableRent := 0.0
-		nonLeaseExpense := 0.0
-		prepaidAtCommencement := 0.0
+		payment := decimal.Zero
+		variableRent := decimal.Zero
+		nonLeaseExpense := decimal.Zero
+		prepaidAtCommencement := decimal.Zero
 
 		for _, p := range payments {
 			if !isSameDay(p.Date, currentDate) {
@@ -359,36 +367,39 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 			}
 			switch p.Type {
 			case "variable":
-				variableRent += p.Amount
+				variableRent = variableRent.Add(p.Amount.Decimal())
 			case "non_lease":
-				nonLeaseExpense += p.Amount
+				nonLeaseExpense = nonLeaseExpense.Add(p.Amount.Decimal())
 			default:
 				if p.Timing == "prepaid" && !p.Date.After(commencementDate) {
 					// Prepaid at/before commencement: capitalized into ROU, does not reduce liability
-					prepaidAtCommencement += p.Amount
+					prepaidAtCommencement = prepaidAtCommencement.Add(p.Amount.Decimal())
 					continue
 				}
-				payment += p.Amount
+				payment = payment.Add(p.Amount.Decimal())
 			}
 		}
 
-		currentLiability = currentLiability + interest - payment
+		currentLiability = currentLiability.Add(interest).Sub(payment)
 		depreciation := dailyDepreciation
-		currentROUAsset = currentROUAsset - depreciation
+		currentROUAsset = currentROUAsset.Sub(depreciation)
 
-		// Build the entry
+		// Build the entry. Every field is quantised at this boundary — the
+		// schedule is what the API serialises and what the ledger persists;
+		// the carry (currentLiability/currentROUAsset) stays at full
+		// precision between periods.
 		entry := DailyEntry{
 			Date:                currentDate,
-			OpeningLiability:    round(openingLiability),
-			InterestExpense:     round(interest),
-			Payment:             round(payment),
-			PrepaidPayment:      round(prepaidAtCommencement),
-			ClosingLiability:    round(currentLiability),
-			OpeningROUAsset:     round(openingROUAsset),
-			Depreciation:        round(depreciation),
-			ClosingROUAsset:     round(currentROUAsset),
-			VariableRentExpense: round(variableRent),
-			NonLeaseExpense:     round(nonLeaseExpense),
+			OpeningLiability:    money.New(openingLiability).Round("CNY"),
+			InterestExpense:     money.New(interest).Round("CNY"),
+			Payment:             money.New(payment).Round("CNY"),
+			PrepaidPayment:      money.New(prepaidAtCommencement).Round("CNY"),
+			ClosingLiability:    money.New(currentLiability).Round("CNY"),
+			OpeningROUAsset:     money.New(openingROUAsset).Round("CNY"),
+			Depreciation:        money.New(depreciation).Round("CNY"),
+			ClosingROUAsset:     money.New(currentROUAsset).Round("CNY"),
+			VariableRentExpense: money.New(variableRent).Round("CNY"),
+			NonLeaseExpense:     money.New(nonLeaseExpense).Round("CNY"),
 		}
 
 		// Force zero on the last day of the lease term.
@@ -399,15 +410,15 @@ func GenerateForwardSchedule(startDate, endDate time.Time, initialLiability, ini
 		//   Closing = Opening + Interest - Payment + Adjustment = 0
 		isLastDay := day == leaseTermDays-1
 		if isLastDay {
-			if currentLiability != 0 {
-				entry.LiabilityAdjustment = round(-currentLiability)
-				entry.ClosingLiability = 0
-				currentLiability = 0
+			if !currentLiability.IsZero() {
+				entry.LiabilityAdjustment = money.New(currentLiability.Neg()).Round("CNY")
+				entry.ClosingLiability = money.NewFromInt64(0)
+				currentLiability = decimal.Zero
 			}
-			if currentROUAsset != 0 {
-				entry.ROUAdjustment = round(-currentROUAsset)
-				entry.ClosingROUAsset = 0
-				currentROUAsset = 0
+			if !currentROUAsset.IsZero() {
+				entry.ROUAdjustment = money.New(currentROUAsset.Neg()).Round("CNY")
+				entry.ClosingROUAsset = money.NewFromInt64(0)
+				currentROUAsset = decimal.Zero
 			}
 		}
 
@@ -438,24 +449,32 @@ func aggregateMonthly(dailyEntries []DailyEntry) []MonthlyEntry {
 		}
 
 		m := monthMap[key]
-		m.InterestExpense += entry.InterestExpense
-		m.TotalPayments += entry.Payment
-		m.PrepaidPayment += entry.PrepaidPayment
-		m.LiabilityAdjustment += entry.LiabilityAdjustment
-		m.Depreciation += entry.Depreciation
-		m.ROUAdjustment += entry.ROUAdjustment
+		m.InterestExpense = m.InterestExpense.Add(entry.InterestExpense)
+		m.TotalPayments = m.TotalPayments.Add(entry.Payment)
+		m.PrepaidPayment = m.PrepaidPayment.Add(entry.PrepaidPayment)
+		m.LiabilityAdjustment = m.LiabilityAdjustment.Add(entry.LiabilityAdjustment)
+		m.Depreciation = m.Depreciation.Add(entry.Depreciation)
+		m.ROUAdjustment = m.ROUAdjustment.Add(entry.ROUAdjustment)
 		m.ClosingLiability = entry.ClosingLiability
 		m.ClosingROUAsset = entry.ClosingROUAsset
-		m.ExemptLeaseExpense += entry.ExemptLeaseExpense
-		m.VariableRentExpense += entry.VariableRentExpense
-		m.NonLeaseExpense += entry.NonLeaseExpense
+		m.ExemptLeaseExpense = m.ExemptLeaseExpense.Add(entry.ExemptLeaseExpense)
+		m.VariableRentExpense = m.VariableRentExpense.Add(entry.VariableRentExpense)
+		m.NonLeaseExpense = m.NonLeaseExpense.Add(entry.NonLeaseExpense)
 	}
 
-	// Convert map to sorted slice
+	// Convert map to sorted slice. The wire output must be deterministic:
+	// a random month order would make API responses and the regression
+	// report churn on every run.
 	var result []MonthlyEntry
 	for _, m := range monthMap {
 		result = append(result, *m)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Year != result[j].Year {
+			return result[i].Year < result[j].Year
+		}
+		return result[i].Month < result[j].Month
+	})
 
 	return result
 }
@@ -464,15 +483,11 @@ func isSameDay(t1, t2 time.Time) bool {
 	return t1.Year() == t2.Year() && t1.YearDay() == t2.YearDay()
 }
 
-func round(val float64) float64 {
-	return math.Round(val*100) / 100
-}
-
 // RecalculateFromDate performs a lease remeasurement from a given carrying amount.
 // It computes the new liability PV from the effective date using revised payments/discount rate,
 // adjusts the ROU by the liability change, handles P&L recognition when ROU reduction exceeds
 // the carrying amount, and generates a forward amortization schedule.
-func RecalculateFromDate(carryingLiability, carryingROU float64, input RemeasurementInput) (*RemeasurementOutput, error) {
+func RecalculateFromDate(carryingLiability, carryingROU money.Amount, input RemeasurementInput) (*RemeasurementOutput, error) {
 	output := &RemeasurementOutput{}
 
 	// 1. Calculate new liability = PV of revised payments from effective date.
@@ -491,24 +506,24 @@ func RecalculateFromDate(carryingLiability, carryingROU float64, input Remeasure
 		Payments:         outstanding,
 	}
 	output.NewLiability = calculateInitialLiability(calcInput)
-	output.LiabilityDelta = output.NewLiability - carryingLiability
+	output.LiabilityDelta = output.NewLiability.Sub(carryingLiability)
 
 	if input.ScopeDecreaseProportion > 0 {
 		// IFRS 16.46(a): scope decrease. The ROU asset is written down by the
 		// share of the lease surrendered, and the difference between that
 		// write-down and the liability released is a gain or a loss.
 		proportion := math.Min(input.ScopeDecreaseProportion, 1)
-		rouRemoved := carryingROU * proportion
-		liabilityReleased := -output.LiabilityDelta
+		rouRemoved := carryingROU.Decimal().Mul(decimal.NewFromFloat(proportion))
+		liabilityReleased := output.LiabilityDelta.Neg()
 
-		output.ROUAdjustment = -rouRemoved
-		difference := liabilityReleased - rouRemoved
-		if difference >= 0 {
-			output.PnLGain = round(difference)
+		output.ROUAdjustment = money.New(rouRemoved.Neg())
+		difference := liabilityReleased.Decimal().Sub(rouRemoved)
+		if difference.IsPositive() || difference.IsZero() {
+			output.PnLGain = money.New(difference).Round("CNY")
 		} else {
 			// More asset written off than liability released — this is the loss
 			// the engine previously had no way to express.
-			output.PnLLoss = round(-difference)
+			output.PnLLoss = money.New(difference.Neg()).Round("CNY")
 		}
 	} else {
 		// IFRS 16.46(b): every other remeasurement. The ROU asset absorbs the
@@ -517,16 +532,16 @@ func RecalculateFromDate(carryingLiability, carryingROU float64, input Remeasure
 
 		// An ROU asset cannot be driven below zero; whatever the liability
 		// reduction cannot absorb is a gain.
-		if output.ROUAdjustment < 0 && math.Abs(output.ROUAdjustment) > carryingROU {
-			output.PnLGain = round(math.Abs(output.ROUAdjustment) - carryingROU)
-			output.ROUAdjustment = -carryingROU
+		if output.ROUAdjustment.Decimal().IsNegative() && output.ROUAdjustment.Neg().Decimal().Cmp(carryingROU.Decimal()) > 0 {
+			output.PnLGain = output.ROUAdjustment.Neg().Sub(carryingROU).Round("CNY")
+			output.ROUAdjustment = carryingROU.Neg()
 		}
 	}
 
 	// 4. Compute new ROU
-	output.NewROU = carryingROU + output.ROUAdjustment + input.InitialDirectCost - input.LeaseIncentives
-	if output.NewROU < 0 {
-		output.NewROU = 0
+	output.NewROU = carryingROU.Add(output.ROUAdjustment).Add(input.InitialDirectCost).Sub(input.LeaseIncentives)
+	if output.NewROU.Decimal().IsNegative() {
+		output.NewROU = money.NewFromInt64(0)
 	}
 
 	// 5. Generate forward schedule from effective date

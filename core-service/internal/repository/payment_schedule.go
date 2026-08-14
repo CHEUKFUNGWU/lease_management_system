@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"github.com/lease-management-system/core-service/internal/money"
 	"time"
 
 	"github.com/google/uuid"
@@ -230,7 +231,7 @@ func ToIFRS16Payments(schedules []*PaymentSchedule) []ifrs16.LeasePayment {
 
 		payments = append(payments, ifrs16.LeasePayment{
 			Date:   ps.DueDate,
-			Amount: ps.Amount,
+			Amount: money.NewFromFloat(ps.Amount),
 			Timing: ps.PaymentTiming,
 			Type:   paymentType,
 		})

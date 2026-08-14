@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	ifrs16svc "github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
@@ -52,17 +53,17 @@ func TestCloseStatus(t *testing.T) {
 
 func TestBuildJournalEntries_Capitalized(t *testing.T) {
 	monthly := &ifrs16svc.MonthlyEntry{
-		InterestExpense:     100,
-		Depreciation:        200,
-		TotalPayments:       300,
-		VariableRentExpense: 50,
-		NonLeaseExpense:     40,
-		ExemptLeaseExpense:  999, // must be ignored for capitalized basis
+		InterestExpense:     money.NewFromInt64(100),
+		Depreciation:        money.NewFromInt64(200),
+		TotalPayments:       money.NewFromInt64(300),
+		VariableRentExpense: money.NewFromInt64(50),
+		NonLeaseExpense:     money.NewFromInt64(40),
+		ExemptLeaseExpense:  money.NewFromInt64(999), // must be ignored for capitalized basis
 	}
 	entryDate := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
 	entries := buildJournalEntries("c1", "HKD", "2026-01", entryDate, monthly, "batch1", "capitalized", 0)
 
-	byType := map[string]float64{}
+	byType := map[string]money.Amount{}
 	for _, e := range entries {
 		byType[e.EntryType] = e.Amount
 		if e.PostingStatus != "draft" {
@@ -77,12 +78,15 @@ func TestBuildJournalEntries_Capitalized(t *testing.T) {
 		}
 	}
 
-	want := map[string]float64{"interest": 100, "depreciation": 200, "payment": 300, "variable_rent": 50, "non_lease": 40}
+	want := map[string]money.Amount{
+		"interest": money.NewFromInt64(100), "depreciation": money.NewFromInt64(200),
+		"payment": money.NewFromInt64(300), "variable_rent": money.NewFromInt64(50), "non_lease": money.NewFromInt64(40),
+	}
 	if len(byType) != len(want) {
 		t.Fatalf("got %d entries (%v), want %d", len(byType), byType, len(want))
 	}
 	for k, v := range want {
-		if byType[k] != v {
+		if !byType[k].Equal(v) {
 			t.Errorf("entry %s amount = %v, want %v", k, byType[k], v)
 		}
 	}
@@ -93,10 +97,10 @@ func TestBuildJournalEntries_Capitalized(t *testing.T) {
 
 func TestBuildJournalEntries_StraightLine(t *testing.T) {
 	monthly := &ifrs16svc.MonthlyEntry{
-		InterestExpense:     500, // must be ignored for straight-line basis
-		ExemptLeaseExpense:  120,
-		VariableRentExpense: 30,
-		NonLeaseExpense:     20,
+		InterestExpense:     money.NewFromInt64(500), // must be ignored for straight-line basis
+		ExemptLeaseExpense:  money.NewFromInt64(120),
+		VariableRentExpense: money.NewFromInt64(30),
+		NonLeaseExpense:     money.NewFromInt64(20),
 	}
 	entries := buildJournalEntries("c1", "HKD", "2026-01", time.Now(), monthly, "batch1", "straight_line_expense", 0)
 
@@ -116,8 +120,8 @@ func TestBuildJournalEntries_StraightLine(t *testing.T) {
 
 func TestBuildJournalEntries_OmitsTinyAmounts(t *testing.T) {
 	monthly := &ifrs16svc.MonthlyEntry{
-		InterestExpense: 0.005, // below the configured 0.01 threshold
-		Depreciation:    200,
+		InterestExpense: money.NewFromFloat(0.005), // below the configured 0.01 threshold
+		Depreciation:    money.NewFromInt64(200),
 	}
 	entries := buildJournalEntries("c1", "HKD", "2026-01", time.Now(), monthly, "batch1", "capitalized", 0.01)
 	for _, e := range entries {
@@ -132,13 +136,13 @@ func TestBuildJournalEntries_OmitsTinyAmounts(t *testing.T) {
 
 func TestMeasurementResult_Mapping(t *testing.T) {
 	monthly := &ifrs16svc.MonthlyEntry{
-		OpeningLiability: 1000,
-		InterestExpense:  100,
-		TotalPayments:    300,
-		ClosingLiability: 800,
-		OpeningROUAsset:  900,
-		Depreciation:     150,
-		ClosingROUAsset:  750,
+		OpeningLiability: money.NewFromInt64(1000),
+		InterestExpense:  money.NewFromInt64(100),
+		TotalPayments:    money.NewFromInt64(300),
+		ClosingLiability: money.NewFromInt64(800),
+		OpeningROUAsset:  money.NewFromInt64(900),
+		Depreciation:     money.NewFromInt64(150),
+		ClosingROUAsset:  money.NewFromInt64(750),
 	}
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
@@ -149,7 +153,7 @@ func TestMeasurementResult_Mapping(t *testing.T) {
 	if mr.ContractID != "c1" || mr.AccountingPeriod != "2026-01" {
 		t.Errorf("identity mismatch: %+v", mr)
 	}
-	if mr.OpeningLiability != 1000 || mr.ClosingLiability != 800 || mr.Depreciation != 150 {
+	if !mr.OpeningLiability.Equal(money.NewFromInt64(1000)) || !mr.ClosingLiability.Equal(money.NewFromInt64(800)) || !mr.Depreciation.Equal(money.NewFromInt64(150)) {
 		t.Errorf("amount mapping mismatch: %+v", mr)
 	}
 	if mr.DiscountRate != 0.05 {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
@@ -157,8 +158,8 @@ func accountingResultForPersistenceTest(t *testing.T) Result {
 
 func fixedPaymentsForPersistenceTest() []ifrs16.LeasePayment {
 	return []ifrs16.LeasePayment{
-		{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-		{Date: date("2025-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+		{Date: date("2025-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+		{Date: date("2025-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 	}
 }
 

@@ -97,8 +97,8 @@ func (h *CalculationHandler) Calculate(c *gin.Context) {
 		ContractID:       req.ContractID,
 		LeaseScope:       result.LeaseScope,
 		MeasurementBasis: result.MeasurementBasis,
-		InitialLiability: result.InitialLiability,
-		InitialROUAsset:  result.InitialROUAsset,
+		InitialLiability: result.InitialLiability.Float64(),
+		InitialROUAsset:  result.InitialROUAsset.Float64(),
 		TotalDays:        len(result.DailyAmortization),
 		MonthlySummary:   result.MonthlySummary,
 	})

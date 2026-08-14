@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
 
@@ -27,8 +28,8 @@ func TestScopeDecrease_PartialTerminationWritesOffTheProportionGivenUp(t *testin
 		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {
@@ -74,9 +75,9 @@ func TestScopeDecrease_RecognisesALossWhenTheAssetExceedsTheLiability(t *testing
 		Payments: []ifrs16.LeasePayment{
 			// Two years of rent settled up front. The asset carries it; the
 			// liability, having nothing left to pay, does not.
-			{Date: date("2024-01-01"), Amount: 400000, Timing: "prepaid", Type: "fixed"},
-			{Date: date("2025-06-30"), Amount: 20000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 20000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2024-01-01"), Amount: money.NewFromInt64(400000), Timing: "prepaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(20000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(20000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {
@@ -119,9 +120,9 @@ func TestScopeDecrease_LossJournalsBalance(t *testing.T) {
 		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2024-01-01"), Amount: 400000, Timing: "prepaid", Type: "fixed"},
-			{Date: date("2025-06-30"), Amount: 20000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 20000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2024-01-01"), Amount: money.NewFromInt64(400000), Timing: "prepaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(20000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(20000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {
@@ -176,9 +177,9 @@ func TestScopeDecrease_ExtensionIsUnaffected(t *testing.T) {
 		LeaseScope:       ifrs16.LeaseScopeInScope,
 		DiscountRate:     0.05,
 		Payments: []ifrs16.LeasePayment{
-			{Date: date("2025-06-30"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2025-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
-			{Date: date("2026-12-31"), Amount: 100000, Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-06-30"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2025-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
+			{Date: date("2026-12-31"), Amount: money.NewFromInt64(100000), Timing: "postpaid", Type: "fixed"},
 		},
 	})
 	if err != nil {

@@ -2,9 +2,11 @@ package ifrs16
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"time"
+
+	"github.com/lease-management-system/core-service/internal/money"
+	"github.com/shopspring/decimal"
 )
 
 // A lease event used to say only what the new rent was, as a single free-text
@@ -42,8 +44,8 @@ const (
 // StepChange is one rung of a stepped escalation: from FromDate onward the
 // fixed payments become Amount.
 type StepChange struct {
-	FromDate time.Time `json:"from_date"`
-	Amount   float64   `json:"amount"`
+	FromDate time.Time    `json:"from_date"`
+	Amount   money.Amount `json:"amount"`
 }
 
 // PaymentRevision states, in the landlord's terms, how the rent changes. Only
@@ -59,7 +61,7 @@ type PaymentRevision struct {
 	AppliesTo time.Time `json:"applies_to"`
 
 	// Amount is the new payment for RevisionSetAmount.
-	Amount float64 `json:"amount"`
+	Amount money.Amount `json:"amount"`
 
 	// Percentage is the movement for RevisionPercentage, expressed as a
 	// percentage: 5 means +5%, -10 means a 10% reduction.
@@ -81,12 +83,12 @@ type PaymentRevision struct {
 // PaymentChange is one line of the derived draft, kept alongside its original
 // so the person confirming it can see what moved rather than only the result.
 type PaymentChange struct {
-	Date           time.Time `json:"date"`
-	OriginalAmount float64   `json:"original_amount"`
-	RevisedAmount  float64   `json:"revised_amount"`
-	Delta          float64   `json:"delta"`
-	Timing         string    `json:"timing"`
-	Type           string    `json:"type"`
+	Date           time.Time    `json:"date"`
+	OriginalAmount money.Amount `json:"original_amount"`
+	RevisedAmount  money.Amount `json:"revised_amount"`
+	Delta          money.Amount `json:"delta"`
+	Timing         string       `json:"timing"`
+	Type           string       `json:"type"`
 	// Changed is false for payments the revision left alone. They are still
 	// returned, because a draft that hides the untouched lines invites the
 	// reader to assume they were deleted.
@@ -98,10 +100,10 @@ type RevisedSchedule struct {
 	Changes []PaymentChange `json:"changes"`
 	// OriginalTotal and RevisedTotal cover only the payments on or after the
 	// revision start, since that is the span the event can affect.
-	OriginalTotal float64 `json:"original_total"`
-	RevisedTotal  float64 `json:"revised_total"`
-	Delta         float64 `json:"delta"`
-	ChangedCount  int     `json:"changed_count"`
+	OriginalTotal money.Amount `json:"original_total"`
+	RevisedTotal  money.Amount `json:"revised_total"`
+	Delta         money.Amount `json:"delta"`
+	ChangedCount  int          `json:"changed_count"`
 	// AppliedFactor is the multiplier a percentage or index revision worked out
 	// to, after any cap or floor. It is reported because "CPI gave 2.6% but the
 	// 2% cap applied" is exactly the sentence an auditor asks for.
@@ -177,14 +179,14 @@ func DeriveRevisedPayments(original []LeasePayment, revision PaymentRevision, ef
 			if err != nil {
 				return RevisedSchedule{}, err
 			}
-			change.RevisedAmount = round(revised)
-			change.Delta = round(change.RevisedAmount - change.OriginalAmount)
-			change.Changed = math.Abs(change.Delta) > materialityRounding
+			change.RevisedAmount = revised.Round("CNY")
+			change.Delta = change.RevisedAmount.Sub(change.OriginalAmount).Round("CNY")
+			change.Changed = change.Delta.Abs().Decimal().Cmp(decimal.NewFromFloat(materialityRounding)) > 0
 		}
 
 		if !payment.Date.Before(from) {
-			schedule.OriginalTotal += change.OriginalAmount
-			schedule.RevisedTotal += change.RevisedAmount
+			schedule.OriginalTotal = schedule.OriginalTotal.Add(change.OriginalAmount)
+			schedule.RevisedTotal = schedule.RevisedTotal.Add(change.RevisedAmount)
 		}
 		if change.Changed {
 			schedule.ChangedCount++
@@ -192,19 +194,21 @@ func DeriveRevisedPayments(original []LeasePayment, revision PaymentRevision, ef
 		schedule.Changes = append(schedule.Changes, change)
 	}
 
-	schedule.OriginalTotal = round(schedule.OriginalTotal)
-	schedule.RevisedTotal = round(schedule.RevisedTotal)
-	schedule.Delta = round(schedule.RevisedTotal - schedule.OriginalTotal)
+	schedule.OriginalTotal = schedule.OriginalTotal.Round("CNY")
+	schedule.RevisedTotal = schedule.RevisedTotal.Round("CNY")
+	schedule.Delta = schedule.RevisedTotal.Sub(schedule.OriginalTotal).Round("CNY")
 	return schedule, nil
 }
 
-// reviseAmount restates one payment under the stated terms.
-func reviseAmount(payment LeasePayment, revision PaymentRevision, factor float64, steps []StepChange) (float64, error) {
+// reviseAmount restates one payment under the stated terms. The factor is a
+// float64 rate computation; the payment is exact money, multiplied at full
+// decimal precision and rounded only when the draft line is emitted.
+func reviseAmount(payment LeasePayment, revision PaymentRevision, factor float64, steps []StepChange) (money.Amount, error) {
 	switch revision.Kind {
 	case RevisionSetAmount:
 		return revision.Amount, nil
 	case RevisionPercentage, RevisionIndex:
-		return payment.Amount * factor, nil
+		return money.New(payment.Amount.Decimal().Mul(decimal.NewFromFloat(factor))), nil
 	case RevisionStepped:
 		// The rung in force is the last one that has already started. A payment
 		// before the first rung keeps its original amount.
@@ -216,7 +220,7 @@ func reviseAmount(payment LeasePayment, revision PaymentRevision, factor float64
 		}
 		return amount, nil
 	default:
-		return 0, fmt.Errorf("unknown revision kind %q", revision.Kind)
+		return money.Amount{}, fmt.Errorf("unknown revision kind %q", revision.Kind)
 	}
 }
 
@@ -225,7 +229,7 @@ func reviseAmount(payment LeasePayment, revision PaymentRevision, factor float64
 func revisionFactor(revision PaymentRevision) (factor float64, capped, floored bool, err error) {
 	switch revision.Kind {
 	case RevisionSetAmount:
-		if revision.Amount < 0 {
+		if revision.Amount.Decimal().IsNegative() {
 			return 0, false, false, fmt.Errorf("revised rent cannot be negative")
 		}
 		return 1, false, false, nil
@@ -275,7 +279,7 @@ func sortedSteps(revision PaymentRevision) ([]StepChange, error) {
 	steps := make([]StepChange, len(revision.Steps))
 	copy(steps, revision.Steps)
 	for _, step := range steps {
-		if step.Amount < 0 {
+		if step.Amount.Decimal().IsNegative() {
 			return nil, fmt.Errorf("step amount cannot be negative")
 		}
 		if step.FromDate.IsZero() {

@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Typography } from "antd";
-import { ArrowLeftOutlined, InfoCircleOutlined, ReloadOutlined, WarningOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, ReloadOutlined } from "@ant-design/icons";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
+import DataTrustBar, { KPIReadyBadge } from "../components/DataTrustBar";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
 import { useAuth } from "../context/AuthContext";
@@ -46,11 +47,11 @@ function Status({ metric }: { metric?: RetailStoreDiagnosticsResponse["summary"]
   return <StatusTag kind={kind}>{label}</StatusTag>;
 }
 
-function MetricCard({ code, metric, currency }: { code: PulseMetricCode; metric?: RetailStoreDiagnosticsResponse["summary"][string]; currency: string }) {
+function MetricCard({ code, metric, currency, notReady }: { code: PulseMetricCode; metric?: RetailStoreDiagnosticsResponse["summary"][string]; currency: string; notReady?: boolean }) {
   const tone = changeTone(code, metric as RetailSummaryMetric | undefined);
   const reason = metric?.reason || metric?.current.reason || metric?.comparison.reason;
   return <Card size="small" className="store-360-kpi-card" data-testid={`store360-kpi-${code}`}>
-    <Flex justify="space-between" align="center"><Typography.Text type="secondary">{KPI_LABELS[code]}</Typography.Text><Status metric={metric} /></Flex>
+    <Flex justify="space-between" align="center"><Typography.Text type="secondary">{KPI_LABELS[code]}</Typography.Text><Flex align="center" gap={4}>{notReady && <KPIReadyBadge />}<Status metric={metric} /></Flex></Flex>
     <Typography.Title level={3} style={{ margin: "12px 0 4px", fontVariantNumeric: "tabular-nums" }}>{displayMetric(metric, currency)}</Typography.Title>
     <Typography.Text className={`pulse-change pulse-change-${tone}`}>{formatChange(metric as RetailSummaryMetric | undefined)} {reason ? `· ${reason}` : ""}</Typography.Text>
     <Typography.Text type="secondary" className="pulse-kpi-comparison">对比 {formatKPIValue(metric?.comparison, currency)}</Typography.Text>
@@ -163,7 +164,7 @@ function Store360Inner() {
         <Button onClick={() => change({ sourceSystem: sourceInput.trim() })}>应用来源</Button>
       </Flex>
     </Card>
-    <Alert className="store-360-trust-strip" type={query.classification === "production" ? "info" : "warning"} showIcon icon={query.classification === "production" ? <InfoCircleOutlined /> : <WarningOutlined />} message={<Flex wrap="wrap" gap={12}><StatusTag kind={query.classification === "production" ? "processing" : "warning"}>{query.classification === "production" ? "正式数据 · Working" : "模拟数据 · 不进入 Official"}</StatusTag><span>dataset: {query.classification === "simulated" ? query.datasetVersion || "—" : "—"}</span><span>formula: retail-kpi-v1</span><span>诊断: retail-store-diagnostics-v1</span>{response && <span>decision-ready: {response.decision_ready ? "是" : "否"} · coverage {response.target_coverage.observed_store_days}/{response.target_coverage.expected_store_days}</span>}<span>经营占用现金成本 ≠ IFRS 16 会计费用</span></Flex>} description={latestMatches ? `generator: ${latestMatches.generator_version} · latest anomaly: ${latestAnomalyDate(latestMatches)}` : query.classification === "production" ? "正式数据不会显示模拟 generator；当前仅读取 Working 事实。" : "当前 URL 数据集没有可用的 latest 元数据。"} />
+    {response && <DataTrustBar envelope={response.envelope} basis={response.basis} detailExtra={latestMatches ? <span>generator: {latestMatches.generator_version} · latest anomaly: {latestAnomalyDate(latestMatches)}</span> : undefined} />}
     {noQuery && <Card><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Space direction="vertical"><Typography.Text strong>还没有可用的模拟数据集</Typography.Text><Typography.Text type="secondary">请先在经营脉搏由管理员按固定流程生成演示数据，之后从门店关注行进入门店 360。</Typography.Text><Button onClick={() => router.push("/operating-pulse")}>前往经营脉搏</Button></Space>} /></Card>}
     {query.classification === "simulated" && !query.datasetVersion && !discoveryLoading && <Card><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Space direction="vertical"><Typography.Text strong>模拟数据集版本缺失</Typography.Text><Typography.Text type="secondary">请从经营脉搏选择一个可用数据集后再进入门店 360；本页不会自动生成或补写数据。</Typography.Text><Button onClick={() => router.push("/operating-pulse")}>前往经营脉搏</Button></Space>} /></Card>}
     {optionsError && <Alert type="error" showIcon message="门店列表加载失败" description={optionsError} action={<Button size="small" onClick={() => setRetry((value) => value + 1)}>重试</Button>} />}
@@ -174,7 +175,7 @@ function Store360Inner() {
     {response && !response.decision_ready && response.evidence.observed_store_days === 0 && <Alert style={{ marginBottom: 16 }} type="warning" showIcon message="当前窗口没有门店事实" description="请先导入并完成该门店的经营日事实，或选择包含有效事实的数据集；系统不会用 0 填补缺失。" />}
     {response && <>
       <Card className="store-360-identity-card" title="门店身份"><Flex wrap="wrap" gap={24}><div><Typography.Text type="secondary">门店</Typography.Text><Typography.Title level={4} style={{ margin: 0 }}>{response.store.store_code} · {response.store.store_name}</Typography.Title></div><div><Typography.Text type="secondary">品牌 / 区域</Typography.Text><div>{response.store.brand || "—"} · {response.store.region || "—"}</div></div><div><Typography.Text type="secondary">币种</Typography.Text><div>{response.currency || "—"} · {response.currency_status}</div></div><div><Typography.Text type="secondary">事实版本</Typography.Text><div>{response.fact_version_min}–{response.fact_version_max}</div></div></Flex></Card>
-      <Row gutter={[12, 12]} style={{ marginTop: 16 }}>{STORE360_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><MetricCard code={code} metric={response.summary[code]} currency={response.currency} /></Col>)}</Row>
+      <Row gutter={[12, 12]} style={{ marginTop: 16 }}>{STORE360_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><MetricCard code={code} metric={response.summary[code]} currency={response.currency} notReady={!response.decision_ready} /></Col>)}</Row>
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}><Col xs={24} lg={16}><Trend response={response} /></Col><Col xs={24} lg={8}><Card title="辅助指标"><Space direction="vertical" size={8} style={{ width: "100%" }}>{STORE360_AUX_CODES.map((code) => <Flex key={code} justify="space-between" align="center"><span>{KPI_LABELS[code]}</span><Flex gap={8} align="center"><Status metric={response.summary[code]} /><Typography.Text>{displayMetric(response.summary[code], response.currency)}</Typography.Text></Flex></Flex>)}</Space><Alert type="info" showIcon style={{ marginTop: 16 }} message="经营口径" description="经营占用现金成本仅用于经营分析，未混入 IFRS 16 计量或 Official 过账链路。" /></Card></Col></Row>
       <Card title="同群基准" style={{ marginTop: 16 }}><Typography.Text type="secondary">{response.peer_definition} · 最少 {response.minimum_peer_count} 家同群门店</Typography.Text><Table style={{ marginTop: 8 }} size="small" pagination={false} rowKey="code" dataSource={response.peer_benchmark} columns={[{ title: "指标", render: (_: unknown, row: RetailStoreDiagnosticsResponse["peer_benchmark"][number]) => KPI_LABELS[row.code as PulseMetricCode] || row.code }, { title: "目标", render: (_: unknown, row) => formatKPIValue({ value: row.target, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency) }, { title: "P25 / 中位 / P75", render: (_: unknown, row) => `${formatKPIValue({ value: row.p25, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency)} / ${formatKPIValue({ value: row.median, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency)} / ${formatKPIValue({ value: row.p75, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency)}` }, { title: "样本 / 百分位", render: (_: unknown, row) => `${row.peer_count} · ${row.percentile == null ? "—" : `${row.percentile.toFixed(1)}%`}` }, { title: "状态", render: (_: unknown, row) => <Tag>{formatPeerBenchmarkStatus(row.status, row.reason)}</Tag> }]} /></Card>
       <div style={{ marginTop: 16 }}><BridgePanel bridges={response.bridges} currency={response.currency} /></div>

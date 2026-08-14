@@ -51,8 +51,10 @@ import ToolChip from "../components/ToolChip";
 import ThinkingTrace from "../components/ThinkingTrace";
 import SourceCitation from "../components/SourceCitation";
 import ConfidenceBadge from "../components/ConfidenceBadge";
+import ApprovalCard, { type ApprovalProposalLike } from "../components/ApprovalCard";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
 import {
@@ -75,6 +77,7 @@ import {
 } from "./runtime";
 import { notifyError } from "../lib/notify";
 import { safeInternalAIURL } from "../lib/retailAI";
+import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioResponse } from "../lib/api";
 import { AI_CHAT_SESSION_ITEM_CLASS, AI_CHAT_SESSION_MORE_CLASS, getAIChatResponsiveState, getAIChatSessionButtonProps, getAIChatSessionRowProps, transitionAIChatDrawer, type AIChatDrawerEvent } from "./responsive";
 
 const { TextArea } = Input;
@@ -194,10 +197,53 @@ function getPaymentScheduleDraftView(message: Message) {
 }
 
 function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) {
+  const { token } = useAuth();
+  const { language } = useLanguage();
+  const router = useRouter();
+  const [adoptingArtifact, setAdoptingArtifact] = useState<string | null>(null);
   const genericArtifacts = (artifacts || []).filter(
     (artifact) => artifact.artifact_type !== "contract_draft" && artifact.artifact_type !== "payment_schedule_draft",
   );
   if (genericArtifacts.length === 0) return null;
+
+  // 采纳走既有 action API（零售情景行动草稿，幂等）：确认前零写入，
+  // 与 AGENTS.md 底线一致——写操作只发生在这一个调用点。
+  const adoptRetailProposal = async (artifactId: string, raw: unknown) => {
+    const proposal = raw as ApprovalProposalLike;
+    const scenario = proposal.scenario as RetailScenarioResponse | undefined;
+    if (!token || !scenario) return;
+    const selected = scenario.scenarios.find((item) => item.key !== "baseline") || scenario.scenarios[0];
+    if (!selected) return;
+    const days = Math.round((new Date(scenario.current.date_to).getTime() - new Date(scenario.current.date_from).getTime()) / 86400000) + 1;
+    const windowDays = days === 7 || days === 14 || days === 28 ? days : 7;
+    const scope = {
+      store_id: scenario.store.store_id,
+      data_classification: scenario.data_classification as RetailDataClassification,
+      dataset_version: scenario.dataset_version || undefined,
+      as_of: scenario.current.date_to,
+      window_days: windowDays as 7 | 14 | 28,
+      source_system: scenario.source_system || undefined,
+    };
+    const body = {
+      horizon_months: scenario.horizon_months,
+      selected_scenario: { key: selected.key, name: selected.name, assumptions: selected.assumptions },
+      title: proposal.title || scenario.scenarios[0]?.name || "retail action proposal",
+      planned_action: proposal.planned_action || "",
+      owner_name: proposal.owner_name || undefined,
+      due_date: proposal.due_date || undefined,
+      verification_period: proposal.verification_period || undefined,
+    };
+    setAdoptingArtifact(artifactId);
+    try {
+      const result = await retailAnalyticsApi.saveStoreScenarioAction(scope, body, `retail-proposal-${artifactId}`, token);
+      message.success(result.idempotent_replay ? t("scenario.saved_replay", language) : t("scenario.saved", language));
+    } catch (error) {
+      message.error(apiErrorMessage(error));
+    } finally {
+      setAdoptingArtifact(null);
+    }
+  };
+
   return (
     <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
       {genericArtifacts.map((artifact) => (
@@ -221,16 +267,19 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
               复核项：{artifact.review_reasons.join("、")}
             </div>
           )}
-          {artifact.artifact_type === "retail_action_proposal" && (
+          {artifact.artifact_type === "retail_action_proposal" && artifact.data && (
             <div style={{ marginTop: 8 }}>
-              <Text type="secondary" style={{ display: "block", marginBottom: 6 }}>仅为行动提议：不会写入行动清单或正式台账。</Text>
-              <DataTrustBar envelope={artifact.data?.envelope} basis="Scenario" />
-              <Space wrap>
-                <StatusTag kind="warning">待情景工作台确认</StatusTag>
-                <StatusTag kind="neutral">Owner: {artifact.data?.owner_name || "—"}</StatusTag>
-                <StatusTag kind="neutral">Due: {artifact.data?.due_date || "—"}</StatusTag>
-                {artifact.data?.next_url && String(artifact.data.next_url).startsWith("/") && <a href={artifact.data.next_url}>前往情景工作台</a>}
-              </Space>
+              <Text type="secondary" style={{ display: "block", marginBottom: 6 }}>{t("ai.approval.notice", language)}</Text>
+              <ApprovalCard
+                proposal={{ ...artifact.data, envelope: artifact.data.envelope, next_url: artifact.data.next_url } as ApprovalProposalLike}
+                adopting={adoptingArtifact === artifact.id}
+                onAdopt={(proposal) => adoptRetailProposal(artifact.id, proposal)}
+                onModify={(proposal) => {
+                  const url = proposal.next_url;
+                  if (url && String(url).startsWith("/")) router.push(String(url));
+                }}
+                onReject={() => message.info(t("ai.approval.rejected", language))}
+              />
             </div>
           )}
           <details style={{ marginTop: 8 }}>

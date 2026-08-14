@@ -12,6 +12,7 @@ import AppLayout from "../components/AppLayout";
 import { SeverityDot, toSeverity } from "../components/SeverityDot";
 import PageHeader from "../components/PageHeader";
 import DataTrustBar, { KPIReadyBadge } from "../components/DataTrustBar";
+import RetailAIDrawer from "../components/RetailAIDrawer";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
 import { hasRole, useAuth } from "../context/AuthContext";
@@ -20,7 +21,6 @@ import { t, type Language } from "../lib/i18n";
 import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, switchClassification, trendValue, type PulseMetricCode } from "./logic";
 import { createLatestRequestGate } from "./requestGate";
-import { retailAIHref } from "../lib/retailAI";
 
 const WINDOW_OPTIONS = [7, 14, 28] as const;
 const TODAY = dayjs().format("YYYY-MM-DD");
@@ -114,6 +114,7 @@ function SuppressedPanel({ items, language }: { items: RetailSuppressedAttention
 function OperatingPulseInner() {
   const { token, user } = useAuth();
   const { language } = useLanguage();
+  const [aiOpen, setAiOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [latest, setLatest] = useState<RetailSimulationDatasetData | null | undefined>(undefined);
@@ -257,7 +258,7 @@ function OperatingPulseInner() {
   };
 
   return <ProtectedRoute><AppLayout><div className="operating-pulse-page">
-    <PageHeader title={t("pulse.title", language)} subtitle={t("pulse.subtitle", language)} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Button onClick={() => router.push(retailAIHref({ page: "operating-pulse", title: t("pulse.title", language), asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, classification: currentClassification || undefined, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, sourceSystem, storeIDs }))}>{t("common.ai_analysis", language)}</Button>} />
+    <PageHeader title={t("pulse.title", language)} subtitle={t("pulse.subtitle", language)} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button>} />
     <Card size="small" className="pulse-filter-card" style={{ marginBottom: 16 }}>
       <Flex gap={12} wrap="wrap" align="center">
         <Radio.Group value={currentClassification} onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />
@@ -281,6 +282,7 @@ function OperatingPulseInner() {
       <div style={{ marginTop: 16 }}><SuppressedPanel language={language} items={partition.suppressed_attention || []} /></div>
       </>}
     </>}
+    <RetailAIDrawer open={aiOpen} onClose={() => setAiOpen(false)} pageContext={{ page: "operating-pulse", title: t("pulse.title", language), filters: { as_of: asOf || TODAY, window_days: String(validWindow ? windowDays : 7), classification: currentClassification || "", dataset_version: currentClassification === "simulated" ? datasetVersion : "", source_system: sourceSystem || "", store_ids: storeIDs.join(",") } }} />
   </div></AppLayout></ProtectedRoute>;
 }
 

@@ -9,6 +9,7 @@ import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import DataTrustBar, { KPIReadyBadge } from "../components/DataTrustBar";
+import RetailAIDrawer from "../components/RetailAIDrawer";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
 import { useAuth } from "../context/AuthContext";
@@ -17,7 +18,6 @@ import { t, type Language } from "../lib/i18n";
 import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailSimulationDatasetData, type RetailStore360Option, type RetailStoreDiagnosticsResponse, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, type PulseMetricCode } from "../operating-pulse/logic";
 import { bridgeConservation, bridgeTone, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, summaryStatus, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
-import { retailAIHref } from "../lib/retailAI";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
 
@@ -77,6 +77,7 @@ function BridgePanel({ bridges, currency, language }: { bridges: RetailStoreDiag
 function Store360Inner() {
   const { token } = useAuth();
   const { language } = useLanguage();
+  const [aiOpen, setAiOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = useMemo(() => queryFromURL(searchParams), [searchParams]);
@@ -154,7 +155,7 @@ function Store360Inner() {
   const change = (next: Partial<typeof query>) => writeQuery(router, { classification: (next.classification || query.classification || "simulated") as RetailDataClassification, datasetVersion: next.datasetVersion ?? query.datasetVersion, asOf: next.asOf || query.asOf || TODAY, windowDays: next.windowDays ?? (validWindow(query.windowDays) ? query.windowDays : 14), sourceSystem: next.sourceSystem ?? query.sourceSystem, storeID: next.storeID ?? query.storeID, returnQuery: query.returnQuery });
 
   return <ProtectedRoute><AppLayout><div className="store-360-page">
-    <PageHeader title={t("store360.title", language)} subtitle={t("store360.subtitle", language)} primaryAction={<Button icon={<ReloadOutlined />} loading={loading || discoveryLoading} onClick={() => setRetry((value) => value + 1)}>{t("common.refresh", language)}</Button>} secondaryAction={<Space><Button onClick={() => router.push(retailAIHref({ page: "store-360", title: t("store360.title", language), asOf: query.asOf, windowDays: query.windowDays, classification: query.classification as "production" | "simulated", datasetVersion: query.datasetVersion || undefined, sourceSystem: query.sourceSystem, storeID: query.storeID || undefined }))}>{t("common.ai_analysis", language)}</Button><Button onClick={() => router.push(scenarioURL)}>{t("store360.scenario_analysis", language)}</Button><Button icon={<ArrowLeftOutlined />} onClick={() => router.push(backURL)}>{t("store360.back_pulse", language)}</Button></Space>} />
+    <PageHeader title={t("store360.title", language)} subtitle={t("store360.subtitle", language)} primaryAction={<Button icon={<ReloadOutlined />} loading={loading || discoveryLoading} onClick={() => setRetry((value) => value + 1)}>{t("common.refresh", language)}</Button>} secondaryAction={<Space><Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button><Button onClick={() => router.push(scenarioURL)}>{t("store360.scenario_analysis", language)}</Button><Button icon={<ArrowLeftOutlined />} onClick={() => router.push(backURL)}>{t("store360.back_pulse", language)}</Button></Space>} />
     <Card size="small" className="store-360-filter-card">
       <Flex gap={12} wrap="wrap" align="center">
         <Radio.Group value={query.classification || "simulated"} onChange={(event) => { const next = event.target.value as RetailDataClassification; if (next === "production") change({ classification: next, datasetVersion: "", asOf: TODAY }); else if (latest) change({ classification: next, datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest) }); else change({ classification: next, datasetVersion: "" }); }} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />
@@ -183,6 +184,7 @@ function Store360Inner() {
       <Card title={t("store360.observations", language)} style={{ marginTop: 16 }}><Space direction="vertical" style={{ width: "100%" }}>{response.observations.length ? response.observations.map((item) => <Alert key={`${item.code}-${item.reference}`} type={item.status === "complete" ? "info" : "warning"} showIcon message={item.label} description={item.statement} />) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("store360.no_observations", language)} />}</Space></Card>
       <Collapse style={{ marginTop: 16 }} items={[{ key: "evidence", label: t("store360.evidence_title", language), children: <Space direction="vertical"><Typography.Text>{t("common.current", language)} {response.evidence.current.date_from}–{response.evidence.current.date_to} · {t("common.contrast", language)} {response.evidence.comparison.date_from}–{response.evidence.comparison.date_to}</Typography.Text><Typography.Text>{t("store360.evidence.coverage_source", language).replace("{observed}", String(response.evidence.observed_store_days)).replace("{expected}", String(response.evidence.expected_store_days)).replace("{sources}", response.evidence.source_systems.join(", ") || "—").replace("{datasets}", response.evidence.dataset_versions.join(", ") || "—")}</Typography.Text><Typography.Text>required fields: {response.evidence.required_fields.join(", ")}</Typography.Text><Typography.Text>{t("store360.evidence.fact_version", language).replace("{min}", String(response.evidence.fact_version_min)).replace("{max}", String(response.evidence.fact_version_max))} · <a href={response.evidence.kpi_drilldown_url}>{t("common.view_kpi_drilldown", language)}</a></Typography.Text></Space> }]} />
     </>}
+    <RetailAIDrawer open={aiOpen} onClose={() => setAiOpen(false)} pageContext={{ page: "store-360", title: t("store360.title", language), filters: { as_of: query.asOf, window_days: String(query.windowDays), classification: query.classification || "", dataset_version: query.datasetVersion || "", source_system: query.sourceSystem || "", store_id: query.storeID || "" } }} />
   </div></AppLayout></ProtectedRoute>;
 }
 

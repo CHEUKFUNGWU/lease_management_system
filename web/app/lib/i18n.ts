@@ -1210,6 +1210,95 @@ const dict: TranslationDict = {
     en: "Degradation reason",
   },
 
+  // AI-002 — approval card and retail AI drawer
+  "ai.approval.role": {
+    "zh-CN": "AI 行动提议",
+    "zh-HK": "AI 行動提議",
+    en: "AI action proposal",
+  },
+  "ai.approval.untitled": {
+    "zh-CN": "未命名提议",
+    "zh-HK": "未命名提議",
+    en: "Untitled proposal",
+  },
+  "ai.approval.evidence_complete": {
+    "zh-CN": "证据完整",
+    "zh-HK": "證據完整",
+    en: "Evidence complete",
+  },
+  "ai.approval.evidence_incomplete": {
+    "zh-CN": "需补证据",
+    "zh-HK": "需補證據",
+    en: "Evidence incomplete",
+  },
+  "ai.approval.expected_benefit": {
+    "zh-CN": "预期影响",
+    "zh-HK": "預期影響",
+    en: "Expected impact",
+  },
+  "ai.approval.adopt": {
+    "zh-CN": "采纳",
+    "zh-HK": "採納",
+    en: "Adopt",
+  },
+  "ai.approval.modify": {
+    "zh-CN": "修改",
+    "zh-HK": "修改",
+    en: "Modify",
+  },
+  "ai.approval.reject": {
+    "zh-CN": "拒绝",
+    "zh-HK": "拒絕",
+    en: "Reject",
+  },
+  "ai.drawer.title": {
+    "zh-CN": "交给 AI 分析",
+    "zh-HK": "交給 AI 分析",
+    en: "Analyze with AI",
+  },
+  "ai.drawer.context": {
+    "zh-CN": "当前页面上下文",
+    "zh-HK": "當前頁面上下文",
+    en: "Current page context",
+  },
+  "ai.drawer.empty": {
+    "zh-CN": "针对当前页面提问，AI 回答会附引用来源。",
+    "zh-HK": "針對當前頁面提問，AI 回答會附引用來源。",
+    en: "Ask about this page; answers carry citations.",
+  },
+  "ai.drawer.placeholder": {
+    "zh-CN": "输入问题…",
+    "zh-HK": "輸入問題…",
+    en: "Ask a question…",
+  },
+  "ai.drawer.send": {
+    "zh-CN": "发送",
+    "zh-HK": "發送",
+    en: "Send",
+  },
+  "ai.drawer.no_answer": {
+    "zh-CN": "（无回答）",
+    "zh-HK": "（無回答）",
+    en: "(no answer)",
+  },
+
+  // AI-002 — proposal notice
+  "ai.approval.notice": {
+    "zh-CN": "仅为行动提议：确认前不会写入行动清单或正式台账。",
+    "zh-HK": "僅為行動提議：確認前不會寫入行動清單或正式台賬。",
+    en: "This is only a proposal: nothing is written until you confirm.",
+  },
+  "ai.approval.rejected": {
+    "zh-CN": "已拒绝该提议",
+    "zh-HK": "已拒絕該提議",
+    en: "Proposal rejected",
+  },
+  "ai.approval.adopt_failed": {
+    "zh-CN": "采纳失败，请重试",
+    "zh-HK": "採納失敗，請重試",
+    en: "Adopt failed, retry",
+  },
+
   // ENV-002 DataTrustBar — DESIGN.md §10 数据可信度展示
   "trust.classification_production": {
     "zh-CN": "正式数据 · Working",

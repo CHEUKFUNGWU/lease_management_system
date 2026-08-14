@@ -1411,3 +1411,36 @@ html {
 .ai-confidence-badge.is-high .ai-confidence-dot { background: var(--state-success-text); }
 .ai-tool-row { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 .ai-confidence-row { margin-top: 8px; }
+
+/* ── AI-002: ApprovalCard + RetailAIDrawer ─────────────────────── */
+.approval-card {
+  border: 1px solid var(--state-info-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--state-info-bg);
+}
+.approval-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.approval-card-action { margin: 8px 0 4px; }
+.approval-card-benefit { font-weight: 500; }
+.approval-card-meta { margin-top: 8px; }
+.approval-card-actions { margin-top: 10px; }
+
+.retail-ai-drawer { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+.retail-ai-drawer-context { display: flex; flex-direction: column; gap: 2px; }
+.retail-ai-drawer-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.retail-ai-drawer-message { font-size: 13px; }
+.retail-ai-drawer-message.is-user { align-self: flex-end; }
+.retail-ai-drawer-input { margin-top: 4px; }
+.retail-ai-drawer-input { width: 100%; }

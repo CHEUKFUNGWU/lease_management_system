@@ -42,28 +42,36 @@ function changedLines(file) {
   }
   const diff = execSync(`git diff -U0 ${base} -- ${file}`, { cwd: root }).toString();
   const lines = [];
-  const removedByPosition = new Map();
   let newLine = 0;
-  let oldLine = 0;
+  let removedInHunk = [];
+  let addedInHunk = [];
+  const flushHunk = () => {
+    // hunk 内按序配对：第 i 条新增行对第 i 条删除行。跨 hunk 的行号
+    // 偏移不影响配对，只有真正改写过的行才拿得到旧行内容。
+    for (let i = 0; i < addedInHunk.length; i += 1) {
+      lines.push({ number: addedInHunk[i].number, text: addedInHunk[i].text, oldText: removedInHunk[i] || "" });
+    }
+    removedInHunk = [];
+    addedInHunk = [];
+  };
   for (const raw of diff.split("\n")) {
     const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
     if (hunk) {
-      oldLine = Number(hunk[1]);
+      flushHunk();
       newLine = Number(hunk[2]);
       continue;
     }
     if (raw.startsWith("+++") || raw.startsWith("---") || raw.startsWith("@@")) continue;
     if (raw.startsWith("+")) {
-      lines.push({ number: newLine, text: raw.slice(1), oldText: removedByPosition.get(newLine) || "" });
+      addedInHunk.push({ number: newLine, text: raw.slice(1) });
       newLine += 1;
     } else if (raw.startsWith("-")) {
-      removedByPosition.set(oldLine, raw.slice(1));
-      oldLine += 1;
+      removedInHunk.push(raw.slice(1));
     } else {
-      oldLine += 1;
       newLine += 1;
     }
   }
+  flushHunk();
   return lines;
 }
 

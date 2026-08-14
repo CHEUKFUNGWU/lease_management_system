@@ -67,7 +67,7 @@ export const colors = {
 
 export const typography = {
   fontFamily: {
-    sans: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+    sans: 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
     mono: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   },
 

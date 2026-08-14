@@ -1,3 +1,4 @@
+import { t, type Language } from "../lib/i18n";
 import type { RetailScenarioAssumptions, RetailScenarioBridge, RetailScenarioInput, RetailScenarioResponse } from "../lib/api";
 
 export const SCENARIO_CODES = [
@@ -6,12 +7,17 @@ export const SCENARIO_CODES = [
   "occupancy_cash_cost", "store_contribution", "store_contribution_margin",
 ] as const;
 
-export const SCENARIO_LABELS: Record<string, string> = {
-  revenue: "销售额", gross_profit: "毛利额", gross_margin_rate: "毛利率", labor_cost: "人工成本",
-  fixed_rent: "固定现金租金", variable_rent_rate: "变动租金率", variable_rent: "变动租金",
-  non_lease_cost: "非租赁占用成本", other_controllable_cost: "其他可控成本",
-  occupancy_cash_cost: "经营占用现金成本", store_contribution: "门店贡献额", store_contribution_margin: "门店贡献率",
+const SCENARIO_LABEL_KEYS: Record<string, string> = {
+  revenue: "retail.kpi.revenue", gross_profit: "retail.kpi.gross_profit", gross_margin_rate: "retail.kpi.gross_margin_rate", labor_cost: "retail.kpi.labor_cost",
+  fixed_rent: "retail.kpi.fixed_rent", variable_rent_rate: "retail.kpi.variable_rent_rate", variable_rent: "retail.kpi.variable_rent",
+  non_lease_cost: "retail.kpi.non_lease_cost", other_controllable_cost: "retail.kpi.other_controllable_cost",
+  occupancy_cash_cost: "retail.kpi.occupancy_cash_cost", store_contribution: "retail.kpi.store_contribution", store_contribution_margin: "retail.kpi.store_contribution_margin",
 };
+
+export function scenarioLabel(code: string, language: Language): string {
+  const key = SCENARIO_LABEL_KEYS[code];
+  return key ? t(key, language) : code;
+}
 
 export const defaultAssumptions = (): RetailScenarioAssumptions => ({
   revenue_change_pct: 0, gross_margin_rate_change_pp: 0, labor_cost_change_pct: 0,
@@ -51,16 +57,16 @@ export function acceptsEvaluation(responseKey: string | null, currentKey: string
   return responseKey === currentKey && requestSequence === latestSequence;
 }
 
-export function formatScenarioValue(value: number | null | undefined, unit: string, currency: string): string {
+export function formatScenarioValue(value: number | null | undefined, unit: string, currency: string, language: Language): string {
   if (value == null) return "—";
   const formatted = value.toLocaleString("zh-CN", { minimumFractionDigits: unit === "percent" ? 4 : 2, maximumFractionDigits: unit === "percent" ? 4 : 2 });
   if (unit === "percent") return `${formatted}%`;
-  if (unit === "currency") return `${formatted} ${currency || "金额"}`;
+  if (unit === "currency") return `${formatted} ${currency || t("retail.unit.currency", language)}`;
   return `${formatted} ${unit}`;
 }
 
-export function responseHorizonLabel(response: Pick<RetailScenarioResponse, "horizon_months">): string {
-  return `${response.horizon_months}个月`;
+export function responseHorizonLabel(response: Pick<RetailScenarioResponse, "horizon_months">, language: Language): string {
+  return `${response.horizon_months}${t("retail.months", language)}`;
 }
 
 export function bridgeConservation(bridge: RetailScenarioBridge): number | null {

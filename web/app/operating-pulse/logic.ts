@@ -1,3 +1,4 @@
+import { t, type Language } from "../lib/i18n";
 import type {
   RetailAttention,
   RetailKPIValue,
@@ -26,60 +27,65 @@ export const PULSE_AUXILIARY_CODES = [
 
 export type PulseMetricCode = (typeof PULSE_KPI_CODES)[number] | (typeof PULSE_AUXILIARY_CODES)[number];
 
-export const KPI_LABELS: Record<PulseMetricCode, string> = {
-  revenue: "销售额",
-  gross_profit: "毛利额",
-  gross_margin_rate: "毛利率",
-  footfall: "客流",
-  conversion_rate: "转化率",
-  store_contribution: "门店贡献",
-  average_transaction_value: "客单价",
-  labor_cost_rate: "人工成本率",
-  occupancy_cash_cost_rate: "经营占用成本率",
-  store_contribution_margin: "门店贡献率",
-  sales_per_sqm: "期间坪效",
+const KPI_LABEL_KEYS: Record<PulseMetricCode, string> = {
+  revenue: "retail.kpi.revenue",
+  gross_profit: "retail.kpi.gross_profit",
+  gross_margin_rate: "retail.kpi.gross_margin_rate",
+  footfall: "retail.kpi.footfall",
+  conversion_rate: "retail.kpi.conversion_rate",
+  store_contribution: "retail.kpi.store_contribution",
+  average_transaction_value: "retail.kpi.average_transaction_value",
+  labor_cost_rate: "retail.kpi.labor_cost_rate",
+  occupancy_cash_cost_rate: "retail.kpi.occupancy_cash_cost_rate",
+  store_contribution_margin: "retail.kpi.store_contribution_margin",
+  sales_per_sqm: "retail.kpi.sales_per_sqm",
 };
 
-export const SIGNAL_LABELS: Record<string, string> = {
-  revenue_decline: "销售额下降",
-  footfall_decline: "客流下降",
-  footfall_continuous_decline: "连续客流下降",
-  conversion_drop: "转化率下降",
-  conversion_rate_drop: "转化率下降",
-  average_ticket_drop: "客单价下降",
-  gross_margin_compression: "毛利率收窄",
-  labor_cost_rate_spike: "人工成本率上升",
-  labor_cost_spike: "人工成本率上升",
-  occupancy_cost_rate_spike: "经营占用成本率上升",
-  occupancy_cost_burden: "经营占用成本率上升",
-  contribution_turns_negative: "门店贡献转负",
+export function kpiLabel(code: string, language: Language): string {
+  const key = KPI_LABEL_KEYS[code as PulseMetricCode];
+  return key ? t(key, language) : code;
+}
+
+const SIGNAL_LABEL_KEYS: Record<string, string> = {
+  revenue_decline: "retail.signal.revenue_decline",
+  footfall_decline: "retail.signal.footfall_decline",
+  footfall_continuous_decline: "retail.signal.footfall_continuous_decline",
+  conversion_drop: "retail.signal.conversion_drop",
+  conversion_rate_drop: "retail.signal.conversion_rate_drop",
+  average_ticket_drop: "retail.signal.average_ticket_drop",
+  gross_margin_compression: "retail.signal.gross_margin_compression",
+  labor_cost_rate_spike: "retail.signal.labor_cost_rate_spike",
+  labor_cost_spike: "retail.signal.labor_cost_spike",
+  occupancy_cost_rate_spike: "retail.signal.occupancy_cost_rate_spike",
+  occupancy_cost_burden: "retail.signal.occupancy_cost_burden",
+  contribution_turns_negative: "retail.signal.contribution_turns_negative",
 };
 
-export const metricUnitLabel = (unit: string, currency?: string): string => {
-  if (unit === "currency") return currency || "金额";
-  if (unit === "currency_per_sqm") return `${currency || "金额"}/㎡`;
+export const metricUnitLabel = (unit: string, currency: string | undefined, language: Language): string => {
+  if (unit === "currency") return currency || t("retail.unit.currency", language);
+  if (unit === "currency_per_sqm") return `${currency || t("retail.unit.currency", language)}/㎡`;
   if (unit === "percent") return "%";
-  if (unit === "count") return "笔/人次";
+  if (unit === "count") return t("retail.unit.count", language);
   return unit;
 };
 
-export function formatUnitValue(value: number | null | undefined, unit: string, currency?: string): string {
+export function formatUnitValue(value: number | null | undefined, unit: string, currency: string | undefined, language: Language): string {
   if (value === null || value === undefined) return "—";
   const precision = unit === "count" ? 0 : 2;
   const formatted = value.toLocaleString("zh-CN", { minimumFractionDigits: precision, maximumFractionDigits: precision });
   if (unit === "percent") return `${formatted}%`;
   if (unit === "percentage_point") return `${formatted}pp`;
-  if (unit === "currency" || unit === "currency_per_sqm") return `${formatted} ${metricUnitLabel(unit, currency)}`;
-  if (unit === "count") return `${formatted} ${metricUnitLabel(unit, currency)}`;
+  if (unit === "currency" || unit === "currency_per_sqm") return `${formatted} ${metricUnitLabel(unit, currency, language)}`;
+  if (unit === "count") return `${formatted} ${metricUnitLabel(unit, currency, language)}`;
   return `${formatted} ${unit}`;
 }
 
-export function formatSignalValue(value: number | null | undefined, unit: string, currency?: string): string {
-  return formatUnitValue(value, unit, currency);
+export function formatSignalValue(value: number | null | undefined, unit: string, currency: string | undefined, language: Language): string {
+  return formatUnitValue(value, unit, currency, language);
 }
 
-export function formatKPIValue(value: RetailKPIValue | null | undefined, currency?: string): string {
-  return value ? formatUnitValue(value.value, value.unit, currency) : "—";
+export function formatKPIValue(value: RetailKPIValue | null | undefined, currency: string | undefined, language: Language): string {
+  return value ? formatUnitValue(value.value, value.unit, currency, language) : "—";
 }
 
 export function formatChange(metric: RetailSummaryMetric | null | undefined): string {
@@ -97,17 +103,18 @@ export function changeTone(code: PulseMetricCode, metric: RetailSummaryMetric | 
   return unfavorable ? "bad" : "good";
 }
 
-export function metricStatusLabel(metric: RetailSummaryMetric | null | undefined): { label: "完整" | "部分" | "缺失"; reason?: string } {
-  if (!metric) return { label: "缺失", reason: "指标不可用" };
+export function metricStatusLabel(metric: RetailSummaryMetric | null | undefined, language: Language): { status: "complete" | "partial" | "missing"; label: string; reason?: string } {
+  if (!metric) return { status: "missing", label: t("retail.status.missing", language), reason: t("retail.status_reason.unavailable", language) };
   const statuses = [metric.current.status, metric.comparison.status];
   const reasons = [metric.current.reason, metric.comparison.reason, metric.reason].filter(Boolean);
-  if (statuses.some((status) => status === "unavailable")) return { label: "缺失", reason: reasons.join(" / ") || "所需事实不可用" };
-  if (statuses.some((status) => status === "partial")) return { label: "部分", reason: reasons.join(" / ") || "覆盖不足或字段不完整" };
-  return { label: "完整", reason: reasons.join(" / ") || undefined };
+  if (statuses.some((status) => status === "unavailable")) return { status: "missing", label: t("retail.status.missing", language), reason: reasons.join(" / ") || t("retail.status_reason.facts_unavailable", language) };
+  if (statuses.some((status) => status === "partial")) return { status: "partial", label: t("retail.status.partial", language), reason: reasons.join(" / ") || t("retail.status_reason.coverage_incomplete", language) };
+  return { status: "complete", label: t("retail.status.complete", language), reason: reasons.join(" / ") || undefined };
 }
 
-export function signalLabel(code: string): string {
-  return SIGNAL_LABELS[code] || code;
+export function signalLabel(code: string, language: Language): string {
+  const key = SIGNAL_LABEL_KEYS[code];
+  return key ? t(key, language) : code;
 }
 
 export function latestAnomalyDate(dataset: RetailSimulationDatasetData): string {
@@ -152,6 +159,6 @@ export function trendValue(row: RetailPulsePartition["daily_trend"][number], cod
   return value === undefined ? null : value;
 }
 
-export function attentionSignalSummary(attention: RetailAttention): string {
-  return attention.observed_signals.map((signal) => `${signalLabel(signal.signal_code)} ${signal.observed_change === null ? "—" : `${signal.observed_change > 0 ? "+" : ""}${signal.observed_change.toFixed(1)}${signal.unit === "percentage_point" ? "pp" : "%"}`}`).join(" · ");
+export function attentionSignalSummary(attention: RetailAttention, language: Language): string {
+  return attention.observed_signals.map((signal) => `${signalLabel(signal.signal_code, language)} ${signal.observed_change === null ? "—" : `${signal.observed_change > 0 ? "+" : ""}${signal.observed_change.toFixed(1)}${signal.unit === "percentage_point" ? "pp" : "%"}`}`).join(" · ");
 }

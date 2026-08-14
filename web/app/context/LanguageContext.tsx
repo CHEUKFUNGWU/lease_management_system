@@ -17,7 +17,9 @@ export type Language = "zh-CN" | "zh-HK" | "en";
  * To offer them again: finish those pages, then list the languages here. Nothing
  * else needs to change.
  */
-export const SUPPORTED_LANGUAGES: Language[] = ["zh-CN"];
+// I18N-001: the three retail pages are fully translated again, so the
+// language switch reopens for zh-HK and en.
+export const SUPPORTED_LANGUAGES: Language[] = ["zh-CN", "zh-HK", "en"];
 
 export const LANGUAGE_LABELS: Record<Language, string> = {
   "zh-CN": "简体中文",

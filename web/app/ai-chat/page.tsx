@@ -47,8 +47,14 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import AppLayout from "../components/AppLayout";
 import DataTrustBar from "../components/DataTrustBar";
+import ToolChip from "../components/ToolChip";
+import ThinkingTrace from "../components/ThinkingTrace";
+import SourceCitation from "../components/SourceCitation";
+import ConfidenceBadge from "../components/ConfidenceBadge";
+import ApprovalCard, { type ApprovalProposalLike } from "../components/ApprovalCard";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
 import {
@@ -71,6 +77,7 @@ import {
 } from "./runtime";
 import { notifyError } from "../lib/notify";
 import { safeInternalAIURL } from "../lib/retailAI";
+import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioResponse } from "../lib/api";
 import { AI_CHAT_SESSION_ITEM_CLASS, AI_CHAT_SESSION_MORE_CLASS, getAIChatResponsiveState, getAIChatSessionButtonProps, getAIChatSessionRowProps, transitionAIChatDrawer, type AIChatDrawerEvent } from "./responsive";
 
 const { TextArea } = Input;
@@ -190,10 +197,53 @@ function getPaymentScheduleDraftView(message: Message) {
 }
 
 function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) {
+  const { token } = useAuth();
+  const { language } = useLanguage();
+  const router = useRouter();
+  const [adoptingArtifact, setAdoptingArtifact] = useState<string | null>(null);
   const genericArtifacts = (artifacts || []).filter(
     (artifact) => artifact.artifact_type !== "contract_draft" && artifact.artifact_type !== "payment_schedule_draft",
   );
   if (genericArtifacts.length === 0) return null;
+
+  // 采纳走既有 action API（零售情景行动草稿，幂等）：确认前零写入，
+  // 与 AGENTS.md 底线一致——写操作只发生在这一个调用点。
+  const adoptRetailProposal = async (artifactId: string, raw: unknown) => {
+    const proposal = raw as ApprovalProposalLike;
+    const scenario = proposal.scenario as RetailScenarioResponse | undefined;
+    if (!token || !scenario) return;
+    const selected = scenario.scenarios.find((item) => item.key !== "baseline") || scenario.scenarios[0];
+    if (!selected) return;
+    const days = Math.round((new Date(scenario.current.date_to).getTime() - new Date(scenario.current.date_from).getTime()) / 86400000) + 1;
+    const windowDays = days === 7 || days === 14 || days === 28 ? days : 7;
+    const scope = {
+      store_id: scenario.store.store_id,
+      data_classification: scenario.data_classification as RetailDataClassification,
+      dataset_version: scenario.dataset_version || undefined,
+      as_of: scenario.current.date_to,
+      window_days: windowDays as 7 | 14 | 28,
+      source_system: scenario.source_system || undefined,
+    };
+    const body = {
+      horizon_months: scenario.horizon_months,
+      selected_scenario: { key: selected.key, name: selected.name, assumptions: selected.assumptions },
+      title: proposal.title || scenario.scenarios[0]?.name || "retail action proposal",
+      planned_action: proposal.planned_action || "",
+      owner_name: proposal.owner_name || undefined,
+      due_date: proposal.due_date || undefined,
+      verification_period: proposal.verification_period || undefined,
+    };
+    setAdoptingArtifact(artifactId);
+    try {
+      const result = await retailAnalyticsApi.saveStoreScenarioAction(scope, body, `retail-proposal-${artifactId}`, token);
+      message.success(result.idempotent_replay ? t("scenario.saved_replay", language) : t("scenario.saved", language));
+    } catch (error) {
+      message.error(apiErrorMessage(error));
+    } finally {
+      setAdoptingArtifact(null);
+    }
+  };
+
   return (
     <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
       {genericArtifacts.map((artifact) => (
@@ -217,16 +267,19 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
               复核项：{artifact.review_reasons.join("、")}
             </div>
           )}
-          {artifact.artifact_type === "retail_action_proposal" && (
+          {artifact.artifact_type === "retail_action_proposal" && artifact.data && (
             <div style={{ marginTop: 8 }}>
-              <Text type="secondary" style={{ display: "block", marginBottom: 6 }}>仅为行动提议：不会写入行动清单或正式台账。</Text>
-              <DataTrustBar envelope={artifact.data?.envelope} basis="Scenario" />
-              <Space wrap>
-                <StatusTag kind="warning">待情景工作台确认</StatusTag>
-                <StatusTag kind="neutral">Owner: {artifact.data?.owner_name || "—"}</StatusTag>
-                <StatusTag kind="neutral">Due: {artifact.data?.due_date || "—"}</StatusTag>
-                {artifact.data?.next_url && String(artifact.data.next_url).startsWith("/") && <a href={artifact.data.next_url}>前往情景工作台</a>}
-              </Space>
+              <Text type="secondary" style={{ display: "block", marginBottom: 6 }}>{t("ai.approval.notice", language)}</Text>
+              <ApprovalCard
+                proposal={{ ...artifact.data, envelope: artifact.data.envelope, next_url: artifact.data.next_url } as ApprovalProposalLike}
+                adopting={adoptingArtifact === artifact.id}
+                onAdopt={(proposal) => adoptRetailProposal(artifact.id, proposal)}
+                onModify={(proposal) => {
+                  const url = proposal.next_url;
+                  if (url && String(url).startsWith("/")) router.push(String(url));
+                }}
+                onReject={() => message.info(t("ai.approval.rejected", language))}
+              />
             </div>
           )}
           <details style={{ marginTop: 8 }}>
@@ -319,6 +372,9 @@ function MessageContent({
   sources,
   model,
   thinking,
+  toolCalls,
+  confidence,
+  confidenceReason,
   i18nLang,
   role = "assistant",
 }: {
@@ -326,10 +382,12 @@ function MessageContent({
   sources?: Array<string | RuntimeSource>;
   model?: string;
   thinking?: string;
+  toolCalls?: AgentToolCall[];
+  confidence?: number;
+  confidenceReason?: string;
   i18nLang: Language;
   role?: "user" | "assistant";
 }) {
-  const [showThinking, setShowThinking] = useState(false);
   const textColor = role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)";
 
   // Parse markdown-like code blocks
@@ -362,42 +420,7 @@ function MessageContent({
     <div>
       {thinking && (
         <div style={{ marginBottom: 8 }}>
-          <Button
-            type="text"
-           
-            onClick={() => setShowThinking(!showThinking)}
-            style={{ fontSize: 12, color: "var(--fg-muted)", padding: 0, height: 24 }}
-          >
-            <span style={{ marginRight: 4 }}>{showThinking ? "▼" : "▶"}</span>
-            {t("ai.thinking_process", i18nLang)}
-          </Button>
-          <AnimatePresence>
-            {showThinking && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                style={{ overflow: "hidden" }}
-              >
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    marginTop: 4,
-                    fontSize: 12,
-                    color: "var(--fg-tertiary)",
-                    lineHeight: 1.6,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {thinking}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <ThinkingTrace thinking={thinking} />
         </div>
       )}
 
@@ -419,17 +442,26 @@ function MessageContent({
         )
       )}
 
+      {toolCalls && toolCalls.length > 0 && (
+        <div className="ai-tool-row">
+          {toolCalls.map((call, idx) => <ToolChip key={idx} call={call} />)}
+        </div>
+      )}
+
+      {typeof confidence === "number" && (
+        <div className="ai-confidence-row">
+          <ConfidenceBadge confidence={confidence} reason={confidenceReason} />
+        </div>
+      )}
+
       {sources && sources.length > 0 && (
         <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
           <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>
             {t("ai.sources", i18nLang)}
           </Text>
           {sources.map((source, idx) => {
-            const label = typeof source === "string" ? source : source.title || source.id || source.type || "系统来源";
-            const link = typeof source === "string" ? undefined : source.url;
-            const tag = <StatusTag icon={<FileTextOutlined />} style={{ fontSize: 11, borderRadius: 4 }}>{label}</StatusTag>;
-            const safeLink = safeInternalAIURL(link);
-            return safeLink ? <a key={idx} href={safeLink} style={{ textDecoration: "none" }}>{tag}</a> : <span key={idx}>{tag}</span>;
+            const value = typeof source === "string" ? source : { ...source, url: safeInternalAIURL(source.url) };
+            return <SourceCitation key={idx} source={value} />;
           })}
         </div>
       )}
@@ -445,7 +477,7 @@ function MessageContent({
 
 // ─── Typewriter Effect ─────────────────────────────────────────
 
-function TypewriterMessage({ content, sources, model, thinking, i18nLang }: { content: string; sources?: Array<string | RuntimeSource>; model?: string; thinking?: string; i18nLang: Language }) {
+function TypewriterMessage({ content, sources, model, thinking, toolCalls, confidence, i18nLang }: { content: string; sources?: Array<string | RuntimeSource>; model?: string; thinking?: string; toolCalls?: AgentToolCall[]; confidence?: number; i18nLang: Language }) {
   const [displayedContent, setDisplayedContent] = useState("");
   const contentRef = useRef(content);
   const indexRef = useRef(0);
@@ -473,6 +505,8 @@ function TypewriterMessage({ content, sources, model, thinking, i18nLang }: { co
       sources={displayedContent.length === content.length ? sources : undefined}
       model={displayedContent.length === content.length ? model : undefined}
       thinking={thinking}
+      toolCalls={toolCalls}
+      confidence={confidence}
       i18nLang={i18nLang}
       role="assistant"
     />
@@ -2135,6 +2169,8 @@ function AIChatPageContent() {
                             sources={msg.sources}
                             model={msg.model}
                             thinking={msg.thinking}
+                            toolCalls={msg.toolCalls}
+                            confidence={msg.confidence}
                             i18nLang={language}
                           />
                         ) : (
@@ -2143,6 +2179,8 @@ function AIChatPageContent() {
                             sources={msg.sources}
                             model={msg.model}
                             thinking={msg.thinking}
+                            toolCalls={msg.toolCalls}
+                            confidence={msg.confidence}
                             i18nLang={language}
                             role={msg.role}
                           />

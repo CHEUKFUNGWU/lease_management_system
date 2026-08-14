@@ -158,6 +158,7 @@ export interface Message {
   attachments?: UploadedFile[];
   model?: string;
   thinking?: string;
+  confidence?: number;
   agentMode?: boolean;
   agentPlan?: AgentPlanStep[];
   toolCalls?: AgentToolCall[];

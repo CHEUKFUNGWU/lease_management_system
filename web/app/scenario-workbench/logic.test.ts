@@ -23,9 +23,9 @@ describe("scenario workbench pure logic", () => {
   });
 
   it("formats null and scenario units without inventing zero", () => {
-    expect(formatScenarioValue(null, "currency", "CNY")).toBe("—");
-    expect(formatScenarioValue(12.3456, "percent", "CNY")).toBe("12.3456%");
-    expect(formatScenarioValue(1234.5, "currency", "CNY")).toBe("1,234.50 CNY");
+    expect(formatScenarioValue(null, "currency", "CNY", "zh-CN")).toBe("—");
+    expect(formatScenarioValue(12.3456, "percent", "CNY", "zh-CN")).toBe("12.3456%");
+    expect(formatScenarioValue(1234.5, "currency", "CNY", "zh-CN")).toBe("1,234.50 CNY");
   });
 
   it("checks bridge conservation including rounding residual", () => {
@@ -62,6 +62,6 @@ describe("scenario workbench pure logic", () => {
 
   it("labels an expired result with the response horizon, not current controls", () => {
     const value = response();
-    expect(responseHorizonLabel(value)).toBe("12个月");
+    expect(responseHorizonLabel(value, "zh-CN")).toBe("12个月");
   });
 });

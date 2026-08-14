@@ -301,6 +301,7 @@ export function useAIChatRuntime({
         agentPlan: runResponse.agent_plan,
         toolCalls: runResponse.tool_calls,
         reviewPrompts: runResponse.review_prompts,
+        confidence: typeof runResponse.confidence === "number" ? runResponse.confidence : undefined,
         ...assistantSeed,
       };
       updateSessionMessages(localSessionId, (messages) => [...messages, assistantMessage]);

@@ -1,5 +1,6 @@
+import { t, type Language } from "../lib/i18n";
 import type { RetailBridge, RetailKPIValue, RetailStore360Option, RetailStore360SummaryMetric, RetailStoreDiagnosticsResponse, RetailSummaryMetric } from "../lib/api";
-import { formatKPIValue, formatSignalValue, KPI_LABELS, metricStatusLabel, metricUnitLabel } from "../operating-pulse/logic";
+import { formatKPIValue, formatSignalValue, kpiLabel, metricStatusLabel, metricUnitLabel } from "../operating-pulse/logic";
 
 export const STORE360_CODES = ["revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "store_contribution"] as const;
 export const STORE360_AUX_CODES = ["average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution_margin", "sales_per_sqm"] as const;
@@ -42,8 +43,8 @@ export function bridgeTone(value: number | null): "positive" | "negative" | "neu
   return value > 0 ? "positive" : "negative";
 }
 
-export function formatBridgeItem(value: number | null, unit: string, currency: string): string {
-  return formatSignalValue(value, unit, currency);
+export function formatBridgeItem(value: number | null, unit: string, currency: string, language: Language): string {
+  return formatSignalValue(value, unit, currency, language);
 }
 
 export function bridgeConservation(bridge: RetailBridge): number | null {
@@ -57,32 +58,33 @@ export function trendValue(row: RetailStoreDiagnosticsResponse["daily_trend"][nu
 	return row.target_kpis[code]?.value ?? null;
 }
 
-export function formatPeerBenchmarkStatus(status: string, reason?: string): string {
+export function formatPeerBenchmarkStatus(status: string, reason: string | undefined, language: Language): string {
 	const labels: Record<string, string> = {
-		complete: "可用",
-		insufficient_peers: "同群样本不足",
-		unavailable: "不可用",
+		complete: "store360.peer_status.complete",
+		insufficient_peers: "store360.peer_status.insufficient_peers",
+		unavailable: "store360.peer_status.unavailable",
 	};
-	const label = labels[status] || status;
+	const key = labels[status];
+	const label = key ? t(key, language) : status;
 	return reason ? `${label} · ${reason}` : label;
 }
 
-export function formatTrendTooltip(value: number | null, series: string, gap: boolean, unit: string, currency: string): [string, string] {
-	const label = series === "target" ? "目标门店" : "同群中位数";
-	if (series === "target" && gap) return ["数据缺口", label];
-	return [formatSignalValue(value, unit, currency), label];
+export function formatTrendTooltip(value: number | null, series: string, gap: boolean, unit: string, currency: string, language: Language): [string, string] {
+	const label = series === "target" ? t("store360.trend.target", language) : t("store360.trend.peer_median", language);
+	if (series === "target" && gap) return [t("store360.trend.data_gap", language), label];
+	return [formatSignalValue(value, unit, currency, language), label];
 }
 
-export function summaryStatus(metric: RetailStore360SummaryMetric | undefined): { label: string; reason?: string } {
-  return metricStatusLabel(metric as RetailSummaryMetric | undefined);
+export function summaryStatus(metric: RetailStore360SummaryMetric | undefined, language: Language): { status: string; label: string; reason?: string } {
+  return metricStatusLabel(metric as RetailSummaryMetric | undefined, language);
 }
 
-export function displayMetric(metric: RetailStore360SummaryMetric | undefined, currency: string): string {
-  return metric ? formatKPIValue(metric.current, currency) : "—";
+export function displayMetric(metric: RetailStore360SummaryMetric | undefined, currency: string, language: Language): string {
+  return metric ? formatKPIValue(metric.current, currency, language) : "—";
 }
 
-export function signalUnit(unit: string, currency: string): string {
-  return metricUnitLabel(unit, currency);
+export function signalUnit(unit: string, currency: string, language: Language): string {
+  return metricUnitLabel(unit, currency, language);
 }
 
-export { KPI_LABELS };
+export { kpiLabel };

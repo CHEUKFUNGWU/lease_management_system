@@ -59,6 +59,1246 @@ const dict: TranslationDict = {
     en: "The request did not succeed. Please try again.",
   },
 
+  // I18N-001 — retail shared labels (CONTEXT.md terminology)
+  "retail.kpi.revenue": {
+    "zh-CN": "销售额",
+    "zh-HK": "銷售額",
+    en: "Revenue",
+  },
+  "retail.kpi.gross_profit": {
+    "zh-CN": "毛利额",
+    "zh-HK": "毛利額",
+    en: "Gross profit",
+  },
+  "retail.kpi.gross_margin_rate": {
+    "zh-CN": "毛利率",
+    "zh-HK": "毛利率",
+    en: "Gross margin rate",
+  },
+  "retail.kpi.footfall": {
+    "zh-CN": "客流",
+    "zh-HK": "客流",
+    en: "Footfall",
+  },
+  "retail.kpi.conversion_rate": {
+    "zh-CN": "转化率",
+    "zh-HK": "轉化率",
+    en: "Conversion rate",
+  },
+  "retail.kpi.store_contribution": {
+    "zh-CN": "门店贡献",
+    "zh-HK": "門店貢獻",
+    en: "Store contribution",
+  },
+  "retail.kpi.average_transaction_value": {
+    "zh-CN": "客单价",
+    "zh-HK": "客單價",
+    en: "Average transaction value",
+  },
+  "retail.kpi.labor_cost_rate": {
+    "zh-CN": "人工成本率",
+    "zh-HK": "人工成本率",
+    en: "Labor cost rate",
+  },
+  "retail.kpi.occupancy_cash_cost_rate": {
+    "zh-CN": "经营占用成本率",
+    "zh-HK": "經營佔用成本率",
+    en: "Occupancy cash cost rate",
+  },
+  "retail.kpi.store_contribution_margin": {
+    "zh-CN": "门店贡献率",
+    "zh-HK": "門店貢獻率",
+    en: "Store contribution margin",
+  },
+  "retail.kpi.sales_per_sqm": {
+    "zh-CN": "期间坪效",
+    "zh-HK": "期間坪效",
+    en: "Sales per sqm",
+  },
+  "retail.kpi.fixed_rent": {
+    "zh-CN": "固定现金租金",
+    "zh-HK": "固定現金租金",
+    en: "Fixed cash rent",
+  },
+  "retail.kpi.variable_rent_rate": {
+    "zh-CN": "变动租金率",
+    "zh-HK": "變動租金率",
+    en: "Variable rent rate",
+  },
+  "retail.kpi.variable_rent": {
+    "zh-CN": "变动租金",
+    "zh-HK": "變動租金",
+    en: "Variable rent",
+  },
+  "retail.kpi.non_lease_cost": {
+    "zh-CN": "非租赁占用成本",
+    "zh-HK": "非租賃佔用成本",
+    en: "Non-lease cost",
+  },
+  "retail.kpi.other_controllable_cost": {
+    "zh-CN": "其他可控成本",
+    "zh-HK": "其他可控成本",
+    en: "Other controllable cost",
+  },
+  "retail.kpi.occupancy_cash_cost": {
+    "zh-CN": "经营占用现金成本",
+    "zh-HK": "經營佔用現金成本",
+    en: "Occupancy cash cost",
+  },
+  "retail.signal.revenue_decline": {
+    "zh-CN": "销售额下降",
+    "zh-HK": "銷售額下降",
+    en: "Revenue decline",
+  },
+  "retail.signal.footfall_decline": {
+    "zh-CN": "客流下降",
+    "zh-HK": "客流下降",
+    en: "Footfall decline",
+  },
+  "retail.signal.footfall_continuous_decline": {
+    "zh-CN": "连续客流下降",
+    "zh-HK": "連續客流下降",
+    en: "Continuous footfall decline",
+  },
+  "retail.signal.conversion_drop": {
+    "zh-CN": "转化率下降",
+    "zh-HK": "轉化率下降",
+    en: "Conversion drop",
+  },
+  "retail.signal.conversion_rate_drop": {
+    "zh-CN": "转化率下降",
+    "zh-HK": "轉化率下降",
+    en: "Conversion rate drop",
+  },
+  "retail.signal.average_ticket_drop": {
+    "zh-CN": "客单价下降",
+    "zh-HK": "客單價下降",
+    en: "Average ticket drop",
+  },
+  "retail.signal.gross_margin_compression": {
+    "zh-CN": "毛利率收窄",
+    "zh-HK": "毛利率收窄",
+    en: "Gross margin compression",
+  },
+  "retail.signal.labor_cost_rate_spike": {
+    "zh-CN": "人工成本率上升",
+    "zh-HK": "人工成本率上升",
+    en: "Labor cost rate spike",
+  },
+  "retail.signal.labor_cost_spike": {
+    "zh-CN": "人工成本率上升",
+    "zh-HK": "人工成本率上升",
+    en: "Labor cost spike",
+  },
+  "retail.signal.occupancy_cost_rate_spike": {
+    "zh-CN": "经营占用成本率上升",
+    "zh-HK": "經營佔用成本率上升",
+    en: "Occupancy cost rate spike",
+  },
+  "retail.signal.occupancy_cost_burden": {
+    "zh-CN": "经营占用成本率上升",
+    "zh-HK": "經營佔用成本率上升",
+    en: "Occupancy cost burden",
+  },
+  "retail.signal.contribution_turns_negative": {
+    "zh-CN": "门店贡献转负",
+    "zh-HK": "門店貢獻轉負",
+    en: "Contribution turns negative",
+  },
+  "retail.unit.currency": {
+    "zh-CN": "金额",
+    "zh-HK": "金額",
+    en: "amount",
+  },
+  "retail.unit.count": {
+    "zh-CN": "笔/人次",
+    "zh-HK": "筆/人次",
+    en: "transactions/visits",
+  },
+  "retail.status.complete": {
+    "zh-CN": "完整",
+    "zh-HK": "完整",
+    en: "Complete",
+  },
+  "retail.status.partial": {
+    "zh-CN": "部分",
+    "zh-HK": "部分",
+    en: "Partial",
+  },
+  "retail.status.missing": {
+    "zh-CN": "缺失",
+    "zh-HK": "缺失",
+    en: "Missing",
+  },
+  "retail.status_reason.unavailable": {
+    "zh-CN": "指标不可用",
+    "zh-HK": "指標不可用",
+    en: "Metric unavailable",
+  },
+  "retail.status_reason.facts_unavailable": {
+    "zh-CN": "所需事实不可用",
+    "zh-HK": "所需事實不可用",
+    en: "Required facts unavailable",
+  },
+  "retail.status_reason.coverage_incomplete": {
+    "zh-CN": "覆盖不足或字段不完整",
+    "zh-HK": "覆蓋不足或字段不完整",
+    en: "Coverage incomplete or fields missing",
+  },
+  "retail.months": {
+    "zh-CN": "个月",
+    "zh-HK": "個月",
+    en: " months",
+  },
+  "retail.classification.simulated": {
+    "zh-CN": "模拟数据",
+    "zh-HK": "模擬數據",
+    en: "Simulated",
+  },
+  "retail.classification.production": {
+    "zh-CN": "正式数据",
+    "zh-HK": "正式數據",
+    en: "Production",
+  },
+  "common.retry": {
+    "zh-CN": "重试",
+    "zh-HK": "重試",
+    en: "Retry",
+  },
+  "common.refresh": {
+    "zh-CN": "刷新",
+    "zh-HK": "刷新",
+    en: "Refresh",
+  },
+  "common.contrast": {
+    "zh-CN": "对比",
+    "zh-HK": "對比",
+    en: "comparison",
+  },
+  "common.current": {
+    "zh-CN": "当前",
+    "zh-HK": "當前",
+    en: "current",
+  },
+  "common.threshold": {
+    "zh-CN": "阈值",
+    "zh-HK": "閾值",
+    en: "threshold",
+  },
+  "common.view_kpi_drilldown": {
+    "zh-CN": "查看 KPI 下钻",
+    "zh-HK": "查看 KPI 下鑽",
+    en: "View KPI drilldown",
+  },
+  "common.go_pulse": {
+    "zh-CN": "前往经营脉搏",
+    "zh-HK": "前往經營脈搏",
+    en: "Go to Operating Pulse",
+  },
+
+  // store-360 shared labels
+  "store360.peer_status.complete": {
+    "zh-CN": "可用",
+    "zh-HK": "可用",
+    en: "Available",
+  },
+  "store360.peer_status.insufficient_peers": {
+    "zh-CN": "同群样本不足",
+    "zh-HK": "同群樣本不足",
+    en: "Insufficient peer cohort",
+  },
+  "store360.peer_status.unavailable": {
+    "zh-CN": "不可用",
+    "zh-HK": "不可用",
+    en: "Unavailable",
+  },
+  "store360.trend.target": {
+    "zh-CN": "目标门店",
+    "zh-HK": "目標門店",
+    en: "Target store",
+  },
+  "store360.trend.peer_median": {
+    "zh-CN": "同群中位数",
+    "zh-HK": "同群中位數",
+    en: "Peer median",
+  },
+  "store360.trend.data_gap": {
+    "zh-CN": "数据缺口",
+    "zh-HK": "數據缺口",
+    en: "Data gap",
+  },
+
+  // I18N-001 — operating-pulse page
+  "common.ai_analysis": {
+    "zh-CN": "交给 AI 分析",
+    "zh-HK": "交給 AI 分析",
+    en: "Analyze with AI",
+  },
+  "common.source_system": {
+    "zh-CN": "来源系统",
+    "zh-HK": "來源系統",
+    en: "Source system",
+  },
+  "common.source_system_optional": {
+    "zh-CN": "source_system（可选）",
+    "zh-HK": "source_system（可選）",
+    en: "source_system (optional)",
+  },
+  "common.store360": {
+    "zh-CN": "门店 360",
+    "zh-HK": "門店 360",
+    en: "Store 360",
+  },
+  "common.no_trend": {
+    "zh-CN": "暂无趋势事实",
+    "zh-HK": "暫無趨勢事實",
+    en: "No trend facts",
+  },
+  "common.days_suffix": {
+    "zh-CN": "天",
+    "zh-HK": "天",
+    en: " days",
+  },
+  "pulse.title": {
+    "zh-CN": "经营脉搏",
+    "zh-HK": "經營脈搏",
+    en: "Operating Pulse",
+  },
+  "pulse.subtitle": {
+    "zh-CN": "两分钟完成整体表现、数据可信度与优先门店晨检。",
+    "zh-HK": "兩分鐘完成整體表現、數據可信度與優先門店晨檢。",
+    en: "A two-minute check of overall performance, data trust, and priority stores.",
+  },
+  "pulse.trend_title": {
+    "zh-CN": "每日趋势",
+    "zh-HK": "每日趨勢",
+    en: "Daily trend",
+  },
+  "pulse.col.priority": {
+    "zh-CN": "优先",
+    "zh-HK": "優先",
+    en: "Priority",
+  },
+  "pulse.col.store": {
+    "zh-CN": "门店",
+    "zh-HK": "門店",
+    en: "Store",
+  },
+  "pulse.col.signal": {
+    "zh-CN": "信号",
+    "zh-HK": "信號",
+    en: "Signals",
+  },
+  "pulse.col.change": {
+    "zh-CN": "变化",
+    "zh-HK": "變化",
+    en: "Change",
+  },
+  "pulse.col.score": {
+    "zh-CN": "评分",
+    "zh-HK": "評分",
+    en: "Score",
+  },
+  "pulse.col.source": {
+    "zh-CN": "数据来源",
+    "zh-HK": "數據來源",
+    en: "Source",
+  },
+  "pulse.col.action": {
+    "zh-CN": "操作",
+    "zh-HK": "操作",
+    en: "Action",
+  },
+  "pulse.view_store_pulse": {
+    "zh-CN": "查看门店脉搏",
+    "zh-HK": "查看門店脈搏",
+    en: "View store pulse",
+  },
+  "pulse.no_signals": {
+    "zh-CN": "当前筛选下未触发固定经营信号",
+    "zh-HK": "當前篩選下未觸發固定經營信號",
+    en: "No fixed operating signals triggered under the current filter",
+  },
+  "pulse.suppressed_title": {
+    "zh-CN": "数据不足而被抑制的门店",
+    "zh-HK": "數據不足而被抑制的門店",
+    en: "Suppressed stores with insufficient data",
+  },
+  "pulse.err_missing_dataset_version": {
+    "zh-CN": "模拟数据缺少 dataset_version，请从最新数据集重新进入。",
+    "zh-HK": "模擬數據缺少 dataset_version，請從最新數據集重新進入。",
+    en: "Simulated data is missing a dataset_version. Re-enter from the latest dataset.",
+  },
+  "pulse.err_invalid_window": {
+    "zh-CN": "窗口仅支持 7、14 或 28 天，请选择一个有效窗口。",
+    "zh-HK": "窗口僅支持 7、14 或 28 天，請選擇一個有效窗口。",
+    en: "The window only supports 7, 14 or 28 days. Pick a valid window.",
+  },
+  "pulse.demo_generated": {
+    "zh-CN": "固定演示数据已生成",
+    "zh-HK": "固定演示數據已生成",
+    en: "Fixed demo dataset generated",
+  },
+  "pulse.anomaly_select": {
+    "zh-CN": "模拟场景",
+    "zh-HK": "模擬場景",
+    en: "Simulation scenario",
+  },
+  "pulse.all_anomalies": {
+    "zh-CN": "全部固定异常",
+    "zh-HK": "全部固定異常",
+    en: "All fixed anomalies",
+  },
+  "pulse.as_of": {
+    "zh-CN": "截至日期",
+    "zh-HK": "截至日期",
+    en: "As-of date",
+  },
+  "pulse.window": {
+    "zh-CN": "窗口",
+    "zh-HK": "窗口",
+    en: "Window",
+  },
+  "pulse.back_all_stores": {
+    "zh-CN": "返回全部门店",
+    "zh-HK": "返回全部門店",
+    en: "Back to all stores",
+  },
+  "pulse.all_authorized_stores": {
+    "zh-CN": "全部授权门店",
+    "zh-HK": "全部授權門店",
+    en: "All authorized stores",
+  },
+  "pulse.no_dataset_title": {
+    "zh-CN": "当前法人还没有模拟数据集",
+    "zh-HK": "當前法人還沒有模擬數據集",
+    en: "This legal entity has no simulated dataset yet",
+  },
+  "pulse.no_dataset_desc": {
+    "zh-CN": "生成固定 60 店演示数据后，可复演六类经营信号。页面不会自动写入数据。",
+    "zh-HK": "生成固定 60 店演示數據後，可復演六類經營信號。頁面不會自動寫入數據。",
+    en: "After generating the fixed 60-store demo dataset, the six operating signals can be replayed. The page never writes data by itself.",
+  },
+  "pulse.generate_demo": {
+    "zh-CN": "生成固定演示数据",
+    "zh-HK": "生成固定演示數據",
+    en: "Generate fixed demo data",
+  },
+  "pulse.contact_admin": {
+    "zh-CN": "请联系当前法人管理员生成演示数据。",
+    "zh-HK": "請聯繫當前法人管理員生成演示數據。",
+    en: "Ask the legal entity admin to generate the demo dataset.",
+  },
+  "pulse.unavailable_title": {
+    "zh-CN": "经营脉搏暂不可用",
+    "zh-HK": "經營脈搏暫不可用",
+    en: "Operating Pulse is temporarily unavailable",
+  },
+  "pulse.loading": {
+    "zh-CN": "读取经营脉搏…",
+    "zh-HK": "讀取經營脈搏…",
+    en: "Loading Operating Pulse…",
+  },
+  "pulse.no_facts_title": {
+    "zh-CN": "当前正式数据窗口没有事实",
+    "zh-HK": "當前正式數據窗口沒有事實",
+    en: "No facts in the current production window",
+  },
+  "pulse.no_facts_desc": {
+    "zh-CN": "请先导入并完成门店日事实映射，再刷新经营脉搏。系统不会用 0 填补缺失。",
+    "zh-HK": "請先導入並完成門店日事實映射，再刷新經營脈搏。系統不會用 0 填補缺失。",
+    en: "Import and map store-day facts first, then refresh. The system never fills gaps with 0.",
+  },
+  "pulse.currency_partition": {
+    "zh-CN": "币种分区",
+    "zh-HK": "幣種分區",
+    en: "Currency partition",
+  },
+  "pulse.unknown_currency": {
+    "zh-CN": "未知币种",
+    "zh-HK": "未知幣種",
+    en: "Unknown currency",
+  },
+  "pulse.aux_metrics": {
+    "zh-CN": "辅助指标",
+    "zh-HK": "輔助指標",
+    en: "Auxiliary metrics",
+  },
+  "pulse.cash_basis_title": {
+    "zh-CN": "经营现金口径",
+    "zh-HK": "經營現金口徑",
+    en: "Operating cash basis",
+  },
+  "pulse.cash_basis_desc": {
+    "zh-CN": "经营占用现金成本不等于 IFRS 16 折旧、利息、ROU 或租赁负债变动。",
+    "zh-HK": "經營佔用現金成本不等於 IFRS 16 折舊、利息、ROU 或租賃負債變動。",
+    en: "Operating cash occupancy cost is not IFRS 16 depreciation, interest, ROU, or lease liability movement.",
+  },
+  "pulse.store_pulse_title": {
+    "zh-CN": "门店脉搏",
+    "zh-HK": "門店脈搏",
+    en: "Store pulse",
+  },
+  "pulse.priority_stores": {
+    "zh-CN": "优先关注门店",
+    "zh-HK": "優先關注門店",
+    en: "Priority stores",
+  },
+  "pulse.api_order": {
+    "zh-CN": "按 API rank 原序 · 不在前端重算评分",
+    "zh-HK": "按 API rank 原序 · 不在前端重算評分",
+    en: "In API rank order · never re-scored on the frontend",
+  },
+
+  // I18N-001 — operating-pulse suppressed table
+  "pulse.col.brand_region": {
+    "zh-CN": "品牌 / 区域",
+    "zh-HK": "品牌 / 區域",
+    en: "Brand / region",
+  },
+  "pulse.col.reason": {
+    "zh-CN": "原因",
+    "zh-HK": "原因",
+    en: "Reason",
+  },
+  "pulse.col.coverage": {
+    "zh-CN": "覆盖",
+    "zh-HK": "覆蓋",
+    en: "Coverage",
+  },
+
+  // I18N-001 — operating-pulse table
+  "pulse.col.status": {
+    "zh-CN": "状态",
+    "zh-HK": "狀態",
+    en: "Status",
+  },
+
+  // I18N-001 — store-360 page
+  "store360.title": {
+    "zh-CN": "门店 360",
+    "zh-HK": "門店 360",
+    en: "Store 360",
+  },
+  "store360.subtitle": {
+    "zh-CN": "围绕单店的事实、同群对比与变化贡献；仅供 Working 经营分析，不作解释性判断。",
+    "zh-HK": "圍繞單店的事實、同群對比與變化貢獻；僅供 Working 經營分析，不作解釋性判斷。",
+    en: "Facts, peer comparison and change contribution for one store; Working analysis only, never an interpretive judgment.",
+  },
+  "store360.scenario_analysis": {
+    "zh-CN": "情景分析",
+    "zh-HK": "情景分析",
+    en: "Scenario analysis",
+  },
+  "store360.back_pulse": {
+    "zh-CN": "返回经营脉搏",
+    "zh-HK": "返回經營脈搏",
+    en: "Back to Operating Pulse",
+  },
+  "store360.select_store": {
+    "zh-CN": "选择授权门店",
+    "zh-HK": "選擇授權門店",
+    en: "Select an authorized store",
+  },
+  "store360.loading_stores": {
+    "zh-CN": "加载门店…",
+    "zh-HK": "加載門店…",
+    en: "Loading stores…",
+  },
+  "store360.no_selectable_stores": {
+    "zh-CN": "当前范围没有可选门店",
+    "zh-HK": "當前範圍沒有可選門店",
+    en: "No selectable stores in the current scope",
+  },
+  "store360.apply_source": {
+    "zh-CN": "应用来源",
+    "zh-HK": "應用來源",
+    en: "Apply source",
+  },
+  "store360.no_dataset_title": {
+    "zh-CN": "还没有可用的模拟数据集",
+    "zh-HK": "還沒有可用的模擬數據集",
+    en: "No simulated dataset available yet",
+  },
+  "store360.no_dataset_desc": {
+    "zh-CN": "请先在经营脉搏由管理员按固定流程生成演示数据，之后从门店关注行进入门店 360。",
+    "zh-HK": "請先在經營脈搏由管理員按固定流程生成演示數據，之後從門店關注行進入門店 360。",
+    en: "Generate the demo dataset in Operating Pulse first, then enter Store 360 from a priority store row.",
+  },
+  "store360.missing_version_title": {
+    "zh-CN": "模拟数据集版本缺失",
+    "zh-HK": "模擬數據集版本缺失",
+    en: "Simulated dataset version missing",
+  },
+  "store360.missing_version_desc": {
+    "zh-CN": "请从经营脉搏选择一个可用数据集后再进入门店 360；本页不会自动生成或补写数据。",
+    "zh-HK": "請從經營脈搏選擇一個可用數據集後再進入門店 360；本頁不會自動生成或補寫數據。",
+    en: "Pick an available dataset in Operating Pulse before entering Store 360; this page never generates or writes data.",
+  },
+  "store360.options_error": {
+    "zh-CN": "门店列表加载失败",
+    "zh-HK": "門店列表加載失敗",
+    en: "Failed to load the store list",
+  },
+  "store360.no_authorized_stores": {
+    "zh-CN": "当前范围没有授权门店",
+    "zh-HK": "當前範圍沒有授權門店",
+    en: "No authorized stores in the current scope",
+  },
+  "store360.no_authorized_desc": {
+    "zh-CN": "请检查法人、region/brand/store 数据权限或选择其他 classification/dataset；系统不会自动选择或补造门店。",
+    "zh-HK": "請檢查法人、region/brand/store 數據權限或選擇其他 classification/dataset；系統不會自動選擇或補造門店。",
+    en: "Check legal entity, region/brand/store data permissions or pick another classification/dataset; the system never auto-selects or fabricates stores.",
+  },
+  "store360.loading": {
+    "zh-CN": "读取门店诊断…",
+    "zh-HK": "讀取門店診斷…",
+    en: "Loading store diagnostics…",
+  },
+  "store360.unavailable": {
+    "zh-CN": "门店诊断暂不可用",
+    "zh-HK": "門店診斷暫不可用",
+    en: "Store diagnostics temporarily unavailable",
+  },
+  "store360.pick_filters": {
+    "zh-CN": "请选择完整筛选条件后读取门店事实。",
+    "zh-HK": "請選擇完整篩選條件後讀取門店事實。",
+    en: "Pick the full filter set to read store facts.",
+  },
+  "store360.no_facts_title": {
+    "zh-CN": "当前窗口没有门店事实",
+    "zh-HK": "當前窗口沒有門店事實",
+    en: "No store facts in the current window",
+  },
+  "store360.no_facts_desc": {
+    "zh-CN": "请先导入并完成该门店的经营日事实，或选择包含有效事实的数据集；系统不会用 0 填补缺失。",
+    "zh-HK": "請先導入並完成該門店的經營日事實，或選擇包含有效事實的數據集；系統不會用 0 填補缺失。",
+    en: "Import and map the store's daily facts, or choose a dataset that contains them; the system never fills gaps with 0.",
+  },
+  "store360.identity": {
+    "zh-CN": "门店身份",
+    "zh-HK": "門店身份",
+    en: "Store identity",
+  },
+  "store360.field.store": {
+    "zh-CN": "门店",
+    "zh-HK": "門店",
+    en: "Store",
+  },
+  "store360.field.brand_region": {
+    "zh-CN": "品牌 / 区域",
+    "zh-HK": "品牌 / 區域",
+    en: "Brand / region",
+  },
+  "store360.field.currency": {
+    "zh-CN": "币种",
+    "zh-HK": "幣種",
+    en: "Currency",
+  },
+  "store360.field.fact_version": {
+    "zh-CN": "事实版本",
+    "zh-HK": "事實版本",
+    en: "Fact version",
+  },
+  "store360.aux_metrics": {
+    "zh-CN": "辅助指标",
+    "zh-HK": "輔助指標",
+    en: "Auxiliary metrics",
+  },
+  "store360.cash_basis_title": {
+    "zh-CN": "经营口径",
+    "zh-HK": "經營口徑",
+    en: "Operating basis",
+  },
+  "store360.cash_basis_desc": {
+    "zh-CN": "经营占用现金成本仅用于经营分析，未混入 IFRS 16 计量或 Official 过账链路。",
+    "zh-HK": "經營佔用現金成本僅用於經營分析，未混入 IFRS 16 計量或 Official 過賬鏈路。",
+    en: "Operating cash occupancy cost is for operating analysis only and never enters IFRS 16 measurement or the Official posting chain.",
+  },
+  "store360.peer_benchmark": {
+    "zh-CN": "同群基准",
+    "zh-HK": "同群基準",
+    en: "Peer benchmark",
+  },
+  "store360.peer_definition": {
+    "zh-CN": "最少 {n} 家同群门店",
+    "zh-HK": "最少 {n} 家同群門店",
+    en: "minimum {n} peer stores",
+  },
+  "store360.col.metric": {
+    "zh-CN": "指标",
+    "zh-HK": "指標",
+    en: "Metric",
+  },
+  "store360.col.target": {
+    "zh-CN": "目标",
+    "zh-HK": "目標",
+    en: "Target",
+  },
+  "store360.col.quartiles": {
+    "zh-CN": "P25 / 中位 / P75",
+    "zh-HK": "P25 / 中位 / P75",
+    en: "P25 / median / P75",
+  },
+  "store360.col.sample_percentile": {
+    "zh-CN": "样本 / 百分位",
+    "zh-HK": "樣本 / 百分位",
+    en: "Sample / percentile",
+  },
+  "store360.col.status": {
+    "zh-CN": "状态",
+    "zh-HK": "狀態",
+    en: "Status",
+  },
+  "store360.observations": {
+    "zh-CN": "观察信号",
+    "zh-HK": "觀察信號",
+    en: "Observations",
+  },
+  "store360.no_observations": {
+    "zh-CN": "当前期间没有可用观察信号",
+    "zh-HK": "當前期間沒有可用觀察信號",
+    en: "No usable observations in the current period",
+  },
+  "store360.evidence_title": {
+    "zh-CN": "证据与可追溯性",
+    "zh-HK": "證據與可追溯性",
+    en: "Evidence & traceability",
+  },
+  "store360.evidence.coverage_source": {
+    "zh-CN": "覆盖 {observed}/{expected} store-days · 来源 {sources} · dataset {datasets}",
+    "zh-HK": "覆蓋 {observed}/{expected} store-days · 來源 {sources} · dataset {datasets}",
+    en: "Coverage {observed}/{expected} store-days · source {sources} · dataset {datasets}",
+  },
+  "store360.evidence.fact_version": {
+    "zh-CN": "fact version {min}–{max}",
+    "zh-HK": "fact version {min}–{max}",
+    en: "fact version {min}–{max}",
+  },
+  "store360.bridge.title": {
+    "zh-CN": "变化贡献桥（仅观察信号）",
+    "zh-HK": "變化貢獻橋（僅觀察信號）",
+    en: "Change contribution bridge (observational)",
+  },
+  "store360.bridge.complete": {
+    "zh-CN": "可用",
+    "zh-HK": "可用",
+    en: "Available",
+  },
+  "store360.bridge.unavailable": {
+    "zh-CN": "不可用",
+    "zh-HK": "不可用",
+    en: "Unavailable",
+  },
+  "store360.bridge.reason_default": {
+    "zh-CN": "所需字段不可用，未补零。",
+    "zh-HK": "所需字段不可用，未補零。",
+    en: "Required fields unavailable; nothing was zero-filled.",
+  },
+  "store360.bridge.contrast": {
+    "zh-CN": "对比",
+    "zh-HK": "對比",
+    en: "comparison",
+  },
+  "store360.bridge.current": {
+    "zh-CN": "当前",
+    "zh-HK": "當前",
+    en: "current",
+  },
+  "store360.bridge.change": {
+    "zh-CN": "变化",
+    "zh-HK": "變化",
+    en: "change",
+  },
+  "store360.bridge.residual": {
+    "zh-CN": "守恒残差",
+    "zh-HK": "守恆殘差",
+    en: "conservation residual",
+  },
+  "store360.bridge.item": {
+    "zh-CN": "变化项",
+    "zh-HK": "變化項",
+    en: "Change item",
+  },
+  "store360.bridge.contribution": {
+    "zh-CN": "贡献",
+    "zh-HK": "貢獻",
+    en: "Contribution",
+  },
+  "store360.trend_title": {
+    "zh-CN": "每日趋势（目标门店 / 同群中位数）",
+    "zh-HK": "每日趨勢（目標門店 / 同群中位數）",
+    en: "Daily trend (target store / peer median)",
+  },
+  "store360.status.missing": {
+    "zh-CN": "缺失",
+    "zh-HK": "缺失",
+    en: "Missing",
+  },
+  "store360.status.partial": {
+    "zh-CN": "部分",
+    "zh-HK": "部分",
+    en: "Partial",
+  },
+  "store360.status.complete": {
+    "zh-CN": "完整",
+    "zh-HK": "完整",
+    en: "Complete",
+  },
+
+  // I18N-001 — scenario-workbench page
+  "scenario.title": {
+    "zh-CN": "情景工作台",
+    "zh-HK": "情景工作台",
+    en: "Scenario Workbench",
+  },
+  "scenario.subtitle": {
+    "zh-CN": "门店经营 What-if；服务端基于同一 Working 事实重算 30-day run-rate，不输出最优方案或 IFRS 16 影响。",
+    "zh-HK": "門店經營 What-if；服務端基於同一 Working 事實重算 30-day run-rate，不輸出最優方案或 IFRS 16 影響。",
+    en: "Store what-if; the server recomputes a 30-day run-rate on the same Working facts, with no optimal plan or IFRS 16 impact.",
+  },
+  "scenario.calculate": {
+    "zh-CN": "计算情景",
+    "zh-HK": "計算情景",
+    en: "Evaluate scenario",
+  },
+  "scenario.back_store360": {
+    "zh-CN": "返回门店 360",
+    "zh-HK": "返回門店 360",
+    en: "Back to Store 360",
+  },
+  "scenario.delta.revenue_change_pct": {
+    "zh-CN": "销售额变化",
+    "zh-HK": "銷售額變化",
+    en: "Revenue change",
+  },
+  "scenario.delta.gross_margin_rate_change_pp": {
+    "zh-CN": "毛利率变化",
+    "zh-HK": "毛利率變化",
+    en: "Gross margin rate change",
+  },
+  "scenario.delta.labor_cost_change_pct": {
+    "zh-CN": "人工成本变化",
+    "zh-HK": "人工成本變化",
+    en: "Labor cost change",
+  },
+  "scenario.delta.fixed_rent_change_pct": {
+    "zh-CN": "固定现金租金变化",
+    "zh-HK": "固定現金租金變化",
+    en: "Fixed cash rent change",
+  },
+  "scenario.delta.variable_rent_rate_change_pp": {
+    "zh-CN": "变动租金率变化",
+    "zh-HK": "變動租金率變化",
+    en: "Variable rent rate change",
+  },
+  "scenario.delta.non_lease_cost_change_pct": {
+    "zh-CN": "非租赁占用成本变化",
+    "zh-HK": "非租賃佔用成本變化",
+    en: "Non-lease cost change",
+  },
+  "scenario.delta.other_controllable_cost_change_pct": {
+    "zh-CN": "其他可控成本变化",
+    "zh-HK": "其他可控成本變化",
+    en: "Other controllable cost change",
+  },
+  "scenario.horizon": {
+    "zh-CN": "预测期",
+    "zh-HK": "預測期",
+    en: "Horizon",
+  },
+  "scenario.months_option": {
+    "zh-CN": "{n}个月",
+    "zh-HK": "{n}個月",
+    en: "{n} months",
+  },
+  "scenario.baseline_note": {
+    "zh-CN": "Baseline 为固定零 delta；Plan 的七类变化会由服务端重新计算。",
+    "zh-HK": "Baseline 為固定零 delta；Plan 的七類變化會由服務端重新計算。",
+    en: "Baseline is a fixed zero-delta; the seven Plan changes are recomputed server-side.",
+  },
+  "scenario.col.metric": {
+    "zh-CN": "指标",
+    "zh-HK": "指標",
+    en: "Metric",
+  },
+  "scenario.col.baseline": {
+    "zh-CN": "Baseline",
+    "zh-HK": "Baseline",
+    en: "Baseline",
+  },
+  "scenario.col.plan": {
+    "zh-CN": "Plan",
+    "zh-HK": "Plan",
+    en: "Plan",
+  },
+  "scenario.col.change": {
+    "zh-CN": "变化",
+    "zh-HK": "變化",
+    en: "Change",
+  },
+  "scenario.col.status": {
+    "zh-CN": "状态",
+    "zh-HK": "狀態",
+    en: "Status",
+  },
+  "scenario.err_select_store": {
+    "zh-CN": "请先选择授权门店。",
+    "zh-HK": "請先選擇授權門店。",
+    en: "Select an authorized store first.",
+  },
+  "scenario.err_dataset_version": {
+    "zh-CN": "模拟数据必须明确 dataset version。",
+    "zh-HK": "模擬數據必須明確 dataset version。",
+    en: "Simulated data must specify a dataset version.",
+  },
+  "scenario.confirm_save_title": {
+    "zh-CN": "保存行动草稿？",
+    "zh-HK": "保存行動草稿？",
+    en: "Save the action draft?",
+  },
+  "scenario.confirm_save_content": {
+    "zh-CN": "服务端会重新读取 Working 事实并只写入一条 open 行动草稿。",
+    "zh-HK": "服務端會重新讀取 Working 事實並只寫入一條 open 行動草稿。",
+    en: "The server re-reads Working facts and writes a single open action draft.",
+  },
+  "scenario.saved_replay": {
+    "zh-CN": "已安全重放现有草稿",
+    "zh-HK": "已安全重放現有草稿",
+    en: "Existing draft replayed safely",
+  },
+  "scenario.saved": {
+    "zh-CN": "行动草稿已保存",
+    "zh-HK": "行動草稿已保存",
+    en: "Action draft saved",
+  },
+  "scenario.pick_store": {
+    "zh-CN": "请选择授权门店后计算情景；本页不会自动生成模拟数据。",
+    "zh-HK": "請選擇授權門店後計算情景；本頁不會自動生成模擬數據。",
+    en: "Pick an authorized store to evaluate; this page never generates simulated data.",
+  },
+  "scenario.missing_version_title": {
+    "zh-CN": "模拟 dataset version 缺失",
+    "zh-HK": "模擬 dataset version 缺失",
+    en: "Simulated dataset version missing",
+  },
+  "scenario.missing_version_desc": {
+    "zh-CN": "请从经营脉搏选择固定模拟数据集；页面不会把 production 或旧版本伪装成 latest。",
+    "zh-HK": "請從經營脈搏選擇固定模擬數據集；頁面不會把 production 或舊版本偽裝成 latest。",
+    en: "Pick the fixed simulated dataset in Operating Pulse; the page never disguises production or old versions as latest.",
+  },
+  "scenario.options_error": {
+    "zh-CN": "授权门店加载失败",
+    "zh-HK": "授權門店加載失敗",
+    en: "Failed to load authorized stores",
+  },
+  "scenario.no_authorized": {
+    "zh-CN": "当前范围没有授权门店",
+    "zh-HK": "當前範圍沒有授權門店",
+    en: "No authorized stores in the current scope",
+  },
+  "scenario.no_authorized_desc": {
+    "zh-CN": "请检查法人、classification、dataset 或数据权限；系统不会自动选择或补造门店。",
+    "zh-HK": "請檢查法人、classification、dataset 或數據權限；系統不會自動選擇或補造門店。",
+    en: "Check legal entity, classification, dataset or data permissions; the system never auto-selects or fabricates stores.",
+  },
+  "scenario.stale_title": {
+    "zh-CN": "结果已过期，不能保存",
+    "zh-HK": "結果已過期，不能保存",
+    en: "Result is stale and cannot be saved",
+  },
+  "scenario.stale_desc": {
+    "zh-CN": "门店、日期窗口、来源、预测期或七项情景假设已变化。请重新计算后再生成行动草稿。",
+    "zh-HK": "門店、日期窗口、來源、預測期或七項情景假設已變化。請重新計算後再生成行動草稿。",
+    en: "Store, window, source, horizon or the seven assumptions changed. Re-evaluate before saving a draft.",
+  },
+  "scenario.recalculate": {
+    "zh-CN": "重新计算",
+    "zh-HK": "重新計算",
+    en: "Re-evaluate",
+  },
+  "scenario.unavailable": {
+    "zh-CN": "情景不可用",
+    "zh-HK": "情景不可用",
+    en: "Scenario unavailable",
+  },
+  "scenario.loading": {
+    "zh-CN": "服务端读取事实并计算 30-day run-rate…",
+    "zh-HK": "服務端讀取事實並計算 30-day run-rate…",
+    en: "Reading facts and computing the 30-day run-rate…",
+  },
+  "scenario.baseline_title": {
+    "zh-CN": "Baseline / {name}",
+    "zh-HK": "Baseline / {name}",
+    en: "Baseline / {name}",
+  },
+  "scenario.stale": {
+    "zh-CN": "结果已过期",
+    "zh-HK": "結果已過期",
+    en: "Stale result",
+  },
+  "scenario.monthly_change": {
+    "zh-CN": "月度贡献变化",
+    "zh-HK": "月度貢獻變化",
+    en: "Monthly contribution change",
+  },
+  "scenario.horizon_change": {
+    "zh-CN": "预测期贡献变化",
+    "zh-HK": "預測期貢獻變化",
+    en: "Horizon contribution change",
+  },
+  "scenario.evidence_title": {
+    "zh-CN": "证据与公式",
+    "zh-HK": "證據與公式",
+    en: "Evidence & formulas",
+  },
+  "scenario.evidence.facts": {
+    "zh-CN": "当前事实：{from}–{to} · 覆盖 {observed}/{expected}（{rate}）",
+    "zh-HK": "當前事實：{from}–{to} · 覆蓋 {observed}/{expected}（{rate}）",
+    en: "Current facts: {from}–{to} · coverage {observed}/{expected} ({rate})",
+  },
+  "scenario.evidence.formula": {
+    "zh-CN": "公式：30-day run-rate = 30 ÷ observed store-days；贡献额 = 毛利额 − 人工 − 经营占用现金成本 − 其他可控成本。经营占用现金成本不等同 IFRS 16 会计费用。",
+    "zh-HK": "公式：30-day run-rate = 30 ÷ observed store-days；貢獻額 = 毛利額 − 人工 − 經營佔用現金成本 − 其他可控成本。經營佔用現金成本不等同 IFRS 16 會計費用。",
+    en: "Formula: 30-day run-rate = 30 ÷ observed store-days; contribution = gross profit − labor − occupancy cash cost − other controllable cost. Occupancy cash cost is not IFRS 16 accounting.",
+  },
+  "scenario.view_drilldown": {
+    "zh-CN": "查看 KPI 事实下钻",
+    "zh-HK": "查看 KPI 事實下鑽",
+    en: "View KPI drilldown",
+  },
+  "scenario.bridge.title": {
+    "zh-CN": "变化贡献桥（守恒，非根因）",
+    "zh-HK": "變化貢獻橋（守恆，非根因）",
+    en: "Change contribution bridge (conserved, not causal)",
+  },
+  "scenario.bridge.item": {
+    "zh-CN": "变化项",
+    "zh-HK": "變化項",
+    en: "Change item",
+  },
+  "scenario.bridge.contribution": {
+    "zh-CN": "贡献",
+    "zh-HK": "貢獻",
+    en: "Contribution",
+  },
+  "scenario.bridge.total": {
+    "zh-CN": "总变化",
+    "zh-HK": "總變化",
+    en: "Total change",
+  },
+  "scenario.bridge.residual": {
+    "zh-CN": "残差",
+    "zh-HK": "殘差",
+    en: "Residual",
+  },
+  "scenario.bridge.conservation": {
+    "zh-CN": "守恒误差",
+    "zh-HK": "守恆誤差",
+    en: "Conservation error",
+  },
+  "scenario.draft.title": {
+    "zh-CN": "行动草稿（只写 open）",
+    "zh-HK": "行動草稿（只寫 open）",
+    en: "Action draft (open only)",
+  },
+  "scenario.draft.title_placeholder": {
+    "zh-CN": "标题",
+    "zh-HK": "標題",
+    en: "Title",
+  },
+  "scenario.draft.action_placeholder": {
+    "zh-CN": "计划动作（需复核验证）",
+    "zh-HK": "計劃動作（需覆核驗證）",
+    en: "Planned action (requires review)",
+  },
+  "scenario.draft.owner_placeholder": {
+    "zh-CN": "Owner（可空）",
+    "zh-HK": "Owner（可空）",
+    en: "Owner (optional)",
+  },
+  "scenario.draft.period_placeholder": {
+    "zh-CN": "验证期间 YYYY-MM",
+    "zh-HK": "驗證期間 YYYY-MM",
+    en: "Verification period YYYY-MM",
+  },
+  "scenario.draft.save": {
+    "zh-CN": "保存行动草稿",
+    "zh-HK": "保存行動草稿",
+    en: "Save action draft",
+  },
+  "scenario.draft.saved_title": {
+    "zh-CN": "行动草稿已安全保存/重放",
+    "zh-HK": "行動草稿已安全保存/重放",
+    en: "Action draft saved/replayed safely",
+  },
+  "scenario.draft.real_id": {
+    "zh-CN": "真实 ID：{id} · status={status}",
+    "zh-HK": "真實 ID：{id} · status={status}",
+    en: "Real ID: {id} · status={status}",
+  },
+  "scenario.draft.idempotent_yes": {
+    "zh-CN": "是",
+    "zh-HK": "是",
+    en: "Yes",
+  },
+  "scenario.draft.idempotent_no": {
+    "zh-CN": "否",
+    "zh-HK": "否",
+    en: "No",
+  },
+  "scenario.draft.idempotency": {
+    "zh-CN": "Idempotency replay：{value}",
+    "zh-HK": "Idempotency replay：{value}",
+    en: "Idempotency replay: {value}",
+  },
+  "scenario.draft.go_workbench": {
+    "zh-CN": "前往经营工作台查看",
+    "zh-HK": "前往經營工作台查看",
+    en: "Open the performance workbench",
+  },
+
+  // AI-001 — explainability components (DESIGN.md §9)
+  "ai.tool.completed": {
+    "zh-CN": "已完成",
+    "zh-HK": "已完成",
+    en: "Completed",
+  },
+  "ai.tool.failed": {
+    "zh-CN": "失败",
+    "zh-HK": "失敗",
+    en: "Failed",
+  },
+  "ai.tool.needs_review": {
+    "zh-CN": "需复核",
+    "zh-HK": "需覆核",
+    en: "Needs review",
+  },
+  "ai.tool.output_chars": {
+    "zh-CN": "输出 {n} 字符",
+    "zh-HK": "輸出 {n} 字符",
+    en: "{n} chars out",
+  },
+  "ai.tool.duration": {
+    "zh-CN": "{ms}ms",
+    "zh-HK": "{ms}ms",
+    en: "{ms}ms",
+  },
+  "ai.citation.anonymous": {
+    "zh-CN": "来源",
+    "zh-HK": "來源",
+    en: "Source",
+  },
+  "ai.confidence.low": {
+    "zh-CN": "低置信",
+    "zh-HK": "低置信",
+    en: "Low confidence",
+  },
+  "ai.confidence.medium": {
+    "zh-CN": "中置信",
+    "zh-HK": "中置信",
+    en: "Medium confidence",
+  },
+  "ai.confidence.high": {
+    "zh-CN": "高置信",
+    "zh-HK": "高置信",
+    en: "High confidence",
+  },
+  "ai.confidence.reason": {
+    "zh-CN": "降级原因",
+    "zh-HK": "降級原因",
+    en: "Degradation reason",
+  },
+
+  // AI-002 — approval card and retail AI drawer
+  "ai.approval.role": {
+    "zh-CN": "AI 行动提议",
+    "zh-HK": "AI 行動提議",
+    en: "AI action proposal",
+  },
+  "ai.approval.untitled": {
+    "zh-CN": "未命名提议",
+    "zh-HK": "未命名提議",
+    en: "Untitled proposal",
+  },
+  "ai.approval.evidence_complete": {
+    "zh-CN": "证据完整",
+    "zh-HK": "證據完整",
+    en: "Evidence complete",
+  },
+  "ai.approval.evidence_incomplete": {
+    "zh-CN": "需补证据",
+    "zh-HK": "需補證據",
+    en: "Evidence incomplete",
+  },
+  "ai.approval.expected_benefit": {
+    "zh-CN": "预期影响",
+    "zh-HK": "預期影響",
+    en: "Expected impact",
+  },
+  "ai.approval.adopt": {
+    "zh-CN": "采纳",
+    "zh-HK": "採納",
+    en: "Adopt",
+  },
+  "ai.approval.modify": {
+    "zh-CN": "修改",
+    "zh-HK": "修改",
+    en: "Modify",
+  },
+  "ai.approval.reject": {
+    "zh-CN": "拒绝",
+    "zh-HK": "拒絕",
+    en: "Reject",
+  },
+  "ai.drawer.title": {
+    "zh-CN": "交给 AI 分析",
+    "zh-HK": "交給 AI 分析",
+    en: "Analyze with AI",
+  },
+  "ai.drawer.context": {
+    "zh-CN": "当前页面上下文",
+    "zh-HK": "當前頁面上下文",
+    en: "Current page context",
+  },
+  "ai.drawer.empty": {
+    "zh-CN": "针对当前页面提问，AI 回答会附引用来源。",
+    "zh-HK": "針對當前頁面提問，AI 回答會附引用來源。",
+    en: "Ask about this page; answers carry citations.",
+  },
+  "ai.drawer.placeholder": {
+    "zh-CN": "输入问题…",
+    "zh-HK": "輸入問題…",
+    en: "Ask a question…",
+  },
+  "ai.drawer.send": {
+    "zh-CN": "发送",
+    "zh-HK": "發送",
+    en: "Send",
+  },
+  "ai.drawer.no_answer": {
+    "zh-CN": "（无回答）",
+    "zh-HK": "（無回答）",
+    en: "(no answer)",
+  },
+
+  // AI-002 — proposal notice
+  "ai.approval.notice": {
+    "zh-CN": "仅为行动提议：确认前不会写入行动清单或正式台账。",
+    "zh-HK": "僅為行動提議：確認前不會寫入行動清單或正式台賬。",
+    en: "This is only a proposal: nothing is written until you confirm.",
+  },
+  "ai.approval.rejected": {
+    "zh-CN": "已拒绝该提议",
+    "zh-HK": "已拒絕該提議",
+    en: "Proposal rejected",
+  },
+  "ai.approval.adopt_failed": {
+    "zh-CN": "采纳失败，请重试",
+    "zh-HK": "採納失敗，請重試",
+    en: "Adopt failed, retry",
+  },
+
   // ENV-002 DataTrustBar — DESIGN.md §10 数据可信度展示
   "trust.classification_production": {
     "zh-CN": "正式数据 · Working",

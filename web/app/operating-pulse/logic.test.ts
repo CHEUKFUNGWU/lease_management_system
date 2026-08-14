@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RetailKPIValue, RetailPulseResponse } from "../lib/api";
-import { changeTone, formatChange, formatKPIValue, formatSignalValue, latestAnomalyDate, metricStatusLabel, responsePartitions, signalLabel, switchClassification, trendValue } from "./logic";
+import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, responsePartitions, signalLabel, switchClassification, trendValue } from "./logic";
 
 const value = (unit: string, current: number | null): RetailKPIValue => ({
   value: current,
@@ -25,10 +25,10 @@ const response = (overrides: Partial<RetailPulseResponse> = {}): RetailPulseResp
 
 describe("operating pulse presentation adapter", () => {
   it("formats money, percent, count and null without inventing zero", () => {
-    expect(formatKPIValue(value("currency", 1234.5), "CNY")).toBe("1,234.50 CNY");
-    expect(formatKPIValue(value("percent", 12.5))).toBe("12.50%");
-    expect(formatKPIValue(value("count", 42))).toBe("42 笔/人次");
-    expect(formatKPIValue(value("currency", null), "CNY")).toBe("—");
+    expect(formatKPIValue(value("currency", 1234.5), "CNY", "zh-CN")).toBe("1,234.50 CNY");
+    expect(formatKPIValue(value("percent", 12.5), undefined, "zh-CN")).toBe("12.50%");
+    expect(formatKPIValue(value("count", 42), undefined, "zh-CN")).toBe("42 笔/人次");
+    expect(formatKPIValue(value("currency", null), "CNY", "zh-CN")).toBe("—");
   });
 
   it("keeps pp and percent changes distinct and maps unfavorable direction", () => {
@@ -36,9 +36,9 @@ describe("operating pulse presentation adapter", () => {
     expect(formatChange({ current: value("currency", 90), comparison: value("currency", 100), change_value: -10, change_type: "percent", status: "complete" })).toBe("-10.00%");
     expect(changeTone("revenue", { current: value("currency", 90), comparison: value("currency", 100), change_value: -10, change_type: "percent", status: "complete" })).toBe("bad");
     expect(changeTone("labor_cost_rate", { current: value("percent", 12), comparison: value("percent", 10), change_value: 2, change_type: "percentage_point", status: "complete" })).toBe("bad");
-    expect(formatSignalValue(-10, "percent")).toBe("-10.00%");
-    expect(formatSignalValue(-2, "percentage_point")).toBe("-2.00pp");
-    expect(formatSignalValue(20, "count")).toBe("20 笔/人次");
+    expect(formatSignalValue(-10, "percent", undefined, "zh-CN")).toBe("-10.00%");
+    expect(formatSignalValue(-2, "percentage_point", undefined, "zh-CN")).toBe("-2.00pp");
+    expect(formatSignalValue(20, "count", undefined, "zh-CN")).toBe("20 笔/人次");
   });
 
   it("preserves partitions, gaps and null trend values", () => {
@@ -54,7 +54,7 @@ describe("operating pulse presentation adapter", () => {
     expect([
       "footfall_continuous_decline", "conversion_rate_drop", "average_ticket_drop",
       "gross_margin_compression", "labor_cost_spike", "occupancy_cost_burden",
-    ].map(signalLabel)).toEqual(["连续客流下降", "转化率下降", "客单价下降", "毛利率收窄", "人工成本率上升", "经营占用成本率上升"]);
+    ].map((code) => signalLabel(code, "zh-CN"))).toEqual(["连续客流下降", "转化率下降", "客单价下降", "毛利率收窄", "人工成本率上升", "经营占用成本率上升"]);
   });
 
   it("normalizes the three classification switch paths", () => {
@@ -69,9 +69,9 @@ describe("operating pulse presentation adapter", () => {
     const complete = { current: value("percent", 10), comparison: value("percent", 9), change_value: 1, change_type: "percentage_point", status: "complete" } as const;
     const partial = { current: { ...value("percent", 10), status: "partial", reason: "coverage_below_threshold" }, comparison: value("percent", 9), change_value: null, change_type: "percentage_point", status: "partial" } as const;
     const unavailable = { current: { ...value("percent", null), status: "unavailable", reason: "zero_denominator" }, comparison: value("percent", 9), change_value: null, change_type: "percentage_point", status: "unavailable" } as const;
-    expect(metricStatusLabel(complete)).toEqual({ label: "完整", reason: undefined });
-    expect(metricStatusLabel(partial)).toEqual({ label: "部分", reason: "coverage_below_threshold" });
-    expect(metricStatusLabel(unavailable)).toEqual({ label: "缺失", reason: "zero_denominator" });
-    expect(metricStatusLabel(null)).toEqual({ label: "缺失", reason: "指标不可用" });
+    expect(metricStatusLabel(complete, "zh-CN")).toEqual({ status: "complete", label: "完整", reason: undefined });
+    expect(metricStatusLabel(partial, "zh-CN")).toEqual({ status: "partial", label: "部分", reason: "coverage_below_threshold" });
+    expect(metricStatusLabel(unavailable, "zh-CN")).toEqual({ status: "missing", label: "缺失", reason: "zero_denominator" });
+    expect(metricStatusLabel(null, "zh-CN")).toEqual({ status: "missing", label: "缺失", reason: "指标不可用" });
   });
 });

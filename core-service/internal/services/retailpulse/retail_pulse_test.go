@@ -342,10 +342,10 @@ func TestPulseCoverageSuppressionAndMultiCurrency(t *testing.T) {
 func TestPulseZeroComparisonDoesNotCreateInfiniteChange(t *testing.T) {
 	zero := 0.0
 	current := 100.0
-	if value, reason := change(&current, &zero, "percent"); value != nil || reason != "zero_comparison" {
+	if value, reason := retailkpi.ChangeRate(&current, &zero, "percent"); value != nil || reason != "zero_comparison" {
 		t.Fatalf("zero comparison value=%v reason=%s", value, reason)
 	}
-	if value, reason := change(&current, nil, "percent"); value != nil || reason != "missing_value" {
+	if value, reason := retailkpi.ChangeRate(&current, nil, "percent"); value != nil || reason != "missing_value" {
 		t.Fatalf("missing comparison value=%v reason=%s", value, reason)
 	}
 }

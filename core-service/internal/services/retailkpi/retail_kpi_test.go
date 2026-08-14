@@ -292,3 +292,33 @@ func assertGoldenMetrics(t *testing.T, row Aggregate, expected map[string]float6
 		}
 	}
 }
+
+// K3: the single Fact Coverage verdict. Over-coverage (observed > expected)
+// is not incomplete — the store-360 engine previously used `!=` and wiped
+// the peer benchmark on any over-coverage; every read now shares this rule.
+func TestCoverageIncompleteSingleVerdict(t *testing.T) {
+	cases := []struct {
+		name     string
+		coverage Coverage
+		want     bool
+	}{
+		{"under coverage", Coverage{ObservedStoreDays: 5, ExpectedStoreDays: 7}, true},
+		{"exact coverage", Coverage{ObservedStoreDays: 7, ExpectedStoreDays: 7}, false},
+		{"over coverage", Coverage{ObservedStoreDays: 10, ExpectedStoreDays: 7}, false},
+		{"unknown expected", Coverage{ObservedStoreDays: 7, ExpectedStoreDays: 0}, false},
+		{"empty", Coverage{}, false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := CoverageIncomplete(testCase.coverage); got != testCase.want {
+				t.Fatalf("CoverageIncomplete(%+v) = %v, want %v", testCase.coverage, got, testCase.want)
+			}
+			// Complete means expected known and fully observed; with an
+			// unknown expected population neither verdict fires.
+			wantComplete := testCase.coverage.ExpectedStoreDays > 0 && !testCase.want
+			if got := CoverageComplete(testCase.coverage); got != wantComplete {
+				t.Fatalf("CoverageComplete(%+v) = %v, want %v", testCase.coverage, got, wantComplete)
+			}
+		})
+	}
+}

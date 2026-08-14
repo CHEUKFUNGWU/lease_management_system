@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 	"github.com/lease-management-system/core-service/internal/services/retailstore360"
 	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
-	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
 const (
@@ -150,26 +150,26 @@ type Evidence struct {
 }
 
 type Response struct {
-	Basis              string           `json:"basis"`
-	ScenarioVersion    string           `json:"scenario_version"`
-	FormulaVersion     string           `json:"formula_version"`
-	DiagnosticsVersion string           `json:"diagnostics_version"`
-	SideEffects        bool             `json:"side_effects"`
-	ReviewRequired     bool             `json:"review_required"`
-	OfficialImpact     bool             `json:"official_impact"`
-	IFRS16Impact       bool             `json:"ifrs16_impact"`
-	GeneratedAt        time.Time        `json:"generated_at"`
-	Store              StoreIdentity    `json:"store"`
-	DataClassification string           `json:"data_classification"`
-	DatasetVersion     string           `json:"dataset_version,omitempty"`
-	SourceSystem       string           `json:"source_system,omitempty"`
+	Basis              string                  `json:"basis"`
+	ScenarioVersion    string                  `json:"scenario_version"`
+	FormulaVersion     string                  `json:"formula_version"`
+	DiagnosticsVersion string                  `json:"diagnostics_version"`
+	SideEffects        bool                    `json:"side_effects"`
+	ReviewRequired     bool                    `json:"review_required"`
+	OfficialImpact     bool                    `json:"official_impact"`
+	IFRS16Impact       bool                    `json:"ifrs16_impact"`
+	GeneratedAt        time.Time               `json:"generated_at"`
+	Store              StoreIdentity           `json:"store"`
+	DataClassification string                  `json:"data_classification"`
+	DatasetVersion     string                  `json:"dataset_version,omitempty"`
+	SourceSystem       string                  `json:"source_system,omitempty"`
 	Envelope           sourceenvelope.Envelope `json:"envelope"`
-	Currency           string           `json:"currency"`
-	Current            Period           `json:"current"`
-	HorizonMonths      int              `json:"horizon_months"`
-	Baseline           ScenarioResult   `json:"baseline"`
-	Scenarios          []ScenarioResult `json:"scenarios"`
-	Evidence           Evidence         `json:"evidence"`
+	Currency           string                  `json:"currency"`
+	Current            Period                  `json:"current"`
+	HorizonMonths      int                     `json:"horizon_months"`
+	Baseline           ScenarioResult          `json:"baseline"`
+	Scenarios          []ScenarioResult        `json:"scenarios"`
+	Evidence           Evidence                `json:"evidence"`
 }
 
 type baseValues struct {
@@ -348,7 +348,7 @@ func buildBase(facts []retailkpi.DailyFact, from, to time.Time, expected int) (b
 	if len(current) == 0 {
 		return baseValues{}, 0, currency, "no_facts"
 	}
-	if len(current) != expected {
+	if retailkpi.CoverageIncomplete(retailkpi.Coverage{ObservedStoreDays: len(current), ExpectedStoreDays: expected}) {
 		return baseValues{}, len(current), currency, "incomplete_store_day_coverage"
 	}
 	for _, f := range current {

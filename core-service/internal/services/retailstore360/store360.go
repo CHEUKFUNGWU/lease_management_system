@@ -10,14 +10,15 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
-	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
 const (
 	DiagnosticsVersion = "retail-store-diagnostics-v1"
-	MinimumPeerCount   = 3
+	// MinimumPeerCount is the shared retail-kpi-v1 cohort rule.
+	MinimumPeerCount = retailkpi.MinimumPeerCount
 )
 
 var (
@@ -129,38 +130,38 @@ type Evidence struct {
 }
 
 type Response struct {
-	Basis              string                   `json:"basis"`
-	DiagnosticsVersion string                   `json:"diagnostics_version"`
-	FormulaVersion     string                   `json:"formula_version"`
-	PulseVersion       string                   `json:"pulse_version"`
-	DataClassification string                   `json:"data_classification"`
-	DatasetVersion     string                   `json:"dataset_version,omitempty"`
-	GeneratedAt        time.Time                `json:"generated_at"`
-	Store              StoreIdentity            `json:"store"`
-	Current            Period                   `json:"current"`
-	Comparison         Period                   `json:"comparison"`
-	TargetCoverage     retailkpi.Coverage       `json:"target_coverage"`
-	ComparisonCoverage retailkpi.Coverage       `json:"comparison_coverage"`
-	DecisionReady      bool                     `json:"decision_ready"`
-	DecisionReadyReason string                  `json:"decision_ready_reason,omitempty"`
-	Envelope           sourceenvelope.Envelope  `json:"envelope"`
-	Currency           string                   `json:"currency"`
-	CurrencyStatus     string                   `json:"currency_status"`
-	Summary            map[string]SummaryMetric `json:"summary"`
-	DailyTrend         []DailyTrend             `json:"daily_trend"`
-	PeerDefinition     string                   `json:"peer_definition"`
-	MinimumPeerCount   int                      `json:"minimum_peer_count"`
-	PeerBenchmark      []PeerBenchmark          `json:"peer_benchmark"`
-	Bridges            []Bridge                 `json:"bridges"`
-	Observations       []Observation            `json:"observations"`
-	Evidence           Evidence                 `json:"evidence"`
-	SourceSystems      []string                 `json:"source_systems"`
-	DatasetVersions    []string                 `json:"dataset_versions"`
-	FactVersionMin     int                      `json:"fact_version_min"`
-	FactVersionMax     int                      `json:"fact_version_max"`
-	HighestAsOf        *time.Time               `json:"highest_as_of,omitempty"`
-	DataQualityIssues  []string                 `json:"data_quality_issues,omitempty"`
-	KPIDrilldownURL    string                   `json:"kpi_drilldown_url"`
+	Basis               string                   `json:"basis"`
+	DiagnosticsVersion  string                   `json:"diagnostics_version"`
+	FormulaVersion      string                   `json:"formula_version"`
+	PulseVersion        string                   `json:"pulse_version"`
+	DataClassification  string                   `json:"data_classification"`
+	DatasetVersion      string                   `json:"dataset_version,omitempty"`
+	GeneratedAt         time.Time                `json:"generated_at"`
+	Store               StoreIdentity            `json:"store"`
+	Current             Period                   `json:"current"`
+	Comparison          Period                   `json:"comparison"`
+	TargetCoverage      retailkpi.Coverage       `json:"target_coverage"`
+	ComparisonCoverage  retailkpi.Coverage       `json:"comparison_coverage"`
+	DecisionReady       bool                     `json:"decision_ready"`
+	DecisionReadyReason string                   `json:"decision_ready_reason,omitempty"`
+	Envelope            sourceenvelope.Envelope  `json:"envelope"`
+	Currency            string                   `json:"currency"`
+	CurrencyStatus      string                   `json:"currency_status"`
+	Summary             map[string]SummaryMetric `json:"summary"`
+	DailyTrend          []DailyTrend             `json:"daily_trend"`
+	PeerDefinition      string                   `json:"peer_definition"`
+	MinimumPeerCount    int                      `json:"minimum_peer_count"`
+	PeerBenchmark       []PeerBenchmark          `json:"peer_benchmark"`
+	Bridges             []Bridge                 `json:"bridges"`
+	Observations        []Observation            `json:"observations"`
+	Evidence            Evidence                 `json:"evidence"`
+	SourceSystems       []string                 `json:"source_systems"`
+	DatasetVersions     []string                 `json:"dataset_versions"`
+	FactVersionMin      int                      `json:"fact_version_min"`
+	FactVersionMax      int                      `json:"fact_version_max"`
+	HighestAsOf         *time.Time               `json:"highest_as_of,omitempty"`
+	DataQualityIssues   []string                 `json:"data_quality_issues,omitempty"`
+	KPIDrilldownURL     string                   `json:"kpi_drilldown_url"`
 }
 
 type Service struct {
@@ -243,7 +244,7 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 	if !decisionReady {
 		quality = appendUnique(quality, "diagnostics_not_decision_ready")
 	}
-	if currentCoverage.ObservedStoreDays != currentCoverage.ExpectedStoreDays || comparisonCoverage.ObservedStoreDays != comparisonCoverage.ExpectedStoreDays {
+	if retailkpi.CoverageIncomplete(currentCoverage) || retailkpi.CoverageIncomplete(comparisonCoverage) {
 		quality = appendUnique(quality, "incomplete_store_day_coverage")
 		for i := range benchmarks {
 			benchmarks[i].Status = "unavailable"
@@ -253,7 +254,7 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 	}
 	if !decisionReady {
 		bridgeReason := "diagnostics_not_decision_ready"
-		if currentCoverage.ObservedStoreDays != currentCoverage.ExpectedStoreDays || comparisonCoverage.ObservedStoreDays != comparisonCoverage.ExpectedStoreDays {
+		if retailkpi.CoverageIncomplete(currentCoverage) || retailkpi.CoverageIncomplete(comparisonCoverage) {
 			bridgeReason = "incomplete_store_day_coverage"
 		}
 		if currencyStatus == "conflict" {
@@ -306,7 +307,6 @@ func storeDecisionReadyReason(decisionReady bool, quality []string) string {
 	}
 	return "not_decision_ready"
 }
-
 
 func dateOnly(t time.Time) time.Time {
 	y, m, d := t.Date()
@@ -467,7 +467,7 @@ func buildBenchmarks(summary map[string]SummaryMetric, peers []retailkpi.Aggrega
 			b.Median = &m
 			b.P25 = &p25
 			b.P75 = &p75
-			b.Percentile = percentileRank(values, *target)
+			b.Percentile = retailkpi.PercentileRank(values, *target)
 			d := *target - m
 			b.TargetMinusMedian = &d
 		}
@@ -489,21 +489,6 @@ func quantile(values []float64, p float64) float64 {
 		return values[lo]
 	}
 	return values[lo] + (values[hi]-values[lo])*(pos-float64(lo))
-}
-func percentileRank(values []float64, target float64) *float64 {
-	if len(values) == 0 {
-		return nil
-	}
-	less, equal := 0, 0
-	for _, v := range values {
-		if v < target {
-			less++
-		} else if v == target {
-			equal++
-		}
-	}
-	v := (float64(less) + 0.5*float64(equal)) / float64(len(values)) * 100
-	return &v
 }
 func buildDailyTrend(allFacts []retailkpi.DailyFact, targetID string, peers []retailkpi.StorePopulation, currency string, from, to time.Time) []DailyTrend {
 	out := make([]DailyTrend, 0, int(to.Sub(from).Hours()/24)+1)

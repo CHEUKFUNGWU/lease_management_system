@@ -127,7 +127,7 @@ func TestQuantileTieIsDeterministic(t *testing.T) {
 	if got := quantile(values, .5); got != 1.5 {
 		t.Fatalf("median = %v", got)
 	}
-	rank := percentileRank(values, 1)
+	rank := retailkpi.PercentileRank(values, 1)
 	if rank == nil || *rank != 25 {
 		t.Fatalf("tie rank = %v", rank)
 	}

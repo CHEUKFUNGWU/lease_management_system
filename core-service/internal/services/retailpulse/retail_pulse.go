@@ -445,8 +445,8 @@ func buildSummary(current, comparison retailkpi.Aggregate) map[string]SummaryMet
 	result := map[string]SummaryMetric{}
 	for _, code := range []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "transactions", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"} {
 		currentKPI, comparisonKPI := current.KPIs[code], comparison.KPIs[code]
-		metric := SummaryMetric{Current: currentKPI, Comparison: comparisonKPI, ChangeType: summaryChangeType(code), Status: summaryStatus(currentKPI, comparisonKPI)}
-		metric.ChangeValue, metric.Reason = change(currentKPI.Value, comparisonKPI.Value, metric.ChangeType)
+		metric := SummaryMetric{Current: currentKPI, Comparison: comparisonKPI, ChangeType: retailkpi.ChangeRateType(code), Status: summaryStatus(currentKPI, comparisonKPI)}
+		metric.ChangeValue, metric.Reason = retailkpi.ChangeRate(currentKPI.Value, comparisonKPI.Value, metric.ChangeType)
 		if code == "store_contribution" {
 			metric.ChangeMarginPP = changeRate(current.KPIs["store_contribution_margin"].Value, comparison.KPIs["store_contribution_margin"].Value)
 		}
@@ -463,28 +463,6 @@ func summaryStatus(current, comparison retailkpi.KPIValue) string {
 		return string(retailkpi.StatusPartial)
 	}
 	return string(retailkpi.StatusComplete)
-}
-func summaryChangeType(code string) string {
-	switch code {
-	case "gross_margin_rate", "conversion_rate", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution_margin":
-		return "percentage_point"
-	default:
-		return "percent"
-	}
-}
-func change(current, comparison *float64, changeType string) (*float64, string) {
-	if current == nil || comparison == nil {
-		return nil, "missing_value"
-	}
-	if changeType == "percentage_point" {
-		v := *current - *comparison
-		return roundPtr(&v), ""
-	}
-	if *comparison == 0 {
-		return nil, "zero_comparison"
-	}
-	v := (*current / *comparison - 1) * 100
-	return roundPtr(&v), ""
 }
 func changeRate(current, comparison *float64) *float64 {
 	if current == nil || comparison == nil {
@@ -571,7 +549,7 @@ func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, l
 
 func evaluateSignal(rule signalRule, current, comparison retailkpi.Aggregate) (Signal, bool) {
 	currentKPI, comparisonKPI := current.KPIs[rule.metric], comparison.KPIs[rule.metric]
-	observed, _ := change(currentKPI.Value, comparisonKPI.Value, map[bool]string{true: "percentage_point", false: "percent"}[rule.percentagePoint])
+	observed, _ := retailkpi.ChangeRate(currentKPI.Value, comparisonKPI.Value, map[bool]string{true: "percentage_point", false: "percent"}[rule.percentagePoint])
 	if observed == nil {
 		return Signal{}, false
 	}
@@ -640,7 +618,7 @@ func suppressionReasons(currentAgg, comparisonAgg *retailkpi.Aggregate, currentC
 	if currentAgg == nil || comparisonAgg == nil {
 		add("missing_period_facts")
 	}
-	if currentCoverage.ExpectedStoreDays > 0 && currentCoverage.ObservedStoreDays < currentCoverage.ExpectedStoreDays || comparisonCoverage.ExpectedStoreDays > 0 && comparisonCoverage.ObservedStoreDays < comparisonCoverage.ExpectedStoreDays {
+	if retailkpi.CoverageIncomplete(currentCoverage) || retailkpi.CoverageIncomplete(comparisonCoverage) {
 		add("incomplete_store_day_coverage")
 	}
 	for _, aggregate := range []*retailkpi.Aggregate{currentAgg, comparisonAgg} {

@@ -47,6 +47,8 @@ export function mapServerMessage(message: any): Message {
       .filter(Boolean),
     attachments: parseRuntimeField<UploadedFile[]>(message.attachments),
     model: message.model || undefined,
+    confidence: typeof message.confidence === "number" ? message.confidence : undefined,
+    confidenceReason: typeof message.confidence_reason === "string" ? message.confidence_reason : undefined,
   };
 }
 
@@ -133,6 +135,8 @@ export function applyRuntimeEvent(message: Message, event: RuntimeEvent): Runtim
       patch = {
         content: payload.content || "",
         model: payload.model,
+        confidence: typeof payload.confidence === "number" ? payload.confidence : undefined,
+        confidenceReason: typeof payload.confidence_reason === "string" ? payload.confidence_reason : undefined,
         sources: Array.isArray(payload.sources)
           ? payload.sources
               .map((source: any) => typeof source === "string" ? source : ({

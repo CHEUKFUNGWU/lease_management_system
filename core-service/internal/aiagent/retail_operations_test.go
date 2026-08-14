@@ -64,6 +64,11 @@ func TestRetailAgentUsesDeterministicPulseWithoutLLM(t *testing.T) {
 	if len(response.ToolCalls) != 1 || response.ToolCalls[0].Tool != "retail.operating_pulse.read" {
 		t.Fatalf("tool calls=%#v", response.ToolCalls)
 	}
+	// FIX-001 F1: the executed tool's wall-clock duration is carried on the
+	// Run response so the frontend ToolChip can render it.
+	if response.ToolCalls[0].DurationMs == nil || *response.ToolCalls[0].DurationMs < 0 {
+		t.Fatalf("executed tool call must carry a measured duration_ms, got %#v", response.ToolCalls[0])
+	}
 }
 
 func TestRetailAgentParsesExplicitContextWithoutPageFilters(t *testing.T) {
@@ -87,6 +92,11 @@ func TestRetailAgentActionProducesProposalOnly(t *testing.T) {
 	}
 	if len(response.ToolCalls) != 3 || response.ToolCalls[0].Tool != "retail.operating_pulse.read" || response.ToolCalls[1].Tool != "retail.store_diagnostics.read" || response.ToolCalls[2].Tool != "retail.store.scenario.evaluate" {
 		t.Fatalf("tool order=%#v", response.ToolCalls)
+	}
+	for index, call := range response.ToolCalls {
+		if call.DurationMs == nil || *call.DurationMs < 0 {
+			t.Fatalf("executed tool %d (%s) must carry duration_ms, got %#v", index, call.Tool, call)
+		}
 	}
 	projected := ProjectResult(response)
 	if len(projected.Artifacts) != 1 || projected.Artifacts[0].Type != "retail_action_proposal" {

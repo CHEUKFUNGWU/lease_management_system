@@ -85,6 +85,12 @@ type Result struct {
 	ReviewPrompts  any
 	ReviewRequired bool
 	Artifacts      []ArtifactDraft
+	// Confidence and ConfidenceReason are the assistant answer's measured
+	// confidence and its degradation reason; they are persisted with the
+	// message so a reloaded session can still render the ConfidenceBadge.
+	// Nil means no confidence is available.
+	Confidence       *float64
+	ConfidenceReason *string
 }
 
 type Execution struct {

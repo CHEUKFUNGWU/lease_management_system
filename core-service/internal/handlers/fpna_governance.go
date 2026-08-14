@@ -140,7 +140,12 @@ func (h *FPnAGovernanceHandler) CreatePlanVersion(c *gin.Context) {
 }
 
 func (h *FPnAGovernanceHandler) ListPlanVersions(c *gin.Context) {
-	rows, err := h.repo.ListPlanVersions(c.Request.Context(), middleware.GetTenantID(c), c.Query("version_type"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListPlanVersions(c.Request.Context(), entity, c.Query("version_type"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -154,7 +159,12 @@ func (h *FPnAGovernanceHandler) FreezePlanVersion(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "only approver or admin may freeze an Official plan version"})
 		return
 	}
-	item, err := h.repo.FreezePlanVersion(c.Request.Context(), c.Param("id"), middleware.GetTenantID(c), userIDFromContext(c), official)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	item, err := h.repo.FreezePlanVersion(c.Request.Context(), c.Param("id"), entity, userIDFromContext(c), official)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -180,12 +190,17 @@ func (h *FPnAGovernanceHandler) ComparePlanVersions(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "left_id, right_id and period are required"})
 		return
 	}
-	leftVersion, err := h.repo.GetPlanVersion(c.Request.Context(), leftID, middleware.GetTenantID(c))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	leftVersion, err := h.repo.GetPlanVersion(c.Request.Context(), leftID, entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	rightVersion, err := h.repo.GetPlanVersion(c.Request.Context(), rightID, middleware.GetTenantID(c))
+	rightVersion, err := h.repo.GetPlanVersion(c.Request.Context(), rightID, entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -195,12 +210,12 @@ func (h *FPnAGovernanceHandler) ComparePlanVersions(c *gin.Context) {
 		return
 	}
 	filters := planLineFilters(c)
-	left, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), leftID, middleware.GetTenantID(c), period, c.Query("grain"), filters)
+	left, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), leftID, entity, period, c.Query("grain"), filters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	right, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), rightID, middleware.GetTenantID(c), period, c.Query("grain"), filters)
+	right, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), rightID, entity, period, c.Query("grain"), filters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -234,12 +249,17 @@ func (h *FPnAGovernanceHandler) ForecastAccuracy(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "forecast_id and actual_id are required"})
 		return
 	}
-	forecast, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), forecastID, middleware.GetTenantID(c), c.Query("period"), c.Query("grain"), planLineFilters(c))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	forecast, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), forecastID, entity, c.Query("period"), c.Query("grain"), planLineFilters(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	actual, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), actualID, middleware.GetTenantID(c), c.Query("period"), c.Query("grain"), planLineFilters(c))
+	actual, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), actualID, entity, c.Query("period"), c.Query("grain"), planLineFilters(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -257,12 +277,17 @@ func (h *FPnAGovernanceHandler) HybridForecast(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	forecast, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), req.ForecastID, middleware.GetTenantID(c), "", "", planLineFilters(c))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	forecast, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), req.ForecastID, entity, "", "", planLineFilters(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	actual, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), req.ActualID, middleware.GetTenantID(c), "", "", planLineFilters(c))
+	actual, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), req.ActualID, entity, "", "", planLineFilters(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -331,7 +356,12 @@ func (h *FPnAGovernanceHandler) CreateMapping(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": item, "review_required": item.Status != "approved"})
 }
 func (h *FPnAGovernanceHandler) ListMappings(c *gin.Context) {
-	rows, err := h.repo.ListMappings(c.Request.Context(), middleware.GetTenantID(c), c.Query("mapping_type"), c.Query("effective_date"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListMappings(c.Request.Context(), entity, c.Query("mapping_type"), c.Query("effective_date"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -407,7 +437,12 @@ func (h *FPnAGovernanceHandler) CreateMetricDefinition(c *gin.Context) {
 }
 
 func (h *FPnAGovernanceHandler) ListAgentSignals(c *gin.Context) {
-	rows, err := h.repo.ListAgentSignals(c.Request.Context(), middleware.GetTenantID(c), c.Query("period"), c.Query("status"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListAgentSignals(c.Request.Context(), entity, c.Query("period"), c.Query("status"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -485,7 +520,12 @@ func (h *FPnAGovernanceHandler) CreateDataQuality(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": item})
 }
 func (h *FPnAGovernanceHandler) ListDataQuality(c *gin.Context) {
-	rows, err := h.repo.ListDataQuality(c.Request.Context(), middleware.GetTenantID(c), c.Query("period"), c.Query("status"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListDataQuality(c.Request.Context(), entity, c.Query("period"), c.Query("status"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -505,7 +545,12 @@ func (h *FPnAGovernanceHandler) UpdateDataQualityStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "status must be acknowledged, resolved or accepted"})
 		return
 	}
-	item, err := h.repo.UpdateDataQualityStatus(c.Request.Context(), c.Param("id"), middleware.GetTenantID(c), input.Status)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	item, err := h.repo.UpdateDataQualityStatus(c.Request.Context(), c.Param("id"), entity, input.Status)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -530,7 +575,12 @@ type realizationInput struct {
 }
 
 func (h *FPnAGovernanceHandler) CreateRealization(c *gin.Context) {
-	allowed, scopeErr := h.repo.ActionInScope(c.Request.Context(), c.Param("id"), middleware.GetTenantID(c))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	allowed, scopeErr := h.repo.ActionInScope(c.Request.Context(), c.Param("id"), entity)
 	if scopeErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": scopeErr.Error()})
 		return
@@ -610,7 +660,12 @@ func (h *FPnAGovernanceHandler) CreateMemo(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": item, "basis": "Scenario", "review_required": true})
 }
 func (h *FPnAGovernanceHandler) ListMemos(c *gin.Context) {
-	rows, err := h.repo.ListMemos(c.Request.Context(), middleware.GetTenantID(c), c.Query("memo_type"), c.Query("status"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListMemos(c.Request.Context(), entity, c.Query("memo_type"), c.Query("status"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -633,7 +688,12 @@ func (h *FPnAGovernanceHandler) UpdateMemoStatus(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "only approver or admin may approve a decision memo"})
 		return
 	}
-	item, err := h.repo.UpdateMemoStatus(c.Request.Context(), c.Param("id"), middleware.GetTenantID(c), userIDFromContext(c), input.Status)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	item, err := h.repo.UpdateMemoStatus(c.Request.Context(), c.Param("id"), entity, userIDFromContext(c), input.Status)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -684,8 +744,13 @@ func (h *FPnAGovernanceHandler) GenerateReportPack(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "only approver or admin may generate an Official report artifact"})
 		return
 	}
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
 	if basis == "Official" {
-		version, versionErr := h.repo.GetPlanVersion(c.Request.Context(), c.Query("official_version_id"), middleware.GetTenantID(c))
+		version, versionErr := h.repo.GetPlanVersion(c.Request.Context(), c.Query("official_version_id"), entity)
 		if versionErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": versionErr.Error()})
 			return
@@ -695,10 +760,9 @@ func (h *FPnAGovernanceHandler) GenerateReportPack(c *gin.Context) {
 			return
 		}
 	}
-	legal := middleware.GetTenantID(c)
-	var entity *string
-	if legal != "" {
-		entity = &legal
+	var legalEntityPayload *string
+	if scopedID, idErr := entity.LegalEntityID(); idErr == nil {
+		legalEntityPayload = &scopedID
 	}
 	overview := any(nil)
 	actions := any([]*repository.FPnAActionItem{})
@@ -706,10 +770,10 @@ func (h *FPnAGovernanceHandler) GenerateReportPack(c *gin.Context) {
 	stores := any([]operating.FourWall{})
 	equipment := any([]*repository.EquipmentOperatingFact{})
 	if h.operatingRepo != nil {
-		if v, e := h.operatingRepo.Overview(c.Request.Context(), legal, period); e == nil {
+		if v, e := h.operatingRepo.Overview(c.Request.Context(), entity, period); e == nil {
 			overview = v
 		}
-		if v, e := h.operatingRepo.ListActions(c.Request.Context(), legal, period, "", ""); e == nil {
+		if v, e := h.operatingRepo.ListActions(c.Request.Context(), entity, period, "", ""); e == nil {
 			actions = v
 			for _, action := range v {
 				if realizations, realizationErr := h.repo.ListActionRealizations(c.Request.Context(), action.ID); realizationErr == nil {
@@ -721,14 +785,14 @@ func (h *FPnAGovernanceHandler) GenerateReportPack(c *gin.Context) {
 				}
 			}
 		}
-		if v, e := h.operatingRepo.ListStores(c.Request.Context(), legal, period, ""); e == nil {
+		if v, e := h.operatingRepo.ListStores(c.Request.Context(), entity, period, ""); e == nil {
 			metrics := make([]operating.FourWall, 0, len(v))
 			for _, row := range v {
 				metrics = append(metrics, operating.CalculateFourWall(*row))
 			}
 			stores = metrics
 		}
-		if v, e := h.operatingRepo.ListEquipmentFacts(c.Request.Context(), legal, period, "", ""); e == nil {
+		if v, e := h.operatingRepo.ListEquipmentFacts(c.Request.Context(), entity, period, "", ""); e == nil {
 			equipment = v
 		}
 	}
@@ -743,7 +807,7 @@ func (h *FPnAGovernanceHandler) GenerateReportPack(c *gin.Context) {
 	if basis == "Official" {
 		artifactStatus = "published"
 	}
-	item, err := h.repo.CreateReportArtifact(c.Request.Context(), &repository.FPnAReportArtifact{LegalEntityID: entity, ReportType: reportType, ViewType: defaultString(c.Query("view"), "group"), Period: period, Basis: basis, Format: format, Status: artifactStatus, Payload: raw, SourceMetadata: source, ManifestSHA256: hex.EncodeToString(sum[:]), DataVersion: dataVersion, AssumptionVersion: assumptionVersion, MetricDefinitionVersion: metricDefinitionVersion, GeneratedBy: optionalString(userIDFromContext(c))})
+	item, err := h.repo.CreateReportArtifact(c.Request.Context(), &repository.FPnAReportArtifact{LegalEntityID: legalEntityPayload, ReportType: reportType, ViewType: defaultString(c.Query("view"), "group"), Period: period, Basis: basis, Format: format, Status: artifactStatus, Payload: raw, SourceMetadata: source, ManifestSHA256: hex.EncodeToString(sum[:]), DataVersion: dataVersion, AssumptionVersion: assumptionVersion, MetricDefinitionVersion: metricDefinitionVersion, GeneratedBy: optionalString(userIDFromContext(c))})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -754,7 +818,12 @@ func (h *FPnAGovernanceHandler) GenerateReportPack(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": item, "download": gin.H{"format": format, "basis": basis, "manifest_sha256": item.ManifestSHA256}, "review_required": basis != "Official"})
 }
 func (h *FPnAGovernanceHandler) ListReportPacks(c *gin.Context) {
-	rows, err := h.repo.ListReportArtifacts(c.Request.Context(), middleware.GetTenantID(c), c.Query("report_type"), c.Query("period"), c.Query("basis"))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	rows, err := h.repo.ListReportArtifacts(c.Request.Context(), entity, c.Query("report_type"), c.Query("period"), c.Query("basis"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -763,7 +832,12 @@ func (h *FPnAGovernanceHandler) ListReportPacks(c *gin.Context) {
 }
 
 func (h *FPnAGovernanceHandler) DownloadReportPack(c *gin.Context) {
-	item, err := h.repo.GetReportArtifact(c.Request.Context(), c.Param("id"), middleware.GetTenantID(c))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	item, err := h.repo.GetReportArtifact(c.Request.Context(), c.Param("id"), entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 type RenewalDecisionSnapshot struct {
@@ -51,15 +52,24 @@ func (r *RenewalDecisionRepository) Create(ctx context.Context, snapshot *Renewa
 	return snapshot, nil
 }
 
-func (r *RenewalDecisionRepository) List(ctx context.Context, contractID, legalEntityID string) ([]*RenewalDecisionSnapshot, error) {
-	rows, err := r.db.Query(ctx, `
+func (r *RenewalDecisionRepository) List(ctx context.Context, contractID string, entity access.EntityFilter) ([]*RenewalDecisionSnapshot, error) {
+	args := []any{contractID}
+	query := `
 		SELECT id, contract_id, legal_entity_id, decision_date, owner_name,
 			business_opinion, evidence, snapshot, created_by, created_at
 		FROM renewal_decision_snapshots
-		WHERE contract_id = $1 AND ($2 = '' OR legal_entity_id::text = $2)
+		WHERE contract_id = $1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += `
 		ORDER BY decision_date DESC, created_at DESC
 		LIMIT 100
-	`, contractID, legalEntityID)
+	`
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list renewal decisions: %w", err)
 	}
@@ -80,14 +90,23 @@ func (r *RenewalDecisionRepository) List(ctx context.Context, contractID, legalE
 	return result, nil
 }
 
-func (r *RenewalDecisionRepository) Exists(ctx context.Context, contractID, legalEntityID string) (bool, error) {
+func (r *RenewalDecisionRepository) Exists(ctx context.Context, contractID string, entity access.EntityFilter) (bool, error) {
 	var exists bool
-	err := r.db.QueryRow(ctx, `
+	args := []any{contractID}
+	query := `
 		SELECT EXISTS (
 			SELECT 1 FROM renewal_decision_snapshots
-			WHERE contract_id = $1 AND ($2 = '' OR legal_entity_id::text = $2)
+			WHERE contract_id = $1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return false, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += `
 		)
-	`, contractID, legalEntityID).Scan(&exists)
+	`
+	err := r.db.QueryRow(ctx, query, args...).Scan(&exists)
 	if err == pgx.ErrNoRows {
 		return false, nil
 	}

@@ -241,7 +241,12 @@ func (h *RenewalCardHandler) CreateDecision(c *gin.Context) {
 }
 
 func (h *RenewalCardHandler) ListDecisions(c *gin.Context) {
-	items, err := h.decisionRepo.List(c.Request.Context(), c.Param("id"), middleware.GetTenantID(c))
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	items, err := h.decisionRepo.List(c.Request.Context(), c.Param("id"), entity)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

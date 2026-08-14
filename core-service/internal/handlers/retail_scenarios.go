@@ -56,8 +56,8 @@ func (h *RetailScenarioHandler) Evaluate(c *gin.Context) {
 }
 
 func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
-	legalEntityID := strings.TrimSpace(middleware.GetTenantID(c))
-	if legalEntityID == "" {
+	entity, ok := tenantEntity(c)
+	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "legal_entity_id is required"})
 		return
 	}
@@ -70,7 +70,10 @@ func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 	if !ok {
 		return
 	}
-	query.LegalEntityID = legalEntityID
+	query.LegalEntityID = ""
+	if scopedID, idErr := entity.LegalEntityID(); idErr == nil {
+		query.LegalEntityID = scopedID
+	}
 	var request scenarioActionRequest
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
@@ -118,8 +121,7 @@ func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 		return
 	}
 	fingerprint := retailscenario.RequestFingerprint(query, evaluateRequest, request.Title, request.PlannedAction, request.OwnerName, stringValue(request.DueDate), request.VerificationPeriod)
-	entity := legalEntityID
-	if existing, lookupErr := h.actions.GetActionByIdempotency(c.Request.Context(), &entity, key); lookupErr != nil {
+	if existing, lookupErr := h.actions.GetActionByIdempotency(c.Request.Context(), entity, key); lookupErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": lookupErr.Error()})
 		return
 	} else if existing != nil {
@@ -131,14 +133,17 @@ func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"basis": "Scenario", "formal_execution": false, "review_required": true, "data": existing, "idempotent_replay": true})
 		return
 	}
-	entityPtr := &entity
+	var legalEntityPayload *string
+	if scopedID, idErr := entity.LegalEntityID(); idErr == nil {
+		legalEntityPayload = &scopedID
+	}
 	dueDate := parseDatePointer(request.DueDate)
 	evidence := map[string]interface{}{"store": result.Store, "data_classification": result.DataClassification, "dataset_version": result.DatasetVersion, "source_system": result.SourceSystem, "current": result.Current, "fact_version_min": result.Evidence.FactVersionMin, "fact_version_max": result.Evidence.FactVersionMax, "scenario_version": result.ScenarioVersion, "formula_version": result.FormulaVersion, "baseline": result.Baseline, "selected_scenario": selected, "kpi_drilldown_url": result.Evidence.KPIDrilldownURL, "formal_execution": false, "request_fingerprint": fingerprint}
 	evidenceJSON, _ := json.Marshal(evidence)
 	baselineContribution := metricValue(selectedMetric(result.Baseline, "store_contribution"))
 	planContribution := metricValue(selectedMetric(*selected, "store_contribution"))
 	benefit := selected.HorizonContributionChange
-	item := &repository.FPnAActionItem{LegalEntityID: entityPtr, Period: request.VerificationPeriod, Category: "retail_store_scenario", Severity: "medium", Status: "open", Title: request.Title, Description: "Scenario plan is a deterministic working draft; verify before action.", RuleCode: retailscenario.ActionRuleCode(fingerprint, key), SourceTable: "retail_store_day_facts", SourceRecordID: query.StoreID, DataVersion: result.ScenarioVersion, IdempotencyKey: key, Currency: result.Currency, OwnerName: request.OwnerName, DueDate: dueDate, BaselineAmount: baselineContribution, TargetAmount: planContribution, ExpectedBenefit: benefit, VerificationPeriod: request.VerificationPeriod, VerificationStatus: "not_due", PlannedAction: request.PlannedAction, Evidence: evidenceJSON}
+	item := &repository.FPnAActionItem{LegalEntityID: legalEntityPayload, Period: request.VerificationPeriod, Category: "retail_store_scenario", Severity: "medium", Status: "open", Title: request.Title, Description: "Scenario plan is a deterministic working draft; verify before action.", RuleCode: retailscenario.ActionRuleCode(fingerprint, key), SourceTable: "retail_store_day_facts", SourceRecordID: query.StoreID, DataVersion: result.ScenarioVersion, IdempotencyKey: key, Currency: result.Currency, OwnerName: request.OwnerName, DueDate: dueDate, BaselineAmount: baselineContribution, TargetAmount: planContribution, ExpectedBenefit: benefit, VerificationPeriod: request.VerificationPeriod, VerificationStatus: "not_due", PlannedAction: request.PlannedAction, Evidence: evidenceJSON}
 	created, replayed, createErr := h.actions.CreateScenarioAction(c.Request.Context(), item)
 	if createErr != nil {
 		if errors.Is(createErr, repository.ErrRetailScenarioActionScopeConflict) {

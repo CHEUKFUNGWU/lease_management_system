@@ -107,6 +107,22 @@ func GetAccessScope(c *gin.Context) (access.Scope, bool) {
 	return scope, ok
 }
 
+// EntityFilterFromRequest builds the caller's legal-entity filter from the
+// request scope. The RequireTenant guard in the same chain guarantees the
+// scope exists and is either global or carries a legal entity, so failure
+// here means a middleware regression and should be answered with 403.
+func EntityFilterFromRequest(c *gin.Context) (access.EntityFilter, bool) {
+	scope, ok := GetAccessScope(c)
+	if !ok {
+		return access.EntityFilter{}, false
+	}
+	filter, err := access.FromScope(scope)
+	if err != nil {
+		return access.EntityFilter{}, false
+	}
+	return filter, true
+}
+
 // RequireLegalEntityWideScope prevents a store/region/brand-scoped actor from
 // applying an operation, such as a period lock, to the entire legal entity.
 func RequireLegalEntityWideScope() gin.HandlerFunc {

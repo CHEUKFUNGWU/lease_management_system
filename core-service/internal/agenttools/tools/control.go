@@ -3,8 +3,10 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/lease-management-system/core-service/internal/services/cashflow"
 )
@@ -19,7 +21,7 @@ type ControlReaders struct {
 }
 
 type BudgetVarianceReader interface {
-	ReadVariance(context.Context, string, string, string) (any, error)
+	ReadVariance(context.Context, access.EntityFilter, string, string) (any, error)
 }
 
 type CashflowScenarioReader interface {
@@ -27,7 +29,7 @@ type CashflowScenarioReader interface {
 }
 
 type RenewalDecisionReader interface {
-	ReadDecisions(context.Context, string, string) (any, error)
+	ReadDecisions(context.Context, access.EntityFilter, string) (any, error)
 }
 
 type BudgetVarianceArguments struct {
@@ -54,7 +56,11 @@ func NewBudgetVarianceDefinition(reader BudgetVarianceReader) agenttools.ToolDef
 			if reader == nil {
 				return nil, nil, errReaderUnavailable
 			}
-			data, err := reader.ReadVariance(ctx, execution.Principal.Scope.LegalEntityID, strings.TrimSpace(args.VersionID), strings.TrimSpace(args.Period))
+			entity, ok := filterFromExecution(execution)
+			if !ok {
+				return nil, nil, fmt.Errorf("legal entity scope is required")
+			}
+			data, err := reader.ReadVariance(ctx, entity, strings.TrimSpace(args.VersionID), strings.TrimSpace(args.Period))
 			return data, []agenttools.ToolSource{{Type: "budget_variance", ID: args.VersionID + ":" + args.Period, Title: "预算差异桥", Locator: "version=" + args.VersionID + ";period=" + args.Period}}, err
 		},
 	)
@@ -84,7 +90,11 @@ func NewRenewalDecisionDefinition(reader RenewalDecisionReader) agenttools.ToolD
 			if reader == nil {
 				return nil, nil, errReaderUnavailable
 			}
-			data, err := reader.ReadDecisions(ctx, execution.Principal.Scope.LegalEntityID, strings.TrimSpace(args.ContractID))
+			entity, ok := filterFromExecution(execution)
+			if !ok {
+				return nil, nil, fmt.Errorf("legal entity scope is required")
+			}
+			data, err := reader.ReadDecisions(ctx, entity, strings.TrimSpace(args.ContractID))
 			return data, []agenttools.ToolSource{{Type: "renewal_decision_snapshot", ID: args.ContractID, Title: "续租决策快照", Locator: "contract=" + args.ContractID}}, err
 		},
 	)

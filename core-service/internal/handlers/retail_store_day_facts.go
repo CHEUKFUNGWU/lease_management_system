@@ -15,7 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/lease-management-system/core-service/internal/middleware"
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/repository"
 	auditservice "github.com/lease-management-system/core-service/internal/services/audit"
 )
@@ -33,8 +33,8 @@ var (
 )
 
 type retailStoreDayFactStore interface {
-	UpsertRetailStoreDayFactsAtomic(context.Context, string, []*repository.RetailStoreDayFact, string, string, *string, repository.RetailStoreDayFactAuditFunc) (*repository.RetailStoreDayFactWriteResult, error)
-	ListRetailStoreDayFactsPage(context.Context, string, string, string, []string, int, int) (*repository.RetailStoreDayFactsPage, error)
+	UpsertRetailStoreDayFactsAtomic(context.Context, access.EntityFilter, []*repository.RetailStoreDayFact, string, string, *string, repository.RetailStoreDayFactAuditFunc) (*repository.RetailStoreDayFactWriteResult, error)
+	ListRetailStoreDayFactsPage(context.Context, access.EntityFilter, string, string, []string, int, int) (*repository.RetailStoreDayFactsPage, error)
 }
 
 type retailStoreDayFactAuditor interface {
@@ -121,7 +121,11 @@ func (h *RetailStoreDayFactsHandler) Upsert(c *gin.Context) {
 		prepared = append(prepared, fact)
 	}
 
-	legalEntityID := middleware.GetTenantID(c)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
 	payload, err := json.Marshal(prepared)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "encode idempotency payload"})
@@ -143,7 +147,7 @@ func (h *RetailStoreDayFactsHandler) Upsert(c *gin.Context) {
 			return h.audit.LogInTx(ctx, tx, "retail_store_day_facts", newFact.ID, "upsert", oldFact, newFact, userIDFromContext(c), c)
 		}
 	}
-	result, err := h.repo.UpsertRetailStoreDayFactsAtomic(c.Request.Context(), legalEntityID, prepared, idempotencyKey, payloadSHA256, optionalString(userIDFromContext(c)), auditFn)
+	result, err := h.repo.UpsertRetailStoreDayFactsAtomic(c.Request.Context(), entity, prepared, idempotencyKey, payloadSHA256, optionalString(userIDFromContext(c)), auditFn)
 	if err != nil {
 		if errors.Is(err, repository.ErrRetailStoreDayFactIdempotencyConflict) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
@@ -189,7 +193,12 @@ func (h *RetailStoreDayFactsHandler) List(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": paginationError})
 		return
 	}
-	result, err := h.repo.ListRetailStoreDayFactsPage(c.Request.Context(), middleware.GetTenantID(c), dateFrom, dateTo, storeIDs, pageSize, offset)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	result, err := h.repo.ListRetailStoreDayFactsPage(c.Request.Context(), entity, dateFrom, dateTo, storeIDs, pageSize, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

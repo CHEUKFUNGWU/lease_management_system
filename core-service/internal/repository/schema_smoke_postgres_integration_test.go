@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -271,7 +272,7 @@ func TestSchemaSmoke_ExchangeRatesAndWorkQueue(t *testing.T) {
 	if _, err := repository.NewWorkQueueRepository(pool).Load(ctx, "", 30); err != nil {
 		t.Fatalf("load work queue: %v", err)
 	}
-	if _, err := repository.NewBudgetRepository(pool).ListVersions(ctx, ""); err != nil {
+	if _, err := repository.NewBudgetRepository(pool).ListVersions(ctx, access.GlobalEntityFilter()); err != nil {
 		t.Fatalf("list budget versions: %v", err)
 	}
 }

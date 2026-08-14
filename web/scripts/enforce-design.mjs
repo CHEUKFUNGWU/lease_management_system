@@ -75,11 +75,17 @@ function changedLines(file) {
   return lines;
 }
 
-// 「新增」的精确读法：违规模式必须不在旧行里才成立。改到一行含有
-// 存量违规的行（906 处内联样式 / 142 处 !important 之一）不是新增，
-// 行级 diff 必须结合旧行内容判断。
+// 「新增」的精确读法：违规必须在**数量**上比旧行多才成立（ENF-003）。
+// 上一版用有/无判定，语义漂成了「不得新增违规行」——已经违规的行可以
+// 随意加码（往已有 !important 的行再加一个、把内联样式从 2 个属性扩写
+// 到 5 个都被放行）。计数法两个都拦：改到含存量违规的行不误报（数量
+// 不变），但任何加码都会让数量上升。
+function violationCount(pattern, text) {
+  return (text.match(new RegExp(pattern.source, pattern.flags + "g")) || []).length;
+}
+
 function isNewViolation(pattern, line, oldText) {
-  return pattern.test(line) && !pattern.test(oldText);
+  return violationCount(pattern, line) > violationCount(pattern, oldText);
 }
 
 const violations = [];
@@ -127,21 +133,33 @@ const IMPORTANT_RE = /!important/;
 const CJK_RE = /[\u4e00-\u9fff]/;
 const HARDCODED_TIMESTAMP_RE = /TIMESTAMPTZ\s*'\s*20\d\d-\d\d-\d\d|TIMESTAMP\s*'\s*20\d\d-\d\d-\d\d/;
 
-// 静态内联样式判定：`key: value` 中任一 value 以标识符/表达式开头
-// （引号、数字、#、%、( 开头的都是字面量）即视为动态值，DESIGN.md
-// §13-2 允许，不拦截。无冒号的展开对象也视为动态。单行启发式。
-function isStaticStyleObject(inner) {
-  for (const pair of inner.split(",")) {
-    const colon = pair.indexOf(":");
-    if (colon === -1) {
-      return false;
-    }
-    const value = pair.slice(colon + 1).trim();
-    if (/^[A-Za-z_$]/.test(value)) {
-      return false;
+// 静态内联样式按**属性个数**比，不是按 style={{ 出现次数（ENF-003）：
+// 每个 `key: value` 里 value 以标识符/表达式开头的（引号、数字、#、%、
+// ( 开头的都是字面量）视为动态值，DESIGN.md §13-2 允许，不计数；无
+// 冒号的展开对象也视为动态。既有 2 个静态属性扩写到 5 个，新行计数
+// 5 > 旧行 2，拦截。
+function staticStylePropCount(text) {
+  let total = 0;
+  const re = new RegExp(INLINE_STYLE_RE.source, "g");
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    for (const pair of match[1].split(",")) {
+      const colon = pair.indexOf(":");
+      if (colon === -1) {
+        continue;
+      }
+      const value = pair.slice(colon + 1).trim();
+      if (/^[A-Za-z_$]/.test(value)) {
+        continue;
+      }
+      total += 1;
     }
   }
-  return true;
+  return total;
+}
+
+function isNewStaticStyle(line, oldText) {
+  return staticStylePropCount(line) > staticStylePropCount(oldText);
 }
 
 for (const file of changedFiles) {
@@ -164,10 +182,9 @@ for (const file of changedFiles) {
       }
       // 「营」徽标只豁免内联样式一条（品牌 mark 的存量写法）；
       // !important 与 fontWeight 检查照常生效（上一批 Review §4）。
-      const styleMatch = INLINE_STYLE_RE.exec(line);
       const styleExempt =
         BRAND_BADGE_LINE.test(line) || INLINE_STYLE_EXEMPT_PAGES.has(file);
-      if (styleMatch && !styleExempt && isNewViolation(INLINE_STYLE_RE, line, oldText) && isStaticStyleObject(styleMatch[1])) {
+      if (!styleExempt && isNewStaticStyle(line, oldText)) {
         fail(file, number, "新增静态内联 style={{}}（DESIGN.md §13-2）：用类名 + CSS 变量");
       }
       if (isNewViolation(FONT_WEIGHT_RE, line, oldText)) {

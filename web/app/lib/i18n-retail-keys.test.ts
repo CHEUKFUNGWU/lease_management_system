@@ -37,7 +37,7 @@ describe("G4: retail page translation keys are complete in three languages", () 
       if (RETAIL_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) used.add(key);
     }));
     expect(used.size).toBeGreaterThan(40);
-    for (const key of used) {
+    for (const key of Array.from(used)) {
       for (const lang of ["zh-CN", "zh-HK", "en"] as Language[]) {
         const value = t(key, lang);
         expect(value.trim(), `${key} in ${lang}`).not.toBe("");
@@ -61,7 +61,7 @@ describe("G5: no Chinese residue when switching to en / zh-HK", () => {
     RETAIL_FILES.forEach((file) => keysInFile(file).forEach((key) => {
       if (RETAIL_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) used.add(key);
     }));
-    for (const key of used) {
+    for (const key of Array.from(used)) {
       expect(CJK.test(t(key, "en")), `${key} en copy contains CJK`).toBe(false);
     }
   });
@@ -71,7 +71,7 @@ describe("G5: no Chinese residue when switching to en / zh-HK", () => {
     RETAIL_FILES.forEach((file) => keysInFile(file).forEach((key) => {
       if (RETAIL_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) used.add(key);
     }));
-    for (const key of used) {
+    for (const key of Array.from(used)) {
       expect(t(key, "zh-HK").trim(), `${key} in zh-HK`).not.toBe("");
     }
   });

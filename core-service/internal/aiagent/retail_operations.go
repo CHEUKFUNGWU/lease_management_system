@@ -53,6 +53,7 @@ type RetailActionProposal struct {
 	Scenario           any     `json:"scenario"`
 	Evidence           any     `json:"evidence"`
 	EvidenceComplete   bool    `json:"evidence_complete"`
+	Envelope           any     `json:"envelope,omitempty"`
 	DataClassification string  `json:"data_classification"`
 	DatasetVersion     string  `json:"dataset_version,omitempty"`
 	SourceSystem       string  `json:"source_system,omitempty"`
@@ -885,7 +886,7 @@ func retailPulseInsufficientReason(response *retailpulse.Response) string {
 	if response.CurrentCoverage.ExpectedStoreDays == 0 && response.ComparisonCoverage.ExpectedStoreDays == 0 {
 		return "no_facts"
 	}
-	if response.CurrentCoverage.ObservedStoreDays < response.CurrentCoverage.ExpectedStoreDays || response.ComparisonCoverage.ObservedStoreDays < response.ComparisonCoverage.ExpectedStoreDays {
+	if retailkpi.CoverageIncomplete(response.CurrentCoverage) || retailkpi.CoverageIncomplete(response.ComparisonCoverage) {
 		return "partial_coverage"
 	}
 	for _, metric := range response.Summary {
@@ -972,7 +973,7 @@ func makeRetailActionProposal(response *retailscenario.Response, filters retailA
 	values.Set("variable_rent_rate_change_pp", strconv.FormatFloat(filters.Assumptions.VariableRentRateChangePP, 'f', -1, 64))
 	values.Set("non_lease_cost_change_pct", strconv.FormatFloat(filters.Assumptions.NonLeaseCostChangePct, 'f', -1, 64))
 	values.Set("other_controllable_cost_change_pct", strconv.FormatFloat(filters.Assumptions.OtherControllableCostChangePct, 'f', -1, 64))
-	return &RetailActionProposal{Type: "retail_action_proposal", Status: "proposal", Title: "门店经营情景行动提议", Store: response.Store, PlannedAction: "前往情景工作台复核 Baseline/Plan、证据和负责人后再保存", OwnerName: nil, DueDate: nil, VerificationPeriod: "", Scenario: response, Evidence: response.Evidence, EvidenceComplete: response.Evidence.CoverageRate != nil && *response.Evidence.CoverageRate >= 100, DataClassification: response.DataClassification, DatasetVersion: response.DatasetVersion, SourceSystem: response.SourceSystem, FormulaVersion: response.FormulaVersion, FormalExecution: false, BusinessWrite: false, NextURL: "/scenario-workbench?" + values.Encode()}
+	return &RetailActionProposal{Type: "retail_action_proposal", Status: "proposal", Title: "门店经营情景行动提议", Store: response.Store, PlannedAction: "前往情景工作台复核 Baseline/Plan、证据和负责人后再保存", OwnerName: nil, DueDate: nil, VerificationPeriod: "", Scenario: response, Evidence: response.Evidence, EvidenceComplete: response.Evidence.CoverageRate != nil && *response.Evidence.CoverageRate >= 100, Envelope: response.Envelope, DataClassification: response.DataClassification, DatasetVersion: response.DatasetVersion, SourceSystem: response.SourceSystem, FormulaVersion: response.FormulaVersion, FormalExecution: false, BusinessWrite: false, NextURL: "/scenario-workbench?" + values.Encode()}
 }
 
 func (h *Agent) retailSourceScope(req Request) map[string]string {

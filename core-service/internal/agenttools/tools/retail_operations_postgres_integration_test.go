@@ -268,6 +268,11 @@ func stableRetailJSON(value any) []byte {
 		return raw
 	}
 	delete(object, "generated_at")
+	// ENV-001: the Source Envelope carries its own generated_at; both are
+	// wall-clock timestamps and must not break determinism checks.
+	if envelope, ok := object["envelope"].(map[string]any); ok {
+		delete(envelope, "generated_at")
+	}
 	result, _ := json.Marshal(object)
 	return result
 }

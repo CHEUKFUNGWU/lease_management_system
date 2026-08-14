@@ -15,6 +15,9 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailpulse"
+	"github.com/lease-management-system/core-service/internal/services/retailstore360"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 const (
@@ -147,25 +150,26 @@ type Evidence struct {
 }
 
 type Response struct {
-	Basis              string           `json:"basis"`
-	ScenarioVersion    string           `json:"scenario_version"`
-	FormulaVersion     string           `json:"formula_version"`
-	DiagnosticsVersion string           `json:"diagnostics_version"`
-	SideEffects        bool             `json:"side_effects"`
-	ReviewRequired     bool             `json:"review_required"`
-	OfficialImpact     bool             `json:"official_impact"`
-	IFRS16Impact       bool             `json:"ifrs16_impact"`
-	GeneratedAt        time.Time        `json:"generated_at"`
-	Store              StoreIdentity    `json:"store"`
-	DataClassification string           `json:"data_classification"`
-	DatasetVersion     string           `json:"dataset_version,omitempty"`
-	SourceSystem       string           `json:"source_system,omitempty"`
-	Currency           string           `json:"currency"`
-	Current            Period           `json:"current"`
-	HorizonMonths      int              `json:"horizon_months"`
-	Baseline           ScenarioResult   `json:"baseline"`
-	Scenarios          []ScenarioResult `json:"scenarios"`
-	Evidence           Evidence         `json:"evidence"`
+	Basis              string                  `json:"basis"`
+	ScenarioVersion    string                  `json:"scenario_version"`
+	FormulaVersion     string                  `json:"formula_version"`
+	DiagnosticsVersion string                  `json:"diagnostics_version"`
+	SideEffects        bool                    `json:"side_effects"`
+	ReviewRequired     bool                    `json:"review_required"`
+	OfficialImpact     bool                    `json:"official_impact"`
+	IFRS16Impact       bool                    `json:"ifrs16_impact"`
+	GeneratedAt        time.Time               `json:"generated_at"`
+	Store              StoreIdentity           `json:"store"`
+	DataClassification string                  `json:"data_classification"`
+	DatasetVersion     string                  `json:"dataset_version,omitempty"`
+	SourceSystem       string                  `json:"source_system,omitempty"`
+	Envelope           sourceenvelope.Envelope `json:"envelope"`
+	Currency           string                  `json:"currency"`
+	Current            Period                  `json:"current"`
+	HorizonMonths      int                     `json:"horizon_months"`
+	Baseline           ScenarioResult          `json:"baseline"`
+	Scenarios          []ScenarioResult        `json:"scenarios"`
+	Evidence           Evidence                `json:"evidence"`
 }
 
 type baseValues struct {
@@ -224,21 +228,38 @@ func (s *Service) Evaluate(ctx context.Context, q Query, req EvaluateRequest) (*
 			results = append(results, result)
 		}
 	}
-	minVersion, maxVersion, highest := factVersionRange(storeFacts)
 	coverage := float64(observed) / float64(q.WindowDays) * 100
-	versionSet := map[string]bool{}
-	for _, f := range storeFacts {
-		if f.SimulationDatasetVersion != nil && *f.SimulationDatasetVersion != "" {
-			versionSet[*f.SimulationDatasetVersion] = true
-		}
-	}
-	datasets := sortedKeys(versionSet)
 	requestJSON, _ := json.Marshal(req)
-	evidence := Evidence{Current: Period{DateFrom: dateFrom, DateTo: dateTo}, ObservedStoreDays: observed, ExpectedStoreDays: q.WindowDays, CoverageRate: &coverage, RequiredFields: scenarioRequiredFields(), SourceSystems: storeSourceSystems(storeFacts), DatasetVersions: datasets, FactVersionMin: minVersion, FactVersionMax: maxVersion, RequestAssumptions: requestJSON, KPIDrilldownURL: kpiDrilldownURL(q, q.StoreID, currentStart, currentEnd)}
-	if !highest.IsZero() {
-		evidence.HighestAsOf = &highest
+	evidence := Evidence{Current: Period{DateFrom: dateFrom, DateTo: dateTo}, ObservedStoreDays: observed, ExpectedStoreDays: q.WindowDays, CoverageRate: &coverage, RequiredFields: scenarioRequiredFields(), RequestAssumptions: requestJSON, KPIDrilldownURL: kpiDrilldownURL(q, q.StoreID, currentStart, currentEnd)}
+	response := &Response{Basis: "Scenario", ScenarioVersion: ScenarioVersion, FormulaVersion: FormulaVersion, DiagnosticsVersion: retailstore360.DiagnosticsVersion, SideEffects: false, ReviewRequired: true, OfficialImpact: false, IFRS16Impact: false, GeneratedAt: s.now(), Store: StoreIdentity{StoreID: population.StoreID, StoreCode: population.StoreCode, StoreName: population.StoreName, Brand: population.Brand, Region: population.Region}, DataClassification: q.Classification, DatasetVersion: q.DatasetVersion, SourceSystem: singleSource(storeFacts), Currency: currency, Current: Period{DateFrom: dateFrom, DateTo: dateTo}, HorizonMonths: req.HorizonMonths, Baseline: baseline, Scenarios: results, Evidence: evidence}
+	scenarioFillEnvelope(response, q, storeFacts, currentStart, currentEnd, observed, q.WindowDays, true)
+	return response, nil
+}
+
+// scenarioFillEnvelope builds the Source Envelope for the store's own facts
+// and mirrors it into the response's provenance fields. ready=false means the
+// evaluation did not run (buildBase failed or rates were out of range).
+func scenarioFillEnvelope(response *Response, q Query, facts []retailkpi.DailyFact, from, to time.Time, observed, windowDays int, ready bool) {
+	readyReason := ""
+	if !ready {
+		readyReason = "scenario_not_ready"
+	} else if windowDays > 0 && observed < windowDays {
+		readyReason = "incomplete_store_day_coverage"
 	}
-	return &Response{Basis: "Scenario", ScenarioVersion: ScenarioVersion, FormulaVersion: FormulaVersion, DiagnosticsVersion: "retail-store-diagnostics-v1", SideEffects: false, ReviewRequired: true, OfficialImpact: false, IFRS16Impact: false, GeneratedAt: s.now(), Store: StoreIdentity{StoreID: population.StoreID, StoreCode: population.StoreCode, StoreName: population.StoreName, Brand: population.Brand, Region: population.Region}, DataClassification: q.Classification, DatasetVersion: q.DatasetVersion, SourceSystem: singleSource(storeFacts), Currency: currency, Current: Period{DateFrom: dateFrom, DateTo: dateTo}, HorizonMonths: req.HorizonMonths, Baseline: baseline, Scenarios: results, Evidence: evidence}, nil
+	env := sourceenvelope.Build(facts, sourceenvelope.Spec{
+		Classification: q.Classification,
+		FormulaVersion: FormulaVersion,
+		PulseVersion:   retailpulse.PulseVersion,
+		Current:        sourceenvelope.PeriodSpec{From: from, To: to, ExpectedStoreDays: windowDays},
+		DecisionReady:  ready, DecisionReadyReason: readyReason,
+		GeneratedAt: response.GeneratedAt,
+	})
+	response.Envelope = env
+	response.Evidence.SourceSystems = env.SourceSystems
+	response.Evidence.DatasetVersions = env.DatasetVersions
+	response.Evidence.FactVersionMin = env.FactVersionMin
+	response.Evidence.FactVersionMax = env.FactVersionMax
+	response.Evidence.HighestAsOf = env.HighestAsOf
 }
 
 func validateQuery(q Query) error {
@@ -327,7 +348,7 @@ func buildBase(facts []retailkpi.DailyFact, from, to time.Time, expected int) (b
 	if len(current) == 0 {
 		return baseValues{}, 0, currency, "no_facts"
 	}
-	if len(current) != expected {
+	if retailkpi.CoverageIncomplete(retailkpi.Coverage{ObservedStoreDays: len(current), ExpectedStoreDays: expected}) {
 		return baseValues{}, len(current), currency, "incomplete_store_day_coverage"
 	}
 	for _, f := range current {
@@ -508,7 +529,7 @@ func storeSourceSystems(facts []retailkpi.DailyFact) []string {
 	return sortedKeys(values)
 }
 func singleSource(facts []retailkpi.DailyFact) string {
-	values := storeSourceSystems(facts)
+	values := sourceenvelope.SourceSystems(facts)
 	if len(values) == 1 {
 		return values[0]
 	}
@@ -522,46 +543,27 @@ func sortedKeys(values map[string]bool) []string {
 	sort.Strings(out)
 	return out
 }
-func factVersionRange(facts []retailkpi.DailyFact) (int, int, time.Time) {
-	min, max := 0, 0
-	var highest time.Time
-	for _, f := range facts {
-		if min == 0 || f.Version < min {
-			min = f.Version
-		}
-		if f.Version > max {
-			max = f.Version
-		}
-		if f.AsOfAt.After(highest) {
-			highest = f.AsOfAt
-		}
-	}
-	return min, max, highest
-}
 
 func buildEvidence(q Query, facts []retailkpi.DailyFact, from, to time.Time, observed int) Evidence {
-	minVersion, maxVersion, highest := factVersionRange(facts)
 	coverage := (*float64)(nil)
 	if q.WindowDays > 0 {
 		value := float64(observed) / float64(q.WindowDays) * 100
 		coverage = &value
 	}
-	evidence := Evidence{Current: Period{DateFrom: from.Format("2006-01-02"), DateTo: to.Format("2006-01-02")}, ObservedStoreDays: observed, ExpectedStoreDays: q.WindowDays, CoverageRate: coverage, RequiredFields: scenarioRequiredFields(), SourceSystems: storeSourceSystems(facts), DatasetVersions: datasetVersions(facts), FactVersionMin: minVersion, FactVersionMax: maxVersion, KPIDrilldownURL: kpiDrilldownURL(q, q.StoreID, from, to)}
-	if !highest.IsZero() {
-		evidence.HighestAsOf = &highest
-	}
-	return evidence
+	// A failed evaluation still carries a full Source Envelope so the reason
+	// is visible alongside the provenance — a rejected scenario is never
+	// reported as if the data simply did not exist.
+	env := sourceenvelope.Build(facts, sourceenvelope.Spec{
+		Classification: q.Classification,
+		FormulaVersion: FormulaVersion,
+		PulseVersion:   retailpulse.PulseVersion,
+		Current:        sourceenvelope.PeriodSpec{From: from, To: to, ExpectedStoreDays: q.WindowDays},
+		DecisionReady:  false, DecisionReadyReason: "scenario_not_ready",
+		GeneratedAt: time.Now().UTC(),
+	})
+	return Evidence{Current: Period{DateFrom: from.Format("2006-01-02"), DateTo: to.Format("2006-01-02")}, ObservedStoreDays: observed, ExpectedStoreDays: q.WindowDays, CoverageRate: coverage, RequiredFields: scenarioRequiredFields(), SourceSystems: env.SourceSystems, DatasetVersions: env.DatasetVersions, FactVersionMin: env.FactVersionMin, FactVersionMax: env.FactVersionMax, HighestAsOf: env.HighestAsOf, KPIDrilldownURL: kpiDrilldownURL(q, q.StoreID, from, to)}
 }
 
-func datasetVersions(facts []retailkpi.DailyFact) []string {
-	values := map[string]bool{}
-	for _, fact := range facts {
-		if fact.SimulationDatasetVersion != nil && *fact.SimulationDatasetVersion != "" {
-			values[*fact.SimulationDatasetVersion] = true
-		}
-	}
-	return sortedKeys(values)
-}
 func scenarioRequiredFields() []string {
 	return []string{"revenue", "gross_profit", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost"}
 }

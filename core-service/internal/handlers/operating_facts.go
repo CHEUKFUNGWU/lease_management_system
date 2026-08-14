@@ -20,6 +20,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/audit"
 	"github.com/lease-management-system/core-service/internal/services/fpna"
 	"github.com/lease-management-system/core-service/internal/services/operating"
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
 var operatingPeriodPattern = regexp.MustCompile(`^\d{4}-(0[1-9]|1[0-2])$`)
@@ -377,7 +378,7 @@ func (h *OperatingFactsHandler) StoreBenchmarks(c *gin.Context) {
 	if !ok {
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"period": period, "basis": "Working", "data": operating.BenchmarkStores(rows), "peer_definition": "region+brand", "exchange_rate_version": exchangeRateVersion, "source": gin.H{"type": "store_operating_facts", "coverage": "permission_scoped"}})
+	c.JSON(http.StatusOK, gin.H{"period": period, "basis": "Working", "data": operating.BenchmarkStores(rows), "peer_definition": "same brand + region + currency, decision-ready, excluding target, minimum 3 peers", "minimum_peer_count": retailkpi.MinimumPeerCount, "exchange_rate_version": exchangeRateVersion, "source": gin.H{"type": "store_operating_facts", "coverage": "permission_scoped"}})
 }
 
 func (h *OperatingFactsHandler) StoreCohorts(c *gin.Context) {

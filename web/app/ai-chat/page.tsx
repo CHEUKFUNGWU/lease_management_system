@@ -46,6 +46,7 @@ import {
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import AppLayout from "../components/AppLayout";
+import DataTrustBar from "../components/DataTrustBar";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -219,10 +220,9 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
           {artifact.artifact_type === "retail_action_proposal" && (
             <div style={{ marginTop: 8 }}>
               <Text type="secondary" style={{ display: "block", marginBottom: 6 }}>仅为行动提议：不会写入行动清单或正式台账。</Text>
+              <DataTrustBar envelope={artifact.data?.envelope} basis="Scenario" />
               <Space wrap>
                 <StatusTag kind="warning">待情景工作台确认</StatusTag>
-                {artifact.data?.data_classification && <StatusTag kind="neutral">{artifact.data.data_classification}</StatusTag>}
-                {artifact.data?.dataset_version && <StatusTag kind="neutral">dataset: {artifact.data.dataset_version}</StatusTag>}
                 <StatusTag kind="neutral">Owner: {artifact.data?.owner_name || "—"}</StatusTag>
                 <StatusTag kind="neutral">Due: {artifact.data?.due_date || "—"}</StatusTag>
                 {artifact.data?.next_url && String(artifact.data.next_url).startsWith("/") && <a href={artifact.data.next_url}>前往情景工作台</a>}

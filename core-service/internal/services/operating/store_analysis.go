@@ -2,18 +2,22 @@ package operating
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
-// StoreBenchmark is a deterministic peer comparison. Peer sets are explicit
-// (region + brand) and a missing EBITDA remains missing rather than becoming a
-// zero that would distort the rank.
+// StoreBenchmark is a deterministic peer comparison. The Peer Cohort follows
+// the retail-kpi-v1 rule (CONTEXT.md): stores sharing the target's brand,
+// region and currency, decision-ready, excluding the target; a cohort below
+// the minimum sample yields no benchmark rather than a weak one.
 type StoreBenchmark struct {
 	StoreID     string   `json:"store_id"`
 	StoreCode   string   `json:"store_code"`
 	Region      string   `json:"region"`
 	Brand       string   `json:"brand"`
+	Currency    string   `json:"currency,omitempty"`
 	Cohort      string   `json:"cohort"`
 	Metric      string   `json:"metric"`
 	Value       *float64 `json:"value,omitempty"`
@@ -24,7 +28,14 @@ type StoreBenchmark struct {
 }
 
 func BenchmarkStores(facts []*repository.StoreOperatingFact) []StoreBenchmark {
-	values := make(map[string][]float64)
+	// Peer membership: same brand + region + currency, decision-ready, with a
+	// measurable metric. The target itself is excluded from its own cohort.
+	type peerMember struct {
+		storeID string
+		ebitda  float64
+		ready   bool
+	}
+	cohorts := make(map[string][]peerMember)
 	for _, fact := range facts {
 		if fact == nil {
 			continue
@@ -33,8 +44,8 @@ func BenchmarkStores(facts []*repository.StoreOperatingFact) []StoreBenchmark {
 		if metric.FourWallEBITDA == nil {
 			continue
 		}
-		peer := fact.Region + "\x00" + fact.Brand
-		values[peer] = append(values[peer], *metric.FourWallEBITDA)
+		key := fact.Region + "\x00" + fact.Brand + "\x00" + strings.ToUpper(fact.Currency)
+		cohorts[key] = append(cohorts[key], peerMember{storeID: fact.StoreID, ebitda: *metric.FourWallEBITDA, ready: metric.DataReady})
 	}
 	result := make([]StoreBenchmark, 0, len(facts))
 	for _, fact := range facts {
@@ -42,27 +53,23 @@ func BenchmarkStores(facts []*repository.StoreOperatingFact) []StoreBenchmark {
 			continue
 		}
 		metric := CalculateFourWall(*fact)
-		peer := fact.Region + "\x00" + fact.Brand
-		peers := append([]float64(nil), values[peer]...)
+		key := fact.Region + "\x00" + fact.Brand + "\x00" + strings.ToUpper(fact.Currency)
+		peers := make([]float64, 0, len(cohorts[key]))
+		for _, member := range cohorts[key] {
+			if member.storeID == fact.StoreID {
+				continue // the target is not part of its own cohort
+			}
+			peers = append(peers, member.ebitda)
+		}
 		average, percentile := (*float64)(nil), (*float64)(nil)
-		if len(peers) > 0 {
+		if len(peers) >= retailkpi.MinimumPeerCount {
 			sum := 0.0
 			for _, value := range peers {
 				sum += value
 			}
 			avg := round2(sum / float64(len(peers)))
 			average = &avg
-			if metric.FourWallEBITDA != nil {
-				sort.Float64s(peers)
-				rank := 0
-				for _, value := range peers {
-					if value <= *metric.FourWallEBITDA {
-						rank++
-					}
-				}
-				p := round2(float64(rank) / float64(len(peers)) * 100)
-				percentile = &p
-			}
+			percentile = retailkpi.PercentileRank(peers, *metric.FourWallEBITDA)
 		}
 		cohort := fact.CohortCode
 		if cohort == "" && fact.StoreAgeMonths != nil {
@@ -75,7 +82,7 @@ func BenchmarkStores(facts []*repository.StoreOperatingFact) []StoreBenchmark {
 				cohort = "mature_36m_plus"
 			}
 		}
-		result = append(result, StoreBenchmark{StoreID: fact.StoreID, StoreCode: fact.StoreCode, Region: fact.Region, Brand: fact.Brand, Cohort: cohort, Metric: "four_wall_ebitda", Value: metric.FourWallEBITDA, PeerAverage: average, PeerCount: len(peers), Percentile: percentile, DataReady: metric.DataReady})
+		result = append(result, StoreBenchmark{StoreID: fact.StoreID, StoreCode: fact.StoreCode, Region: fact.Region, Brand: fact.Brand, Currency: fact.Currency, Cohort: cohort, Metric: "four_wall_ebitda", Value: metric.FourWallEBITDA, PeerAverage: average, PeerCount: len(peers), Percentile: percentile, DataReady: metric.DataReady})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].StoreCode < result[j].StoreCode })
 	return result

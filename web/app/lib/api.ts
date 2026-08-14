@@ -270,6 +270,7 @@ export interface RetailPulsePartition {
 
 export interface RetailPulseResponse extends RetailPulsePartition {
   basis: "Working" | string;
+  envelope?: SourceEnvelope;
   pulse_version: string;
   formula_version: string;
   data_classification: RetailDataClassification;
@@ -1506,6 +1507,7 @@ export interface RetailStoreEvidence {
 
 export interface RetailStoreDiagnosticsResponse {
   basis: "Working" | string;
+  envelope?: SourceEnvelope;
   diagnostics_version: string;
   formula_version: string;
   pulse_version: string;
@@ -1591,6 +1593,7 @@ export interface RetailScenarioResult {
 
 export interface RetailScenarioResponse {
   basis: "Scenario" | string;
+  envelope?: SourceEnvelope;
   scenario_version: string;
   formula_version: string;
   diagnostics_version: string;
@@ -1632,6 +1635,34 @@ export interface RetailScenarioActionRequest {
   owner_name?: string;
   due_date?: string | null;
   verification_period?: string;
+}
+
+// ENV-001: the Source Envelope every retail read carries (CONTEXT.md).
+// The frontend renders provenance only through <DataTrustBar>; a missing
+// coverage rate is null and must render as "—", never as 0.
+export interface SourceEnvelopeCoverage {
+  requested_date_from?: string;
+  requested_date_to?: string;
+  observed_store_days?: number;
+  expected_store_days?: number;
+  coverage_rate?: number | null;
+}
+
+export interface SourceEnvelope {
+  data_classification: "production" | "simulated" | "mixed" | string;
+  source_systems: string[];
+  dataset_versions: string[];
+  fact_version_min: number;
+  fact_version_max: number;
+  highest_as_of?: string;
+  current_coverage: SourceEnvelopeCoverage;
+  comparison_coverage?: SourceEnvelopeCoverage;
+  decision_ready: boolean;
+  decision_ready_reason?: string;
+  formula_version: string;
+  pulse_version: string;
+  semantic_version: string;
+  generated_at: string;
 }
 
 // Single typed client for the additive operating-pulse module. Query

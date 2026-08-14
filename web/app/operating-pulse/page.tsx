@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Tooltip, Typography, message,
 } from "antd";
-import { ArrowDownOutlined, ArrowUpOutlined, EyeOutlined, InfoCircleOutlined, ReloadOutlined, WarningOutlined } from "@ant-design/icons";
+import { ArrowDownOutlined, ArrowUpOutlined, EyeOutlined, ReloadOutlined } from "@ant-design/icons";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import { SeverityDot, toSeverity } from "../components/SeverityDot";
 import PageHeader from "../components/PageHeader";
+import DataTrustBar, { KPIReadyBadge } from "../components/DataTrustBar";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
 import { hasRole, useAuth } from "../context/AuthContext";
@@ -38,23 +39,19 @@ function coverageText(coverage: RetailCoverage): string {
   return `${coverage.observed_store_days}/${coverage.expected_store_days} store-days · ${rate}`;
 }
 
-function coverageRange(response: RetailPulseResponse): string {
-  return `${coverageText(response.current_coverage)} current · ${coverageText(response.comparison_coverage)} comparison`;
-}
-
 function effectivePartition(response: RetailPulseResponse, selectedCurrency: string): RetailPulsePartition | null {
   const partitions = responsePartitions(response);
   return partitions.find((item) => item.currency === selectedCurrency) || partitions[0] || null;
 }
 
-function KPIValueCard({ code, metric, currency }: { code: PulseMetricCode; metric?: RetailPulseResponse["summary"] extends infer T ? T extends Record<string, infer M> ? M : never : never; currency: string }) {
+function KPIValueCard({ code, metric, currency, notReady }: { code: PulseMetricCode; metric?: RetailPulseResponse["summary"] extends infer T ? T extends Record<string, infer M> ? M : never : never; currency: string; notReady?: boolean }) {
   if (!metric) return <Card size="small" className="pulse-kpi-card"><Typography.Text type="secondary">{KPI_LABELS[code]}</Typography.Text><div className="pulse-kpi-null">—</div></Card>;
   const tone = changeTone(code, metric);
   const arrow = metric.change_value == null ? undefined : metric.change_value < 0 ? <ArrowDownOutlined /> : metric.change_value > 0 ? <ArrowUpOutlined /> : undefined;
   const status = metricStatusLabel(metric);
   const statusKind = status.label === "完整" ? "neutral" : "warning";
   return <Card size="small" className="pulse-kpi-card" data-testid={`pulse-kpi-${code}`}>
-    <Flex justify="space-between" align="start" gap={8}><Typography.Text type="secondary">{KPI_LABELS[code]}</Typography.Text><Tooltip title={status.reason}><StatusTag kind={statusKind}>{status.label}</StatusTag></Tooltip></Flex>
+    <Flex justify="space-between" align="start" gap={8}><Typography.Text type="secondary">{KPI_LABELS[code]}</Typography.Text><Flex align="center" gap={4}>{notReady && <KPIReadyBadge />}<Tooltip title={status.reason}><StatusTag kind={statusKind}>{status.label}</StatusTag></Tooltip></Flex></Flex>
     <Typography.Title level={3} style={{ margin: "12px 0 4px", fontVariantNumeric: "tabular-nums" }}>{formatKPIValue(metric.current, currency)}</Typography.Title>
     <Typography.Text className={`pulse-change pulse-change-${tone}`}>{arrow} {formatChange(metric)} {status.reason ? `· ${status.reason}` : ""}</Typography.Text>
     <Typography.Text type="secondary" className="pulse-kpi-comparison">对比 {formatKPIValue(metric.comparison, currency)}</Typography.Text>
@@ -224,7 +221,6 @@ function OperatingPulseInner() {
   const isEmptyInitial = latest === null && !response && !error;
   const isScoped = storeIDs.length > 0;
   const displaySummary = partition?.summary || response?.summary || {};
-  const sourceSystems = response?.source_systems || [];
   const latestMetadata = latest && currentClassification === "simulated" && latest.dataset_version === datasetVersion ? latest : undefined;
   const anomalies = latestMetadata?.anomaly_manifest || [];
   const currentAnomaly = anomalies.find((item) => item.date_to === asOf);
@@ -242,7 +238,7 @@ function OperatingPulseInner() {
   const clearStore = () => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs: [], sourceSystem });
   const refresh = () => { latestLoaded.current = false; setLatestRetryNonce((value) => value + 1); setRefreshNonce((value) => value + 1); };
 
-  const kpiCards = PULSE_KPI_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><KPIValueCard code={code} metric={displaySummary[code]} currency={partition?.currency || response?.currency || ""} /></Col>);
+  const kpiCards = PULSE_KPI_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><KPIValueCard code={code} metric={displaySummary[code]} currency={partition?.currency || response?.currency || ""} notReady={!response?.decision_ready} /></Col>);
   const aux = PULSE_AUXILIARY_CODES.map((code) => <AuxiliaryMetricRow key={code} code={code} metric={displaySummary[code]} currency={partition?.currency || response?.currency} />);
 
   const onClassificationChange = (next: "production" | "simulated") => {
@@ -273,7 +269,7 @@ function OperatingPulseInner() {
     {error && <Alert type="error" showIcon message="经营脉搏暂不可用" description={error} action={<Button size="small" onClick={refresh}>重试</Button>} />}
     {loading && !response && !isEmptyInitial && <Card><Flex justify="center" align="center" style={{ minHeight: 220 }}><Spin tip="读取经营脉搏…" /></Flex></Card>}
       {response && partition && <>
-      <Alert type={response.decision_ready ? "info" : "warning"} showIcon icon={response.decision_ready ? <InfoCircleOutlined /> : <WarningOutlined />} className="pulse-trust-strip" message={<Flex wrap="wrap" gap={12} align="center"><StatusTag kind={response.data_classification === "simulated" ? "warning" : "processing"}>{response.data_classification === "simulated" ? "模拟数据 · 不进入 Official" : "正式数据 · Working"}</StatusTag><StatusTag kind="neutral">{response.basis}</StatusTag><span>{response.current.date_from} – {response.current.date_to} · 对比 {response.comparison.date_from} – {response.comparison.date_to}</span><span>{coverageRange(response)}</span><span>source: {sourceSystems.join(", ") || "—"}</span><span>formula: {response.formula_version}</span></Flex>} description={<Flex wrap="wrap" gap={12}><span>dataset: {response.dataset_version || "—"}</span><span>generator: {latestMetadata?.generator_version || "—"}</span><span>pulse: {response.pulse_version}</span><span>fact version: {response.fact_version_min}–{response.fact_version_max}</span><span>decision-ready: {response.decision_ready ? "是" : "否 · KPI 仅供查看，不可作为完整判断"}</span>{response.highest_as_of && <span>最高事实截至 {dayjs(response.highest_as_of).format("YYYY-MM-DD HH:mm")}</span>}</Flex>} />
+      <DataTrustBar envelope={response.envelope} basis={response.basis} detailExtra={<span>generator: {latestMetadata?.generator_version || "—"}</span>} />
       {noFacts ? <Card style={{ marginTop: 16 }}><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Space direction="vertical"><Typography.Text strong>当前正式数据窗口没有事实</Typography.Text><Typography.Text type="secondary">请先导入并完成门店日事实映射，再刷新经营脉搏。系统不会用 0 填补缺失。</Typography.Text></Space>} /></Card> : <>
       {response.multi_currency && <Card size="small" style={{ marginTop: 16 }}><Flex align="center" gap={8}><Typography.Text strong>币种分区</Typography.Text><Segmented value={selectedCurrency} onChange={(value) => setSelectedCurrency(String(value))} options={partitions.map((item) => ({ label: item.currency || "未知币种", value: item.currency }))} /></Flex></Card>}
       <Row gutter={[12, 12]} style={{ marginTop: 16 }}>{kpiCards}</Row>

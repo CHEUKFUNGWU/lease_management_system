@@ -123,6 +123,73 @@ type Coverage struct {
 	MissingFields     []string `json:"missing_fields,omitempty"`
 }
 
+// MinimumPeerCount is the minimum size a Peer Cohort must have before a
+// benchmark is produced (CONTEXT.md: Peer Cohort — a cohort below the
+// minimum yields no benchmark rather than a weak one).
+const MinimumPeerCount = 3
+
+// CoverageIncomplete reports missing store-days: the expected population is
+// known and the observed store-days fall below it. Over-coverage
+// (observed > expected) is not incomplete. This is the single Fact Coverage
+// verdict predicate — every retail read evaluates coverage through it.
+func CoverageIncomplete(c Coverage) bool {
+	return c.ExpectedStoreDays > 0 && c.ObservedStoreDays < c.ExpectedStoreDays
+}
+
+// CoverageComplete reports the coverage is sufficient to judge on: the
+// expected population is known and fully observed.
+func CoverageComplete(c Coverage) bool {
+	return c.ExpectedStoreDays > 0 && c.ObservedStoreDays >= c.ExpectedStoreDays
+}
+
+// PercentileRank returns the percentile of target within values
+// ((less + 0.5*equal) / n * 100), or nil when values is empty.
+func PercentileRank(values []float64, target float64) *float64 {
+	if len(values) == 0 {
+		return nil
+	}
+	less, equal := 0, 0
+	for _, value := range values {
+		if value < target {
+			less++
+		} else if value == target {
+			equal++
+		}
+	}
+	rank := (float64(less) + 0.5*float64(equal)) / float64(len(values)) * 100
+	return &rank
+}
+
+// ChangeRateType classifies a metric's period-over-period change: rates and
+// margins move in percentage points, volume and amount metrics in percent.
+func ChangeRateType(code string) string {
+	switch code {
+	case "gross_margin_rate", "conversion_rate", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution_margin", "rent_to_sales_rate":
+		return "percentage_point"
+	default:
+		return "percent"
+	}
+}
+
+// ChangeRate computes the period-over-period change of two KPI values under
+// retail-kpi-v1 null semantics. A missing side yields nil with a reason; a
+// percentage_point change is a plain difference; a percent change against a
+// zero comparison is refused (no fabricated change).
+func ChangeRate(current, comparison *float64, changeType string) (*float64, string) {
+	if current == nil || comparison == nil {
+		return nil, "missing_value"
+	}
+	if changeType == "percentage_point" {
+		value := *current - *comparison
+		return roundPtr(&value), ""
+	}
+	if *comparison == 0 {
+		return nil, "zero_comparison"
+	}
+	value := (*current / *comparison - 1) * 100
+	return roundPtr(&value), ""
+}
+
 type Aggregate struct {
 	GroupBy              string              `json:"group_by"`
 	GroupKey             string              `json:"group_key"`
@@ -176,7 +243,7 @@ func AggregateFacts(facts []DailyFact, req Request) ([]Aggregate, Coverage, erro
 		result := aggregateGroup(groups[key], req.GroupBy, parts[0], labels[key], parts[1])
 		results = append(results, result)
 	}
-	if coverage.ExpectedStoreDays > 0 && coverage.ObservedStoreDays < coverage.ExpectedStoreDays {
+	if CoverageIncomplete(coverage) {
 		for i := range results {
 			results[i].DataQualityIssues = appendUniqueIssue(results[i].DataQualityIssues, "incomplete_store_day_coverage")
 			results[i].DecisionReady = false
@@ -353,6 +420,18 @@ func allCoreComplete(values map[string]KPIValue) bool {
 		}
 	}
 	return true
+}
+
+// EvaluateStorePeriod computes the retail-kpi-v1 KPI set for one store's
+// period facts at store grain. The monthly four-wall view feeds this with
+// its single period row so both engines speak the same semantic layer;
+// zero denominators stay null, never fabricated.
+func EvaluateStorePeriod(facts []DailyFact) map[string]KPIValue {
+	if len(facts) == 0 {
+		return map[string]KPIValue{}
+	}
+	first := facts[0]
+	return aggregateGroup(facts, "store", first.StoreID, first.StoreCode, first.Currency).KPIs
 }
 
 func groupKey(f DailyFact, groupBy string) (string, string) {

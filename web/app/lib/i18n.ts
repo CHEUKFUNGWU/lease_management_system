@@ -59,6 +59,138 @@ const dict: TranslationDict = {
     en: "The request did not succeed. Please try again.",
   },
 
+  // ENV-002 DataTrustBar — DESIGN.md §10 数据可信度展示
+  "trust.classification_production": {
+    "zh-CN": "正式数据 · Working",
+    "zh-HK": "正式數據 · Working",
+    en: "Production data · Working",
+  },
+  "trust.classification_simulated": {
+    "zh-CN": "模拟数据 · 不进入 Official",
+    "zh-HK": "模擬數據 · 不進入 Official",
+    en: "Simulated data · never Official",
+  },
+  "trust.classification_mixed": {
+    "zh-CN": "混合数据 · 不进入 Official",
+    "zh-HK": "混合數據 · 不進入 Official",
+    en: "Mixed data · never Official",
+  },
+  "trust.ready": {
+    "zh-CN": "决策就绪",
+    "zh-HK": "決策就緒",
+    en: "Decision ready",
+  },
+  "trust.not_ready": {
+    "zh-CN": "未达决策就绪 · 仅可查看",
+    "zh-HK": "未達決策就緒 · 僅可查看",
+    en: "Not decision ready · view only",
+  },
+  "trust.kpi_not_ready": {
+    "zh-CN": "仅供查看",
+    "zh-HK": "僅供查看",
+    en: "View only",
+  },
+  "trust.expand": {
+    "zh-CN": "查看全部口径",
+    "zh-HK": "查看全部口徑",
+    en: "View full provenance",
+  },
+  "trust.collapse": {
+    "zh-CN": "收起",
+    "zh-HK": "收起",
+    en: "Collapse",
+  },
+  "trust.store_days": {
+    "zh-CN": "store-days",
+    "zh-HK": "store-days",
+    en: "store-days",
+  },
+  "trust.comparison": {
+    "zh-CN": "对比",
+    "zh-HK": "對比",
+    en: "comparison",
+  },
+  "trust.source": {
+    "zh-CN": "来源",
+    "zh-HK": "來源",
+    en: "Source",
+  },
+  "trust.dataset": {
+    "zh-CN": "dataset",
+    "zh-HK": "dataset",
+    en: "Dataset",
+  },
+  "trust.fact_version": {
+    "zh-CN": "fact version",
+    "zh-HK": "fact version",
+    en: "Fact version",
+  },
+  "trust.as_of": {
+    "zh-CN": "最高事实截至",
+    "zh-HK": "最高事實截至",
+    en: "Highest as-of",
+  },
+  "trust.formula": {
+    "zh-CN": "formula",
+    "zh-HK": "formula",
+    en: "Formula",
+  },
+  "trust.pulse": {
+    "zh-CN": "pulse",
+    "zh-HK": "pulse",
+    en: "Pulse",
+  },
+  "trust.semantic": {
+    "zh-CN": "envelope",
+    "zh-HK": "envelope",
+    en: "Envelope",
+  },
+  "trust.reason.incomplete_store_day_coverage": {
+    "zh-CN": "门店日覆盖不足",
+    "zh-HK": "門店日覆蓋不足",
+    en: "Incomplete store-day coverage",
+  },
+  "trust.reason.not_decision_ready": {
+    "zh-CN": "未达决策就绪标准",
+    "zh-HK": "未達決策就緒標準",
+    en: "Not decision ready",
+  },
+  "trust.reason.scenario_not_ready": {
+    "zh-CN": "情景计算未完成",
+    "zh-HK": "情景計算未完成",
+    en: "Scenario not evaluated",
+  },
+  "trust.reason.currency_conflict": {
+    "zh-CN": "币种冲突",
+    "zh-HK": "幣種衝突",
+    en: "Currency conflict",
+  },
+  "trust.reason.insufficient_peer_count": {
+    "zh-CN": "同群样本不足",
+    "zh-HK": "同群樣本不足",
+    en: "Insufficient peer cohort",
+  },
+  "trust.reason.data_quality_invalid": {
+    "zh-CN": "数据质量无效",
+    "zh-HK": "數據質量無效",
+    en: "Invalid data quality",
+  },
+  "trust.reason.diagnostics_not_decision_ready": {
+    "zh-CN": "诊断未达决策就绪",
+    "zh-HK": "診斷未達決策就緒",
+    en: "Diagnostics not decision ready",
+  },
+  "trust.reason.no_facts": {
+    "zh-CN": "无事实数据",
+    "zh-HK": "無事實數據",
+    en: "No facts",
+  },
+  "trust.reason.raw_facts_read": {
+    "zh-CN": "原始事实读取，非决策结论",
+    "zh-HK": "原始事實讀取，非決策結論",
+    en: "Raw facts read, not a decision",
+  },
+
   // AppLayout
   "nav.home": {
     "zh-CN": "首页",

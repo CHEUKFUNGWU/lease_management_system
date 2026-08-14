@@ -63,7 +63,11 @@ jobs:
     name: 前端
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 让 enforce-design 的 diff 基线（origin/main）可用；
+      # 止血检查只扫相对基线的变更文件，不扫全树。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -74,6 +78,12 @@ jobs:
       - name: 安装依赖
         working-directory: web
         run: npm ci
+
+      - name: lint（ESLint + DESIGN.md §13 止血 diff 检查）
+        working-directory: web
+        run: npm run lint
+        env:
+          CI: "true"
 
       - name: 类型检查
         working-directory: web

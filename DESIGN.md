@@ -31,19 +31,19 @@
 | `web/app/design-system/tokens.ts` | → `theme.ts` → `ThemeProvider` → **所有 Ant Design 组件**；`StatusTag.tsx` 也直接引用 |
 | `web/app/globals.css` 的 `:root` | → **所有自定义 CSS 与 `var(--*)` 引用** |
 
-已确认的漂移：
+已确认的漂移（**STY-001 已全部消除**，保留历史供追溯）：
 
-| 项 | `tokens.ts`（→ AntD 组件） | `globals.css`（→ 自定义 CSS） | 后果 |
+| 项 | 修复前 `tokens.ts` | 修复前 `:root` | 定为（STY-001） |
 |---|---|---|---|
-| `border.default` | `#E5E5E5` | `--mono-90` = `#D9D9D9` | 同一屏里 AntD 卡片和自定义卡片边框颜色不同 |
-| `border.strong` | `#D9D9D9` | `--mono-70` = `#A6A6A6` | hover 态边框深浅不一致 |
-| 页面主标题 | `display` 32px / 700 | `.page-header-title` 28px / 700 | 两种页面标题尺寸 |
-| 静态深度 | `depth.static` = `1px solid #D9D9D9` | `--shadow-static` = `0 0 0 1px rgba(0,0,0,.04)` | **一个用 border 一个用 shadow ring**，叠加处出现 1px 错位 |
-| 等宽字体 | `JetBrains Mono` | `ui-monospace, SFMono-Regular, Menlo` | `JetBrains Mono` 从未被加载，是死配置 |
+| `border.default` | `#E5E5E5` | `--mono-90` = `#D9D9D9` | **`#D9D9D9`** |
+| `border.strong` | `#D9D9D9` | `--mono-70` = `#A6A6A6` | **`#A6A6A6`** |
+| 页面主标题 | `display` 32px / 700 | `.page-header-title` 28px / 700 | **28px / 600**（DESIGN.md §4.1/§4.2） |
+| 静态深度 | `depth.static` = `1px solid #D9D9D9` | `--shadow-static` = `0 0 0 1px rgba(0,0,0,.04)` | **环形阴影**（DESIGN.md §6） |
+| 等宽字体 | `JetBrains Mono`（死配置） | `ui-monospace, SFMono-Regular, Menlo` | **`ui-monospace` 栈** |
 
 **规则：`tokens.ts` 是唯一真相源。** `globals.css` 的 `:root` 必须与之逐项对齐（AntD 的 `ConfigProvider` 只能吃 JS 值，所以源必须在 TS 侧）。
 
-**改令牌时：改 `tokens.ts` → 同步 `:root` → 跑对齐测试。** 只改一边就是引入下一次漂移。上表五项的对齐属于改善方案阶段一，未完成前**不要基于任何一侧的值新增硬编码**。
+**改令牌时：改 `tokens.ts` → 同步 `:root` → 跑对齐测试。** 只改一边就是引入下一次漂移。对齐测试见 `web/app/design-system/tokens-alignment.test.ts`，任何一边改动未同步即失败。
 
 ---
 
@@ -320,7 +320,7 @@ xs sm md  lg  xl  2xl 3xl 4xl
 | 字重 700 / 800 | 13 处 | 阶段一 |
 | `border: 1px solid` | 11 处 | 阶段一 |
 | JS hover handler | 6 处 | 阶段一 |
-| `tokens.ts` 与 `:root` 漂移 | 见 §1 表 | 阶段一 |
+| ~~`tokens.ts` 与 `:root` 漂移~~ | ✅ STY-001 已消除，对齐测试守护 | 已完成 |
 | 字体走 Google Fonts `@import`，未用 `next/font` | 全仓 0 处 `next/font` | 阶段一 |
 | 单环 focus，深色面上不可见 | 全站 | 阶段一 |
 | 三个零售页无 `t()` | 3 页 | 阶段四 |

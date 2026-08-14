@@ -40,9 +40,9 @@ export const colors = {
   },
 
   border: {
-    default: "#E5E5E5",     // Standard dividers, card borders
-    strong: "#D9D9D9",      // Hover states, active borders
-    subtle: "#F0F0F0",      // Internal dividers, table rows
+    default: "#D9D9D9",     // Standard dividers, card borders (--mono-90)
+    strong: "#A6A6A6",      // Hover states, active borders (--mono-70)
+    subtle: "#F0F0F0",      // Internal dividers, table rows (--mono-95)
     inverse: "rgba(255,255,255,0.1)", // Borders on dark elements
   },
 
@@ -67,14 +67,14 @@ export const colors = {
 
 export const typography = {
   fontFamily: {
-    sans: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
-    mono: '"JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace',
+    sans: 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+    mono: 'ui-monospace, SFMono-Regular, Menlo, monospace',
   },
 
   // Scale: 8 levels, tight tracking for headings
   sizes: {
-    display: { size: 32, lineHeight: 40, weight: 700, tracking: -0.04 },    // Page titles
-    h1: { size: 24, lineHeight: 32, weight: 700, tracking: -0.03 },         // Section headers
+    display: { size: 28, lineHeight: 36, weight: 600, tracking: -0.04 },    // Page titles
+    h1: { size: 24, lineHeight: 32, weight: 600, tracking: -0.03 },         // Section headers
     h2: { size: 18, lineHeight: 28, weight: 600, tracking: -0.02 },         // Card titles, tabs
     h3: { size: 15, lineHeight: 24, weight: 600, tracking: -0.01 },         // Subsection, form groups
     body: { size: 14, lineHeight: 22, weight: 400, tracking: 0 },           // Primary body
@@ -88,7 +88,6 @@ export const typography = {
     normal: 400,
     medium: 500,
     semibold: 600,
-    bold: 700,
   },
 } as const;
 
@@ -118,7 +117,7 @@ export const depth = {
   // 3. Shadows (extremely subtle, only for floating elements)
 
   static: {
-    border: "1px solid #D9D9D9",
+    shadow: "0 0 0 1px rgba(0, 0, 0, 0.04)",
     background: "#FFFFFF",
   },
 

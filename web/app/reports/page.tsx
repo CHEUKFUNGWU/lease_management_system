@@ -153,7 +153,7 @@ function KPIStatCard({ title, value, loading }: { title: string; value: number; 
             value={value}
             valueStyle={{
               fontSize: 26,
-              fontWeight: 700,
+              fontWeight: 600,
               letterSpacing: "-0.03em",
               color: "var(--fg-primary)",
             }}
@@ -955,7 +955,7 @@ function ReportsPageContent() {
                               }
                               value={amortSummary.closingLiability}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>
@@ -972,7 +972,7 @@ function ReportsPageContent() {
                               }
                               value={amortSummary.closingROU}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>
@@ -989,7 +989,7 @@ function ReportsPageContent() {
                               }
                               value={amortSummary.totalInterest}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>
@@ -1006,7 +1006,7 @@ function ReportsPageContent() {
                               }
                               value={amortSummary.totalDepreciation}
                               precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
+                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
                             />
                           </Card>
                         </Col>

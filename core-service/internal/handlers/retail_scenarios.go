@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailscenario"
@@ -43,7 +44,7 @@ func (h *RetailScenarioHandler) Evaluate(c *gin.Context) {
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	query.LegalEntityID = legalEntityID
@@ -58,12 +59,12 @@ func (h *RetailScenarioHandler) Evaluate(c *gin.Context) {
 func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 	entity, ok := tenantEntity(c)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "legal_entity_id is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "legal_entity_id is required", nil)
 		return
 	}
 	key := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
 	if key == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Idempotency-Key is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "Idempotency-Key is required", nil)
 		return
 	}
 	query, ok := h.parseQueryOnly(c)
@@ -78,30 +79,30 @@ func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	if strings.TrimSpace(request.Title) == "" || strings.TrimSpace(request.PlannedAction) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "title and planned_action are required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "title and planned_action are required", nil)
 		return
 	}
 	if len(request.Title) > 200 || len(request.PlannedAction) > 2000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "title or planned_action is too long"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "title or planned_action is too long", nil)
 		return
 	}
 	if request.VerificationPeriod != "" && !operatingPeriodPattern.MatchString(request.VerificationPeriod) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "verification_period must be YYYY-MM"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "verification_period must be YYYY-MM", nil)
 		return
 	}
 	if request.DueDate != nil && strings.TrimSpace(*request.DueDate) != "" {
 		if _, err := time.Parse("2006-01-02", strings.TrimSpace(*request.DueDate)); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "due_date must be YYYY-MM-DD"})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "due_date must be YYYY-MM-DD", nil)
 			return
 		}
 	}
 	evaluateRequest := retailscenario.EvaluateRequest{HorizonMonths: request.HorizonMonths, Scenarios: []retailscenario.ScenarioInput{{Key: "baseline", Name: "Baseline"}, request.SelectedScenario}}
 	if request.SelectedScenario.Key == "baseline" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "selected_scenario must be a non-baseline plan"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "selected_scenario must be a non-baseline plan", nil)
 		return
 	}
 	result, err := h.service.Evaluate(c.Request.Context(), query, evaluateRequest)
@@ -117,16 +118,16 @@ func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 		}
 	}
 	if selected == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "selected_scenario was not evaluated"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "selected_scenario was not evaluated", nil)
 		return
 	}
 	fingerprint := retailscenario.RequestFingerprint(query, evaluateRequest, request.Title, request.PlannedAction, request.OwnerName, stringValue(request.DueDate), request.VerificationPeriod)
 	if existing, lookupErr := h.actions.GetActionByIdempotency(c.Request.Context(), entity, key); lookupErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": lookupErr.Error()})
+		writeSystemFailure(c, http.StatusInternalServerError, lookupErr)
 		return
 	} else if existing != nil {
 		if existingFingerprint(existing.Evidence) != fingerprint {
-			c.JSON(http.StatusConflict, gin.H{"error": "Idempotency-Key payload conflict", "reason": "idempotency_payload_conflict"})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, "Idempotency-Key payload conflict", gin.H{"reason": "idempotency_payload_conflict"})
 			return
 		}
 		existing.Replayed = true
@@ -147,15 +148,15 @@ func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 	created, replayed, createErr := h.actions.CreateScenarioAction(c.Request.Context(), item)
 	if createErr != nil {
 		if errors.Is(createErr, repository.ErrRetailScenarioActionScopeConflict) {
-			c.JSON(http.StatusConflict, gin.H{"error": createErr.Error(), "reason": "scenario_action_scope_conflict"})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, createErr.Error(), gin.H{"reason": "scenario_action_scope_conflict"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": createErr.Error()})
+		writeSystemFailure(c, http.StatusInternalServerError, createErr)
 		return
 	}
 	if replayed {
 		if existingFingerprint(created.Evidence) != fingerprint {
-			c.JSON(http.StatusConflict, gin.H{"error": "Idempotency-Key payload conflict", "reason": "idempotency_payload_conflict"})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, "Idempotency-Key payload conflict", gin.H{"reason": "idempotency_payload_conflict"})
 			return
 		}
 		created.Replayed = true
@@ -166,7 +167,7 @@ func (h *RetailScenarioHandler) SaveAction(c *gin.Context) {
 func (h *RetailScenarioHandler) parseQuery(c *gin.Context) (string, retailscenario.Query, bool) {
 	legalEntityID := strings.TrimSpace(middleware.GetTenantID(c))
 	if legalEntityID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "legal_entity_id is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "legal_entity_id is required", nil)
 		return "", retailscenario.Query{}, false
 	}
 	query, ok := h.parseQueryOnly(c)
@@ -176,19 +177,19 @@ func (h *RetailScenarioHandler) parseQuery(c *gin.Context) (string, retailscenar
 func (h *RetailScenarioHandler) parseQueryOnly(c *gin.Context) (retailscenario.Query, bool) {
 	storeID := strings.TrimSpace(c.Param("store_id"))
 	if _, err := uuid.Parse(storeID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "store_id must be a UUID"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "store_id must be a UUID", nil)
 		return retailscenario.Query{}, false
 	}
 	asOf, err := time.Parse("2006-01-02", strings.TrimSpace(c.Query("as_of")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "as_of must be an ISO date (YYYY-MM-DD)"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "as_of must be an ISO date (YYYY-MM-DD)", nil)
 		return retailscenario.Query{}, false
 	}
 	windowDays := 14
 	if raw := strings.TrimSpace(c.Query("window_days")); raw != "" {
 		parsed, scanErr := strconv.Atoi(raw)
 		if scanErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "window_days must be one of 7, 14 or 28"})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be one of 7, 14 or 28", nil)
 			return retailscenario.Query{}, false
 		}
 		windowDays = parsed
@@ -203,22 +204,28 @@ func (h *RetailScenarioHandler) parseQueryOnly(c *gin.Context) (retailscenario.Q
 func (h *RetailScenarioHandler) writeError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, retailscenario.ErrInvalidRequest):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 	case errors.Is(err, retailscenario.ErrStoreNotFound):
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, err.Error(), nil)
 	case errors.Is(err, repository.ErrRetailKPISourceConflict):
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error(), "reason": "source_conflict"})
+		writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
 	case errors.Is(err, retailscenario.ErrDataUnavailable):
 		var evidenceErr *retailscenario.ScenarioEvidenceError
 		if errors.As(err, &evidenceErr) {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "reason": evidenceErr.Reason, "evidence": evidenceErr.Evidence})
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeDataUnavailable, err.Error(), gin.H{"reason": evidenceErr.Reason, "evidence": evidenceErr.Evidence})
 			return
 		}
+		// DataUnavailableError is currently never constructed; keep the
+		// branch honest instead of dereferencing a nil reason (the nil
+		// deref flagged in the architecture review is gone with this shape).
 		var dataErr *retailscenario.DataUnavailableError
-		errors.As(err, &dataErr)
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "reason": dataErr.Reason})
+		if errors.As(err, &dataErr) {
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeDataUnavailable, err.Error(), gin.H{"reason": dataErr.Reason})
+			return
+		}
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeDataUnavailable, err.Error(), nil)
 	default:
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSystemFailure(c, http.StatusInternalServerError, err)
 	}
 }
 

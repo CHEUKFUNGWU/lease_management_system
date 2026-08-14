@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/repository"
 	auditservice "github.com/lease-management-system/core-service/internal/services/audit"
 )
@@ -99,15 +100,15 @@ type retailStoreDayFactRequest struct {
 func (h *RetailStoreDayFactsHandler) Upsert(c *gin.Context) {
 	var request retailStoreDayFactRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON request: " + err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "invalid JSON request: "+err.Error(), nil)
 		return
 	}
 	if len(request.Items) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "items must contain at least one fact"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "items must contain at least one fact", nil)
 		return
 	}
 	if len(request.Items) > maxRetailStoreDayBatch {
-		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "batch exceeds maximum of 500 facts", "max_batch_size": maxRetailStoreDayBatch})
+		writeCodedError(c, http.StatusRequestEntityTooLarge, errcontract.CodeInvalidArguments, "batch exceeds maximum of 500 facts", gin.H{"max_batch_size": maxRetailStoreDayBatch})
 		return
 	}
 
@@ -115,7 +116,7 @@ func (h *RetailStoreDayFactsHandler) Upsert(c *gin.Context) {
 	for index, input := range request.Items {
 		fact, validationError := validateRetailStoreDayInput(input)
 		if validationError != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": validationError, "index": index})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, validationError, gin.H{"index": index})
 			return
 		}
 		prepared = append(prepared, fact)
@@ -123,19 +124,19 @@ func (h *RetailStoreDayFactsHandler) Upsert(c *gin.Context) {
 
 	entity, ok := tenantEntity(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		writeCodedError(c, http.StatusForbidden, errcontract.CodePermissionDenied, "legal entity scope is required", nil)
 		return
 	}
 	payload, err := json.Marshal(prepared)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "encode idempotency payload"})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, "encode idempotency payload", nil)
 		return
 	}
 	digest := sha256.Sum256(payload)
 	payloadSHA256 := hex.EncodeToString(digest[:])
 	idempotencyKey := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
 	if len(idempotencyKey) > 255 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Idempotency-Key exceeds 255 characters"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "Idempotency-Key exceeds 255 characters", nil)
 		return
 	}
 	for _, fact := range prepared {
@@ -150,10 +151,13 @@ func (h *RetailStoreDayFactsHandler) Upsert(c *gin.Context) {
 	result, err := h.repo.UpsertRetailStoreDayFactsAtomic(c.Request.Context(), entity, prepared, idempotencyKey, payloadSHA256, optionalString(userIDFromContext(c)), auditFn)
 	if err != nil {
 		if errors.Is(err, repository.ErrRetailStoreDayFactIdempotencyConflict) {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), nil)
 			return
 		}
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		// Contract errors (scope_denied, invalid batch reference, replay
+		// verification) keep their code and message; anything else is
+		// sanitized as an internal failure.
+		writeCodedFailure(c, http.StatusUnprocessableEntity, err, nil)
 		return
 	}
 	response := retailStoreDayEnvelope(result.Facts, "", "", nil, len(result.Facts), 1, len(result.Facts), 0)
@@ -166,41 +170,41 @@ func (h *RetailStoreDayFactsHandler) List(c *gin.Context) {
 	dateFrom, dateTo := strings.TrimSpace(c.Query("date_from")), strings.TrimSpace(c.Query("date_to"))
 	from, err := parseRetailBusinessDate(dateFrom)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date_from must be an ISO date (YYYY-MM-DD)"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "date_from must be an ISO date (YYYY-MM-DD)", nil)
 		return
 	}
 	to, err := parseRetailBusinessDate(dateTo)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date_to must be an ISO date (YYYY-MM-DD)"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "date_to must be an ISO date (YYYY-MM-DD)", nil)
 		return
 	}
 	if to.Before(from) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date_to must not be before date_from"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "date_to must not be before date_from", nil)
 		return
 	}
 	if int(to.Sub(from).Hours()/24)+1 > maxRetailStoreDayRange {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date range exceeds maximum of 366 days", "max_range_days": maxRetailStoreDayRange})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "date range exceeds maximum of 366 days", gin.H{"max_range_days": maxRetailStoreDayRange})
 		return
 	}
 
 	storeIDs, storeIDError := retailStoreIDs(c.QueryArray("store_id"))
 	if storeIDError != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": storeIDError})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, storeIDError, nil)
 		return
 	}
 	page, pageSize, offset, paginationError := retailStoreDayPagination(c)
 	if paginationError != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": paginationError})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, paginationError, nil)
 		return
 	}
 	entity, ok := tenantEntity(c)
 	if !ok {
-		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		writeCodedError(c, http.StatusForbidden, errcontract.CodePermissionDenied, "legal entity scope is required", nil)
 		return
 	}
 	result, err := h.repo.ListRetailStoreDayFactsPage(c.Request.Context(), entity, dateFrom, dateTo, storeIDs, pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSystemFailure(c, http.StatusInternalServerError, err)
 		return
 	}
 	c.JSON(http.StatusOK, retailStoreDayEnvelope(result.Data, dateFrom, dateTo, storeIDs, result.Total, page, pageSize, offset))

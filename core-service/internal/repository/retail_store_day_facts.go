@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 )
 
 // ErrRetailStoreDayFactIdempotencyConflict is returned when an idempotency key
@@ -333,7 +334,12 @@ func (r *OperatingFactsRepository) resolveRetailStoreDayFactStore(ctx context.Co
 	var resolvedLegalEntity string
 	if err := r.db.QueryRow(ctx, storeQuery, storeArgs...).Scan(&resolvedLegalEntity, &fact.StoreCode, &fact.StoreName, &fact.Brand, &fact.Region); err != nil {
 		if err == pgx.ErrNoRows {
-			return "", fmt.Errorf("retail store-day fact store not found in tenant scope")
+			// The store is either missing or outside the caller's tenant
+			// scope. AGENTS.md forbids softening a scope refusal into "no
+			// data", and the Agent seam already treats a store that is not
+			// visible under the caller scope as scope_denied — so this write
+			// path says so explicitly instead of hiding the reason.
+			return "", errcontract.New(errcontract.CodeScopeDenied, "retail store is outside the caller data scope")
 		}
 		return "", fmt.Errorf("resolve retail store-day fact store: %w", err)
 	}
@@ -347,12 +353,12 @@ func (r *OperatingFactsRepository) validateRetailStoreDayFactImportBatch(ctx con
 	var batchLegalEntity *string
 	if err := r.db.QueryRow(ctx, `SELECT legal_entity_id::text FROM operating_fact_batches WHERE id=$1`, strings.TrimSpace(*importBatchID)).Scan(&batchLegalEntity); err != nil {
 		if err == pgx.ErrNoRows {
-			return fmt.Errorf("retail store-day fact import batch %s not found", strings.TrimSpace(*importBatchID))
+			return errcontract.New(errcontract.CodeInvalidArguments, fmt.Sprintf("retail store-day fact import batch %s not found", strings.TrimSpace(*importBatchID)))
 		}
 		return fmt.Errorf("resolve retail store-day fact import batch %s: %w", strings.TrimSpace(*importBatchID), err)
 	}
 	if batchLegalEntity == nil || *batchLegalEntity != storeLegalEntity {
-		return fmt.Errorf("retail store-day fact import batch %s does not belong to store legal entity %s", strings.TrimSpace(*importBatchID), storeLegalEntity)
+		return errcontract.New(errcontract.CodeConflict, fmt.Sprintf("retail store-day fact import batch %s does not belong to store legal entity %s", strings.TrimSpace(*importBatchID), storeLegalEntity))
 	}
 	return nil
 }
@@ -411,7 +417,7 @@ func (r *OperatingFactsRepository) listRetailStoreDayFactsByIDs(ctx context.Cont
 		return nil, fmt.Errorf("iterate idempotent retail store-day facts: %w", err)
 	}
 	if len(result) != len(factIDs) {
-		return nil, fmt.Errorf("idempotent retail store-day result is outside the caller scope or no longer exists")
+		return nil, errcontract.New(errcontract.CodeDataUnavailable, "idempotent retail store-day result is outside the caller scope or no longer exists")
 	}
 	return result, nil
 }

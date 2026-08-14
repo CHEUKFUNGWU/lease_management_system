@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
@@ -36,21 +37,21 @@ func (h *RetailKPIHandler) StoreDays(c *gin.Context) {
 	fromText, toText := strings.TrimSpace(c.Query("date_from")), strings.TrimSpace(c.Query("date_to"))
 	from, err := time.Parse("2006-01-02", fromText)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date_from must be an ISO date (YYYY-MM-DD)"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "date_from must be an ISO date (YYYY-MM-DD)", nil)
 		return
 	}
 	to, err := time.Parse("2006-01-02", toText)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date_to must be an ISO date (YYYY-MM-DD)"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "date_to must be an ISO date (YYYY-MM-DD)", nil)
 		return
 	}
 	if to.Before(from) || int(to.Sub(from).Hours()/24)+1 > maxRetailKPIDateRange {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "date range must be 1-366 days"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "date range must be 1-366 days", nil)
 		return
 	}
 	classification := strings.TrimSpace(c.Query("data_classification"))
 	if classification != "production" && classification != "simulated" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "data_classification must be explicitly production or simulated"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "data_classification must be explicitly production or simulated", nil)
 		return
 	}
 	datasetVersion := strings.TrimSpace(c.Query("dataset_version"))
@@ -58,40 +59,40 @@ func (h *RetailKPIHandler) StoreDays(c *gin.Context) {
 		datasetVersion = strings.TrimSpace(c.Query("simulation_dataset_version"))
 	}
 	if classification == "simulated" && datasetVersion == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "dataset_version is required for simulated data"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "dataset_version is required for simulated data", nil)
 		return
 	}
 	if classification == "production" && datasetVersion != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "dataset_version is not allowed for production data"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "dataset_version is not allowed for production data", nil)
 		return
 	}
 	groupBy := strings.TrimSpace(c.DefaultQuery("group_by", "total"))
 	if groupBy != "total" && groupBy != "region" && groupBy != "brand" && groupBy != "store" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "group_by must be one of total, region, brand, store"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "group_by must be one of total, region, brand, store", nil)
 		return
 	}
 	storeIDs, storeErr := parseRetailKPIStoreIDs(c.QueryArray("store_id"))
 	if storeErr != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": storeErr})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, storeErr, nil)
 		return
 	}
 	legalEntityID := middleware.GetTenantID(c)
 	if strings.TrimSpace(legalEntityID) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "legal entity scope is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "legal entity scope is required", nil)
 		return
 	}
 	result, err := h.repo.QueryFacts(c.Request.Context(), legalEntityID, fromText, toText, classification, datasetVersion, strings.TrimSpace(c.Query("source_system")), storeIDs)
 	if err != nil {
 		if errors.Is(err, repository.ErrRetailKPISourceConflict) {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error(), "reason": "source_conflict"})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSystemFailure(c, http.StatusInternalServerError, err)
 		return
 	}
 	aggregates, coverage, err := retailkpi.AggregateFacts(result.Facts, retailkpi.Request{DateFrom: from, DateTo: to, RequestedDateFrom: fromText, RequestedDateTo: toText, GroupBy: groupBy, ExpectedStoreCount: result.ExpectedStoreCount})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	var asOf any

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
@@ -41,12 +42,12 @@ type retailSimulationRequest struct {
 func (h *RetailSimulationHandler) GenerateStoreDays(c *gin.Context) {
 	legalEntityID := strings.TrimSpace(middleware.GetTenantID(c))
 	if legalEntityID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant legal entity is required; global admin context cannot generate a dataset"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "tenant legal entity is required; global admin context cannot generate a dataset", nil)
 		return
 	}
 	var request retailSimulationRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON request: " + err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "invalid JSON request: "+err.Error(), nil)
 		return
 	}
 	input := retailsimulation.Input{}
@@ -64,27 +65,27 @@ func (h *RetailSimulationHandler) GenerateStoreDays(c *gin.Context) {
 	}
 	payloadSHA256, normalized, err := retailsimulation.PayloadSHA256(legalEntityID, input)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	plan, err := retailsimulation.Build(legalEntityID, normalized)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	idempotencyKey := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
 	if len(idempotencyKey) > 255 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Idempotency-Key exceeds 255 characters"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "Idempotency-Key exceeds 255 characters", nil)
 		return
 	}
 	userID := userIDFromContext(c)
 	result, err := h.repo.Generate(c.Request.Context(), legalEntityID, optionalString(userID), idempotencyKey, payloadSHA256, plan)
 	if err != nil {
 		if errors.Is(err, repository.ErrRetailSimulationIdempotencyConflict) {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), nil)
 			return
 		}
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeSystemFailure(c, http.StatusUnprocessableEntity, err)
 		return
 	}
 	if h.audit != nil && !result.Replayed {
@@ -110,12 +111,12 @@ func (h *RetailSimulationHandler) GenerateStoreDays(c *gin.Context) {
 func (h *RetailSimulationHandler) LatestStoreDays(c *gin.Context) {
 	legalEntityID := strings.TrimSpace(middleware.GetTenantID(c))
 	if legalEntityID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tenant legal entity is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "tenant legal entity is required", nil)
 		return
 	}
 	latestStore, ok := h.repo.(retailSimulationLatestStore)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "latest simulation dataset reader is unavailable"})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, "latest simulation dataset reader is unavailable", nil)
 		return
 	}
 	dataset, err := latestStore.LatestCompleted(c.Request.Context(), legalEntityID)
@@ -124,7 +125,7 @@ func (h *RetailSimulationHandler) LatestStoreDays(c *gin.Context) {
 			c.JSON(http.StatusOK, retailSimulationLatestEnvelope(nil))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeSystemFailure(c, http.StatusInternalServerError, err)
 		return
 	}
 	c.JSON(http.StatusOK, retailSimulationLatestEnvelope(dataset))

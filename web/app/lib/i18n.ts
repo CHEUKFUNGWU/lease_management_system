@@ -20,6 +20,21 @@ const dict: TranslationDict = {
     "zh-HK": "目前帳號沒有執行此操作的權限。",
     en: "This account does not have permission to perform this action.",
   },
+  // ERR-002: scope_denied must be distinguishable from permission_denied —
+  // the object exists but is outside the caller's data scope. DESIGN.md §9
+  // forbids softening this into "no data".
+  "api.scope_denied": {
+    "zh-CN": "该对象不在你的数据范围内，无法访问。请确认所属法人或门店范围。",
+    "zh-HK": "該對象不在你的數據範圍內，無法存取。請確認所屬法人或門店範圍。",
+    en: "This object is outside your data scope and cannot be accessed. Check your legal entity or store scope.",
+  },
+  // ERR-001 source_conflict detail reason: multiple source systems exist for
+  // the same store-day, so the fact set is ambiguous until a source is picked.
+  "api.source_conflict": {
+    "zh-CN": "事实存在多个来源，请指定唯一 source_system 后重试。",
+    "zh-HK": "事實存在多個來源，請指定唯一 source_system 後重試。",
+    en: "The facts have multiple sources. Specify a single source_system and retry.",
+  },
   "api.not_found": {
     "zh-CN": "请求的数据不存在或已被移除。",
     "zh-HK": "請求的資料不存在或已被移除。",

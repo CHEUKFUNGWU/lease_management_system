@@ -281,7 +281,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <span
               style={{
                 fontSize: 16,
-                fontWeight: 700,
+                fontWeight: 600,
                 letterSpacing: "-0.5px",
                 color: "var(--fg-primary)",
                 whiteSpace: "nowrap",

@@ -196,7 +196,7 @@ export const antdTheme = {
     Statistic: {
       titleFontSize: typography.sizes.caption.size,
       contentFontSize: typography.sizes.h1.size,
-      contentFontWeight: typography.weights.bold,
+      contentFontWeight: typography.weights.semibold,
     },
 
     // ── Tabs ──

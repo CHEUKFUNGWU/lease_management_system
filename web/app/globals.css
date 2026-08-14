@@ -229,7 +229,7 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.03em;
   margin-bottom: 24px;
 }
@@ -491,7 +491,7 @@ h3 {
 
 /* Statistic */
 .ant-statistic-content-value {
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   letter-spacing: -0.03em !important;
   font-size: 28px !important;
 }
@@ -587,7 +587,7 @@ h3 {
 
 /* Result */
 .ant-result-title {
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   letter-spacing: -0.02em !important;
 }
 
@@ -1065,4 +1065,30 @@ html {
 @keyframes pulse-subtle {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+/* ─── SeverityDot（STY-002）────────────────────────────── */
+.severity-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.severity-dot-critical,
+.severity-dot-high {
+  background: var(--state-error-text);
+}
+.severity-dot-medium {
+  background: var(--state-warning-text);
+}
+.severity-dot-low {
+  background: var(--fg-muted);
+}
+.severity-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg-secondary);
+  font-size: 12px;
 }

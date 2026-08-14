@@ -9,6 +9,7 @@ import { ArrowDownOutlined, ArrowUpOutlined, EyeOutlined, InfoCircleOutlined, Re
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
+import { SeverityDot, toSeverity } from "../components/SeverityDot";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
@@ -107,7 +108,7 @@ function AttentionTable({ attention, onSelect, onStore360 }: { attention: Retail
   const columns = [
     { title: "优先", dataIndex: "rank", width: 56, render: (value: number) => <strong>#{value}</strong> },
     { title: "门店", key: "store", render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}><strong>{row.store_code} · {row.store_name}</strong><Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text></Space> },
-    { title: "信号", key: "signals", render: (_: unknown, row: RetailAttention) => <Space wrap size={[4, 4]}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signal.signal_code} · threshold ${formatSignalValue(signal.threshold, signal.unit, row.currency)}`}><Tag color={row.severity === "critical" || row.severity === "high" ? "red" : "gold"}>{signalLabel(signal.signal_code)}</Tag></Tooltip>)}</Space> },
+    { title: "信号", key: "signals", render: (_: unknown, row: RetailAttention) => <Space wrap size={[4, 4]}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signal.signal_code} · threshold ${formatSignalValue(signal.threshold, signal.unit, row.currency)}`}><span className="severity-label"><SeverityDot severity={toSeverity(row.severity)} />{signalLabel(signal.signal_code)}</span></Tooltip>)}</Space> },
     { title: "变化", key: "change", render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`当前 ${formatSignalValue(signal.current, signal.unit, row.currency)} · 对比 ${formatSignalValue(signal.comparison, signal.unit, row.currency)} · 阈值 ${formatSignalValue(signal.threshold, signal.unit, row.currency)}`}><Typography.Text className="pulse-change-bad">{signalLabel(signal.signal_code)} {formatSignalValue(signal.observed_change, signal.unit, row.currency)} · 阈值 {formatSignalValue(signal.threshold, signal.unit, row.currency)}</Typography.Text></Tooltip>)}</Space> },
     { title: "评分", key: "score", render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}><StatusTag kind={row.severity === "critical" || row.severity === "high" ? "error" : "warning"}>{row.severity}</StatusTag><span>{row.score.toFixed(2)}</span></Space> },
     { title: "数据来源", key: "source", render: (_: unknown, row: RetailAttention) => <Typography.Text type="secondary">{row.evidence.source_systems.join(", ") || "—"}</Typography.Text> },

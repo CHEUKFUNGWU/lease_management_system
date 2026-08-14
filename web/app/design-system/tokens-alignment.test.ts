@@ -71,4 +71,12 @@ describe("tokens.ts 与 globals.css :root 对齐（DESIGN.md §1）", () => {
   it("静态深度一致（--shadow-static ↔ depth.static.shadow）", () => {
     expect(cssVarResolved("shadow-static")).toBe(depth.static.shadow);
   });
+
+  it("字重只有三档：tokens 不再定义 700/800（DESIGN.md §4.2，STY-002）", () => {
+    const weights = Object.values(typography.weights);
+    expect(weights).toEqual([400, 500, 600]);
+    for (const size of Object.values(typography.sizes)) {
+      expect(size.weight).toBeLessThanOrEqual(600);
+    }
+  });
 });

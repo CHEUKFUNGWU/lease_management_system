@@ -187,7 +187,7 @@ export default function HomePage() {
                 <div style={{ fontSize: 12, color: "var(--fg-tertiary)", marginBottom: 8 }}>{t("dashboard.close_readiness", language)}</div>
                 {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
                   <>
-                    <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{readinessLabel}</div>
+                    <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>{readinessLabel}</div>
                     <div style={{ color: "var(--fg-tertiary)", fontSize: 13 }}>{t("dashboard.blocking_items", language)}: <strong>{readiness?.blocking_count ?? 0}</strong></div>
                     <div style={{ color: "var(--fg-muted)", fontSize: 12, marginTop: 8 }}>{readiness?.evaluated_at ? `${t("dashboard.data_as_of", language)} ${dayjs(readiness.evaluated_at).format("YYYY-MM-DD HH:mm")}` : t("dashboard.readiness_not_evaluated", language)}</div>
                     <Button type="link" size="small" style={{ padding: 0, marginTop: 12 }} onClick={() => router.push("/todo")}>{t("dashboard.open_work_queue", language)} <span aria-hidden="true">→</span></Button>

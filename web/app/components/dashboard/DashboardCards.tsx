@@ -40,7 +40,7 @@ export function KPICard({ title, value, prefix, loading }: KPICardProps) {
             prefix={<span style={{ marginRight: 8, display: "inline-flex" }}>{prefix}</span>}
             valueStyle={{
               fontSize: 28,
-              fontWeight: 700,
+              fontWeight: 600,
               letterSpacing: "-0.03em",
               color: "var(--fg-primary)",
             }}
@@ -80,10 +80,10 @@ export function MoneyKPICard({ title, value, subtitle, loading }: MoneyKPICardPr
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {value.length === 0 ? (
-                <div style={{ fontSize: 26, fontWeight: 700, color: "var(--fg-primary)" }}>—</div>
+                <div style={{ fontSize: 26, fontWeight: 600, color: "var(--fg-primary)" }}>—</div>
               ) : value.map((slice) => (
                 <div key={slice.currency} title={fmtMoney(slice.value, slice.currency)} style={{ display: "flex", alignItems: "baseline", gap: 8, fontVariantNumeric: "tabular-nums" }}>
-                  <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}>
+                  <span style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}>
                     {slice.value === 0 ? "0.00" : compactMoney(slice.value, slice.currency)}
                   </span>
                   <span style={{ fontSize: 12, color: "var(--fg-tertiary)", fontWeight: 600 }}>{slice.currency || "—"}</span>

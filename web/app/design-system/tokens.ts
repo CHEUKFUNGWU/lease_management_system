@@ -74,7 +74,7 @@ export const typography = {
   // Scale: 8 levels, tight tracking for headings
   sizes: {
     display: { size: 28, lineHeight: 36, weight: 600, tracking: -0.04 },    // Page titles
-    h1: { size: 24, lineHeight: 32, weight: 700, tracking: -0.03 },         // Section headers
+    h1: { size: 24, lineHeight: 32, weight: 600, tracking: -0.03 },         // Section headers
     h2: { size: 18, lineHeight: 28, weight: 600, tracking: -0.02 },         // Card titles, tabs
     h3: { size: 15, lineHeight: 24, weight: 600, tracking: -0.01 },         // Subsection, form groups
     body: { size: 14, lineHeight: 22, weight: 400, tracking: 0 },           // Primary body
@@ -88,7 +88,6 @@ export const typography = {
     normal: 400,
     medium: 500,
     semibold: 600,
-    bold: 700,
   },
 } as const;
 

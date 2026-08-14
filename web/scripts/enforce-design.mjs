@@ -31,35 +31,47 @@ const untracked = new Set(
   execSync(`git ls-files --others --exclude-standard`, { cwd: root }).toString().split("\n").map((p) => p.trim()).filter(Boolean),
 );
 
-function addedLines(file) {
+function changedLines(file) {
   if (untracked.has(file)) {
-    // 未跟踪文件整文件都是新增
+    // 未跟踪文件整文件都是新增，无旧行可比
     try {
-      return readFileSync(path.join(root, file), "utf8").split("\n").map((text, index) => ({ number: index + 1, text }));
+      return readFileSync(path.join(root, file), "utf8").split("\n").map((text, index) => ({ number: index + 1, text, oldText: "" }));
     } catch {
       return [];
     }
   }
   const diff = execSync(`git diff -U0 ${base} -- ${file}`, { cwd: root }).toString();
   const lines = [];
+  const removedByPosition = new Map();
   let newLine = 0;
+  let oldLine = 0;
   for (const raw of diff.split("\n")) {
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
+    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
     if (hunk) {
-      newLine = Number(hunk[1]);
+      oldLine = Number(hunk[1]);
+      newLine = Number(hunk[2]);
       continue;
     }
     if (raw.startsWith("+++") || raw.startsWith("---") || raw.startsWith("@@")) continue;
     if (raw.startsWith("+")) {
-      lines.push({ number: newLine, text: raw.slice(1) });
+      lines.push({ number: newLine, text: raw.slice(1), oldText: removedByPosition.get(newLine) || "" });
       newLine += 1;
     } else if (raw.startsWith("-")) {
-      // 删除行不推进新文件行号
+      removedByPosition.set(oldLine, raw.slice(1));
+      oldLine += 1;
     } else {
+      oldLine += 1;
       newLine += 1;
     }
   }
   return lines;
+}
+
+// 「新增」的精确读法：违规模式必须不在旧行里才成立。改到一行含有
+// 存量违规的行（906 处内联样式 / 142 处 !important 之一）不是新增，
+// 行级 diff 必须结合旧行内容判断。
+function isNewViolation(pattern, line, oldText) {
+  return pattern.test(line) && !pattern.test(oldText);
 }
 
 const violations = [];
@@ -78,6 +90,12 @@ const CJK_EXEMPT_PAGES = new Set([
   "web/app/store-360/page.tsx",
   "web/app/scenario-workbench/page.tsx",
 ]);
+
+// 内联样式对三个零售页豁免——它们整页都是存量内联样式（阶段四整体
+// 整改），任何触碰都会被行级 diff 误判为「新增静态样式」，页面将无法
+// 维护。与 CJK 豁免同一批文件、同一个理由：阶段四完成的那一天，
+// 两个 Set 一起删。!important 与 fontWeight 检查对这三页照常生效。
+const INLINE_STYLE_EXEMPT_PAGES = CJK_EXEMPT_PAGES;
 
 // t() 词典文件、测试文件里的中文是内容本身；守卫脚本自身也不扫描。
 const CJK_EXEMPT_SUFFIXES = [/\/lib\/i18n(\.\w+)*\.tsx?$/, /\.test\.(ts|tsx)$/, /\.spec\.(ts|tsx)$/];
@@ -129,20 +147,22 @@ for (const file of changedFiles) {
   } catch {
     continue; // 文件被删除，无需检查
   }
-  const lines = addedLines(file);
+  const lines = changedLines(file);
 
   if (file.startsWith("web/")) {
-    for (const { number, text: line } of lines) {
-      if (IMPORTANT_RE.test(line)) {
+    for (const { number, text: line, oldText } of lines) {
+      if (isNewViolation(IMPORTANT_RE, line, oldText)) {
         fail(file, number, "新增 !important（DESIGN.md §13-1）：提高特异性或改 token");
       }
       // 「营」徽标只豁免内联样式一条（品牌 mark 的存量写法）；
       // !important 与 fontWeight 检查照常生效（上一批 Review §4）。
       const styleMatch = INLINE_STYLE_RE.exec(line);
-      if (styleMatch && !BRAND_BADGE_LINE.test(line) && isStaticStyleObject(styleMatch[1])) {
+      const styleExempt =
+        BRAND_BADGE_LINE.test(line) || INLINE_STYLE_EXEMPT_PAGES.has(file);
+      if (styleMatch && !styleExempt && isNewViolation(INLINE_STYLE_RE, line, oldText) && isStaticStyleObject(styleMatch[1])) {
         fail(file, number, "新增静态内联 style={{}}（DESIGN.md §13-2）：用类名 + CSS 变量");
       }
-      if (FONT_WEIGHT_RE.test(line)) {
+      if (isNewViolation(FONT_WEIGHT_RE, line, oldText)) {
         fail(file, number, "新增 fontWeight > 600（DESIGN.md §13-6）：用尺寸和字距做层级");
       }
     }
@@ -150,12 +170,12 @@ for (const file of changedFiles) {
     if (file.startsWith("web/app/")) {
       const exempt = CJK_EXEMPT_PAGES.has(file) || METADATA_EXEMPT_FILES.has(file) || CJK_EXEMPT_SUFFIXES.some((re) => re.test(file));
       if (!exempt) {
-        for (const { number, text: line } of lines) {
+        for (const { number, text: line, oldText } of lines) {
           const trimmed = line.trim();
           if (BRAND_BADGE_LINE.test(line)) {
             continue; // 「营」徽标：品牌 mark，见豁免名单
           }
-          if (CJK_RE.test(line) && !/t\(\s*['"]/.test(line) && !/^(\/\/|\/\*|\*)/.test(trimmed)) {
+          if (isNewViolation(CJK_RE, line, oldText) && !/t\(\s*['"]/.test(line) && !/^(\/\/|\/\*|\*)/.test(trimmed)) {
             fail(file, number, "新增硬编码中文（DESIGN.md §13-7）：文案走 t()，三种语言齐全");
           }
         }
@@ -164,8 +184,8 @@ for (const file of changedFiles) {
   }
 
   if (file.endsWith("_test.go")) {
-    for (const { number, text: line } of lines) {
-      if (HARDCODED_TIMESTAMP_RE.test(line)) {
+    for (const { number, text: line, oldText } of lines) {
+      if (isNewViolation(HARDCODED_TIMESTAMP_RE, line, oldText)) {
         fail(
           file,
           number,

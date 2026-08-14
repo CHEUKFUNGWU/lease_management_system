@@ -830,21 +830,6 @@ const dict: TranslationDict = {
     "zh-HK": "每日趨勢（目標門店 / 同群中位數）",
     en: "Daily trend (target store / peer median)",
   },
-  "store360.status.missing": {
-    "zh-CN": "缺失",
-    "zh-HK": "缺失",
-    en: "Missing",
-  },
-  "store360.status.partial": {
-    "zh-CN": "部分",
-    "zh-HK": "部分",
-    en: "Partial",
-  },
-  "store360.status.complete": {
-    "zh-CN": "完整",
-    "zh-HK": "完整",
-    en: "Complete",
-  },
 
   // I18N-001 — scenario-workbench page
   "scenario.title": {
@@ -1041,11 +1026,6 @@ const dict: TranslationDict = {
     "zh-CN": "月度贡献变化",
     "zh-HK": "月度貢獻變化",
     en: "Monthly contribution change",
-  },
-  "scenario.horizon_change": {
-    "zh-CN": "预测期贡献变化",
-    "zh-HK": "預測期貢獻變化",
-    en: "Horizon contribution change",
   },
   "scenario.evidence_title": {
     "zh-CN": "证据与公式",
@@ -1292,11 +1272,6 @@ const dict: TranslationDict = {
     "zh-CN": "已拒绝该提议",
     "zh-HK": "已拒絕該提議",
     en: "Proposal rejected",
-  },
-  "ai.approval.adopt_failed": {
-    "zh-CN": "采纳失败，请重试",
-    "zh-HK": "採納失敗，請重試",
-    en: "Adopt failed, retry",
   },
 
   // ENV-002 DataTrustBar — DESIGN.md §10 数据可信度展示
@@ -1623,21 +1598,6 @@ const dict: TranslationDict = {
     "zh-HK": "退出登錄",
     en: "Logout",
   },
-  "lang.zh_CN": {
-    "zh-CN": "简体中文",
-    "zh-HK": "簡體中文",
-    en: "Simplified Chinese",
-  },
-  "lang.zh_TW": {
-    "zh-CN": "繁体中文",
-    "zh-HK": "繁體中文",
-    en: "Traditional Chinese",
-  },
-  "lang.en": {
-    "zh-CN": "英文",
-    "zh-HK": "英文",
-    en: "English",
-  },
 
   // AI Chat
   "ai.welcome": {
@@ -1659,11 +1619,6 @@ const dict: TranslationDict = {
     "zh-CN": "告诉 Agent 你的目标，或上传合同/台账文件...",
     "zh-HK": "告訴 Agent 你的目標，或上傳合同/台賬文件...",
     en: "Tell the Agent your goal, or upload a contract/ledger file...",
-  },
-  "ai.send": {
-    "zh-CN": "发送",
-    "zh-HK": "發送",
-    en: "Send",
   },
   "ai.thinking": {
     "zh-CN": "AI 思考中...",
@@ -1689,11 +1644,6 @@ const dict: TranslationDict = {
     "zh-CN": "上传失败",
     "zh-HK": "上傳失敗",
     en: "Upload failed",
-  },
-  "ai.file_uploaded": {
-    "zh-CN": "已上传文件: ",
-    "zh-HK": "已上傳文件: ",
-    en: "Uploaded file: ",
   },
   "ai.unsupported_file": {
     "zh-CN": "不支持的文件类型，请上传 PDF、Excel 或图片文件",
@@ -1938,11 +1888,6 @@ const dict: TranslationDict = {
     "zh-HK": "導出 CSV",
     en: "Export CSV",
   },
-  "reports.export_excel": {
-    "zh-CN": "导出 Excel",
-    "zh-HK": "導出 Excel",
-    en: "Export Excel",
-  },
   "reports.search": {
     "zh-CN": "查询",
     "zh-HK": "查詢",
@@ -2088,16 +2033,6 @@ const dict: TranslationDict = {
     "zh-HK": "攤銷報表",
     en: "Amortization Report",
   },
-  "reports.contains_unapproved": {
-    "zh-CN": "含未审批数据",
-    "zh-HK": "含未審批數據",
-    en: "Includes Unapproved Data",
-  },
-  "reports.official_only": {
-    "zh-CN": "仅正式数据",
-    "zh-HK": "僅正式數據",
-    en: "Official Data Only",
-  },
   "reports.no_data_hint": {
     "zh-CN": "请设置查询条件后点击「查询」",
     "zh-HK": "請設置查詢條件後點擊「查詢」",
@@ -2157,36 +2092,6 @@ const dict: TranslationDict = {
   },
 
   // Dashboard
-  "dashboard.title": {
-    "zh-CN": "仪表板",
-    "zh-HK": "儀表板",
-    en: "Dashboard",
-  },
-  "dashboard.subtitle": {
-    "zh-CN": "欢迎回来，这是您今天的租赁管理概览",
-    "zh-HK": "歡迎回來，這是您今天的租賃管理概覽",
-    en: "Welcome back, here is your lease management overview for today",
-  },
-  "dashboard.total_contracts": {
-    "zh-CN": "合同总数",
-    "zh-HK": "合同總數",
-    en: "Total Contracts",
-  },
-  "dashboard.approved": {
-    "zh-CN": "已审批",
-    "zh-HK": "已審批",
-    en: "Approved",
-  },
-  "dashboard.pending": {
-    "zh-CN": "待处理",
-    "zh-HK": "待處理",
-    en: "Pending",
-  },
-  "dashboard.draft": {
-    "zh-CN": "草稿",
-    "zh-HK": "草稿",
-    en: "Draft",
-  },
   "dashboard.liability_trend": {
     "zh-CN": "租赁负债趋势",
     "zh-HK": "租賃負債趨勢",
@@ -2227,70 +2132,20 @@ const dict: TranslationDict = {
     "zh-HK": "暫無合同狀態數據",
     en: "No contract status data",
   },
-  "dashboard.quick_actions": {
-    "zh-CN": "快捷操作",
-    "zh-HK": "快捷操作",
-    en: "Quick Actions",
-  },
   "dashboard.add_contract": {
     "zh-CN": "新增合同",
     "zh-HK": "新增合同",
     en: "Add Contract",
-  },
-  "dashboard.add_contract_desc": {
-    "zh-CN": "手动录入新租赁合同",
-    "zh-HK": "手動錄入新租賃合同",
-    en: "Manually enter a new lease contract",
   },
   "dashboard.upload_file": {
     "zh-CN": "在 AI Chat 上传文件",
     "zh-HK": "在 AI Chat 上傳文件",
     en: "Upload Files in AI Chat",
   },
-  "dashboard.upload_file_desc": {
-    "zh-CN": "统一通过 AI Chat 上传合同、台账和租金表",
-    "zh-HK": "統一通過 AI Chat 上傳合同、台賬和租金表",
-    en: "Upload contracts, ledgers, and rent schedules only through AI Chat",
-  },
   "dashboard.view_report": {
     "zh-CN": "查看报表",
     "zh-HK": "查看報表",
     en: "View Reports",
-  },
-  "dashboard.view_report_desc": {
-    "zh-CN": "负债滚动表与合同汇总",
-    "zh-HK": "負債滾動表與合同匯總",
-    en: "Liability roll-forward and contract summary",
-  },
-  "dashboard.ai_assistant": {
-    "zh-CN": "AI 助手",
-    "zh-HK": "AI 助手",
-    en: "AI Assistant",
-  },
-  "dashboard.ai_assistant_desc": {
-    "zh-CN": "智能问答与数据分析",
-    "zh-HK": "智能問答與數據分析",
-    en: "Intelligent Q&A and data analysis",
-  },
-  "dashboard.loading": {
-    "zh-CN": "加载中...",
-    "zh-HK": "加載中...",
-    en: "Loading...",
-  },
-  "dashboard.month_short": {
-    "zh-CN": "月",
-    "zh-HK": "月",
-    en: "",
-  },
-  "dashboard.ten_thousand": {
-    "zh-CN": "万",
-    "zh-HK": "萬",
-    en: "k",
-  },
-  "dashboard.lease_liability": {
-    "zh-CN": "租赁负债",
-    "zh-HK": "租賃負債",
-    en: "Lease Liability",
   },
   "dashboard.copies": {
     "zh-CN": "份",
@@ -2346,11 +2201,6 @@ const dict: TranslationDict = {
   "contracts.asset_machinery": { "zh-CN": "机器设备", "zh-HK": "機器設備", en: "Machinery" },
   "contracts.asset_other": { "zh-CN": "其他", "zh-HK": "其他", en: "Other" },
   "contracts.open": { "zh-CN": "打开合同", "zh-HK": "打開合同", en: "Open contract" },
-  "contracts.col_number": {
-    "zh-CN": "合同编号",
-    "zh-HK": "合同編號",
-    en: "Contract Number",
-  },
   "contracts.col_name": {
     "zh-CN": "合同名称",
     "zh-HK": "合同名稱",
@@ -2549,11 +2399,6 @@ const dict: TranslationDict = {
     "zh-HK": "添加付款計劃",
     en: "Add Payment Schedule",
   },
-  "contract.ai_parse": {
-    "zh-CN": "AI 识别租金表",
-    "zh-HK": "AI 識別租金表",
-    en: "AI Parse Rent Schedule",
-  },
   "contract.ai_agent_intake": {
     "zh-CN": "在 AI Agent 中处理",
     "zh-HK": "在 AI Agent 中處理",
@@ -2679,41 +2524,6 @@ const dict: TranslationDict = {
     "zh-HK": "否",
     en: "No",
   },
-  "contract.confirmed": {
-    "zh-CN": "已确认",
-    "zh-HK": "已確認",
-    en: "Confirmed",
-  },
-  "contract.skip": {
-    "zh-CN": "跳过",
-    "zh-HK": "跳過",
-    en: "Skip",
-  },
-  "contract.restore": {
-    "zh-CN": "恢复",
-    "zh-HK": "恢復",
-    en: "Restore",
-  },
-  "contract.confirm_all": {
-    "zh-CN": "全选确认",
-    "zh-HK": "全選確認",
-    en: "Confirm All",
-  },
-  "contract.import_confirmed": {
-    "zh-CN": "导入已确认行",
-    "zh-HK": "導入已確認行",
-    en: "Import Confirmed",
-  },
-  "contract.ai_draft_title": {
-    "zh-CN": "AI 识别结果草稿",
-    "zh-HK": "AI 識別結果草稿",
-    en: "AI Recognition Draft",
-  },
-  "contract.ai_warning": {
-    "zh-CN": "AI 警告",
-    "zh-HK": "AI 警告",
-    en: "AI Warning",
-  },
   "contract.confidence": {
     "zh-CN": "置信度",
     "zh-HK": "置信度",
@@ -2808,31 +2618,6 @@ const dict: TranslationDict = {
     "zh-CN": "非租赁费用",
     "zh-HK": "非租賃費用",
     en: "Non-lease Expense",
-  },
-  "contract.posting_confirm": {
-    "zh-CN": "过账确认",
-    "zh-HK": "過賬確認",
-    en: "Posting Confirmation",
-  },
-  "contract.posting_confirm_desc": {
-    "zh-CN": "确认将以下分录过账？",
-    "zh-HK": "確認將以下分錄過賬？",
-    en: "Confirm posting the following entry?",
-  },
-  "contract.entry_type": {
-    "zh-CN": "分录类型",
-    "zh-HK": "分錄類型",
-    en: "Entry Type",
-  },
-  "contract.erp_reference": {
-    "zh-CN": "ERP 凭证号（可选）",
-    "zh-HK": "ERP 憑證號（可選）",
-    en: "ERP Reference (Optional)",
-  },
-  "contract.erp_placeholder": {
-    "zh-CN": "输入 ERP 凭证号",
-    "zh-HK": "輸入 ERP 憑證號",
-    en: "Enter ERP reference",
   },
   "contract.ok": {
     "zh-CN": "确认",
@@ -2964,11 +2749,6 @@ const dict: TranslationDict = {
     "zh-HK": "選擇事件類型",
     en: "Select Event Type",
   },
-  "contract.reason_required": {
-    "zh-CN": "请输入原因",
-    "zh-HK": "請輸入原因",
-    en: "Please enter reason",
-  },
   "contract.review_reject_title": {
     "zh-CN": "退回编辑",
     "zh-HK": "退回編輯",
@@ -2994,11 +2774,6 @@ const dict: TranslationDict = {
     "zh-HK": "請輸入原因...",
     en: "Enter reason...",
   },
-  "contract.edit_draft": {
-    "zh-CN": "编辑草稿行",
-    "zh-HK": "編輯草稿行",
-    en: "Edit Draft Row",
-  },
   "contract.amount_type_placeholder": {
     "zh-CN": "例如：fixed_rent, turnover_rent, CAM",
     "zh-HK": "例如：fixed_rent, turnover_rent, CAM",
@@ -3018,16 +2793,6 @@ const dict: TranslationDict = {
     "zh-CN": "计入负债",
     "zh-HK": "計入負債",
     en: "Include in Liability PV",
-  },
-  "contract.currency_cny": {
-    "zh-CN": "人民币 (CNY)",
-    "zh-HK": "人民幣 (CNY)",
-    en: "CNY",
-  },
-  "contract.currency_usd": {
-    "zh-CN": "美元 (USD)",
-    "zh-HK": "美元 (USD)",
-    en: "USD",
   },
   "contract.payment_timing_label": {
     "zh-CN": "付款时点",
@@ -3320,11 +3085,6 @@ const dict: TranslationDict = {
     "zh-CN": "会计期间",
     "zh-HK": "會計期間",
     en: "Accounting Period",
-  },
-  "monthly.lock_status": {
-    "zh-CN": "锁账状态",
-    "zh-HK": "鎖賬狀態",
-    en: "Lock Status",
   },
   "monthly.locked": {
     "zh-CN": "已锁账",
@@ -3760,81 +3520,6 @@ const dict: TranslationDict = {
   },
 
   // Common Actions
-  "common.save": {
-    "zh-CN": "保存",
-    "zh-HK": "保存",
-    en: "Save",
-  },
-  "common.delete": {
-    "zh-CN": "删除",
-    "zh-HK": "刪除",
-    en: "Delete",
-  },
-  "common.edit": {
-    "zh-CN": "编辑",
-    "zh-HK": "編輯",
-    en: "Edit",
-  },
-  "common.create": {
-    "zh-CN": "创建",
-    "zh-HK": "創建",
-    en: "Create",
-  },
-  "common.cancel": {
-    "zh-CN": "取消",
-    "zh-HK": "取消",
-    en: "Cancel",
-  },
-  "common.confirm": {
-    "zh-CN": "确认",
-    "zh-HK": "確認",
-    en: "Confirm",
-  },
-  "common.submit": {
-    "zh-CN": "提交",
-    "zh-HK": "提交",
-    en: "Submit",
-  },
-  "common.search": {
-    "zh-CN": "搜索",
-    "zh-HK": "搜索",
-    en: "Search",
-  },
-  "common.reset": {
-    "zh-CN": "重置",
-    "zh-HK": "重置",
-    en: "Reset",
-  },
-  "common.loading": {
-    "zh-CN": "加载中...",
-    "zh-HK": "加載中...",
-    en: "Loading...",
-  },
-  "common.no_data": {
-    "zh-CN": "暂无数据",
-    "zh-HK": "暫無數據",
-    en: "No data",
-  },
-  "common.success": {
-    "zh-CN": "成功",
-    "zh-HK": "成功",
-    en: "Success",
-  },
-  "common.failed": {
-    "zh-CN": "失败",
-    "zh-HK": "失敗",
-    en: "Failed",
-  },
-  "common.please_select": {
-    "zh-CN": "请选择",
-    "zh-HK": "請選擇",
-    en: "Please select",
-  },
-  "common.please_enter": {
-    "zh-CN": "请输入",
-    "zh-HK": "請輸入",
-    en: "Please enter",
-  },
 
   // ─── New Contract ──────────────────────────────────────────────
   "contract_new.title": {
@@ -5085,51 +4770,6 @@ const dict: TranslationDict = {
     "zh-HK": "請選擇租賃結束日",
     en: "Please select lease end date",
   },
-  "contract_new.entity_le001": {
-    "zh-CN": "零售集团总公司",
-    "zh-HK": "零售集團總公司",
-    en: "Retail Group Headquarters",
-  },
-  "contract_new.entity_le002": {
-    "zh-CN": "零售集团上海公司",
-    "zh-HK": "零售集團上海公司",
-    en: "Retail Group Shanghai",
-  },
-  "contract_new.store_nanjing": {
-    "zh-CN": "南京东路旗舰店",
-    "zh-HK": "南京東路旗艦店",
-    en: "Nanjing East Road Flagship",
-  },
-  "contract_new.store_huaihai": {
-    "zh-CN": "淮海路店",
-    "zh-HK": "淮海路店",
-    en: "Huaihai Road Store",
-  },
-  "contract_new.lessor_shanghai": {
-    "zh-CN": "上海商业地产集团",
-    "zh-HK": "上海商業地產集團",
-    en: "Shanghai Commercial Real Estate Group",
-  },
-  "contract_new.lessor_beijing": {
-    "zh-CN": "北京购物中心管理",
-    "zh-HK": "北京購物中心管理",
-    en: "Beijing Shopping Center Management",
-  },
-  "contract_new.currency_cny": {
-    "zh-CN": "人民币 (CNY)",
-    "zh-HK": "人民幣 (CNY)",
-    en: "CNY (Renminbi)",
-  },
-  "contract_new.currency_usd": {
-    "zh-CN": "美元 (USD)",
-    "zh-HK": "美元 (USD)",
-    en: "USD (US Dollar)",
-  },
-  "contract_new.currency_eur": {
-    "zh-CN": "欧元 (EUR)",
-    "zh-HK": "歐元 (EUR)",
-    en: "EUR (Euro)",
-  },
 
   // ─── Cashflow Forecast ───────────────────────────────────────
   "cashflow.title": {
@@ -5156,16 +4796,6 @@ const dict: TranslationDict = {
     "zh-CN": "正式报表 (Official)",
     "zh-HK": "正式報表 (Official)",
     en: "Official Report",
-  },
-  "cashflow.working_hint": {
-    "zh-CN": "工作报表模式：包含所有合同（含草稿、待审批），用于内部试算和测试",
-    "zh-HK": "工作報表模式：包含所有合同（含草稿、待審批），用於內部試算和測試",
-    en: "Working mode: includes all contracts (draft, pending) for internal testing",
-  },
-  "cashflow.official_hint": {
-    "zh-CN": "正式报表模式：仅包含已审批合同，用于正式财务和审计",
-    "zh-HK": "正式報表模式：僅包含已審批合同，用於正式財務和審計",
-    en: "Official mode: only approved contracts for formal financials and audit",
   },
   "cashflow.view_dimension": {
     "zh-CN": "视图维度：",
@@ -5756,326 +5386,6 @@ const dict: TranslationDict = {
   },
 
   // ─── Upload ────────────────────────────────────────────────────
-  "upload.title": {
-    "zh-CN": "智能合同录入 — AI 辅助批量解析",
-    "zh-HK": "智能合同錄入 — AI 輔助批量解析",
-    en: "Smart Contract Entry — AI Assisted Batch Parsing",
-  },
-  "upload.step_upload": {
-    "zh-CN": "上传文件",
-    "zh-HK": "上傳文件",
-    en: "Upload Files",
-  },
-  "upload.step_parse": {
-    "zh-CN": "AI 解析",
-    "zh-HK": "AI 解析",
-    en: "AI Parse",
-  },
-  "upload.step_confirm": {
-    "zh-CN": "批量确认",
-    "zh-HK": "批量確認",
-    en: "Batch Confirm",
-  },
-  "upload.step_complete": {
-    "zh-CN": "完成",
-    "zh-HK": "完成",
-    en: "Complete",
-  },
-  "upload.upload_card_title": {
-    "zh-CN": "上传合同文件",
-    "zh-HK": "上傳合同文件",
-    en: "Upload Contract Files",
-  },
-  "upload.file_count": {
-    "zh-CN": "{n} 个文件",
-    "zh-HK": "{n} 個文件",
-    en: "{n} files",
-  },
-  "upload.reupload": {
-    "zh-CN": "重新上传",
-    "zh-HK": "重新上傳",
-    en: "Re-upload",
-  },
-  "upload.drag_hint": {
-    "zh-CN": "点击或拖拽合同文件到此区域（支持批量）",
-    "zh-HK": "點擊或拖拽合同文件到此區域（支持批量）",
-    en: "Click or drag contract files here (batch supported)",
-  },
-  "upload.support_formats": {
-    "zh-CN": "支持 PDF、Excel、JPG、PNG、TIFF 格式，单个文件不超过 50MB",
-    "zh-HK": "支持 PDF、Excel、JPG、PNG、TIFF 格式，單個文件不超過 50MB",
-    en: "Supports PDF, Excel, JPG, PNG, TIFF. Max 50MB per file.",
-  },
-  "upload.uploaded_files": {
-    "zh-CN": "已上传文件",
-    "zh-HK": "已上傳文件",
-    en: "Uploaded Files",
-  },
-  "upload.start_parse": {
-    "zh-CN": "开始解析 ({n} 个)",
-    "zh-HK": "開始解析 ({n} 個)",
-    en: "Start Parsing ({n})",
-  },
-  "upload.upload_success": {
-    "zh-CN": "{name} 上传成功",
-    "zh-HK": "{name} 上傳成功",
-    en: "{name} uploaded successfully",
-  },
-  "upload.upload_failed": {
-    "zh-CN": "{name} 上传失败",
-    "zh-HK": "{name} 上傳失敗",
-    en: "{name} upload failed",
-  },
-  "upload.unsupported_file": {
-    "zh-CN": "不支持的文件类型，请上传 PDF、Excel 或图片文件",
-    "zh-HK": "不支持的文件類型，請上傳 PDF、Excel 或圖片文件",
-    en: "Unsupported file type. Please upload PDF, Excel or image files.",
-  },
-  "upload.file_too_large": {
-    "zh-CN": "文件大小不能超过 50MB",
-    "zh-HK": "文件大小不能超過 50MB",
-    en: "File size cannot exceed 50MB",
-  },
-  "upload.status_uploading": {
-    "zh-CN": "上传中",
-    "zh-HK": "上傳中",
-    en: "Uploading",
-  },
-  "upload.status_uploaded": {
-    "zh-CN": "已上传",
-    "zh-HK": "已上傳",
-    en: "Uploaded",
-  },
-  "upload.status_parsing": {
-    "zh-CN": "解析中",
-    "zh-HK": "解析中",
-    en: "Parsing",
-  },
-  "upload.status_parsed": {
-    "zh-CN": "已解析",
-    "zh-HK": "已解析",
-    en: "Parsed",
-  },
-  "upload.status_failed": {
-    "zh-CN": "失败",
-    "zh-HK": "失敗",
-    en: "Failed",
-  },
-  "upload.remove": {
-    "zh-CN": "移除",
-    "zh-HK": "移除",
-    en: "Remove",
-  },
-  "upload.parsing_progress": {
-    "zh-CN": "解析第 {n}/{total} 份合同...",
-    "zh-HK": "解析第 {n}/{total} 份合同...",
-    en: "Parsing contract {n}/{total}...",
-  },
-  "upload.parsing_detail": {
-    "zh-CN": "正在使用 PaddleOCR + DeepSeek...",
-    "zh-HK": "正在使用 PaddleOCR + DeepSeek...",
-    en: "Using PaddleOCR + DeepSeek...",
-  },
-  "upload.confirm_title": {
-    "zh-CN": "批量确认合同信息",
-    "zh-HK": "批量確認合同信息",
-    en: "Batch Confirm Contract Information",
-  },
-  "upload.parsed_count": {
-    "zh-CN": "{n} 份已解析",
-    "zh-HK": "{n} 份已解析",
-    en: "{n} parsed",
-  },
-  "upload.failed_count": {
-    "zh-CN": "{n} 份失败",
-    "zh-HK": "{n} 份失敗",
-    en: "{n} failed",
-  },
-  "upload.batch_create": {
-    "zh-CN": "批量创建合同 ({n})",
-    "zh-HK": "批量創建合同 ({n})",
-    en: "Batch Create Contracts ({n})",
-  },
-  "upload.parse_failed_alert": {
-    "zh-CN": "{n} 份文件解析失败，请检查后重新上传",
-    "zh-HK": "{n} 份文件解析失敗，請檢查後重新上傳",
-    en: "{n} files failed to parse, please check and re-upload",
-  },
-  "upload.creating_progress": {
-    "zh-CN": "创建第 {n}/{total} 份合同...",
-    "zh-HK": "創建第 {n}/{total} 份合同...",
-    en: "Creating contract {n}/{total}...",
-  },
-  "upload.partial_success": {
-    "zh-CN": "部分创建成功",
-    "zh-HK": "部分創建成功",
-    en: "Partially created",
-  },
-  "upload.all_success": {
-    "zh-CN": "全部创建成功！",
-    "zh-HK": "全部創建成功！",
-    en: "All created successfully!",
-  },
-  "upload.success_count": {
-    "zh-CN": "成功创建 {n} 份合同",
-    "zh-HK": "成功創建 {n} 份合同",
-    en: "Successfully created {n} contracts",
-  },
-  "upload.failed_count_result": {
-    "zh-CN": "{n} 份失败",
-    "zh-HK": "{n} 份失敗",
-    en: "{n} failed",
-  },
-  "upload.view_contracts": {
-    "zh-CN": "查看合同列表",
-    "zh-HK": "查看合同列表",
-    en: "View Contract List",
-  },
-  "upload.reupload_btn": {
-    "zh-CN": "重新上传",
-    "zh-HK": "重新上傳",
-    en: "Re-upload",
-  },
-  "upload.processing": {
-    "zh-CN": "处理中...",
-    "zh-HK": "處理中...",
-    en: "Processing...",
-  },
-  "upload.edit_modal_title": {
-    "zh-CN": "编辑合同信息",
-    "zh-HK": "編輯合同信息",
-    en: "Edit Contract Information",
-  },
-  "upload.save": {
-    "zh-CN": "保存",
-    "zh-HK": "保存",
-    en: "Save",
-  },
-  "upload.cancel": {
-    "zh-CN": "取消",
-    "zh-HK": "取消",
-    en: "Cancel",
-  },
-  "upload.ai_tips": {
-    "zh-CN": "AI 解析提示 ({n} 条)",
-    "zh-HK": "AI 解析提示 ({n} 條)",
-    en: "AI Parse Tips ({n})",
-  },
-  "upload.col_file": {
-    "zh-CN": "文件",
-    "zh-HK": "文件",
-    en: "File",
-  },
-  "upload.col_contract_number": {
-    "zh-CN": "合同编号",
-    "zh-HK": "合同編號",
-    en: "Contract Number",
-  },
-  "upload.col_lessee": {
-    "zh-CN": "承租方",
-    "zh-HK": "承租方",
-    en: "Lessee",
-  },
-  "upload.col_lessor": {
-    "zh-CN": "出租方",
-    "zh-HK": "出租方",
-    en: "Lessor",
-  },
-  "upload.col_store": {
-    "zh-CN": "门店",
-    "zh-HK": "門店",
-    en: "Store",
-  },
-  "upload.col_start_date": {
-    "zh-CN": "起始日",
-    "zh-HK": "起始日",
-    en: "Start Date",
-  },
-  "upload.col_end_date": {
-    "zh-CN": "结束日",
-    "zh-HK": "結束日",
-    en: "End Date",
-  },
-  "upload.col_rent": {
-    "zh-CN": "租金",
-    "zh-HK": "租金",
-    en: "Rent",
-  },
-  "upload.col_status": {
-    "zh-CN": "状态",
-    "zh-HK": "狀態",
-    en: "Status",
-  },
-  "upload.col_action": {
-    "zh-CN": "操作",
-    "zh-HK": "操作",
-    en: "Action",
-  },
-  "upload.action_edit": {
-    "zh-CN": "编辑",
-    "zh-HK": "編輯",
-    en: "Edit",
-  },
-  "upload.section_basic": {
-    "zh-CN": "合同基本信息",
-    "zh-HK": "合同基本信息",
-    en: "Basic Information",
-  },
-  "upload.section_dates": {
-    "zh-CN": "日期与金额",
-    "zh-HK": "日期與金額",
-    en: "Dates & Amounts",
-  },
-  "upload.section_discount": {
-    "zh-CN": "折现率设置",
-    "zh-HK": "折現率設置",
-    en: "Discount Rate Settings",
-  },
-  "upload.section_other": {
-    "zh-CN": "其他费用",
-    "zh-HK": "其他費用",
-    en: "Other Fees",
-  },
-  "upload.section_tags": {
-    "zh-CN": "标签 / 备注",
-    "zh-HK": "標籤 / 備註",
-    en: "Tags / Notes",
-  },
-  "upload.please_login": {
-    "zh-CN": "请先登录",
-    "zh-HK": "請先登錄",
-    en: "Please login first",
-  },
-  "upload.no_files": {
-    "zh-CN": "没有待解析的文件",
-    "zh-HK": "沒有待解析的文件",
-    en: "No files to parse",
-  },
-  "upload.parse_failed": {
-    "zh-CN": "解析失败",
-    "zh-HK": "解析失敗",
-    en: "Parse failed",
-  },
-  "upload.edit_only_parsed": {
-    "zh-CN": "只能编辑已解析完成的合同",
-    "zh-HK": "只能編輯已解析完成的合同",
-    en: "Can only edit fully parsed contracts",
-  },
-  "upload.select_at_least_one": {
-    "zh-CN": "请至少选择一个合同",
-    "zh-HK": "請至少選擇一個合同",
-    en: "Please select at least one contract",
-  },
-  "upload.modify_saved": {
-    "zh-CN": "修改已保存",
-    "zh-HK": "修改已保存",
-    en: "Changes saved",
-  },
-  "upload.hint_text": {
-    "zh-CN": "支持批量上传合同文件，上传后 AI 将依次解析并提取关键信息...",
-    "zh-HK": "支持批量上傳合同文件，上傳後 AI 將依次解析並提取關鍵信息...",
-    en: "Supports batch upload of contract files. After upload, AI will parse and extract key information...",
-  },
 
   // ─── Audit Logs ────────────────────────────────────────────────
   "audit.title": {
@@ -6664,11 +5974,6 @@ const dict: TranslationDict = {
     "zh-HK": "確認入庫",
     en: "Confirm Import",
   },
-  "ai.could_not_understand": {
-    "zh-CN": "抱歉，我无法理解您的问题。",
-    "zh-HK": "抱歉，我無法理解您的問題。",
-    en: "Sorry, I couldn't understand your question.",
-  },
   "ai.request_failed": {
     "zh-CN": "请求失败：{error}",
     "zh-HK": "請求失敗：{error}",
@@ -6884,41 +6189,6 @@ const dict: TranslationDict = {
     "zh-HK": "等待中",
     en: "Pending",
   },
-  "ai.agent_step_human_review_done": {
-    "zh-CN": "人工已确认草稿",
-    "zh-HK": "人工已確認草稿",
-    en: "Human Review Confirmed",
-  },
-  "ai.agent_step_create_draft": {
-    "zh-CN": "创建 draft 合同",
-    "zh-HK": "創建 draft 合同",
-    en: "Create Draft Contracts",
-  },
-  "ai.agent_create_input": {
-    "zh-CN": "提交 {count} 份已确认草稿到 Core Service",
-    "zh-HK": "提交 {count} 份已確認草稿到 Core Service",
-    en: "Submit {count} confirmed drafts to Core Service",
-  },
-  "ai.agent_create_output": {
-    "zh-CN": "创建完成：成功 {success} 份，失败 {failed} 份",
-    "zh-HK": "創建完成：成功 {success} 份，失敗 {failed} 份",
-    en: "Creation completed: {success} succeeded, {failed} failed",
-  },
-  "ai.agent_create_failed_title": {
-    "zh-CN": "处理失败合同",
-    "zh-HK": "處理失敗合同",
-    en: "Resolve Failed Contracts",
-  },
-  "ai.agent_create_failed_description": {
-    "zh-CN": "{count} 份合同未能创建为 draft，需要检查错误详情。",
-    "zh-HK": "{count} 份合同未能創建為 draft，需要檢查錯誤詳情。",
-    en: "{count} contracts could not be created as drafts. Review the failure details.",
-  },
-  "ai.agent_create_failed_action": {
-    "zh-CN": "根据失败详情修正草稿字段、主数据或重复合同编号后重新确认。",
-    "zh-HK": "根據失敗詳情修正草稿字段、主數據或重複合同編號後重新確認。",
-    en: "Fix draft fields, master data, or duplicate contract numbers based on the failure details, then confirm again.",
-  },
   "ai.batch_create_result": {
     "zh-CN": "批量创建完成：成功 {success} 份，失败 {failed} 份。{details}",
     "zh-HK": "批量創建完成：成功 {success} 份，失敗 {failed} 份。{details}",
@@ -6929,20 +6199,10 @@ const dict: TranslationDict = {
     "zh-HK": "成功創建 {count} 份合同",
     en: "Successfully created {count} contracts",
   },
-  "ai.batch_create_failed_details": {
-    "zh-CN": "\n\n失败详情：\n",
-    "zh-HK": "\n\n失敗詳情：\n",
-    en: "\n\nFailure details:\n",
-  },
   "ai.batch_create_failed": {
     "zh-CN": "批量创建失败: {error}",
     "zh-HK": "批量創建失敗: {error}",
     en: "Batch creation failed: {error}",
-  },
-  "ai.skip_import": {
-    "zh-CN": "已跳过本次合同入库。您可以修改文件后重新上传，或手动录入合同。",
-    "zh-HK": "已跳過本次合同入庫。您可以修改文件後重新上傳，或手動錄入合同。",
-    en: "Import skipped. You can modify the file and re-upload, or manually enter the contract.",
   },
   "ai.schedule_panel_title": {
     "zh-CN": "付款计划草稿",
@@ -7008,26 +6268,6 @@ const dict: TranslationDict = {
     "zh-CN": "导入付款计划",
     "zh-HK": "導入付款計劃",
     en: "Import Payment Schedules",
-  },
-  "ai.schedule_step_import": {
-    "zh-CN": "导入付款计划",
-    "zh-HK": "導入付款計劃",
-    en: "Import Payment Schedules",
-  },
-  "ai.schedule_import_input": {
-    "zh-CN": "提交 {count} 笔已确认付款计划到 Core Service",
-    "zh-HK": "提交 {count} 筆已確認付款計劃到 Core Service",
-    en: "Submit {count} confirmed payment schedules to Core Service",
-  },
-  "ai.schedule_import_output": {
-    "zh-CN": "付款计划导入完成：成功 {count} 笔",
-    "zh-HK": "付款計劃導入完成：成功 {count} 筆",
-    en: "Payment schedule import completed: {count} succeeded",
-  },
-  "ai.schedule_import_result": {
-    "zh-CN": "付款计划导入完成：已向合同 {contract} 写入 {count} 笔付款计划。",
-    "zh-HK": "付款計劃導入完成：已向合同 {contract} 寫入 {count} 筆付款計劃。",
-    en: "Payment schedule import completed: wrote {count} schedules to contract {contract}.",
   },
   "ai.schedule_import_success": {
     "zh-CN": "成功导入 {count} 笔付款计划",
@@ -7266,11 +6506,6 @@ const dict: TranslationDict = {
     "zh-HK": "例如 5 或 5.25",
     en: "e.g. 5 or 5.25",
   },
-  "reports.select_currency": {
-    "zh-CN": "选择货币",
-    "zh-HK": "選擇貨幣",
-    en: "Select Currency",
-  },
   "reports.exchange_rate_placeholder": {
     "zh-CN": "例如 7.20",
     "zh-HK": "例如 7.20",
@@ -7280,11 +6515,6 @@ const dict: TranslationDict = {
     "zh-CN": "摊销报表",
     "zh-HK": "攤銷報表",
     en: "Amortization Report",
-  },
-  "reports.ai_chat_params": {
-    "zh-CN": "AI 对话参数",
-    "zh-HK": "AI 對話參數",
-    en: "AI Chat Parameters",
   },
 
   // ─── Contract Detail (page.tsx supplemental) ───────────────────
@@ -7354,16 +6584,6 @@ const dict: TranslationDict = {
     "zh-HK": "更新失敗",
     en: "Update failed",
   },
-  "contract_detail.ai_parse_failed": {
-    "zh-CN": "AI 解析失败",
-    "zh-HK": "AI 解析失敗",
-    en: "AI parse failed",
-  },
-  "contract_detail.import_failed": {
-    "zh-CN": "导入失败",
-    "zh-HK": "導入失敗",
-    en: "Import failed",
-  },
   "contract_detail.create_schedule_failed": {
     "zh-CN": "创建失败",
     "zh-HK": "創建失敗",
@@ -7416,40 +6636,10 @@ const dict: TranslationDict = {
     "zh-HK": "IFRS 16 計算完成",
     en: "IFRS 16 calculation complete",
   },
-  "contract_detail.discount_rate_missing_title": {
-    "zh-CN": "折现率未设置",
-    "zh-HK": "折現率未設置",
-    en: "Discount rate not set",
-  },
-  "contract_detail.discount_rate_missing_content": {
-    "zh-CN": "该合同尚未设置折现率，无法生成 IFRS 16 计算表格。请先前往设置页面配置集团默认折现率，或在合同中填写具体折现率。",
-    "zh-HK": "該合同尚未設置折現率，無法生成 IFRS 16 計算表格。請先前往設置頁面配置集團默認折現率，或在合同中填寫具體折現率。",
-    en: "This contract does not have a discount rate set and cannot generate an IFRS 16 calculation table. Please go to Settings to configure the group default discount rate, or enter a specific discount rate for this contract.",
-  },
-  "contract_detail.go_to_settings": {
-    "zh-CN": "前往设置",
-    "zh-HK": "前往設置",
-    en: "Go to Settings",
-  },
-  "contract_detail.cancel": {
-    "zh-CN": "取消",
-    "zh-HK": "取消",
-    en: "Cancel",
-  },
   "contract_detail.contract_updated": {
     "zh-CN": "合同更新成功",
     "zh-HK": "合同更新成功",
     en: "Contract updated",
-  },
-  "contract_detail.draft_updated": {
-    "zh-CN": "草稿行已更新",
-    "zh-HK": "草稿行已更新",
-    en: "Draft row updated",
-  },
-  "contract_detail.confirmed_all": {
-    "zh-CN": "已全选确认",
-    "zh-HK": "已全選確認",
-    en: "All confirmed",
   },
   "contract_detail.schedule_created": {
     "zh-CN": "付款计划创建成功",
@@ -7463,32 +6653,12 @@ const dict: TranslationDict = {
     "zh-HK": "請輸入原因",
     en: "Please enter reason",
   },
-  "contract_detail.ai_parse_warning": {
-    "zh-CN": "AI 识别结果需要人工复核，请检查低置信度字段",
-    "zh-HK": "AI 識別結果需要人工覆核，請檢查低置信度字段",
-    en: "AI recognition requires human review, please check low-confidence fields",
-  },
-  "contract_detail.no_confirmed_drafts": {
-    "zh-CN": "没有已确认的草稿可导入",
-    "zh-HK": "沒有已確認的草稿可導入",
-    en: "No confirmed drafts to import",
-  },
 
   // Template messages (with {count} placeholder)
-  "contract_detail.ai_parse_success": {
-    "zh-CN": "AI 识别完成：{count} 笔付款计划",
-    "zh-HK": "AI 識別完成：{count} 筆付款計劃",
-    en: "AI recognition complete: {count} payment schedules",
-  },
   "contract_detail.agent_payment_summary": {
     "zh-CN": "当前任务：为此合同解析租金表并生成付款计划草稿。",
     "zh-HK": "當前任務：為此合同解析租金表並生成付款計劃草稿。",
     en: "Current task: parse a rent schedule for this contract and generate payment schedule drafts.",
-  },
-  "contract_detail.import_success": {
-    "zh-CN": "成功导入 {count} 笔付款计划",
-    "zh-HK": "成功導入 {count} 筆付款計劃",
-    en: "Successfully imported {count} payment schedules",
   },
 
   // Inline UI texts
@@ -7496,16 +6666,6 @@ const dict: TranslationDict = {
     "zh-CN": "笔",
     "zh-HK": "筆",
     en: "items",
-  },
-  "contract_detail.ai_draft_count": {
-    "zh-CN": "{confirmed} 笔已确认 / {total} 笔总计",
-    "zh-HK": "{confirmed} 筆已確認 / {total} 筆總計",
-    en: "{confirmed} confirmed / {total} total",
-  },
-  "contract_detail.ai_warning_more": {
-    "zh-CN": "... 等 {count} 条警告",
-    "zh-HK": "... 等 {count} 條警告",
-    en: "... and {count} more warnings",
   },
   "contract_detail.days_unit": {
     "zh-CN": "天",
@@ -8077,11 +7237,6 @@ const dict: TranslationDict = {
     "zh-HK": "總租賃負債",
     en: "Total Lease Liability",
   },
-  "dashboard.kpi_total_rou": {
-    "zh-CN": "使用权资产净额",
-    "zh-HK": "使用權資產淨額",
-    en: "Net ROU Assets",
-  },
   "dashboard.kpi_month_expense": {
     "zh-CN": "本月租赁费用",
     "zh-HK": "本月租賃費用",
@@ -8091,16 +7246,6 @@ const dict: TranslationDict = {
     "zh-CN": "利息 + 折旧",
     "zh-HK": "利息 + 折舊",
     en: "Interest + Depreciation",
-  },
-  "dashboard.kpi_next12m_cashout": {
-    "zh-CN": "未来 12 个月现金流出",
-    "zh-HK": "未來 12 個月現金流出",
-    en: "Next 12M Cash Outflow",
-  },
-  "dashboard.kpi_contracts_sub": {
-    "zh-CN": "合同 {total} 份 · 已批 {approved} · 待批 {pending} · 草稿 {draft}",
-    "zh-HK": "合同 {total} 份 · 已批 {approved} · 待批 {pending} · 草稿 {draft}",
-    en: "{total} contracts · {approved} approved · {pending} pending · {draft} draft",
   },
   "dashboard.trend_liability": {
     "zh-CN": "租赁负债",

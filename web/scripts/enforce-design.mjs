@@ -133,14 +133,13 @@ for (const file of changedFiles) {
 
   if (file.startsWith("web/")) {
     for (const { number, text: line } of lines) {
-      if (BRAND_BADGE_LINE.test(line)) {
-        continue; // 「营」徽标：品牌 mark，见豁免名单
-      }
       if (IMPORTANT_RE.test(line)) {
         fail(file, number, "新增 !important（DESIGN.md §13-1）：提高特异性或改 token");
       }
+      // 「营」徽标只豁免内联样式一条（品牌 mark 的存量写法）；
+      // !important 与 fontWeight 检查照常生效（上一批 Review §4）。
       const styleMatch = INLINE_STYLE_RE.exec(line);
-      if (styleMatch && isStaticStyleObject(styleMatch[1])) {
+      if (styleMatch && !BRAND_BADGE_LINE.test(line) && isStaticStyleObject(styleMatch[1])) {
         fail(file, number, "新增静态内联 style={{}}（DESIGN.md §13-2）：用类名 + CSS 变量");
       }
       if (FONT_WEIGHT_RE.test(line)) {

@@ -330,8 +330,10 @@ func TestPulseCoverageSuppressionAndMultiCurrency(t *testing.T) {
 	if response.DecisionReady || len(response.SuppressedAttention) != 0 || response.Currency != "" || response.CurrencyStatus != UnknownCurrencyStatus || response.CurrentCoverage.RequestedDateFrom != "2026-01-01" || response.CurrentCoverage.RequestedDateTo != "2026-01-07" || len(response.DailyTrend) != 7 {
 		t.Fatalf("zero-authorized empty envelope=%+v trend=%d", response, len(response.DailyTrend))
 	}
+	// ENV-001: a trend row with no expected store-days carries a null
+	// coverage rate — a missing signal is never zero-filled.
 	for _, row := range response.DailyTrend {
-		if !row.Gap || row.Currency != "" || row.CurrencyStatus != UnknownCurrencyStatus || row.Coverage.CoverageRate == nil || *row.Coverage.CoverageRate != 0 {
+		if !row.Gap || row.Currency != "" || row.CurrencyStatus != UnknownCurrencyStatus || row.Coverage.CoverageRate != nil {
 			t.Fatalf("zero-authorized trend row=%+v", row)
 		}
 	}

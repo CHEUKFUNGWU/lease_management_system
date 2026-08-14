@@ -13,6 +13,8 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailpulse"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 const maxRetailKPIDateRange = 366
@@ -99,12 +101,33 @@ func (h *RetailKPIHandler) StoreDays(c *gin.Context) {
 	if !result.HighestAsOf.IsZero() {
 		asOf = result.HighestAsOf
 	}
+	readReady := len(aggregates) > 0
+	for _, aggregate := range aggregates {
+		readReady = readReady && aggregate.DecisionReady
+	}
+	readReadyReason := ""
+	if !readReady {
+		if coverage.ExpectedStoreDays > 0 && coverage.ObservedStoreDays < coverage.ExpectedStoreDays {
+			readReadyReason = "incomplete_store_day_coverage"
+		} else {
+			readReadyReason = "not_decision_ready"
+		}
+	}
+	env := sourceenvelope.Build(result.Facts, sourceenvelope.Spec{
+		Classification: classification,
+		FormulaVersion: retailkpi.FormulaVersion,
+		PulseVersion:   retailpulse.PulseVersion,
+		Current: sourceenvelope.PeriodSpec{From: from, To: to,
+			ExpectedStoreDays: coverage.ExpectedStoreDays},
+		DecisionReady: readReady, DecisionReadyReason: readReadyReason,
+		GeneratedAt: nowUTC(),
+	})
 	response := gin.H{
 		"basis": "Working", "formula_version": retailkpi.FormulaVersion,
 		"data_classification": classification, "dataset_version": datasetVersion, "simulation_dataset_versions": result.DatasetVersions,
 		"requested_scope": gin.H{"legal_entity_id": legalEntityID, "store_ids": storeIDs},
 		"group_by":        groupBy, "as_of": asOf, "source_system": strings.TrimSpace(c.Query("source_system")),
-		"coverage": coverage, "multi_currency": len(uniqueCurrencies(result.Facts)) > 1, "total_rows": len(aggregates),
+		"coverage": coverage, "multi_currency": len(uniqueCurrencies(result.Facts)) > 1, "total_rows": len(aggregates), "envelope": env,
 		"fact_version_min": result.MinFactVersion, "fact_version_max": result.MaxFactVersion,
 		"data": aggregates, "definition_url": "/api/v1/retail/kpis/definitions",
 		"source": gin.H{"table": "retail_store_day_facts", "source_systems": result.SourceSystems, "dataset_versions": result.DatasetVersions, "selected_fact_count": len(result.Facts), "fact_version_range": gin.H{"min": result.MinFactVersion, "max": result.MaxFactVersion}, "highest_as_of": asOf},

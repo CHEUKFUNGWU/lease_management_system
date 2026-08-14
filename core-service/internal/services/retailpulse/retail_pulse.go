@@ -11,6 +11,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 const (
@@ -149,6 +150,8 @@ type Response struct {
 	CurrentCoverage           retailkpi.Coverage          `json:"current_coverage"`
 	ComparisonCoverage        retailkpi.Coverage          `json:"comparison_coverage"`
 	DecisionReady             bool                        `json:"decision_ready"`
+	DecisionReadyReason       string                      `json:"decision_ready_reason,omitempty"`
+	Envelope                  sourceenvelope.Envelope     `json:"envelope"`
 	Summary                   map[string]SummaryMetric    `json:"summary,omitempty"`
 	DailyTrend                []DailyTrend                `json:"daily_trend,omitempty"`
 	Attention                 []Attention                 `json:"attention,omitempty"`
@@ -224,17 +227,14 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 		SimulationDatasetVersions: set.DatasetVersions,
 		RequestedScope:            map[string]any{"legal_entity_id": query.LegalEntityID, "store_ids": query.StoreIDs},
 		RequestedStores:           set.ExpectedStores,
-		SourceSystems:             set.SourceSystems, FactVersionMin: set.MinFactVersion, FactVersionMax: set.MaxFactVersion, MultiCurrency: distinctCurrencies(set.Facts) > 1,
-		Current:     Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")},
-		Comparison:  Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")},
-		GeneratedAt: s.now(), DefinitionsURL: "/api/v1/retail/kpis/definitions",
+		MultiCurrency:             distinctCurrencies(set.Facts) > 1,
+		Current:                   Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")},
+		Comparison:                Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")},
+		GeneratedAt:               s.now(), DefinitionsURL: "/api/v1/retail/kpis/definitions",
 		KPIDrilldownURL:           drilldownTemplate(linkQuery, "{group_by}", "{store_id}", "{date_from}", "{date_to}"),
 		StoreDrilldownURL:         drilldownTemplate(linkQuery, "store", "{store_id}", "{date_from}", "{date_to}"),
 		CurrentKPIDrilldownURL:    drilldownURL(linkQuery, "total", "", currentStart, currentEnd),
 		ComparisonKPIDrilldownURL: drilldownURL(linkQuery, "total", "", comparisonStart, comparisonEnd),
-	}
-	if !set.HighestAsOf.IsZero() {
-		response.HighestAsOf = &set.HighestAsOf
 	}
 	if len(partitions) == 1 {
 		p := partitions[0]
@@ -249,7 +249,43 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 			response.AttentionCount += p.AttentionCount
 		}
 	}
+	response.DecisionReadyReason = pulseDecisionReadyReason(response)
+	expectedStores := set.ExpectedStoreCount
+	if expectedStores == 0 && len(set.ExpectedStores) > 0 {
+		expectedStores = len(set.ExpectedStores)
+	}
+	env := sourceenvelope.Build(set.Facts, sourceenvelope.Spec{
+		Classification: query.Classification,
+		FormulaVersion: retailkpi.FormulaVersion,
+		PulseVersion:   PulseVersion,
+		Current: sourceenvelope.PeriodSpec{From: currentStart, To: currentEnd,
+			ExpectedStoreDays: expectedStores * inclusiveDays(currentStart, currentEnd)},
+		Comparison: sourceenvelope.PeriodSpec{From: comparisonStart, To: comparisonEnd,
+			ExpectedStoreDays: expectedStores * inclusiveDays(comparisonStart, comparisonEnd)},
+		DecisionReady:       response.DecisionReady,
+		DecisionReadyReason: response.DecisionReadyReason,
+		GeneratedAt:         response.GeneratedAt,
+	})
+	response.Envelope = env
+	response.SourceSystems = env.SourceSystems
+	response.FactVersionMin = env.FactVersionMin
+	response.FactVersionMax = env.FactVersionMax
+	response.HighestAsOf = env.HighestAsOf
 	return response, nil
+}
+
+// pulseDecisionReadyReason names the first reason a pulse read is not
+// decision-ready; an empty reason means it is ready.
+func pulseDecisionReadyReason(response *Response) string {
+	if response.DecisionReady {
+		return ""
+	}
+	for _, coverage := range []retailkpi.Coverage{response.CurrentCoverage, response.ComparisonCoverage} {
+		if coverage.ExpectedStoreDays > 0 && coverage.ObservedStoreDays < coverage.ExpectedStoreDays {
+			return "incomplete_store_day_coverage"
+		}
+	}
+	return "not_decision_ready"
 }
 
 func drilldownURL(query Query, groupBy, storeID string, from, to time.Time) string {
@@ -392,7 +428,9 @@ func (s *Service) buildPartitions(set *repository.RetailKPIFactSet, query Query,
 }
 
 func emptyCoverage(from, to time.Time, expected int) retailkpi.Coverage {
-	return retailkpi.Coverage{RequestedDateFrom: from.Format("2006-01-02"), RequestedDateTo: to.Format("2006-01-02"), ObservedStoreDays: 0, ExpectedStoreDays: expected * inclusiveDays(from, to), CoverageRate: ptr(0)}
+	// CoverageRate stays nil when expected store-days are unknown — a missing
+	// signal is never zero-filled (AGENTS.md: 不用 0 填补缺失).
+	return retailkpi.Coverage{RequestedDateFrom: from.Format("2006-01-02"), RequestedDateTo: to.Format("2006-01-02"), ObservedStoreDays: 0, ExpectedStoreDays: expected * inclusiveDays(from, to)}
 }
 
 func totalAggregate(facts []retailkpi.DailyFact, from, to time.Time, expected int) (*retailkpi.Aggregate, retailkpi.Coverage) {
@@ -569,9 +607,8 @@ func buildTrend(facts []retailkpi.DailyFact, currency string, from, to time.Time
 			}
 		}
 		_, coverage := totalAggregate(dayFacts, date, date, expected)
-		if coverage.CoverageRate == nil {
-			coverage.CoverageRate = ptr(0)
-		}
+		// rate stays nil when the day has no expected store-days; the
+		// frontend renders null as "—" instead of a fabricated 0.
 		row := DailyTrend{Date: date.Format("2006-01-02"), Currency: currency, Gap: len(dayFacts) == 0, Coverage: coverage}
 		if currency == "" {
 			row.CurrencyStatus = UnknownCurrencyStatus

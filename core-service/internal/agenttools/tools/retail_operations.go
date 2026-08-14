@@ -23,6 +23,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 	"github.com/lease-management-system/core-service/internal/services/retailscenario"
 	"github.com/lease-management-system/core-service/internal/services/retailstore360"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 const retailOperationsSkill = "retail_operations"
@@ -371,35 +372,18 @@ func (r scopedRetailReader) QueryFacts(ctx context.Context, legal, from, to, cla
 	})
 	filtered.ExpectedStoreCount = len(filtered.ExpectedStores)
 	filtered.Facts = make([]retailkpi.DailyFact, 0, len(set.Facts))
-	seenSources := map[string]bool{}
-	seenDatasets := map[string]bool{}
-	filtered.MinFactVersion, filtered.MaxFactVersion = 0, 0
-	filtered.HighestAsOf = time.Time{}
 	for _, fact := range set.Facts {
 		if _, ok := allowed[fact.StoreID]; !ok {
 			continue
 		}
 		filtered.Facts = append(filtered.Facts, fact)
-		if filtered.MinFactVersion == 0 || fact.Version < filtered.MinFactVersion {
-			filtered.MinFactVersion = fact.Version
-		}
-		if fact.Version > filtered.MaxFactVersion {
-			filtered.MaxFactVersion = fact.Version
-		}
-		if fact.AsOfAt.After(filtered.HighestAsOf) {
-			filtered.HighestAsOf = fact.AsOfAt
-		}
-		if fact.SourceSystem != "" && !seenSources[fact.SourceSystem] {
-			seenSources[fact.SourceSystem] = true
-			filtered.SourceSystems = append(filtered.SourceSystems, fact.SourceSystem)
-		}
-		if fact.SimulationDatasetVersion != nil && *fact.SimulationDatasetVersion != "" && !seenDatasets[*fact.SimulationDatasetVersion] {
-			seenDatasets[*fact.SimulationDatasetVersion] = true
-			filtered.DatasetVersions = append(filtered.DatasetVersions, *fact.SimulationDatasetVersion)
-		}
 	}
-	sort.Strings(filtered.SourceSystems)
-	sort.Strings(filtered.DatasetVersions)
+	// Provenance is rebuilt through the shared envelope helpers, never
+	// hand-rolled a fourth time: the filtered fact slice is the only source.
+	filtered.MinFactVersion, filtered.MaxFactVersion = sourceenvelope.FactVersionRange(filtered.Facts)
+	filtered.HighestAsOf = sourceenvelope.HighestAsOf(filtered.Facts)
+	filtered.SourceSystems = sourceenvelope.SourceSystems(filtered.Facts)
+	filtered.DatasetVersions = sourceenvelope.DatasetVersions(filtered.Facts)
 	return &filtered, nil
 }
 

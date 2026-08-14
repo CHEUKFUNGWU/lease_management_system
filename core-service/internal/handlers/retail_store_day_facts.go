@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +18,9 @@ import (
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/repository"
 	auditservice "github.com/lease-management-system/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailpulse"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 const (
@@ -317,6 +319,27 @@ func parseRetailBusinessDate(value string) (time.Time, error) {
 	return time.Parse("2006-01-02", value)
 }
 
+// mustRetailBusinessDate parses a business date that is already validated by
+// the repository; a stored row always carries a valid date.
+func mustRetailBusinessDate(value string) time.Time {
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
+}
+
+// HighestAsOfOf returns the newest as-of timestamp across the rows.
+func HighestAsOfOf(rows []*repository.RetailStoreDayFact) time.Time {
+	var highest time.Time
+	for _, row := range rows {
+		if row.AsOfAt.After(highest) {
+			highest = row.AsOfAt
+		}
+	}
+	return highest
+}
+
 func retailStoreIDs(raw []string) ([]string, string) {
 	result := make([]string, 0)
 	seen := make(map[string]struct{})
@@ -364,10 +387,9 @@ func retailStoreDayPagination(c *gin.Context) (int, int, int, string) {
 
 func retailStoreDayEnvelope(rows []*repository.RetailStoreDayFact, dateFrom, dateTo string, requestedStoreIDs []string, total, page, pageSize, offset int) gin.H {
 	classifications := make(map[string]struct{})
-	versions := make(map[string]struct{})
 	stores := make(map[string]struct{})
-	asOf := time.Time{}
 	coverageFrom, coverageTo := dateFrom, dateTo
+	facts := make([]retailkpi.DailyFact, 0, len(rows))
 	for _, row := range rows {
 		classifications[row.DataClassification] = struct{}{}
 		stores[row.StoreID] = struct{}{}
@@ -377,12 +399,15 @@ func retailStoreDayEnvelope(rows []*repository.RetailStoreDayFact, dateFrom, dat
 		if coverageTo == "" || row.BusinessDate > coverageTo {
 			coverageTo = row.BusinessDate
 		}
+		var datasetVersion *string
 		if row.SimulationDatasetVersion != nil && *row.SimulationDatasetVersion != "" {
-			versions[*row.SimulationDatasetVersion] = struct{}{}
+			datasetVersion = row.SimulationDatasetVersion
 		}
-		if row.AsOfAt.After(asOf) {
-			asOf = row.AsOfAt
-		}
+		facts = append(facts, retailkpi.DailyFact{
+			StoreID: row.StoreID, BusinessDate: mustRetailBusinessDate(row.BusinessDate), AsOfAt: row.AsOfAt,
+			SourceSystem: row.SourceSystem, DataClassification: row.DataClassification,
+			SimulationDatasetVersion: datasetVersion, Version: row.Version,
+		})
 	}
 	classification := "none"
 	if len(classifications) == 1 {
@@ -392,19 +417,31 @@ func retailStoreDayEnvelope(rows []*repository.RetailStoreDayFact, dateFrom, dat
 	} else if len(classifications) > 1 {
 		classification = "mixed"
 	}
-	datasetVersions := make([]string, 0, len(versions))
-	for value := range versions {
-		datasetVersions = append(datasetVersions, value)
+	// The envelope is the single provenance producer for this read too: the
+	// store-day list has no expected-population knowledge, so its coverage
+	// rate stays null (expected == 0) instead of a fabricated number.
+	env := sourceenvelope.Build(facts, sourceenvelope.Spec{
+		Classification: classification,
+		FormulaVersion: retailkpi.FormulaVersion,
+		PulseVersion:   retailpulse.PulseVersion,
+		Current:        sourceenvelope.PeriodSpec{From: mustRetailBusinessDate(coverageFrom), To: mustRetailBusinessDate(coverageTo)},
+		DecisionReady:  false, DecisionReadyReason: "raw_facts_read",
+		GeneratedAt: nowUTC(),
+	})
+	if asOf := HighestAsOfOf(rows); !asOf.IsZero() {
+		env.HighestAsOf = &asOf
 	}
-	sort.Strings(datasetVersions)
-	if asOf.IsZero() {
-		asOf = nowUTC()
+	env.CurrentCoverage.ObservedStoreDays = total
+	asOf := nowUTC()
+	if highest := HighestAsOfOf(rows); !highest.IsZero() {
+		asOf = highest
 	}
 	returned := len(rows)
 	hasMore := offset+returned < total
 	return gin.H{
 		"basis": "Working", "as_of": asOf, "data_classification": classification,
-		"simulation_dataset_versions": datasetVersions,
+		"simulation_dataset_versions": env.DatasetVersions,
+		"envelope":                    env,
 		"coverage": gin.H{"date_from": coverageFrom, "date_to": coverageTo,
 			"requested_store_ids": requestedStoreIDs, "returned_store_count": len(stores)},
 		"source": gin.H{"type": "retail_store_day_facts", "grain": "store_day", "versioned": true},

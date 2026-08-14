@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailpulse"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
@@ -140,6 +142,8 @@ type Response struct {
 	TargetCoverage     retailkpi.Coverage       `json:"target_coverage"`
 	ComparisonCoverage retailkpi.Coverage       `json:"comparison_coverage"`
 	DecisionReady      bool                     `json:"decision_ready"`
+	DecisionReadyReason string                  `json:"decision_ready_reason,omitempty"`
+	Envelope           sourceenvelope.Envelope  `json:"envelope"`
 	Currency           string                   `json:"currency"`
 	CurrencyStatus     string                   `json:"currency_status"`
 	Summary            map[string]SummaryMetric `json:"summary"`
@@ -264,30 +268,45 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 	if linkQuery.SourceSystem == "" && len(set.SourceSystems) == 1 {
 		linkQuery.SourceSystem = set.SourceSystems[0]
 	}
-	storeMinVersion, storeMaxVersion, storeHighestAsOf := factVersionRange(storeFacts)
-	response := &Response{Basis: "Working", DiagnosticsVersion: DiagnosticsVersion, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: "retail-pulse-v1", DataClassification: q.Classification, DatasetVersion: q.DatasetVersion, GeneratedAt: s.now(), Store: StoreIdentity{StoreID: population.StoreID, StoreCode: population.StoreCode, StoreName: population.StoreName, Brand: population.Brand, Region: population.Region}, Current: Period{currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02")}, Comparison: Period{comparisonStart.Format("2006-01-02"), comparisonEnd.Format("2006-01-02")}, TargetCoverage: currentCoverage, ComparisonCoverage: comparisonCoverage, DecisionReady: decisionReady, Currency: targetCurrency, CurrencyStatus: currencyStatus, Summary: summary, DailyTrend: trend, PeerDefinition: "same brand + region + currency, current decision-ready, excluding target", MinimumPeerCount: MinimumPeerCount, PeerBenchmark: benchmarks, Bridges: bridges, Observations: observations, SourceSystems: storeSourceSystems(storeFacts), DatasetVersions: storeDatasetVersions(storeFacts), FactVersionMin: storeMinVersion, FactVersionMax: storeMaxVersion, KPIDrilldownURL: diagnosticKPIDrilldown(linkQuery, q.StoreID, currentStart, currentEnd)}
-	if !storeHighestAsOf.IsZero() {
-		response.HighestAsOf = &storeHighestAsOf
-	}
+	response := &Response{Basis: "Working", DiagnosticsVersion: DiagnosticsVersion, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: retailpulse.PulseVersion, DataClassification: q.Classification, DatasetVersion: q.DatasetVersion, GeneratedAt: s.now(), Store: StoreIdentity{StoreID: population.StoreID, StoreCode: population.StoreCode, StoreName: population.StoreName, Brand: population.Brand, Region: population.Region}, Current: Period{currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02")}, Comparison: Period{comparisonStart.Format("2006-01-02"), comparisonEnd.Format("2006-01-02")}, TargetCoverage: currentCoverage, ComparisonCoverage: comparisonCoverage, DecisionReady: decisionReady, Currency: targetCurrency, CurrencyStatus: currencyStatus, Summary: summary, DailyTrend: trend, PeerDefinition: "same brand + region + currency, current decision-ready, excluding target", MinimumPeerCount: MinimumPeerCount, PeerBenchmark: benchmarks, Bridges: bridges, Observations: observations, KPIDrilldownURL: diagnosticKPIDrilldown(linkQuery, q.StoreID, currentStart, currentEnd)}
 	response.DataQualityIssues = quality
-	response.Evidence = Evidence{Current: response.Current, Comparison: response.Comparison, ObservedStoreDays: currentCoverage.ObservedStoreDays + comparisonCoverage.ObservedStoreDays, ExpectedStoreDays: currentCoverage.ExpectedStoreDays + comparisonCoverage.ExpectedStoreDays, RequiredFields: requiredFields(), FormulaVersion: retailkpi.FormulaVersion, SourceSystems: response.SourceSystems, DatasetVersions: response.DatasetVersions, FactVersionMin: storeMinVersion, FactVersionMax: storeMaxVersion, HighestAsOf: response.HighestAsOf, DataQualityIssues: quality, KPIDrilldownURL: response.KPIDrilldownURL}
+	response.DecisionReadyReason = storeDecisionReadyReason(decisionReady, quality)
+	// The envelope is the single provenance shape: sources, dataset
+	// versions, fact version range, as-of and coverage for the store's own
+	// facts. The response keeps its historical top-level fields, filled
+	// from the envelope instead of a hand-rolled rollup.
+	env := sourceenvelope.Build(storeFacts, sourceenvelope.Spec{
+		Classification: q.Classification,
+		FormulaVersion: retailkpi.FormulaVersion,
+		PulseVersion:   retailpulse.PulseVersion,
+		Current:        sourceenvelope.PeriodSpec{From: currentStart, To: currentEnd, ExpectedStoreDays: currentCoverage.ExpectedStoreDays},
+		Comparison:     sourceenvelope.PeriodSpec{From: comparisonStart, To: comparisonEnd, ExpectedStoreDays: comparisonCoverage.ExpectedStoreDays},
+		DecisionReady:  decisionReady, DecisionReadyReason: response.DecisionReadyReason,
+		GeneratedAt: response.GeneratedAt,
+	})
+	response.Envelope = env
+	response.SourceSystems = env.SourceSystems
+	response.DatasetVersions = env.DatasetVersions
+	response.FactVersionMin = env.FactVersionMin
+	response.FactVersionMax = env.FactVersionMax
+	response.HighestAsOf = env.HighestAsOf
+	response.Evidence = Evidence{Current: response.Current, Comparison: response.Comparison, ObservedStoreDays: currentCoverage.ObservedStoreDays + comparisonCoverage.ObservedStoreDays, ExpectedStoreDays: currentCoverage.ExpectedStoreDays + comparisonCoverage.ExpectedStoreDays, RequiredFields: requiredFields(), FormulaVersion: retailkpi.FormulaVersion, SourceSystems: response.SourceSystems, DatasetVersions: response.DatasetVersions, FactVersionMin: env.FactVersionMin, FactVersionMax: env.FactVersionMax, HighestAsOf: response.HighestAsOf, DataQualityIssues: quality, KPIDrilldownURL: response.KPIDrilldownURL}
 	return response, nil
 }
 
-func factVersionRange(facts []retailkpi.DailyFact) (min, max int, highest time.Time) {
-	for _, fact := range facts {
-		if min == 0 || fact.Version < min {
-			min = fact.Version
-		}
-		if fact.Version > max {
-			max = fact.Version
-		}
-		if fact.AsOfAt.After(highest) {
-			highest = fact.AsOfAt
+func storeDecisionReadyReason(decisionReady bool, quality []string) string {
+	if decisionReady {
+		return ""
+	}
+	for _, issue := range quality {
+		switch issue {
+		case "incomplete_store_day_coverage", "currency_conflict", "insufficient_peer_count", "diagnostics_not_decision_ready", "data_quality_invalid":
+			return issue
 		}
 	}
-	return min, max, highest
+	return "not_decision_ready"
 }
+
 
 func dateOnly(t time.Time) time.Time {
 	y, m, d := t.Date()
@@ -728,32 +747,6 @@ func uniqueSorted(xs []string) []string {
 }
 func requiredFields() []string {
 	return []string{"revenue", "gross_profit", "transactions", "footfall", "area_sqm", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost"}
-}
-func storeSourceSystems(facts []retailkpi.DailyFact) []string {
-	m := map[string]bool{}
-	for _, f := range facts {
-		if f.SourceSystem != "" {
-			m[f.SourceSystem] = true
-		}
-	}
-	return mapKeys(m)
-}
-func storeDatasetVersions(facts []retailkpi.DailyFact) []string {
-	m := map[string]bool{}
-	for _, f := range facts {
-		if f.SimulationDatasetVersion != nil && *f.SimulationDatasetVersion != "" {
-			m[*f.SimulationDatasetVersion] = true
-		}
-	}
-	return mapKeys(m)
-}
-func mapKeys(m map[string]bool) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }
 func diagnosticKPIDrilldown(q Query, store string, from, to time.Time) string {
 	parts := []string{"group_by=store", "store_id=" + store, "date_from=" + from.Format("2006-01-02"), "date_to=" + to.Format("2006-01-02"), "data_classification=" + q.Classification}

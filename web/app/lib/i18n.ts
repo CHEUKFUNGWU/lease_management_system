@@ -60,6 +60,7 @@ const dict: TranslationDict = {
     "zh-HK": "AI Chat",
     en: "AI Chat",
   },
+  "nav.upload": { "zh-CN": "批量上传", "zh-HK": "批量上傳", en: "Batch upload" },
   "nav.reports": {
     "zh-CN": "报表查询",
     "zh-HK": "報表查詢",
@@ -6781,6 +6782,7 @@ const dict: TranslationDict = {
   "search.group_contracts": { "zh-CN": "合同", "zh-HK": "合同", en: "Contracts" },
   "search.group_pages": { "zh-CN": "页面", "zh-HK": "頁面", en: "Pages" },
   "search.group_actions": { "zh-CN": "操作", "zh-HK": "操作", en: "Actions" },
+  "search.group_stores": { "zh-CN": "门店", "zh-HK": "門店", en: "Stores" },
   "search.group_daily": { "zh-CN": "日常作业", "zh-HK": "日常作業", en: "Daily work" },
   "search.group_accounting": { "zh-CN": "会计与合规", "zh-HK": "會計與合規", en: "Accounting & compliance" },
   "search.group_analysis": { "zh-CN": "分析与决策", "zh-HK": "分析與決策", en: "Analysis & decisions" },

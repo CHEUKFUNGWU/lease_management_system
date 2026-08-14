@@ -6,10 +6,11 @@ import { Button, Input, Modal, Space, Tag } from "antd";
 import type { InputRef } from "antd";
 import { ArrowRightOutlined, FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../context/AuthContext";
+import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { contractApi } from "../lib/api";
+import { contractApi, masterDataApi } from "../lib/api";
 import { t } from "../lib/i18n";
+import { PALETTE_PAGES } from "../lib/palette";
 
 interface SearchableContract {
   id: string;
@@ -19,34 +20,45 @@ interface SearchableContract {
   lessor_name?: string;
 }
 
+interface SearchableStore {
+  id: string;
+  code: string;
+  name: string;
+  brand?: string;
+  region?: string;
+}
+
 interface CommandItem {
   id: string;
   label: string;
   description?: string;
   path: string;
-  kind: "page" | "action" | "contract";
+  kind: "page" | "action" | "contract" | "store";
 }
 
 export default function GlobalSearch() {
   const router = useRouter();
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [contracts, setContracts] = useState<SearchableContract[]>([]);
+  const [stores, setStores] = useState<SearchableStore[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<InputRef>(null);
 
-  const pageItems = useMemo<CommandItem[]>(() => [
-    { id: "page-todo", label: t("nav.todo", language), description: t("search.group_daily", language), path: "/todo", kind: "page" },
-    { id: "page-contracts", label: t("nav.contracts", language), description: t("search.group_daily", language), path: "/contracts", kind: "page" },
-    { id: "page-reports", label: t("nav.reports", language), description: t("search.group_accounting", language), path: "/reports", kind: "page" },
-    { id: "page-closing", label: t("nav.monthly_closing", language), description: t("search.group_accounting", language), path: "/monthly-closing", kind: "page" },
-    { id: "page-cashflow", label: t("nav.cashflow", language), description: t("search.group_analysis", language), path: "/cashflow-forecast", kind: "page" },
-    { id: "page-sensitivity", label: t("nav.sensitivity", language), description: t("search.group_analysis", language), path: "/sensitivity", kind: "page" },
-    { id: "page-settings", label: t("nav.settings", language), description: t("search.group_system", language), path: "/settings", kind: "page" },
-  ], [language]);
+  // 页面路由来自 lib/palette.ts 注册表（U3 测试保证每个业务页面都已登记），
+  // 可见性遵循与 AppLayout useMenuItems 相同的角色规则。
+  const pageItems = useMemo<CommandItem[]>(() =>
+    PALETTE_PAGES.filter((def) => def.visible(user)).map((def) => ({
+      id: `page-${def.path}`,
+      label: t(def.labelKey, language),
+      description: t(`search.group_${def.group}`, language),
+      path: def.path,
+      kind: "page" as const,
+    })),
+  [language, user]);
 
   const actionItems = useMemo<CommandItem[]>(() => [
     { id: "action-new-contract", label: t("search.action_new_contract", language), path: "/contracts/new", kind: "action" },
@@ -82,6 +94,14 @@ export default function GlobalSearch() {
         if (!cancelled) setContracts(res.data || []);
       } catch {
         if (!cancelled) setContracts([]);
+      }
+      // 门店来源复用 master-data/stores（服务端按权限 scope，无需分类参数；
+      // storeOptions 的 data_classification 语义对全局导航面板不自然）。
+      try {
+        const storeRes = (await masterDataApi.listStores(token)) as { stores?: SearchableStore[] };
+        if (!cancelled) setStores(storeRes.stores || []);
+      } catch {
+        if (!cancelled) setStores([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -107,8 +127,17 @@ export default function GlobalSearch() {
         path: `/contracts/${contract.id}`,
         kind: "contract" as const,
       }));
-    return [...staticItems, ...contractItems].slice(0, 14);
-  }, [actionItems, contracts, keyword, pageItems]);
+    const storeItems = stores
+      .filter((store) => `${store.code} ${store.name} ${store.brand || ""} ${store.region || ""}`.toLowerCase().includes(query))
+      .map((store) => ({
+        id: `store-${store.id}`,
+        label: store.code,
+        description: store.name,
+        path: `/store-360?store_id=${encodeURIComponent(store.id)}`,
+        kind: "store" as const,
+      }));
+    return [...staticItems, ...contractItems, ...storeItems].slice(0, 14);
+  }, [actionItems, contracts, keyword, pageItems, stores]);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -142,6 +171,7 @@ export default function GlobalSearch() {
   const kindLabel = (kind: CommandItem["kind"]) => {
     if (kind === "contract") return t("search.group_contracts", language);
     if (kind === "page") return t("search.group_pages", language);
+    if (kind === "store") return t("search.group_stores", language);
     return t("search.group_actions", language);
   };
 

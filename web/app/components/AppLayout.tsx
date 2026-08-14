@@ -175,7 +175,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const baseMenuItems = useMenuItems(language, user);
   const adminMenuItem = {
     key: "/admin/users",
-    icon: <SafetyOutlined style={{ fontSize: 16 }} />,
+    icon: <SafetyOutlined className="app-menu-admin-icon" />,
     label: <Link href="/admin/users">{t("nav.admin", language)}</Link>,
   };
 
@@ -190,7 +190,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const breadcrumbMap = getBreadcrumbMap(language);
     const segments = pathname.split("/").filter(Boolean);
     const items: { title: React.ReactNode; href?: string }[] = [
-      { title: <Link href="/"><HomeOutlined style={{ fontSize: 14 }} /></Link> },
+      { title: <Link href="/"><HomeOutlined className="app-breadcrumb-home-icon" /></Link> },
     ];
 
     let currentPath = "";
@@ -234,59 +234,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
+    <Layout className="app-root">
       {/* ── Header ── */}
-      <Header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          background: "var(--fg-inverse)",
-          borderBottom: "1px solid var(--border-default)",
-          padding: "0 32px",
-          height: 60,
-          position: "sticky",
-          top: 0,
-          zIndex: 200,
-          flexShrink: 0,
-        }}
-      >
+      <Header className="app-header">
         {/* Left: Logo + Collapse + Breadcrumb */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 0 }}>
+        <div className="app-header-left">
           {/* Logo */}
           <Link
             href="/"
             aria-label={t("app.title", language)}
             className="app-logo"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              flexShrink: 0,
-            }}
           >
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 7,
-                background: "var(--fg-primary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span aria-hidden="true" style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-inverse)", letterSpacing: "-0.5px" }}>营</span>
+            <div className="app-logo-badge">
+              <span aria-hidden="true" className="app-logo-badge-mark">营</span>
             </div>
-            <span
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: "-0.5px",
-                color: "var(--fg-primary)",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <span className="app-logo-title">
               {t("app.title", language)}
             </span>
           </Link>
@@ -298,35 +260,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             aria-expanded={!collapsed}
             onClick={() => (isMobile ? setMobileNavOpen(true) : setCollapsed(!collapsed))}
             className="layout-icon-button"
-            style={{
-              padding: "6px",
-              borderRadius: 6,
-              transition: "background 0.15s",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--fg-tertiary)",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </button>
 
           {/* Breadcrumb */}
           {pathname !== "/" && (
-            <div style={{ marginLeft: 8, minWidth: 0, overflow: "hidden" }}>
+            <div className="app-breadcrumb-wrap">
               <Breadcrumb
                 items={breadcrumbs}
-                separator={<span style={{ color: "var(--border-strong)" }}>/</span>}
-                style={{ fontSize: 13 }}
+                separator={<span className="app-breadcrumb-separator">/</span>}
+                className="app-breadcrumb"
               />
             </div>
           )}
         </div>
 
         {/* Right: Search + Notifications + Language + User */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <div className="app-header-right">
           {/* Global Search */}
           <GlobalSearch />
 
@@ -350,23 +301,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 type="button"
                 aria-label={t("nav.language", language)}
                 aria-haspopup="menu"
-                style={{
-                  cursor: "pointer",
-                  padding: "8px",
-                  borderRadius: 8,
-                  transition: "background 0.15s",
-                  color: "var(--fg-tertiary)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 13,
-                  fontWeight: 500,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                className="app-language-button"
               >
-                <GlobalOutlined style={{ fontSize: 14 }} />
-                <span style={{ textTransform: "uppercase", fontSize: 12 }}>
+                <GlobalOutlined className="app-language-icon" />
+                <span className="app-language-code">
                   {language === "zh-CN" ? "CN" : language === "zh-HK" ? "HK" : "EN"}
                 </span>
               </button>
@@ -374,7 +312,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
 
           {/* Divider */}
-          <div style={{ width: 1, height: 20, background: "var(--border-default)" }} />
+          <div className="app-header-divider" />
 
           {/* User */}
           {user && (
@@ -383,24 +321,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 type="button"
                 aria-label={t("user.menu", language)}
                 aria-haspopup="menu"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  cursor: "pointer",
-                  padding: "6px 12px",
-                  borderRadius: 9999,
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                className="app-user-button"
               >
                 <Avatar
                   size={28}
                   icon={<UserOutlined />}
-                  style={{ background: "var(--fg-primary)", fontSize: 12 }}
+                  className="app-avatar"
                 />
-                <span style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                <span className="app-username">
                   {user.username}
                 </span>
               </button>
@@ -409,52 +337,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </Header>
 
-      <Layout style={{ flex: 1, overflow: "hidden" }}>
+      <Layout className="app-content-shell">
         {/* ── Sidebar ── */}
         {!isMobile && <Sider
           width={240}
           collapsed={collapsed}
           collapsedWidth={64}
           trigger={null}
-          style={{
-            background: "var(--fg-inverse)",
-            borderRight: "1px solid var(--border-default)",
-            flexShrink: 0,
-            overflowY: "auto",
-            overflowX: "hidden",
-          }}
+          className="app-sider"
         >
-          <div style={{ padding: "12px 8px" }}>
+          <div className="app-sider-inner">
             <Menu
               mode="inline"
               selectedKeys={[activeMenuKey]}
               inlineCollapsed={collapsed}
-              style={{
-                borderRight: 0,
-                background: "transparent",
-              }}
+              className="app-sider-menu"
               items={menuItems}
             />
           </div>
 
           {/* Sidebar Footer */}
           {!collapsed && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                padding: "12px 16px",
-                borderTop: "1px solid var(--bg-inset)",
-                fontSize: 11,
-                color: "var(--fg-muted)",
-                textAlign: "center",
-                lineHeight: 1.5,
-              }}
-            >
+            <div className="app-sider-footer">
               <div>{t("app.title", language)}</div>
-              <div style={{ marginTop: 2 }}>v0.1.0</div>
+              <div className="app-sider-footer-version">v0.1.0</div>
             </div>
           )}
         </Sider>}
@@ -465,26 +371,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           open={isMobile && mobileNavOpen}
           onClose={() => setMobileNavOpen(false)}
           width={272}
-          styles={{ body: { padding: "8px 0" }, header: { padding: "16px 20px" } }}
+          classNames={{ body: "app-drawer-body", header: "app-drawer-header" }}
         >
           <Menu
             mode="inline"
             selectedKeys={[activeMenuKey]}
             items={menuItems}
             onClick={() => setMobileNavOpen(false)}
-            style={{ borderRight: 0 }}
+            className="app-drawer-menu"
           />
         </Drawer>
 
         {/* ── Content ── */}
         <Content
-          style={{
-            padding: "32px 48px",
-            background: "var(--fg-inverse)",
-            overflowY: "auto",
-            overflowX: "hidden",
-            minWidth: 0,
-          }}
+          className="app-content"
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -493,7 +393,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               animate={pageTransition.animate}
               exit={undefined}
               transition={pageTransition.transition as any}
-              style={{ maxWidth: 1440, margin: "0 auto" }}
+              className="app-content-inner"
             >
               {children}
             </motion.div>

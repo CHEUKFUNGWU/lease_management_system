@@ -34,8 +34,8 @@ describe("store 360 presentation contract", () => {
   });
 
   it("keeps peer reason visible and scopes gap tooltip to target only", () => {
-    expect(formatPeerBenchmarkStatus("insufficient_peers", "peer_count_below_minimum")).toBe("同群样本不足 · peer_count_below_minimum");
-    expect(formatTrendTooltip(1234, "target", true, "currency", "CNY")).toEqual(["数据缺口", "目标门店"]);
-    expect(formatTrendTooltip(1234, "peer", true, "currency", "CNY")).toEqual(["1,234.00 CNY", "同群中位数"]);
+    expect(formatPeerBenchmarkStatus("insufficient_peers", "peer_count_below_minimum", "zh-CN")).toBe("同群样本不足 · peer_count_below_minimum");
+    expect(formatTrendTooltip(1234, "target", true, "currency", "CNY", "zh-CN")).toEqual(["数据缺口", "目标门店"]);
+    expect(formatTrendTooltip(1234, "peer", true, "currency", "CNY", "zh-CN")).toEqual(["1,234.00 CNY", "同群中位数"]);
   });
 });

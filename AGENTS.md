@@ -215,6 +215,13 @@ cd ../web && npm run type-check && npm run build && npm test
 
 真实 PostgreSQL 集成测试需 `TEST_DATABASE_URL`，未设置时正常 skip。IFRS 16 回归用 `make ifrs16-regression`。
 
+**替换类改动的验收规则（GUARD-001，缺失即退回）**：凡是「把 A 换成 B」的改动——内联样式换成类名、组件 A 换成组件 B、手写逻辑换成接缝函数——验收必须证明 **B 真的生效**，只证明 A 消失了不算数。判定「B 生效」的机械手段，按改动类型二选一或并用：
+
+1. **运行时实测**：报告给出 `getComputedStyle` / `getBoundingClientRect` 的改动前后对照（例如 Modal 标题 line-height 修复前 768px → 修复后 32px；卡片高度 82px → 41px）。FIX-019 / FIX-005 是已落地的先例。
+2. **精确规则体断言**：测试用 `ruleBody()` 一类的辅助函数取目标选择器的规则体做断言，禁止 `expect(css).toMatch(/A[\s\S]*?B/)` 全文跨规则正则（FIX-021 教训：懒惰通配会跨行命中无关规则，断言恒真）。先例：`web/app/home/chatLayout.test.ts`、`web/app/lib/kpi-card-height.test.ts`。
+
+样式重构类改动（内联样式 → 类名）尤其如此：`class-coverage.test.ts` 只能证明「类有规则」，不能证明「规则挂在了正确的元素上、值正确」（STY-005 教训：31 个类补上规则时 44 处替换点必须逐个核对同元素同值，报告给「文件/行号/原内联值/现类名/规则值/是否同元素」表）。自检句：**把 B 的规则删掉或改错，这条测试会不会红？不会红就是没写对。**
+
 启动方式、端口、测试账号见 [README.md](README.md)。
 
 **IFRS 16 计量参考值**（改计量引擎后用于快速自检）：初始负债 ¥3,255,676.79 / 36 个月摊销；月结 2024-01 参考分录利息 ¥13,318、折旧 ¥92,170、付款 ¥50,000。

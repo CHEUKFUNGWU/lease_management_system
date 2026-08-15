@@ -111,6 +111,8 @@ export const antdTheme = {
     // ── Menu ──
     Menu: {
       itemBorderRadius: radius.md,
+      // STY-007: submenu titles carried the same 6px radius via CSS.
+      subMenuItemBorderRadius: radius.md,
       activeBarBorderWidth: 0,
       itemSelectedBg: colors.background.inset,
       itemSelectedColor: colors.foreground.primary,

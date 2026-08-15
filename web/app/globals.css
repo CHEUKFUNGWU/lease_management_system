@@ -427,30 +427,26 @@ body .ant-modal .ant-modal-footer {
   border-top: 1px solid var(--border-subtle);
 }
 
-/* Menu */
-.ant-menu {
-  border-right: none !important;
+/* Menu.
+   STY-007: item radius, selected/hover backgrounds live in theme.ts
+   (Menu.itemBorderRadius 6, itemSelectedBg inset, itemHoverBg surface).
+   Kept without the flag: margins, the selected weight, the border removal
+   and the transitions — no Menu token covers them. */
+body .ant-menu {
+  border-right: none;
 }
 
-.ant-menu-item {
-  border-radius: 6px !important;
-  margin: 2px 8px !important;
-  transition: all 0.15s var(--ease-micro) !important;
+body .ant-menu .ant-menu-item {
+  margin: 2px 8px;
+  transition: all 0.15s var(--ease-micro);
 }
 
-.ant-menu-item-selected {
-  background: var(--bg-inset) !important;
-  font-weight: 600 !important;
+body .ant-menu .ant-menu-item-selected {
+  font-weight: 600;
 }
 
-.ant-menu-item:hover:not(.ant-menu-item-selected) {
-  background: var(--bg-surface) !important;
-}
-
-/* Menu submenu */
-.ant-menu-submenu-title {
-  border-radius: 6px !important;
-  margin: 2px 8px !important;
+body .ant-menu .ant-menu-submenu-title {
+  margin: 2px 8px;
 }
 
 /* Dropdown */

@@ -128,8 +128,10 @@ export function ChartCard({ title, children, extra }: ChartCardProps) {
 interface DashboardHeaderProps {
   title: string;
   subtitle: string;
-  primaryAction: ReactNode;
-  secondaryAction: ReactNode;
+  // Both actions are optional: a page may legitimately offer one or none.
+  // PageHeader already renders nothing for an absent action.
+  primaryAction?: ReactNode;
+  secondaryAction?: ReactNode;
 }
 
 export function DashboardHeader({

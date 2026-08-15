@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Drawer, message } from "antd";
-import { PlusOutlined, RobotOutlined } from "@ant-design/icons";
+import { RobotOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import AppLayout from "./components/AppLayout";
@@ -214,8 +214,9 @@ export default function HomePage() {
         <DashboardHeader
           title={t("dashboard.todo_title", language)}
           subtitle={subtitle}
-          primaryAction={<Button icon={<PlusOutlined />} onClick={() => router.push("/contracts/new")}>{t("dashboard.add_contract", language)}</Button>}
-          secondaryAction={<Button icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>}
+          // 「新增合同」已从首页移除：首页是经营简报的入口，不是合同录入的入口。
+          // 功能未删除，仍在 /contracts 页、命令面板和 /contracts/new 路由上。
+          primaryAction={<Button icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>}
         />
 
         <div className="home-grid">

@@ -275,6 +275,7 @@ func Commit(ctx, rows [][]string, mapping Mapping, envelope Envelope, idempotenc
 ### P5 小项（同样不改模块形状）
 
 13. 月度导入器僵尸收口：/performance 补导入 UI（客户端 API 已存在，纯接线）或明确 deprecated 标注（PRD P5-48）。测试：上传路径可用性或页面无死链。
+14. 解析格式补齐：ai-service 解析适配器引入 AnyDoc（Rust/MIT/纯本地）接管 office 家族（docx/doc、ppt、xls/xlsb、odt、rtf、epub → GFM Markdown），CSV 用标准库确定性解析；PDF/图片路径不动（PaddleOCR 保持）；docx 无坐标体系，证据降级为 quote 锚点（PRD P5-51）。测试：docx/ppt/xls 中文用例、加密/超限错误路径、quote 锚点证据。
 
 ## 12. 测试策略
 

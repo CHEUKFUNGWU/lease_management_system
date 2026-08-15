@@ -150,7 +150,7 @@
 17. **经营数据导入页（新页面）。** 上传 → 列映射预览 → 校验报告（行级错误、预计覆盖率）→ 确认导入 → 跳转 `/operating-pulse?data_classification=production`；BI 端零改动（覆盖率不足由语义层诚实降级）。支撑 P5-42～47。
 18. **月度导入器状态收口。** /performance 补导入 UI（客户端 API 已存在，属接线）或明确标记 deprecated，消除「后端通、前端断」。支撑 P5-48。
 19. **FP&A 导入。** 预算版本 Excel 导入（与 P2 的 fpna-version-lifecycle 落地同步交付）与 GL Trial Balance 导入（按 ADR-0009 的 spec 落地）。支撑 P5-49/50。
-20. **解析格式补齐。** ai-service 解析器增加 CSV 与 docx 支持（现有 PDF+Excel）；CLI 文件入口不在本轮（企业用户走 Web）。支撑 P5-51。
+20. **解析格式补齐（引入 AnyDoc 作为 office 家族解析适配器）。** ai-service 的解析器引入 Firecrawl AnyDoc（Rust、MIT、纯本地、无 ML/无外部服务/无 API Key）：docx/doc、ppt、xls/xlsb、odt、rtf、epub → GFM Markdown，接管「Word 合同」与旧版 .xls 两个当前缺口；CSV 用标准库确定性解析（不依赖 LLM，数字不进模型）；PDF 路径不变（PaddleOCR 优先 + PyMuPDF fallback，扫描件/图片仍走 PaddleOCR）；Word/office 文件无坐标体系，证据定位降级为 quote 锚点（page/coordinates 留空，UI 显示文本引用）；加密文件/超限文件返回明确错误并走人工路径，不静默成功。CLI 文件入口不在本轮（企业用户走 Web）。支撑 P5-51。
 
 ## 5. Testing Decisions
 
@@ -163,6 +163,7 @@
 - **AI 收尾**：页面往返后会话上下文保留的组件测试（vitest 先例）；死代码移除后无引用；合同读取经 Tool runtime 后审计日志可断言；覆盖率/样本不足时置信度下降；长回答分片输出或超时语义。PPT 生成的文件结构与口径头。
 - **导入器（P5）**：幂等重放（同一文件 + Idempotency-Key 只落一批）、行级错误与部分成功、覆盖率报告、envelope 强制（缺字段拒绝）、500/批分块、权限（沿用既有 store-day 写入权限）；集成断言只写 store-day 事实、零写 IFRS 16 正式表；AI 列映射只产出建议（不含数值解析），人工确认后才入库。
 - **僵尸收口（P5）**：/performance 上传路径可用性，或 deprecated 标注可被验证（页面无死链）。
+- **格式补齐（P5）**：AnyDoc 解析用例（docx/ppt/xls 中文文档 → GFM Markdown）、加密文件与超限文件错误路径（明确报错不静默）、CSV 标准库确定性解析；docx 证据定位为 quote 锚点（page/coordinates 为空）。
 - **集成**：真实 PostgreSQL 集成测试沿用 `TEST_DATABASE_URL` 模式（未设置时 skip）；P4 决策卡须有「正式台账零写入」e2e 证据（前后计数，先例：MAX-009）。
 - **回归**：每批完成跑通 `cd core-service && GOCACHE=$(pwd)/.gocache go test ./... && go vet ./...` 与 `cd ../web && npm run type-check && npm run build && npm test`；IFRS 16 计量参考值不变。
 
@@ -185,4 +186,5 @@
 - P4 落地前需先确认会计政策口径（续租/终止判断标准、退出罚金来源、折现率政策），对应风险红线 1。
 - **PPT 与 classification 过滤依赖真实需求确认**：Review 一建议 2 原只承诺 CSV/XLSX，PPT（P1-19）如 BP/客户无 MBR/WBR 材料需求可延后；classification 过滤（P1-18）属「值得收紧」项，聚合路径已安全，本轮只收紧列表读取面。
 - **P5 排期**：P5-1（store-day 导入器）为 Review 二判定的最高杠杆项，建议与 P0/P1 并行；P5-3 的预算导入与 P2 的 fpna-version-lifecycle 落地联动交付，trial balance 以 ADR-0009 为准。Review 二同时确认：模式已由合同侧验证（ai-intake.v1 + 受控模板），本批是「把同一条流水线复制到零售事实域」，无新技术风险。
+- **AnyDoc 引入决定（2026-08）**：P5-4 的格式补齐采用 Firecrawl AnyDoc（Rust、MIT、纯本地、无 ML/无外部服务/无 API Key）作为 ai-service 解析适配器，覆盖 docx/doc、ppt、xls/xlsb、odt、rtf、epub → GFM Markdown，CSV 走标准库确定性解析。它不替代 PaddleOCR（扫描件/图片保持现状），不触碰 M8 的 Go 确定性导入链路，数字解析不进任何 LLM。实施前需验证：目标平台 wheel 可用性（ai-service 构建镜像）、中文复杂表格/合同质量、加密与超限文件错误映射。
 - 本 PRD 与《CodebaseDesign_零售经营分析工作站_模块深化.md》配套：PRD 管「要什么」，设计文档管「模块长什么样、接缝在哪、怎么测」。

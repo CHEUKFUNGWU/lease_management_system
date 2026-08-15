@@ -100,7 +100,7 @@ function SensitivityPage() {
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <PageHeader
               title="敏感性分析"
-              subtitle="复用 IFRS 16 计量引擎，量化折现率假设变动对初始租赁负债和 ROU 资产的影响。"
+
             />
 
             <Card>

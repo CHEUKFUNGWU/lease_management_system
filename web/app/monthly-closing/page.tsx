@@ -1235,7 +1235,7 @@ function MonthlyClosingPage() {
         >
           <PageHeader
             title={t("monthly.title", language)}
-            subtitle={t("monthly.subtitle", language)}
+
             meta={selectedPeriod ? (
               <Space size={12} style={{ marginTop: 8 }}>
                 <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>

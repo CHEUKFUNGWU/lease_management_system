@@ -362,8 +362,7 @@ export default function ContractDetailPage() {
     <ProtectedRoute>
       <AppLayout>
         <PageHeader
-          title={contract?.contract_name || t("contract.detail_title", language)}
-          subtitle={contract?.contract_number}
+          title={<>{contract?.contract_name || t("contract.detail_title", language)}{contract?.contract_number && <span className="page-header-count">{contract.contract_number}</span>}</>}
           meta={contract && (
             <StatusTag kind={statusKindFromAntColor(statusColors[contract.approval_status])}>
               {statusLabels[contract.approval_status]}

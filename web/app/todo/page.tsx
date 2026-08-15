@@ -367,8 +367,7 @@ export default function TodoPage() {
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <PageHeader
-            title={t("todo.title", language)}
-            subtitle={t("todo.subtitle", language, { count: String(queue.total) })}
+            title={<>{t("todo.title", language)}<span className="page-header-count">{t("todo.subtitle", language, { count: String(queue.total) })}</span></>}
             primaryAction={
               <Button icon={<ReloadOutlined />} onClick={() => load(period)} loading={loading}>
                 {t("todo.refresh", language)}

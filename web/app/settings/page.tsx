@@ -400,7 +400,7 @@ export default function SettingsPage() {
       <AppLayout>
         <PageHeader
           title={<><TagOutlined style={{ marginRight: 8 }} />{t("settings.title", language)}</>}
-          subtitle={t("settings.description", language)}
+
         />
 
         <Card

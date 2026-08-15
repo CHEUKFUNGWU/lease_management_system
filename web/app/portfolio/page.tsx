@@ -163,7 +163,7 @@ function PortfolioPage() {
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <PageHeader
               title="租赁组合分析"
-              subtitle="按资产类型、IFRS 16 范围和币种查看合同规模、租金承诺与非租赁成本暴露。"
+
               primaryAction={
                 <Space>
                   <Segmented

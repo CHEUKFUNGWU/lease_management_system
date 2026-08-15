@@ -179,8 +179,7 @@ export default function AdminUsersPage() {
   return (
     <div>
       <PageHeader
-        title={<><UserOutlined /> {t("admin_users.title", language)}</>}
-        subtitle={t("admin_users.subtitle", language, { count: String(users.length) })}
+        title={<><UserOutlined /> {t("admin_users.title", language)}<span className="page-header-count">{t("admin_users.subtitle", language, { count: String(users.length) })}</span></>}
         primaryAction={
           <Button
             type="primary"

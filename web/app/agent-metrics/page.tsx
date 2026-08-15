@@ -153,7 +153,7 @@ export default function AgentMetricsPage() {
       <AppLayout>
         <PageHeader
           title={t("agent_metrics.title", language)}
-          subtitle={t("agent_metrics.description", language)}
+
           primaryAction={
             <Space wrap>
               <Select<RangeKey>

@@ -393,7 +393,7 @@ function ReportsPageContent() {
           {/* ─── Page Header ─── */}
           <PageHeader
             title={t("reports.title", language)}
-            subtitle={t("reports.subtitle", language)}
+
           />
 
           {/* ─── Report mode selector ─── */}

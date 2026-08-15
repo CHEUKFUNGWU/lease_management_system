@@ -124,7 +124,7 @@ export default function PerformancePage() {
   return <ProtectedRoute><AppLayout><div>
     <PageHeader
       title="经营驾驶舱"
-      subtitle={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
+      meta={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
     />
     <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={period} onChange={event => setPeriod(event.target.value)} onPressEnter={load} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={load} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button></Space></Card>
     {overview && <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>

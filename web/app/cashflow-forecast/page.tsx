@@ -207,7 +207,7 @@ function CashflowForecastPage() {
         {/* ─── page heading ─── */}
         <PageHeader
           title={<><LineChartOutlined style={{ marginRight: 8 }} />{t("cashflow.title", language)}</>}
-          subtitle={t("cashflow.description", language)}
+
         />
 
         {/* ─── report mode card ─── */}

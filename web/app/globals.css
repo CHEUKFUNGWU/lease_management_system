@@ -118,11 +118,25 @@ body {
   letter-spacing: -0.04em;
 }
 
-.page-header-subtitle {
-  margin: 0;
+/* FIX-017: counts and identifiers sit beside the title instead of forming a
+   second line under it — they are data, not description. */
+.page-header-count {
+  margin-left: 12px;
   color: var(--fg-muted);
   font-size: 14px;
-  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* FIX-017: replaces .page-header-subtitle. The header no longer carries
+   explanatory copy — only the scope/compliance sentence a page's numbers
+   depend on, set one step smaller than the old subtitle so it reads as a
+   footnote to the title rather than a second headline. */
+.page-header-meta {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .page-header-actions {
@@ -1843,6 +1857,16 @@ html {
 }
 .home-msg {
   display: flex;
+/* FIX-015: with no messages the flex:1 body still ate the whole column and the
+   composer sat ~800px below the starter chips. Collapsing the column to its
+   content instead (the first attempt) overcorrected — the composer floated a
+   third of the way down the viewport with a bigger void underneath. The column
+   keeps its full height and the composer keeps the bottom; it is the empty
+   state's starters that centre in the leftover space, so the gap is split
+   above and below them instead of piling up in one place. */
+.home-chat-body.is-empty {
+  justify-content: center;
+}
   align-items: flex-start;
   gap: 8px;
   max-width: 100%;
@@ -1857,16 +1881,6 @@ html {
   flex-shrink: 0;
 }
 .home-msg-bubble {
-/* FIX-015: with no messages the flex:1 body still ate the whole column and the
-   composer sat ~800px below the starter chips. Collapsing the column to its
-   content instead (the first attempt) overcorrected — the composer floated a
-   third of the way down the viewport with a bigger void underneath. The column
-   keeps its full height and the composer keeps the bottom; it is the empty
-   state's starters that centre in the leftover space, so the gap is split
-   above and below them instead of piling up in one place. */
-.home-chat-body.is-empty {
-  justify-content: center;
-}
   padding: 10px 14px;
   border-radius: 16px 16px 16px 4px;
   background: var(--bg-surface);

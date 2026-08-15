@@ -67,7 +67,6 @@ export default function RoiPage() {
       <AppLayout>
         <PageHeader
           title="ROI 测算"
-          subtitle={`当前假设 · ${contracts == null ? "未设置合同数量" : `${contracts.toLocaleString()} 份合同`} · 可随参数调整`}
         />
 
         <Row gutter={[16, 16]}>

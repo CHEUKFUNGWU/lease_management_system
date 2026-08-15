@@ -612,10 +612,10 @@ const dict: TranslationDict = {
     "zh-HK": "門店 360",
     en: "Store 360",
   },
-  "store360.subtitle": {
-    "zh-CN": "围绕单店的事实、同群对比与变化贡献；仅供 Working 经营分析，不作解释性判断。",
-    "zh-HK": "圍繞單店的事實、同群對比與變化貢獻；僅供 Working 經營分析，不作解釋性判斷。",
-    en: "Facts, peer comparison and change contribution for one store; Working analysis only, never an interpretive judgment.",
+  "store360.scope_note": {
+    "zh-CN": "仅供 Working 经营分析，不作解释性判断。",
+    "zh-HK": "僅供 Working 經營分析，不作解釋性判斷。",
+    en: "Working analysis only, never an interpretive judgment.",
   },
   "store360.scenario_analysis": {
     "zh-CN": "情景分析",
@@ -869,11 +869,6 @@ const dict: TranslationDict = {
     "zh-CN": "租金谈判测算",
     "zh-HK": "租金談判測算",
     en: "Rent Negotiation Scenario",
-  },
-  "scenario.subtitle": {
-    "zh-CN": "调整租金、销售、人工假设，看单店利润怎么变。",
-    "zh-HK": "調整租金、銷售、人工假設，看單店利潤怎麼變。",
-    en: "Adjust rent, sales and labor assumptions to see how store profit changes.",
   },
   // FIX-014: the compliance wording stays — it moves under the plain
   // subtitle as the scope note, exactly as before, only repositioned.
@@ -1507,11 +1502,6 @@ const dict: TranslationDict = {
     "zh-CN": "Agent 运营与用量",
     "zh-HK": "Agent 運營與用量",
     en: "Agent Operations & Usage",
-  },
-  "agent_metrics.description": {
-    "zh-CN": "查看当前权限范围内 Planner 跨 Run 的调用、Token 和成本核算状态。数据来自持久化 Trace，不展示业务数据或敏感提示词。",
-    "zh-HK": "查看當前權限範圍內 Planner 跨 Run 的調用、Token 和成本核算狀態。數據來自持久化 Trace，不展示業務數據或敏感提示詞。",
-    en: "Review Planner calls, tokens, and cost-accounting status across Runs in your authorized scope. The data comes from persisted traces and excludes business data and sensitive prompts.",
   },
   "agent_metrics.range_24h": {
     "zh-CN": "最近 24 小时",
@@ -2200,9 +2190,9 @@ const dict: TranslationDict = {
     en: "Contract Ledger",
   },
   "contracts.subtitle": {
-    "zh-CN": "共 {count} 份合同，管理您的 IFRS 16 租赁合约",
-    "zh-HK": "共 {count} 份合同，管理您的 IFRS 16 租賃合約",
-    en: "{count} contracts, managing your IFRS 16 lease contracts",
+    "zh-CN": "共 {count} 份合同",
+    "zh-HK": "共 {count} 份合同",
+    en: "{count} contracts",
   },
   "contracts.add_contract": {
     "zh-CN": "新增合同",
@@ -2900,11 +2890,6 @@ const dict: TranslationDict = {
     "zh-CN": "结账中心",
     "zh-HK": "結賬中心",
     en: "Monthly Closing",
-  },
-  "monthly.subtitle": {
-    "zh-CN": "IFRS 16 租赁负债月结生成、分录预览与过账管理",
-    "zh-HK": "IFRS 16 租賃負債月結生成、分錄預覽與過賬管理",
-    en: "IFRS 16 lease liability monthly closing, entry preview and posting management",
   },
   "monthly.current_period": {
     "zh-CN": "当前期间",
@@ -3604,11 +3589,6 @@ const dict: TranslationDict = {
     "zh-CN": "新增合同",
     "zh-HK": "新增合同",
     en: "New Contract",
-  },
-  "contract_new.subtitle": {
-    "zh-CN": "手工录入 · 也可改用 AI 上传解析",
-    "zh-HK": "手工錄入 · 也可改用 AI 上載解析",
-    en: "Manual entry · or use AI upload and parsing",
   },
   "contract_new.back": {
     "zh-CN": "返回",
@@ -4855,11 +4835,6 @@ const dict: TranslationDict = {
     "zh-HK": "未來租金現金流預測",
     en: "Future Rent Cashflow Forecast",
   },
-  "cashflow.description": {
-    "zh-CN": "基于合同与付款计划预测未来期间的租金现金流出",
-    "zh-HK": "基於合同與付款計劃預測未來期間的租金現金流出",
-    en: "Forecast future rent cash outflows based on contracts and payment schedules",
-  },
   "cashflow.report_mode": {
     "zh-CN": "报表模式",
     "zh-HK": "報表模式",
@@ -5201,11 +5176,6 @@ const dict: TranslationDict = {
     "zh-CN": "全部设备会话撤销失败",
     "zh-HK": "全部設備會話撤銷失敗",
     en: "Failed to revoke all device sessions",
-  },
-  "settings.description": {
-    "zh-CN": "标签用于驱动 IFRS 16 摊销报表的多维度分组与汇总分析",
-    "zh-HK": "標籤用於驅動 IFRS 16 攤銷報表的多維度分組與匯總分析",
-    en: "Tags are used to drive multi-dimensional grouping and summary analysis in IFRS 16 amortization reports",
   },
   "settings.group_discount_rate": {
     "zh-CN": "集团默认折现率",
@@ -5709,9 +5679,9 @@ const dict: TranslationDict = {
     en: "User Management",
   },
   "admin_users.subtitle": {
-    "zh-CN": "共 {count} 个用户 · 管理员可创建和维护账号",
-    "zh-HK": "共 {count} 個用戶 · 管理員可建立及維護帳號",
-    en: "{count} users · Admins can create and maintain accounts",
+    "zh-CN": "共 {count} 个用户",
+    "zh-HK": "共 {count} 個用戶",
+    en: "{count} users",
   },
   "admin_users.new_user": {
     "zh-CN": "新建用户",
@@ -6518,11 +6488,6 @@ const dict: TranslationDict = {
     "zh-CN": "损益调整",
     "zh-HK": "損益調整",
     en: "P&L Adjustment",
-  },
-  "reports.subtitle": {
-    "zh-CN": "租赁负债滚动表与摊销报表查询",
-    "zh-HK": "租賃負債滾動表與攤銷報表查詢",
-    en: "Lease Liability Roll-forward & Amortization Report Query",
   },
   "reports.working_hint": {
     "zh-CN": "工作报表：包含 Draft / Pending Approval 数据，用于内部试算",

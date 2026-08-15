@@ -141,7 +141,6 @@ export default function DealComparePage() {
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
           <PageHeader
             title="条款比价"
-            subtitle={chartData.length > 0 ? `已比较 ${chartData.length} 个方案 · 按直线化有效租金与现金流现值折算` : "尚未生成比较结果 · 填写方案条款后计算"}
           />
 
           <Form

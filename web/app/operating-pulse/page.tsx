@@ -268,7 +268,7 @@ function OperatingPulseInner() {
   };
 
   return <ProtectedRoute><AppLayout><div className="operating-pulse-page">
-    <PageHeader title={t("pulse.title", language)} subtitle={t("pulse.subtitle", language)} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button>} />
+    <PageHeader title={t("pulse.title", language)} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button>} />
     <Card size="small" className="pulse-filter-card" style={{ marginBottom: 16 }}>
       <Flex gap={12} wrap="wrap" align="center">
         <Radio.Group value={currentClassification} onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />

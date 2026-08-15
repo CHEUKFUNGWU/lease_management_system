@@ -90,7 +90,7 @@ export default function StandardsPage() {
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <PageHeader
               title="多准则对比"
-              subtitle="对同一合同展示 IFRS 16、ASC 842 与中国租赁准则下的资产负债表和损益表差异。"
+
             />
 
             <Card>

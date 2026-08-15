@@ -138,7 +138,6 @@ export default function PreDealPage() {
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
           <PageHeader
             title="签约前决策"
-            subtitle={briefing ? `最近测算：${currency || "未定币种"} · ${briefing.yearly?.length || 0} 个年度期间` : "尚未生成方案 · 填写条款参数后开始测算"}
           />
 
           <Form

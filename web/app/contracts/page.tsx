@@ -436,8 +436,7 @@ function ContractsPage() {
           transition={{ duration: 0.25 }}
         >
           <PageHeader
-            title={t("contracts.title", language)}
-            subtitle={t("contracts.subtitle", language, { count: String(total) })}
+            title={<>{t("contracts.title", language)}<span className="page-header-count">{t("contracts.subtitle", language, { count: String(total) })}</span></>}
             primaryAction={
               <Button
                 type="primary"

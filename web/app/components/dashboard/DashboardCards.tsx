@@ -140,5 +140,5 @@ export function DashboardHeader({
   primaryAction,
   secondaryAction,
 }: DashboardHeaderProps) {
-  return <PageHeader title={title} subtitle={subtitle} primaryAction={primaryAction} secondaryAction={secondaryAction} />;
+  return <PageHeader title={title} primaryAction={primaryAction} secondaryAction={secondaryAction} />;
 }

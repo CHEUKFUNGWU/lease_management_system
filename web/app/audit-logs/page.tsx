@@ -276,8 +276,7 @@ export default function AuditLogsPage() {
       <AppLayout>
         <div style={{ padding: 0 }}>
           <PageHeader
-            title={t("audit.title", language)}
-            subtitle={t("audit.subtitle", language, { total: String(total) })}
+            title={<>{t("audit.title", language)}<span className="page-header-count">{t("audit.subtitle", language, { total: String(total) })}</span></>}
           />
 
           {/* Filters */}

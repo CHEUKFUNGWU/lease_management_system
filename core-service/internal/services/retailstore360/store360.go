@@ -650,7 +650,7 @@ func buildObservations(s map[string]SummaryMetric, b []PeerBenchmark, bridges []
 		"revenue": "销售额", "gross_profit": "毛利额", "footfall": "客流", "conversion_rate": "转化率",
 		"average_transaction_value": "客单价", "labor_cost": "人工成本", "occupancy_cash_cost": "经营占用现金成本",
 		"other_controllable_cost": "其他可控成本", "labor_cost_rate": "人工成本率", "occupancy_cash_cost_rate": "经营占用成本率",
-		"store_contribution": "门店贡献", "store_contribution_margin": "门店贡献率", "sales_per_sqm": "期间坪效",
+		"store_contribution": "门店经营利润", "store_contribution_margin": "门店经营利润率", "sales_per_sqm": "期间坪效",
 	}
 	for code, metric := range s {
 		if metric.ChangeValue == nil {

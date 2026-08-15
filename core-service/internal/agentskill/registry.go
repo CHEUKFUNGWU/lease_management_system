@@ -123,7 +123,9 @@ func ProductionRegistry() *Registry {
 			ID: "retail_operations", Version: "v1", Name: "零售经营分析 Agent", Priority: 70,
 			Description:    "基于 retail-pulse-v1、retail-store-diagnostics-v1 和 retail-store-scenario-v1 提供可追溯的零售经营事实与行动提议。",
 			IntentExamples: []string{"经营脉搏", "门店诊断", "分析 Store006", "人工下降 10% 情景", "生成行动提议"},
-			MatchTerms:     []string{"经营脉搏", "门店诊断", "门店分析", "经营情景", "零售经营", "客流", "转化", "客单", "人工", "占用现金成本", "门店贡献", "同群", "门店异常", "行动草稿", "retail operations", "store diagnostics", "operating pulse"},
+			// FIX-029: 「门店贡献」改名为「门店经营利润」是展示层改动，匹配词只增不减——
+			// 老说法仍要能路由到本 skill，行业说法「四墙利润」一并收进来。
+			MatchTerms:     []string{"经营脉搏", "门店诊断", "门店分析", "经营情景", "零售经营", "客流", "转化", "客单", "人工", "占用现金成本", "门店经营利润", "门店贡献", "四墙利润", "同群", "门店异常", "行动草稿", "retail operations", "store diagnostics", "operating pulse"},
 			AllowedRoles:   []string{"admin", "editor", "reviewer", "approver", "auditor", "readonly"},
 			RequiredInputs: []string{"message"}, RequiredContext: []string{"retail_filters"},
 			AllowedTools:  []string{"retail.operating_pulse.read", "retail.store_diagnostics.read", "retail.store.scenario.evaluate"},

@@ -9,7 +9,7 @@ import {
 } from "antd";
 import {
   SearchOutlined, CopyOutlined, EyeOutlined, BarChartOutlined,
-  TagOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
+  TagOutlined, SettingOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -399,8 +399,7 @@ export default function SettingsPage() {
     <ProtectedRoute>
       <AppLayout>
         <PageHeader
-          title={<><TagOutlined style={{ marginRight: 8 }} />{t("settings.title", language)}</>}
-
+          title={<><SettingOutlined style={{ marginRight: 8 }} />{t("settings.title", language)}</>}
         />
 
         <Card

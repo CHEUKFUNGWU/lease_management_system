@@ -248,7 +248,11 @@ function ContractsPage() {
       width: 260,
       render: (_: unknown, record: Contract) => (
         <div style={{ minWidth: 220 }}>
-          <div style={{ fontFamily: "monospace", fontWeight: 600, fontSize: 13 }}>{record.contract_number}</div>
+          {/* FIX-030: the only way into a contract used to be a 12px muted
+              arrow in the last column, with no label and no clickable row —
+              the entry point was there but unreadable as one. The number is
+              now the link, which is where anyone looks first. */}
+          <a className="contract-number-link" onClick={() => router.push(`/contracts/${record.id}`)}>{record.contract_number}</a>
           <div style={{ color: "var(--fg-secondary)", fontWeight: 500, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={record.contract_name}>{record.contract_name}</div>
           {record.discount_rate_missing && <StatusTag kind="error" style={{ marginTop: 5, fontSize: 11, padding: "1px 7px" }}>{t("contracts.discount_rate_missing", language)}</StatusTag>}
         </div>

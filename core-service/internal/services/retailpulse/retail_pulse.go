@@ -601,9 +601,12 @@ func buildTrend(facts []retailkpi.DailyFact, currency string, from, to time.Time
 	}
 	return result
 }
+// FIX-031: gross_profit was missing here while the trend switcher offered
+// 毛利额 — picking it drew an empty chart directly under a KPI card showing
+// that very number. This whitelist must cover every code the switcher exposes.
 func selectTrendKPIs(all map[string]retailkpi.KPIValue) map[string]retailkpi.KPIValue {
 	result := map[string]retailkpi.KPIValue{}
-	for _, code := range []string{"revenue", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution"} {
+	for _, code := range []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution"} {
 		result[code] = all[code]
 	}
 	return result

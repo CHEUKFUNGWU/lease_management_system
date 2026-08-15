@@ -112,9 +112,13 @@ const dict: TranslationDict = {
     "zh-HK": "轉化率",
     en: "Conversion rate",
   },
+  // FIX-029: 「门店贡献」是行话，用户看不懂就得问。改叫「门店经营利润」——
+  // 保留「利润」的白话，用「门店」限定范围，避免被当成利润表的营业利润
+  // （本指标不含折旧摊销与总部分摊，且用现金租金而非 IFRS 16 租赁费用）。
+  // 英文保持 store contribution：那是零售业对这个指标的标准叫法，不存在同名歧义。
   "retail.kpi.store_contribution": {
-    "zh-CN": "门店贡献",
-    "zh-HK": "門店貢獻",
+    "zh-CN": "门店经营利润",
+    "zh-HK": "門店經營利潤",
     en: "Store contribution",
   },
   "retail.kpi.average_transaction_value": {
@@ -138,8 +142,8 @@ const dict: TranslationDict = {
     en: "Occupancy cash cost rate",
   },
   "retail.kpi.store_contribution_margin": {
-    "zh-CN": "门店贡献率",
-    "zh-HK": "門店貢獻率",
+    "zh-CN": "门店经营利润率",
+    "zh-HK": "門店經營利潤率",
     en: "Store contribution margin",
   },
   "retail.kpi.sales_per_sqm": {
@@ -233,8 +237,8 @@ const dict: TranslationDict = {
     en: "Occupancy cost burden",
   },
   "retail.signal.contribution_turns_negative": {
-    "zh-CN": "门店贡献转负",
-    "zh-HK": "門店貢獻轉負",
+    "zh-CN": "门店经营利润转负",
+    "zh-HK": "門店經營利潤轉負",
     en: "Contribution turns negative",
   },
   "retail.unit.currency": {
@@ -5150,10 +5154,13 @@ const dict: TranslationDict = {
   },
 
   // ─── Settings ──────────────────────────────────────────────────
+  // FIX-032: the page was a tag manager once. It now holds device sessions,
+  // the group discount rate, rent-to-sales policy, budget variance policy and
+  // journal materiality — the nav calls it 设置 and the header said 标签总管.
   "settings.title": {
-    "zh-CN": "标签总管",
-    "zh-HK": "標籤總管",
-    en: "Tag Manager",
+    "zh-CN": "设置",
+    "zh-HK": "設置",
+    en: "Settings",
   },
   "settings.group_device_sessions": {
     "zh-CN": "设备会话",

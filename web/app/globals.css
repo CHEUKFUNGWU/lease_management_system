@@ -899,6 +899,19 @@ h3 {
   font: 600 13px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* FIX-030: the contract number is the way into the contract. It keeps the
+   monospace identity treatment and reads as text until hover, so the table
+   does not turn into a wall of blue. */
+.contract-number-link {
+  color: var(--fg-primary);
+  font: 600 13px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.contract-number-link:hover {
+  color: var(--fg-primary);
+  text-decoration: underline;
+}
+
 .contract-mobile-name {
   overflow: hidden;
   color: var(--fg-secondary);

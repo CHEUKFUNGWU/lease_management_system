@@ -227,7 +227,7 @@ func plFlowNodes() []PlFlowNode {
 		{Key: "rent", Label: "租金"},
 		{Key: "non_lease", Label: "非租赁成本"},
 		{Key: "other", Label: "其他可控成本"},
-		{Key: "contribution", Label: "门店贡献"},
+		{Key: "contribution", Label: "门店经营利润"},
 	}
 }
 

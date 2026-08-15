@@ -16,7 +16,9 @@ const homePage = readFileSync(path.join(import.meta.dirname, "../page.tsx"), "ut
 
 function ruleBody(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\/g, "\\");
-  const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(css);
+  // Anchor the selector end so "-chip" never matches "-chips", and allow
+  // selector groups ("a,\nb {") by running to the first brace.
+  const match = new RegExp(`${escaped}(?![\\w-])[^{}]*\\{([^}]*)\\}`).exec(css);
   return match ? match[1] : "";
 }
 
@@ -72,9 +74,9 @@ describe("HOME-004 layout contract (L1–L8)", () => {
 
   it("L8: three columns — middle at least 640px at 1440, right stays usable", () => {
     expect(ruleBody(".home-grid")).toMatch(/minmax\(640px,\s*1fr\)/);
-    expect(ruleBody(".home-grid")).toMatch(/300px/);
+    expect(ruleBody(".home-grid")).toMatch(/330px/);
     const narrow = css.slice(css.indexOf("@media (max-width: 1439px)"));
-    expect(narrow.slice(0, 200)).toMatch(/minmax\(0,\s*1fr\)\s*300px/);
+    expect(narrow.slice(0, 200)).toMatch(/minmax\(0,\s*1fr\)\s*330px/);
   });
 
   it("§3: composer is pinned to the column bottom, starters reuse /ai-chat keys", () => {
@@ -90,3 +92,82 @@ describe("HOME-004 layout contract (L1–L8)", () => {
     expect(homePage).toContain("<RightColumn {...rightColumnProps} />");
   });
 });
+
+describe("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
+  it("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
+    expect(ruleBody(".home-grid")).toMatch(/330px/);
+    expect(ruleBody("@media (max-width: 1439px)") || ruleBody(".home-grid")).toMatch(/330px/);
+    // The money KPI value line must never reflow: the flex value row has no
+    // wrap permission anywhere in the home right column.
+    expect(css).toMatch(/\.home-right-kpis[\s\S]*?flex-direction:\s*column/);
+  });
+});
+
+describe("FIX-007: the conversation column is the scroll container, composer outside it", () => {
+  it("FIX-007: the conversation column is the scroll container, composer outside it", () => {
+    const column = ruleBody(".home-chat-column");
+    expect(column).toMatch(/height:\s*calc\(100dvh/);
+    expect(column).toMatch(/position:\s*sticky/);
+    const body = ruleBody(".home-chat-body");
+    expect(body).toMatch(/overflow-y:\s*auto/);
+    expect(body).toMatch(/flex:\s*1/);
+    // composer is a sibling of the scrolling body, not inside it
+    const bodyIndex = briefColumn.indexOf('className="home-chat-body"');
+    const composerIndex = briefColumn.indexOf('className="home-chat-composer"');
+    expect(bodyIndex).toBeGreaterThan(-1);
+    expect(composerIndex).toBeGreaterThan(bodyIndex);
+    expect(briefColumn.slice(composerIndex)).not.toContain('className="home-chat-body"');
+  });
+});
+
+describe("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
+  it("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
+    expect(ruleBody(".home-chat-starter-chip")).toMatch(/border-radius:\s*(9999px|50px)/);
+    expect(ruleBody(".home-msg.is-user")).toMatch(/row-reverse/);
+    expect(briefColumn).toMatch(/sendText\(t\(key, language\)\)/);
+    expect(briefColumn).not.toMatch(/askStarter/);
+  });
+});
+
+describe("FIX-009: Spin-wrapped home columns restore their gaps", () => {
+  it("FIX-009: Spin-wrapped home columns restore their gaps", () => {
+    expect(ruleBody(".home-right-stack .ant-spin-container")).toMatch(/gap:\s*24px/);
+    expect(ruleBody(".home-work-focus .ant-spin-container")).toMatch(/gap:\s*16px/);
+    // The readiness card joins the AntD card language (border, no ring).
+    expect(ruleBody(".home-readiness-card")).toMatch(/border:\s*1px solid var\(--border-default\)/);
+    expect(ruleBody(".home-readiness-card")).toMatch(/box-shadow:\s*none/);
+  });
+});
+
+describe("FIX-013: pending bubble shows the step scaffold, results stagger in", () => {
+  it("FIX-013: pending bubble shows the step scaffold, results stagger in", () => {
+    const steps = ruleBody(".home-chat-steps");
+    expect(steps).toMatch(/flex-direction:\s*column/);
+    expect(briefColumn).toContain("home-chat-step is-pending");
+    expect(briefColumn).toContain("home-chat-step-mark");
+    // The thinking copy is no longer the only pending expression.
+    expect(briefColumn).toContain("home.chat_thinking");
+    expect(css).toContain("@keyframes home-step-in");
+  });
+});
+
+describe("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
+  it("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
+    expect(ruleBody(".home-grid")).toMatch(/330px/);
+    expect(ruleBody("@media (max-width: 1439px)") || ruleBody(".home-grid")).toMatch(/330px/);
+    // The money KPI value line must never reflow: the flex value row has no
+    // wrap permission anywhere in the home right column.
+    expect(css).toMatch(/\.home-right-kpis[\s\S]*?flex-direction:\s*column/);
+  });
+});
+
+describe("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
+  it("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
+    expect(ruleBody(".home-grid")).toMatch(/330px/);
+    expect(ruleBody("@media (max-width: 1439px)") || ruleBody(".home-grid")).toMatch(/330px/);
+    // The money KPI value line must never reflow: the flex value row has no
+    // wrap permission anywhere in the home right column.
+    expect(css).toMatch(/\.home-right-kpis[\s\S]*?flex-direction:\s*column/);
+  });
+});
+

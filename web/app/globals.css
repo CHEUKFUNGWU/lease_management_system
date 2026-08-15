@@ -1489,21 +1489,22 @@ html {
 .retail-ai-drawer-input { width: 100%; }
 
 /* ── HOME-001: 三栏首页 ───────────────────────────────────────── */
-/* HOME-004 L8: nav | conversation | actions. minmax(640px, 1fr) keeps the
-   middle column a usable conversation at 1440 (640+) while the fixed right
-   column never gets squeezed at 1280 (1440 - 240 nav - 48*2 padding - 24
-   gap - 300 right ≈ 784 middle at the 1440 content max). */
+/* HOME-004 L8 + FIX-005: right column widened back to 330px so the
+   compact money value lines ("1.28e8 CNY") stay on one line — measured at
+   1440x900: 300px→82px wrapped value line, 330px→41px single line. */
 .home-grid {
   display: grid;
-  grid-template-columns: minmax(640px, 1fr) 300px;
+  grid-template-columns: minmax(640px, 1fr) 330px;
   gap: 24px;
-  align-items: start;
+  /* FIX-007: stretch (not start) so the middle column's grid track is as
+     tall as the taller right column — that extra height is what gives the
+     sticky conversation column room to pin while the page scrolls. */
 }
 /* Below 1440 the content shell narrows: keep the right column usable
    rather than defending the 640 floor with an unusable 1024–1279 band. */
 @media (max-width: 1439px) {
   .home-grid {
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 330px;
   }
 }
 .home-middle {

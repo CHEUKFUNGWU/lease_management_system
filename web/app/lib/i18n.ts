@@ -3538,6 +3538,14 @@ const dict: TranslationDict = {
     "zh-HK": "登錄失敗",
     en: "Login failed",
   },
+  // A 401 from the login endpoint means the credentials are wrong, not that a
+  // session lapsed — the generic 401 copy sends people looking for a session
+  // they never had.
+  "login.invalid_credentials": {
+    "zh-CN": "用户名或密码错误，请重试。",
+    "zh-HK": "用戶名或密碼錯誤，請重試。",
+    en: "Incorrect username or password. Please try again.",
+  },
   "login.no_register": {
     "zh-CN": "公开注册已关闭，如需账号请联系管理员",
     "zh-HK": "公開註冊已關閉，如需賬號請聯繫管理員",

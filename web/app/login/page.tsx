@@ -7,7 +7,7 @@ import { LockOutlined, UserOutlined, SafetyOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
-import { authApi } from "../lib/api";
+import { ApiError, authApi } from "../lib/api";
 import { notifyError } from "../lib/notify";
 
 export default function LoginPage() {
@@ -30,7 +30,15 @@ export default function LoginPage() {
       message.success(t("login.success", language));
       router.push("/");
     } catch (error: any) {
-      notifyError(error.message || t("login.failed", language));
+      // The shared mapper turns any codeless 401 into "session expired", which
+      // is wrong here: failing to sign in is not a lapsed session. Until the
+      // auth handler carries an error code, the login page owns this case.
+      const credentialsRejected = error instanceof ApiError && error.status === 401;
+      notifyError(
+        credentialsRejected
+          ? t("login.invalid_credentials", language)
+          : error.message || t("login.failed", language),
+      );
     } finally {
       setLoading(false);
     }

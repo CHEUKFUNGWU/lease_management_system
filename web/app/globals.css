@@ -368,38 +368,32 @@ h3 {
   color: var(--fg-primary) !important;
 }
 
-/* Table: refined headers and rows */
-.ant-table-wrapper .ant-table-thead > tr > th {
-  font-weight: 600 !important;
-  color: var(--fg-tertiary) !important;
-  font-size: 12px !important;
-  text-transform: none !important;
-  letter-spacing: 0.01em !important;
-  background: var(--bg-inset) !important;
-  border-bottom: 1px solid var(--border-subtle) !important;
-  padding: 12px 16px !important;
+/* Table: refined headers and rows.
+   STY-007: headerBg / headerColor / headerSplitColor / cellPaddingBlock /
+   cellPaddingInline / rowHoverBg / rowSelectedBg / borderColor /
+   cellFontSize now live in theme.ts (components.Table). These rules keep
+   only what the token system cannot express — weight, size, tracking and
+   the body-cell color. AntD's runtime rules are injected later and carry
+   the same specificity (:where() contributes zero), so each retained rule
+   is prefixed with `body` to win without !important. */
+body .ant-table-wrapper .ant-table-thead > tr > th {
+  font-weight: 600;
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
-.ant-table-wrapper .ant-table-tbody > tr > td {
-  font-size: 14px !important;
-  color: var(--fg-secondary) !important;
-  padding: 12px 16px !important;
-  border-bottom: 1px solid var(--border-subtle) !important;
+body .ant-table-wrapper .ant-table-tbody > tr > td {
+  font-size: 14px;
+  color: var(--fg-secondary);
   transition: background 0.1s var(--ease-micro);
 }
 
-.ant-table-wrapper .ant-table-tbody > tr:hover > td {
-  background: var(--bg-surface) !important;
-}
-
-.ant-table-wrapper .ant-table-tbody > tr.ant-table-row-selected > td {
-  background: var(--bg-inset) !important;
-}
-
-.ant-table-wrapper,
-.ant-table-container {
+body .ant-table-wrapper,
+body .ant-table-container {
   max-width: 100%;
-  overflow-x: auto !important;
+  overflow-x: auto;
 }
 
 .ant-table {

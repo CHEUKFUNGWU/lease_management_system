@@ -132,6 +132,13 @@ export const antdTheme = {
       rowSelectedHoverBg: colors.background.inset,
       cellPaddingBlock: 12,
       cellPaddingInline: 16,
+      // STY-007: size="small" tables used to be forced to the same 12/16
+      // padding by a CSS override flagged important; without it antd's small
+      // defaults (4px inline) change every small table's look. Pin the small
+      // tokens to the same values so deleting the override does not change
+      // rendered output.
+      cellPaddingBlockSM: 12,
+      cellPaddingInlineSM: 16,
       cellFontSize: typography.sizes.body.size,
       headerSplitColor: colors.border.subtle,
     },

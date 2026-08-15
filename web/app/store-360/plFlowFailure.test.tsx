@@ -44,7 +44,10 @@ describe("FIX-024: pl-flow failures surface", () => {
   });
 
   it("the page passes the rejection on instead of discarding it", () => {
-    expect(page).toContain("setPlFlowError(apiErrorMessage(");
+    // FETCH-001: the failure now exits the shared fetch seam (useRetailQuery)
+    // as a STATE-001 failed state and reaches the panel via plFlowError.
+    expect(page).toContain("useRetailQuery");
+    expect(page).toContain("plFlowState.kind === \"failed\"");
     expect(page).toContain("error={plFlowError}");
     // The old swallow-everything catch is gone.
     expect(page).not.toMatch(/\.catch\(\(\)\s*=>\s*\{[^}]*setPlFlow\(null\)[^}]*\}\)/);

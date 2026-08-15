@@ -111,12 +111,15 @@ describe("FIX-007: the conversation column is the scroll container, composer out
     const body = ruleBody(".home-chat-body");
     expect(body).toMatch(/overflow-y:\s*auto/);
     expect(body).toMatch(/flex:\s*1/);
-    // composer is a sibling of the scrolling body, not inside it
-    const bodyIndex = briefColumn.indexOf('className="home-chat-body"');
-    const composerIndex = briefColumn.indexOf('className="home-chat-composer"');
+    // composer is a sibling of the scrolling body, not inside it.
+    // FIX-015: the body's className is conditional now (is-empty centres the
+    // starters), so match the class name itself rather than a literal
+    // className="..." attribute — the structural contract is unchanged.
+    const bodyIndex = briefColumn.indexOf("home-chat-body");
+    const composerIndex = briefColumn.indexOf("home-chat-composer");
     expect(bodyIndex).toBeGreaterThan(-1);
     expect(composerIndex).toBeGreaterThan(bodyIndex);
-    expect(briefColumn.slice(composerIndex)).not.toContain('className="home-chat-body"');
+    expect(briefColumn.slice(composerIndex)).not.toContain("home-chat-body");
   });
 });
 
@@ -179,12 +182,15 @@ describe("FIX-007: the conversation column is the scroll container, composer out
     const body = ruleBody(".home-chat-body");
     expect(body).toMatch(/overflow-y:\s*auto/);
     expect(body).toMatch(/flex:\s*1/);
-    // composer is a sibling of the scrolling body, not inside it
-    const bodyIndex = briefColumn.indexOf('className="home-chat-body"');
-    const composerIndex = briefColumn.indexOf('className="home-chat-composer"');
+    // composer is a sibling of the scrolling body, not inside it.
+    // FIX-015: the body's className is conditional now (is-empty centres the
+    // starters), so match the class name itself rather than a literal
+    // className="..." attribute — the structural contract is unchanged.
+    const bodyIndex = briefColumn.indexOf("home-chat-body");
+    const composerIndex = briefColumn.indexOf("home-chat-composer");
     expect(bodyIndex).toBeGreaterThan(-1);
     expect(composerIndex).toBeGreaterThan(bodyIndex);
-    expect(briefColumn.slice(composerIndex)).not.toContain('className="home-chat-body"');
+    expect(briefColumn.slice(composerIndex)).not.toContain("home-chat-body");
   });
 });
 

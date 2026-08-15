@@ -1798,20 +1798,22 @@ html {
    viewport below the shell padding, the message body scrolls internally and
    the composer is pinned to the column bottom (sticky keeps the whole column
    in view while the taller right column scrolls the page). Height budget:
-   60px app header + 32px content padding + 32px sticky offset, so the
-   composer bottom lands exactly on the viewport edge. */
+   60px app header + 32px content padding + 32px sticky offset + 24px composer
+   breathing room, so the composer bottom clears the viewport edge instead of
+   sitting flush against it (FIX-015: FIX-007 landed it at exactly 0px, which
+   reads as the input falling off the screen). */
 .home-chat-column {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
-  height: calc(100dvh - 124px);
+  height: calc(100dvh - 148px);
   position: sticky;
   top: 32px;
 }
 @media (max-width: 1023px) {
   .home-chat-column {
-    height: calc(100dvh - 108px);
+    height: calc(100dvh - 132px);
     top: 24px;
   }
 }
@@ -1855,6 +1857,16 @@ html {
   flex-shrink: 0;
 }
 .home-msg-bubble {
+/* FIX-015: with no messages the flex:1 body still ate the whole column and the
+   composer sat ~800px below the starter chips. Collapsing the column to its
+   content instead (the first attempt) overcorrected — the composer floated a
+   third of the way down the viewport with a bigger void underneath. The column
+   keeps its full height and the composer keeps the bottom; it is the empty
+   state's starters that centre in the leftover space, so the gap is split
+   above and below them instead of piling up in one place. */
+.home-chat-body.is-empty {
+  justify-content: center;
+}
   padding: 10px 14px;
   border-radius: 16px 16px 16px 4px;
   background: var(--bg-surface);

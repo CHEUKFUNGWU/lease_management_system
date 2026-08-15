@@ -202,11 +202,15 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
 
   const send = () => sendText(input);
 
+  // FIX-015: an empty conversation must not stretch the column to full height,
+  // or the composer sits ~800px below the starter chips with nothing between.
+  const isEmptyConversation = messages.length === 0 && !sending;
+
   return (
     <div className="home-chat-column">
       <BriefBand state={state} result={brief} error={error} language={language} onRetry={retry} />
-      <div className="home-chat-body">
-        {messages.length === 0 && !sending && (
+      <div className={isEmptyConversation ? "home-chat-body is-empty" : "home-chat-body"}>
+        {isEmptyConversation && (
           <div className="home-chat-starters">
             <Typography.Text type="secondary" className="home-chat-starters-label">
               {t("ai.quick_questions", language)}

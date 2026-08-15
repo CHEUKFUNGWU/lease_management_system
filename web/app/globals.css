@@ -1282,21 +1282,25 @@ html {
   background: var(--fg-inverse);
   border-right: 1px solid var(--border-default);
   flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* FIX-011: the sider is a flex column — the menu scrolls internally and
+     the footer returns to normal flow instead of floating over the last
+     menu item. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .app-sider-inner {
   padding: 12px 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .app-sider-menu {
   border-right: 0;
   background: transparent;
 }
 .app-sider-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
   padding: 12px 16px;
   border-top: 1px solid var(--bg-inset);
   font-size: 11px;

@@ -95,6 +95,11 @@ const dict: TranslationDict = {
     "zh-HK": "客單價",
     en: "Average transaction value",
   },
+  "retail.kpi.labor_cost": {
+    "zh-CN": "人工成本",
+    "zh-HK": "人工成本",
+    en: "Labor cost",
+  },
   "retail.kpi.labor_cost_rate": {
     "zh-CN": "人工成本率",
     "zh-HK": "人工成本率",

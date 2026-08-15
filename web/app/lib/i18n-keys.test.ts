@@ -10,16 +10,17 @@
  *
  * 引用规则与 web/scripts/audit-i18n.mjs 一致，宁严勿松。
  *
- * 已知既有缺陷（K1 显式豁免，不补文案，另行开票）：
- *   - retail.kpi.labor_cost：scenario-workbench 的 KPI 表引用但字典缺失，
- *     情景工作台的「人工成本」标签当前渲染为空串（main 上即存在）。
+ * 豁免名单当前为空，且应当保持为空：本测试是为了让缺失 key 立刻失败，
+ * 往名单里加一条就等于把一处空白文案放回生产。发现缺失请补文案，
+ * 而不是加豁免。（I18N-002 建网时唯一的一条 retail.kpi.labor_cost
+ * 已补齐并移除。）
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
-// Documented pre-existing gaps the net must not trip on (see header).
-const KNOWN_MISSING: ReadonlySet<string> = new Set(["retail.kpi.labor_cost"]);
+// Intentionally empty — see the header before adding anything here.
+const KNOWN_MISSING: ReadonlySet<string> = new Set<string>();
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

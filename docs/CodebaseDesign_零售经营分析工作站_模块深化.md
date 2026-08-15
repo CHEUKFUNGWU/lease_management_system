@@ -98,7 +98,7 @@ func Export(kind ExportKind, format Format, response any, envelope sourceenvelop
 
 **藏在接口后面**：口径头生成（data_classification、dataset_version、as_of、formula_version、period/窗口、group_by、法人）；Working/模拟标识（文件名 `operating-pulse-2026-08-15-working.csv` + 表头标记）；CSV 转义与 BOM；XLSX 工作簿组装（多 sheet：KPI 卡/表/桥/明细）；列名与排序的单一来源。
 
-**接缝与适配器**：handler 层同一 GET 端点带 `format=csv|xlsx` 参数，响应即数据源。适配器决策：服务端只出 CSV（Go 标准库，口径权威、审计可复演）；XLSX 由前端用既有工作簿库从同源响应生成。两个适配器（服务端 CSV / 前端 XLSX）⇒ 真实接缝。CSV 先行，XLSX 跟进。
+**接缝与适配器**：handler 层同一 GET 端点带 `format=csv|xlsx` 参数，响应即数据源。适配器决策：服务端只出 CSV（Go 标准库，口径权威、审计可复演）；XLSX 由前端用既有工作簿库从同源响应生成。两个适配器（服务端 CSV / 前端 XLSX）⇒ 真实接缝。CSV 先行，XLSX 跟进。**后续扩展**：PPTX 为 P1 后续项（PRD P1-19），生成位置（服务端或前端库）与格式枚举扩展待真实汇报需求确认后决定；口径头与 Working/模拟标识必须与 CSV/XLSX 一致。
 
 **测试面**：行结构、口径头、转义、文件名、分类标识、非法 kind/format 的错误路径。
 
@@ -185,7 +185,8 @@ func (g *Guard) Check(ctx, userID string, kind string) error  // 拒绝返回 42
 
 Review 在 AI 工程评估中点名的次级项，均为既有模块内改动，不构成新接缝：
 
-- **会话持久化**：零售页内嵌 AI 抽屉的对话上下文跨页面往返保留，或明确定义一次性会话语义并在 UI 提示；既有深链构造被真实接线调用或删除，不留死代码。测试：页面往返后上下文保留的组件测试。
+- **会话持久化**：零售页内嵌 AI 抽屉的对话上下文跨页面往返保留，或明确定义一次性会话语义并在 UI 提示（PRD P3-32 二选一）。测试：页面往返后上下文保留的组件测试。
+- **死代码清理**：既有深链构造被真实接线调用，或确认无调用方后删除（PRD P3-33 二选一）。测试：移除后全仓无引用。
 - **访问审计收口**：合同读取从绕过 Tool runtime 的直连改为经 Tool runtime（带审计与维度收窄），与「权限拒绝必须保持原因」纪律一致。测试：审计日志可断言的集成测试。
 - **置信度来源化**：零售 Agent 置信度从硬编码改为由覆盖率、样本量、规则命中强度推导，输出向后兼容。测试：样本不足时置信度下降的单元用例。
 - **流式响应**：Web chat 长回答从同步阻塞/DB 轮询改为增量输出，或明确超时与进度语义；与 agent-runner 预算语义对齐。测试：分片输出/超时语义。
@@ -226,7 +227,7 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 
 ## 10. 快速修复清单（不改模块形状）
 
-既有模块内的小修，不构成新接缝，随 P0 一起交付：
+既有模块内的小修，不构成新接缝；第 1–10 项随 P0 交付，P1 小项随 P1 交付：
 
 1. store-360 深链丢失 store_id：发现数据集的 effect 补写 store_id（与相邻分支一致）。
 2. scenario-workbench 未评估时伪造「决策就绪」：无结果时渲染「未评估」态，不渲染可信条。
@@ -238,6 +239,11 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 8. 覆盖超额检测：重复 (store_id, business_date) 行报警（覆盖语义补全，与覆盖不足对称）。
 9. ai_chat 集成测试注释两处弯引号还原（与所引 SQL 逐字一致）。
 10. pulse 输入即查询：本地 state + Apply（store-360 已有先例，收敛做法）。
+
+### P1 小项（同样不改模块形状）
+
+11. 原始事实列表 API 增加 `data_classification` 过滤参数：收紧列表读取面（PRD P1-18；聚合路径保持现状安全）。测试：handler 参数回显与错误路径。
+12. 导出格式枚举扩展 PPTX（PRD P1-19，后续项）：无真实汇报需求可延后；口径头与 Working/模拟标识与 CSV/XLSX 一致。
 
 ## 11. 测试策略
 
@@ -255,7 +261,7 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 
 ```
 P0:  M1 + 快速修复清单                        （无新依赖，直接修可信度）
-P1:  M2（期间）+ M3（导出）+ M5（区域视图）   （M5 依赖语义层既有 group_by）
+P1:  M2（期间）+ M3（导出）+ M5（区域视图）+ 事实列表过滤与 PPT 后续小项   （M5 依赖语义层既有 group_by）
 P2:  M4（预算对比，依赖 M2）+ fpna-version-lifecycle 落地
 P3:  M6（路由 + 引用 + 护栏 + 工程收尾）
 P4:  M7（决策卡，依赖既有 snapshot/projection 与折现率解析）

@@ -40,6 +40,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { notifyError } from "../lib/notify";
 import { t } from "../lib/i18n";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Text } = Typography;
 
@@ -322,7 +323,7 @@ export default function PreDealPage() {
                   rowKey="year"
                   pagination={false}
                   size="small"
-                  scroll={{ x: 800 }}
+                  scroll={tableScrollX((briefing.exit_curve || []).length, 800)}
                   columns={[
                     { title: t("pre_deal.col_exit_point", language), dataIndex: "year", render: (value: number) => t("pre_deal.exit_year", language, { value: String(value) }) },
                     {

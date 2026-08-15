@@ -23,6 +23,7 @@ import { pulseHelpContent } from "../components/help-content";
 import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, signalMix, switchClassification, trendValue, type PulseMetricCode } from "./logic";
 import { createLatestRequestGate } from "./requestGate";
+import { tableScrollX } from "../lib/tableScroll";
 
 const WINDOW_OPTIONS = [7, 14, 28] as const;
 const TODAY = dayjs().format("YYYY-MM-DD");
@@ -139,7 +140,7 @@ function AttentionTable({ attention, onSelect, onStore360, language }: { attenti
 
 function SuppressedPanel({ items, language }: { items: RetailSuppressedAttention[]; language: Language }) {
   if (!items.length) return null;
-  return <Collapse items={[{ key: "suppressed", label: `${t("pulse.suppressed_title", language)}（${items.length}）`, children: <Table size="small" rowKey={(row: RetailSuppressedAttention) => `${row.store_id}-${row.reason}`} pagination={false} scroll={{ x: 760 }} dataSource={items} columns={[{ title: t("pulse.col.store", language), render: (_: unknown, row: RetailSuppressedAttention) => `${row.store_code} · ${row.store_name}` }, { title: t("pulse.col.brand_region", language), render: (_: unknown, row: RetailSuppressedAttention) => `${row.brand || "—"} · ${row.region || "—"}` }, { title: t("pulse.col.reason", language), render: (_: unknown, row: RetailSuppressedAttention) => <Space wrap>{(row.reasons || [row.reason]).map((reason) => <Tag key={reason}>{reason}</Tag>)}</Space> }, { title: t("pulse.col.coverage", language), render: (_: unknown, row: RetailSuppressedAttention) => `${coverageText(row.current_coverage)} · ${coverageText(row.comparison_coverage)}` }]} /> }]} />;
+  return <Collapse items={[{ key: "suppressed", label: `${t("pulse.suppressed_title", language)}（${items.length}）`, children: <Table size="small" rowKey={(row: RetailSuppressedAttention) => `${row.store_id}-${row.reason}`} pagination={false} scroll={tableScrollX(items.length, 760)} dataSource={items} columns={[{ title: t("pulse.col.store", language), render: (_: unknown, row: RetailSuppressedAttention) => `${row.store_code} · ${row.store_name}` }, { title: t("pulse.col.brand_region", language), render: (_: unknown, row: RetailSuppressedAttention) => `${row.brand || "—"} · ${row.region || "—"}` }, { title: t("pulse.col.reason", language), render: (_: unknown, row: RetailSuppressedAttention) => <Space wrap>{(row.reasons || [row.reason]).map((reason) => <Tag key={reason}>{reason}</Tag>)}</Space> }, { title: t("pulse.col.coverage", language), render: (_: unknown, row: RetailSuppressedAttention) => `${coverageText(row.current_coverage)} · ${coverageText(row.comparison_coverage)}` }]} /> }]} />;
 }
 
 function OperatingPulseInner() {

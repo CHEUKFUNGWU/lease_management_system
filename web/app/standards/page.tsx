@@ -14,6 +14,7 @@ import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import { notifyError } from "../lib/notify";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Text } = Typography;
 
@@ -176,7 +177,7 @@ export default function StandardsPage() {
                 rowKey="standard"
                 size="small"
                 pagination={false}
-                scroll={{ x: 1320 }}
+                scroll={tableScrollX((rows || []).length, 1320)}
                 columns={[
                   { title: "准则", dataIndex: "standard_name", width: 210, fixed: "left" },
                   { title: "分类", dataIndex: "classification", width: 160, render: (v: string) => <StatusTag kind="processing">{v}</StatusTag> },

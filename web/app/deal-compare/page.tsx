@@ -30,6 +30,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { notifyError } from "../lib/notify";
 import { t } from "../lib/i18n";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Text } = Typography;
 
@@ -327,7 +328,7 @@ export default function DealComparePage() {
                   rowKey="name"
                   pagination={false}
                   size="small"
-                  scroll={{ x: 900 }}
+                  scroll={tableScrollX((result.offers || []).length, 900)}
                   columns={[
                     {
                       title: t("deal_compare.col_plan", language),

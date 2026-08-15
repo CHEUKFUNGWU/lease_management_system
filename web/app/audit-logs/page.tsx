@@ -26,6 +26,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { notifyError } from "../lib/notify";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { RangePicker } = DatePicker;
 
@@ -364,7 +365,7 @@ export default function AuditLogsPage() {
                 pageSizeOptions: ["20", "50", "100"],
               }}
               onChange={handleTableChange}
-              scroll={{ x: 900 }}
+              scroll={tableScrollX((logs || []).length, 900)}
               size="small"
             />
           </Card>

@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import { storeMetricsApi } from "../lib/api";
 import { fmtMoney, fmtNum } from "../lib/format";
 import { notifyError } from "../lib/notify";
+import { tableScrollX } from "../lib/tableScroll";
 
 interface StoreRatio {
   store_id: string;
@@ -174,7 +175,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
             loading={loading}
             size="small"
             pagination={{ pageSize: 10 }}
-            scroll={{ x: 900 }}
+            scroll={tableScrollX((result.stores || []).length, 900)}
             columns={[
               { title: "门店", dataIndex: "store_name", render: (name: string, row: StoreRatio) => (
                 <span>

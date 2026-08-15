@@ -50,6 +50,7 @@ import type {
   PaymentSchedule,
 } from "./workspace/types";
 import { useContractWorkspace } from "./workspace/useContractWorkspace";
+import { tableScrollX } from "../../lib/tableScroll";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -636,7 +637,7 @@ export default function ContractDetailPage() {
                       rowKey="id"
                       pagination={{ pageSize: 12 }}
                       size="small"
-                      scroll={{ x: 900 }}
+                      scroll={tableScrollX((schedules || []).length, 900)}
                       locale={{ emptyText: t("contract.no_schedules", language) }}
                     />
                   </Card>
@@ -818,7 +819,7 @@ export default function ContractDetailPage() {
                           rowKey="id"
                           pagination={{ pageSize: 8 }}
                           size="small"
-                          scroll={{ x: 980 }}
+                          scroll={tableScrollX((obligations || []).length, 980)}
                         />
                       </Card>
                     ),
@@ -960,7 +961,7 @@ export default function ContractDetailPage() {
                           rowKey="id"
                           pagination={{ pageSize: 10 }}
                           size="small"
-                          scroll={{ x: 1000 }}
+                          scroll={tableScrollX((events || []).length, 1000)}
                           locale={{ emptyText: t("contract.no_events", language) }}
                         />
                       </Card>
@@ -1016,7 +1017,7 @@ export default function ContractDetailPage() {
                             rowKey={(r: MonthlyEntry) => `${r.Year}-${r.Month}`}
                             pagination={{ pageSize: 12 }}
                             size="small"
-                            scroll={{ x: 1000 }}
+                            scroll={tableScrollX((sortedMonthly || []).length, 1000)}
                           />
                         </Card>
                       </>

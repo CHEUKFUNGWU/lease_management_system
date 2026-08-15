@@ -146,8 +146,11 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     runBrief();
   }, [token, runBrief, runNonce]);
 
-  // The newest message scrolls into view like /ai-chat.
+  // The newest message scrolls into view like /ai-chat — but only when a
+  // conversation exists; on first load the end-of-stream ref is empty and
+  // scrolling to it would push the whole page down (FIX-007).
   useEffect(() => {
+    if (messages.length === 0) return;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 

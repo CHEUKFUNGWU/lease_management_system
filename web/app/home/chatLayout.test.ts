@@ -171,3 +171,20 @@ describe("FIX-005: right column is at least 320px (measured 330px keeps money va
   });
 });
 
+describe("FIX-007: the conversation column is the scroll container, composer outside it", () => {
+  it("FIX-007: the conversation column is the scroll container, composer outside it", () => {
+    const column = ruleBody(".home-chat-column");
+    expect(column).toMatch(/height:\s*calc\(100dvh/);
+    expect(column).toMatch(/position:\s*sticky/);
+    const body = ruleBody(".home-chat-body");
+    expect(body).toMatch(/overflow-y:\s*auto/);
+    expect(body).toMatch(/flex:\s*1/);
+    // composer is a sibling of the scrolling body, not inside it
+    const bodyIndex = briefColumn.indexOf('className="home-chat-body"');
+    const composerIndex = briefColumn.indexOf('className="home-chat-composer"');
+    expect(bodyIndex).toBeGreaterThan(-1);
+    expect(composerIndex).toBeGreaterThan(bodyIndex);
+    expect(briefColumn.slice(composerIndex)).not.toContain('className="home-chat-body"');
+  });
+});
+

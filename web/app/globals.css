@@ -1753,18 +1753,41 @@ html {
    bottom. /ai-chat is untouched — these are home-local classes carrying
    the same bubble language (user right / assistant left, 16px radius with
    one flattened corner). */
+/* FIX-007: the conversation column is the scroll container — it fills the
+   viewport below the shell padding, the message body scrolls internally and
+   the composer is pinned to the column bottom (sticky keeps the whole column
+   in view while the taller right column scrolls the page). Height budget:
+   60px app header + 32px content padding + 32px sticky offset, so the
+   composer bottom lands exactly on the viewport edge. */
 .home-chat-column {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  height: calc(100dvh - 124px);
+  position: sticky;
+  top: 32px;
+}
+@media (max-width: 1023px) {
+  .home-chat-column {
+    height: calc(100dvh - 108px);
+    top: 24px;
+  }
+}
+@media (max-width: 767px) {
+  .home-chat-column {
+    height: auto;
+    position: static;
+  }
 }
 .home-chat-body {
-  min-height: 320px;
+  min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  overflow-y: auto;
 }
 /* L1: reading measure for the conversation body — 68ch, never the full
    column width. */

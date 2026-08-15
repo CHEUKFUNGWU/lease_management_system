@@ -410,26 +410,21 @@ body .ant-table-container {
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06) !important;
 }
 
-/* Modal */
-.ant-modal-content {
-  border-radius: 12px !important;
+/* Modal.
+   STY-007: radius, paddings, backgrounds and shadow already live in
+   theme.ts (components.Modal) with identical values. Only the dividers
+   and the clipped overflow stay here — the token system has no
+   header/footer divider — and body out-specifies antd's injected rules. */
+body .ant-modal-content {
   overflow: hidden;
-  box-shadow: var(--shadow-modal) !important;
 }
 
-.ant-modal-header {
-  border-radius: 12px 12px 0 0 !important;
-  border-bottom: 1px solid var(--border-subtle) !important;
-  padding: 20px 24px !important;
+body .ant-modal .ant-modal-header {
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.ant-modal-body {
-  padding: 0 24px 24px !important;
-}
-
-.ant-modal-footer {
-  border-top: 1px solid var(--border-subtle) !important;
-  padding: 16px 24px !important;
+body .ant-modal .ant-modal-footer {
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* Menu */

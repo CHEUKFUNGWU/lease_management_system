@@ -11,6 +11,9 @@ export const antdTheme = {
   token: {
     // ── Core Colors ──
     colorPrimary: colors.foreground.primary,      // #000000
+    // STY-007: primary-button hover used to be painted #262626 by CSS; antd
+    // derives the hover fill from colorPrimaryHover.
+    colorPrimaryHover: colors.foreground.secondary,
     colorInfo: colors.state.info,
     colorInfoBg: colors.status.processing.bg,
     colorInfoBorder: colors.status.processing.border,
@@ -71,12 +74,16 @@ export const antdTheme = {
       controlHeight: 36,
       controlHeightSM: 28,
       controlHeightLG: 44,
-      fontWeight: typography.weights.semibold,
+      // STY-007: the global override used to force 500 via CSS; the token
+      // must match what the UI actually rendered, not the old 600 intent.
+      fontWeight: typography.weights.medium,
       defaultBg: colors.background.page,
       defaultBorderColor: colors.border.default,
       defaultColor: colors.foreground.primary,
       defaultHoverBg: colors.background.surface,
-      defaultHoverBorderColor: colors.border.strong,
+      // STY-007: the override painted the hover border with the primary
+      // foreground; keep that rendered value.
+      defaultHoverBorderColor: colors.foreground.primary,
       defaultHoverColor: colors.foreground.primary,
       defaultActiveBg: colors.background.inset,
       defaultActiveBorderColor: colors.foreground.primary,

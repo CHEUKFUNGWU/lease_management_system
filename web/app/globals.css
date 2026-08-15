@@ -343,29 +343,18 @@ h3 {
   padding: 20px !important;
 }
 
-/* Button: refined press state */
-.ant-btn {
-  font-weight: 500 !important;
-  transition: all 0.1s var(--ease-micro) !important;
+/* Button: refined press state.
+   STY-007: weight / primary fill / hover colours now live in theme.ts
+   (Button.fontWeight 500, colorPrimary, colorPrimaryHover,
+   defaultHoverBorderColor). Only the motion stays here — tokens cannot
+   express it — and it is prefixed with body to out-specify antd's later
+   injected rules. */
+body .ant-btn {
+  transition: all 0.1s var(--ease-micro);
 }
 
 .ant-btn:active {
   transform: scale(0.98);
-}
-
-.ant-btn-primary {
-  background: var(--fg-primary) !important;
-  border-color: var(--fg-primary) !important;
-}
-
-.ant-btn-primary:not(:disabled):hover {
-  background: var(--fg-secondary) !important;
-  border-color: var(--fg-secondary) !important;
-}
-
-.ant-btn-default:not(:disabled):hover {
-  border-color: var(--fg-primary) !important;
-  color: var(--fg-primary) !important;
 }
 
 /* Table: refined headers and rows.

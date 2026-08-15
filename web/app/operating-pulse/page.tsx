@@ -99,14 +99,14 @@ function TrendChart({ trend, code, currency, onMetricChange, language }: { trend
 function AttentionTable({ attention, onSelect, onStore360, language }: { attention: RetailAttention[]; onSelect: (storeID: string) => void; onStore360: (storeID: string) => void; language: Language }) {
   const columns = [
     { title: t("pulse.col.priority", language), dataIndex: "rank", width: 56, render: (value: number) => <strong>#{value}</strong> },
-    { title: t("pulse.col.store", language), key: "store", render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}><strong>{row.store_code} · {row.store_name}</strong><Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text></Space> },
-    { title: t("pulse.col.signal", language), key: "signals", render: (_: unknown, row: RetailAttention) => <Space wrap size={[4, 4]}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signal.signal_code} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><span className="severity-label"><SeverityDot severity={toSeverity(row.severity)} />{signalLabel(signal.signal_code, language)}</span></Tooltip>)}</Space> },
-    { title: t("pulse.col.change", language), key: "change", render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${t("common.current", language)} ${formatSignalValue(signal.current, signal.unit, row.currency, language)} · ${t("common.contrast", language)} ${formatSignalValue(signal.comparison, signal.unit, row.currency, language)} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><Typography.Text className="pulse-change-bad">{signalLabel(signal.signal_code, language)} {formatSignalValue(signal.observed_change, signal.unit, row.currency, language)} · {t("common.threshold", language)} {formatSignalValue(signal.threshold, signal.unit, row.currency, language)}</Typography.Text></Tooltip>)}</Space> },
-    { title: t("pulse.col.score", language), key: "score", render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}><StatusTag kind={row.severity === "critical" || row.severity === "high" ? "error" : "warning"}>{row.severity}</StatusTag><span>{row.score.toFixed(2)}</span></Space> },
-    { title: t("pulse.col.source", language), key: "source", render: (_: unknown, row: RetailAttention) => <Typography.Text type="secondary">{row.evidence.source_systems.join(", ") || "—"}</Typography.Text> },
+    { title: t("pulse.col.store", language), key: "store", width: 260, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}><strong>{row.store_code}</strong><Typography.Text>{row.store_name}</Typography.Text><Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text></Space> },
+    { title: t("pulse.col.signal", language), key: "signals", width: 160, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signal.signal_code} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><span className="severity-label"><SeverityDot severity={toSeverity(row.severity)} />{signalLabel(signal.signal_code, language)}</span></Tooltip>)}</Space> },
+    { title: t("pulse.col.change", language), key: "change", width: 340, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${t("common.current", language)} ${formatSignalValue(signal.current, signal.unit, row.currency, language)} · ${t("common.contrast", language)} ${formatSignalValue(signal.comparison, signal.unit, row.currency, language)} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><Typography.Text className="pulse-change-bad">{signalLabel(signal.signal_code, language)} {formatSignalValue(signal.observed_change, signal.unit, row.currency, language)} · {t("common.threshold", language)} {formatSignalValue(signal.threshold, signal.unit, row.currency, language)}</Typography.Text></Tooltip>)}</Space> },
+    { title: t("pulse.col.score", language), key: "score", width: 112, render: (_: unknown, row: RetailAttention) => <Flex align="center" gap={8} wrap={false}><StatusTag kind={row.severity === "critical" || row.severity === "high" ? "error" : "warning"}>{row.severity}</StatusTag><span>{row.score.toFixed(2)}</span></Flex> },
+    { title: t("pulse.col.source", language), key: "source", width: 150, render: (_: unknown, row: RetailAttention) => <Typography.Text type="secondary" ellipsis={{ tooltip: row.evidence.source_systems.join(", ") }}>{row.evidence.source_systems.join(", ") || "—"}</Typography.Text> },
     { title: t("pulse.col.action", language), key: "action", width: 220, render: (_: unknown, row: RetailAttention) => <Space><Button size="small" icon={<EyeOutlined />} onClick={() => onSelect(row.store_id)}>{t("pulse.view_store_pulse", language)}</Button><Button size="small" onClick={() => onStore360(row.store_id)}>{t("common.store360", language)}</Button></Space> },
   ];
-  return attention.length ? <Table rowKey="store_id" size="small" columns={columns} dataSource={attention} pagination={false} scroll={{ x: 980 }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} />;
+  return attention.length ? <Table rowKey="store_id" size="small" columns={columns} dataSource={attention} pagination={false} scroll={{ x: 1298 }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} />;
 }
 
 function SuppressedPanel({ items, language }: { items: RetailSuppressedAttention[]; language: Language }) {
@@ -116,6 +116,13 @@ function SuppressedPanel({ items, language }: { items: RetailSuppressedAttention
 
 function OperatingPulseInner() {
   const { token, user } = useAuth();
+  // FIX-016: every column carries an explicit width. With only priority and
+  // action sized, AntD split the remaining width evenly across the five other
+  // columns (~185px each), which is too wide for the source system and far too
+  // narrow for the change sentence — so "retail_simulator" broke mid-word and
+  // each signal's change wrapped in the middle of its amount. Widths are sized
+  // to the longest real content per column and scroll.x is their sum, so a
+  // narrow viewport scrolls horizontally instead of squeezing.
   const { language } = useLanguage();
   const [aiOpen, setAiOpen] = useState(false);
   const router = useRouter();

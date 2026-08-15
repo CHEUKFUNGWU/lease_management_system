@@ -6,7 +6,7 @@
  * H2: 复用而非重写 —— 右栏只 import 既有 dashboard 组件，内部未改。
  * H3: 断点契约见 responsive.test.ts。
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -59,6 +59,35 @@ const props = {
   onOpenContract: () => {},
 };
 
+const proposalItem = {
+  key: "run-123",
+  response: {
+    answer: "情景评估完成",
+    run_id: "run-123",
+    retail_action_proposal: {
+      type: "retail_action_proposal",
+      status: "proposal",
+      title: "门店经营情景行动提议",
+      store: { store_code: "SIM-006", store_name: "门店6" },
+      planned_action: "复核 Baseline/Plan 后保存",
+      evidence_complete: true,
+      data_classification: "simulated",
+      dataset_version: "ds-1",
+      formula_version: "retail-kpi-v1",
+      next_url: "/scenario-workbench?store_id=store-1",
+      scenario: {
+        current: { date_from: "2026-06-01", date_to: "2026-06-07" },
+        store: { store_id: "store-1" },
+        data_classification: "simulated",
+        dataset_version: "ds-1",
+        source_system: "retail_simulator",
+        horizon_months: 6,
+        scenarios: [{ key: "labor-10", name: "人工-10%", assumptions: {} }],
+      },
+    },
+  },
+};
+
 describe("RightColumn (HOME-001 H1)", () => {
   it("keeps all six existing home contents visible", () => {
     const markup = render(React.createElement(RightColumn, props));
@@ -89,6 +118,30 @@ describe("RightColumn (HOME-001 H1)", () => {
   });
 });
 
+describe("RightColumn (HOME-003 P1/P2)", () => {
+  it("renders an agent proposal in the proposals section", () => {
+    const markup = render(React.createElement(RightColumn, { ...props, proposals: [proposalItem], onAdoptProposal: () => {}, onModifyProposal: () => {}, onRejectProposal: () => {} }));
+    expect(markup).toContain(t("home.proposals_title", "zh-CN"));
+    expect(markup).toContain("门店经营情景行动提议");
+    expect(markup).toContain("SIM-006");
+    // AntD inserts a space between two CJK characters on buttons.
+    expect(markup).toContain("采 纳");
+    expect(markup).toContain("修 改");
+    expect(markup).toContain("拒 绝");
+  });
+
+  it("does not adopt during render — zero writes before a confirm action", () => {
+    const onAdopt = vi.fn();
+    render(React.createElement(RightColumn, { ...props, proposals: [proposalItem], onAdoptProposal: onAdopt, onModifyProposal: () => {}, onRejectProposal: () => {} }));
+    expect(onAdopt).not.toHaveBeenCalled();
+  });
+
+  it("renders the empty state when there are no proposals", () => {
+    const markup = render(React.createElement(RightColumn, props));
+    expect(markup).toContain(t("home.proposals_empty", "zh-CN"));
+  });
+});
+
 describe("RightColumn (HOME-001 H2: reuse, not rewrite)", () => {
   const source = readFileSync(path.join(__dirname, "RightColumn.tsx"), "utf8");
   it("imports the existing dashboard components", () => {
@@ -102,5 +155,14 @@ describe("RightColumn (HOME-001 H2: reuse, not rewrite)", () => {
     // list rows or KPI numbers.
     expect(source).not.toContain("<List");
     expect(source).not.toContain("<Statistic");
+  });
+
+  it("keeps the adopt path out of the column — no direct business API call", () => {
+    // HOME-003 P2: the column renders <ApprovalCard> and forwards callbacks;
+    // the only write call lives in the caller (proposals.ts), so rendering
+    // can never write to a business table.
+    expect(source).not.toContain("retailAnalyticsApi");
+    expect(source).not.toContain("saveStoreScenarioAction");
+    expect(source).toContain('ApprovalCard, { type ApprovalProposalLike } from "../components/ApprovalCard"');
   });
 });

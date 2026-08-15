@@ -1,21 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Button, Drawer } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Drawer, message } from "antd";
 import { PlusOutlined, RobotOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import type { ApprovalProposalLike } from "./components/ApprovalCard";
 import { DashboardHeader } from "./components/dashboard/DashboardCards";
 import BriefColumn from "./home/BriefColumn";
 import RightColumn from "./home/RightColumn";
 import WorkQueueFocus from "./home/WorkQueueFocus";
 import { canViewHomeBrief } from "./home/logic";
+import { adoptHomeProposal, toHomeProposalItem, type HomeProposalItem } from "./home/proposals";
+import type { HomeBriefResult } from "./home/types";
 import type { DashboardMoneyKPIs, DashboardUpcomingDate, DashboardWorkQueue, MoneySlice } from "./components/dashboard/types";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
-import { leaseAdminApi, monthlyClosingApi, reportApi, workQueueApi } from "./lib/api";
+import { apiErrorMessage, leaseAdminApi, monthlyClosingApi, reportApi, workQueueApi } from "./lib/api";
 import { t } from "./lib/i18n";
 import { getHomeResponsiveState } from "./home/responsive";
 
@@ -82,6 +85,38 @@ export default function HomePage() {
   const [readiness, setReadiness] = useState<{ status?: string; blocking_count?: number; evaluated_at?: string } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [todoDrawerOpen, setTodoDrawerOpen] = useState(false);
+  // HOME-003: proposals from the brief and follow-ups settle in the right
+  // column; adoption goes through the existing action API (proposals.ts).
+  const [proposals, setProposals] = useState<HomeProposalItem[]>([]);
+  const [adoptingId, setAdoptingId] = useState<string | null>(null);
+
+  const handleProposal = useCallback((response: HomeBriefResult) => {
+    const item = toHomeProposalItem(response);
+    if (!item) return;
+    setProposals((current) => (current.some((existing) => existing.key === item.key) ? current : [...current, item]));
+  }, []);
+
+  const handleAdoptProposal = useCallback(async (item: HomeProposalItem) => {
+    if (!token) return;
+    setAdoptingId(item.key);
+    try {
+      const result = await adoptHomeProposal(item, token);
+      message.success(result.idempotent_replay ? t("scenario.saved_replay", language) : t("scenario.saved", language));
+    } catch (error) {
+      message.error(apiErrorMessage(error));
+    } finally {
+      setAdoptingId(null);
+    }
+  }, [token, language]);
+
+  const handleModifyProposal = useCallback((proposal: ApprovalProposalLike) => {
+    const url = proposal.next_url;
+    if (url && String(url).startsWith("/")) router.push(String(url));
+  }, [router]);
+
+  const handleRejectProposal = useCallback(() => {
+    message.info(t("ai.approval.rejected", language));
+  }, [language]);
 
   useEffect(() => {
     const sync = () => setIsMobile(!getHomeResponsiveState(window.innerWidth).threeColumn);
@@ -166,6 +201,11 @@ export default function HomePage() {
     language,
     onOpenQueue: () => router.push("/todo"),
     onOpenContract: (contractId: string) => router.push(`/contracts/${contractId}`),
+    proposals,
+    adoptingId,
+    onAdoptProposal: handleAdoptProposal,
+    onModifyProposal: handleModifyProposal,
+    onRejectProposal: handleRejectProposal,
   };
 
   return (
@@ -186,7 +226,7 @@ export default function HomePage() {
               </Button>
             </div>
             {canViewHomeBrief(user) ? (
-              <BriefColumn token={token} language={language} />
+              <BriefColumn token={token} language={language} onProposal={handleProposal} />
             ) : (
               <WorkQueueFocus {...rightColumnProps} />
             )}

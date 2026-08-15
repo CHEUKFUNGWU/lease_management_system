@@ -1676,3 +1676,35 @@ html {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── HOME-003: 待确认建议 ──────────────────────────────────────── */
+.home-proposals {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.home-proposals-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.home-proposals-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-tertiary);
+  background: var(--bg-surface);
+  border-radius: 999px;
+  padding: 1px 8px;
+  box-shadow: var(--shadow-static);
+}
+.home-proposals-empty {
+  padding: 4px 0;
+}
+.home-proposals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

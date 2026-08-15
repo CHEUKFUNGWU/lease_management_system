@@ -1,12 +1,14 @@
 "use client";
 
-import { Button, Skeleton, Spin } from "antd";
+import { Button, Empty, Skeleton, Spin } from "antd";
 import dayjs from "dayjs";
+import ApprovalCard, { type ApprovalProposalLike } from "../components/ApprovalCard";
 import { t, type Language } from "../lib/i18n";
 import type { StatusKind } from "../components/StatusTag";
 import { MoneyKPICard } from "../components/dashboard/DashboardCards";
 import { UpcomingDatesCard, WorkQueueSummaryCard } from "../components/dashboard/DashboardLists";
 import type { DashboardMoneyKPIs, DashboardUpcomingDate, DashboardWorkQueue } from "../components/dashboard/types";
+import type { HomeProposalItem } from "./proposals";
 
 export interface HomeReadiness {
   status?: string;
@@ -24,6 +26,12 @@ export interface RightColumnProps {
   language: Language;
   onOpenQueue: () => void;
   onOpenContract: (contractId: string) => void;
+  /** HOME-003: agent action proposals awaiting human confirmation. */
+  proposals?: HomeProposalItem[];
+  adoptingId?: string | null;
+  onAdoptProposal?: (item: HomeProposalItem) => void;
+  onModifyProposal?: (proposal: ApprovalProposalLike) => void;
+  onRejectProposal?: (proposal: ApprovalProposalLike) => void;
 }
 
 /**
@@ -32,6 +40,9 @@ export interface RightColumnProps {
  * readiness, total liability, month expense) live here, reusing the
  * existing dashboard components untouched — nothing is re-implemented.
  * The same content renders inline on desktop and inside the mobile Drawer.
+ * HOME-003: agent action proposals land at the top of the column, rendered
+ * through <ApprovalCard>; the card itself never writes anything — the
+ * adopt path is wired by the caller to the existing action API.
  */
 export default function RightColumn({
   queue,
@@ -43,6 +54,11 @@ export default function RightColumn({
   language,
   onOpenQueue,
   onOpenContract,
+  proposals = [],
+  adoptingId = null,
+  onAdoptProposal,
+  onModifyProposal,
+  onRejectProposal,
 }: RightColumnProps) {
   const readinessLabel = readiness?.status === "blocked"
     ? t("todo.readiness_blocked", language)
@@ -60,6 +76,30 @@ export default function RightColumn({
   return (
     <div className="home-right-stack">
       <div className="home-right-title">{t("home.right_title", language)}</div>
+      <div className="home-proposals">
+        <div className="home-proposals-title">
+          <span>{t("home.proposals_title", language)}</span>
+          {proposals.length > 0 && <span className="home-proposals-count">{proposals.length}</span>}
+        </div>
+        {proposals.length === 0 ? (
+          <div className="home-proposals-empty">
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("home.proposals_empty", language)} />
+          </div>
+        ) : (
+          <div className="home-proposals-list">
+            {proposals.map((item) => (
+              <ApprovalCard
+                key={item.key}
+                proposal={item.response.retail_action_proposal as ApprovalProposalLike}
+                adopting={adoptingId === item.key}
+                onAdopt={() => onAdoptProposal?.(item)}
+                onModify={(proposal) => onModifyProposal?.(proposal)}
+                onReject={(proposal) => onRejectProposal?.(proposal)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
       <Spin spinning={loading}>
         <WorkQueueSummaryCard queue={queue} language={language} onOpen={onOpenQueue} />
         <div className="home-right-kpis">

@@ -7400,6 +7400,8 @@ const dict: TranslationDict = {
   "home.brief_error_title": { "zh-CN": "今日经营简报生成失败", "zh-HK": "今日經營簡報生成失敗", en: "Failed to generate today's brief" },
   "home.brief_attention": { "zh-CN": "关注门店", "zh-HK": "關注門店", en: "Attention stores" },
   "home.brief_plan_trace": { "zh-CN": "推理轨迹", "zh-HK": "推理軌跡", en: "Reasoning trace" },
+  "home.proposals_title": { "zh-CN": "待确认建议", "zh-HK": "待確認建議", en: "Proposals to confirm" },
+  "home.proposals_empty": { "zh-CN": "暂无待确认建议；Agent 提出的行动建议会出现在这里。", "zh-HK": "暫無待確認建議；Agent 提出的行動建議會出現在這裡。", en: "No proposals awaiting confirmation; agent action proposals will appear here." },
   "contracts.col_identity": { "zh-CN": "合同标识", "zh-HK": "合同標識", en: "Contract" },
   "contracts.col_liability": { "zh-CN": "租赁负债余额", "zh-HK": "租賃負債餘額", en: "Lease liability" },
   "contracts.col_rou": { "zh-CN": "ROU 余额", "zh-HK": "ROU 餘額", en: "ROU balance" },

@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Input, Space, Typography } from "antd";
-import { SendOutlined } from "@ant-design/icons";
+import { RobotOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
+import { Avatar } from "antd";
 import dayjs from "dayjs";
 import ConfidenceBadge from "../components/ConfidenceBadge";
 import DataTrustBar from "../components/DataTrustBar";
 import SourceCitation from "../components/SourceCitation";
+import ThinkingTrace from "../components/ThinkingTrace";
 import ToolChip from "../components/ToolChip";
 import { aiChatApi, apiErrorMessage, retailAnalyticsApi } from "../lib/api";
 import { t, type Language } from "../lib/i18n";
@@ -24,40 +26,67 @@ export interface BriefColumnProps {
   onProposal?: (response: HomeBriefResult) => void;
 }
 
-function FollowUpMessage({ message, language }: { message: HomeChatMessage; language: Language }) {
+/**
+ * HOME-004 §3: the home conversation is a real message stream, not an
+ * isolated input. Bubbles reuse the /ai-chat visual language (user right /
+ * assistant left, avatars, radius 16 with one flattened corner) but render
+ * through the shared explainability components — no copy of MessageContent,
+ * /ai-chat itself is untouched. The full rendering lives in this module as
+ * home-local CSS classes; the machine answer stays a trace, never the body.
+ */
+function ChatMessage({ message, language }: { message: HomeChatMessage; language: Language }) {
   if (message.role === "user") {
-    return <div className="home-followup is-user">{message.content}</div>;
+    return (
+      <div className="home-msg is-user">
+        <Avatar icon={<UserOutlined />} className="home-msg-avatar" />
+        <div className="home-msg-bubble is-user">{message.content}</div>
+      </div>
+    );
   }
   if (message.error) {
-    return <div className="home-followup is-assistant is-error">{message.error}</div>;
+    return (
+      <div className="home-msg is-assistant">
+        <Avatar icon={<RobotOutlined />} className="home-msg-avatar" />
+        <div className="home-msg-bubble is-assistant home-msg-error">{message.error}</div>
+      </div>
+    );
   }
   const response = message.response;
   if (!response) return null;
+  const trace = [response.answer].filter(Boolean).join("\n");
   return (
-    <div className="home-followup is-assistant">
-      {response.tool_calls && response.tool_calls.length > 0 && (
-        <div className="ai-tool-row">
-          {response.tool_calls.map((call, index) => <ToolChip key={index} call={call} />)}
-        </div>
-      )}
-      {typeof response.confidence === "number" && <ConfidenceBadge confidence={response.confidence} />}
-      {response.retail_operations?.pulse && <DataTrustBar envelope={response.retail_operations.pulse.envelope} basis={response.retail_operations.pulse.basis} />}
-      <Typography.Paragraph>{response.answer}</Typography.Paragraph>
-      {response.sources && response.sources.length > 0 && (
-        <div className="ai-tool-row">
-          {response.sources.map((source, index) => <SourceCitation key={index} source={source} />)}
-        </div>
-      )}
+    <div className="home-msg is-assistant">
+      <Avatar icon={<RobotOutlined />} className="home-msg-avatar" />
+      <div className="home-msg-bubble is-assistant">
+        {(response.tool_calls?.length || typeof response.confidence === "number") && (
+          <div className="ai-tool-row">
+            {response.tool_calls?.map((call, index) => <ToolChip key={index} call={call} />)}
+            {typeof response.confidence === "number" && <ConfidenceBadge confidence={response.confidence} />}
+          </div>
+        )}
+        {response.retail_operations?.pulse && (
+          <DataTrustBar envelope={response.retail_operations.pulse.envelope} basis={response.retail_operations.pulse.basis} />
+        )}
+        {trace && <ThinkingTrace thinking={trace} />}
+        {response.sources && response.sources.length > 0 && (
+          <div className="ai-tool-row">
+            {response.sources.map((source, index) => <SourceCitation key={index} source={source} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
+/** The empty conversation offers the same starter questions as /ai-chat. */
+const HOME_STARTER_KEYS = ["ai.chip_missing_dr", "ai.chip_pending", "ai.chip_expiring"];
+
 /**
  * HOME-002: the middle column for analysis roles. On first mount it runs
  * the morning brief through the existing retail Agent path (page load auto
- * run, §1.1), then keeps a follow-up composer below it. Follow-ups use the
- * exact RetailAIDrawer call path (aiChatApi.chat + page context) and the
- * shared explainability components.
+ * run, §1.1). HOME-004 flips the hierarchy: the brief is one compact band
+ * on top and the conversation below is the page body, with the composer
+ * pinned to the column bottom.
  */
 export default function BriefColumn({ token, language, onProposal }: BriefColumnProps) {
   const [brief, setBrief] = useState<HomeBriefResult | null>(null);
@@ -69,6 +98,7 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
   const [sending, setSending] = useState(false);
   const [runNonce, setRunNonce] = useState(0);
   const gate = useRef(createLatestRequestGate());
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   // The parent may pass an inline callback; keep the run effect stable.
   const onProposalRef = useRef(onProposal);
   useEffect(() => {
@@ -116,6 +146,11 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     runBrief();
   }, [token, runBrief, runNonce]);
 
+  // The newest message scrolls into view like /ai-chat.
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
+
   const retry = () => {
     resetHomeBriefCache();
     setRunNonce((value) => value + 1);
@@ -147,23 +182,47 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     }
   };
 
+  const askStarter = (question: string) => {
+    setInput(question);
+  };
+
   return (
-    <div className="home-brief-column">
-      {/* HOME-004: the brief is one compact strip above the conversation,
-          no longer the page body. */}
+    <div className="home-chat-column">
       <BriefBand state={state} result={brief} error={error} language={language} onRetry={retry} />
-      {messages.length > 0 && (
-        <div className="home-followups">
-          {messages.map((message, index) => <FollowUpMessage key={index} message={message} language={language} />)}
+      <div className="home-chat-body">
+        {messages.length === 0 && !sending && (
+          <div className="home-chat-starters">
+            <Typography.Text type="secondary" className="home-chat-starters-label">
+              {t("ai.quick_questions", language)}
+            </Typography.Text>
+            <div className="home-chat-starter-chips">
+              {HOME_STARTER_KEYS.map((key) => (
+                <Button key={key} size="small" className="home-chat-starter-chip" onClick={() => askStarter(t(key, language))}>
+                  {t(key, language)}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="home-chat-messages">
+          {messages.map((message, index) => <ChatMessage key={index} message={message} language={language} />)}
+          {sending && (
+            <div className="home-msg is-assistant">
+              <Avatar icon={<RobotOutlined />} className="home-msg-avatar" />
+              <div className="home-msg-bubble is-assistant home-msg-pending">{t("home.chat_thinking", language)}</div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
-      )}
-      <Space.Compact className="home-brief-composer">
+      </div>
+      <Space.Compact className="home-chat-composer">
         <Input
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onPressEnter={send}
           placeholder={t("ai.drawer.placeholder", language)}
           disabled={sending}
+          aria-label={t("ai.drawer.placeholder", language)}
         />
         <Button type="primary" icon={<SendOutlined />} onClick={send} loading={sending}>
           {t("ai.drawer.send", language)}

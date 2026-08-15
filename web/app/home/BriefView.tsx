@@ -1,16 +1,10 @@
 "use client";
 
-import { Alert, Button, Empty, Skeleton, Typography } from "antd";
+import { Alert, Button, Empty, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
-import ConfidenceBadge from "../components/ConfidenceBadge";
 import DataTrustBar from "../components/DataTrustBar";
-import { SeverityDot, toSeverity } from "../components/SeverityDot";
-import SourceCitation from "../components/SourceCitation";
-import ThinkingTrace from "../components/ThinkingTrace";
-import ToolChip from "../components/ToolChip";
 import { t, type Language } from "../lib/i18n";
-import { formatSignalValue, signalLabel } from "../operating-pulse/logic";
-import { briefAttentionCards, planToThinking, type HomeBriefState } from "./logic";
+import type { HomeBriefState } from "./logic";
 import type { HomeBriefResult } from "./types";
 
 export interface BriefViewProps {
@@ -22,18 +16,13 @@ export interface BriefViewProps {
 }
 
 /**
- * HOME-002: the auto-generated morning brief. Renders the agent run
- * through the shared explainability components (DESIGN.md §9) — the brief
- * never re-implements trust, confidence, citations or severity rendering.
+ * HOME-002 introduced this view for the auto-run brief; HOME-004 demoted the
+ * brief to a band (BriefBand) and the band now renders the ready state.
+ * What remains here are the degraded presentations — loading is handled by
+ * the band, and scope_denied is never softened into "no data" (AGENTS.md:
+ * 权限拒绝必须保持原因).
  */
 export default function BriefView({ state, result, error, language, onRetry }: BriefViewProps) {
-  if (state === "loading") {
-    return (
-      <div className="home-brief-state">
-        <Skeleton active paragraph={{ rows: 6 }} />
-      </div>
-    );
-  }
   if (state === "error") {
     return (
       <Alert
@@ -93,52 +82,6 @@ export default function BriefView({ state, result, error, language, onRetry }: B
       </div>
     );
   }
-
-  const pulse = result?.retail_operations?.pulse;
-  const attention = briefAttentionCards(pulse);
-  const thinking = planToThinking(result?.agent_plan);
-  const sources = result?.sources || [];
-  return (
-    <div className="home-brief" data-testid="home-brief">
-      <DataTrustBar envelope={pulse?.envelope} basis={pulse?.basis} />
-      {typeof result?.confidence === "number" && <ConfidenceBadge confidence={result.confidence} />}
-      {result?.tool_calls && result.tool_calls.length > 0 && (
-        <div className="ai-tool-row">
-          {result.tool_calls.map((call, index) => <ToolChip key={index} call={call} />)}
-        </div>
-      )}
-      <Typography.Paragraph className="home-brief-answer">{result?.answer}</Typography.Paragraph>
-      {attention.length > 0 && (
-        <div className="home-brief-attention">
-          <div className="home-brief-attention-title">{t("home.brief_attention", language)}</div>
-          {attention.map((card) => (
-            <div key={card.store_id} className="home-brief-attention-card">
-              <span className="home-brief-attention-rank">#{card.rank}</span>
-              <SeverityDot severity={toSeverity(card.severity)} />
-              <span className="home-brief-attention-store">{card.store_code} · {card.store_name}</span>
-              <span className="home-brief-attention-citation">[{card.rank}]</span>
-              <div className="home-brief-attention-signals">
-                {card.signals.map((signal) => (
-                  <span key={signal.signal_code} className="home-brief-attention-signal">
-                    {signalLabel(signal.signal_code, language)} {formatSignalValue(signal.observed_change, signal.unit, card.currency, language)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {thinking && <ThinkingTrace thinking={thinking} />}
-      {sources.length > 0 && (
-        <div className="home-brief-sources">
-          {sources.map((source, index) => (
-            <span key={index} className="home-brief-source">
-              <span className="home-brief-source-index">[{index + 1}]</span>
-              <SourceCitation source={source} />
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  // loading / ready are rendered by BriefBand; nothing left to do here.
+  return null;
 }

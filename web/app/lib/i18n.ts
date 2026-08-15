@@ -7457,9 +7457,13 @@ const dict: TranslationDict = {
   "home.severity_high": { "zh-CN": "高", "zh-HK": "高", en: "High" },
   "home.severity_medium": { "zh-CN": "中", "zh-HK": "中", en: "Medium" },
   "home.severity_low": { "zh-CN": "低", "zh-HK": "低", en: "Low" },
+  // HOME-004 §3: the home conversation — pending bubble copy and the
+  // starters reuse the /ai-chat quick-question keys (ai.chip_*).
+  "home.chat_thinking": { "zh-CN": "正在思考…", "zh-HK": "正在思考…", en: "Thinking…" },
   "home.brief_plan_trace": { "zh-CN": "推理轨迹", "zh-HK": "推理軌跡", en: "Reasoning trace" },
   "home.proposals_title": { "zh-CN": "待确认建议", "zh-HK": "待確認建議", en: "Proposals to confirm" },
   "home.proposals_empty": { "zh-CN": "暂无待确认建议；Agent 提出的行动建议会出现在这里。", "zh-HK": "暫無待確認建議；Agent 提出的行動建議會出現在這裡。", en: "No proposals awaiting confirmation; agent action proposals will appear here." },
+  "home.proposals_empty_short": { "zh-CN": "暂无待确认建议", "zh-HK": "暫無待確認建議", en: "No proposals awaiting confirmation" },
   "contracts.col_identity": { "zh-CN": "合同标识", "zh-HK": "合同標識", en: "Contract" },
   "contracts.col_liability": { "zh-CN": "租赁负债余额", "zh-HK": "租賃負債餘額", en: "Lease liability" },
   "contracts.col_rou": { "zh-CN": "ROU 余额", "zh-HK": "ROU 餘額", en: "ROU balance" },

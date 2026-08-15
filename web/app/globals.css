@@ -1489,11 +1489,22 @@ html {
 .retail-ai-drawer-input { width: 100%; }
 
 /* ── HOME-001: 三栏首页 ───────────────────────────────────────── */
+/* HOME-004 L8: nav | conversation | actions. minmax(640px, 1fr) keeps the
+   middle column a usable conversation at 1440 (640+) while the fixed right
+   column never gets squeezed at 1280 (1440 - 240 nav - 48*2 padding - 24
+   gap - 300 right ≈ 784 middle at the 1440 content max). */
 .home-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(640px, 1fr) 300px;
   gap: 24px;
   align-items: start;
+}
+/* Below 1440 the content shell narrows: keep the right column usable
+   rather than defending the 640 floor with an unusable 1024–1279 band. */
+@media (max-width: 1439px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
 }
 .home-middle {
   min-width: 0;
@@ -1540,15 +1551,6 @@ html {
 }
 .home-brief-placeholder {
   border-radius: 10px;
-}
-.home-brief-title {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-.home-brief-composer {
-  display: flex;
-  gap: 8px;
 }
 .home-readiness-card {
   background: var(--bg-surface);
@@ -1743,77 +1745,103 @@ html {
   flex-direction: column;
   gap: 8px;
 }
-.home-brief-column {
+/* ── HOME-004 §3/§4: chat-first middle column and the layout rules L1–L8 ──
+   The conversation is the page body; the composer pins to the column
+   bottom. /ai-chat is untouched — these are home-local classes carrying
+   the same bubble language (user right / assistant left, 16px radius with
+   one flattened corner). */
+.home-chat-column {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
 }
-.home-brief-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.home-brief-state {
-  padding: 24px 0;
-}
-.home-brief-spin-block {
-  min-height: 180px;
-}
-.home-brief {
+.home-chat-body {
+  min-height: 320px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
 }
-.home-brief-answer {
-  white-space: pre-wrap;
-  margin-bottom: 0;
+/* L1: reading measure for the conversation body — 68ch, never the full
+   column width. */
+.home-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 68ch;
+  min-width: 0;
 }
-.home-brief-attention {
+.home-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+}
+.home-msg.is-user {
+  justify-content: flex-end;
+}
+.home-msg-avatar {
+  flex-shrink: 0;
+}
+.home-msg-bubble {
+  padding: 10px 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-static);
+  font-size: 13px;
+  line-height: 1.7;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.home-brief-attention-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--fg-secondary);
-  margin-top: 4px;
+.home-msg-bubble.is-user {
+  border-radius: 16px 16px 4px 16px;
+  background: var(--fg-primary);
+  color: var(--fg-inverse);
 }
-.home-brief-attention-card {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
-  align-items: center;
+.home-msg-error {
+  color: var(--state-error-text);
+  background: var(--state-error-bg);
+}
+.home-msg-pending {
+  color: var(--fg-tertiary);
+}
+.home-chat-starters {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
-  background: var(--bg-surface);
-  border-radius: 8px;
-  box-shadow: var(--shadow-static);
+  max-width: 68ch;
 }
-.home-brief-attention-rank {
-  font-weight: 600;
-  color: var(--fg-tertiary);
+.home-chat-starters-label {
   font-size: 12px;
 }
-.home-brief-attention-store {
-  font-weight: 600;
-  font-size: 13px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.home-brief-attention-citation {
-  font-size: 12px;
-  color: var(--fg-tertiary);
-}
-.home-brief-attention-signals {
-  grid-column: 2 / -1;
+.home-chat-starter-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 8px;
+}
+.home-chat-starter-chip {
+  border-radius: 9999;
   font-size: 12px;
   color: var(--fg-secondary);
+}
+.home-chat-composer {
+  display: flex;
+  gap: 8px;
+}
+/* L7: an empty proposals block collapses to one quiet line instead of a
+   tall Empty — the right column is for actions, not placeholder art. */
+.home-proposals-empty-line {
+  font-size: 12px;
+  color: var(--fg-muted);
+  padding: 2px 0;
+}
+/* BriefView degraded-state padding (HOME-002; the ready state moved to
+   BriefBand in HOME-004). */
+.home-brief-state {
+  padding: 24px 0;
 }
 .home-brief-sources {
   display: flex;
@@ -1829,29 +1857,6 @@ html {
 .home-brief-source-index {
   font-size: 11px;
   color: var(--fg-tertiary);
-}
-.home-followups {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 4px;
-}
-.home-followup {
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-}
-.home-followup.is-user {
-  background: var(--bg-surface);
-  align-self: flex-end;
-  box-shadow: var(--shadow-static);
-}
-.home-followup.is-assistant {
-  align-self: stretch;
-}
-.home-followup.is-error {
-  color: var(--state-error-text);
-  background: var(--state-error-bg);
 }
 .home-work-focus {
   display: flex;

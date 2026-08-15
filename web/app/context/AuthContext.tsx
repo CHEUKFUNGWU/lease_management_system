@@ -33,8 +33,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedToken = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
     if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+        setToken(storedToken);
+      } catch {
+        // FIX-022: corrupted localStorage user must not leave the app stuck
+        // on "loading…" — parse failure is treated as logged out (clear both
+        // keys) instead of being swallowed silently, so the user always
+        // lands on the login page with a recoverable state.
+        localStorage.removeItem("token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user");
+      }
     }
     const handleTokenRefresh = (event: Event) => {
       const refreshedToken = (event as CustomEvent<string>).detail;

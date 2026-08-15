@@ -1657,9 +1657,116 @@ html {
 .home-brief-placeholder {
   border-radius: 10px;
 }
-/* STATE-001: 设置页标签统计的 actionable 提示（折现率缺失阻塞） */
+/* STATE-001: actionable notice on the settings tag summary (blocked by a missing discount rate). */
 .settings-tags-actionable {
   margin-bottom: 16px;
+}
+
+/* ── FIX-034: the rules STY-005 never wrote ──────────────────────
+   STY-005 swapped 44 static inline styles across the three retail pages and
+   the contract detail for class names, and then wrote none of the classes.
+   The design guard only checks that inline styles are gone; nothing checked
+   that the replacement exists. So the suite stayed green while both trend
+   charts vanished (a height-less parent leaves ResponsiveContainer nothing to
+   measure) and every card gap collapsed to zero.
+   Every value below is restored from the inline style deleted at d5903cf —
+   this is a restoration, not a redesign. */
+
+/* Chart measuring box: ResponsiveContainer needs a parent with a height. */
+.pulse-trend-frame {
+  height: 270px;
+  width: 100%;
+}
+.store360-trend-frame {
+  height: 270px;
+}
+
+/* Block spacing */
+.pulse-block-gap,
+.store360-block-gap,
+.scenario-block-gap,
+.contract-block-gap,
+.store360-peer-table {
+  margin-top: 16px;
+}
+.scenario-block-gap-sm {
+  margin-top: 8px;
+}
+.pulse-block-margin,
+.contract-block-gap-bottom,
+.store360-block-margin {
+  margin-bottom: 16px;
+}
+.store360-bridge-meta {
+  margin-bottom: 8px;
+}
+.store360-identity-title {
+  margin: 0;
+}
+
+/* Full-width fills */
+.pulse-full-width,
+.store360-full-width,
+.scenario-full-width {
+  width: 100%;
+}
+
+/* Filter control widths */
+.pulse-select-min {
+  min-width: 220px;
+}
+.store360-store-select,
+.scenario-store-select {
+  min-width: 260px;
+}
+.pulse-source-input {
+  width: 180px;
+}
+.store360-source-input,
+.scenario-source-input {
+  width: 190px;
+}
+
+/* Loading and suspense blocks */
+.pulse-loading-block,
+.store360-loading-block,
+.scenario-loading-block {
+  min-height: 220px;
+}
+.pulse-suspense-fallback,
+.store360-suspense-fallback,
+.scenario-suspense-fallback {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+/* FIX-034: ProtectedRoute used `.sr-only` but the rule never existed, so the
+   loading text meant only for screen readers was rendering visibly. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Contract detail empty state */
+.contract-empty-block {
+  padding: 40px;
+  text-align: center;
+}
+.contract-empty-icon {
+  font-size: 48px;
+  color: var(--fg-muted);
+}
+.contract-empty-note {
+  margin-top: 16px;
+  color: var(--fg-muted);
 }
 /* FIX-021: the money KPI value line (26px compact figure + currency) must
    never reflow — a fixed-width card cannot grow, so the line truncates and

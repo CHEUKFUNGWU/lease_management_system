@@ -1,7 +1,7 @@
 "use client";
 
-import { Alert, Card, Empty, Typography } from "antd";
-import { Sankey } from "recharts";
+import { Alert, Empty, Typography } from "antd";
+import { ResponsiveContainer, Sankey, Tooltip as ChartTooltip } from "recharts";
 import { t, type Language } from "../lib/i18n";
 import type { RetailPlFlowResponse } from "../lib/api";
 import { fmtMoney } from "../lib/format";
@@ -10,24 +10,48 @@ import { fmtMoney } from "../lib/format";
  * SANKEY-001 一期：门店利润流向。单一「营业额」节点 → 四项费用 + 门店贡献。
  * residual 显式展示（左右不平不抹平）；partial 时标注缺失字段。
  * 二期（营收按大类分流）与三期（品类利润）见后端 pl_flow.go 接口注释。
+ *
+ * FIX-028: this is the *body* of a view, not a card. It used to own an outer
+ * <Card> and render a bare <Sankey height={260}> — with no ResponsiveContainer
+ * and therefore no width, recharts laid out nothing and the card showed a tall
+ * blank box under a "complete" status line. It now renders inside the change
+ * card's existing .chart-frame, which is what gives every other chart on this
+ * page its measured box.
  */
+/** recharts draws Sankey nodes as bare rectangles — a flow diagram with no
+ *  labels cannot be read at all, so the node carries its own name and amount.
+ *  Sources sit left of their rectangle, sinks right of theirs, which keeps the
+ *  text off the ribbons. */
+function FlowNode({ x, y, width, height, index, payload, unit }: any) {
+  const isSource = payload?.sourceNodes?.length === 0 || payload?.depth === 0;
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill="var(--chart-blue)" rx={2} />
+      <text
+        x={isSource ? x - 8 : x + width + 8}
+        y={y + height / 2}
+        textAnchor={isSource ? "end" : "start"}
+        dominantBaseline="middle"
+        fontSize={11}
+        fill="var(--fg-secondary)"
+        key={`label-${index}`}
+      >
+        {payload?.name}
+        <tspan fill="var(--fg-tertiary)"> {fmtMoney(payload?.value, unit)}</tspan>
+      </text>
+    </g>
+  );
+}
+
 export default function ProfitFlowPanel({ flow, error, currency, language }: { flow: RetailPlFlowResponse | null; error?: string | null; currency?: string; language: Language }) {
   // FIX-024: a failed request is not an empty one. It gets its own presentation
   // with the reason attached, so "the endpoint is not deployed" can never read
   // as "this store has no profit flow".
   if (error) {
-    return (
-      <Card className="store-360-pl-flow" title={t("store360.pl_flow.title", language)} size="small">
-        <Alert type="error" showIcon message={t("store360.pl_flow.load_failed", language)} description={error} />
-      </Card>
-    );
+    return <Alert type="error" showIcon message={t("store360.pl_flow.load_failed", language)} description={error} />;
   }
   if (!flow || flow.status === "unavailable") {
-    return (
-      <Card className="store-360-pl-flow" title={t("store360.pl_flow.title", language)} size="small">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={flow?.reason ? t("store360.pl_flow.unavailable", language) : t("store360.pl_flow.pick_store", language)} />
-      </Card>
-    );
+    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={flow?.reason ? t("store360.pl_flow.unavailable", language) : t("store360.pl_flow.pick_store", language)} />;
   }
   const unit = currency || flow.currency || "";
   const indexByKey = new Map(flow.nodes.map((node, index) => [node.key, index]));
@@ -40,13 +64,23 @@ export default function ProfitFlowPanel({ flow, error, currency, language }: { f
     })),
   };
   return (
-    <Card className="store-360-pl-flow" title={t("store360.pl_flow.title", language)} size="small" extra={<Typography.Text type="secondary" className="pl-flow-basis">{flow.basis}</Typography.Text>}>
-      <Sankey
-        data={data}
-        nodePadding={24}
-        margin={{ top: 8, right: 24, bottom: 8, left: 24 }}
-        height={260}
-      />
+    <>
+      <div className="chart-frame">
+        <ResponsiveContainer width="100%" height="100%">
+          <Sankey
+            data={data}
+            nodePadding={24}
+            // Both margins are label gutters, not padding: the source label
+            // sits left of its node and the sink labels right of theirs, and
+            // each carries a name plus a formatted amount.
+            margin={{ top: 12, right: 140, bottom: 12, left: 124 }}
+            link={{ stroke: "var(--chart-blue)", strokeOpacity: 0.25 }}
+            node={<FlowNode unit={unit} />}
+          >
+            <ChartTooltip formatter={(value) => fmtMoney(Number(value), unit)} />
+          </Sankey>
+        </ResponsiveContainer>
+      </div>
       <div className="pl-flow-meta">
         <span>{t("store360.pl_flow.status", language)}: {flow.status}</span>
         <span>
@@ -59,6 +93,6 @@ export default function ProfitFlowPanel({ flow, error, currency, language }: { f
         )}
         <span>{t("store360.pl_flow.formula", language)}: {flow.formula_version}</span>
       </div>
-    </Card>
+    </>
   );
 }

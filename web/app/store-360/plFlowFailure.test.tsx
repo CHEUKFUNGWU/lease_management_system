@@ -50,3 +50,26 @@ describe("FIX-024: pl-flow failures surface", () => {
     expect(page).not.toMatch(/\.catch\(\(\)\s*=>\s*\{[^}]*setPlFlow\(null\)[^}]*\}\)/);
   });
 });
+
+describe("FIX-028: the flow is an option on the change card, not a card of its own", () => {
+  it("renders inside a measured frame — a bare Sankey has no width and draws nothing", () => {
+    const panel = readFileSync(path.join(import.meta.dirname, "ProfitFlowPanel.tsx"), "utf8");
+    expect(panel).toContain("ResponsiveContainer");
+    expect(panel).toContain("chart-frame");
+    // The panel no longer owns an outer Card; the change card provides it.
+    // Checked at the import, not in the body — the comment above the component
+    // mentions <Card> while explaining why it was removed.
+    const antdImport = /import\s*\{([^}]*)\}\s*from\s*"antd"/.exec(panel);
+    expect(antdImport, "the panel imports from antd").not.toBeNull();
+    expect(antdImport![1]).not.toMatch(/\bCard\b/);
+  });
+
+  it("puts the flow on the change card's switcher and follows it with the title", () => {
+    expect(page).toContain("PL_FLOW_OPTION");
+    expect(page).toContain("showPlFlow");
+    // Title switches with the selection.
+    expect(page).toMatch(/showPlFlow\s*\?\s*t\("store360\.pl_flow\.title"/);
+    // And there is exactly one place left that renders the panel.
+    expect(page.match(/<ProfitFlowPanel/g)).toHaveLength(1);
+  });
+});

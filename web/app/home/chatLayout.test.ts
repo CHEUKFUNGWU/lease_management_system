@@ -207,3 +207,15 @@ describe("FIX-009: Spin-wrapped home columns restore their gaps", () => {
   });
 });
 
+describe("FIX-013: pending bubble shows the step scaffold, results stagger in", () => {
+  it("FIX-013: pending bubble shows the step scaffold, results stagger in", () => {
+    const steps = ruleBody(".home-chat-steps");
+    expect(steps).toMatch(/flex-direction:\s*column/);
+    expect(briefColumn).toContain("home-chat-step is-pending");
+    expect(briefColumn).toContain("home-chat-step-mark");
+    // The thinking copy is no longer the only pending expression.
+    expect(briefColumn).toContain("home.chat_thinking");
+    expect(css).toContain("@keyframes home-step-in");
+  });
+});
+

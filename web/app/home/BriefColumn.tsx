@@ -67,6 +67,21 @@ function ChatMessage({ message, language }: { message: HomeChatMessage; language
         {response.retail_operations?.pulse && (
           <DataTrustBar envelope={response.retail_operations.pulse.envelope} basis={response.retail_operations.pulse.basis} />
         )}
+        {/* FIX-013: the plan steps unfold in order once the answer arrives —
+            the request is one-shot, so the steps cannot stream, but they
+            render progressively instead of flashing whole. */}
+        {response.agent_plan && response.agent_plan.length > 0 && (
+          <ol className="home-chat-steps">
+            {response.agent_plan.map((step) => (
+              <li key={step.id} className={`home-chat-step is-${step.status === "completed" ? "done" : step.status === "failed" ? "failed" : "pending"}`}>
+                <span className="home-chat-step-mark" aria-hidden="true">
+                  {step.status === "completed" ? "✓" : step.status === "failed" ? "✗" : "…"}
+                </span>
+                <span>{step.title}</span>
+              </li>
+            ))}
+          </ol>
+        )}
         {trace && <ThinkingTrace thinking={trace} />}
         {response.sources && response.sources.length > 0 && (
           <div className="ai-tool-row">
@@ -213,7 +228,16 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
           {sending && (
             <div className="home-msg is-assistant">
               <Avatar icon={<RobotOutlined />} className="home-msg-avatar" />
-              <div className="home-msg-bubble is-assistant home-msg-pending">{t("home.chat_thinking", language)}</div>
+              <div className="home-msg-bubble is-assistant home-msg-pending">
+                {/* FIX-013: the pending bubble shows the step scaffold so the
+                    wait is readable, not a lone spinner text. */}
+                <div className="home-chat-steps" aria-hidden="true">
+                  <div className="home-chat-step is-pending" />
+                  <div className="home-chat-step is-pending" />
+                  <div className="home-chat-step is-pending" />
+                </div>
+                <span className="home-chat-pending-text">{t("home.chat_thinking", language)}</span>
+              </div>
             </div>
           )}
           <div ref={messagesEndRef} />

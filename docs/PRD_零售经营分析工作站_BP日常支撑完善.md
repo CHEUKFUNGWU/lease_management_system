@@ -1,11 +1,17 @@
 # PRD：零售经营分析工作站 — 支撑财务 BP 完整日常工作
 
-> 来源：2026-08-15 双视角 Review（财务 BP / Business Analyst + AI Engineer），关键项已由 Reviewer 亲自到代码核实。本文档所有引用的模块与接缝均已在仓库中验证存在，接口层面的设计见《CodebaseDesign_零售经营分析工作站_模块深化.md》。
-> 文档约定：P0–P4 为五批独立可交付的改进批次，按「可信度 → 日常价值 → 差异化」排序。
+> 来源：2026-08-15 两份 Review——
+> - **Review 一**：财务 BP / Business Analyst + AI Engineer 双视角（BP 日常工作覆盖度 + AI 工程），关键项已由 Reviewer 亲自到代码核实；
+> - **Review 二**：数据链路「文件 → AI 解析 → 入库 → BI 展示」逐域核实，9 项断言全部经代码复核通过。
+>
+> 本文档所有引用的模块与接缝均已在仓库中验证存在，接口层面的设计见《CodebaseDesign_零售经营分析工作站_模块深化.md》。
+> 文档约定：P0–P5 为六批独立可交付的改进批次，按「可信度 → 日常价值 → 差异化」排序；**批次编号不代表排期先后**（P5-1 为 Review 二判定的最高杠杆项，建议与 P0/P1 并行推进）。
 
 ## 1. Problem Statement
 
-从财务 BP 的视角，「单店发现 → 诊断 → 模拟 → 行动草稿」的闭环骨架真实可用，工程质量高于一般 MVP；但今天还支撑不了一个财务 BP 的完整日常工作：
+### 1.1 财务 BP 视角（Review 一）
+
+「单店发现 → 诊断 → 模拟 → 行动草稿」的闭环骨架真实可用，工程质量高于一般 MVP；但今天还支撑不了一个财务 BP 的完整日常工作：
 
 - **没有预算对比。** 经营脉搏只有「当前窗口 vs 上一等长窗口」的环比，没有 Actual vs Budget/Forecast；而预算对比是 FP&A 每日工作量的大头，没有它谈不上经营分析工作站。
 - **出不了系统。** 零售三个页面（经营脉搏、门店 360、情景工作台）零导出。关注榜、同群分位表、守恒桥、情景结果都无法生成 Excel/PPT 材料（WBR/MBR）。
@@ -14,7 +20,9 @@
 - **核心差异化缺位。** 情景只有七个全局百分比杠杆，无闭店动作、无 NPV/回收期、固定租金调整是百分比而非按合同条款。可行性报告中的工作台 E（占用成本与合同情景）与《renewal-termination-decision-card》spec 均未实现。
 - **四个确定的交互逻辑 bug 直接伤害「分析结论可信」**（详见 §3 P0）。
 
-从 AI Engineer 的视角，治理边界是模范级（只读 Tool、scope 多层防护、Artifact-only、HITL 全部实锤），但 AI 工程存在确定性缺陷：
+### 1.2 AI Engineer 视角（Review 一）
+
+治理边界是模范级（只读 Tool、scope 多层防护、Artifact-only、HITL 全部实锤），但 AI 工程存在确定性缺陷：
 
 - **路由脆弱。** 规划靠关键词匹配 skill registry；「A 门店毛利下滑」这种没有「诊断/分析」字眼的自然提问可能路由不到 retail skill，而数据本身完全够回答。
 - **引用保真度缺陷。** 模型没写引用时回退为挂上全部已知来源——引用可以被附加成模型从未做出的声明。
@@ -22,19 +30,31 @@
 - **Context 无上限。** 合同全量 dump + 性能 JSON 全量 + 客户端可控且未校验的 History 直接入 prompt → token 溢出风险 + prompt injection 面（注入拿不到权限提升，但能塑造叙述性回答）。
 - **交互体验与死代码。** 页内嵌 AI 抽屉无会话持久化（页面一走对话即失）；专门写的深链构造是死代码没人调用；长回答同步阻塞至 4 分钟，SSE 实为 750ms DB 轮询而非 token 流。
 
+### 1.3 数据链路视角（Review 二）
+
+零售侧「文件 → AI 解析 → 入库 → BI 展示」整条链不存在（合同侧这条链完整且质量高）：
+
+- **store-day 事实（新 BI 的数据源）没有任何文件入口。** 财务拿着 POS 导出的 Excel，今天没有任何办法把它弄进经营脉搏/门店 360/情景工作台；唯一非模拟入口是手写 JSON 调 API——那是开发者行为，不是用户行为。BI 页只能看模拟数据，对真实用户确实是鸡肋（与仓库自述「真实 POS/ERP 接入是试点第一阻塞项」一致，但「全量 POS 对接」与「Excel 手动导入」之间还有一整级便宜的台阶没修）。
+- **月度导入器是「僵尸」状态。** 后端 CSV/XLSX 受控模板导入完整存在（行级隔离、批次、数据质量留痕，`POST /operating-facts/stores/import` + `import-xlsx`），但没有任何页面调用，web 客户端函数（`operatingFactsApi`）是死代码。
+- **预算与 Trial Balance 只有 JSON 或只有 spec。** 预算创建仅 JSON（无文件上传端点）；GL Trial Balance 连路由都没有（只有 ADR-0009 spec）。
+- **讽刺的是最难的那半条链已经建完。** 合同侧 ai-intake.v1（文件解析、置信度、原文锚定、草稿审批）是全仓库质量最高的模块之一；受控模板导入器的后端模式也写好了——只是它们一个只服务合同域，一个写旧月度表（新 BI 按硬约束只读 store-day，读不到它），而且后者连前端都没接。
+
 ## 2. Solution
 
-按五批推进，每批独立交付、独立验收：
+按六批推进，每批独立交付、独立验收：
 
 | 批次 | 主题 | 交付物 | 对应 Review 诉求 |
 |---|---|---|---|
-| P0 | 可信度修复批次 | 4 个确定 bug + 8 个次级交互/口径问题 | 建议 1 + 交互 bug 清单 |
-| P1 | BP 价值三件套 | 零售线导出（CSV/XLSX，PPT 为后续项）、跨店/区域视图、日历期语义、事实列表分类过滤 | 建议 2 + Review 点名收紧项 |
-| P2 | Actual vs Budget | 落地 fpna-version-lifecycle spec + 零售侧 vs 预算对比 | 建议 3 |
-| P3 | AI Agent 加固 | 速率/成本护栏、context 有界、引用保真、意图路由强化；AI 工程收尾（会话持久化、死代码清理、访问审计、置信度来源、流式响应） | 建议 4 + Review 点名次级项 |
-| P4 | 租赁续租/终止/闭店决策 | 落地 renewal-termination-decision-card spec（工作台 E） | 建议 5 |
+| P0 | 可信度修复批次 | 4 个确定 bug + 8 个次级交互/口径问题 | Review 一：建议 1 + 交互 bug 清单 |
+| P1 | BP 价值三件套 | 零售线导出（CSV/XLSX，PPT 为后续项）、跨店/区域视图、日历期语义、事实列表分类过滤 | Review 一：建议 2 + 点名收紧项 |
+| P2 | Actual vs Budget | 落地 fpna-version-lifecycle spec + 零售侧 vs 预算对比 | Review 一：建议 3 |
+| P3 | AI Agent 加固 | 速率/成本护栏、context 有界、引用保真、意图路由强化；AI 工程收尾（会话持久化、死代码清理、访问审计、置信度来源、流式响应） | Review 一：建议 4 + 点名次级项 |
+| P4 | 租赁续租/终止/闭店决策 | 落地 renewal-termination-decision-card spec（工作台 E） | Review 一：建议 5 |
+| P5 | 数据入口与导入链路 | store-day 受控模板导入器 + 经营数据导入页、月度导入器僵尸收口、FP&A 导入（预算 Excel + Trial Balance）、解析格式补齐（CSV/docx） | Review 二：全部 4 项 |
 
 所有批次遵守既有五条底线（跨法人隔离、模拟/正式区分、来源追溯、重复导入保护、IFRS 16 正式台账隔离），以及零售经营分析约束（store-day 粒度、`retail-kpi-v1` 语义、不用 0 填缺失、显式降级、经营占用口径 ≠ IFRS 16 口径）。所有经营结论继续保持 `unvalidated` 口径（无真实 POS/ERP 联调、无客户验证）。
+
+**排期说明**：P5-1（store-day 导入器）是 Review 二判定的最高杠杆项——「从内部演示走到试点可用最便宜的一步」，模式已由合同侧验证（受控模板 + 批次 + 数据质量留痕），无新技术风险；建议与 P0/P1 并行排期，不等待 P4。
 
 ## 3. User Stories
 
@@ -94,6 +114,19 @@
 40. 作为 Finance Reviewer，我想保存责任人、业务意见、决定日期与情景快照，以便之后复演当时使用的假设。
 41. 作为审计，我想确保决策卡的保存/加载不改变正式合同、付款计划与会计计量结果，以便边界不破。
 
+### P5 — 数据入口与导入链路
+
+42. 作为财务 BP，我想把 POS 导出的 Excel/CSV 上传生成 production 的 store-day 经营事实，以便真实门店数据进入经营脉搏、门店 360 与情景工作台，而不是只能看模拟数据。
+43. 作为财务 BP，我想在上传后看到列映射预览与校验报告（行级错误、预计覆盖率），以便确认后才真正入库。
+44. 作为财务 BP，我想让导入强制记录来源信封（source_system、import_batch_id、as_of_at），以便每条事实可追溯。
+45. 作为财务 BP，我想让同一文件重传不产生重复行（请求级与业务级幂等），以便出错时能安全重试。
+46. 作为财务 BP，我想在确认导入后直接跳转到生产数据的经营脉搏，以便立即看到覆盖情况（覆盖率不足时诚实显示 `decision_ready=false`，BI 端零改动）。
+47. 作为财务 BP，我想让 AI 建议「POS 表头 → 标准字段」的列映射（Assist Mode、人工确认），以便任意格式的 POS 导出都能快速完成映射；数字解析仍走 Go 确定性校验（LLM 不读数字）。
+48. 作为财务 BP，我想在 /performance 直接上传月度经营事实 CSV/XLSX（或看到该功能被明确标记 deprecated），以便不会面对「后端通、前端断」的迷惑状态。
+49. 作为 FP&A，我想用 Excel 模板导入预算/计划版本，以便预算数字不需要手写 JSON（与 fpna-version-lifecycle 落地同步）。
+50. 作为财务 BP，我想导入 GL Trial Balance，以便「预算 vs 实际」的分析闭环能转起来（按 ADR-0009）。
+51. 作为财务 BP，我想让 AI 解析支持 CSV 与 Word 文档（现在只有 PDF+Excel），以便常见业务文件都走同一条解析链。
+
 ## 4. Implementation Decisions
 
 按模块给出（接口与接缝细节见 Codebase Design 文档；不在此重复文件路径）。
@@ -113,6 +146,11 @@
 13. **流式响应。** Web chat 长回答从同步阻塞/DB 轮询改为增量流式输出，或明确超时与进度语义；与 agent-runner 既有预算语义对齐。支撑 P3-36。
 14. **事实列表过滤。** 原始 store-day 事实列表 API 增加 `data_classification` 过滤参数；聚合路径保持现状（安全），仅收紧列表读取面。支撑 P1-18。
 15. **PPT 导出（后续项）。** 导出模块的格式枚举扩展 PPTX（服务端生成或前端库），口径头与 Working/模拟标识与 CSV/XLSX 一致；若评审确认无真实汇报需求可延后。支撑 P1-19。
+16. **store-day 受控模板导入器（新端点）。** 仿照既有受控模板导入模式（表头列名映射、行级隔离、批次与数据质量留痕），新增文件导入端点；强制来源信封（source_system、import_batch_id、as_of_at 缺一拒绝），复用既有原子 upsert + Idempotency-Key，500 行/批分块；只产 production 事实。AI 列映射建议运行在 Assist Mode（只产出映射建议，人工确认后走 Go 确定性解析；数字不进 LLM）。支撑 P5-42～47。
+17. **经营数据导入页（新页面）。** 上传 → 列映射预览 → 校验报告（行级错误、预计覆盖率）→ 确认导入 → 跳转 `/operating-pulse?data_classification=production`；BI 端零改动（覆盖率不足由语义层诚实降级）。支撑 P5-42～47。
+18. **月度导入器状态收口。** /performance 补导入 UI（客户端 API 已存在，属接线）或明确标记 deprecated，消除「后端通、前端断」。支撑 P5-48。
+19. **FP&A 导入。** 预算版本 Excel 导入（与 P2 的 fpna-version-lifecycle 落地同步交付）与 GL Trial Balance 导入（按 ADR-0009 的 spec 落地）。支撑 P5-49/50。
+20. **解析格式补齐。** ai-service 解析器增加 CSV 与 docx 支持（现有 PDF+Excel）；CLI 文件入口不在本轮（企业用户走 Web）。支撑 P5-51。
 
 ## 5. Testing Decisions
 
@@ -123,18 +161,21 @@
 - **服务与 handler**：`group_by`、日历期、`format`、`data_classification` 参数的回显与错误路径。先例：各 retail handler 测试。
 - **AI**：路由命中（自然问法如「毛利下滑」「为什么」）、引用空回退、护栏拒绝语义与预算记录。先例：aiagent / agenttools 零售测试。
 - **AI 收尾**：页面往返后会话上下文保留的组件测试（vitest 先例）；死代码移除后无引用；合同读取经 Tool runtime 后审计日志可断言；覆盖率/样本不足时置信度下降；长回答分片输出或超时语义。PPT 生成的文件结构与口径头。
+- **导入器（P5）**：幂等重放（同一文件 + Idempotency-Key 只落一批）、行级错误与部分成功、覆盖率报告、envelope 强制（缺字段拒绝）、500/批分块、权限（沿用既有 store-day 写入权限）；集成断言只写 store-day 事实、零写 IFRS 16 正式表；AI 列映射只产出建议（不含数值解析），人工确认后才入库。
+- **僵尸收口（P5）**：/performance 上传路径可用性，或 deprecated 标注可被验证（页面无死链）。
 - **集成**：真实 PostgreSQL 集成测试沿用 `TEST_DATABASE_URL` 模式（未设置时 skip）；P4 决策卡须有「正式台账零写入」e2e 证据（前后计数，先例：MAX-009）。
 - **回归**：每批完成跑通 `cd core-service && GOCACHE=$(pwd)/.gocache go test ./... && go vet ./...` 与 `cd ../web && npm run type-check && npm run build && npm test`；IFRS 16 计量参考值不变。
 
 ## 6. Out of Scope
 
-- 角色模型重构（可行性报告 §2.3 缺口四：角色与数据范围/动作权限解耦）——已被点名，但不在本 PRD 五批内。
-- 真实 POS/ERP 联调与客户验证——所有经营结论保持 `unvalidated` 口径。
+- 角色模型重构（可行性报告 §2.3 缺口四：角色与数据范围/动作权限解耦）——已被点名，但不在本 PRD 六批内。
+- 真实 POS/ERP 系统对接（Review 二亦承认那是另一级台阶；本轮只做文件导入这一级）与客户验证——所有经营结论保持 `unvalidated` 口径。
 - LLM 意图路由升级（不引入 function calling 主链路；本轮只做确定性路由强化）。
 - 版本审批工作流与自动 Forecast 生成（fpna-version-lifecycle spec 已声明为非目标）。
 - 完整损益表预算行（预算对比聚焦经营 KPI 与四墙口径）。
 - 物理重命名 `lease_*`（既有底线：不顺手重命名；显示名与代码命名空间分离）。
 - 自动批准续租/终止事件、决策卡写入正式台账、替代法务对终止条款的解释。
+- CLI 文件入口（企业用户走 Web 即可；Review 二明确可缓）。
 
 ## 7. Further Notes
 
@@ -142,5 +183,6 @@
 - 实施按《转型执行看板》登记任务，每批一个任务、一个报告，沿用既有评审与证据流程（`docs/execution/reports/`、`docs/execution/evidence/`）。
 - 本次 Review 附带发现：ai_chat 集成测试文件注释中两处引号被改成 Unicode 弯引号（无语义变化），需还原（P0-12）。
 - P4 落地前需先确认会计政策口径（续租/终止判断标准、退出罚金来源、折现率政策），对应风险红线 1。
-- **PPT 与 classification 过滤依赖真实需求确认**：Review 建议 2 原只承诺 CSV/XLSX，PPT（P1-19）如 BP/客户无 MBR/WBR 材料需求可延后；classification 过滤（P1-18）属「值得收紧」项，聚合路径已安全，本轮只收紧列表读取面。
+- **PPT 与 classification 过滤依赖真实需求确认**：Review 一建议 2 原只承诺 CSV/XLSX，PPT（P1-19）如 BP/客户无 MBR/WBR 材料需求可延后；classification 过滤（P1-18）属「值得收紧」项，聚合路径已安全，本轮只收紧列表读取面。
+- **P5 排期**：P5-1（store-day 导入器）为 Review 二判定的最高杠杆项，建议与 P0/P1 并行；P5-3 的预算导入与 P2 的 fpna-version-lifecycle 落地联动交付，trial balance 以 ADR-0009 为准。Review 二同时确认：模式已由合同侧验证（ai-intake.v1 + 受控模板），本批是「把同一条流水线复制到零售事实域」，无新技术风险。
 - 本 PRD 与《CodebaseDesign_零售经营分析工作站_模块深化.md》配套：PRD 管「要什么」，设计文档管「模块长什么样、接缝在哪、怎么测」。

@@ -2,7 +2,7 @@
 
 > 配套文档：《PRD_零售经营分析工作站_BP日常支撑完善.md》（要什么）。
 > 本文用 codebase-design 词汇（**module / interface / seam / adapter / depth**）描述「模块长什么样、接缝在哪、藏在接口后面的行为、怎么测」。只描述接口与接缝，不写文件路径与实现细节；实施批次按接口契约落地。
-> 所有现状描述均已在仓库中验证（2026-08-15 双视角 Review 实锤 + 代码复核）。
+> 所有现状描述均已在仓库中验证（2026-08-15 两份 Review——BP/AI 双视角与数据链路「文件 → AI 解析 → 入库 → BI 展示」——实锤 + 代码复核；数据链路 9 项断言全部复核通过）。
 
 ## 0. 设计原则（判定标准）
 
@@ -23,6 +23,7 @@
 | AI 路由 | 关键词匹配 skill registry | 匹配策略太浅：「A 门店毛利下滑」这种自然问法漏匹配 |
 | AI 引用 | 模型没写引用时回退挂全部已知来源 | 接口语义含糊——「没有引用」与「引用全部」不分，保真度缺陷 |
 | AI 护栏 | 全库无 RateLimit；context 无上限（全量 dump + 未校验 History） | 模块不存在 |
+| 数据入口 | store-day 事实无文件入口（只有 JSON API ≤500/批与模拟器两个写入方）；月度导入器后端通、前端断（web 客户端函数零调用）；预算仅 JSON；Trial Balance 无路由 | 财务无法把 POS 导出的 Excel 弄进 BI；唯一非模拟入口是手写 JSON——开发者行为，不是用户行为 |
 
 ## 2. 接缝总览
 
@@ -36,6 +37,7 @@
 | agent 护栏 | agentguard（M6） | 内存计数 / DB 计数（两个适配器） | 单元测试 |
 | skill 匹配 | agentskill 深化（M6） | — | 单元测试：路由用例 |
 | 决策卡 | renewal（M7） | 与计量引擎共用 snapshot/projection 接缝 | 单元测试 + e2e 零写入证据 |
+| 文件导入 | retailingest（M8） | 受控模板解析（Go 确定性）/ AI 列映射建议（Assist Mode） | 单元测试 + handler + 集成（幂等） |
 
 ## 3. M1 差异/环比语义单源 — retailkpi
 
@@ -225,9 +227,34 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 
 **测试面**：折现率缺失拒绝；快照不可变；保存/加载后正式合同/付款计划/计量结果零写入（e2e 前后计数，先例：MAX-009）；五年曲线总额可复核。
 
-## 10. 快速修复清单（不改模块形状）
+## 10. M8 零售事实导入 — retailingest（新模块）
 
-既有模块内的小修，不构成新接缝；第 1–10 项随 P0 交付，P1 小项随 P1 交付：
+**目标**：把「POS/财务导出文件 → 受控的 production store-day 事实」整段行为藏在一个导入模块后面，复制合同侧已验证的流水线模式（受控模板 + 批次 + 数据质量留痕），解锁真实数据试点（PRD P5，Review 二判定的最高杠杆项）。
+
+**接口**（导入页的四个阶段对应四个函数，调用方只学四个签名）：
+
+```go
+type RawRow   []string
+type Mapping  map[string]string        // 文件列名 → 标准字段
+type Envelope struct { SourceSystem, ImportBatchID string; AsOfAt time.Time }
+
+func ParseTemplate(file []byte, format Format) (headers []string, rows [][]string, err error)
+func SuggestMapping(headers []string) (Mapping, error)          // AI 建议，Assist Mode，人工确认
+func Validate(mapping Mapping, rows [][]string) (ValidationReport, error)
+func Commit(ctx, rows [][]string, mapping Mapping, envelope Envelope, idempotencyKey string) (*ImportReport, error)
+```
+
+**藏在接口后面**：受控模板解析（表头规范化、列映射、位置解析）；行级错误收集与部分成功；预计覆盖率（对既有 store-day 数据的时间/门店重叠估计）；数值解析（Go 确定性——LLM 只建议映射，不读数字）；envelope 强制（source_system / import_batch_id / as_of_at 缺一拒绝）；500 行/批分块与既有原子 upsert 复用；幂等（Idempotency-Key + payload SHA，重放不产生第二条）；只产 production 事实；批次与数据质量留痕（与既有批次模式同构）。
+
+**接缝与适配器**：新 handler 端点（沿用既有 store-day 写入权限）+ 新「经营数据导入」页。适配器：受控模板解析（Go 确定性）与 AI 列映射建议（LLM adapter，Assist Mode）两个适配器 ⇒ 真实接缝；AI 输出只到映射建议为止，人工确认后才进入确定性路径。
+
+**删除测试**：删除后，「文件 → 事实」的表头校验、行级错误、信封、幂等、分批逻辑重新扩散到页面与 handler，且大概率各自为政再次漂移。
+
+**测试面**：幂等重放（同文件 + 同 Key 只落一批）、行级错误与部分成功、覆盖率报告、envelope 缺字段拒绝、分批边界；AI 映射建议不含数值；集成断言只写 store-day、零写 IFRS 16 正式表。
+
+## 11. 快速修复清单（不改模块形状）
+
+既有模块内的小修，不构成新接缝；第 1–10 项随 P0 交付，P1/P5 小项随各自批次交付：
 
 1. store-360 深链丢失 store_id：发现数据集的 effect 补写 store_id（与相邻分支一致）。
 2. scenario-workbench 未评估时伪造「决策就绪」：无结果时渲染「未评估」态，不渲染可信条。
@@ -245,7 +272,11 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 11. 原始事实列表 API 增加 `data_classification` 过滤参数：收紧列表读取面（PRD P1-18；聚合路径保持现状安全）。测试：handler 参数回显与错误路径。
 12. 导出格式枚举扩展 PPTX（PRD P1-19，后续项）：无真实汇报需求可延后；口径头与 Working/模拟标识与 CSV/XLSX 一致。
 
-## 11. 测试策略
+### P5 小项（同样不改模块形状）
+
+13. 月度导入器僵尸收口：/performance 补导入 UI（客户端 API 已存在，纯接线）或明确 deprecated 标注（PRD P5-48）。测试：上传路径可用性或页面无死链。
+
+## 12. 测试策略
 
 - **接口即测试面**：每个模块的测试从它的接口驱动；不测穿接口内部。
 - M1：负基数方向（−100→−50 显示改善）、零分母、空值、既有输出回归（golden 对数）。
@@ -255,16 +286,18 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 - M5：`GroupBy=""` 零回归；分组信号、门槛、多币种处理。
 - M6：路由命中（自然问法）、引用空回退、护栏拒绝语义 + 预算记录；agenttools 只读属性回归。
 - M7：折现率缺失拒绝、快照不可变、正式台账零写入（前后计数）。
+- M8：幂等重放、行级错误与部分成功、覆盖率报告、envelope 强制、分批边界；AI 映射建议不含数值；集成断言只写 store-day、零写 IFRS 16 正式表。
 - 集成测试沿用 `TEST_DATABASE_URL` 模式（未设置时 skip）；每批跑通 AGENTS.md 验证命令。
 
-## 12. 依赖与实施顺序
+## 13. 依赖与实施顺序
 
 ```
 P0:  M1 + 快速修复清单                        （无新依赖，直接修可信度）
-P1:  M2（期间）+ M3（导出）+ M5（区域视图）+ 事实列表过滤与 PPT 后续小项   （M5 依赖语义层既有 group_by）
+P1:  M2（期间）+ M3（导出）+ M5（区域视图）+ 事实列表过滤与 PPT 后续小项
 P2:  M4（预算对比，依赖 M2）+ fpna-version-lifecycle 落地
 P3:  M6（路由 + 引用 + 护栏 + 工程收尾）
 P4:  M7（决策卡，依赖既有 snapshot/projection 与折现率解析）
+P5:  M8（导入器 + 导入页）+ 月度僵尸收口 + FP&A 导入（与 P2 联动）+ 解析格式补齐
 ```
 
-每批独立可交付、独立验收；顺序即优先级：可信度 → 日常价值 → 差异化。所有批次遵守五条底线与「模拟/正式」标识纪律，导出与决策卡输出必须带 Working/模拟标注。
+每批独立可交付、独立验收；顺序即优先级：可信度 → 日常价值 → 差异化。**P5-1（store-day 导入器）按 Review 二为最高杠杆项，建议排期与 P0/P1 并行，批次编号不代表先后。** 所有批次遵守五条底线与「模拟/正式」标识纪律，导出与决策卡输出必须带 Working/模拟标注。

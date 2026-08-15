@@ -2,7 +2,7 @@
 
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Badge, Button, Card, Empty, Input, List, Space, Spin, Tag, Typography, message } from "antd";
 import { ReloadOutlined, RightOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { notifyError } from "../lib/notify";
+import { useRetailQuery } from "../retail/useRetailQuery";
 
 interface WorkQueueItem {
   kind: string;
@@ -97,40 +98,49 @@ const emptyQueue: WorkQueue = {
   total: 0,
 };
 
+interface TodoQueryData {
+  queue: WorkQueue;
+  readiness: CloseReadiness | null;
+  exceptions: CloseException[];
+  exceptionsScopeComplete: boolean;
+}
+
 export default function TodoPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
   const router = useRouter();
-  const [queue, setQueue] = useState<WorkQueue>(emptyQueue);
   const [period, setPeriod] = useState(dayjs().format("YYYY-MM"));
-  const [readiness, setReadiness] = useState<CloseReadiness | null>(null);
-  const [exceptions, setExceptions] = useState<CloseException[]>([]);
   const [exceptionsScopeComplete, setExceptionsScopeComplete] = useState(true);
-  const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (requestedPeriod: string) => {
-    if (!token) return;
-    setLoading(true);
-    try {
+  // FETCH-002: the work-queue page goes through the shared fetch seam. One
+  // query fans out to the three endpoints the page needs; the seam owns the
+  // loading flag, the race gate and the error state.
+  const { loading, state, retry } = useRetailQuery<TodoQueryData, { period: string }>({
+    token,
+    params: { period },
+    paramsKey: period,
+    fetcher: async (p, t) => {
       const [queueRes, readinessRes, exceptionsRes] = await Promise.all([
-        workQueueApi.get(token),
-        monthlyClosingApi.getReadiness(requestedPeriod, token),
-        monthlyClosingApi.listExceptions(requestedPeriod, token),
+        workQueueApi.get(t),
+        monthlyClosingApi.getReadiness(p.period, t),
+        monthlyClosingApi.listExceptions(p.period, t),
       ]);
-      setQueue({ ...emptyQueue, ...queueRes });
-      setReadiness(readinessRes);
-      setExceptions(exceptionsRes.data || []);
-      setExceptionsScopeComplete(exceptionsRes.scope_complete !== false);
-    } catch (error: any) {
-      notifyError(error?.message || t("todo.load_failed", language));
-    } finally {
-      setLoading(false);
-    }
-  }, [token, language]);
-
+      return {
+        queue: { ...emptyQueue, ...queueRes },
+        readiness: readinessRes,
+        exceptions: exceptionsRes.data || [],
+        exceptionsScopeComplete: exceptionsRes.scope_complete !== false,
+      };
+    },
+  });
+  const queryData = state.kind === "ready" ? state.data : undefined;
+  const queue: WorkQueue = queryData?.queue ?? emptyQueue;
+  const readiness = queryData?.readiness ?? null;
+  const exceptions: CloseException[] = queryData?.exceptions ?? [];
   useEffect(() => {
-    load(dayjs().format("YYYY-MM"));
-  }, [load]);
+    if (state.kind === "failed") notifyError(state.message || t("todo.load_failed", language));
+    if (state.kind === "ready" && queryData) setExceptionsScopeComplete(queryData.exceptionsScopeComplete);
+  }, [state, queryData, language]);
 
   // A due date is what makes an item urgent, so overdue items are called out
   // rather than just sorted first.
@@ -216,11 +226,11 @@ export default function TodoPage() {
           <Input
             value={period}
             onChange={(event) => setPeriod(event.target.value)}
-            onPressEnter={() => load(period)}
+            onPressEnter={retry}
             placeholder="YYYY-MM"
             style={{ width: 110 }}
           />
-          <Button size="small" onClick={() => load(period)} loading={loading}>
+          <Button size="small" onClick={retry} loading={loading}>
             {t("todo.readiness_refresh", language)}
           </Button>
         </Space>
@@ -288,7 +298,7 @@ export default function TodoPage() {
     try {
       await monthlyClosingApi.detectExceptions(period, token);
       message.success(t("todo.exceptions_detected", language));
-      await load(period);
+      retry();
     } catch (error: any) {
       notifyError(error?.message || t("todo.exceptions_action_failed", language));
     }
@@ -305,7 +315,7 @@ export default function TodoPage() {
     try {
       await monthlyClosingApi.applyExceptionAction(exception.id, { action, owner_id: ownerId, note }, token);
       message.success(t("todo.exceptions_action_done", language));
-      await load(period);
+      retry();
     } catch (error: any) {
       notifyError(error?.message || t("todo.exceptions_action_failed", language));
     }
@@ -369,7 +379,7 @@ export default function TodoPage() {
           <PageHeader
             title={<>{t("todo.title", language)}<span className="page-header-count">{t("todo.subtitle", language, { count: String(queue.total) })}</span></>}
             primaryAction={
-              <Button icon={<ReloadOutlined />} onClick={() => load(period)} loading={loading}>
+              <Button icon={<ReloadOutlined />} onClick={retry} loading={loading}>
                 {t("todo.refresh", language)}
               </Button>
             }

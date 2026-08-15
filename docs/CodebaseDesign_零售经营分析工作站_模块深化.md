@@ -181,6 +181,15 @@ func (g *Guard) Check(ctx, userID string, kind string) error  // 拒绝返回 42
 
 **适配器**：内存计数（单实例、测试用）与 DB 计数（跨实例）两个适配器 ⇒ 真实接缝。**接入点**：Web chat 与 agent-runner 共用；agent-runner 既有预算（max-tool-calls / max-model-tokens）语义对齐。
 
+### 8.4 AI 工程收尾（P3 补丁级改动，不改模块形状）
+
+Review 在 AI 工程评估中点名的次级项，均为既有模块内改动，不构成新接缝：
+
+- **会话持久化**：零售页内嵌 AI 抽屉的对话上下文跨页面往返保留，或明确定义一次性会话语义并在 UI 提示；既有深链构造被真实接线调用或删除，不留死代码。测试：页面往返后上下文保留的组件测试。
+- **访问审计收口**：合同读取从绕过 Tool runtime 的直连改为经 Tool runtime（带审计与维度收窄），与「权限拒绝必须保持原因」纪律一致。测试：审计日志可断言的集成测试。
+- **置信度来源化**：零售 Agent 置信度从硬编码改为由覆盖率、样本量、规则命中强度推导，输出向后兼容。测试：样本不足时置信度下降的单元用例。
+- **流式响应**：Web chat 长回答从同步阻塞/DB 轮询改为增量输出，或明确超时与进度语义；与 agent-runner 预算语义对齐。测试：分片输出/超时语义。
+
 ## 9. M7 续租/终止决策卡 — renewal（新模块）
 
 **目标**：按《renewal-termination-decision-card》spec 落地「续租 / 重谈 / 终止」决策卡，兑现工作台 E（占用成本与合同情景）这一核心差异化。
@@ -248,7 +257,7 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 P0:  M1 + 快速修复清单                        （无新依赖，直接修可信度）
 P1:  M2（期间）+ M3（导出）+ M5（区域视图）   （M5 依赖语义层既有 group_by）
 P2:  M4（预算对比，依赖 M2）+ fpna-version-lifecycle 落地
-P3:  M6（路由 + 引用 + 护栏）
+P3:  M6（路由 + 引用 + 护栏 + 工程收尾）
 P4:  M7（决策卡，依赖既有 snapshot/projection 与折现率解析）
 ```
 

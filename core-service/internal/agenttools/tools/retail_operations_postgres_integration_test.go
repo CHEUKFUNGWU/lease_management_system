@@ -139,11 +139,28 @@ func TestRetailOperationsPostgresIsolationNoWrites(t *testing.T) {
 	if err := db.QueryRow(dbCtx, `SELECT s.id::text,d.dataset_version,d.date_to::text FROM stores s JOIN retail_simulation_datasets d ON d.legal_entity_id=s.legal_entity_id WHERE s.legal_entity_id=$1 AND s.code=$2 AND d.status='completed' ORDER BY d.completed_at DESC LIMIT 1`, entityA, expectedStoreCode).Scan(&storeID, &dataset, &dateTo); err != nil {
 		t.Fatal(err)
 	}
+	// Counts are scoped to this test's own legal entities. A bare
+	// SELECT COUNT(*) counts every row in the table, so any package running
+	// concurrently against the shared CI database — monthend and ifrs16 both
+	// write journal entries and payment schedules — moves the number and
+	// fails this assertion for reasons that have nothing to do with the read
+	// tools under test. Scoping keeps the assertion about what it claims:
+	// these tools wrote nothing for these entities.
+	scopedCounts := map[string]string{
+		"fpna_action_items":       "SELECT COUNT(*) FROM fpna_action_items WHERE legal_entity_id::text = ANY($1)",
+		"fpna_scenario_drafts":    "SELECT COUNT(*) FROM fpna_scenario_drafts WHERE legal_entity_id::text = ANY($1)",
+		"lease_contracts":         "SELECT COUNT(*) FROM lease_contracts WHERE legal_entity_id::text = ANY($1)",
+		"lease_events":            "SELECT COUNT(*) FROM lease_events e JOIN lease_contracts c ON c.id = e.contract_id WHERE c.legal_entity_id::text = ANY($1)",
+		"lease_payment_schedules": "SELECT COUNT(*) FROM lease_payment_schedules s JOIN lease_contracts c ON c.id = s.contract_id WHERE c.legal_entity_id::text = ANY($1)",
+		"measurement_results":     "SELECT COUNT(*) FROM measurement_results m JOIN lease_contracts c ON c.id = m.contract_id WHERE c.legal_entity_id::text = ANY($1)",
+		"journal_entries":         "SELECT COUNT(*) FROM journal_entries j JOIN lease_contracts c ON c.id = j.contract_id WHERE c.legal_entity_id::text = ANY($1)",
+	}
+	ownEntities := []string{entityA, entityB}
 	tableCounts := func() map[string]int64 {
 		counts := map[string]int64{}
-		for _, table := range []string{"fpna_action_items", "fpna_scenario_drafts", "lease_contracts", "lease_events", "lease_payment_schedules", "measurement_results", "journal_entries"} {
+		for table, query := range scopedCounts {
 			var count int64
-			if err := db.QueryRow(dbCtx, "SELECT COUNT(*) FROM "+table).Scan(&count); err != nil {
+			if err := db.QueryRow(dbCtx, query, ownEntities).Scan(&count); err != nil {
 				t.Fatalf("count %s: %v", table, err)
 			}
 			counts[table] = count

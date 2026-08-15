@@ -281,6 +281,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/retail/operating-pulse", permission("reports", "read"), retailPulseHandler.OperatingPulse)
 		protected.Handle(http.MethodGet, "/retail/store-options", permission("reports", "read"), retailStoreDiagnosticsHandler.StoreOptions)
 		protected.Handle(http.MethodGet, "/retail/stores/:store_id/diagnostics", permission("reports", "read"), retailStoreDiagnosticsHandler.Diagnostics)
+		protected.Handle(http.MethodGet, "/retail/stores/:store_id/pl-flow", permission("reports", "read"), retailStoreDiagnosticsHandler.PlFlow)
 		protected.Handle(http.MethodPost, "/retail/stores/:store_id/scenarios/evaluate", permission("reports", "read"), retailScenarioHandler.Evaluate)
 		protected.Handle(http.MethodPost, "/retail/stores/:store_id/scenario-action-drafts", permission("fpna_actions", "write"), retailScenarioHandler.SaveAction)
 		protected.Handle(http.MethodPost, "/retail/simulations/store-days/generate", permission("master_data", "manage"), retailSimulationHandler.GenerateStoreDays)

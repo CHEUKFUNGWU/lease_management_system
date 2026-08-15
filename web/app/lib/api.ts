@@ -1580,6 +1580,22 @@ export interface RetailStoreDiagnosticsResponse {
   kpi_drilldown_url: string;
 }
 
+// SANKEY-001 一期：门店利润流向（单一营业额节点 → 四项费用 + 门店贡献）。
+// residual 显式表达未归因金额；status = complete | partial | unavailable。
+// 二期（营收按大类分流）需新增 store × date × category 事实表，不能给现表
+// 加维度（会破坏唯一键与既有 KPI 口径）；大类映射复用 mapping_status 三态。
+export interface RetailPlFlowResponse {
+  nodes: Array<{ key: string; label: string }>;
+  links: Array<{ from: string; to: string; value: number }>;
+  currency: string;
+  basis: "Working" | string;
+  residual: number;
+  status: "complete" | "partial" | "unavailable" | string;
+  formula_version: string;
+  missing?: string[];
+  reason?: string;
+}
+
 export interface RetailStore360QueryParams {
   store_id: string;
   data_classification: RetailDataClassification;
@@ -1753,6 +1769,15 @@ export const retailAnalyticsApi = {
     if (params.dataset_version) query.set("dataset_version", params.dataset_version);
     if (params.source_system) query.set("source_system", params.source_system);
     return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/diagnostics?${query.toString()}`, { token }) as Promise<RetailStoreDiagnosticsResponse>;
+  },
+
+  plFlow: (params: RetailStore360QueryParams, token: string) => {
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated pl-flow requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production pl-flow cannot include dataset_version");
+    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    if (params.source_system) query.set("source_system", params.source_system);
+    return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/pl-flow?${query.toString()}`, { token }) as Promise<RetailPlFlowResponse>;
   },
 
   evaluateStoreScenario: (params: RetailStore360QueryParams, body: { horizon_months: number; scenarios: RetailScenarioInput[] }, token: string) => {

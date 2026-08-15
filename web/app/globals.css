@@ -228,6 +228,17 @@ body {
    additional styling to the new investigation route. */
 .store-360-page .store-360-filter-card,
 .store-360-page .store-360-identity-card { margin-bottom: 16px; }
+/* SANKEY-001: profit-flow panel sits under the bridge panel. */
+.store-360-page .store-360-pl-flow { margin-top: 16px; }
+.pl-flow-basis { font-size: 12px; }
+.pl-flow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
 .store-360-kpi-card {
   height: 156px;
   overflow: hidden;

@@ -15,9 +15,10 @@ import { StatusTag } from "../components/StatusTag";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
-import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailSimulationDatasetData, type RetailStore360Option, type RetailStoreDiagnosticsResponse, type RetailSummaryMetric } from "../lib/api";
+import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailPlFlowResponse, type RetailSimulationDatasetData, type RetailStore360Option, type RetailStoreDiagnosticsResponse, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, type PulseMetricCode } from "../operating-pulse/logic";
 import { bridgeConservation, bridgeTone, bridgeWaterfall, bridgeWaterfallDomain, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, summaryStatus, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
+import ProfitFlowPanel from "./ProfitFlowPanel";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
 
@@ -111,6 +112,7 @@ function Store360Inner() {
   const [options, setOptions] = useState<RetailStore360Option[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [response, setResponse] = useState<RetailStoreDiagnosticsResponse | null>(null);
+  const [plFlow, setPlFlow] = useState<RetailPlFlowResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [discoveryLoading, setDiscoveryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +152,16 @@ function Store360Inner() {
     setError(null);
     setResponse(null);
     retailAnalyticsApi.storeDiagnostics({ store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, window_days: query.windowDays, source_system: query.sourceSystem || undefined }, token).then((result) => { if (active) setResponse(result); }).catch((err) => { if (active) setError(apiErrorMessage(err)); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [token, query.storeID, query.classification, query.datasetVersion, query.asOf, query.windowDays, query.sourceSystem, retry]);
+
+  useEffect(() => {
+    if (!token || !query.storeID || !query.classification || !query.asOf || !validWindow(query.windowDays) || (query.classification === "simulated" && !query.datasetVersion)) {
+      setPlFlow(null);
+      return;
+    }
+    let active = true;
+    retailAnalyticsApi.plFlow({ store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, window_days: query.windowDays, source_system: query.sourceSystem || undefined }, token).then((result) => { if (active) setPlFlow(result); }).catch(() => { if (active) setPlFlow(null); });
     return () => { active = false; };
   }, [token, query.storeID, query.classification, query.datasetVersion, query.asOf, query.windowDays, query.sourceSystem, retry]);
 
@@ -206,7 +218,8 @@ function Store360Inner() {
       <Row gutter={[12, 12]} style={{ marginTop: 16 }}>{STORE360_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><MetricCard language={language} code={code} metric={response.summary[code]} currency={response.currency} notReady={!response.decision_ready} /></Col>)}</Row>
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}><Col xs={24} lg={16}><Space direction="vertical" size={16} className="chart-stack"><Trend response={response} language={language} /><BridgeWaterfall bridges={response.bridges} currency={response.currency} language={language} /></Space></Col><Col xs={24} lg={8}><Card title={t("store360.aux_metrics", language)}><Space direction="vertical" size={8} style={{ width: "100%" }}>{STORE360_AUX_CODES.map((code) => <Flex key={code} justify="space-between" align="center"><span>{kpiLabel(code, language)}</span><Flex gap={8} align="center"><Status metric={response.summary[code]} language={language} /><Typography.Text>{displayMetric(response.summary[code], response.currency, language)}</Typography.Text></Flex></Flex>)}</Space><Alert type="info" showIcon style={{ marginTop: 16 }} message={t("store360.cash_basis_title", language)} description={t("store360.cash_basis_desc", language)} /></Card></Col></Row>
       <Card title={t("store360.peer_benchmark", language)} style={{ marginTop: 16 }}><Typography.Text type="secondary">{response.peer_definition} · {t("store360.peer_definition", language).replace("{n}", String(response.minimum_peer_count))}</Typography.Text><Table style={{ marginTop: 8 }} size="small" pagination={false} rowKey="code" dataSource={response.peer_benchmark} columns={[{ title: t("store360.col.metric", language), render: (_: unknown, row: RetailStoreDiagnosticsResponse["peer_benchmark"][number]) => kpiLabel(row.code as PulseMetricCode, language) || row.code }, { title: t("store360.col.target", language), render: (_: unknown, row) => formatKPIValue({ value: row.target, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language) }, { title: t("store360.col.quartiles", language), render: (_: unknown, row) => `${formatKPIValue({ value: row.p25, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)} / ${formatKPIValue({ value: row.median, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)} / ${formatKPIValue({ value: row.p75, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)}` }, { title: t("store360.col.sample_percentile", language), render: (_: unknown, row) => `${row.peer_count} · ${row.percentile == null ? "—" : `${row.percentile.toFixed(1)}%`}` }, { title: t("store360.col.status", language), render: (_: unknown, row) => <Tag>{formatPeerBenchmarkStatus(row.status, row.reason, language)}</Tag> }]} /></Card>
-      <div style={{ marginTop: 16 }}><BridgePanel language={language} bridges={response.bridges} currency={response.currency} /></div>
+	      <div style={{ marginTop: 16 }}><BridgePanel language={language} bridges={response.bridges} currency={response.currency} /></div>
+	      <ProfitFlowPanel flow={plFlow} currency={response.currency} language={language} />
       <Card title={t("store360.observations", language)} style={{ marginTop: 16 }}><Space direction="vertical" style={{ width: "100%" }}>{response.observations.length ? response.observations.map((item) => <Alert key={`${item.code}-${item.reference}`} type={item.status === "complete" ? "info" : "warning"} showIcon message={item.label} description={item.statement} />) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("store360.no_observations", language)} />}</Space></Card>
       <Collapse style={{ marginTop: 16 }} items={[{ key: "evidence", label: t("store360.evidence_title", language), children: <Space direction="vertical"><Typography.Text>{t("common.current", language)} {response.evidence.current.date_from}–{response.evidence.current.date_to} · {t("common.contrast", language)} {response.evidence.comparison.date_from}–{response.evidence.comparison.date_to}</Typography.Text><Typography.Text>{t("store360.evidence.coverage_source", language).replace("{observed}", String(response.evidence.observed_store_days)).replace("{expected}", String(response.evidence.expected_store_days)).replace("{sources}", response.evidence.source_systems.join(", ") || "—").replace("{datasets}", response.evidence.dataset_versions.join(", ") || "—")}</Typography.Text><Typography.Text>required fields: {response.evidence.required_fields.join(", ")}</Typography.Text><Typography.Text>{t("store360.evidence.fact_version", language).replace("{min}", String(response.evidence.fact_version_min)).replace("{max}", String(response.evidence.fact_version_max))} · <a href={response.evidence.kpi_drilldown_url}>{t("common.view_kpi_drilldown", language)}</a></Typography.Text></Space> }]} />
     </>}

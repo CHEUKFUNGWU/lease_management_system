@@ -757,6 +757,14 @@ const dict: TranslationDict = {
     "zh-HK": "經營佔用現金成本僅用於經營分析，未混入 IFRS 16 計量或 Official 過賬鏈路。",
     en: "Operating cash occupancy cost is for operating analysis only and never enters IFRS 16 measurement or the Official posting chain.",
   },
+  // SANKEY-001 一期：利润流向桑基图
+  "store360.pl_flow.title": { "zh-CN": "利润流向", "zh-HK": "利潤流向", en: "Profit flow" },
+  "store360.pl_flow.status": { "zh-CN": "状态", "zh-HK": "狀態", en: "Status" },
+  "store360.pl_flow.residual": { "zh-CN": "未归因金额", "zh-HK": "未歸因金額", en: "Unattributed" },
+  "store360.pl_flow.missing": { "zh-CN": "缺失字段", "zh-HK": "缺失字段", en: "Missing fields" },
+  "store360.pl_flow.formula": { "zh-CN": "口径", "zh-HK": "口徑", en: "Formula" },
+  "store360.pl_flow.unavailable": { "zh-CN": "当前窗口没有可用于利润流向的经营事实", "zh-HK": "當前窗口沒有可用於利潤流向的經營事實", en: "No operating facts in the current window for a profit-flow view" },
+  "store360.pl_flow.pick_store": { "zh-CN": "选择门店后展示利润流向", "zh-HK": "選擇門店後展示利潤流向", en: "Pick a store to see its profit flow" },
   "store360.peer_benchmark": {
     "zh-CN": "同群基准",
     "zh-HK": "同群基準",

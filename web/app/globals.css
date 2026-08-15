@@ -118,11 +118,25 @@ body {
   letter-spacing: -0.04em;
 }
 
-.page-header-subtitle {
-  margin: 0;
+/* FIX-017: counts and identifiers sit beside the title instead of forming a
+   second line under it — they are data, not description. */
+.page-header-count {
+  margin-left: 12px;
   color: var(--fg-muted);
   font-size: 14px;
-  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* FIX-017: replaces .page-header-subtitle. The header no longer carries
+   explanatory copy — only the scope/compliance sentence a page's numbers
+   depend on, set one step smaller than the old subtitle so it reads as a
+   footnote to the title rather than a second headline. */
+.page-header-meta {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .page-header-actions {
@@ -130,6 +144,35 @@ body {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* HELP-001: the help slot is a quiet icon, never styled as an operation. */
+.page-header-help {
+  display: inline-flex;
+  align-items: center;
+}
+.page-header-help-trigger {
+  color: var(--fg-tertiary);
+}
+.help-drawer-body {
+  width: 100%;
+}
+.help-section-heading {
+  margin: 0 0 4px;
+}
+.help-section-body {
+  margin-bottom: 0;
+}
+
+/* FIX-018: shared frame for the second chart on the pulse / store-360 pages,
+   so the added charts carry no static inline style (DESIGN.md §13-2). */
+.chart-frame {
+  height: 270px;
+  width: 100%;
+}
+
+.chart-stack {
+  width: 100%;
 }
 
 /* MAX-005 additive operating-pulse layout; it uses the existing token
@@ -203,6 +246,17 @@ body {
    additional styling to the new investigation route. */
 .store-360-page .store-360-filter-card,
 .store-360-page .store-360-identity-card { margin-bottom: 16px; }
+/* SANKEY-001: profit-flow panel sits under the bridge panel. */
+.store-360-page .store-360-pl-flow { margin-top: 16px; }
+.pl-flow-basis { font-size: 12px; }
+.pl-flow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
 .store-360-kpi-card {
   height: 156px;
   overflow: hidden;
@@ -692,7 +746,12 @@ h3 {
   background: var(--bg-surface);
 }
 
-.global-search-trigger {
+/* FIX-010: AntD runtime styles (.ant-btn) beat the bare class at equal
+   specificity, so the capsule background never applied in the real header.
+   Scoped to the app header to win the cascade without an important flag;
+   the hover rule drops its legacy important flag now that specificity
+   suffices. */
+.app-header .global-search-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -703,9 +762,19 @@ h3 {
   background: var(--bg-inset);
 }
 
-.global-search-trigger:hover {
-  color: var(--fg-primary) !important;
-  background: var(--bg-inset) !important;
+.app-header .global-search-trigger:hover {
+  color: var(--fg-primary);
+  background: var(--bg-inset);
+}
+
+/* FIX-010: kbd inherited the header line-height and became a 24×64
+   sliver; pin it inside the 34px trigger. */
+.app-header .global-search-trigger kbd {
+  height: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .global-search-trigger kbd,
@@ -828,6 +897,19 @@ h3 {
 .contract-mobile-number {
   color: var(--fg-primary);
   font: 600 13px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* FIX-030: the contract number is the way into the contract. It keeps the
+   monospace identity treatment and reads as text until hover, so the table
+   does not turn into a wall of blue. */
+.contract-number-link {
+  color: var(--fg-primary);
+  font: 600 13px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+.contract-number-link:hover {
+  color: var(--fg-primary);
+  text-decoration: underline;
 }
 
 .contract-mobile-name {
@@ -1267,21 +1349,25 @@ html {
   background: var(--fg-inverse);
   border-right: 1px solid var(--border-default);
   flex-shrink: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* FIX-011: the sider is a flex column — the menu scrolls internally and
+     the footer returns to normal flow instead of floating over the last
+     menu item. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .app-sider-inner {
   padding: 12px 8px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .app-sider-menu {
   border-right: 0;
   background: transparent;
 }
 .app-sider-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
   padding: 12px 16px;
   border-top: 1px solid var(--bg-inset);
   font-size: 11px;
@@ -1489,21 +1575,22 @@ html {
 .retail-ai-drawer-input { width: 100%; }
 
 /* ── HOME-001: 三栏首页 ───────────────────────────────────────── */
-/* HOME-004 L8: nav | conversation | actions. minmax(640px, 1fr) keeps the
-   middle column a usable conversation at 1440 (640+) while the fixed right
-   column never gets squeezed at 1280 (1440 - 240 nav - 48*2 padding - 24
-   gap - 300 right ≈ 784 middle at the 1440 content max). */
+/* HOME-004 L8 + FIX-005: right column widened back to 330px so the
+   compact money value lines ("1.28e8 CNY") stay on one line — measured at
+   1440x900: 300px→82px wrapped value line, 330px→41px single line. */
 .home-grid {
   display: grid;
-  grid-template-columns: minmax(640px, 1fr) 300px;
+  grid-template-columns: minmax(640px, 1fr) 330px;
   gap: 24px;
-  align-items: start;
+  /* FIX-007: stretch (not start) so the middle column's grid track is as
+     tall as the taller right column — that extra height is what gives the
+     sticky conversation column room to pin while the page scrolls. */
 }
 /* Below 1440 the content shell narrows: keep the right column usable
    rather than defending the 640 floor with an unusable 1024–1279 band. */
 @media (max-width: 1439px) {
   .home-grid {
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) 330px;
   }
 }
 .home-middle {
@@ -1521,6 +1608,24 @@ html {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+/* FIX-009: <Spin> inserts .ant-spin-nested-loading > .ant-spin-container
+   between the stack and its blocks, so the parent gap stopped applying.
+   Scoped to the home columns only — other Spin call sites keep their own
+   layout. */
+/* FIX-009: <Spin> inserts .ant-spin-nested-loading > .ant-spin-container
+   between the stack and its blocks, so the parent gap stopped applying.
+   Scoped to the home columns only — other Spin call sites keep their own
+   layout. home-work-focus keeps its 16px rhythm. */
+.home-right-stack .ant-spin-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.home-work-focus .ant-spin-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .home-right-title {
   font-size: 15px;
@@ -1552,11 +1657,142 @@ html {
 .home-brief-placeholder {
   border-radius: 10px;
 }
+/* STATE-001: actionable notice on the settings tag summary (blocked by a missing discount rate). */
+.settings-tags-actionable {
+  margin-bottom: 16px;
+}
+
+/* ── FIX-034: the rules STY-005 never wrote ──────────────────────
+   STY-005 swapped 44 static inline styles across the three retail pages and
+   the contract detail for class names, and then wrote none of the classes.
+   The design guard only checks that inline styles are gone; nothing checked
+   that the replacement exists. So the suite stayed green while both trend
+   charts vanished (a height-less parent leaves ResponsiveContainer nothing to
+   measure) and every card gap collapsed to zero.
+   Every value below is restored from the inline style deleted at d5903cf —
+   this is a restoration, not a redesign. */
+
+/* Chart measuring box: ResponsiveContainer needs a parent with a height. */
+.pulse-trend-frame {
+  height: 270px;
+  width: 100%;
+}
+.store360-trend-frame {
+  height: 270px;
+}
+
+/* Block spacing */
+.pulse-block-gap,
+.store360-block-gap,
+.scenario-block-gap,
+.contract-block-gap {
+  margin-top: 16px;
+}
+/* STY-006: peer table keeps its own 8px top gap — grouping it with the
+   16px block-gap classes changed the value the inline style had. */
+.store360-peer-table {
+  margin-top: 8px;
+}
+.scenario-block-gap-sm {
+  margin-top: 12px;
+}
+.pulse-block-margin,
+.contract-block-gap-bottom,
+.store360-block-margin {
+  margin-bottom: 16px;
+}
+.store360-bridge-meta {
+  margin-bottom: 8px;
+}
+.store360-identity-title {
+  margin: 0;
+}
+
+/* Full-width fills */
+.pulse-full-width,
+.store360-full-width,
+.scenario-full-width {
+  width: 100%;
+}
+
+/* Filter control widths */
+.pulse-select-min {
+  min-width: 220px;
+}
+.store360-store-select,
+.scenario-store-select {
+  min-width: 260px;
+}
+.pulse-source-input {
+  width: 180px;
+}
+.store360-source-input,
+.scenario-source-input {
+  width: 190px;
+}
+
+/* Loading and suspense blocks */
+.pulse-loading-block,
+.store360-loading-block {
+  min-height: 220px;
+}
+/* STY-006: the scenario loading block was 160px inline; the 220px group
+   value changed what the page had. */
+.scenario-loading-block {
+  min-height: 160px;
+}
+.pulse-suspense-fallback,
+.store360-suspense-fallback,
+.scenario-suspense-fallback {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+/* FIX-034: ProtectedRoute used `.sr-only` but the rule never existed, so the
+   loading text meant only for screen readers was rendering visibly. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Contract detail empty state */
+.contract-empty-block {
+  padding: 40px;
+  text-align: center;
+}
+.contract-empty-icon {
+  font-size: 48px;
+  color: var(--fg-muted);
+}
+.contract-empty-note {
+  margin-top: 16px;
+  color: var(--fg-muted);
+}
+/* FIX-021: the money KPI value line (26px compact figure + currency) must
+   never reflow — a fixed-width card cannot grow, so the line truncates and
+   keeps the full value in its title tooltip. */
+.money-kpi-value-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .home-readiness-card {
-  background: var(--bg-surface);
+  /* FIX-009: unify the hand-written card onto the AntD card language
+     (1px border-default, no ring shadow) — the hairline shadow version
+     was invisible on the white page background. */
+  background: var(--bg-page);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 20px;
-  box-shadow: var(--shadow-static);
+  box-shadow: none;
   min-height: 188px;
 }
 .home-readiness-title {
@@ -1594,7 +1830,9 @@ html {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 14px 12px;
+  /* FIX-006: tightened so the collapsed strip stays ≤ 96px tall with the
+     trust bar on one line (measured 95px at 1440×900). */
+  padding: 8px 14px 8px;
   background: var(--bg-surface);
   border-radius: 8px;
   box-shadow: var(--shadow-static);
@@ -1750,18 +1988,55 @@ html {
    bottom. /ai-chat is untouched — these are home-local classes carrying
    the same bubble language (user right / assistant left, 16px radius with
    one flattened corner). */
+/* FIX-007: the conversation column is the scroll container — it fills the
+   viewport below the shell padding, the message body scrolls internally and
+   the composer is pinned to the column bottom (sticky keeps the whole column
+   in view while the taller right column scrolls the page). Height budget:
+   60px app header + 32px content padding + 32px sticky offset + 24px composer
+   breathing room, so the composer bottom clears the viewport edge instead of
+   sitting flush against it (FIX-015: FIX-007 landed it at exactly 0px, which
+   reads as the input falling off the screen). */
 .home-chat-column {
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  height: calc(100dvh - 148px);
+  position: sticky;
+  top: 32px;
+}
+@media (max-width: 1023px) {
+  .home-chat-column {
+    height: calc(100dvh - 132px);
+    top: 24px;
+  }
+}
+@media (max-width: 767px) {
+  .home-chat-column {
+    height: auto;
+    position: static;
+  }
 }
 .home-chat-body {
-  min-height: 320px;
+  min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  overflow-y: auto;
+}
+/* FIX-015: with no messages the flex:1 body still ate the whole column and the
+   composer sat ~800px below the starter chips. Collapsing the column to its
+   content instead (the first attempt) overcorrected — the composer floated a
+   third of the way down the viewport with a bigger void underneath. The column
+   keeps its full height and the composer keeps the bottom.
+   FIX-027: centring the starters in the leftover space split the void in two
+   and still read as a hole. They now sit directly above the composer — the
+   thing you click and the thing you type into are one unit, and the empty
+   space collects in one place above them instead of framing them. */
+.home-chat-body.is-empty {
+  justify-content: flex-end;
 }
 /* L1: reading measure for the conversation body — 68ch, never the full
    column width. */
@@ -1780,6 +2055,9 @@ html {
 }
 .home-msg.is-user {
   justify-content: flex-end;
+  /* FIX-008: match /ai-chat — avatar on the right, bubble on the left of
+     the row-reverse flex, not avatar-first. */
+  flex-direction: row-reverse;
 }
 .home-msg-avatar {
   flex-shrink: 0;
@@ -1823,9 +2101,48 @@ html {
   gap: 8px;
 }
 .home-chat-starter-chip {
-  border-radius: 9999;
+  border-radius: 9999px;
   font-size: 12px;
   color: var(--fg-secondary);
+}
+.home-chat-pending-text {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+}
+/* FIX-013: agent plan steps render as a visible sequence — result steps
+   stagger in, pending ones read as scaffold rows. */
+.home-chat-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+}
+.home-chat-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 16px;
+  animation: home-step-in 0.3s var(--ease-micro) both;
+}
+.home-chat-step:nth-child(2) { animation-delay: 0.12s; }
+.home-chat-step:nth-child(3) { animation-delay: 0.24s; }
+.home-chat-step:nth-child(4) { animation-delay: 0.36s; }
+.home-chat-step:nth-child(5) { animation-delay: 0.48s; }
+.home-chat-step:nth-child(6) { animation-delay: 0.6s; }
+.home-chat-step.is-pending { color: var(--fg-muted); }
+.home-chat-step.is-done .home-chat-step-mark { color: var(--state-success-text); }
+.home-chat-step.is-failed .home-chat-step-mark { color: var(--state-error-text); }
+.home-chat-step-mark {
+  width: 12px;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes home-step-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
 }
 .home-chat-composer {
   display: flex;

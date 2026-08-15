@@ -50,6 +50,7 @@ import { t } from "../lib/i18n";
 import { fmtMoney } from "../lib/format";
 import { useUrlState } from "../hooks/useUrlState";
 import { notifyError } from "../lib/notify";
+import { tableScrollX } from "../lib/tableScroll";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -1046,7 +1047,7 @@ function MonthlyClosingPage() {
                   },
                 }}
                 size="small"
-                scroll={{ x: 1360 }}
+                scroll={tableScrollX((entries || []).length, 1360)}
               />
             </Spin>
           )}
@@ -1084,7 +1085,7 @@ function MonthlyClosingPage() {
                 rowKey="id"
                 pagination={{ pageSize: 10 }}
                 size="small"
-                scroll={{ x: 1200 }}
+                scroll={tableScrollX((batches || []).length, 1200)}
               />
             </Spin>
           )}
@@ -1235,7 +1236,7 @@ function MonthlyClosingPage() {
         >
           <PageHeader
             title={t("monthly.title", language)}
-            subtitle={t("monthly.subtitle", language)}
+
             meta={selectedPeriod ? (
               <Space size={12} style={{ marginTop: 8 }}>
                 <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>

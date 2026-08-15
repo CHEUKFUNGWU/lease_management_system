@@ -32,6 +32,7 @@ import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { agentUsageApi } from "../lib/api";
 import { t } from "../lib/i18n";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -153,7 +154,7 @@ export default function AgentMetricsPage() {
       <AppLayout>
         <PageHeader
           title={t("agent_metrics.title", language)}
-          subtitle={t("agent_metrics.description", language)}
+
           primaryAction={
             <Space wrap>
               <Select<RangeKey>
@@ -236,7 +237,7 @@ export default function AgentMetricsPage() {
                   dataSource={summary.rollups}
                   pagination={false}
                   size="small"
-                  scroll={{ x: 900 }}
+                  scroll={tableScrollX((summary.rollups || []).length, 900)}
                 />
               ) : (
                 <Empty description={t("agent_metrics.empty", language)} />

@@ -117,6 +117,29 @@ export function signalLabel(code: string, language: Language): string {
   return key ? t(key, language) : code;
 }
 
+/** FIX-018: score_contribution was returned by the API and never read. Rolled
+ *  up per signal code it answers the one question the attention table cannot:
+ *  whether the flagged stores share one cause or each have their own. */
+export interface SignalMixRow {
+  code: string;
+  label: string;
+  stores: number;
+  weight: number;
+}
+
+export function signalMix(attention: RetailAttention[], language: Language): SignalMixRow[] {
+  const rows = new Map<string, SignalMixRow>();
+  for (const store of attention) {
+    for (const signal of store.observed_signals) {
+      const row = rows.get(signal.signal_code) ?? { code: signal.signal_code, label: signalLabel(signal.signal_code, language), stores: 0, weight: 0 };
+      row.stores += 1;
+      row.weight += signal.score_contribution;
+      rows.set(signal.signal_code, row);
+    }
+  }
+  return Array.from(rows.values()).sort((a, b) => b.weight - a.weight || b.stores - a.stores);
+}
+
 export function latestAnomalyDate(dataset: RetailSimulationDatasetData): string {
   return dataset.anomaly_manifest.reduce((max, anomaly) => anomaly.date_to > max ? anomaly.date_to : max, "") || dataset.date_to;
 }

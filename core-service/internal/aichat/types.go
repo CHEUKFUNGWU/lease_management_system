@@ -43,6 +43,10 @@ type Input struct {
 	AgentMode     *bool
 	SkillID       string
 	SkillVersion  string
+	// Initiator marks who started the session when this run creates one:
+	// "user" (default) or "system" for automatic runs (CHAT-001 home brief).
+	// It is written onto the session so the user-facing list can filter it.
+	Initiator string
 }
 
 type SessionCommand struct {
@@ -51,6 +55,7 @@ type SessionCommand struct {
 	Title           string
 	BoundContractID string
 	ContextSnapshot any
+	Initiator       string
 }
 
 type Plan struct {

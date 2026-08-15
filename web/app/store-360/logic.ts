@@ -47,6 +47,73 @@ export function formatBridgeItem(value: number | null, unit: string, currency: s
   return formatSignalValue(value, unit, currency, language);
 }
 
+/** FIX-018: the bridge payload is already waterfall-shaped (comparison ->
+ *  items -> current, with a rounding residual that must be shown for the bars
+ *  to reconcile). This turns it into floating [from, to] ranges so recharts
+ *  can draw it directly; an incomplete bridge yields no steps. */
+export interface BridgeWaterfallStep {
+  name: string;
+  range: [number, number];
+  contribution: number;
+  tone: "positive" | "negative" | "neutral";
+}
+
+export function bridgeWaterfall(bridge: RetailBridge, labels: { start: string; end: string; residual: string }): BridgeWaterfallStep[] {
+  if (bridge.status !== "complete" || bridge.comparison == null || bridge.current == null) return [];
+  let running = bridge.comparison;
+  const steps: BridgeWaterfallStep[] = [{ name: labels.start, range: [0, running], contribution: running, tone: "neutral" }];
+  const items = bridge.items.map((item) => ({ label: item.label, contribution: item.contribution ?? 0 }));
+  if (bridge.rounding_residual) items.push({ label: labels.residual, contribution: bridge.rounding_residual });
+  for (const item of items) {
+    const next = running + item.contribution;
+    steps.push({ name: item.label, range: [Math.min(running, next), Math.max(running, next)], contribution: item.contribution, tone: bridgeTone(item.contribution) });
+    running = next;
+  }
+  steps.push({ name: labels.end, range: [0, bridge.current], contribution: bridge.current, tone: "neutral" });
+  return steps;
+}
+
+/** FIX-018a: a waterfall on a large base is unreadable against a zero-based
+ *  axis — a 500 contribution on a 48,000 opening is one pixel. The domain
+ *  brackets the values the steps actually span, padded by a tenth of that
+ *  span, so the contributions are the visible part. Returns null when every
+ *  step is flat (nothing to bracket) and the caller should let recharts pick. */
+export function bridgeWaterfallDomain(steps: BridgeWaterfallStep[]): [number, number] | null {
+  if (steps.length === 0) return null;
+  const values = steps.flatMap((step) => step.range);
+  const low = Math.min(...values.filter((value) => value !== 0));
+  const high = Math.max(...values);
+  if (!Number.isFinite(low) || high === low) return null;
+  const pad = (high - low) / 10;
+  // FIX-025: the raw padded bounds made recharts derive ticks off an arbitrary
+  // float — the axis read "25,351.727 / 25,217.723 / 24,917.723". Snapping the
+  // bounds outward to a round step gives the axis whole numbers to divide.
+  // The step comes from the *span*, not from the values: a 1,034-wide bracket
+  // sitting at 24,000 snaps to 100s (widening it by ~6%), whereas snapping by
+  // the value's own magnitude would round to 1,000s and double the bracket —
+  // undoing exactly the zoom FIX-018a added. Outward only: never clip a step.
+  const span = (high + pad) - (low - pad);
+  return [niceFloor(low - pad, span), niceCeil(high + pad, span)];
+}
+
+/** Step size for snapping: the largest power of ten that still divides the
+ *  span into at least a few slices, so a 1,000-wide span snaps to 100s and a
+ *  10-wide span snaps to 1s. */
+function niceStep(span: number): number {
+  if (!(span > 0)) return 1;
+  return Math.pow(10, Math.floor(Math.log10(span)) - 1);
+}
+
+export function niceFloor(value: number, span?: number): number {
+  const step = niceStep(span ?? Math.abs(value));
+  return Math.floor(value / step) * step;
+}
+
+export function niceCeil(value: number, span?: number): number {
+  const step = niceStep(span ?? Math.abs(value));
+  return Math.ceil(value / step) * step;
+}
+
 export function bridgeConservation(bridge: RetailBridge): number | null {
   if (bridge.total_change == null) return null;
   const sum = bridge.items.reduce((total, item) => total + (item.contribution || 0), 0);

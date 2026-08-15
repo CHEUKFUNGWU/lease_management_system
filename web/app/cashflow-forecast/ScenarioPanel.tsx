@@ -9,6 +9,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { notifyError } from "../lib/notify";
+import { tableScrollX } from "../lib/tableScroll";
 
 interface Ladder {
   labels: string[];
@@ -162,7 +163,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
             pagination={false}
             size="small"
             style={{ marginBottom: 16 }}
-            scroll={{ x: 700 }}
+            scroll={tableScrollX((results || []).length, 700)}
             columns={[
               {
                 title: "情景",

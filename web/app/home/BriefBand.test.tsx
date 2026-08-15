@@ -170,6 +170,14 @@ describe("BriefBand (collapsed strip)", () => {
     expect(bandSource).not.toContain('className="home-brief-answer"');
   });
 
+  it("FIX-006: collapsed band exposes exactly one expand control", () => {
+    const markup = render(React.createElement(BriefBand, { state: "ready", result: readyBriefFixture, error: null, ...base }));
+    const buttons = (markup.match(/<button/g) || []).length;
+    expect(buttons).toBe(1);
+    expect(markup).toContain("home-brief-band-toggle");
+    expect(markup).not.toContain("data-trust-bar-toggle");
+  });
+
   it("keeps degraded states on BriefView, scope_denied unsoftened", () => {
     const denied = render(React.createElement(BriefBand, { state: "scope_denied", result: readyBriefFixture, error: null, ...base }));
     expect(denied).toContain(t("api.scope_denied", zh));

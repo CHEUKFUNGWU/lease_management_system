@@ -82,7 +82,7 @@ export function MoneyKPICard({ title, value, subtitle, loading }: MoneyKPICardPr
               {value.length === 0 ? (
                 <div style={{ fontSize: 26, fontWeight: 600, color: "var(--fg-primary)" }}>—</div>
               ) : value.map((slice) => (
-                <div key={slice.currency} title={fmtMoney(slice.value, slice.currency)} style={{ display: "flex", alignItems: "baseline", gap: 8, fontVariantNumeric: "tabular-nums" }}>
+                <div key={slice.currency} title={fmtMoney(slice.value, slice.currency)} className="money-kpi-value-line" style={{ display: "flex", alignItems: "baseline", gap: 8, fontVariantNumeric: "tabular-nums" }}>
                   <span style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}>
                     {slice.value === 0 ? "0.00" : compactMoney(slice.value, slice.currency)}
                   </span>
@@ -140,5 +140,5 @@ export function DashboardHeader({
   primaryAction,
   secondaryAction,
 }: DashboardHeaderProps) {
-  return <PageHeader title={title} subtitle={subtitle} primaryAction={primaryAction} secondaryAction={secondaryAction} />;
+  return <PageHeader title={title} primaryAction={primaryAction} secondaryAction={secondaryAction} />;
 }

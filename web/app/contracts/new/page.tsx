@@ -173,7 +173,7 @@ export default function NewContractPage() {
       <AppLayout>
         <PageHeader
           title={t("contract_new.title", language)}
-          subtitle={t("contract_new.subtitle", language)}
+
           primaryAction={
             <Button
               icon={<ArrowLeftOutlined />}

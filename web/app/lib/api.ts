@@ -14,24 +14,35 @@ export function setApiLanguage(language: Language) {
   apiLanguage = language;
 }
 
+// DIAG-001: details.reason === "policy_thresholds_missing" (rent-to-sales
+// ceilings unconfigured) — a config gap the user can close in settings.
+function isPolicyThresholdsMissing(detail: unknown): boolean {
+  if (typeof detail !== "object" || detail === null) return false;
+  return (detail as { details?: { reason?: unknown } }).details?.reason === "policy_thresholds_missing";
+}
+
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly detail?: unknown;
+  /** DIAG-001: the endpoint that failed — surfaced in fallback copy so the
+   *  generic message still names the failing capability. */
+  readonly endpoint?: string;
 
-  constructor(code: string, status: number, detail?: unknown) {
-    super(ApiError.userMessage(code, status, detail));
+  constructor(code: string, status: number, detail?: unknown, endpoint?: string) {
+    super(ApiError.userMessage(code, status, detail, endpoint));
     this.name = "ApiError";
     this.code = code;
     this.status = status;
     this.detail = detail;
+    this.endpoint = endpoint;
   }
 
   // ERR-002: the mapping branches on the shared error-contract vocabulary
   // (errcontract, see core-service/internal/errcontract) instead of invented
   // client codes. Status codes remain only as a fallback for legacy
   // endpoints that do not emit a code yet.
-  static userMessage(code: string, status: number, detail?: unknown): string {
+  static userMessage(code: string, status: number, detail?: unknown, endpoint?: string): string {
     switch (code) {
       case "unauthenticated":
         return t("api.session_expired", apiLanguage);
@@ -52,8 +63,10 @@ export class ApiError extends Error {
         return t("api.request_failed", apiLanguage);
       case "data_unavailable":
         // FIX-002: discount-rate 422s get contract-specific, actionable copy.
+        // DIAG-001: unconfigured policy thresholds likewise name the fix.
         // Anything else under this code keeps the generic message.
         {
+          if (isPolicyThresholdsMissing(detail)) return t("api.policy_thresholds_missing", apiLanguage);
           const contracts = discountRateMissingContracts(detail);
           if (contracts !== null && contracts.length > 0) {
             return t("api.discount_rate_missing", apiLanguage, { contracts: contracts.join("、") });
@@ -75,6 +88,9 @@ export class ApiError extends Error {
         if (status === 403) return t("api.forbidden", apiLanguage);
         if (status === 404) return t("api.not_found", apiLanguage);
         if (status >= 500) return t("api.server_unavailable", apiLanguage);
+        // DIAG-001: the fallback names the failing capability so a raw
+        // "request failed" never hides which call broke.
+        if (endpoint) return t("api.request_failed_with_endpoint", apiLanguage, { endpoint });
         return t("api.request_failed", apiLanguage);
     }
   }
@@ -396,7 +412,7 @@ export async function apiRequest(
     if (response.status === 401 && typeof window !== "undefined" && !endpoint.startsWith("/api/v1/auth/")) {
       window.dispatchEvent(new Event("auth-session-expired"));
     }
-    throw new ApiError(code, response.status, error);
+    throw new ApiError(code, response.status, error, endpoint);
   }
 
   return response.json();
@@ -942,6 +958,9 @@ export const aiChatApi = {
     language?: string;
     skill_id?: string;
     skill_version?: string;
+    /** CHAT-001: "system" marks an automatic run (home brief) whose session
+     *  must not crowd the user-facing session list. */
+    initiator?: string;
     page_context?: {
       page?: string;
       title?: string;
@@ -1564,6 +1583,22 @@ export interface RetailStoreDiagnosticsResponse {
   kpi_drilldown_url: string;
 }
 
+// SANKEY-001 一期：门店利润流向（单一营业额节点 → 四项费用 + 门店贡献）。
+// residual 显式表达未归因金额；status = complete | partial | unavailable。
+// 二期（营收按大类分流）需新增 store × date × category 事实表，不能给现表
+// 加维度（会破坏唯一键与既有 KPI 口径）；大类映射复用 mapping_status 三态。
+export interface RetailPlFlowResponse {
+  nodes: Array<{ key: string; label: string }>;
+  links: Array<{ from: string; to: string; value: number }>;
+  currency: string;
+  basis: "Working" | string;
+  residual: number;
+  status: "complete" | "partial" | "unavailable" | string;
+  formula_version: string;
+  missing?: string[];
+  reason?: string;
+}
+
 export interface RetailStore360QueryParams {
   store_id: string;
   data_classification: RetailDataClassification;
@@ -1737,6 +1772,15 @@ export const retailAnalyticsApi = {
     if (params.dataset_version) query.set("dataset_version", params.dataset_version);
     if (params.source_system) query.set("source_system", params.source_system);
     return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/diagnostics?${query.toString()}`, { token }) as Promise<RetailStoreDiagnosticsResponse>;
+  },
+
+  plFlow: (params: RetailStore360QueryParams, token: string) => {
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated pl-flow requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production pl-flow cannot include dataset_version");
+    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    if (params.source_system) query.set("source_system", params.source_system);
+    return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/pl-flow?${query.toString()}`, { token }) as Promise<RetailPlFlowResponse>;
   },
 
   evaluateStoreScenario: (params: RetailStore360QueryParams, body: { horizon_months: number; scenarios: RetailScenarioInput[] }, token: string) => {

@@ -10,6 +10,7 @@ import { budgetApi } from "../../lib/api";
 import { t, type Language } from "../../lib/i18n";
 import { fmtNum } from "../../lib/format";
 import { notifyError } from "../../lib/notify";
+import { tableScrollX } from "../../lib/tableScroll";
 
 interface BudgetVersion {
   id: string;
@@ -423,7 +424,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
               rowKey="contract_id"
               pagination={{ pageSize: 10 }}
               size="small"
-              scroll={{ x: 800 }}
+              scroll={tableScrollX((result.by_contract || []).length, 800)}
               columns={[
                 { title: t("reports.contract_number", language), dataIndex: "contract_number", width: 140 },
                 { title: t("reports.contract_name", language), dataIndex: "contract_name", ellipsis: true },

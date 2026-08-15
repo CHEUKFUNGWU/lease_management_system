@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -37,7 +37,7 @@ import { t } from "../lib/i18n";
 import { StatusTag, type StatusKind } from "../components/StatusTag";
 import { fmtMoney } from "../lib/format";
 import { useUrlState } from "../hooks/useUrlState";
-import { notifyError } from "../lib/notify";
+import { useRetailQuery } from "../retail/useRetailQuery";
 
 interface Contract {
   id: string;
@@ -98,13 +98,10 @@ const ASSET_TYPE_KEYS: Record<string, string> = {
 };
 
 function ContractsPage() {
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [total, setTotal] = useState(0);
   const [pageParam, setPageParam] = useUrlState("page", "1");
   const [pageSizeParam, setPageSizeParam] = useUrlState("page_size", "20");
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useUrlState("q", "");
   const [statusFilter, setStatusFilter] = useUrlState("status", "");
   const [riskFilter, setRiskFilter] = useUrlState("risk", "");
@@ -153,41 +150,58 @@ function ContractsPage() {
     setPageParam("1");
   };
 
-  const loadContracts = useCallback(async (
-    searchVal: string,
-    statusVal: string,
-    sortByVal: string,
-    sortOrderVal: string,
-    pageVal: number = 1,
-    pageSizeVal: number = 20,
-  ) => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const data = await contractApi.list(token, {
-        search: searchVal || undefined,
-        status: statusVal || undefined,
-        discount_rate_missing: riskFilter === "discount_rate_missing" || undefined,
-        lease_scope: scopeFilter || undefined,
-        asset_type: assetFilter || undefined,
-        lease_end_before: expiryFilter ? dayjs().add(Number(expiryFilter), "day").format("YYYY-MM-DD") : undefined,
-        sort_by: sortByVal || undefined,
-        sort_order: sortOrderVal || undefined,
-        page: pageVal,
-        page_size: pageSizeVal,
-      });
-      setContracts(data.data || []);
-      // The server counts every match, so the pager stays honest even though
-      // only one page was fetched.
-      setTotal(data.total ?? (data.data || []).length);
-      setPageParam(String(data.page || pageVal));
-      setPageSizeParam(String(data.page_size || pageSizeVal));
-    } catch (error: any) {
-      notifyError(error.message || t("contracts.load_failed", language));
-    } finally {
-      setLoading(false);
-    }
-  }, [assetFilter, expiryFilter, language, riskFilter, scopeFilter, setPageParam, setPageSizeParam, token]);
+  // FETCH-002: the ledger query goes through the shared fetch seam. The URL
+  // state updates immediately on input; the request itself is debounced so
+  // keystrokes do not fire one call each (matches the previous 300ms timer).
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const listParams = {
+    search: debouncedSearch,
+    status: statusFilter,
+    risk: riskFilter,
+    scope: scopeFilter,
+    asset: assetFilter,
+    expiry: expiryFilter,
+    sortBy,
+    sortOrder,
+    page,
+    pageSize,
+  };
+  const listParamsKey = JSON.stringify(listParams);
+  const { loading, state, retry } = useRetailQuery({
+    token,
+    params: listParams,
+    paramsKey: listParamsKey,
+    fetcher: (p, t) =>
+      contractApi.list(t, {
+        search: p.search || undefined,
+        status: p.status || undefined,
+        discount_rate_missing: p.risk === "discount_rate_missing" || undefined,
+        lease_scope: p.scope || undefined,
+        asset_type: p.asset || undefined,
+        lease_end_before: p.expiry ? dayjs().add(Number(p.expiry), "day").format("YYYY-MM-DD") : undefined,
+        sort_by: p.sortBy || undefined,
+        sort_order: p.sortOrder || undefined,
+        page: p.page,
+        page_size: p.pageSize,
+      }),
+  });
+  const data = state.kind === "ready" ? state.data : undefined;
+  const contracts: Contract[] = data?.data ?? [];
+  // The server counts every match, so the pager stays honest even though only
+  // one page was fetched.
+  const total: number = data?.total ?? (data?.data ?? []).length;
+  // Keep the URL in sync when the server normalised the page (e.g. a page
+  // number past the last one). Only writes when it actually differs, so this
+  // cannot loop.
+  useEffect(() => {
+    if (data && typeof data.page === "number" && data.page !== page) setPageParam(String(data.page));
+    if (data && typeof data.page_size === "number" && data.page_size !== pageSize) setPageSizeParam(String(data.page_size));
+  }, [data, page, pageSize, setPageParam, setPageSizeParam]);
 
   const handleBulkSubmit = async () => {
     if (!token || selectedRowKeys.length === 0) return;
@@ -211,16 +225,15 @@ function ContractsPage() {
         );
       }
       setSelectedRowKeys([]);
-      loadContracts(search, statusFilter, sortBy, sortOrder, page, pageSize);
+      retry();
     } finally {
       setBulkSubmitting(false);
     }
   };
 
-  useEffect(() => {
-    loadContracts(search, statusFilter, sortBy, sortOrder, page, pageSize);
-  }, [loadContracts, page, pageSize, search, sortBy, sortOrder, statusFilter, riskFilter, scopeFilter, assetFilter, expiryFilter]);
-
+  // FETCH-002: the effect that used to call loadContracts is gone — the seam
+  // refetches when listParamsKey changes. The debounce below only exists to
+  // reset to page 1 on a new search, mirroring the old timer's second half.
   const handleSearchChange = (value: string) => {
     setSearch(value);
     if (debounceTimer.current) {
@@ -228,7 +241,6 @@ function ContractsPage() {
     }
     debounceTimer.current = setTimeout(() => {
       setPageParam("1");
-      loadContracts(value, statusFilter, sortBy, sortOrder, 1, pageSize);
     }, 300);
   };
 
@@ -248,7 +260,11 @@ function ContractsPage() {
       width: 260,
       render: (_: unknown, record: Contract) => (
         <div style={{ minWidth: 220 }}>
-          <div style={{ fontFamily: "monospace", fontWeight: 600, fontSize: 13 }}>{record.contract_number}</div>
+          {/* FIX-030: the only way into a contract used to be a 12px muted
+              arrow in the last column, with no label and no clickable row —
+              the entry point was there but unreadable as one. The number is
+              now the link, which is where anyone looks first. */}
+          <a className="contract-number-link" onClick={() => router.push(`/contracts/${record.id}`)}>{record.contract_number}</a>
           <div style={{ color: "var(--fg-secondary)", fontWeight: 500, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={record.contract_name}>{record.contract_name}</div>
           {record.discount_rate_missing && <StatusTag kind="error" style={{ marginTop: 5, fontSize: 11, padding: "1px 7px" }}>{t("contracts.discount_rate_missing", language)}</StatusTag>}
         </div>
@@ -436,8 +452,7 @@ function ContractsPage() {
           transition={{ duration: 0.25 }}
         >
           <PageHeader
-            title={t("contracts.title", language)}
-            subtitle={t("contracts.subtitle", language, { count: String(total) })}
+            title={<>{t("contracts.title", language)}<span className="page-header-count">{t("contracts.subtitle", language, { count: String(total) })}</span></>}
             primaryAction={
               <Button
                 type="primary"
@@ -624,7 +639,6 @@ function ContractsPage() {
                   setSelectedRowKeys([]);
                   setPageParam(String(nextPage));
                   setPageSizeParam(String(nextSize));
-                  loadContracts(search, statusFilter, sortBy, sortOrder, nextPage, nextSize);
                 },
                 showTotal: (total) => {
                   const text = t("contracts.total_items", language, { total: "__TOTAL__" });

@@ -556,6 +556,11 @@ type Request struct {
 	Language     string        `json:"language,omitempty"`
 	SkillID      string        `json:"skill_id,omitempty"`
 	SkillVersion string        `json:"skill_version,omitempty"`
+	// Initiator marks a run that creates a system-initiated session when no
+	// session_id is given (CHAT-001: the home brief). "user" or empty keeps
+	// the session user-visible; "system" hides it from the session list while
+	// the run and audit trail persist as usual.
+	Initiator string `json:"initiator,omitempty"`
 }
 
 type ChatMessage = aichat.Message
@@ -1658,7 +1663,7 @@ func (h *Agent) buildSystemPrompt(userID, role, legalEntityID, contextData strin
 		langInstruction = "\n\n请用简体中文回答。"
 	}
 
-	return fmt.Sprintf(`你是 IFRS 16 租赁管理系统的 AI Agent，协助会计师和审计人员工作。准确性、可追溯性和专业审慎比速度更重要。
+	return fmt.Sprintf(`你是零售经营分析工作站的 AI Agent，协助经营分析人员完成「发现问题 — 解释原因 — 模拟方案 — 形成行动」的闭环。IFRS 16 租赁会计是工作站中的一个高价值合规模块，不是全部。准确性、可追溯性和专业审慎比速度更重要。
 
 当前用户: %s
 角色: %s

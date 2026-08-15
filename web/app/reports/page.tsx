@@ -28,6 +28,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useUrlState } from "../hooks/useUrlState";
 import { staggerContainer, staggerItem } from "../design-system/animations";
 import { notifyError } from "../lib/notify";
+import { useRetailQuery } from "../retail/useRetailQuery";
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -192,30 +193,25 @@ function ReportsPageContent() {
   const [activeTab, setActiveTab] = useUrlState("tab", "ledger");
 
   /* ---- Tab 1: contract ledger ---- */
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
-
-  const fetchLedger = async (mode: "working" | "official") => {
-    if (!token) return;
-    setLoading(true);
-    try {
+  // FETCH-002: the ledger load goes through the shared fetch seam — the
+  // loading flag, race gate and error state are the seam's, not local state.
+  const { loading, state: ledgerState, retry: retryLedger } = useRetailQuery<{ data: any[]; summary: any }, { mode: "working" | "official" }>({
+    token,
+    params: activeTab === "ledger" ? { mode: reportMode } : null,
+    paramsKey: `ledger-${activeTab}-${reportMode}`,
+    fetcher: async (p, t) => {
       const [liabilityRes, summaryRes] = await Promise.all([
-        reportApi.liabilityRolling(mode, token, language),
-        reportApi.contractSummary(mode, token, language),
+        reportApi.liabilityRolling(p.mode, t, language),
+        reportApi.contractSummary(p.mode, t, language),
       ]);
-      setData(liabilityRes.data || []);
-      setSummary(summaryRes);
-    } catch (error: any) {
-      console.error("Failed to fetch reports:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+      return { data: liabilityRes.data || [], summary: summaryRes };
+    },
+  });
+  const ledgerData = ledgerState.kind === "ready" ? ledgerState.data?.data ?? [] : [];
+  const summary = ledgerState.kind === "ready" ? ledgerState.data?.summary ?? null : null;
   useEffect(() => {
-    if (activeTab === "ledger") fetchLedger(reportMode);
-  }, [reportMode, token, activeTab]);
+    if (ledgerState.kind === "failed") notifyError(ledgerState.message || t("reports.query_failed", language));
+  }, [ledgerState, language]);
 
   /* ---- Tab 2: amortisation ---- */
   const [amortView, setAmortView] = useState<"contract" | "store" | "tag" | "summary">("contract");
@@ -228,9 +224,7 @@ function ReportsPageContent() {
   const [amortContractId, setAmortContractId] = useState("");
   const [amortStore, setAmortStore] = useState("");
   const [amortTag, setAmortTag] = useState("");
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagLoading, setTagLoading] = useState(false);
   const [discountRateOverride, setDiscountRateOverride] = useState("");
   const [reportCurrency, setReportCurrency] = useState("");
   const [exchangeRate, setExchangeRate] = useState("");
@@ -306,22 +300,15 @@ function ReportsPageContent() {
     }
   }, [activeTab, reportMode, urlInitialized]);
 
-  // fetch available tags on mount / tab switch
-  useEffect(() => {
-    if (!token) return;
-    const fetchTags = async () => {
-      setTagLoading(true);
-      try {
-        const res = await reportApi.tags(token);
-        setAvailableTags(res.tags || []);
-      } catch {
-        // tags endpoint may not exist yet; swallow silently
-      } finally {
-        setTagLoading(false);
-      }
-    };
-    fetchTags();
-  }, [token]);
+  // fetch available tags on mount / tab switch (FETCH-002: seam-owned)
+  const tagsQuery = useRetailQuery<{ tags: string[] }, Record<string, never>>({
+    token,
+    params: {},
+    paramsKey: "reports-tags",
+    fetcher: async (_p, t) => ({ tags: (await reportApi.tags(t)).tags || [] }),
+  });
+  const availableTags = tagsQuery.state.kind === "ready" ? tagsQuery.state.data?.tags ?? [] : [];
+  const tagLoading = tagsQuery.loading;
 
   const handleAmortReset = () => {
     setAmortView("contract");
@@ -393,7 +380,7 @@ function ReportsPageContent() {
           {/* ─── Page Header ─── */}
           <PageHeader
             title={t("reports.title", language)}
-            subtitle={t("reports.subtitle", language)}
+
           />
 
           {/* ─── Report mode selector ─── */}
@@ -575,10 +562,10 @@ function ReportsPageContent() {
                             { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110 },
                             { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110 },
                           ]}
-                          dataSource={data}
+                          dataSource={ledgerData}
                           rowKey="contract_id"
                           pagination={{ pageSize: 10 }}
-                          scroll={data.length ? { x: "max-content" } : undefined}
+                          scroll={ledgerData.length ? { x: "max-content" } : undefined}
                           locale={{ emptyText: reportEmptyState(t("reports.empty_hint", language)) }}
                         />
                       </Spin>

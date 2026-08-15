@@ -467,11 +467,13 @@ CREATE TABLE IF NOT EXISTS ai_chat_sessions (
     status VARCHAR(30) NOT NULL DEFAULT 'active',
     bound_contract_id UUID REFERENCES lease_contracts(id),
     context_snapshot JSONB,
+    initiator VARCHAR(20) NOT NULL DEFAULT 'user',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     last_message_at TIMESTAMP WITH TIME ZONE,
     archived_at TIMESTAMP WITH TIME ZONE,
-    CHECK (status IN ('active', 'archived', 'closed'))
+    CHECK (status IN ('active', 'archived', 'closed')),
+    CHECK (initiator IN ('user', 'system'))
 );
 
 CREATE TABLE IF NOT EXISTS ai_chat_runs (

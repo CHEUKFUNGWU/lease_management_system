@@ -10,6 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
 import { notifyError } from "../../lib/notify";
+import { tableScrollX } from "../../lib/tableScroll";
 
 interface OfferResult {
   name: string;
@@ -248,7 +249,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                 pagination={false}
                 size="small"
                 style={{ marginBottom: 12 }}
-                scroll={{ x: 600 }}
+                scroll={tableScrollX((card.renewal_comparison.offers || []).length, 600)}
                 columns={[
                   { title: t("renewal.offer", language), dataIndex: "name", render: (name: string) => <strong>{scenarioLabel(name)}</strong> },
                   {
@@ -293,7 +294,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                 rowKey="name"
                 pagination={false}
                 size="small"
-                scroll={{ x: 900 }}
+                scroll={tableScrollX((card.decision_scenarios.scenarios || []).length, 900)}
                 expandable={{
                   expandedRowRender: (scenario: ScenarioResult) => scenario.decision === "terminate" && scenario.exit_curve?.length ? (
                     <Table

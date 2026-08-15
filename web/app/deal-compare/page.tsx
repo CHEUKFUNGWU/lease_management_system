@@ -27,7 +27,10 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { notifyError } from "../lib/notify";
+import { t } from "../lib/i18n";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Text } = Typography;
 
@@ -58,7 +61,7 @@ const LINE_COLORS = ["var(--chart-blue)", "var(--state-error-text)", "var(--stat
 // incentive package with escalation, and a flat deal.
 const INITIAL_OFFERS = [
   {
-    name: "方案 A",
+    name: "A",
     term_months: undefined,
     base_monthly_rent: undefined,
     rent_free_months: undefined,
@@ -69,7 +72,7 @@ const INITIAL_OFFERS = [
     area_sqm: undefined,
   },
   {
-    name: "方案 B",
+    name: "B",
     term_months: undefined,
     base_monthly_rent: undefined,
     rent_free_months: undefined,
@@ -83,6 +86,7 @@ const INITIAL_OFFERS = [
 
 export default function DealComparePage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const [form] = Form.useForm();
   const [result, setResult] = useState<Comparison | null>(null);
   const [loading, setLoading] = useState(false);
@@ -111,7 +115,7 @@ export default function DealComparePage() {
         )
       );
     } catch (error: any) {
-      notifyError(error?.message || "比价失败");
+      notifyError(error?.message || t("deal_compare.err_failed", language));
       setResult(null);
     } finally {
       setLoading(false);
@@ -140,8 +144,7 @@ export default function DealComparePage() {
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
           <PageHeader
-            title="条款比价"
-            subtitle={chartData.length > 0 ? `已比较 ${chartData.length} 个方案 · 按直线化有效租金与现金流现值折算` : "尚未生成比较结果 · 填写方案条款后计算"}
+            title={<>{t("deal_compare.title", language)}<span className="page-header-count">{t("deal_compare.header_count", language, { count: String(chartData.length) })}</span></>}
           />
 
           <Form
@@ -154,16 +157,16 @@ export default function DealComparePage() {
               <Row gutter={16}>
                 <Col xs={24} md={8}>
                   <Form.Item
-                    label="折现率（年化，小数）"
+                    label={t("deal_compare.label_rate", language)}
                     name="discount_rate"
-                    rules={[{ required: true, message: "请填写折现率" }]}
-                    extra="排序结果取决于它，系统不会替你假设一个"
+                    rules={[{ required: true, message: t("deal_compare.err_rate", language) }]}
+                    extra={t("deal_compare.hint_rate", language)}
                   >
                     <InputNumber style={{ width: "100%" }} min={0.0001} max={1} step={0.005} precision={4} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={8}>
-                  <Form.Item label="币种" name="currency" rules={[{ required: true, message: "请填写币种" }]}>
+                  <Form.Item label={t("deal_compare.label_currency", language)} name="currency" rules={[{ required: true, message: t("deal_compare.err_currency", language) }]}>
                     <Input placeholder="ISO 4217" />
                   </Form.Item>
                 </Col>
@@ -184,7 +187,7 @@ export default function DealComparePage() {
                               key={`${field.key}-name`}
                               name={[field.name, "name"]}
                               noStyle
-                              rules={[{ required: true, message: "请填写方案名称" }]}
+                              rules={[{ required: true, message: t("deal_compare.err_name", language) }]}
                             >
                               <Input variant="borderless" style={{ fontWeight: 600, padding: 0 }} />
                             </Form.Item>
@@ -205,9 +208,9 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-term`}
-                                label="租期（月）"
+                                label={t("deal_compare.label_term", language)}
                                 name={[field.name, "term_months"]}
-                                rules={[{ required: true, message: "请填写租期" }]}
+                                rules={[{ required: true, message: t("deal_compare.err_term", language) }]}
                               >
                                 <InputNumber style={{ width: "100%" }} min={1} />
                               </Form.Item>
@@ -216,9 +219,9 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-rent`}
-                                label="月租金"
+                                label={t("deal_compare.label_rent", language)}
                                 name={[field.name, "base_monthly_rent"]}
-                                rules={[{ required: true, message: "请填写月租金" }]}
+                                rules={[{ required: true, message: t("deal_compare.err_rent", language) }]}
                               >
                                 <InputNumber style={{ width: "100%" }} min={0} precision={2} />
                               </Form.Item>
@@ -227,7 +230,7 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-free`}
-                                label="免租期（月）"
+                                label={t("deal_compare.label_free", language)}
                                 name={[field.name, "rent_free_months"]}
                               >
                                 <InputNumber style={{ width: "100%" }} min={0} />
@@ -237,7 +240,7 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-esc`}
-                                label="年递增（%）"
+                                label={t("deal_compare.label_esc", language)}
                                 name={[field.name, "annual_escalation_percent"]}
                               >
                                 <InputNumber style={{ width: "100%" }} precision={2} />
@@ -247,9 +250,9 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-other`}
-                                label="月度其他成本"
+                                label={t("deal_compare.label_other", language)}
                                 name={[field.name, "other_monthly_cost"]}
-                                extra="物业费等，不随调租变动"
+                                extra={t("deal_compare.hint_other", language)}
                               >
                                 <InputNumber style={{ width: "100%" }} min={0} precision={2} />
                               </Form.Item>
@@ -258,9 +261,9 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-area`}
-                                label="面积（㎡）"
+                                label={t("deal_compare.label_area", language)}
                                 name={[field.name, "area_sqm"]}
-                                extra="留空则不出每平米单价"
+                                extra={t("deal_compare.hint_area", language)}
                               >
                                 <InputNumber style={{ width: "100%" }} min={0} precision={2} />
                               </Form.Item>
@@ -269,7 +272,7 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-upfront`}
-                                label="前期投入"
+                                label={t("deal_compare.label_upfront", language)}
                                 name={[field.name, "upfront_cost"]}
                               >
                                 <InputNumber style={{ width: "100%" }} min={0} precision={2} />
@@ -279,7 +282,7 @@ export default function DealComparePage() {
                               <Form.Item
                                 {...field}
                                 key={`${field.key}-contrib`}
-                                label="出租方装修补贴"
+                                label={t("deal_compare.label_contrib", language)}
                                 name={[field.name, "landlord_contribution"]}
                               >
                                 <InputNumber style={{ width: "100%" }} min={0} precision={2} />
@@ -295,13 +298,13 @@ export default function DealComparePage() {
                     {fields.length < 5 && (
                       <Button
                         icon={<PlusOutlined />}
-                        onClick={() => add({ ...INITIAL_OFFERS[1], name: `方案 ${String.fromCharCode(65 + fields.length)}` })}
+                        onClick={() => add({ ...INITIAL_OFFERS[1], name: t("deal_compare.plan_name", language, { letter: String.fromCharCode(65 + fields.length) }) })}
                       >
-                        添加方案
+                        {t("deal_compare.add_plan", language)}
                       </Button>
                     )}
                     <Button type="primary" icon={<SwapOutlined />} htmlType="submit" loading={loading}>
-                      比价
+                      {t("deal_compare.btn_compare", language)}
                     </Button>
                   </Space>
                 </>
@@ -315,61 +318,61 @@ export default function DealComparePage() {
                 type={result.measures_disagree ? "warning" : "success"}
                 showIcon
                 style={{ marginBottom: 16, borderRadius: 10 }}
-                message={result.measures_disagree ? "两个口径结论不一致" : "两个口径结论一致"}
+                message={result.measures_disagree ? t("deal_compare.disagree", language) : t("deal_compare.agree", language)}
                 description={result.conclusion}
               />
 
-              <Card title="条款比价结果" style={{ borderRadius: 10, marginBottom: 16 }}>
+              <Card title={t("deal_compare.card_result", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
                 <Table
                   dataSource={result.offers}
                   rowKey="name"
                   pagination={false}
                   size="small"
-                  scroll={{ x: 900 }}
+                  scroll={tableScrollX((result.offers || []).length, 900)}
                   columns={[
                     {
-                      title: "方案",
+                      title: t("deal_compare.col_plan", language),
                       dataIndex: "name",
                       render: (name: string) => (
                         <Space>
-                          <strong>{name}</strong>
-                          {name === result.best_by_present_value && <StatusTag kind="success">现值最优</StatusTag>}
-                          {name === result.best_by_effective_rent && <StatusTag kind="processing">有效租金最优</StatusTag>}
+                          <strong>{/^[A-Z]$/.test(name) ? t("deal_compare.plan_name", language, { letter: name }) : name}</strong>
+                          {name === result.best_by_present_value && <StatusTag kind="success">{t("deal_compare.badge_pv", language)}</StatusTag>}
+                          {name === result.best_by_effective_rent && <StatusTag kind="processing">{t("deal_compare.badge_rent", language)}</StatusTag>}
                         </Space>
                       ),
                     },
                     {
-                      title: "有效租金（月）",
+                      title: t("deal_compare.col_eff_rent", language),
                       dataIndex: "effective_monthly_rent",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "每平米有效单价",
+                      title: t("deal_compare.col_eff_sqm", language),
                       dataIndex: "effective_rent_per_sqm",
                       align: "right" as const,
                       render: (value: number) => (value > 0 ? fmtMoney(value, currency) : "—"),
                     },
                     {
-                      title: "首年租金",
+                      title: t("deal_compare.col_first_year", language),
                       dataIndex: "first_year_rent",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "全期租金",
+                      title: t("deal_compare.col_total_rent", language),
                       dataIndex: "total_rent",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "全期总成本",
+                      title: t("deal_compare.col_total_cost", language),
                       dataIndex: "total_cost",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "现值",
+                      title: t("deal_compare.col_pv", language),
                       dataIndex: "present_value",
                       align: "right" as const,
                       render: (value: number) => <strong>{fmtMoney(value, currency)}</strong>,
@@ -378,16 +381,16 @@ export default function DealComparePage() {
                 />
               </Card>
 
-              <Card title="累计现金支出" style={{ borderRadius: 10 }}>
+              <Card title={t("deal_compare.card_cash", language)} style={{ borderRadius: 10 }}>
                 <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
-                  免租期是一段平线，年递增是一段逐渐变陡的曲线——两条线交叉的位置，就是两个方案成本反超的时点。
+                  {t("deal_compare.cash_note", language)}
                 </div>
                 <div style={{ width: "100%", height: 320 }}>
                   <ResponsiveContainer>
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tickFormatter={(value) => `${value}月`} />
-                      <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 10000)}万`} />
+                      <XAxis dataKey="month" tickFormatter={(value) => t("deal_compare.month_suffix", language, { value: String(value) })} />
+                      <YAxis tickFormatter={(value) => t("deal_compare.axis_wan", language, { value: String(Math.round(Number(value) / 10000)) })} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value), currency)} />
                       <Legend />
                       {result.offers.map((offer, index) => (

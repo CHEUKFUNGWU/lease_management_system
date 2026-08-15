@@ -94,6 +94,7 @@ export default function BriefBand({ state, result, error, language, onRetry }: B
         basis={pulse?.basis}
         expanded={expanded}
         onToggle={() => setExpanded(!expanded)}
+        hideComparison={!expanded}
       />
       {expanded && (
         <div className="home-brief-band-body">

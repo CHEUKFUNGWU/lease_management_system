@@ -8,10 +8,13 @@ import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { HelpTrigger } from "../components/HelpDrawer";
+import { portfolioHelpContent } from "../components/help-content";
 import { reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { RentToSalesPanel } from "./RentToSalesPanel";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { motion } from "framer-motion";
 import { useUrlState } from "../hooks/useUrlState";
 import { notifyError } from "../lib/notify";
@@ -81,6 +84,7 @@ const fmt = (value: number) => value.toLocaleString(undefined, { maximumFraction
 
 function PortfolioPage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const [modeParam, setModeParam] = useUrlState("mode", "working");
   const [groupingParam, setGroupingParam] = useUrlState("group_by", "store");
   const mode: "working" | "official" = modeParam === "official" ? "official" : "working";
@@ -163,7 +167,8 @@ function PortfolioPage() {
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <PageHeader
               title="租赁组合分析"
-              subtitle="按资产类型、IFRS 16 范围和币种查看合同规模、租金承诺与非租赁成本暴露。"
+              help={<HelpTrigger content={portfolioHelpContent(language)} language={language} />}
+
               primaryAction={
                 <Space>
                   <Segmented

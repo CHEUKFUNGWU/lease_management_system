@@ -1,0 +1,78 @@
+/**
+ * FIX-024: a failed /pl-flow request must not be presented as an empty one.
+ *
+ * The regression this pins is concrete: the store-360 page swallowed the
+ * rejection (`.catch(() => setPlFlow(null))`), so when the backend did not
+ * serve the route at all the panel rendered its "pick a store" empty state.
+ * A dead endpoint and a store with no flow looked identical.
+ */
+import { describe, expect, it } from "vitest";
+import React from "react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { renderToStaticMarkup } from "react-dom/server";
+import ProfitFlowPanel from "./ProfitFlowPanel";
+import { LanguageProvider } from "../context/LanguageContext";
+import { t, type Language } from "../lib/i18n";
+
+const zh = "zh-CN" as Language;
+const page = readFileSync(path.join(import.meta.dirname, "page.tsx"), "utf8");
+
+function render(children: React.ReactNode) {
+  return renderToStaticMarkup(React.createElement(LanguageProvider, null, children));
+}
+
+describe("FIX-024: pl-flow failures surface", () => {
+  it("renders the failure with its reason, not the empty state", () => {
+    const markup = render(
+      React.createElement(ProfitFlowPanel, {
+        flow: null,
+        error: "请求未成功（/api/v1/retail/stores/x/pl-flow），请重试。",
+        language: zh,
+      })
+    );
+    expect(markup).toContain(t("store360.pl_flow.load_failed", zh));
+    expect(markup).toContain("/pl-flow");
+    // The empty-state copy must not be what a broken endpoint shows.
+    expect(markup).not.toContain(t("store360.pl_flow.pick_store", zh));
+  });
+
+  it("still shows the empty state when there is no error", () => {
+    const markup = render(React.createElement(ProfitFlowPanel, { flow: null, error: null, language: zh }));
+    expect(markup).toContain(t("store360.pl_flow.pick_store", zh));
+    expect(markup).not.toContain(t("store360.pl_flow.load_failed", zh));
+  });
+
+  it("the page passes the rejection on instead of discarding it", () => {
+    // FETCH-001: the failure now exits the shared fetch seam (useRetailQuery)
+    // as a STATE-001 failed state and reaches the panel via plFlowError.
+    expect(page).toContain("useRetailQuery");
+    expect(page).toContain("plFlowState.kind === \"failed\"");
+    expect(page).toContain("error={plFlowError}");
+    // The old swallow-everything catch is gone.
+    expect(page).not.toMatch(/\.catch\(\(\)\s*=>\s*\{[^}]*setPlFlow\(null\)[^}]*\}\)/);
+  });
+});
+
+describe("FIX-028: the flow is an option on the change card, not a card of its own", () => {
+  it("renders inside a measured frame — a bare Sankey has no width and draws nothing", () => {
+    const panel = readFileSync(path.join(import.meta.dirname, "ProfitFlowPanel.tsx"), "utf8");
+    expect(panel).toContain("ResponsiveContainer");
+    expect(panel).toContain("chart-frame");
+    // The panel no longer owns an outer Card; the change card provides it.
+    // Checked at the import, not in the body — the comment above the component
+    // mentions <Card> while explaining why it was removed.
+    const antdImport = /import\s*\{([^}]*)\}\s*from\s*"antd"/.exec(panel);
+    expect(antdImport, "the panel imports from antd").not.toBeNull();
+    expect(antdImport![1]).not.toMatch(/\bCard\b/);
+  });
+
+  it("puts the flow on the change card's switcher and follows it with the title", () => {
+    expect(page).toContain("PL_FLOW_OPTION");
+    expect(page).toContain("showPlFlow");
+    // Title switches with the selection.
+    expect(page).toMatch(/showPlFlow\s*\?\s*t\("store360\.pl_flow\.title"/);
+    // And there is exactly one place left that renders the panel.
+    expect(page.match(/<ProfitFlowPanel/g)).toHaveLength(1);
+  });
+});

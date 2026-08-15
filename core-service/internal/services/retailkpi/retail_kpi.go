@@ -106,9 +106,9 @@ func Definitions() []Definition {
 var chineseNames = map[string]string{
 	"revenue": "销售额", "gross_profit": "毛利额", "footfall": "客流", "transactions": "交易数",
 	"labor_cost": "人工成本", "fixed_rent": "固定现金租金", "variable_rent": "变动租金", "non_lease_cost": "非租赁占用成本",
-	"other_controllable_cost": "其他可控成本", "occupancy_cash_cost": "经营占用现金成本", "store_contribution": "门店贡献额",
+	"other_controllable_cost": "其他可控成本", "occupancy_cash_cost": "经营占用现金成本", "store_contribution": "门店经营利润",
 	"gross_margin_rate": "毛利率", "conversion_rate": "转化率", "average_transaction_value": "客单价", "labor_cost_rate": "人工成本率",
-	"rent_to_sales_rate": "租金销售比", "occupancy_cash_cost_rate": "经营占用成本率", "store_contribution_margin": "门店贡献率",
+	"rent_to_sales_rate": "租金销售比", "occupancy_cash_cost_rate": "经营占用成本率", "store_contribution_margin": "门店经营利润率",
 	"average_daily_area_sqm": "平均日经营面积", "sales_per_sqm": "期间坪效", "revenue_per_store_day": "单店日均销售",
 }
 

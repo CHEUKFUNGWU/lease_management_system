@@ -67,6 +67,21 @@ function ChatMessage({ message, language }: { message: HomeChatMessage; language
         {response.retail_operations?.pulse && (
           <DataTrustBar envelope={response.retail_operations.pulse.envelope} basis={response.retail_operations.pulse.basis} />
         )}
+        {/* FIX-013: the plan steps unfold in order once the answer arrives —
+            the request is one-shot, so the steps cannot stream, but they
+            render progressively instead of flashing whole. */}
+        {response.agent_plan && response.agent_plan.length > 0 && (
+          <ol className="home-chat-steps">
+            {response.agent_plan.map((step) => (
+              <li key={step.id} className={`home-chat-step is-${step.status === "completed" ? "done" : step.status === "failed" ? "failed" : "pending"}`}>
+                <span className="home-chat-step-mark" aria-hidden="true">
+                  {step.status === "completed" ? "✓" : step.status === "failed" ? "✗" : "…"}
+                </span>
+                <span>{step.title}</span>
+              </li>
+            ))}
+          </ol>
+        )}
         {trace && <ThinkingTrace thinking={trace} />}
         {response.sources && response.sources.length > 0 && (
           <div className="ai-tool-row">
@@ -146,8 +161,11 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     runBrief();
   }, [token, runBrief, runNonce]);
 
-  // The newest message scrolls into view like /ai-chat.
+  // The newest message scrolls into view like /ai-chat — but only when a
+  // conversation exists; on first load the end-of-stream ref is empty and
+  // scrolling to it would push the whole page down (FIX-007).
   useEffect(() => {
+    if (messages.length === 0) return;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
 
@@ -156,8 +174,8 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     setRunNonce((value) => value + 1);
   };
 
-  const send = async () => {
-    const message = input.trim();
+  const sendText = async (text: string) => {
+    const message = text.trim();
     if (!message || sending || !token) return;
     setInput("");
     setSending(true);
@@ -182,22 +200,27 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     }
   };
 
-  const askStarter = (question: string) => {
-    setInput(question);
-  };
+  const send = () => sendText(input);
+
+  // FIX-015: an empty conversation must not stretch the column to full height,
+  // or the composer sits ~800px below the starter chips with nothing between.
+  const isEmptyConversation = messages.length === 0 && !sending;
 
   return (
     <div className="home-chat-column">
       <BriefBand state={state} result={brief} error={error} language={language} onRetry={retry} />
-      <div className="home-chat-body">
-        {messages.length === 0 && !sending && (
+      <div className={isEmptyConversation ? "home-chat-body is-empty" : "home-chat-body"}>
+        {isEmptyConversation && (
           <div className="home-chat-starters">
             <Typography.Text type="secondary" className="home-chat-starters-label">
               {t("ai.quick_questions", language)}
             </Typography.Text>
             <div className="home-chat-starter-chips">
+              {/* FIX-008: starters send immediately, matching /ai-chat's
+                  handleChipClick → handleSend, instead of only filling the
+                  composer. */}
               {HOME_STARTER_KEYS.map((key) => (
-                <Button key={key} size="small" className="home-chat-starter-chip" onClick={() => askStarter(t(key, language))}>
+                <Button key={key} size="small" className="home-chat-starter-chip" onClick={() => sendText(t(key, language))}>
                   {t(key, language)}
                 </Button>
               ))}
@@ -209,7 +232,16 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
           {sending && (
             <div className="home-msg is-assistant">
               <Avatar icon={<RobotOutlined />} className="home-msg-avatar" />
-              <div className="home-msg-bubble is-assistant home-msg-pending">{t("home.chat_thinking", language)}</div>
+              <div className="home-msg-bubble is-assistant home-msg-pending">
+                {/* FIX-013: the pending bubble shows the step scaffold so the
+                    wait is readable, not a lone spinner text. */}
+                <div className="home-chat-steps" aria-hidden="true">
+                  <div className="home-chat-step is-pending" />
+                  <div className="home-chat-step is-pending" />
+                  <div className="home-chat-step is-pending" />
+                </div>
+                <span className="home-chat-pending-text">{t("home.chat_thinking", language)}</span>
+              </div>
             </div>
           )}
           <div ref={messagesEndRef} />

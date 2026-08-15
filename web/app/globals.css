@@ -1595,7 +1595,9 @@ html {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 14px 12px;
+  /* FIX-006: tightened so the collapsed strip stays ≤ 96px tall with the
+     trust bar on one line (measured 95px at 1440×900). */
+  padding: 8px 14px 8px;
   background: var(--bg-surface);
   border-radius: 8px;
   box-shadow: var(--shadow-static);

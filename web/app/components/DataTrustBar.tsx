@@ -54,6 +54,7 @@ export default function DataTrustBar({
   detailExtra,
   expanded,
   onToggle,
+  hideComparison,
 }: {
   envelope?: SourceEnvelope | null;
   basis?: string;
@@ -63,6 +64,11 @@ export default function DataTrustBar({
    *  together. Existing callers pass neither and keep the internal state. */
   expanded?: boolean;
   onToggle?: () => void;
+  /** FIX-006: drops the comparison-coverage segment from the summary row.
+   *  The collapsed brief band needs classification · coverage · readiness ·
+   *  count · expand entry in one line; the comparison belongs to the
+   *  expanded full picture. Uncontrolled callers keep the segment. */
+  hideComparison?: boolean;
 }) {
   const { language } = useLanguage();
   const [internalExpanded, setInternalExpanded] = useState(false);
@@ -88,14 +94,21 @@ export default function DataTrustBar({
           </span>
           {basis && <span>{basis}</span>}
           <span>{coverageText(envelope.current_coverage, language)}</span>
-          {comparison && <span>{t("trust.comparison", language)} {comparison}</span>}
+          {!hideComparison && comparison && <span>{t("trust.comparison", language)} {comparison}</span>}
           <span className={degraded ? "is-not-ready" : "is-ready"}>
             {degraded ? t("trust.not_ready", language) : t("trust.ready", language)}
           </span>
           {degraded && reason && <span className="data-trust-bar-reason">{reason}</span>}
-          <Button type="text" size="small" className="data-trust-bar-toggle" onClick={toggle} aria-expanded={isOpen}>
-            {isOpen ? t("trust.collapse", language) : t("trust.expand", language)}
-          </Button>
+          {/* FIX-006: controlled mode hides the bar's own toggle — the
+              controlled caller (HOME-004 BriefBand) drives expansion for
+              the bar and its container with one button, so a second toggle
+              with the same label would sit right below the first.
+              Uncontrolled callers keep the built-in toggle unchanged. */}
+          {!controlled && (
+            <Button type="text" size="small" className="data-trust-bar-toggle" onClick={toggle} aria-expanded={isOpen}>
+              {isOpen ? t("trust.collapse", language) : t("trust.expand", language)}
+            </Button>
+          )}
         </Space>
       </div>
       {isOpen && (

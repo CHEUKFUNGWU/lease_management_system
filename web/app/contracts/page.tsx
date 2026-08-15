@@ -259,14 +259,14 @@ function ContractsPage() {
       sorter: true,
       width: 260,
       render: (_: unknown, record: Contract) => (
-        <div style={{ minWidth: 220 }}>
+        <div className="sty-17e511d4">
           {/* FIX-030: the only way into a contract used to be a 12px muted
               arrow in the last column, with no label and no clickable row —
               the entry point was there but unreadable as one. The number is
               now the link, which is where anyone looks first. */}
           <a className="contract-number-link" onClick={() => router.push(`/contracts/${record.id}`)}>{record.contract_number}</a>
-          <div style={{ color: "var(--fg-secondary)", fontWeight: 500, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={record.contract_name}>{record.contract_name}</div>
-          {record.discount_rate_missing && <StatusTag kind="error" style={{ marginTop: 5, fontSize: 11, padding: "1px 7px" }}>{t("contracts.discount_rate_missing", language)}</StatusTag>}
+          <div className="sty-9ac25994" title={record.contract_name}>{record.contract_name}</div>
+          {record.discount_rate_missing && <StatusTag kind="error" className="sty-6ddf9e71">{t("contracts.discount_rate_missing", language)}</StatusTag>}
         </div>
       ),
     },
@@ -276,7 +276,7 @@ function ContractsPage() {
       key: "currency",
       width: 80,
       render: (text: string) => (
-        <span style={{ fontWeight: 500, fontSize: 13, color: "var(--fg-tertiary)" }}>
+        <span className="sty-3afd6deb">
           {text}
         </span>
       ),
@@ -306,7 +306,7 @@ function ContractsPage() {
             {fmtMoney(record.current_rent, record.current_rent_currency ?? record.currency)}
           </div>
           {record.current_rent_coverage_start && record.current_rent_coverage_end && (
-            <div style={{ fontSize: 12, color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
+            <div className="sty-0e5391a4">
               {dayjs(record.current_rent_coverage_start).format("YYYY-MM-DD")}
               {" ~ "}
               {dayjs(record.current_rent_coverage_end).format("YYYY-MM-DD")}
@@ -322,7 +322,7 @@ function ContractsPage() {
       sorter: true,
       width: 130,
       render: (text: string) => (
-        <span style={{ fontSize: 13, color: "var(--fg-tertiary)", fontFamily: "monospace" }}>
+        <span className="sty-0e5391a4">
           {text}
         </span>
       ),
@@ -334,7 +334,7 @@ function ContractsPage() {
       sorter: true,
       width: 130,
       render: (text: string) => (
-        <span style={{ fontSize: 13, color: "var(--fg-tertiary)", fontFamily: "monospace" }}>
+        <span className="sty-5e6ef0d9">
           {text}
         </span>
       ),
@@ -350,32 +350,19 @@ function ContractsPage() {
           <Space size={4}>
             <StatusTag
               kind={STATUS_COLORS[status] || "neutral"}
-              style={{ fontWeight: 500, margin: 0 }}
+              className="sty-d7a8387d"
             >
               {STATUS_LABELS[status] || status}
             </StatusTag>
             {record.is_official_version && (
               <Badge
                 count={t("contracts.official", language)}
-                style={{
-                  background: "var(--fg-primary)",
-                  color: "var(--fg-inverse)",
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: "0 6px",
-                  height: 18,
-                  lineHeight: "18px",
-                  borderRadius: 4,
-                }}
+                className="sty-ef82e49c"
               />
             )}
             {!record.is_official_version && status !== "draft" && (
               <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--fg-muted)",
-                  fontWeight: 500,
-                }}
+                className="sty-ab79ea2b"
               >
                 {t("contracts.working", language)}
               </span>
@@ -390,7 +377,7 @@ function ContractsPage() {
       key: "lease_scope",
       width: 110,
       render: (_: any, record: Contract) => (
-        <StatusTag kind={LEASE_SCOPE_COLORS[record.lease_scope || "in_scope"]} style={{ margin: 0 }}>
+        <StatusTag kind={LEASE_SCOPE_COLORS[record.lease_scope || "in_scope"]} className="sty-32c4a785">
           {t(LEASE_SCOPE_KEYS[record.lease_scope || "in_scope"] || "contracts.scope_in_scope", language)}
         </StatusTag>
       ),
@@ -410,18 +397,9 @@ function ContractsPage() {
         <Button
           type="text"
           size="small"
-          icon={<ArrowRightOutlined style={{ fontSize: 12 }} />}
+          icon={<ArrowRightOutlined className="sty-e16cb0e3" />}
           onClick={() => router.push(`/contracts/${record.id}`)}
-          style={{
-            color: "var(--fg-muted)",
-            borderRadius: 6,
-            width: 28,
-            height: 28,
-            padding: 0,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
+          className="sty-cd77f5b4"
           onMouseEnter={(e) => {
             e.currentTarget.style.color = "var(--fg-primary)";
             e.currentTarget.style.background = "var(--bg-inset)";
@@ -458,7 +436,7 @@ function ContractsPage() {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => router.push("/contracts/new")}
-                style={{ borderRadius: 9999, fontWeight: 500 }}
+                className="sty-5ab5e82b"
               >
                 {t("contracts.add_contract", language)}
               </Button>
@@ -474,49 +452,31 @@ function ContractsPage() {
         >
           <Card
             styles={{ body: { padding: "16px 20px" } }}
-            style={{ borderRadius: 10, marginBottom: 16 }}
+            className="sty-91b8ec7c"
           >
             <div
-              style={{
-                display: "flex",
-                gap: 12,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
+              className="sty-e63acfbd"
             >
-              <div style={{ position: "relative", flex: 1, minWidth: 280, maxWidth: 400 }}>
+              <div className="sty-bb510439">
                 <SearchOutlined
-                  style={{
-                    position: "absolute",
-                    left: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "var(--fg-muted)",
-                    fontSize: 14,
-                    zIndex: 1,
-                  }}
+                  className="sty-cceb8d9d"
                 />
                 <Input
                   placeholder={t("contracts.search_placeholder", language)}
                   value={search}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   allowClear
-                  style={{
-                    paddingLeft: 36,
-                    borderRadius: 9999,
-                    height: 36,
-                    fontSize: 13,
-                  }}
+                  className="sty-a1f31e15"
                 />
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <FilterOutlined style={{ color: "var(--fg-muted)", fontSize: 14 }} />
+              <div className="sty-05d4bcf4">
+                <FilterOutlined className="sty-cee1122c" />
                 <Select
                   value={statusFilter}
                   onChange={(value) => { setPageParam("1"); setStatusFilter(value); }}
                   options={STATUS_OPTIONS}
-                  style={{ width: 140 }}
+                  className="sty-477fa20b"
                   size="middle"
                   placeholder={t("contracts.filter_status", language)}
                 />
@@ -528,7 +488,7 @@ function ContractsPage() {
                 allowClear
                 placeholder={t("contracts.filter_risk", language)}
                 options={[{ value: "discount_rate_missing", label: t("contracts.risk_missing_discount_rate", language) }]}
-                style={{ width: 150 }}
+                className="sty-cee1122c"
               />
 
               <Select
@@ -537,7 +497,7 @@ function ContractsPage() {
                 allowClear
                 placeholder={t("contracts.filter_scope", language)}
                 options={Object.entries(LEASE_SCOPE_KEYS).map(([value, key]) => ({ value, label: t(key, language) }))}
-                style={{ width: 140 }}
+                className="sty-ced30fdd"
               />
 
               <Select
@@ -546,7 +506,7 @@ function ContractsPage() {
                 allowClear
                 placeholder={t("contracts.filter_asset_type", language)}
                 options={Object.entries(ASSET_TYPE_KEYS).map(([value, key]) => ({ value, label: t(key, language) }))}
-                style={{ width: 130 }}
+                className="sty-cee1122c"
               />
 
               <Select
@@ -558,23 +518,23 @@ function ContractsPage() {
                   { value: "90", label: t("contracts.expiry_90", language) },
                   { value: "180", label: t("contracts.expiry_180", language) },
                 ]}
-                style={{ width: 140 }}
+                className="sty-f5911ea9"
               />
 
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+              <div className="sty-729b7a2c">
                 <Button
                   type={sortOrder === "desc" ? "primary" : "default"}
                   size="small"
                   icon={<SortDescendingOutlined />}
                   onClick={() => setSortOrder("desc")}
-                  style={{ borderRadius: 6 }}
+                  className="sty-729b7a2c"
                 />
                 <Button
                   type={sortOrder === "asc" ? "primary" : "default"}
                   size="small"
                   icon={<SortAscendingOutlined />}
                   onClick={() => setSortOrder("asc")}
-                  style={{ borderRadius: 6 }}
+                  className="sty-4308db27"
                 />
               </div>
             </div>
@@ -589,13 +549,9 @@ function ContractsPage() {
         >
           {selectedRowKeys.length > 0 && (
             <div
-              style={{
-                display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
-                padding: "10px 16px", borderRadius: 10,
-                background: "var(--bg-inset)", border: "1px solid var(--border-default)",
-              }}
+              className="sty-e3e86ee5"
             >
-              <span style={{ fontSize: 13 }}>
+              <span className="sty-073b2a94">
                 {t("contracts.selected_count", language, { count: String(selectedRowKeys.length) })}
               </span>
               <Button size="small" type="primary" loading={bulkSubmitting} onClick={handleBulkSubmit}>
@@ -610,7 +566,7 @@ function ContractsPage() {
           <div className="contracts-desktop-table">
           <Card
             styles={{ body: { padding: 0 } }}
-            style={{ borderRadius: 10, overflow: "visible" }}
+            className="sty-c6e381ce"
           >
             <Table
               columns={columns}
@@ -644,9 +600,9 @@ function ContractsPage() {
                   const text = t("contracts.total_items", language, { total: "__TOTAL__" });
                   const [before, after] = text.split("__TOTAL__");
                   return (
-                    <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+                    <span className="sty-73be230f">
                       {before}
-                      <strong style={{ color: "var(--fg-primary)" }}>{total}</strong>
+                      <strong className="sty-96007dcc">{total}</strong>
                       {after}
                     </span>
                   );
@@ -658,7 +614,7 @@ function ContractsPage() {
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                     description={
-                      <span style={{ color: "var(--fg-muted)" }}>
+                      <span className="sty-22a08c80">
                         {hasFilters
                           ? t("contracts.no_search_results", language)
                           : t("contracts.no_data", language)}
@@ -701,7 +657,7 @@ function ContractsPage() {
                   return (
                     <div className="contract-mobile-card" key={record.id}>
                       <div className="contract-mobile-card-header">
-                        <div style={{ minWidth: 0 }}>
+                        <div className="sty-dc0fa432">
                           <div className="contract-mobile-number">{record.contract_number}</div>
                           <div className="contract-mobile-name" title={record.contract_name}>{record.contract_name}</div>
                         </div>
@@ -724,7 +680,7 @@ function ContractsPage() {
                           <span>{t("contracts.col_current_rent", language)}</span>
                           <strong>{fmtMoney(record.current_rent, record.current_rent_currency ?? record.currency)}</strong>
                           {record.current_rent_coverage_start && record.current_rent_coverage_end && (
-                            <small style={{ display: "block", marginTop: 3, color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
+                            <small className="sty-8d9ffc18">
                               {dayjs(record.current_rent_coverage_start).format("YYYY-MM-DD")}
                               {" ~ "}
                               {dayjs(record.current_rent_coverage_end).format("YYYY-MM-DD")}
@@ -755,7 +711,7 @@ function ContractsPage() {
 
 export default function ContractsPageWithUrlState() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+    <Suspense fallback={<div className="sty-8d9ffc18" />}>
       <ContractsPage />
     </Suspense>
   );

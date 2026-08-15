@@ -236,7 +236,7 @@ export function ContractWorkspaceDialogs({
                   name="due_date"
                   rules={[{ required: true, message: t("contract_detail.validation.payment_date", language) }]}
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -246,7 +246,7 @@ export function ContractWorkspaceDialogs({
                   rules={[{ required: true, message: t("contract_detail.validation.amount", language) }]}
                 >
                   <InputNumber
-                    style={{ width: "100%" }}
+                    className="sty-70ea3314"
                     min={0}
                     precision={2}
                     prefix={scheduleCurrency || ""}
@@ -285,7 +285,7 @@ export function ContractWorkspaceDialogs({
                   label={t("contract.effective_start_date", language)}
                   name="effective_start_date"
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -293,7 +293,7 @@ export function ContractWorkspaceDialogs({
                   label={t("contract.effective_end_date", language)}
                   name="effective_end_date"
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
             </Row>
@@ -304,7 +304,7 @@ export function ContractWorkspaceDialogs({
                   name="lease_end_date"
                   rules={[{ required: true, message: t("contract_detail.validation.lease_end_date", language) }]}
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -321,7 +321,7 @@ export function ContractWorkspaceDialogs({
                   name="discount_rate_value"
                   help={t("contract.discount_rate_help", language)}
                 >
-                  <InputNumber style={{ width: "100%" }} min={0} step={0.01} placeholder={t("contract_detail.discount_rate_placeholder", language)} />
+                  <InputNumber className="sty-70ea3314" min={0} step={0.01} placeholder={t("contract_detail.discount_rate_placeholder", language)} />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -430,7 +430,7 @@ export function ContractWorkspaceDialogs({
               name="effective_date"
               rules={[{ required: true, message: t("contract_detail.validation.effective_date", language) }]}
             >
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker className="sty-4ffb9b7c" />
             </Form.Item>
 
             <Row gutter={16}>
@@ -461,8 +461,8 @@ export function ContractWorkspaceDialogs({
             {/* The clause replaces editing the payment schedule by hand. Stating
                 it here means the event and the revised rent can no longer
                 disagree, because one is derived from the other. */}
-            <Divider style={{ margin: "8px 0 16px" }}>
-              <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>调租条款（可选）</span>
+            <Divider className="sty-b8bb6f7b">
+              <span className="sty-70ea3314">调租条款（可选）</span>
             </Divider>
 
             <Form.Item
@@ -475,7 +475,7 @@ export function ContractWorkspaceDialogs({
 
             {clauseKind === "set_amount" && (
               <Form.Item label="调整后租金" name="revision_amount" rules={[{ required: true, message: "请填写调整后租金" }]}>
-                <InputNumber style={{ width: "100%" }} min={0} precision={2} prefix={contract?.currency || ""} />
+                <InputNumber className="sty-70ea3314" min={0} precision={2} prefix={contract?.currency || ""} />
               </Form.Item>
             )}
 
@@ -486,7 +486,7 @@ export function ContractWorkspaceDialogs({
                 rules={[{ required: true, message: "请填写涨跌幅" }]}
                 extra="正数为上调，负数为下调。例如装修期减租填 -50。"
               >
-                <InputNumber style={{ width: "100%" }} precision={4} />
+                <InputNumber className="sty-70ea3314" precision={4} />
               </Form.Item>
             )}
 
@@ -495,24 +495,24 @@ export function ContractWorkspaceDialogs({
                 <Row gutter={16}>
                   <Col span={12}>
                     <Form.Item label="基期指数" name="revision_base_index" rules={[{ required: true, message: "请填写基期指数" }]}>
-                      <InputNumber style={{ width: "100%" }} min={0} precision={4} />
+                      <InputNumber className="sty-70ea3314" min={0} precision={4} />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
                     <Form.Item label="现期指数" name="revision_new_index" rules={[{ required: true, message: "请填写现期指数" }]}>
-                      <InputNumber style={{ width: "100%" }} min={0} precision={4} />
+                      <InputNumber className="sty-70ea3314" min={0} precision={4} />
                     </Form.Item>
                   </Col>
                 </Row>
                 <Row gutter={16}>
                   <Col span={12}>
                     <Form.Item label="封顶涨幅（%）" name="revision_cap" extra="留空表示不封顶">
-                      <InputNumber style={{ width: "100%" }} precision={4} />
+                      <InputNumber className="sty-70ea3314" precision={4} />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
                     <Form.Item label="保底涨幅（%）" name="revision_floor" extra="留空表示无下限">
-                      <InputNumber style={{ width: "100%" }} precision={4} />
+                      <InputNumber className="sty-7f21e1ba" precision={4} />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -522,9 +522,9 @@ export function ContractWorkspaceDialogs({
             {clauseKind === "stepped" && (
               <Form.List name="revision_steps">
                 {(fields, { add, remove }) => (
-                  <div style={{ marginBottom: 16 }}>
+                  <div className="sty-5822ad35">
                     {fields.map((field) => (
-                      <Row gutter={8} key={field.key} style={{ marginBottom: 8 }}>
+                      <Row gutter={8} key={field.key} className="sty-70ea3314">
                         <Col span={11}>
                           <Form.Item
                             {...field}
@@ -532,7 +532,7 @@ export function ContractWorkspaceDialogs({
                             name={[field.name, "from_date"]}
                             noStyle
                           >
-                            <DatePicker style={{ width: "100%" }} placeholder="自该日起" />
+                            <DatePicker className="sty-70ea3314" placeholder="自该日起" />
                           </Form.Item>
                         </Col>
                         <Col span={10}>
@@ -542,17 +542,17 @@ export function ContractWorkspaceDialogs({
                             name={[field.name, "amount"]}
                             noStyle
                           >
-                            <InputNumber style={{ width: "100%" }} min={0} precision={2} placeholder="租金" />
+                            <InputNumber className="sty-70ea3314" min={0} precision={2} placeholder="租金" />
                           </Form.Item>
                         </Col>
                         <Col span={3}>
-                          <Button danger size="small" onClick={() => remove(field.name)} style={{ width: "100%" }}>
+                          <Button danger size="small" onClick={() => remove(field.name)} className="sty-70ea3314">
                             删除
                           </Button>
                         </Col>
                       </Row>
                     ))}
-                    <Button size="small" onClick={() => add()} style={{ width: "100%" }}>
+                    <Button size="small" onClick={() => add()} className="sty-70ea3314">
                       添加一级阶梯
                     </Button>
                   </div>
@@ -565,12 +565,12 @@ export function ContractWorkspaceDialogs({
                 <Row gutter={16}>
                   <Col span={12}>
                     <Form.Item label="条款起始日" name="revision_applies_from" extra="留空则取生效日">
-                      <DatePicker style={{ width: "100%" }} />
+                      <DatePicker className="sty-70ea3314" />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
                     <Form.Item label="条款结束日" name="revision_applies_to" extra="留空则至租期结束">
-                      <DatePicker style={{ width: "100%" }} />
+                      <DatePicker className="sty-37c08d18" />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -578,14 +578,14 @@ export function ContractWorkspaceDialogs({
                 <Button
                   onClick={handlePreviewPayments}
                   loading={clauseDraftLoading}
-                  style={{ marginBottom: 12 }}
+                  className="sty-37c08d18"
                   block
                 >
                   推导修订付款流
                 </Button>
 
                 {clauseDraftError && (
-                  <Alert type="error" showIcon message={clauseDraftError} style={{ marginBottom: 12 }} />
+                  <Alert type="error" showIcon message={clauseDraftError} className="sty-37c08d18" />
                 )}
 
                 {clauseDraft && (
@@ -593,7 +593,7 @@ export function ContractWorkspaceDialogs({
                     <Alert
                       type="info"
                       showIcon
-                      style={{ marginBottom: 12 }}
+                      className="sty-a8f26b1e"
                       message={
                         <span>
                           {clauseDraft.changed_count} 笔付款变动，合计{" "}
@@ -636,7 +636,7 @@ export function ContractWorkspaceDialogs({
                           dataIndex: "delta",
                           align: "right" as const,
                           render: (value: number) => (
-                            <span style={{ color: value > 0 ? "var(--state-error-text)" : undefined }}>
+                            <span className="sty-70ea3314">
                               {fmtMoney(value, contract?.currency)}
                             </span>
                           ),
@@ -722,7 +722,7 @@ export function ContractWorkspaceDialogs({
               </Col>
               <Col span={12}>
                 <Form.Item label={t("contract.signing_date", language)} name="signing_date">
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
             </Row>
@@ -744,7 +744,7 @@ export function ContractWorkspaceDialogs({
                   name="commencement_date"
                   rules={[{ required: true, message: t("contract_detail.validation.commencement_date", language) }]}
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -753,7 +753,7 @@ export function ContractWorkspaceDialogs({
                   name="lease_start_date"
                   rules={[{ required: true, message: t("contract_detail.validation.lease_start_date", language) }]}
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
             </Row>
@@ -765,7 +765,7 @@ export function ContractWorkspaceDialogs({
                   name="lease_end_date"
                   rules={[{ required: true, message: t("contract_detail.validation.lease_end_date", language) }]}
                 >
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -848,14 +848,14 @@ export function ContractWorkspaceDialogs({
               </Col>
               <Col span={12}>
                 <Form.Item label="目标日期" name="target_date" rules={[{ required: true, message: "请选择目标日期" }]}>
-                  <DatePicker style={{ width: "100%" }} />
+                  <DatePicker className="sty-70ea3314" />
                 </Form.Item>
               </Col>
             </Row>
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item label="提前提醒天数" name="reminder_days">
-                  <InputNumber min={0} max={365} style={{ width: "100%" }} />
+                  <InputNumber min={0} max={365} className="sty-70ea3314" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -963,7 +963,7 @@ export function ContractWorkspaceDialogs({
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item label="来源页码" name="source_page">
-                  <InputNumber min={1} style={{ width: "100%" }} />
+                  <InputNumber min={1} className="sty-5822ad35" />
                 </Form.Item>
               </Col>
               <Col span={16}>
@@ -984,7 +984,7 @@ export function ContractWorkspaceDialogs({
           okText={t("contract.ok", language)}
           cancelText={t("contract.cancel", language)}
         >
-          <p style={{ marginBottom: 8 }}>
+          <p className="sty-5822ad35">
             {rejectModalType === 'review' ? t("contract.review_reject_reason", language) : t("contract.approve_reject_reason", language)}
           </p>
           <Input.TextArea
@@ -1004,7 +1004,7 @@ export function ContractWorkspaceDialogs({
           okText={t("contract.ok", language)}
           cancelText={t("contract.cancel", language)}
         >
-          <p style={{ marginBottom: 8 }}>
+          <p className="sty-a8f26b1e">
             {eventRejectType === 'review' ? t("contract.review_reject_reason", language) : t("contract.approve_reject_reason", language)}
           </p>
           <Input.TextArea
@@ -1040,12 +1040,12 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_after", language)}>
                 {adjustmentModalData.liability_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "var(--fg-primary)" }}>{fmtMoney(adjustmentModalData.liability_after, adjustmentCurrency)}</span>
+                  <span className="sty-a8f26b1e">{fmtMoney(adjustmentModalData.liability_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_change", language)}>
                 {adjustmentModalData.liability_change != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.liability_change >= 0 ? "var(--fg-primary)" : "var(--fg-primary)" }}>
+                  <span className="sty-a8f26b1e">
                     {adjustmentModalData.liability_change >= 0 ? "+" : ""}
                     {fmtMoney(adjustmentModalData.liability_change, adjustmentCurrency)}
                   </span>
@@ -1056,7 +1056,7 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_after", language)}>
                 {adjustmentModalData.asset_after != null ? (
-                  <span style={{ fontWeight: "bold", color: "var(--fg-primary)" }}>{fmtMoney(adjustmentModalData.asset_after, adjustmentCurrency)}</span>
+                  <span className="sty-a8f26b1e">{fmtMoney(adjustmentModalData.asset_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_change", language)}>

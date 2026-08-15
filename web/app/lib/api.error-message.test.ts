@@ -52,3 +52,27 @@ describe("ApiError.userMessage discount-rate-missing data_unavailable", () => {
     }
   });
 });
+
+describe("DIAG-001 error classification", () => {
+  it("names the fix for unconfigured rent-to-sales policy thresholds", () => {
+    const error = new ApiError("data_unavailable", 422, {
+      code: "data_unavailable",
+      error: "rent-to-sales thresholds are not configured",
+      details: { reason: "policy_thresholds_missing", resource: "rent-to-sales" },
+    });
+    expect(error.message).toBe(t("api.policy_thresholds_missing", "zh-CN"));
+    expect(error.message).toContain("租售比");
+    expect(error.message).not.toContain("请稍后重试");
+  });
+
+  it("names the failing endpoint in the unclassified fallback", () => {
+    const error = new ApiError("http_422", 422, { error: "legacy body" }, "/api/v1/reports/rent-to-sales");
+    expect(error.message).toContain("/api/v1/reports/rent-to-sales");
+    expect(error.message).toContain("请求未成功");
+  });
+
+  it("keeps the bare fallback when no endpoint is known", () => {
+    const error = new ApiError("http_422", 422, {});
+    expect(error.message).toBe(t("api.request_failed", "zh-CN"));
+  });
+});

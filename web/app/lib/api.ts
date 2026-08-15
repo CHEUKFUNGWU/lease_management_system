@@ -14,24 +14,35 @@ export function setApiLanguage(language: Language) {
   apiLanguage = language;
 }
 
+// DIAG-001: details.reason === "policy_thresholds_missing" (rent-to-sales
+// ceilings unconfigured) — a config gap the user can close in settings.
+function isPolicyThresholdsMissing(detail: unknown): boolean {
+  if (typeof detail !== "object" || detail === null) return false;
+  return (detail as { details?: { reason?: unknown } }).details?.reason === "policy_thresholds_missing";
+}
+
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly detail?: unknown;
+  /** DIAG-001: the endpoint that failed — surfaced in fallback copy so the
+   *  generic message still names the failing capability. */
+  readonly endpoint?: string;
 
-  constructor(code: string, status: number, detail?: unknown) {
-    super(ApiError.userMessage(code, status, detail));
+  constructor(code: string, status: number, detail?: unknown, endpoint?: string) {
+    super(ApiError.userMessage(code, status, detail, endpoint));
     this.name = "ApiError";
     this.code = code;
     this.status = status;
     this.detail = detail;
+    this.endpoint = endpoint;
   }
 
   // ERR-002: the mapping branches on the shared error-contract vocabulary
   // (errcontract, see core-service/internal/errcontract) instead of invented
   // client codes. Status codes remain only as a fallback for legacy
   // endpoints that do not emit a code yet.
-  static userMessage(code: string, status: number, detail?: unknown): string {
+  static userMessage(code: string, status: number, detail?: unknown, endpoint?: string): string {
     switch (code) {
       case "unauthenticated":
         return t("api.session_expired", apiLanguage);
@@ -52,8 +63,10 @@ export class ApiError extends Error {
         return t("api.request_failed", apiLanguage);
       case "data_unavailable":
         // FIX-002: discount-rate 422s get contract-specific, actionable copy.
+        // DIAG-001: unconfigured policy thresholds likewise name the fix.
         // Anything else under this code keeps the generic message.
         {
+          if (isPolicyThresholdsMissing(detail)) return t("api.policy_thresholds_missing", apiLanguage);
           const contracts = discountRateMissingContracts(detail);
           if (contracts !== null && contracts.length > 0) {
             return t("api.discount_rate_missing", apiLanguage, { contracts: contracts.join("、") });
@@ -75,6 +88,9 @@ export class ApiError extends Error {
         if (status === 403) return t("api.forbidden", apiLanguage);
         if (status === 404) return t("api.not_found", apiLanguage);
         if (status >= 500) return t("api.server_unavailable", apiLanguage);
+        // DIAG-001: the fallback names the failing capability so a raw
+        // "request failed" never hides which call broke.
+        if (endpoint) return t("api.request_failed_with_endpoint", apiLanguage, { endpoint });
         return t("api.request_failed", apiLanguage);
     }
   }
@@ -396,7 +412,7 @@ export async function apiRequest(
     if (response.status === 401 && typeof window !== "undefined" && !endpoint.startsWith("/api/v1/auth/")) {
       window.dispatchEvent(new Event("auth-session-expired"));
     }
-    throw new ApiError(code, response.status, error);
+    throw new ApiError(code, response.status, error, endpoint);
   }
 
   return response.json();

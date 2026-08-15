@@ -53,6 +53,13 @@ const dict: TranslationDict = {
     "zh-HK": "折現率缺失，無法計量租賃指標。請先在合同工作台確認折現率，或在系統設定配置全域折現率政策。",
     en: "The discount rate is missing, so lease metrics cannot be measured. Confirm the rate in the contract workspace first, or set a global rate policy in system settings.",
   },
+  // DIAG-001: rent-to-sales needs its healthy/warning ceilings from policy
+  // settings — a config gap, so the copy says what to configure, not retry.
+  "api.policy_thresholds_missing": {
+    "zh-CN": "租售比健康线与预警线尚未配置，无法计算租售比。请到系统设置的参数配置中补齐后重试。",
+    "zh-HK": "租售比健康線與預警線尚未配置，無法計算租售比。請到系統設定的參數配置中補齊後重試。",
+    en: "The rent-to-sales healthy and warning ceilings are not configured. Set them under system settings parameters, then retry.",
+  },
   "api.server_unavailable": {
     "zh-CN": "服务暂时不可用，请稍后重试。",
     "zh-HK": "服務暫時不可用，請稍後重試。",
@@ -70,6 +77,13 @@ const dict: TranslationDict = {
     "zh-CN": "请求未成功，请重试。",
     "zh-HK": "請求未成功，請重試。",
     en: "The request did not succeed. Please try again.",
+  },
+  // DIAG-001: the unclassified fallback names the failing capability so the
+  // toast points at the broken call instead of hiding it.
+  "api.request_failed_with_endpoint": {
+    "zh-CN": "请求未成功（{endpoint}），请重试。",
+    "zh-HK": "請求未成功（{endpoint}），請重試。",
+    en: "The request to {endpoint} did not succeed. Please try again.",
   },
 
   // I18N-001 — retail shared labels (CONTEXT.md terminology)

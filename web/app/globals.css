@@ -1657,6 +1657,10 @@ html {
 .home-brief-placeholder {
   border-radius: 10px;
 }
+/* STATE-001: 设置页标签统计的 actionable 提示（折现率缺失阻塞） */
+.settings-tags-actionable {
+  margin-bottom: 16px;
+}
 /* FIX-021: the money KPI value line (26px compact figure + currency) must
    never reflow — a fixed-width card cannot grow, so the line truncates and
    keeps the full value in its title tooltip. */

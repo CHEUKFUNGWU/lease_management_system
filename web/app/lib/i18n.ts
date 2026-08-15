@@ -793,6 +793,13 @@ const dict: TranslationDict = {
   "store360.pl_flow.formula": { "zh-CN": "口径", "zh-HK": "口徑", en: "Formula" },
   "store360.pl_flow.unavailable": { "zh-CN": "当前窗口没有可用于利润流向的经营事实", "zh-HK": "當前窗口沒有可用於利潤流向的經營事實", en: "No operating facts in the current window for a profit-flow view" },
   "store360.pl_flow.pick_store": { "zh-CN": "选择门店后展示利润流向", "zh-HK": "選擇門店後展示利潤流向", en: "Pick a store to see its profit flow" },
+  // STATE-001：门店 360 正式数据下无事实（404）→ actionable
+  "store360.actionable_production_empty": { "zh-CN": "正式数据下没有该门店的经营事实。切换到模拟数据，或先导入正式数据。", "zh-HK": "正式數據下沒有該門店的經營事實。切換到模擬數據，或先導入正式數據。", en: "No operating facts for this store under production data. Switch to simulated data, or import production facts first." },
+  "store360.actionable_switch_simulated": { "zh-CN": "切换到模拟数据", "zh-HK": "切換到模擬數據", en: "Switch to simulated" },
+  // STATE-001：合同详情无付款计划时计量 → actionable
+  "contract_detail.calculate_no_schedules": { "zh-CN": "该合同还没有付款计划，无法计量。已为你打开付款计划页签，去添加付款计划。", "zh-HK": "該合同還沒有付款計劃，無法計量。已為你打開付款計劃頁簽，去添加付款計劃。", en: "This contract has no payment schedule yet, so it cannot be measured. The payments tab is open — add a schedule there." },
+  // STATE-001：设置页标签统计被折现率缺失阻塞 → actionable
+  "settings.tags_actionable": { "zh-CN": "标签统计需要先补全折现率：{contracts}。请到合同工作台补录，或在本页配置全局折现率。", "zh-HK": "標籤統計需要先補全折現率：{contracts}。請到合同工作台補錄，或在本頁配置全域折現率。", en: "Tag statistics need a confirmed discount rate first: {contracts}. Confirm it on the contract, or set a global rate on this page." },
   "store360.pl_flow.load_failed": { "zh-CN": "利润流向加载失败", "zh-HK": "利潤流向載入失敗", en: "Profit flow failed to load" },
   "store360.peer_benchmark": {
     "zh-CN": "同群基准",

@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Drawer, Empty, Input } from "antd";
-import { PlusOutlined, RobotOutlined, SendOutlined } from "@ant-design/icons";
+import { Button, Drawer } from "antd";
+import { PlusOutlined, RobotOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { DashboardHeader } from "./components/dashboard/DashboardCards";
+import BriefColumn from "./home/BriefColumn";
 import RightColumn from "./home/RightColumn";
+import WorkQueueFocus from "./home/WorkQueueFocus";
+import { canViewHomeBrief } from "./home/logic";
 import type { DashboardMoneyKPIs, DashboardUpcomingDate, DashboardWorkQueue, MoneySlice } from "./components/dashboard/types";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import { leaseAdminApi, monthlyClosingApi, reportApi, workQueueApi } from "./lib/api";
-import { t, type Language } from "./lib/i18n";
+import { t } from "./lib/i18n";
 import { getHomeResponsiveState } from "./home/responsive";
 
 const emptyMoney = (): MoneySlice[] => [];
@@ -67,25 +70,8 @@ function latestPerCurrency(rows: any[], currentKey: string, valueKey: string): M
   return Array.from(latest.values()).map(({ currency, value }) => ({ currency, value }));
 }
 
-// HOME-001: the middle column skeleton. The card flow and the composer are
-// wired in HOME-002; until then the column shows where they will live.
-function HomeBriefPlaceholder({ language }: { language: Language }) {
-  return (
-    <Card className="home-brief-placeholder">
-      <div className="home-brief-title">{t("home.brief_title", language)}</div>
-      <div className="home-brief-empty">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("home.brief_coming_desc", language)} />
-      </div>
-      <div className="home-brief-composer">
-        <Input disabled placeholder={t("home.brief_composer_disabled", language)} />
-        <Button disabled type="primary" icon={<SendOutlined />}>{t("ai.drawer.send", language)}</Button>
-      </div>
-    </Card>
-  );
-}
-
 export default function HomePage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { language } = useLanguage();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -199,7 +185,11 @@ export default function HomePage() {
                 {t("home.mobile_todo_trigger", language)}
               </Button>
             </div>
-            <HomeBriefPlaceholder language={language} />
+            {canViewHomeBrief(user) ? (
+              <BriefColumn token={token} language={language} />
+            ) : (
+              <WorkQueueFocus {...rightColumnProps} />
+            )}
           </div>
           <div className="home-right">
             <RightColumn {...rightColumnProps} />

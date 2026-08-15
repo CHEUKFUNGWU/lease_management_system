@@ -455,103 +455,92 @@ body .ant-menu .ant-menu-submenu-title {
   margin: 2px 8px;
 }
 
-/* Dropdown */
-.ant-dropdown-menu {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-dropdown) !important;
-  padding: 4px !important;
+/* Dropdown.
+   STY-007: no Dropdown token covers radius/shadow/padding — the rules
+   stay without the flag, body-prefixed to beat antd's injected rules. */
+body .ant-dropdown-menu {
+  border-radius: 10px;
+  box-shadow: var(--shadow-dropdown);
+  padding: 4px;
 }
 
-.ant-dropdown-menu-item {
-  border-radius: 6px !important;
+body .ant-dropdown-menu-item {
+  border-radius: 6px;
   transition: background 0.1s var(--ease-micro);
 }
 
-/* Tooltip */
-.ant-tooltip-inner {
-  border-radius: 6px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  padding: 6px 10px !important;
+/* Tooltip.
+   STY-007: radius lives in theme.ts (Tooltip.borderRadius 6); size,
+   weight and padding have no token. */
+body .ant-tooltip-inner {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 10px;
 }
 
-/* Select dropdown */
-.ant-select-dropdown {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-dropdown) !important;
-  padding: 4px !important;
+/* Select dropdown — same situation as Dropdown. */
+body .ant-select-dropdown {
+  border-radius: 10px;
+  box-shadow: var(--shadow-dropdown);
+  padding: 4px;
 }
 
-.ant-select-item {
-  border-radius: 6px !important;
+body .ant-select-item {
+  border-radius: 6px;
   transition: background 0.1s var(--ease-micro);
 }
 
-/* DatePicker panel */
-.ant-picker-panel {
-  border-radius: 10px !important;
+/* DatePicker panel — no panel-radius token. */
+body .ant-picker-panel {
+  border-radius: 10px;
 }
 
-/* Tabs */
-.ant-tabs-tab {
-  transition: color 0.15s var(--ease-micro) !important;
+/* Tabs — no token for the ink-bar height or the active weight. */
+body .ant-tabs-tab {
+  transition: color 0.15s var(--ease-micro);
 }
 
-.ant-tabs-tab-active {
-  font-weight: 600 !important;
+body .ant-tabs-tab-active {
+  font-weight: 600;
 }
 
-.ant-tabs-ink-bar {
-  height: 2px !important;
-  border-radius: 1px !important;
+body .ant-tabs-ink-bar {
+  height: 2px;
+  border-radius: 1px;
 }
 
-/* Pagination */
-.ant-pagination-item {
-  border-radius: 6px !important;
-  transition: all 0.1s var(--ease-micro) !important;
+/* Pagination.
+   STY-007: item radius and active colours live in theme.ts (borderRadius
+   6, itemActiveBg primary, itemActiveColor inverse). The transition has
+   no token. */
+body .ant-pagination-item {
+  transition: all 0.1s var(--ease-micro);
 }
 
-.ant-pagination-item-active {
-  background: var(--fg-primary) !important;
-  border-color: var(--fg-primary) !important;
-}
-
-.ant-pagination-item-active a {
-  color: var(--fg-inverse) !important;
-}
-
-/* Steps */
-.ant-steps-item-icon {
-  transition: all 0.2s var(--ease-micro) !important;
-}
-
-/* Descriptions */
-.ant-descriptions-item-label {
-  color: var(--fg-tertiary) !important;
-  font-weight: 500 !important;
-}
-
-.ant-descriptions-item-content {
-  color: var(--fg-secondary) !important;
-}
-
-/* Timeline */
-.ant-timeline-item-head {
+/* Steps — transition only, no token. */
+body .ant-steps-item-icon {
   transition: all 0.2s var(--ease-micro);
 }
 
-/* Statistic */
-.ant-statistic-content-value {
-  font-weight: 600 !important;
-  letter-spacing: -0.03em !important;
-  font-size: 28px !important;
+/* Descriptions.
+   STY-007: label/content colours live in theme.ts (labelColor tertiary,
+   contentColor secondary); the label weight has no token. */
+body .ant-descriptions-item-label {
+  font-weight: 500;
 }
 
-.ant-statistic-title {
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  color: var(--fg-tertiary) !important;
+/* Statistic.
+   STY-007: title/content sizes live in theme.ts (content fontSize 28,
+   title caption) and the title colour in colorTextDescription. The
+   weights have no Statistic token — antd's contentFontWeight is not
+   consumed — so they stay here. */
+body .ant-statistic-content-value {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+body .ant-statistic-title {
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -569,87 +558,61 @@ body .ant-menu .ant-menu-submenu-title {
   100% { background-position: -200% 0; }
 }
 
-/* Empty state */
-.ant-empty-description {
-  color: var(--fg-muted) !important;
+/* Empty — STY-007: colour lives in theme.ts (Empty.colorText muted). */
+
+/* Notification.
+   STY-007: radius lives in theme.ts (Notification.borderRadius 10); the
+   shadow has no token. */
+body .ant-notification-notice {
+  box-shadow: var(--shadow-card);
 }
 
-/* Notification */
-.ant-notification-notice {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-card) !important;
+/* Message — no Message token covers radius or shadow. */
+body .ant-message-notice-content {
+  border-radius: 8px;
+  box-shadow: var(--shadow-dropdown);
 }
 
-/* Message */
-.ant-message-notice-content {
-  border-radius: 8px !important;
-  box-shadow: var(--shadow-dropdown) !important;
+/* Popover.
+   STY-007: radius lives in theme.ts (Popover.borderRadius 10); the
+   shadow has no token. */
+body .ant-popover-inner {
+  box-shadow: var(--shadow-dropdown);
 }
 
-/* Popover */
-.ant-popover-inner {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-dropdown) !important;
+/* Drawer — no Drawer token covers the shadow. */
+body .ant-drawer-content {
+  box-shadow: var(--shadow-modal);
 }
 
-/* Drawer */
-.ant-drawer-content {
-  box-shadow: var(--shadow-modal) !important;
+/* Checkbox / Radio.
+   STY-007: checked fills live in theme.ts (colorPrimary). The
+   indeterminate marker fill has no token. */
+body .ant-checkbox-indeterminate .ant-checkbox-inner::after {
+  background: var(--fg-primary);
 }
 
-/* Switch */
-.ant-switch-checked {
-  background: var(--fg-primary) !important;
+/* Slider.
+   STY-007: track colour lives in theme.ts (trackBg primary); the handle
+   ring has no token. */
+body .ant-slider-handle::after {
+  box-shadow: 0 0 0 2px var(--fg-primary);
 }
 
-/* Checkbox / Radio */
-.ant-checkbox-checked .ant-checkbox-inner,
-.ant-radio-checked .ant-radio-inner {
-  background: var(--fg-primary) !important;
-  border-color: var(--fg-primary) !important;
+/* Segmented — the selected weight has no token. */
+body .ant-segmented-item-selected {
+  font-weight: 600;
 }
 
-.ant-checkbox-indeterminate .ant-checkbox-inner::after {
-  background: var(--fg-primary) !important;
+/* Collapse — the header weight has no token. */
+body .ant-collapse-header {
+  font-weight: 500;
 }
 
-/* Slider */
-.ant-slider-track {
-  background: var(--fg-primary) !important;
-}
-
-.ant-slider-handle::after {
-  box-shadow: 0 0 0 2px var(--fg-primary) !important;
-}
-
-/* Progress */
-.ant-progress-bg {
-  background: var(--fg-primary) !important;
-}
-
-/* Segmented */
-.ant-segmented-item-selected {
-  font-weight: 600 !important;
-}
-
-/* Collapse */
-.ant-collapse-header {
-  font-weight: 500 !important;
-}
-
-/* Result */
-.ant-result-title {
-  font-weight: 600 !important;
-  letter-spacing: -0.02em !important;
-}
-
-/* Badge */
-.ant-badge-count {
-  font-weight: 600 !important;
-  font-size: 10px !important;
-  min-width: 16px !important;
-  height: 16px !important;
-  line-height: 16px !important;
+/* Result — the title weight/tracking has no token. */
+body .ant-result-title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 /* ─── Scrollbar ─────────────────────────────────────────────── */

@@ -15,6 +15,9 @@ export const antdTheme = {
     // derives the hover fill from colorPrimaryHover.
     colorPrimaryHover: colors.foreground.secondary,
     colorInfo: colors.state.info,
+    // STY-007: antd's Statistic title renders with colorTextDescription;
+    // the old CSS forced --fg-tertiary (#595959) — carry the rendered value.
+    colorTextDescription: colors.foreground.tertiary,
     colorInfoBg: colors.status.processing.bg,
     colorInfoBorder: colors.status.processing.border,
     colorInfoText: colors.status.processing.text,
@@ -224,8 +227,11 @@ export const antdTheme = {
     // ── Statistic ──
     Statistic: {
       titleFontSize: typography.sizes.caption.size,
-      contentFontSize: typography.sizes.h1.size,
-      contentFontWeight: typography.weights.semibold,
+      // STY-007: the content-value override forced 28px; the token used to
+      // say 24 (h1) — align with what the UI actually rendered.
+      contentFontSize: typography.sizes.display.size,
+      // Note: contentFontWeight is NOT consumed by antd's Statistic styles
+      // (verified against 5.29 source) — the 600 weight is carried by CSS.
     },
 
     // ── Tabs ──
@@ -331,6 +337,12 @@ export const antdTheme = {
     Badge: {
       colorError: colors.foreground.primary,
       colorWarning: colors.foreground.secondary,
+      // STY-007: the badge-count override forced 10px/600/16px; antd's
+      // defaults are 12px and 20px — pin the tokens to the rendered values.
+      textFontSize: 10,
+      textFontWeight: typography.weights.semibold,
+      indicatorHeight: 16,
+      indicatorHeightSM: 16,
     },
 
     // ── Avatar ──

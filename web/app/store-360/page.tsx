@@ -50,9 +50,12 @@ function Status({ metric, language }: { metric?: RetailStoreDiagnosticsResponse[
 function MetricCard({ code, metric, currency, notReady, language }: { code: PulseMetricCode; metric?: RetailStoreDiagnosticsResponse["summary"][string]; currency: string; notReady?: boolean; language: Language }) {
   const tone = changeTone(code, metric as RetailSummaryMetric | undefined);
   const reason = metric?.reason || metric?.current.reason || metric?.comparison.reason;
+  // FIX-003: same value-line rule as pulse cards — truncate with a tooltip,
+  // never wrap into the fixed card height.
+  const display = displayMetric(metric, currency, language);
   return <Card size="small" className="store-360-kpi-card" data-testid={`store360-kpi-${code}`}>
     <Flex justify="space-between" align="center"><Typography.Text type="secondary">{kpiLabel(code, language)}</Typography.Text><Flex align="center" gap={4}>{notReady && <KPIReadyBadge />}<Status metric={metric} language={language} /></Flex></Flex>
-    <Typography.Title level={3} style={{ margin: "12px 0 4px", fontVariantNumeric: "tabular-nums" }}>{displayMetric(metric, currency, language)}</Typography.Title>
+    <Typography.Title level={3} className="pulse-kpi-value" ellipsis={{ tooltip: display }}>{display}</Typography.Title>
     <Typography.Text className={`pulse-change pulse-change-${tone}`}>{formatChange(metric as RetailSummaryMetric | undefined)} {reason ? `· ${reason}` : ""}</Typography.Text>
     <Typography.Text type="secondary" className="pulse-kpi-comparison">{t("common.contrast", language)} {formatKPIValue(metric?.comparison, currency, language)}</Typography.Text>
   </Card>;

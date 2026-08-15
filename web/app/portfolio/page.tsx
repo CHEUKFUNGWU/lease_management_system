@@ -3,7 +3,7 @@
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Row, Segmented, Space, Statistic, Table, Tag } from "antd";
+import { Alert, Button, Card, Col, Empty, Row, Segmented, Space, Statistic, Table, Tag } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import { useUrlState } from "../hooks/useUrlState";
 import { notifyError } from "../lib/notify";
+import { tableScrollX } from "../lib/tableScroll";
 
 interface PortfolioRow {
   asset_type: string;
@@ -245,8 +246,8 @@ function PortfolioPage() {
                 rowKey="group_key"
                 pagination={{ pageSize: 10 }}
                 size="small"
-                scroll={{ x: 900 }}
-                locale={{ emptyText: "暂无可比数据：请先为合同填写租赁面积" }}
+                scroll={tableScrollX(unitPriceRows.length, 900)}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可比数据：请先为合同填写租赁面积" /> }}
                 columns={[
                   { title: groupingLabels[grouping].replace("按", ""), dataIndex: "group_label" },
                   { title: "币种", dataIndex: "currency", width: 80 },
@@ -302,7 +303,7 @@ function PortfolioPage() {
                 rowKey={(row) => `${row.asset_type}-${row.lease_scope}-${row.currency}`}
                 pagination={{ pageSize: 10 }}
                 size="small"
-                scroll={{ x: 1120 }}
+                scroll={tableScrollX(rows.length, 1120)}
                 columns={[
                   {
                     title: "资产类型",

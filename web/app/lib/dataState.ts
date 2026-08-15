@@ -53,12 +53,17 @@ export function classifyDataState<T>(input: ClassifyInput<T>): DataState<T> {
       // 独立第四态：权限拒绝，原因保留，绝不并入 empty / actionable。
       return { kind: "scope_denied", message: apiErrorMessage(error) };
     }
+    // STATE-002: request failure is adjudicated before actionFor. A caller
+    // could otherwise pass an unconditional actionFor and dress a dead
+    // network / 5xx up as "do something and it will work" — the exact shape
+    // STATE-001 exists to kill. actionFor may only upgrade errors the backend
+    // answered (404 / 422 / other 4xx), never ones the request never made.
+    if (isRequestFailure(error)) {
+      return { kind: "failed", message: apiErrorMessage(error) };
+    }
     if (actionFor) {
       const action = actionFor(error);
       if (action) return { kind: "actionable", message: action.message, actionLabel: action.actionLabel };
-    }
-    if (isRequestFailure(error)) {
-      return { kind: "failed", message: apiErrorMessage(error) };
     }
     if (error instanceof ApiError && (error.status === 404 || error.status === 422)) {
       // 后端明确说「没有」/「条件不满足」：这是空（或可行动），不是故障。

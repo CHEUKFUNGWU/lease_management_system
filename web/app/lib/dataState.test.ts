@@ -48,6 +48,37 @@ describe("STATE-001 classifyDataState matrix", () => {
     expect(isRequestFailure(new ApiError("network_error", 0, {}))).toBe(true);
   });
 
+  it("STATE-002: 无条件 actionFor + 网络失败 → 仍是 failed（动作不能装扮请求没打通）", () => {
+    const error = new ApiError("network_error", 0, {});
+    const state = classifyDataState({
+      data: null,
+      error,
+      actionFor: () => ({ message: "你去点一下就好了", actionLabel: "去做" }),
+    });
+    expect(state.kind).toBe("failed");
+  });
+
+  it("STATE-002: 无条件 actionFor + 500 → 仍是 failed", () => {
+    const error = new ApiError("system_failure", 500, {});
+    const state = classifyDataState({
+      data: null,
+      error,
+      actionFor: () => ({ message: "你去点一下就好了", actionLabel: "去做" }),
+    });
+    expect(state.kind).toBe("failed");
+  });
+
+  it("STATE-002: 无条件 actionFor + 404/422 → 仍可升级为 actionable（后端回答过）", () => {
+    const notFound = new ApiError("not_found", 404, { code: "not_found" });
+    expect(
+      classifyDataState({ data: null, error: notFound, actionFor: () => ({ message: "m", actionLabel: "a" }) }).kind,
+    ).toBe("actionable");
+    const unavailable = new ApiError("data_unavailable", 422, { code: "data_unavailable" });
+    expect(
+      classifyDataState({ data: null, error: unavailable, actionFor: () => ({ message: "m", actionLabel: "a" }) }).kind,
+    ).toBe("actionable");
+  });
+
   it("其余 4xx 无 actionFor → failed", () => {
     expect(ok(null, new ApiError("invalid_arguments", 400, {})).kind).toBe("failed");
   });

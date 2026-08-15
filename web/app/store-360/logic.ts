@@ -85,7 +85,33 @@ export function bridgeWaterfallDomain(steps: BridgeWaterfallStep[]): [number, nu
   const high = Math.max(...values);
   if (!Number.isFinite(low) || high === low) return null;
   const pad = (high - low) / 10;
-  return [low - pad, high + pad];
+  // FIX-025: the raw padded bounds made recharts derive ticks off an arbitrary
+  // float — the axis read "25,351.727 / 25,217.723 / 24,917.723". Snapping the
+  // bounds outward to a round step gives the axis whole numbers to divide.
+  // The step comes from the *span*, not from the values: a 1,034-wide bracket
+  // sitting at 24,000 snaps to 100s (widening it by ~6%), whereas snapping by
+  // the value's own magnitude would round to 1,000s and double the bracket —
+  // undoing exactly the zoom FIX-018a added. Outward only: never clip a step.
+  const span = (high + pad) - (low - pad);
+  return [niceFloor(low - pad, span), niceCeil(high + pad, span)];
+}
+
+/** Step size for snapping: the largest power of ten that still divides the
+ *  span into at least a few slices, so a 1,000-wide span snaps to 100s and a
+ *  10-wide span snaps to 1s. */
+function niceStep(span: number): number {
+  if (!(span > 0)) return 1;
+  return Math.pow(10, Math.floor(Math.log10(span)) - 1);
+}
+
+export function niceFloor(value: number, span?: number): number {
+  const step = niceStep(span ?? Math.abs(value));
+  return Math.floor(value / step) * step;
+}
+
+export function niceCeil(value: number, span?: number): number {
+  const step = niceStep(span ?? Math.abs(value));
+  return Math.ceil(value / step) * step;
 }
 
 export function bridgeConservation(bridge: RetailBridge): number | null {

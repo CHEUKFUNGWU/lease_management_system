@@ -789,6 +789,7 @@ const dict: TranslationDict = {
   "store360.pl_flow.formula": { "zh-CN": "口径", "zh-HK": "口徑", en: "Formula" },
   "store360.pl_flow.unavailable": { "zh-CN": "当前窗口没有可用于利润流向的经营事实", "zh-HK": "當前窗口沒有可用於利潤流向的經營事實", en: "No operating facts in the current window for a profit-flow view" },
   "store360.pl_flow.pick_store": { "zh-CN": "选择门店后展示利润流向", "zh-HK": "選擇門店後展示利潤流向", en: "Pick a store to see its profit flow" },
+  "store360.pl_flow.load_failed": { "zh-CN": "利润流向加载失败", "zh-HK": "利潤流向載入失敗", en: "Profit flow failed to load" },
   "store360.peer_benchmark": {
     "zh-CN": "同群基准",
     "zh-HK": "同群基準",

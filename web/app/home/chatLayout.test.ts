@@ -172,3 +172,11 @@ describe("FIX-013: pending bubble shows the step scaffold, results stagger in", 
     expect(css).toContain("@keyframes home-step-in");
   });
 });
+
+describe("FIX-027: empty-state starters sit against the composer", () => {
+  it("anchors the starters to the bottom of the body, not its centre", () => {
+    // Centring split the leftover space above and below the chips, which read
+    // as two holes instead of one. They belong next to the input.
+    expect(ruleBody(".home-chat-body.is-empty")).toMatch(/justify-content:\s*flex-end/);
+  });
+});

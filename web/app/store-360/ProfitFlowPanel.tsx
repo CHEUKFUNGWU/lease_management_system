@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Empty, Typography } from "antd";
+import { Alert, Card, Empty, Typography } from "antd";
 import { Sankey } from "recharts";
 import { t, type Language } from "../lib/i18n";
 import type { RetailPlFlowResponse } from "../lib/api";
@@ -11,7 +11,17 @@ import { fmtMoney } from "../lib/format";
  * residual 显式展示（左右不平不抹平）；partial 时标注缺失字段。
  * 二期（营收按大类分流）与三期（品类利润）见后端 pl_flow.go 接口注释。
  */
-export default function ProfitFlowPanel({ flow, currency, language }: { flow: RetailPlFlowResponse | null; currency?: string; language: Language }) {
+export default function ProfitFlowPanel({ flow, error, currency, language }: { flow: RetailPlFlowResponse | null; error?: string | null; currency?: string; language: Language }) {
+  // FIX-024: a failed request is not an empty one. It gets its own presentation
+  // with the reason attached, so "the endpoint is not deployed" can never read
+  // as "this store has no profit flow".
+  if (error) {
+    return (
+      <Card className="store-360-pl-flow" title={t("store360.pl_flow.title", language)} size="small">
+        <Alert type="error" showIcon message={t("store360.pl_flow.load_failed", language)} description={error} />
+      </Card>
+    );
+  }
   if (!flow || flow.status === "unavailable") {
     return (
       <Card className="store-360-pl-flow" title={t("store360.pl_flow.title", language)} size="small">

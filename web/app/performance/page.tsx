@@ -23,7 +23,21 @@ const pct = (value?: number) => value == null ? "—" : `${value.toFixed(2)}%`;
 
 export default function PerformancePage() {
   const { token } = useAuth();
+  // FIX-026: `period` is the *applied* period — the only thing the loader
+  // depends on. `periodDraft` is what the text field holds while it is being
+  // edited. They used to be one state in the effect's dependency list, so
+  // editing "2026-07" fired a request at every keystroke and the half-typed
+  // "2026-0" came back rejected as「请求未成功」. Nothing loads until the draft
+  // is a well-formed YYYY-MM and the user applies it.
   const [period, setPeriod] = useState(dayjs().format("YYYY-MM"));
+  const [periodDraft, setPeriodDraft] = useState(period);
+  const periodDraftValid = /^\d{4}-(0[1-9]|1[0-2])$/.test(periodDraft.trim());
+  const applyPeriod = () => {
+    const next = periodDraft.trim();
+    if (!periodDraftValid) return;
+    if (next === period) load();
+    else setPeriod(next);
+  };
   const [overview, setOverview] = useState<Overview | null>(null);
   const [stores, setStores] = useState<FourWall[]>([]);
   const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
@@ -126,7 +140,7 @@ export default function PerformancePage() {
       title="经营驾驶舱"
       meta={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
     />
-    <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={period} onChange={event => setPeriod(event.target.value)} onPressEnter={load} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={load} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button></Space></Card>
+    <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={periodDraft} onChange={event => setPeriodDraft(event.target.value)} onPressEnter={applyPeriod} status={periodDraftValid ? undefined : "error"} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={applyPeriod} disabled={!periodDraftValid} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button></Space></Card>
     {overview && <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="门店事实" value={overview.store_fact_count} suffix={<Typography.Text type="secondary">/ {overview.store_fact_ready_count} 已对账</Typography.Text>} /></Card></Col>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="设备事实" value={overview.equipment_fact_count} /></Card></Col>

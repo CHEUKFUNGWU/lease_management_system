@@ -1898,11 +1898,13 @@ html {
    composer sat ~800px below the starter chips. Collapsing the column to its
    content instead (the first attempt) overcorrected — the composer floated a
    third of the way down the viewport with a bigger void underneath. The column
-   keeps its full height and the composer keeps the bottom; it is the empty
-   state's starters that centre in the leftover space, so the gap is split
-   above and below them instead of piling up in one place. */
+   keeps its full height and the composer keeps the bottom.
+   FIX-027: centring the starters in the leftover space split the void in two
+   and still read as a hole. They now sit directly above the composer — the
+   thing you click and the thing you type into are one unit, and the empty
+   space collects in one place above them instead of framing them. */
 .home-chat-body.is-empty {
-  justify-content: center;
+  justify-content: flex-end;
 }
 /* L1: reading measure for the conversation body — 68ch, never the full
    column width. */

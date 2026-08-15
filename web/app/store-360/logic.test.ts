@@ -95,4 +95,32 @@ describe("FIX-018a: waterfall axis domain", () => {
   it("returns null when there is nothing to bracket", () => {
     expect(bridgeWaterfallDomain([])).toBeNull();
   });
+
+  // FIX-025: the padded bounds used to be raw floats, so recharts derived ticks
+  // like "25,351.727 / 25,217.723". The bounds now snap outward to a round step.
+  it("snaps the bounds to round numbers so the axis ticks are whole", () => {
+    const [low, high] = bridgeWaterfallDomain(bridgeWaterfall(bridge, labels)) as [number, number];
+    const step = 100; // the span here is ~1,800 → hundreds
+    expect(low % step).toBe(0);
+    expect(high % step).toBe(0);
+  });
+
+  it("never clips a step: the snap only ever widens the bracket", () => {
+    const steps = bridgeWaterfall(bridge, labels);
+    const [low, high] = bridgeWaterfallDomain(steps) as [number, number];
+    const values = steps.flatMap((step) => step.range).filter((value) => value !== 0);
+    expect(low).toBeLessThanOrEqual(Math.min(...values));
+    expect(high).toBeGreaterThanOrEqual(Math.max(...values));
+  });
+
+  // The step comes from the span, not the values' magnitude — rounding a
+  // ~1,800-wide bracket sitting at 48,000 to thousands would double it and
+  // undo the zoom FIX-018a added.
+  it("keeps the zoom: snapping widens the bracket by well under half", () => {
+    const steps = bridgeWaterfall(bridge, labels);
+    const [low, high] = bridgeWaterfallDomain(steps) as [number, number];
+    const values = steps.flatMap((step) => step.range).filter((value) => value !== 0);
+    const spanned = Math.max(...values) - Math.min(...values);
+    expect(high - low).toBeLessThan(spanned * 1.5);
+  });
 });

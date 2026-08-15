@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Input, Space, Spin, Typography } from "antd";
+import { Button, Input, Space, Typography } from "antd";
 import { SendOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import ConfidenceBadge from "../components/ConfidenceBadge";
@@ -12,7 +12,7 @@ import { aiChatApi, apiErrorMessage, retailAnalyticsApi } from "../lib/api";
 import { t, type Language } from "../lib/i18n";
 import { latestAnomalyDate } from "../operating-pulse/logic";
 import { createLatestRequestGate } from "../operating-pulse/requestGate";
-import BriefView from "./BriefView";
+import BriefBand from "./BriefBand";
 import { resetHomeBriefCache, runHomeBrief } from "./briefGate";
 import { buildBriefFilters, classifyHomeBrief, type HomeBriefState } from "./logic";
 import type { HomeBriefResult, HomeChatMessage } from "./types";
@@ -149,16 +149,9 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
 
   return (
     <div className="home-brief-column">
-      <div className="home-brief-title">{t("home.brief_title", language)}</div>
-      <div className="home-brief-body">
-        {state === "loading" ? (
-          <Spin tip={t("home.brief_loading", language)}>
-            <div className="home-brief-spin-block" />
-          </Spin>
-        ) : (
-          <BriefView state={state} result={brief} error={error} language={language} onRetry={retry} />
-        )}
-      </div>
+      {/* HOME-004: the brief is one compact strip above the conversation,
+          no longer the page body. */}
+      <BriefBand state={state} result={brief} error={error} language={language} onRetry={retry} />
       {messages.length > 0 && (
         <div className="home-followups">
           {messages.map((message, index) => <FollowUpMessage key={index} message={message} language={language} />)}

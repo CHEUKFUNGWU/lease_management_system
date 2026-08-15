@@ -7450,6 +7450,13 @@ const dict: TranslationDict = {
   "home.brief_needs_input_title": { "zh-CN": "需要补充数据上下文", "zh-HK": "需要補充數據上下文", en: "Data context required" },
   "home.brief_error_title": { "zh-CN": "今日经营简报生成失败", "zh-HK": "今日經營簡報生成失敗", en: "Failed to generate today's brief" },
   "home.brief_attention": { "zh-CN": "关注门店", "zh-HK": "關注門店", en: "Attention stores" },
+  // HOME-004: the collapsed brief band carries the attention count beside the
+  // title so one strip answers "how many stores need attention" unexpanded.
+  "home.band_attention_count": { "zh-CN": "关注门店 {count}", "zh-HK": "關注門店 {count}", en: "Attention stores: {count}" },
+  "home.severity_critical": { "zh-CN": "严重", "zh-HK": "嚴重", en: "Critical" },
+  "home.severity_high": { "zh-CN": "高", "zh-HK": "高", en: "High" },
+  "home.severity_medium": { "zh-CN": "中", "zh-HK": "中", en: "Medium" },
+  "home.severity_low": { "zh-CN": "低", "zh-HK": "低", en: "Low" },
   "home.brief_plan_trace": { "zh-CN": "推理轨迹", "zh-HK": "推理軌跡", en: "Reasoning trace" },
   "home.proposals_title": { "zh-CN": "待确认建议", "zh-HK": "待確認建議", en: "Proposals to confirm" },
   "home.proposals_empty": { "zh-CN": "暂无待确认建议；Agent 提出的行动建议会出现在这里。", "zh-HK": "暫無待確認建議；Agent 提出的行動建議會出現在這裡。", en: "No proposals awaiting confirmation; agent action proposals will appear here." },

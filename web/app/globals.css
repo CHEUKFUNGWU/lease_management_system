@@ -1585,6 +1585,164 @@ html {
 }
 
 /* ── HOME-002: 今日经营简报 ────────────────────────────────────── */
+/* ── HOME-004 §2: the brief demoted to one compact expandable strip above
+   the chat. Collapsed = title + attention count + DataTrustBar summary;
+   expanded adds KPI cards, structured attention cards and the trace. ── */
+.home-brief-band {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  box-shadow: var(--shadow-static);
+}
+.home-brief-band-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.home-brief-band-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg-primary);
+}
+.home-brief-band-count {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.home-brief-band-toggle {
+  margin-left: auto;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--fg-tertiary);
+}
+.home-brief-band-arrow {
+  margin-right: 4px;
+  font-size: 10px;
+}
+.home-brief-band-skeleton {
+  flex: 1;
+  min-width: 0;
+}
+.home-brief-band-skeleton .ant-skeleton-paragraph {
+  margin: 0;
+}
+.home-brief-band-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.home-brief-band-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.home-band-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-inset);
+}
+.home-band-kpi-label {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+}
+.home-band-kpi-value {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-band-kpi-change {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-tertiary);
+}
+.home-band-attention {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.home-band-attention-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-secondary);
+}
+/* HOME-004 §2.3: every attention card carries three explicit slots — store
+   identity, signal line, severity with a text label (color is never the
+   only signal). */
+.home-band-attention-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "store severity" "signals signals";
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--fg-inverse);
+  box-shadow: var(--shadow-static);
+}
+.home-band-attention-store {
+  grid-area: store;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.home-band-attention-rank {
+  font-weight: 600;
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.home-band-attention-storecode {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg-primary);
+}
+.home-band-attention-storename {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-band-attention-citation {
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  margin-left: auto;
+}
+.home-band-attention-severity {
+  grid-area: severity;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+}
+.home-band-attention-signals {
+  grid-area: signals;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.home-band-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .home-brief-column {
   display: flex;
   flex-direction: column;

@@ -2,26 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import {
-  Form,
-  Input,
-  Button,
-  Card,
-  Typography,
-  message,
-  Row,
-  Col,
-  Divider,
-} from "antd";
+import { Form, Input, Button, message } from "antd";
 import { LockOutlined, UserOutlined, SafetyOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { authApi } from "../lib/api";
 import { notifyError } from "../lib/notify";
-
-const { Title, Text } = Typography;
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -50,156 +37,77 @@ export default function LoginPage() {
   };
 
   return (
-    <Row
-      justify="center"
-      align="middle"
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg-surface)",
-        position: "relative",
-      }}
-    >
-      {/* Subtle background pattern */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage: `radial-gradient(circle at 1px 1px, var(--border-default) 1px, transparent 0)`,
-          backgroundSize: "32px 32px",
-          opacity: 0.5,
-        }}
-      />
+    <div className="login-shell">
+      <section className="login-brand">
+        <div className="login-brand-inner">
+          <div className="login-lockup">
+            <span className="login-badge" aria-hidden="true">营</span>
+            <span className="login-lockup-name">{t("login.title", language)}</span>
+          </div>
+          <p className="login-tagline">{t("login.tagline", language)}</p>
+          <ul className="login-points">
+            <li className="login-point">{t("login.point_pulse", language)}</li>
+            <li className="login-point">{t("login.point_store", language)}</li>
+            <li className="login-point">{t("login.point_lease", language)}</li>
+          </ul>
+        </div>
+      </section>
 
-      <Col xs={24} sm={16} md={12} lg={8} xl={6} style={{ position: "relative", zIndex: 1 }}>
-        <motion.div
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-        >
-          <Card
-            style={{
-              borderRadius: 16,
-              boxShadow: "0 0 0 1px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.08)",
-              border: "none",
-            }}
-            styles={{ body: { padding: "40px 36px" } }}
+      <section className="login-panel">
+        <div className="login-panel-inner">
+          <div className="login-lockup login-lockup-compact">
+            <span className="login-badge" aria-hidden="true">营</span>
+            <span className="login-lockup-name">{t("login.title", language)}</span>
+          </div>
+
+          <h1 className="login-heading">{t("login.welcome_back", language)}</h1>
+          <p className="login-subheading">{t("login.continue_hint", language)}</p>
+
+          <Form
+            name="login"
+            className="login-form"
+            onFinish={handleLogin}
+            autoComplete="off"
+            layout="vertical"
+            requiredMark={false}
           >
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
-              <motion.div
-                initial={false}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.1, duration: 0.3 }}
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 14,
-                  background: "var(--fg-primary)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 20,
-                }}
-              >
-                <span aria-hidden="true" style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-inverse)", letterSpacing: "-0.8px" }}>营</span>
-              </motion.div>
-
-              <Title
-                level={3}
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: 22,
-                  fontWeight: 600,
-                  letterSpacing: "-0.03em",
-                  color: "var(--fg-primary)",
-                }}
-              >
-                {t("login.title", language)}
-              </Title>
-            </div>
-
-            <Form
-              name="login"
-              onFinish={handleLogin}
-              autoComplete="off"
-              layout="vertical"
+            <Form.Item
+              name="username"
+              rules={[{ required: true, message: t("login.username_required", language) }]}
             >
-              <Form.Item
-                name="username"
-                rules={[{ required: true, message: t("login.username_required", language) }]}
-                style={{ marginBottom: 20 }}
-              >
-                <Input
-                  prefix={
-                    <UserOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />
-                  }
-                  placeholder={t("login.username", language)}
-                  size="large"
-                  style={{
-                    borderRadius: 10,
-                    height: 44,
-                    fontSize: 14,
-                    paddingLeft: 12,
-                  }}
-                />
-              </Form.Item>
+              <Input
+                prefix={<UserOutlined />}
+                placeholder={t("login.username", language)}
+                size="large"
+                autoComplete="username"
+              />
+            </Form.Item>
 
-              <Form.Item
-                name="password"
-                rules={[{ required: true, message: t("login.password_required", language) }]}
-                style={{ marginBottom: 24 }}
-              >
-                <Input.Password
-                  prefix={
-                    <LockOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />
-                  }
-                  placeholder={t("login.password", language)}
-                  size="large"
-                  style={{
-                    borderRadius: 10,
-                    height: 44,
-                    fontSize: 14,
-                    paddingLeft: 12,
-                  }}
-                />
-              </Form.Item>
+            <Form.Item
+              name="password"
+              rules={[{ required: true, message: t("login.password_required", language) }]}
+            >
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder={t("login.password", language)}
+                size="large"
+                autoComplete="current-password"
+              />
+            </Form.Item>
 
-              <Form.Item style={{ marginBottom: 0 }}>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={loading}
-                  size="large"
-                  block
-                  style={{
-                    height: 44,
-                    borderRadius: 9999,
-                    fontSize: 15,
-                    fontWeight: 600,
-                    boxShadow: "none",
-                  }}
-                >
-                  {t("login.submit", language)}
-                </Button>
-              </Form.Item>
-            </Form>
+            <Form.Item className="login-submit-item">
+              <Button type="primary" htmlType="submit" loading={loading} size="large" block>
+                {t("login.submit", language)}
+              </Button>
+            </Form.Item>
+          </Form>
 
-            <Divider style={{ margin: "24px 0 16px", borderColor: "var(--bg-inset)" }} />
-
-            <div style={{ textAlign: "center" }}>
-              <SafetyOutlined style={{ fontSize: 12, color: "var(--fg-muted)", marginRight: 6 }} />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "var(--fg-muted)",
-                  lineHeight: 1.5,
-                }}
-              >
-                {t("login.no_register", language)}
-              </Text>
-            </div>
-          </Card>
-        </motion.div>
-      </Col>
-    </Row>
+          <p className="login-note">
+            <SafetyOutlined aria-hidden="true" />
+            {t("login.no_register", language)}
+          </p>
+        </div>
+      </section>
+    </div>
   );
 }

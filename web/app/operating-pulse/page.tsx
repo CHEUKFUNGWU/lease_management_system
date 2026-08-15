@@ -18,6 +18,8 @@ import { StatusTag } from "../components/StatusTag";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
+import { HelpTrigger } from "../components/HelpDrawer";
+import { pulseHelpContent } from "../components/help-content";
 import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, signalMix, switchClassification, trendValue, type PulseMetricCode } from "./logic";
 import { createLatestRequestGate } from "./requestGate";
@@ -287,7 +289,7 @@ function OperatingPulseInner() {
   };
 
   return <ProtectedRoute><AppLayout><div className="operating-pulse-page">
-    <PageHeader title={t("pulse.title", language)} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button>} />
+    <PageHeader title={t("pulse.title", language)} help={<HelpTrigger content={pulseHelpContent(language)} language={language} />} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button>} />
     <Card size="small" className="pulse-filter-card" style={{ marginBottom: 16 }}>
       <Flex gap={12} wrap="wrap" align="center">
         <Radio.Group value={currentClassification} onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />

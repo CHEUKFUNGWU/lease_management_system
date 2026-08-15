@@ -146,6 +146,24 @@ body {
   gap: 8px;
 }
 
+/* HELP-001: the help slot is a quiet icon, never styled as an operation. */
+.page-header-help {
+  display: inline-flex;
+  align-items: center;
+}
+.page-header-help-trigger {
+  color: var(--fg-tertiary);
+}
+.help-drawer-body {
+  width: 100%;
+}
+.help-section-heading {
+  margin: 0 0 4px;
+}
+.help-section-body {
+  margin-bottom: 0;
+}
+
 /* FIX-018: shared frame for the second chart on the pulse / store-360 pages,
    so the added charts carry no static inline style (DESIGN.md §13-2). */
 .chart-frame {

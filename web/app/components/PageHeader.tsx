@@ -7,6 +7,10 @@ interface PageHeaderProps {
   primaryAction?: ReactNode;
   secondaryAction?: ReactNode;
   meta?: ReactNode;
+  /** HELP-001: a dedicated help slot — a quiet question-mark entry that
+   *  opens the usage tutorial. Never mixed into primaryAction /
+   *  secondaryAction: it is not an operation button. */
+  help?: ReactNode;
 }
 
 /**
@@ -22,6 +26,7 @@ export default function PageHeader({
   primaryAction,
   secondaryAction,
   meta,
+  help,
 }: PageHeaderProps) {
   return (
     <div className="page-header">
@@ -29,8 +34,9 @@ export default function PageHeader({
         <h1 className="page-header-title">{title}</h1>
         {meta && <p className="page-header-meta">{meta}</p>}
       </div>
-      {(primaryAction || secondaryAction) && (
+      {(primaryAction || secondaryAction || help) && (
         <div className="page-header-actions">
+          {help && <span className="page-header-help">{help}</span>}
           {primaryAction}
           {secondaryAction}
         </div>

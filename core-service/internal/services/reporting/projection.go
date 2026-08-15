@@ -10,7 +10,6 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
-	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 	"github.com/shopspring/decimal"
 )
@@ -284,7 +283,7 @@ func projectStandardComparison(snapshot *Snapshot, request ProjectionRequest) (P
 		discountRate = *request.Rate
 	}
 	if discountRate <= 0 {
-		return ProjectionResult{}, contractsvc.ErrDiscountRateRequired
+		return ProjectionResult{}, &DiscountRateMissingError{ContractNumbers: []string{fact.Contract.ContractNumber}}
 	}
 	payments := repository.ToIFRS16Payments(fact.PaymentSchedules)
 	calculation, err := calculateContract(fact, payments, discountRate)
@@ -423,7 +422,7 @@ func projectSensitivity(snapshot *Snapshot, request ProjectionRequest) (Projecti
 		baseRate = *request.Rate
 	}
 	if baseRate <= 0 {
-		return ProjectionResult{}, contractsvc.ErrDiscountRateRequired
+		return ProjectionResult{}, &DiscountRateMissingError{ContractNumbers: []string{fact.Contract.ContractNumber}}
 	}
 	shocks := request.Shocks
 	if len(shocks) == 0 {

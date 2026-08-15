@@ -134,8 +134,30 @@ body {
 
 /* MAX-005 additive operating-pulse layout; it uses the existing token
    palette and card/grid language without changing global theme behavior. */
+/* FIX-003: fixed height, not min-height — KPI cards in one grid row must not
+   grow apart when a value wraps. Inner lines that can exceed the card width
+   (value, change, comparison) truncate instead of reflowing the card; the
+   value line keeps the full figure in its tooltip. */
 .pulse-kpi-card {
-  min-height: 156px;
+  height: 156px;
+  overflow: hidden;
+}
+
+.pulse-kpi-card .pulse-kpi-value,
+.store-360-kpi-card .pulse-kpi-value {
+  margin: 12px 0 4px;
+  max-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.pulse-kpi-card .pulse-change,
+.store-360-kpi-card .pulse-change,
+.pulse-kpi-card .pulse-kpi-comparison,
+.store-360-kpi-card .pulse-kpi-comparison {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .pulse-kpi-null {
@@ -181,7 +203,10 @@ body {
    additional styling to the new investigation route. */
 .store-360-page .store-360-filter-card,
 .store-360-page .store-360-identity-card { margin-bottom: 16px; }
-.store-360-kpi-card { min-height: 156px; }
+.store-360-kpi-card {
+  height: 156px;
+  overflow: hidden;
+}
 .store-360-bridge-positive { color: var(--state-success-text); }
 .store-360-bridge-negative { color: var(--state-error-text); }
 .store-360-bridge-neutral { color: var(--fg-muted); }
@@ -191,10 +216,11 @@ body {
   .operating-pulse-page .ant-card-body { padding: 16px !important; }
   .operating-pulse-page .ant-segmented { max-width: 100%; overflow-x: auto; }
   .pulse-filter-card .ant-picker { width: 100%; }
-  .pulse-kpi-card { min-height: 136px; }
+  .pulse-kpi-card { height: 136px; }
   .store-360-page .ant-card-body { padding: 16px !important; }
   .store-360-page .ant-segmented { max-width: 100%; overflow-x: auto; }
   .store-360-filter-card .ant-picker { width: 100%; }
+  .store-360-kpi-card { height: 136px; }
 }
 
 @media (max-width: 767px) {

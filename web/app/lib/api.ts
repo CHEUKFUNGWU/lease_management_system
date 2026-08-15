@@ -50,9 +50,19 @@ export class ApiError extends Error {
       case "conflict":
         if (isSourceConflict(detail)) return t("api.source_conflict", apiLanguage);
         return t("api.request_failed", apiLanguage);
+      case "data_unavailable":
+        // FIX-002: discount-rate 422s get contract-specific, actionable copy.
+        // Anything else under this code keeps the generic message.
+        {
+          const contracts = discountRateMissingContracts(detail);
+          if (contracts !== null && contracts.length > 0) {
+            return t("api.discount_rate_missing", apiLanguage, { contracts: contracts.join("、") });
+          }
+          if (contracts !== null) return t("api.discount_rate_missing_no_contracts", apiLanguage);
+          return t("api.request_failed", apiLanguage);
+        }
       case "invalid_arguments":
       case "business_failure":
-      case "data_unavailable":
       case "review_required":
       case "capability_denied":
       case "timeout":
@@ -76,6 +86,21 @@ function isSourceConflict(detail: unknown): boolean {
   if (typeof detail !== "object" || detail === null) return false;
   const details = (detail as { details?: { reason?: unknown } }).details;
   return details?.reason === "source_conflict";
+}
+
+// FIX-002: a 422 data_unavailable whose details flag discount_rate_missing
+// carries details.contracts — the contract numbers that need a confirmed
+// rate before the report can be measured. Naming them turns a dead-end
+// "try again later" into an actionable fix list.
+function discountRateMissingContracts(detail: unknown): string[] | null {
+  if (typeof detail !== "object" || detail === null) return null;
+  const body = detail as { details?: { discount_rate_missing?: unknown; contracts?: unknown } };
+  if (body.details?.discount_rate_missing !== true) return null;
+  const contracts = body.details.contracts;
+  if (Array.isArray(contracts) && contracts.every((item) => typeof item === "string") && contracts.length > 0) {
+    return contracts as string[];
+  }
+  return [];
 }
 
 // Shared page-level helper (ERR-002): the three retail pages used to each

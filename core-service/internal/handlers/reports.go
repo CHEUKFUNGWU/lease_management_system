@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	contractsvc "github.com/lease-management-system/core-service/internal/services/contracts"
@@ -528,13 +529,35 @@ func (h *ReportHandler) buildSnapshot(c *gin.Context, mode reporting.Mode) (*rep
 		Mode: mode, LegalEntityID: middleware.GetTenantID(c),
 	})
 	if err != nil {
+		// A missing discount rate is a data condition the caller can fix
+		// (confirm the rate on the contract or set a global policy), not a
+		// server fault — it must not surface as a retryable 500.
+		var missing *reporting.DiscountRateMissingError
+		if errors.As(err, &missing) {
+			writeDiscountRateMissing(c, missing)
+			return nil, false
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return nil, false
 	}
 	return snapshot, true
 }
 
+// writeDiscountRateMissing is the single HTTP adapter for
+// ErrDiscountRateRequired: 422 + data_unavailable + the affected contract
+// numbers, so the client can say what is missing and where to fix it instead
+// of telling the user to retry a request that will never succeed.
+func writeDiscountRateMissing(c *gin.Context, missing *reporting.DiscountRateMissingError) {
+	writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeDataUnavailable, missing.Error(), gin.H{
+		"discount_rate_missing": true,
+		"contracts":             missing.ContractNumbers,
+	})
+}
+
 func writeProjectionError(c *gin.Context, err error) {
+	// DiscountRateMissingError wraps ErrDiscountRateRequired, so the As check
+	// must win over the Is check below it to keep the contract numbers.
+	var missing *reporting.DiscountRateMissingError
 	switch {
 	case errors.Is(err, reporting.ErrContractNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -542,8 +565,10 @@ func writeProjectionError(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, reporting.ErrSensitivityShocksRequired):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.As(err, &missing):
+		writeDiscountRateMissing(c, missing)
 	case errors.Is(err, contractsvc.ErrDiscountRateRequired):
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "discount_rate_missing": true})
+		writeDiscountRateMissing(c, &reporting.DiscountRateMissingError{})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}

@@ -52,9 +52,12 @@ function KPIValueCard({ code, metric, currency, notReady, language }: { code: Pu
   const arrow = metric.change_value == null ? undefined : metric.change_value < 0 ? <ArrowDownOutlined /> : metric.change_value > 0 ? <ArrowUpOutlined /> : undefined;
   const status = metricStatusLabel(metric, language);
   const statusKind = status.status === "complete" ? "neutral" : "warning";
+  // FIX-003: the value line truncates with a tooltip instead of wrapping,
+  // so a long figure can never stretch the fixed-height card.
+  const display = formatKPIValue(metric.current, currency, language);
   return <Card size="small" className="pulse-kpi-card" data-testid={`pulse-kpi-${code}`}>
     <Flex justify="space-between" align="start" gap={8}><Typography.Text type="secondary">{kpiLabel(code, language)}</Typography.Text><Flex align="center" gap={4}>{notReady && <KPIReadyBadge />}<Tooltip title={status.reason}><StatusTag kind={statusKind}>{status.label}</StatusTag></Tooltip></Flex></Flex>
-    <Typography.Title level={3} style={{ margin: "12px 0 4px", fontVariantNumeric: "tabular-nums" }}>{formatKPIValue(metric.current, currency, language)}</Typography.Title>
+    <Typography.Title level={3} className="pulse-kpi-value" ellipsis={{ tooltip: display }}>{display}</Typography.Title>
     <Typography.Text className={`pulse-change pulse-change-${tone}`}>{arrow} {formatChange(metric)} {status.reason ? `· ${status.reason}` : ""}</Typography.Text>
     <Typography.Text type="secondary" className="pulse-kpi-comparison">{t("common.contrast", language)} {formatKPIValue(metric.comparison, currency, language)}</Typography.Text>
   </Card>;

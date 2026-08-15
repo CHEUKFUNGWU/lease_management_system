@@ -1926,6 +1926,24 @@ html {
   text-align: center;
 }
 
+.login-landing-wrapper {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.login-landing-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.login-landing-link:hover {
+  color: var(--fg-primary);
+  text-decoration: underline;
+}
+
 @media (max-width: 960px) {
   .login-shell {
     grid-template-columns: 1fr;

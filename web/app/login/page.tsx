@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Form, Input, Button, message } from "antd";
-import { LockOutlined, UserOutlined, SafetyOutlined } from "@ant-design/icons";
+import { LockOutlined, UserOutlined, SafetyOutlined, ArrowRightOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -119,6 +120,12 @@ export default function LoginPage() {
             <SafetyOutlined aria-hidden="true" />
             {t("login.no_register", language)}
           </p>
+
+          <div className="login-landing-wrapper">
+            <Link href="/landing" className="login-landing-link">
+              {t("login.view_landing", language)}
+            </Link>
+          </div>
         </div>
       </section>
     </div>

@@ -85,6 +85,7 @@ export const PALETTE_PAGES: PalettePageDef[] = [
 /** U3：app/ 下被排除在面板之外的页面（auth / 首页 / 详情 / 新建动作页）。 */
 export const PALETTE_EXCLUDED_ROUTES = new Set([
   "/",
+  "/landing",
   "/login",
   "/admin/login",
   "/contracts/[id]",

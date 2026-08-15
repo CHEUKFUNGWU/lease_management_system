@@ -692,7 +692,12 @@ h3 {
   background: var(--bg-surface);
 }
 
-.global-search-trigger {
+/* FIX-010: AntD runtime styles (.ant-btn) beat the bare class at equal
+   specificity, so the capsule background never applied in the real header.
+   Scoped to the app header to win the cascade without an important flag;
+   the hover rule drops its legacy important flag now that specificity
+   suffices. */
+.app-header .global-search-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -703,9 +708,19 @@ h3 {
   background: var(--bg-inset);
 }
 
-.global-search-trigger:hover {
-  color: var(--fg-primary) !important;
-  background: var(--bg-inset) !important;
+.app-header .global-search-trigger:hover {
+  color: var(--fg-primary);
+  background: var(--bg-inset);
+}
+
+/* FIX-010: kbd inherited the header line-height and became a 24×64
+   sliver; pin it inside the 34px trigger. */
+.app-header .global-search-trigger kbd {
+  height: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .global-search-trigger kbd,

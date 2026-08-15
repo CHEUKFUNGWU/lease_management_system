@@ -1685,12 +1685,16 @@ html {
 .pulse-block-gap,
 .store360-block-gap,
 .scenario-block-gap,
-.contract-block-gap,
-.store360-peer-table {
+.contract-block-gap {
   margin-top: 16px;
 }
-.scenario-block-gap-sm {
+/* STY-006: peer table keeps its own 8px top gap — grouping it with the
+   16px block-gap classes changed the value the inline style had. */
+.store360-peer-table {
   margin-top: 8px;
+}
+.scenario-block-gap-sm {
+  margin-top: 12px;
 }
 .pulse-block-margin,
 .contract-block-gap-bottom,
@@ -1729,9 +1733,13 @@ html {
 
 /* Loading and suspense blocks */
 .pulse-loading-block,
-.store360-loading-block,
-.scenario-loading-block {
+.store360-loading-block {
   min-height: 220px;
+}
+/* STY-006: the scenario loading block was 160px inline; the 220px group
+   value changed what the page had. */
+.scenario-loading-block {
+  min-height: 160px;
 }
 .pulse-suspense-fallback,
 .store360-suspense-fallback,

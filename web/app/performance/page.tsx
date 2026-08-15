@@ -9,7 +9,10 @@ import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { HelpTrigger } from "../components/HelpDrawer";
+import { performanceHelpContent } from "../components/help-content";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { performanceApi } from "../lib/api";
 import { notifyError } from "../lib/notify";
 
@@ -23,6 +26,7 @@ const pct = (value?: number) => value == null ? "—" : `${value.toFixed(2)}%`;
 
 export default function PerformancePage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   // FIX-026: `period` is the *applied* period — the only thing the loader
   // depends on. `periodDraft` is what the text field holds while it is being
   // edited. They used to be one state in the effect's dependency list, so
@@ -139,6 +143,7 @@ export default function PerformancePage() {
     <PageHeader
       title="经营驾驶舱"
       meta={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
+      help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
     />
     <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={periodDraft} onChange={event => setPeriodDraft(event.target.value)} onPressEnter={applyPeriod} status={periodDraftValid ? undefined : "error"} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={applyPeriod} disabled={!periodDraftValid} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button></Space></Card>
     {overview && <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>

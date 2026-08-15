@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Drawer, message } from "antd";
-import { RobotOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import type { ApprovalProposalLike } from "./components/ApprovalCard";
-import { DashboardHeader } from "./components/dashboard/DashboardCards";
+
 import BriefColumn from "./home/BriefColumn";
 import RightColumn from "./home/RightColumn";
 import WorkQueueFocus from "./home/WorkQueueFocus";
@@ -131,10 +130,6 @@ export default function HomePage() {
   }, [isMobile, todoDrawerOpen]);
 
   const period = dayjs().format("YYYY-MM");
-  const subtitle = useMemo(
-    () => `${period} · ${t("reports.working", language)} · ${t("dashboard.data_as_of", language)} ${dayjs().format("YYYY-MM-DD HH:mm")}`,
-    [language, period]
-  );
 
   useEffect(() => {
     if (!token) return;
@@ -208,17 +203,14 @@ export default function HomePage() {
     onRejectProposal: handleRejectProposal,
   };
 
+  // UIUX 方案 §8.2 的布局图里没有页面级标题栏：首屏直接是三栏。旧的
+  // 「今日待办」标题是被替换掉的那个仪表盘的残留 —— 它顶着旧页面的名字，
+  // 又把三栏整体往下压。两栏各自有标题，数据截至时间在简报的可信条里，
+  // 页面级标题加不了信息。随之移除的两个按钮功能都还在 /contracts、
+  // /ai-chat 和命令面板上。
   return (
     <ProtectedRoute>
       <AppLayout>
-        <DashboardHeader
-          title={t("dashboard.todo_title", language)}
-          subtitle={subtitle}
-          // 「新增合同」已从首页移除：首页是经营简报的入口，不是合同录入的入口。
-          // 功能未删除，仍在 /contracts 页、命令面板和 /contracts/new 路由上。
-          primaryAction={<Button icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>}
-        />
-
         <div className="home-grid">
           <div className="home-middle">
             <div className="home-mobile-todo-bar">

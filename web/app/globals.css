@@ -1523,6 +1523,24 @@ html {
   flex-direction: column;
   gap: 24px;
 }
+/* FIX-009: <Spin> inserts .ant-spin-nested-loading > .ant-spin-container
+   between the stack and its blocks, so the parent gap stopped applying.
+   Scoped to the home columns only — other Spin call sites keep their own
+   layout. */
+/* FIX-009: <Spin> inserts .ant-spin-nested-loading > .ant-spin-container
+   between the stack and its blocks, so the parent gap stopped applying.
+   Scoped to the home columns only — other Spin call sites keep their own
+   layout. home-work-focus keeps its 16px rhythm. */
+.home-right-stack .ant-spin-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.home-work-focus .ant-spin-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
 .home-right-title {
   font-size: 15px;
   font-weight: 600;
@@ -1554,10 +1572,14 @@ html {
   border-radius: 10px;
 }
 .home-readiness-card {
-  background: var(--bg-surface);
+  /* FIX-009: unify the hand-written card onto the AntD card language
+     (1px border-default, no ring shadow) — the hairline shadow version
+     was invisible on the white page background. */
+  background: var(--bg-page);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
   padding: 20px;
-  box-shadow: var(--shadow-static);
+  box-shadow: none;
   min-height: 188px;
 }
 .home-readiness-title {

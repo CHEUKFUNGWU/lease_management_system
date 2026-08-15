@@ -197,3 +197,13 @@ describe("FIX-008: chip radius has a unit, user row reverses, starters send dire
   });
 });
 
+describe("FIX-009: Spin-wrapped home columns restore their gaps", () => {
+  it("FIX-009: Spin-wrapped home columns restore their gaps", () => {
+    expect(ruleBody(".home-right-stack .ant-spin-container")).toMatch(/gap:\s*24px/);
+    expect(ruleBody(".home-work-focus .ant-spin-container")).toMatch(/gap:\s*16px/);
+    // The readiness card joins the AntD card language (border, no ring).
+    expect(ruleBody(".home-readiness-card")).toMatch(/border:\s*1px solid var\(--border-default\)/);
+    expect(ruleBody(".home-readiness-card")).toMatch(/box-shadow:\s*none/);
+  });
+});
+

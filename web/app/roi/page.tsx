@@ -6,11 +6,14 @@ import { CalculatorOutlined, ClockCircleOutlined, DollarOutlined, SafetyOutlined
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { useLanguage } from "../context/LanguageContext";
 import { fmtMoney } from "../lib/format";
+import { t } from "../lib/i18n";
 
 const { Text } = Typography;
 
 export default function RoiPage() {
+  const { language } = useLanguage();
   const [contracts, setContracts] = useState<number | null>(null);
   const [currencyCode, setCurrencyCode] = useState<string | undefined>();
   const [hourlyCost, setHourlyCost] = useState<number | null>(null);
@@ -56,29 +59,31 @@ export default function RoiPage() {
   }, [contracts, currencyCode, hourlyCost, manualHours, aiHours, monthlyCloseDays, systemCloseDays, auditReworkHours]);
 
   const assumptions = [
-    { key: "contracts", item: "合同数量", value: contracts == null ? "—" : contracts.toLocaleString(), note: "门店/设备租赁合同总量" },
-    { key: "intake", item: "单份录入节省", value: manualHours == null || aiHours == null ? "—" : `${Math.max(manualHours - aiHours, 0).toFixed(1)} 小时`, note: "传统 Excel/表单录入 vs AI 草稿确认" },
-    { key: "close", item: "月结节省", value: monthlyCloseDays == null || systemCloseDays == null ? "—" : `${Math.max(monthlyCloseDays - systemCloseDays, 0).toFixed(1)} 人天/月`, note: "分录生成、复核、锁账、报表导出" },
-    { key: "audit", item: "审计返工减少", value: auditReworkHours == null ? "—" : `${auditReworkHours.toLocaleString()} 小时/年`, note: "对数报告、审批留痕、范围判定减少返工" },
+    { key: "contracts", item: t("roi.assumption_contracts", language), value: contracts == null ? "—" : contracts.toLocaleString(), note: t("roi.note_contracts", language) },
+    { key: "intake", item: t("roi.assumption_intake", language), value: manualHours == null || aiHours == null ? "—" : `${Math.max(manualHours - aiHours, 0).toFixed(1)} ${t("roi.unit_hours", language)}`, note: t("roi.note_intake", language) },
+    { key: "close", item: t("roi.assumption_close", language), value: monthlyCloseDays == null || systemCloseDays == null ? "—" : `${Math.max(monthlyCloseDays - systemCloseDays, 0).toFixed(1)} ${t("roi.unit_hours_per_month", language)}`, note: t("roi.note_close", language) },
+    { key: "audit", item: t("roi.assumption_audit", language), value: auditReworkHours == null ? "—" : `${auditReworkHours.toLocaleString()} ${t("roi.unit_hours_per_year", language)}`, note: t("roi.note_audit", language) },
   ];
+
+  const hoursUnit = t("roi.unit_hours", language);
 
   return (
     <ProtectedRoute>
       <AppLayout>
         <PageHeader
-          title="ROI 测算"
+          title={<>{t("roi.title", language)}<span className="page-header-count">{t("roi.header_count", language, { count: contracts == null ? "—" : contracts.toLocaleString() })}</span></>}
         />
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={8}>
-            <Card title="测算参数" style={{ borderRadius: 10 }}>
+            <Card title={t("roi.card_assumptions", language)} style={{ borderRadius: 10 }}>
               <div style={{ display: "grid", gap: 16 }}>
                 <label>
-                  <Text strong>合同数量</Text>
+                  <Text strong>{t("roi.assumption_contracts", language)}</Text>
                   <InputNumber min={1} value={contracts} onChange={(v) => setContracts(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
-                  <Text strong>计价币种</Text>
+                  <Text strong>{t("roi.label_currency", language)}</Text>
                   <Input
                     value={currencyCode}
                     onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())}
@@ -87,27 +92,27 @@ export default function RoiPage() {
                   />
                 </label>
                 <label>
-                  <Text strong>财务人员小时成本</Text>
+                  <Text strong>{t("roi.label_hourly_cost", language)}</Text>
                   <InputNumber min={1} prefix={currencyCode} value={hourlyCost} onChange={(v) => setHourlyCost(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
-                  <Text strong>传统单份录入小时</Text>
+                  <Text strong>{t("roi.label_manual_hours", language)}</Text>
                   <InputNumber min={0} step={0.1} value={manualHours} onChange={(v) => setManualHours(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
-                  <Text strong>AI 草稿确认小时</Text>
+                  <Text strong>{t("roi.label_ai_hours", language)}</Text>
                   <InputNumber min={0} step={0.1} value={aiHours} onChange={(v) => setAiHours(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
-                  <Text strong>传统月结人天/月</Text>
+                  <Text strong>{t("roi.label_close_days", language)}</Text>
                   <InputNumber min={0} step={0.5} value={monthlyCloseDays} onChange={(v) => setMonthlyCloseDays(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
-                  <Text strong>系统月结人天/月</Text>
+                  <Text strong>{t("roi.label_system_close_days", language)}</Text>
                   <InputNumber min={0} step={0.5} value={systemCloseDays} onChange={(v) => setSystemCloseDays(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
                 <label>
-                  <Text strong>年度审计返工减少小时</Text>
+                  <Text strong>{t("roi.label_audit_hours", language)}</Text>
                   <InputNumber min={0} value={auditReworkHours} onChange={(v) => setAuditReworkHours(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
                 </label>
               </div>
@@ -118,32 +123,32 @@ export default function RoiPage() {
             <Row gutter={[16, 16]}>
               <Col xs={24} md={12}>
                 <Card style={{ borderRadius: 10 }}>
-                  <Statistic title="年度节省工时" value={result ? Math.round(result.totalHoursSaved) : undefined} suffix="小时" prefix={<ClockCircleOutlined />} />
+                  <Statistic title={t("roi.stat_hours_saved", language)} value={result ? Math.round(result.totalHoursSaved) : undefined} suffix={hoursUnit} prefix={<ClockCircleOutlined />} />
                 </Card>
               </Col>
               <Col xs={24} md={12}>
                 <Card style={{ borderRadius: 10 }}>
-                  <Statistic title="年度人力成本节省" value={result ? fmtMoney(Math.round(result.laborSavings), result.currency) : "—"} prefix={<DollarOutlined />} />
+                  <Statistic title={t("roi.stat_labor_savings", language)} value={result ? fmtMoney(Math.round(result.laborSavings), result.currency) : "—"} prefix={<DollarOutlined />} />
                 </Card>
               </Col>
               <Col xs={24} md={12}>
                 <Card style={{ borderRadius: 10 }}>
-                  <Statistic title="AI 录入节省" value={result ? Math.round(result.intakeHoursSaved) : undefined} suffix="小时" prefix={<CalculatorOutlined />} />
+                  <Statistic title={t("roi.stat_ai_saved", language)} value={result ? Math.round(result.intakeHoursSaved) : undefined} suffix={hoursUnit} prefix={<CalculatorOutlined />} />
                 </Card>
               </Col>
               <Col xs={24} md={12}>
                 <Card style={{ borderRadius: 10 }}>
-                  <Statistic title="审计返工减少" value={result ? Math.round(result.auditHoursSaved) : undefined} suffix="小时" prefix={<SafetyOutlined />} />
+                  <Statistic title={t("roi.stat_audit_reduced", language)} value={result ? Math.round(result.auditHoursSaved) : undefined} suffix={hoursUnit} prefix={<SafetyOutlined />} />
                 </Card>
               </Col>
             </Row>
 
-            <Card title="测算口径" style={{ borderRadius: 10, marginTop: 16 }}>
+            <Card title={t("roi.card_basis", language)} style={{ borderRadius: 10, marginTop: 16 }}>
               <Table
                 columns={[
-                  { title: "项目", dataIndex: "item" },
-                  { title: "数值", dataIndex: "value", width: 160 },
-                  { title: "说明", dataIndex: "note" },
+                  { title: t("roi.col_item", language), dataIndex: "item" },
+                  { title: t("roi.col_value", language), dataIndex: "value", width: 160 },
+                  { title: t("roi.col_note", language), dataIndex: "note" },
                 ]}
                 dataSource={assumptions}
                 pagination={false}

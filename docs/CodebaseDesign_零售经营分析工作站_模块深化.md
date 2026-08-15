@@ -31,7 +31,7 @@
 |---|---|---|---|
 | 语义层（纯函数） | retailkpi 差异计算（M1）、预算对比（M4） | — | 单元测试（testdata 先例） |
 | 期间解析（纯函数） | retailperiod（M2） | — | 单元测试：边界 |
-| 导出（纯函数 + handler 接线） | retailexport（M3） | CSV（Go）/ XLSX（Go excelize，公式）/ PPTX（web pptxgenjs，原生对象） | 单元测试 + handler 测试 |
+| 导出（纯函数 + handler 接线） | retailexport（M3） | CSV（Go 权威）/ XLSX（web ExcelJS，公式+缓存值+原生 Table）/ PPTX（web pptxgenjs，原生对象） | 单元测试 + handler 测试 |
 | 服务构建 | retailpulse 扩展（M5） | — | 单元测试 + handler 测试 |
 | plan 数据源 | M4 的 PlanReader | fpna_plan_lines / 模拟 plan（两个适配器） | 集成测试 + 单测 |
 | agent 护栏 | agentguard（M6） | 内存计数 / DB 计数（两个适配器） | 单元测试 |
@@ -102,13 +102,13 @@ type ColumnSpec struct {
 func Export(kind ExportKind, format Format, response any, envelope sourceenvelope.Envelope) (filename string, content []byte, err error)
 ```
 
-**藏在接口后面**：口径头生成（data_classification、dataset_version、as_of、formula_version、period/窗口、group_by、法人）；Working/模拟标识（文件名 + 表头标记）；CSV 转义与 BOM；**公式生成**——每种导出 kind 声明自己的列/公式描述符（合计行 =SUM(range)、差异列 =A−B、达成率 =IF(ISERROR(A/B),"",A/B)），模块统一生成公式字符串，文件由 Excel/LibreOffice 打开时自动重算（不依赖计算引擎；实施时验证所选库能否同时写缓存值）；**公式注入防护**——数据文本中形如 `= + - @` 开头的单元格一律转义，只有白名单描述符能产生公式；XLSX 工作簿组装（多 sheet：KPI 卡/表/桥/明细）；PPTX 用原生对象（文本框/表格/图表）组装**可编辑**幻灯片（非图片贴图）；列名与排序的单一来源。
+**藏在接口后面**：口径头生成（data_classification、dataset_version、as_of、formula_version、period/窗口、group_by、法人）；Working/模拟标识（文件名 + 表头标记）；CSV 转义与 BOM；**公式生成**——每种导出 kind 声明自己的列/公式描述符（合计行 =SUM、差异列 =A−B、达成率 =IF(ISERROR(A/B),"",A/B)），公式统一写成**表列结构化引用**（如 `=IF(ISERROR([Actual]-[Budget]),"",[Actual]-[Budget])`），**缓存值与公式同写**（result 由模块从受控响应计算提供——写库库不代算，权威值正好在我们手里，打开即见数）；**原生 Excel Table**——每个数据 sheet 是命名表（totalsRow 合计、filterButton、冻结表头），用户增删行后公式与合计自动跟随、可加切片器/筛选；**公式注入防护**——数据文本中形如 `= + - @` 开头的单元格一律转义，只有白名单描述符能产生公式；PPTX 用原生对象（文本框/表格/图表）组装**可编辑**幻灯片（非图片贴图）；列名与排序的单一来源。
 
-**接缝与适配器**：handler 层同一 GET 端点带 `format=csv|xlsx|pptx` 参数，响应即数据源。适配器决策：服务端出 CSV（Go 标准库，口径权威）与 XLSX（excelize，MIT、纯 Go；公式 + 可选缓存值）；PPTX 由前端 pptxgenjs（MIT、浏览器端）从同源响应生成原生可编辑对象（Go 无成熟 pptx 库）。三个适配器 ⇒ 接缝真实。既有报表页的 SheetJS 导出保持不动（底线：不破坏既有功能）。
+**接缝与适配器**：handler 层同一 GET 端点带 `format=csv|xlsx|pptx` 参数，响应即数据源。适配器决策：服务端出 CSV（Go 标准库，口径权威）；XLSX 与 PPTX 由前端生成——ExcelJS（MIT、浏览器端；`{formula, result}` 公式 + 缓存值、原生 Table）与 pptxgenjs（MIT、浏览器端；原生可编辑对象），两者同为 JS 栈、均从同源受控响应生成。三个适配器 ⇒ 接缝真实。既有报表页的 SheetJS 导出保持不动（底线：不破坏既有功能）。
 
 **删除测试**：删除后，口径头、公式生成、注入转义、文件命名逻辑重新扩散到 N 个页面，且大概率各自为政再次漂移。
 
-**测试面**：行结构、口径头、CSV 转义、文件名、分类标识；公式字符串与缓存值一致性（用工作簿库回读断言）、除零/空值公式用例、`= + - @` 注入转义用例；PPTX 解包断言原生对象存在（非图片）；非法 kind/format 的错误路径。
+**测试面**：行结构、口径头、CSV 转义、文件名、分类标识；公式字符串含结构化引用且缓存值与受控响应一致（用工作簿库回读断言）、除零/空值公式用例、`= + - @` 注入转义用例；表对象用例（命名表、totalsRow 合计、filterButton、冻结表头）；PPTX 解包断言原生对象存在（非图片）；非法 kind/format 的错误路径。
 
 ## 6. M4 预算对比 — retailkpi.ComparePlan + PlanReader 适配器
 
@@ -287,7 +287,7 @@ func Commit(ctx, rows [][]string, mapping Mapping, envelope Envelope, idempotenc
 - **接口即测试面**：每个模块的测试从它的接口驱动；不测穿接口内部。
 - M1：负基数方向（−100→−50 显示改善）、零分母、空值、既有输出回归（golden 对数）。
 - M2：月末/季末边界、as_of 交互、默认值全产品一致、非法输入错误路径。
-- M3：口径头、转义、文件名、分类标识；公式与缓存值一致性、除零保护、`= + - @` 注入转义；PPTX 原生对象断言；handler 集成（`format` 参数）。
+- M3：口径头、转义、文件名、分类标识；公式（结构化引用 + 缓存值一致）、除零保护、`= + - @` 注入转义；表对象（totalsRow/筛选/冻结）；PPTX 原生对象断言；handler 集成（`format` 参数）。
 - M4：覆盖率不足、混币、材料性阈值、null（缺 plan 行 ≠ 0）；PlanReader 双适配器。
 - M5：`GroupBy=""` 零回归；分组信号、门槛、多币种处理。
 - M6：路由命中（自然问法）、引用空回退、护栏拒绝语义 + 预算记录；agenttools 只读属性回归。

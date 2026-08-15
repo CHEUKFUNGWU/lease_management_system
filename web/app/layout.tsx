@@ -18,7 +18,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "零售经营分析工作站",
-  description: "线下零售经营分析工作站：经营脉搏、门店 360、情景工作台与承租合同分析",
+  description: "线下零售经营分析工作站：经营脉搏、门店 360、租金谈判测算与承租合同分析",
 };
 
 export default function RootLayout({

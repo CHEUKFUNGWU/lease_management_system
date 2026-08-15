@@ -849,13 +849,21 @@ const dict: TranslationDict = {
     en: "Daily trend (target store / peer median)",
   },
 
-  // I18N-001 — scenario-workbench page
+  // I18N-001 — scenario-workbench page（FIX-014：用户定名「租金谈判测算」；
+  // 路由 /scenario-workbench 与组件名、API 路径不变）
   "scenario.title": {
-    "zh-CN": "情景工作台",
-    "zh-HK": "情景工作台",
-    en: "Scenario Workbench",
+    "zh-CN": "租金谈判测算",
+    "zh-HK": "租金談判測算",
+    en: "Rent Negotiation Scenario",
   },
   "scenario.subtitle": {
+    "zh-CN": "调整租金、销售、人工假设，看单店利润怎么变。",
+    "zh-HK": "調整租金、銷售、人工假設，看單店利潤怎麼變。",
+    en: "Adjust rent, sales and labor assumptions to see how store profit changes.",
+  },
+  // FIX-014: the compliance wording stays — it moves under the plain
+  // subtitle as the scope note, exactly as before, only repositioned.
+  "scenario.scope_note": {
     "zh-CN": "门店经营 What-if；服务端基于同一 Working 事实重算 30-day run-rate，不输出最优方案或 IFRS 16 影响。",
     "zh-HK": "門店經營 What-if；服務端基於同一 Working 事實重算 30-day run-rate，不輸出最優方案或 IFRS 16 影響。",
     en: "Store what-if; the server recomputes a 30-day run-rate on the same Working facts, with no optimal plan or IFRS 16 impact.",
@@ -1457,9 +1465,9 @@ const dict: TranslationDict = {
     en: "Store 360",
   },
   "nav.scenario_workbench": {
-    "zh-CN": "情景工作台",
-    "zh-HK": "情景工作台",
-    en: "Scenario Workbench",
+    "zh-CN": "租金谈判测算",
+    "zh-HK": "租金談判測算",
+    en: "Rent Negotiation Scenario",
   },
   "nav.cashflow": {
     "zh-CN": "现金流预测",

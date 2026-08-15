@@ -1,19 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Button, Col, Row, Skeleton, Spin } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Drawer, message } from "antd";
 import { PlusOutlined, RobotOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { DashboardHeader, MoneyKPICard } from "./components/dashboard/DashboardCards";
-import { UpcomingDatesCard, WorkQueueSummaryCard } from "./components/dashboard/DashboardLists";
+import type { ApprovalProposalLike } from "./components/ApprovalCard";
+import { DashboardHeader } from "./components/dashboard/DashboardCards";
+import BriefColumn from "./home/BriefColumn";
+import RightColumn from "./home/RightColumn";
+import WorkQueueFocus from "./home/WorkQueueFocus";
+import { canViewHomeBrief } from "./home/logic";
+import { adoptHomeProposal, toHomeProposalItem, type HomeProposalItem } from "./home/proposals";
+import type { HomeBriefResult } from "./home/types";
 import type { DashboardMoneyKPIs, DashboardUpcomingDate, DashboardWorkQueue, MoneySlice } from "./components/dashboard/types";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
-import { leaseAdminApi, monthlyClosingApi, reportApi, workQueueApi } from "./lib/api";
+import { apiErrorMessage, leaseAdminApi, monthlyClosingApi, reportApi, workQueueApi } from "./lib/api";
 import { t } from "./lib/i18n";
+import { getHomeResponsiveState } from "./home/responsive";
 
 const emptyMoney = (): MoneySlice[] => [];
 const emptyKpis = (): DashboardMoneyKPIs => ({
@@ -67,7 +74,7 @@ function latestPerCurrency(rows: any[], currentKey: string, valueKey: string): M
 }
 
 export default function HomePage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { language } = useLanguage();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -76,6 +83,52 @@ export default function HomePage() {
   const [upcomingDates, setUpcomingDates] = useState<DashboardUpcomingDate[]>([]);
   const [queue, setQueue] = useState<DashboardWorkQueue>(emptyQueue);
   const [readiness, setReadiness] = useState<{ status?: string; blocking_count?: number; evaluated_at?: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [todoDrawerOpen, setTodoDrawerOpen] = useState(false);
+  // HOME-003: proposals from the brief and follow-ups settle in the right
+  // column; adoption goes through the existing action API (proposals.ts).
+  const [proposals, setProposals] = useState<HomeProposalItem[]>([]);
+  const [adoptingId, setAdoptingId] = useState<string | null>(null);
+
+  const handleProposal = useCallback((response: HomeBriefResult) => {
+    const item = toHomeProposalItem(response);
+    if (!item) return;
+    setProposals((current) => (current.some((existing) => existing.key === item.key) ? current : [...current, item]));
+  }, []);
+
+  const handleAdoptProposal = useCallback(async (item: HomeProposalItem) => {
+    if (!token) return;
+    setAdoptingId(item.key);
+    try {
+      const result = await adoptHomeProposal(item, token);
+      message.success(result.idempotent_replay ? t("scenario.saved_replay", language) : t("scenario.saved", language));
+    } catch (error) {
+      message.error(apiErrorMessage(error));
+    } finally {
+      setAdoptingId(null);
+    }
+  }, [token, language]);
+
+  const handleModifyProposal = useCallback((proposal: ApprovalProposalLike) => {
+    const url = proposal.next_url;
+    if (url && String(url).startsWith("/")) router.push(String(url));
+  }, [router]);
+
+  const handleRejectProposal = useCallback(() => {
+    message.info(t("ai.approval.rejected", language));
+  }, [language]);
+
+  useEffect(() => {
+    const sync = () => setIsMobile(!getHomeResponsiveState(window.innerWidth).threeColumn);
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
+
+  // Resizing back to desktop must not leave a stray Drawer open.
+  useEffect(() => {
+    if (!isMobile && todoDrawerOpen) setTodoDrawerOpen(false);
+  }, [isMobile, todoDrawerOpen]);
 
   const period = dayjs().format("YYYY-MM");
   const subtitle = useMemo(
@@ -138,9 +191,22 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  const readinessLabel = readiness?.status === "blocked"
-    ? t("todo.readiness_blocked", language)
-    : readiness?.status === "ready" ? t("todo.readiness_ready", language) : t("todo.readiness_not_run", language);
+  const rightColumnProps = {
+    queue,
+    dates: upcomingDates,
+    moneyKpis,
+    readiness,
+    loading,
+    financialLoading,
+    language,
+    onOpenQueue: () => router.push("/todo"),
+    onOpenContract: (contractId: string) => router.push(`/contracts/${contractId}`),
+    proposals,
+    adoptingId,
+    onAdoptProposal: handleAdoptProposal,
+    onModifyProposal: handleModifyProposal,
+    onRejectProposal: handleRejectProposal,
+  };
 
   return (
     <ProtectedRoute>
@@ -152,51 +218,34 @@ export default function HomePage() {
           secondaryAction={<Button icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>}
         />
 
-        <Spin spinning={loading}>
-          <div className="dashboard-work-queue" style={{ marginBottom: 16 }}>
-            <WorkQueueSummaryCard queue={queue} language={language} onOpen={() => router.push("/todo")} />
+        <div className="home-grid">
+          <div className="home-middle">
+            <div className="home-mobile-todo-bar">
+              <Button onClick={() => setTodoDrawerOpen(true)}>
+                {t("home.mobile_todo_trigger", language)}
+              </Button>
+            </div>
+            {canViewHomeBrief(user) ? (
+              <BriefColumn token={token} language={language} onProposal={handleProposal} />
+            ) : (
+              <WorkQueueFocus {...rightColumnProps} />
+            )}
           </div>
+          <div className="home-right">
+            <RightColumn {...rightColumnProps} />
+          </div>
+        </div>
 
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={12}>
-              <MoneyKPICard title={t("dashboard.kpi_total_liability", language)} value={moneyKpis.totalLiability} subtitle={moneyKpis.totalLiability.length > 1 ? t("dashboard.multi_currency_note", language) : t("dashboard.kpi_closing_basis", language)} loading={financialLoading} />
-            </Col>
-            <Col xs={24} lg={12}>
-              <MoneyKPICard title={t("dashboard.kpi_month_expense", language)} value={moneyKpis.monthExpense} subtitle={t("dashboard.kpi_month_expense_sub", language)} loading={financialLoading} />
-            </Col>
-          </Row>
-
-          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-            <Col xs={24} lg={16}>
-              <UpcomingDatesCard
-                dates={upcomingDates}
-                language={language}
-                getDateUrgency={(targetDate) => {
-                  const days = dayjs(targetDate).startOf("day").diff(dayjs().startOf("day"), "day");
-                  return days < 0
-                    ? { kind: "error", text: t("dashboard.overdue_days", language, { days: String(Math.abs(days)) }) }
-                    : days <= 7
-                      ? { kind: "warning", text: t("dashboard.within_days", language, { days: String(days) }) }
-                      : { kind: "processing", text: t("dashboard.remaining_days", language, { days: String(days) }) };
-                }}
-                onOpenContract={(contractId) => router.push(`/contracts/${contractId}`)}
-              />
-            </Col>
-            <Col xs={24} lg={8}>
-              <div className="dashboard-readiness-card" style={{ minHeight: 188, padding: 20, border: "1px solid var(--border-strong)", borderRadius: 10, background: "var(--bg-surface)" }}>
-                <div style={{ fontSize: 12, color: "var(--fg-tertiary)", marginBottom: 8 }}>{t("dashboard.close_readiness", language)}</div>
-                {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
-                  <>
-                    <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>{readinessLabel}</div>
-                    <div style={{ color: "var(--fg-tertiary)", fontSize: 13 }}>{t("dashboard.blocking_items", language)}: <strong>{readiness?.blocking_count ?? 0}</strong></div>
-                    <div style={{ color: "var(--fg-muted)", fontSize: 12, marginTop: 8 }}>{readiness?.evaluated_at ? `${t("dashboard.data_as_of", language)} ${dayjs(readiness.evaluated_at).format("YYYY-MM-DD HH:mm")}` : t("dashboard.readiness_not_evaluated", language)}</div>
-                    <Button type="link" size="small" style={{ padding: 0, marginTop: 12 }} onClick={() => router.push("/todo")}>{t("dashboard.open_work_queue", language)} <span aria-hidden="true">→</span></Button>
-                  </>
-                )}
-              </div>
-            </Col>
-          </Row>
-        </Spin>
+        <Drawer
+          open={isMobile && todoDrawerOpen}
+          onClose={() => setTodoDrawerOpen(false)}
+          title={t("home.right_title", language)}
+          placement="right"
+          width={340}
+          classNames={{ body: "app-drawer-body" }}
+        >
+          <RightColumn {...rightColumnProps} />
+        </Drawer>
       </AppLayout>
     </ProtectedRoute>
   );

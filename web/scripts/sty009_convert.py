@@ -76,7 +76,11 @@ def normalize(props):
 def rule_for(props):
     lines = [f".sty-{hash_body(props)} {{"]
     for k, v in props:
-        lines.append(f"  {k}: {v};")
+        # JSX string values ("100%", "var(--x)") are bare values in CSS
+        value = v.strip()
+        if value.startswith('"') and value.endswith('"') and len(value) >= 2:
+            value = value[1:-1]
+        lines.append(f"  {k}: {value};")
     lines.append("}")
     return "\n".join(lines)
 

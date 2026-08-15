@@ -568,7 +568,7 @@ export default function ContractDetailPage() {
               <Tabs
                 activeKey={activeTab}
                 onChange={setActiveTab}
-                style={{ marginTop: 16 }}
+                className="contract-block-gap"
                 items={[
                   {
                     key: "info",
@@ -977,9 +977,9 @@ export default function ContractDetailPage() {
                           description={`范围判定：${leaseScopeLabels[calcResult.lease_scope || "in_scope"] || calcResult.lease_scope}`}
                           type={calcResult.measurement_basis === "capitalized" ? "info" : "warning"}
                           showIcon
-                          style={{ marginBottom: 16 }}
+                          className="contract-block-gap-bottom"
                         />
-                        <Row gutter={16} style={{ marginBottom: 16 }}>
+                        <Row gutter={16} className="contract-block-gap-bottom">
                           <Col span={8}>
                             <Card>
                               <Statistic
@@ -1023,9 +1023,9 @@ export default function ContractDetailPage() {
                       </>
                     ) : (
                       <Card>
-                        <div style={{ textAlign: "center", padding: 40 }}>
-                          <CalculatorOutlined style={{ fontSize: 48, color: "var(--fg-muted)" }} />
-                          <p style={{ marginTop: 16, color: "var(--fg-muted)" }}>
+                        <div className="contract-empty-block">
+                          <CalculatorOutlined className="contract-empty-icon" />
+                          <p className="contract-empty-note">
                             {t("contract.click_calculate", language)}
                           </p>
                         </div>

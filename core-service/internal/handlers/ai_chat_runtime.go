@@ -148,12 +148,22 @@ func (h *AIChatHandler) ListSessions(c *gin.Context) {
 		return
 	}
 
+	// CHAT-001: the user-facing session list defaults to user-initiated
+	// sessions only. System-initiated sessions (home brief auto-runs) stay
+	// fully recorded for audit but do not crowd the sidebar; pass
+	// ?include_system=true to see them.
+	excludeInitiator := "system"
+	if c.Query("include_system") == "true" {
+		excludeInitiator = ""
+	}
+
 	sessions, err := h.runtimeRepo.ListSessions(c.Request.Context(), repository.AIChatSessionFilter{
-		UserID: userIDStr,
-		Entity: entity,
-		Status: status,
-		Limit:  limit,
-		Offset: offset,
+		UserID:           userIDStr,
+		Entity:           entity,
+		Status:           status,
+		ExcludeInitiator: excludeInitiator,
+		Limit:            limit,
+		Offset:           offset,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat sessions: " + err.Error()})

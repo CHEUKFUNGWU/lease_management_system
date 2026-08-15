@@ -21,10 +21,15 @@ type AIChatSession struct {
 	Status          string          `json:"status"`
 	BoundContractID *string         `json:"bound_contract_id"`
 	ContextSnapshot json.RawMessage `json:"context_snapshot"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	LastMessageAt   *time.Time      `json:"last_message_at"`
-	ArchivedAt      *time.Time      `json:"archived_at"`
+	// Initiator marks who started the session: 'user' (default) or 'system'
+	// (CHAT-001: automatic runs like the home brief). The user-facing session
+	// list filters system sessions out; their runs, messages and audit trail
+	// remain fully intact.
+	Initiator     string     `json:"initiator"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	LastMessageAt *time.Time `json:"last_message_at"`
+	ArchivedAt    *time.Time `json:"archived_at"`
 }
 
 type AIChatRun struct {
@@ -165,8 +170,12 @@ type AIChatSessionFilter struct {
 	// COALESCE-based predicate.
 	Entity access.EntityFilter
 	Status string
-	Limit  int
-	Offset int
+	// ExcludeInitiator hides sessions started by that initiator (CHAT-001:
+	// the user-facing list defaults to excluding "system"). Empty means no
+	// exclusion.
+	ExcludeInitiator string
+	Limit            int
+	Offset           int
 }
 
 type AIChatRuntimeRepository struct {
@@ -202,15 +211,18 @@ func (r *AIChatRuntimeRepository) CreateSession(ctx context.Context, session *AI
 	now := time.Now()
 	session.CreatedAt = now
 	session.UpdatedAt = now
+	if session.Initiator == "" {
+		session.Initiator = "user"
+	}
 
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO ai_chat_sessions (
 			id, user_id, legal_entity_id, title, status, bound_contract_id,
-			context_snapshot, created_at, updated_at, last_message_at, archived_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11)
+			context_snapshot, initiator, created_at, updated_at, last_message_at, archived_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)
 	`,
 		session.ID, session.UserID, session.LegalEntityID, session.Title, session.Status, session.BoundContractID,
-		normalizeJSON(session.ContextSnapshot, "null"), session.CreatedAt, session.UpdatedAt, session.LastMessageAt, session.ArchivedAt,
+		normalizeJSON(session.ContextSnapshot, "null"), session.Initiator, session.CreatedAt, session.UpdatedAt, session.LastMessageAt, session.ArchivedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ai chat session: %w", err)
@@ -222,12 +234,12 @@ func (r *AIChatRuntimeRepository) GetSessionByID(ctx context.Context, sessionID,
 	var session AIChatSession
 	err := r.db.QueryRow(ctx, `
 		SELECT id, user_id, legal_entity_id, title, status, bound_contract_id,
-		       COALESCE(context_snapshot, 'null'::jsonb), created_at, updated_at, last_message_at, archived_at
+		       COALESCE(context_snapshot, 'null'::jsonb), initiator, created_at, updated_at, last_message_at, archived_at
 		FROM ai_chat_sessions
 		WHERE id = $1 AND user_id = $2
 	`, sessionID, userID).Scan(
 		&session.ID, &session.UserID, &session.LegalEntityID, &session.Title, &session.Status, &session.BoundContractID,
-		&session.ContextSnapshot, &session.CreatedAt, &session.UpdatedAt, &session.LastMessageAt, &session.ArchivedAt,
+		&session.ContextSnapshot, &session.Initiator, &session.CreatedAt, &session.UpdatedAt, &session.LastMessageAt, &session.ArchivedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat session: %w", err)
@@ -242,11 +254,12 @@ func (r *AIChatRuntimeRepository) ListSessions(ctx context.Context, filter AICha
 
 	query := `
 		SELECT id, user_id, legal_entity_id, title, status, bound_contract_id,
-		       COALESCE(context_snapshot, 'null'::jsonb), created_at, updated_at, last_message_at, archived_at
+		       COALESCE(context_snapshot, 'null'::jsonb), initiator, created_at, updated_at, last_message_at, archived_at
 		FROM ai_chat_sessions
 		WHERE user_id = $1
-		  AND ($2 = '' OR status = $2)`
-	args := []any{filter.UserID, filter.Status}
+		  AND ($2 = '' OR status = $2)
+		  AND ($3 = '' OR initiator <> $3)`
+	args := []any{filter.UserID, filter.Status, filter.ExcludeInitiator}
 	if clause, arg, err := filter.Entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
 		return nil, err
 	} else if clause != "" {
@@ -269,7 +282,7 @@ func (r *AIChatRuntimeRepository) ListSessions(ctx context.Context, filter AICha
 		var session AIChatSession
 		if err := rows.Scan(
 			&session.ID, &session.UserID, &session.LegalEntityID, &session.Title, &session.Status, &session.BoundContractID,
-			&session.ContextSnapshot, &session.CreatedAt, &session.UpdatedAt, &session.LastMessageAt, &session.ArchivedAt,
+			&session.ContextSnapshot, &session.Initiator, &session.CreatedAt, &session.UpdatedAt, &session.LastMessageAt, &session.ArchivedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan ai chat session: %w", err)
 		}

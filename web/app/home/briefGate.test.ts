@@ -60,6 +60,22 @@ describe("runHomeBrief (B5 session memoization)", () => {
     );
   });
 
+  it("CHAT-001: every brief run marks the session as system-initiated", async () => {
+    // Three independent SPA visits (refresh / new tab / re-login each reset
+    // the module cache) must all carry initiator=system, so the backend can
+    // keep the auto-run out of the user-visible session list while still
+    // recording the run and its audit trail.
+    chatMock.mockResolvedValue(briefResponse);
+    for (let i = 0; i < 3; i++) {
+      resetHomeBriefCache();
+      await runHomeBrief(params);
+    }
+    expect(chatMock).toHaveBeenCalledTimes(3);
+    for (const call of chatMock.mock.calls) {
+      expect(call[0]).toMatchObject({ initiator: "system" });
+    }
+  });
+
   it("does not cache a failure, so the retry button can re-run", async () => {
     chatMock.mockRejectedValueOnce(new Error("network"));
     await expect(runHomeBrief(params)).rejects.toThrow("network");

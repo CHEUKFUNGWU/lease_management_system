@@ -556,6 +556,11 @@ type Request struct {
 	Language     string        `json:"language,omitempty"`
 	SkillID      string        `json:"skill_id,omitempty"`
 	SkillVersion string        `json:"skill_version,omitempty"`
+	// Initiator marks a run that creates a system-initiated session when no
+	// session_id is given (CHAT-001: the home brief). "user" or empty keeps
+	// the session user-visible; "system" hides it from the session list while
+	// the run and audit trail persist as usual.
+	Initiator string `json:"initiator,omitempty"`
 }
 
 type ChatMessage = aichat.Message

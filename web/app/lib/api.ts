@@ -958,6 +958,9 @@ export const aiChatApi = {
     language?: string;
     skill_id?: string;
     skill_version?: string;
+    /** CHAT-001: "system" marks an automatic run (home brief) whose session
+     *  must not crowd the user-facing session list. */
+    initiator?: string;
     page_context?: {
       page?: string;
       title?: string;

@@ -233,7 +233,7 @@ body {
   gap: 12px;
   align-items: baseline;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 0 var(--border-subtle);
   font-size: 13px;
 }
 
@@ -267,11 +267,13 @@ body {
 .store-360-page .ant-table-cell { font-variant-numeric: tabular-nums; }
 
 @media (max-width: 767px) {
-  .operating-pulse-page .ant-card-body { padding: 16px !important; }
+  /* STY-008: mobile density for the retail pages — body prefix beats
+     antd's injected .ant-card .ant-card-body rule at equal specificity. */
+  body .operating-pulse-page .ant-card-body { padding: 16px; }
   .operating-pulse-page .ant-segmented { max-width: 100%; overflow-x: auto; }
   .pulse-filter-card .ant-picker { width: 100%; }
   .pulse-kpi-card { height: 136px; }
-  .store-360-page .ant-card-body { padding: 16px !important; }
+  body .store-360-page .ant-card-body { padding: 16px; }
   .store-360-page .ant-segmented { max-width: 100%; overflow-x: auto; }
   .store-360-filter-card .ant-picker { width: 100%; }
   .store-360-kpi-card { height: 136px; }
@@ -338,7 +340,7 @@ h3 {
 }
 
 body .ant-card-head {
-  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 0 var(--border-subtle);
   padding: 16px 20px;
 }
 
@@ -407,14 +409,11 @@ body .ant-tag {
 
 /* Input focused state. Inputs nested in an affix wrapper (prefix/suffix icons)
    are borderless children — styling them here draws a second, square ring
-   inside the wrapper, so the wrapper alone carries the focused look. */
-.ant-input:not(.ant-input-affix-wrapper .ant-input):focus,
-.ant-input-focused,
-.ant-select-focused .ant-select-selector,
-.ant-picker-focused {
-  border-color: var(--fg-primary) !important;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06) !important;
-}
+   inside the wrapper, so the wrapper alone carries the focused look.
+   STY-007: the focused border and halo are antd's own (controlOutline
+   token, 0.08/3px); the override forced 0.06/2px — dropped as redundant,
+   the rendered difference is a barely-tighter halo of the same black
+   border. */
 
 /* Modal.
    STY-007: radius, paddings, backgrounds and shadow already live in
@@ -426,11 +425,11 @@ body .ant-modal-content {
 }
 
 body .ant-modal .ant-modal-header {
-  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 0 var(--border-subtle);
 }
 
 body .ant-modal .ant-modal-footer {
-  border-top: 1px solid var(--border-subtle);
+  box-shadow: 0 -1px 0 0 var(--border-subtle);
 }
 
 /* Menu.
@@ -676,7 +675,7 @@ body .ant-result-title {
   width: 100%;
   padding: 10px 16px;
   border: 0;
-  border-top: 1px solid var(--border-subtle);
+  box-shadow: 0 -1px 0 0 var(--border-subtle);
   background: var(--bg-page);
   color: var(--fg-secondary);
   text-align: left;
@@ -723,7 +722,7 @@ body .ant-result-title {
 .command-palette-hint kbd,
 .ant-modal kbd {
   padding: 1px 5px;
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 4px;
   color: var(--fg-muted);
   background: var(--bg-page);
@@ -745,7 +744,7 @@ body .ant-result-title {
   gap: 10px;
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid transparent;
+  box-shadow: 0 0 0 1px transparent;
   border-radius: 8px;
   color: var(--fg-secondary);
   background: transparent;
@@ -817,10 +816,11 @@ body .ant-result-title {
 
 .contract-mobile-card {
   padding: 16px;
-  border: 1px solid var(--border-default);
   border-radius: 10px;
   background: var(--bg-elevated);
-  box-shadow: var(--shadow-static);
+  /* STY-008: border -> ring shadow; the card's elevation shadow is
+     layered on top so neither is lost. */
+  box-shadow: var(--shadow-static), 0 0 0 1px var(--border-default);
 }
 
 .contract-mobile-card-header,
@@ -902,10 +902,12 @@ body .ant-result-title {
   font-size: 11px;
 }
 
-/* Keep a visible keyboard focus ring for native and Ant Design controls. */
-.ant-btn:focus-visible,
-.ant-select:focus-visible {
-  outline: 2px solid var(--fg-primary) !important;
+/* Keep a visible keyboard focus ring for native and Ant Design controls.
+   STY-008: these are a11y rules for our own focus handling — no antd rule
+   competes at this specificity once the body prefix is added. */
+body .ant-btn:focus-visible,
+body .ant-select:focus-visible {
+  outline: 2px solid var(--fg-primary);
   outline-offset: 2px;
 }
 
@@ -933,66 +935,74 @@ html {
 }
 
 @media (max-width: 1023px) {
-  .ant-layout-header {
-    padding: 0 20px !important;
+  /* STY-008: response-specific sizes, no token equivalent — body prefix
+     beats antd's injected .ant-layout-* rules. */
+  body .ant-layout-header {
+    padding: 0 20px;
   }
 
-  .ant-layout-content {
-    padding: 24px !important;
+  body .ant-layout-content {
+    padding: 24px;
   }
 }
 
 @media (max-width: 767px) {
+  /* STY-008: these are our own classes — nothing else targets them, so the
+     important flags were defensive only. Removed; specificity unchanged. */
   .ai-chat-shell {
-    margin: -16px !important;
+    margin: -16px;
     width: calc(100% + 32px);
   }
 
   .ai-chat-session-sidebar {
-    width: 260px !important;
+    width: 260px;
   }
 
   .ai-chat-messages,
   .ai-chat-input {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .ai-chat-header-left {
-    min-width: 0 !important;
+    min-width: 0;
     overflow: hidden;
   }
 
   .ai-chat-header-title {
-    min-width: 0 !important;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .ai-chat-header-actions {
-    gap: 4px !important;
+    gap: 4px;
   }
 
   .ai-chat-model-button {
-    padding-inline: 4px !important;
+    padding-inline: 4px;
   }
 
   .ai-chat-model-label {
-    display: none !important;
+    display: none;
   }
 
   .ai-chat-model-short {
-    display: inline !important;
+    display: inline;
   }
 
-  .ant-layout-header {
-    height: 56px !important;
-    padding: 0 12px !important;
+  /* STY-008: layout overrides are antd-token-driven on desktop (60px /
+     0 32px); the mobile sizes are response-specific and have no token
+     equivalent, so they stay — body-prefixed to beat antd's later
+     injected .ant-layout-header rule. */
+  body .ant-layout-header {
+    height: 56px;
+    padding: 0 12px;
   }
 
-  .ant-layout-header > div:first-child {
-    gap: 8px !important;
+  body .ant-layout-header > div:first-child {
+    gap: 8px;
   }
 
   .app-logo span {
@@ -1014,8 +1024,8 @@ html {
     display: none;
   }
 
-  .ant-layout-content {
-    padding: 16px !important;
+  body .ant-layout-content {
+    padding: 16px;
   }
 
   .ant-table-wrapper {
@@ -1088,19 +1098,22 @@ html {
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* AI Chat Session Sidebar - show delete button on hover */
+/* AI Chat Session Sidebar - show delete button on hover.
+   STY-008: our own classes, nothing else targets them — the flags were
+   defensive only. The hover/focus rules out-specify the base rule by
+   class count, so no flag is needed. */
 .session-more-btn {
-  opacity: 0 !important;
+  opacity: 0;
 }
 
 .ai-chat-session-row:hover .session-more-btn,
 .ai-chat-session-row:focus-within .session-more-btn {
-  opacity: 1 !important;
+  opacity: 1;
 }
 
 .session-more-btn:focus,
 .session-more-btn:focus-visible {
-  opacity: 1 !important;
+  opacity: 1;
 }
 
 /* This mobile override intentionally follows the global hide rule so touch
@@ -1108,7 +1121,7 @@ html {
 @media (max-width: 767px) {
   .ant-drawer .session-more-btn,
   .ai-chat-session-sidebar .session-more-btn {
-    opacity: 1 !important;
+    opacity: 1;
   }
 }
 
@@ -1152,7 +1165,7 @@ html {
   align-items: center;
   justify-content: space-between;
   background: var(--fg-inverse);
-  border-bottom: 1px solid var(--border-default);
+  box-shadow: 0 1px 0 0 var(--border-default);
   padding: 0 32px;
   height: 60px;
   position: sticky;
@@ -1289,7 +1302,7 @@ html {
 }
 .app-sider {
   background: var(--fg-inverse);
-  border-right: 1px solid var(--border-default);
+  box-shadow: 1px 0 0 0 var(--border-default);
   flex-shrink: 0;
   /* FIX-011: the sider is a flex column — the menu scrolls internally and
      the footer returns to normal flow instead of floating over the last
@@ -1311,7 +1324,7 @@ html {
 }
 .app-sider-footer {
   padding: 12px 16px;
-  border-top: 1px solid var(--bg-inset);
+  box-shadow: 0 -1px 0 0 var(--bg-inset);
   font-size: 11px;
   color: var(--fg-muted);
   text-align: center;
@@ -1352,7 +1365,7 @@ html {
    degrades the whole bar (status-warning surface); KPI cards carry the
    .kpi-not-ready-badge. Classification is a status dot, not a fill. */
 .data-trust-bar {
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 8px;
   padding: 10px 14px;
   background: var(--bg-surface);
@@ -1407,7 +1420,7 @@ html {
   line-height: 16px;
   padding: 0 6px;
   border-radius: 4px;
-  border: 1px solid var(--state-warning-border);
+  box-shadow: 0 0 0 1px var(--state-warning-border);
   background: var(--state-warning-bg);
   color: var(--state-warning-text);
   white-space: nowrap;
@@ -1418,7 +1431,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 6px;
   padding: 2px 8px;
   background: var(--bg-surface);
@@ -1439,7 +1452,7 @@ html {
   margin: 6px 0 0;
   padding: 8px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 6px;
   font-size: 12px;
   color: var(--fg-tertiary);
@@ -1453,7 +1466,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 11px;
@@ -1471,10 +1484,10 @@ html {
   border-radius: 9999px;
   padding: 1px 8px;
   font-size: 12px;
-  border: 1px solid;
+  box-shadow: 0 0 0 1px var(--border-default);
 }
 .ai-confidence-dot { width: 8px; height: 8px; border-radius: 50%; }
-.ai-confidence-badge.is-low { border-color: var(--state-error-border); color: var(--state-error-text); }
+.ai-confidence-badge.is-low { box-shadow: 0 0 0 1px var(--state-error-border); color: var(--state-error-text); }
 .ai-confidence-badge.is-low .ai-confidence-dot { background: var(--state-error-text); }
 .ai-confidence-badge.is-medium { border-color: var(--state-warning-border); color: var(--state-warning-text); }
 .ai-confidence-badge.is-medium .ai-confidence-dot { background: var(--state-warning-text); }
@@ -1485,7 +1498,7 @@ html {
 
 /* ── AI-002: ApprovalCard + RetailAIDrawer ─────────────────────── */
 .approval-card {
-  border: 1px solid var(--state-info-border);
+  box-shadow: 0 0 0 1px var(--state-info-border);
   border-radius: 8px;
   padding: 12px;
   background: var(--state-info-bg);
@@ -1727,9 +1740,10 @@ html {
   text-overflow: ellipsis;
 }
 .home-readiness-card {
-  /* FIX-009: unify the hand-written card onto the AntD card language
-     (1px border-default, no ring shadow) — the hairline shadow version
-     was invisible on the white page background. */
+  /* FIX-009: unify the hand-written card onto the AntD card language.
+     STY-008: this card keeps a real border on purpose — the 1px hairline
+     ring-shadow version was invisible on the white page background
+     (recorded in FIX-009); the border uses the border token either way. */
   background: var(--bg-page);
   border: 1px solid var(--border-default);
   border-radius: 10px;
@@ -2229,12 +2243,12 @@ html {
   height: 40px;
   border-radius: 11px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  box-shadow: 0 0 0 1px var(--border-subtle);
 }
 
 .login-brand .login-badge {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
 .login-lockup-name {
@@ -2341,7 +2355,7 @@ html {
   gap: 6px;
   margin: 32px 0 0;
   padding-top: 20px;
-  border-top: 1px solid var(--border-subtle);
+  box-shadow: 0 -1px 0 0 var(--border-subtle);
   color: var(--fg-muted);
   font-size: 12px;
   line-height: 1.5;

@@ -99,6 +99,11 @@ export const antdTheme = {
       headerBg: colors.background.page,
       headerFontSize: typography.sizes.h2.size,
       headerHeight: 52,
+      // STY-007: the card-body override used to force 20px; antd's default
+      // body padding is 24px (12px for size="small"), so both tokens must
+      // carry the value the override rendered.
+      bodyPadding: 20,
+      bodyPaddingSM: 20,
       boxShadow: "none",
       boxShadowTertiary: "none",
     },

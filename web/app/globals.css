@@ -321,26 +321,25 @@ h3 {
 
 /* ─── Ant Design Component Overrides ────────────────────────── */
 
-/* Card: subtle border, no heavy shadow */
+/* Card: subtle border, no heavy shadow.
+   STY-007: border/radius/shadow and the 20px body padding live in theme.ts
+   (Card.borderRadiusLG, colorBorderSecondary, boxShadow, bodyPadding).
+   What stays: the hover interaction (tokens have no card-hover state) and
+   the asymmetric head padding (antd's headerPadding token is a single
+   value, cannot express 16px 20px). body prefix out-specifies antd's
+   later-injected equal-specificity rules. */
 .ant-card {
-  border: 1px solid var(--border-default) !important;
-  box-shadow: none !important;
-  border-radius: 10px !important;
   transition: border-color 0.15s var(--ease-micro), box-shadow 0.15s var(--ease-micro);
 }
 
 .ant-card.card-interactive:hover {
-  border-color: var(--border-strong) !important;
-  box-shadow: var(--shadow-hover) !important;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover);
 }
 
-.ant-card-head {
-  border-bottom: 1px solid var(--border-subtle) !important;
-  padding: 16px 20px !important;
-}
-
-.ant-card-body {
-  padding: 20px !important;
+body .ant-card-head {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 16px 20px;
 }
 
 /* Button: refined press state.

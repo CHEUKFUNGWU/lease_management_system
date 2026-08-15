@@ -1915,3 +1915,11 @@ html {
     padding: 72px 24px 48px;
   }
 }
+
+/* Brand icon: the SVG needs inline-block and vertical centring to sit on the
+ * text baseline. DESIGN.md 13-2 forbids static inline styles, so it lives
+ * here rather than on the element. */
+.brand-icon {
+  display: inline-block;
+  vertical-align: middle;
+}

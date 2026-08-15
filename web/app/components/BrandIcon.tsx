@@ -31,9 +31,8 @@ export const BrandIcon: React.FC<BrandIconProps> = ({
       viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={className}
+      className={className ? `brand-icon ${className}` : "brand-icon"}
       aria-hidden={ariaHidden}
-      style={{ display: "inline-block", verticalAlign: "middle" }}
     >
       {/* 1. Outer Hexagon Frame */}
       {/* Top-Left & Top Edge */}

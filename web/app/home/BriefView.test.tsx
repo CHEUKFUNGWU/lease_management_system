@@ -142,16 +142,8 @@ const base = {
 };
 
 describe("BriefView (B4 states)", () => {
-  it("renders the ready brief with trust bar, tool chip, cards and citations", () => {
-    const markup = render(React.createElement(BriefView, { state: "ready", result: readyResult, error: null, ...base }));
-    expect(markup).toContain(t("trust.classification_simulated", zh));
-    expect(markup).toContain("retail.operating_pulse.read");
-    expect(markup).toContain("SIM-006");
-    expect(markup).toContain("retail-pulse-v1 / 2026-06-07");
-    expect(markup).toContain(t("home.brief_attention", zh));
-    expect(markup).toContain(t("ai.thinking_process", zh));
-    expect(markup).toContain("90%");
-  });
+  // The ready brief is rendered by BriefBand (HOME-004); its coverage lives
+  // in BriefBand.test.tsx. Here only the degraded states remain.
 
   it("renders the no-data state with its own copy", () => {
     const markup = render(React.createElement(BriefView, { state: "no_data", result: null, error: null, ...base }));
@@ -185,19 +177,14 @@ describe("BriefView (B4 states)", () => {
 
 describe("BriefView (B2: reuse, no second implementation)", () => {
   const source = readFileSync(path.join(__dirname, "BriefView.tsx"), "utf8");
-  it("imports every shared explainability component", () => {
+  it("renders the not-ready trust through DataTrustBar", () => {
     expect(source).toContain('DataTrustBar from "../components/DataTrustBar"');
-    expect(source).toContain('ToolChip from "../components/ToolChip"');
-    expect(source).toContain('ConfidenceBadge from "../components/ConfidenceBadge"');
-    expect(source).toContain('SourceCitation from "../components/SourceCitation"');
-    expect(source).toContain('ThinkingTrace from "../components/ThinkingTrace"');
-    expect(source).toContain('{ SeverityDot, toSeverity } from "../components/SeverityDot"');
   });
 
   it("does not re-implement trust, confidence or citation rendering", () => {
     expect(source).not.toContain("ai-confidence-badge");
     expect(source).not.toContain("ai-tool-chip");
     expect(source).not.toContain("ai-source-citation");
-    expect(source).not.toContain("data-trust-bar");
+    expect(source).not.toContain("data-trust-bar-summary");
   });
 });

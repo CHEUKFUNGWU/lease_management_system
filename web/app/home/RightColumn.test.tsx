@@ -136,9 +136,11 @@ describe("RightColumn (HOME-003 P1/P2)", () => {
     expect(onAdopt).not.toHaveBeenCalled();
   });
 
-  it("renders the empty state when there are no proposals", () => {
+  it("renders the empty state as one collapsed line (HOME-004 L7)", () => {
     const markup = render(React.createElement(RightColumn, props));
-    expect(markup).toContain(t("home.proposals_empty", "zh-CN"));
+    expect(markup).toContain(t("home.proposals_empty_short", "zh-CN"));
+    // L7: no tall Empty placeholder art when there is nothing to confirm.
+    expect(markup).not.toContain("ant-empty");
   });
 });
 

@@ -52,13 +52,26 @@ export default function DataTrustBar({
   envelope,
   basis,
   detailExtra,
+  expanded,
+  onToggle,
 }: {
   envelope?: SourceEnvelope | null;
   basis?: string;
   detailExtra?: React.ReactNode;
+  /** HOME-004: when provided (with onToggle) the bar becomes controlled — the
+   *  caller drives expansion so one toggle can open the bar and its container
+   *  together. Existing callers pass neither and keep the internal state. */
+  expanded?: boolean;
+  onToggle?: () => void;
 }) {
   const { language } = useLanguage();
-  const [expanded, setExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const controlled = expanded !== undefined || onToggle !== undefined;
+  const isOpen = controlled ? Boolean(expanded) : internalExpanded;
+  const toggle = () => {
+    if (onToggle) onToggle();
+    else if (!controlled) setInternalExpanded(!internalExpanded);
+  };
   if (!envelope) return null;
   const degraded = !envelope.decision_ready;
   const reason = reasonLabel(envelope.decision_ready_reason, language);
@@ -80,12 +93,12 @@ export default function DataTrustBar({
             {degraded ? t("trust.not_ready", language) : t("trust.ready", language)}
           </span>
           {degraded && reason && <span className="data-trust-bar-reason">{reason}</span>}
-          <Button type="text" size="small" className="data-trust-bar-toggle" onClick={() => setExpanded(!expanded)}>
-            {expanded ? t("trust.collapse", language) : t("trust.expand", language)}
+          <Button type="text" size="small" className="data-trust-bar-toggle" onClick={toggle} aria-expanded={isOpen}>
+            {isOpen ? t("trust.collapse", language) : t("trust.expand", language)}
           </Button>
         </Space>
       </div>
-      {expanded && (
+      {isOpen && (
         <div className="data-trust-bar-detail">
           <Space size={10} wrap>
             <span>{t("trust.source", language)}: {envelope.source_systems.join(", ") || "—"}</span>

@@ -145,6 +145,13 @@ export const depth = {
   tooltip: {
     shadow: "0 0 0 1px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.08)",
   },
+
+  // Halo behind a focused control. Ant Design derives this from colorPrimary,
+  // which is pure black here — left alone it paints a 75%-black slab around
+  // every focused input.
+  focus: {
+    outline: "rgba(0, 0, 0, 0.08)",
+  },
 } as const;
 
 // ─── Motion Tokens ─────────────────────────────────────────────

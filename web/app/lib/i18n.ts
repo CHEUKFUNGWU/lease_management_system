@@ -3483,6 +3483,36 @@ const dict: TranslationDict = {
     "zh-HK": "零售經營分析工作站",
     en: "Retail Performance Workstation",
   },
+  "login.tagline": {
+    "zh-CN": "门店经营数据、租约台账与情景推演，收在同一个工作台。",
+    "zh-HK": "門店經營數據、租約台賬與情景推演，收在同一個工作台。",
+    en: "Store performance, lease ledgers and scenario work, on one desk.",
+  },
+  "login.point_pulse": {
+    "zh-CN": "经营脉搏：门店与品类表现一屏可见",
+    "zh-HK": "經營脈搏：門店與品類表現一屏可見",
+    en: "Operating Pulse — store and category performance on one screen",
+  },
+  "login.point_store": {
+    "zh-CN": "门店 360：单店诊断与归因分析",
+    "zh-HK": "門店 360：單店診斷與歸因分析",
+    en: "Store 360 — single-store diagnosis and attribution",
+  },
+  "login.point_lease": {
+    "zh-CN": "租赁台账：IFRS 16 计量、披露与现金流",
+    "zh-HK": "租賃台賬：IFRS 16 計量、披露與現金流",
+    en: "Lease ledger — IFRS 16 measurement, disclosure and cash flow",
+  },
+  "login.welcome_back": {
+    "zh-CN": "欢迎回来",
+    "zh-HK": "歡迎回來",
+    en: "Welcome back",
+  },
+  "login.continue_hint": {
+    "zh-CN": "登录以继续",
+    "zh-HK": "登錄以繼續",
+    en: "Sign in to continue",
+  },
   "login.username": {
     "zh-CN": "用户名",
     "zh-HK": "用戶名",

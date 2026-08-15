@@ -39,6 +39,10 @@ export const antdTheme = {
     colorBorder: colors.border.default,           // #E5E5E5
     colorBorderSecondary: colors.border.subtle,   // #F0F0F0
 
+    // ── Focus ──
+    controlOutline: depth.focus.outline,          // rgba(0, 0, 0, 0.08)
+    controlOutlineWidth: 3,
+
     // ── Typography ──
     fontSize: typography.sizes.body.size,
     lineHeight: typography.sizes.body.lineHeight / typography.sizes.body.size,

@@ -396,10 +396,20 @@ const dict: TranslationDict = {
     "zh-HK": "經營脈搏",
     en: "Operating Pulse",
   },
-  "pulse.subtitle": {
-    "zh-CN": "两分钟完成整体表现、数据可信度与优先门店晨检。",
-    "zh-HK": "兩分鐘完成整體表現、數據可信度與優先門店晨檢。",
-    en: "A two-minute check of overall performance, data trust, and priority stores.",
+  "pulse.signal_mix_title": {
+    "zh-CN": "信号构成",
+    "zh-HK": "信號構成",
+    en: "Signal mix",
+  },
+  "pulse.signal_mix_weight": {
+    "zh-CN": "累计权重",
+    "zh-HK": "累計權重",
+    en: "Cumulative weight",
+  },
+  "pulse.signal_mix_stores": {
+    "zh-CN": "涉及 {count} 家门店",
+    "zh-HK": "涉及 {count} 家門店",
+    en: "{count} stores affected",
   },
   "pulse.trend_title": {
     "zh-CN": "每日趋势",
@@ -846,6 +856,26 @@ const dict: TranslationDict = {
     "zh-CN": "守恒残差",
     "zh-HK": "守恆殘差",
     en: "conservation residual",
+  },
+  "store360.bridge.chart_title": {
+    "zh-CN": "变化贡献分解",
+    "zh-HK": "變化貢獻分解",
+    en: "Change contribution breakdown",
+  },
+  "store360.bridge.start": {
+    "zh-CN": "期初",
+    "zh-HK": "期初",
+    en: "Opening",
+  },
+  "store360.bridge.end": {
+    "zh-CN": "期末",
+    "zh-HK": "期末",
+    en: "Closing",
+  },
+  "store360.bridge.no_complete": {
+    "zh-CN": "本期没有可分解的完整变化贡献",
+    "zh-HK": "本期沒有可分解的完整變化貢獻",
+    en: "No complete change bridge to break down this period",
   },
   "store360.bridge.item": {
     "zh-CN": "变化项",

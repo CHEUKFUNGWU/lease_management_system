@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RetailKPIValue, RetailPulseResponse } from "../lib/api";
-import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, responsePartitions, signalLabel, switchClassification, trendValue } from "./logic";
+import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, responsePartitions, signalLabel, switchClassification, trendValue, signalMix} from "./logic";
 
 const value = (unit: string, current: number | null): RetailKPIValue => ({
   value: current,
@@ -73,5 +73,30 @@ describe("operating pulse presentation adapter", () => {
     expect(metricStatusLabel(partial, "zh-CN")).toEqual({ status: "partial", label: "部分", reason: "coverage_below_threshold" });
     expect(metricStatusLabel(unavailable, "zh-CN")).toEqual({ status: "missing", label: "缺失", reason: "zero_denominator" });
     expect(metricStatusLabel(null, "zh-CN")).toEqual({ status: "missing", label: "缺失", reason: "指标不可用" });
+  });
+});
+
+describe("FIX-018: signal mix rollup", () => {
+  const store = (code: string, signals: { signal_code: string; score_contribution: number }[]) => ({
+    rank: 1, store_id: code, store_code: code, store_name: code, brand: "", region: "", currency: "CNY",
+    score: 1, severity: "high", observed_signals: signals.map((signal) => ({
+      ...signal, observed_change: -1, threshold: 0, direction: "down", current: 1, comparison: 2, unit: "currency",
+    })), current_kpis: {}, comparison_kpis: {},
+    evidence: {} as never, drilldown: {},
+  });
+
+  it("sums score contribution per signal code and counts the stores hit", () => {
+    const rows = signalMix([
+      store("A", [{ signal_code: "revenue_decline", score_contribution: 2 }]),
+      store("B", [{ signal_code: "revenue_decline", score_contribution: 1 }, { signal_code: "labor_cost_spike", score_contribution: 5 }]),
+    ] as never, "zh-CN");
+    expect(rows.map((row) => [row.code, row.weight, row.stores])).toEqual([
+      ["labor_cost_spike", 5, 1],
+      ["revenue_decline", 3, 2],
+    ]);
+  });
+
+  it("is empty when nothing was flagged", () => {
+    expect(signalMix([], "zh-CN")).toEqual([]);
   });
 });

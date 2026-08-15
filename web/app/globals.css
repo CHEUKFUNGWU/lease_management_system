@@ -146,6 +146,17 @@ body {
   gap: 8px;
 }
 
+/* FIX-018: shared frame for the second chart on the pulse / store-360 pages,
+   so the added charts carry no static inline style (DESIGN.md §13-2). */
+.chart-frame {
+  height: 270px;
+  width: 100%;
+}
+
+.chart-stack {
+  width: 100%;
+}
+
 /* MAX-005 additive operating-pulse layout; it uses the existing token
    palette and card/grid language without changing global theme behavior. */
 /* FIX-003: fixed height, not min-height — KPI cards in one grid row must not
@@ -1846,6 +1857,16 @@ html {
   min-width: 0;
   overflow-y: auto;
 }
+/* FIX-015: with no messages the flex:1 body still ate the whole column and the
+   composer sat ~800px below the starter chips. Collapsing the column to its
+   content instead (the first attempt) overcorrected — the composer floated a
+   third of the way down the viewport with a bigger void underneath. The column
+   keeps its full height and the composer keeps the bottom; it is the empty
+   state's starters that centre in the leftover space, so the gap is split
+   above and below them instead of piling up in one place. */
+.home-chat-body.is-empty {
+  justify-content: center;
+}
 /* L1: reading measure for the conversation body — 68ch, never the full
    column width. */
 .home-chat-messages {
@@ -1857,16 +1878,6 @@ html {
 }
 .home-msg {
   display: flex;
-/* FIX-015: with no messages the flex:1 body still ate the whole column and the
-   composer sat ~800px below the starter chips. Collapsing the column to its
-   content instead (the first attempt) overcorrected — the composer floated a
-   third of the way down the viewport with a bigger void underneath. The column
-   keeps its full height and the composer keeps the bottom; it is the empty
-   state's starters that centre in the leftover space, so the gap is split
-   above and below them instead of piling up in one place. */
-.home-chat-body.is-empty {
-  justify-content: center;
-}
   align-items: flex-start;
   gap: 8px;
   max-width: 100%;

@@ -47,6 +47,47 @@ export function formatBridgeItem(value: number | null, unit: string, currency: s
   return formatSignalValue(value, unit, currency, language);
 }
 
+/** FIX-018: the bridge payload is already waterfall-shaped (comparison ->
+ *  items -> current, with a rounding residual that must be shown for the bars
+ *  to reconcile). This turns it into floating [from, to] ranges so recharts
+ *  can draw it directly; an incomplete bridge yields no steps. */
+export interface BridgeWaterfallStep {
+  name: string;
+  range: [number, number];
+  contribution: number;
+  tone: "positive" | "negative" | "neutral";
+}
+
+export function bridgeWaterfall(bridge: RetailBridge, labels: { start: string; end: string; residual: string }): BridgeWaterfallStep[] {
+  if (bridge.status !== "complete" || bridge.comparison == null || bridge.current == null) return [];
+  let running = bridge.comparison;
+  const steps: BridgeWaterfallStep[] = [{ name: labels.start, range: [0, running], contribution: running, tone: "neutral" }];
+  const items = bridge.items.map((item) => ({ label: item.label, contribution: item.contribution ?? 0 }));
+  if (bridge.rounding_residual) items.push({ label: labels.residual, contribution: bridge.rounding_residual });
+  for (const item of items) {
+    const next = running + item.contribution;
+    steps.push({ name: item.label, range: [Math.min(running, next), Math.max(running, next)], contribution: item.contribution, tone: bridgeTone(item.contribution) });
+    running = next;
+  }
+  steps.push({ name: labels.end, range: [0, bridge.current], contribution: bridge.current, tone: "neutral" });
+  return steps;
+}
+
+/** FIX-018a: a waterfall on a large base is unreadable against a zero-based
+ *  axis — a 500 contribution on a 48,000 opening is one pixel. The domain
+ *  brackets the values the steps actually span, padded by a tenth of that
+ *  span, so the contributions are the visible part. Returns null when every
+ *  step is flat (nothing to bracket) and the caller should let recharts pick. */
+export function bridgeWaterfallDomain(steps: BridgeWaterfallStep[]): [number, number] | null {
+  if (steps.length === 0) return null;
+  const values = steps.flatMap((step) => step.range);
+  const low = Math.min(...values.filter((value) => value !== 0));
+  const high = Math.max(...values);
+  if (!Number.isFinite(low) || high === low) return null;
+  const pad = (high - low) / 10;
+  return [low - pad, high + pad];
+}
+
 export function bridgeConservation(bridge: RetailBridge): number | null {
   if (bridge.total_change == null) return null;
   const sum = bridge.items.reduce((total, item) => total + (item.contribution || 0), 0);

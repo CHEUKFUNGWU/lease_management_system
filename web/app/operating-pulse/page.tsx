@@ -6,7 +6,7 @@ import {
   Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Tooltip, Typography, message,
 } from "antd";
 import { ArrowDownOutlined, ArrowUpOutlined, EyeOutlined, ReloadOutlined } from "@ant-design/icons";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import { SeverityDot, toSeverity } from "../components/SeverityDot";
@@ -19,7 +19,7 @@ import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
 import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
-import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, switchClassification, trendValue, type PulseMetricCode } from "./logic";
+import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, signalMix, switchClassification, trendValue, type PulseMetricCode } from "./logic";
 import { createLatestRequestGate } from "./requestGate";
 
 const WINDOW_OPTIONS = [7, 14, 28] as const;
@@ -96,7 +96,33 @@ function TrendChart({ trend, code, currency, onMetricChange, language }: { trend
   </Card>;
 }
 
+/** FIX-018: fills the space left under the trend card, and reads the
+ *  score_contribution the API already sends. A horizontal bar per signal code
+ *  (not a per-store stack) keeps it to one colour and no legend — the question
+ *  is whether one cause dominates, not which store owns which slice. */
+function SignalMix({ attention, language }: { attention: RetailAttention[]; language: Language }) {
+  const rows = signalMix(attention, language);
+  return <Card title={t("pulse.signal_mix_title", language)}>
+    <div className="chart-frame">
+      {rows.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} /> : <ResponsiveContainer width="100%" height="100%"><BarChart data={rows} layout="vertical" margin={{ top: 8, right: 12, left: 12, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+        <XAxis type="number" tick={{ fontSize: 11 }} />
+        <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={140} interval={0} />
+        <ChartTooltip formatter={(value, _name, item) => [`${Number(value).toFixed(2)} · ${t("pulse.signal_mix_stores", language, { count: String(item?.payload?.stores ?? 0) })}`, t("pulse.signal_mix_weight", language)]} />
+        <Bar dataKey="weight" fill="var(--chart-blue)" radius={2} maxBarSize={28} />
+      </BarChart></ResponsiveContainer>}
+    </div>
+  </Card>;
+}
+
 function AttentionTable({ attention, onSelect, onStore360, language }: { attention: RetailAttention[]; onSelect: (storeID: string) => void; onStore360: (storeID: string) => void; language: Language }) {
+  // FIX-016: every column carries an explicit width. With only priority and
+  // action sized, AntD split the remaining width evenly across the five other
+  // columns (~185px each), which is too wide for the source system and far too
+  // narrow for the change sentence — so "retail_simulator" broke mid-word and
+  // each signal's change wrapped in the middle of its amount. Widths are sized
+  // to the longest real content per column and scroll.x is their sum, so a
+  // narrow viewport scrolls horizontally instead of squeezing.
   const columns = [
     { title: t("pulse.col.priority", language), dataIndex: "rank", width: 56, render: (value: number) => <strong>#{value}</strong> },
     { title: t("pulse.col.store", language), key: "store", width: 260, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}><strong>{row.store_code}</strong><Typography.Text>{row.store_name}</Typography.Text><Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text></Space> },
@@ -116,13 +142,6 @@ function SuppressedPanel({ items, language }: { items: RetailSuppressedAttention
 
 function OperatingPulseInner() {
   const { token, user } = useAuth();
-  // FIX-016: every column carries an explicit width. With only priority and
-  // action sized, AntD split the remaining width evenly across the five other
-  // columns (~185px each), which is too wide for the source system and far too
-  // narrow for the change sentence — so "retail_simulator" broke mid-word and
-  // each signal's change wrapped in the middle of its amount. Widths are sized
-  // to the longest real content per column and scroll.x is their sum, so a
-  // narrow viewport scrolls horizontally instead of squeezing.
   const { language } = useLanguage();
   const [aiOpen, setAiOpen] = useState(false);
   const router = useRouter();
@@ -287,7 +306,7 @@ function OperatingPulseInner() {
       {noFacts ? <Card style={{ marginTop: 16 }}><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Space direction="vertical"><Typography.Text strong>{t("pulse.no_facts_title", language)}</Typography.Text><Typography.Text type="secondary">{t("pulse.no_facts_desc", language)}</Typography.Text></Space>} /></Card> : <>
       {response.multi_currency && <Card size="small" style={{ marginTop: 16 }}><Flex align="center" gap={8}><Typography.Text strong>{t("pulse.currency_partition", language)}</Typography.Text><Segmented value={selectedCurrency} onChange={(value) => setSelectedCurrency(String(value))} options={partitions.map((item) => ({ label: item.currency || t("pulse.unknown_currency", language), value: item.currency }))} /></Flex></Card>}
       <Row gutter={[12, 12]} style={{ marginTop: 16 }}>{kpiCards}</Row>
-      <Row gutter={[16, 16]} style={{ marginTop: 16 }}><Col xs={24} lg={16}><TrendChart language={language} trend={partition.daily_trend} code={trendMetric} currency={partition.currency || response.currency || ""} onMetricChange={setTrendMetric} /></Col><Col xs={24} lg={8}><Card title={t("pulse.aux_metrics", language)}><Space direction="vertical" size={0} style={{ width: "100%" }}>{aux}</Space><Alert type="info" showIcon style={{ marginTop: 16 }} message={t("pulse.cash_basis_title", language)} description={t("pulse.cash_basis_desc", language)} /></Card></Col></Row>
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}><Col xs={24} lg={16}><Space direction="vertical" size={16} className="chart-stack"><TrendChart language={language} trend={partition.daily_trend} code={trendMetric} currency={partition.currency || response.currency || ""} onMetricChange={setTrendMetric} /><SignalMix attention={partition.attention} language={language} /></Space></Col><Col xs={24} lg={8}><Card title={t("pulse.aux_metrics", language)}><Space direction="vertical" size={0} style={{ width: "100%" }}>{aux}</Space><Alert type="info" showIcon style={{ marginTop: 16 }} message={t("pulse.cash_basis_title", language)} description={t("pulse.cash_basis_desc", language)} /></Card></Col></Row>
       <Card title={<Flex justify="space-between" align="center"><span>{isScoped ? `${t("pulse.store_pulse_title", language)} · ${scopedTitle}` : t("pulse.priority_stores", language)}</span><Typography.Text type="secondary">{t("pulse.api_order", language)}</Typography.Text></Flex>} style={{ marginTop: 16 }}><AttentionTable language={language} attention={partition.attention} onSelect={onStoreSelect} onStore360={(storeID) => { const returnQuery = new URLSearchParams(searchParams.toString()); const params = new URLSearchParams(searchParams.toString()); params.delete("store_id"); params.set("store_id", storeID); params.set("return_query", returnQuery.toString()); router.push(`/store-360?${params.toString()}`); }} /></Card>
       <div style={{ marginTop: 16 }}><SuppressedPanel language={language} items={partition.suppressed_attention || []} /></div>
       </>}

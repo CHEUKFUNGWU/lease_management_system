@@ -9,6 +9,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { ApiError, authApi } from "../lib/api";
 import { notifyError } from "../lib/notify";
+import BrandIcon from "../components/BrandIcon";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -49,7 +50,9 @@ export default function LoginPage() {
       <section className="login-brand">
         <div className="login-brand-inner">
           <div className="login-lockup">
-            <span className="login-badge" aria-hidden="true">营</span>
+            <span className="login-badge" aria-hidden="true">
+              <BrandIcon size={26} variant="inverse" />
+            </span>
             <span className="login-lockup-name">{t("login.title", language)}</span>
           </div>
           <p className="login-tagline">{t("login.tagline", language)}</p>
@@ -64,7 +67,9 @@ export default function LoginPage() {
       <section className="login-panel">
         <div className="login-panel-inner">
           <div className="login-lockup login-lockup-compact">
-            <span className="login-badge" aria-hidden="true">营</span>
+            <span className="login-badge" aria-hidden="true">
+              <BrandIcon size={26} />
+            </span>
             <span className="login-lockup-name">{t("login.title", language)}</span>
           </div>
 

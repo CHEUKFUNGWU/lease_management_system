@@ -33,6 +33,7 @@ import { t } from "../lib/i18n";
 import { pageTransition } from "../design-system/animations";
 import GlobalSearch from "./GlobalSearch";
 import NotificationBell from "./NotificationBell";
+import BrandIcon from "./BrandIcon";
 
 const { Header, Sider, Content } = Layout;
 
@@ -245,9 +246,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             aria-label={t("app.title", language)}
             className="app-logo"
           >
-            <div className="app-logo-badge">
-              <span aria-hidden="true" className="app-logo-badge-mark">营</span>
-            </div>
+            <BrandIcon size={28} className="app-logo-icon" />
             <span className="app-logo-title">
               {t("app.title", language)}
             </span>

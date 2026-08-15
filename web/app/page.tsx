@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Col, Row, Skeleton, Spin } from "antd";
-import { PlusOutlined, RobotOutlined } from "@ant-design/icons";
+import { Button, Card, Drawer, Empty, Input } from "antd";
+import { PlusOutlined, RobotOutlined, SendOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { DashboardHeader, MoneyKPICard } from "./components/dashboard/DashboardCards";
-import { UpcomingDatesCard, WorkQueueSummaryCard } from "./components/dashboard/DashboardLists";
+import { DashboardHeader } from "./components/dashboard/DashboardCards";
+import RightColumn from "./home/RightColumn";
 import type { DashboardMoneyKPIs, DashboardUpcomingDate, DashboardWorkQueue, MoneySlice } from "./components/dashboard/types";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import { leaseAdminApi, monthlyClosingApi, reportApi, workQueueApi } from "./lib/api";
-import { t } from "./lib/i18n";
+import { t, type Language } from "./lib/i18n";
+import { getHomeResponsiveState } from "./home/responsive";
 
 const emptyMoney = (): MoneySlice[] => [];
 const emptyKpis = (): DashboardMoneyKPIs => ({
@@ -66,6 +67,23 @@ function latestPerCurrency(rows: any[], currentKey: string, valueKey: string): M
   return Array.from(latest.values()).map(({ currency, value }) => ({ currency, value }));
 }
 
+// HOME-001: the middle column skeleton. The card flow and the composer are
+// wired in HOME-002; until then the column shows where they will live.
+function HomeBriefPlaceholder({ language }: { language: Language }) {
+  return (
+    <Card className="home-brief-placeholder">
+      <div className="home-brief-title">{t("home.brief_title", language)}</div>
+      <div className="home-brief-empty">
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("home.brief_coming_desc", language)} />
+      </div>
+      <div className="home-brief-composer">
+        <Input disabled placeholder={t("home.brief_composer_disabled", language)} />
+        <Button disabled type="primary" icon={<SendOutlined />}>{t("ai.drawer.send", language)}</Button>
+      </div>
+    </Card>
+  );
+}
+
 export default function HomePage() {
   const { token } = useAuth();
   const { language } = useLanguage();
@@ -76,6 +94,20 @@ export default function HomePage() {
   const [upcomingDates, setUpcomingDates] = useState<DashboardUpcomingDate[]>([]);
   const [queue, setQueue] = useState<DashboardWorkQueue>(emptyQueue);
   const [readiness, setReadiness] = useState<{ status?: string; blocking_count?: number; evaluated_at?: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [todoDrawerOpen, setTodoDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setIsMobile(!getHomeResponsiveState(window.innerWidth).threeColumn);
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
+
+  // Resizing back to desktop must not leave a stray Drawer open.
+  useEffect(() => {
+    if (!isMobile && todoDrawerOpen) setTodoDrawerOpen(false);
+  }, [isMobile, todoDrawerOpen]);
 
   const period = dayjs().format("YYYY-MM");
   const subtitle = useMemo(
@@ -138,9 +170,17 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, [token]);
 
-  const readinessLabel = readiness?.status === "blocked"
-    ? t("todo.readiness_blocked", language)
-    : readiness?.status === "ready" ? t("todo.readiness_ready", language) : t("todo.readiness_not_run", language);
+  const rightColumnProps = {
+    queue,
+    dates: upcomingDates,
+    moneyKpis,
+    readiness,
+    loading,
+    financialLoading,
+    language,
+    onOpenQueue: () => router.push("/todo"),
+    onOpenContract: (contractId: string) => router.push(`/contracts/${contractId}`),
+  };
 
   return (
     <ProtectedRoute>
@@ -152,51 +192,30 @@ export default function HomePage() {
           secondaryAction={<Button icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>}
         />
 
-        <Spin spinning={loading}>
-          <div className="dashboard-work-queue" style={{ marginBottom: 16 }}>
-            <WorkQueueSummaryCard queue={queue} language={language} onOpen={() => router.push("/todo")} />
+        <div className="home-grid">
+          <div className="home-middle">
+            <div className="home-mobile-todo-bar">
+              <Button onClick={() => setTodoDrawerOpen(true)}>
+                {t("home.mobile_todo_trigger", language)}
+              </Button>
+            </div>
+            <HomeBriefPlaceholder language={language} />
           </div>
+          <div className="home-right">
+            <RightColumn {...rightColumnProps} />
+          </div>
+        </div>
 
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={12}>
-              <MoneyKPICard title={t("dashboard.kpi_total_liability", language)} value={moneyKpis.totalLiability} subtitle={moneyKpis.totalLiability.length > 1 ? t("dashboard.multi_currency_note", language) : t("dashboard.kpi_closing_basis", language)} loading={financialLoading} />
-            </Col>
-            <Col xs={24} lg={12}>
-              <MoneyKPICard title={t("dashboard.kpi_month_expense", language)} value={moneyKpis.monthExpense} subtitle={t("dashboard.kpi_month_expense_sub", language)} loading={financialLoading} />
-            </Col>
-          </Row>
-
-          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-            <Col xs={24} lg={16}>
-              <UpcomingDatesCard
-                dates={upcomingDates}
-                language={language}
-                getDateUrgency={(targetDate) => {
-                  const days = dayjs(targetDate).startOf("day").diff(dayjs().startOf("day"), "day");
-                  return days < 0
-                    ? { kind: "error", text: t("dashboard.overdue_days", language, { days: String(Math.abs(days)) }) }
-                    : days <= 7
-                      ? { kind: "warning", text: t("dashboard.within_days", language, { days: String(days) }) }
-                      : { kind: "processing", text: t("dashboard.remaining_days", language, { days: String(days) }) };
-                }}
-                onOpenContract={(contractId) => router.push(`/contracts/${contractId}`)}
-              />
-            </Col>
-            <Col xs={24} lg={8}>
-              <div className="dashboard-readiness-card" style={{ minHeight: 188, padding: 20, border: "1px solid var(--border-strong)", borderRadius: 10, background: "var(--bg-surface)" }}>
-                <div style={{ fontSize: 12, color: "var(--fg-tertiary)", marginBottom: 8 }}>{t("dashboard.close_readiness", language)}</div>
-                {loading ? <Skeleton active paragraph={{ rows: 2 }} /> : (
-                  <>
-                    <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>{readinessLabel}</div>
-                    <div style={{ color: "var(--fg-tertiary)", fontSize: 13 }}>{t("dashboard.blocking_items", language)}: <strong>{readiness?.blocking_count ?? 0}</strong></div>
-                    <div style={{ color: "var(--fg-muted)", fontSize: 12, marginTop: 8 }}>{readiness?.evaluated_at ? `${t("dashboard.data_as_of", language)} ${dayjs(readiness.evaluated_at).format("YYYY-MM-DD HH:mm")}` : t("dashboard.readiness_not_evaluated", language)}</div>
-                    <Button type="link" size="small" style={{ padding: 0, marginTop: 12 }} onClick={() => router.push("/todo")}>{t("dashboard.open_work_queue", language)} <span aria-hidden="true">→</span></Button>
-                  </>
-                )}
-              </div>
-            </Col>
-          </Row>
-        </Spin>
+        <Drawer
+          open={isMobile && todoDrawerOpen}
+          onClose={() => setTodoDrawerOpen(false)}
+          title={t("home.right_title", language)}
+          placement="right"
+          width={340}
+          classNames={{ body: "app-drawer-body" }}
+        >
+          <RightColumn {...rightColumnProps} />
+        </Drawer>
       </AppLayout>
     </ProtectedRoute>
   );

@@ -102,9 +102,6 @@ describe("FIX-005: right column keeps money value lines single-line", () => {
   it("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
     expect(ruleBody(".home-grid")).toMatch(/330px/);
     expect(ruleBody("@media (max-width: 1439px)") || ruleBody(".home-grid")).toMatch(/330px/);
-    // The money KPI value line must never reflow: the flex value row has no
-    // wrap permission anywhere in the home right column.
-    expect(css).toMatch(/\.home-right-kpis[\s\S]*?flex-direction:\s*column/);
   });
 });
 
@@ -112,6 +109,18 @@ describe("FIX-005: right column keeps money value lines single-line", () => {
 // .money-kpi-value-line with nowrap + ellipsis — the rule body itself must
 // contain those declarations. (This replaced a `[\s\S]*?` scan that matched
 // an unrelated flex-direction rule 69 lines away and was always true.)
+describe("FIX-021: money KPI value line never reflows", () => {
+  it("the value-line rule itself truncates instead of wrapping", () => {
+    const body = ruleBody(".money-kpi-value-line");
+    expect(body).toMatch(/white-space:\s*nowrap/);
+    expect(body).toMatch(/text-overflow:\s*ellipsis/);
+    expect(body).toMatch(/overflow:\s*hidden/);
+  });
+
+  it("the 330px column width guard stays intact", () => {
+    expect(ruleBody(".home-grid")).toMatch(/330px/);
+  });
+});
 
 describe("FIX-007: the conversation column is the scroll container, composer outside it", () => {
   it("FIX-007: the conversation column is the scroll container, composer outside it", () => {

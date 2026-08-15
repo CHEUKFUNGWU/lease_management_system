@@ -188,3 +188,12 @@ describe("FIX-007: the conversation column is the scroll container, composer out
   });
 });
 
+describe("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
+  it("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
+    expect(ruleBody(".home-chat-starter-chip")).toMatch(/border-radius:\s*(9999px|50px)/);
+    expect(ruleBody(".home-msg.is-user")).toMatch(/row-reverse/);
+    expect(briefColumn).toMatch(/sendText\(t\(key, language\)\)/);
+    expect(briefColumn).not.toMatch(/askStarter/);
+  });
+});
+

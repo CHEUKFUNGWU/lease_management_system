@@ -159,8 +159,8 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     setRunNonce((value) => value + 1);
   };
 
-  const send = async () => {
-    const message = input.trim();
+  const sendText = async (text: string) => {
+    const message = text.trim();
     if (!message || sending || !token) return;
     setInput("");
     setSending(true);
@@ -185,9 +185,7 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     }
   };
 
-  const askStarter = (question: string) => {
-    setInput(question);
-  };
+  const send = () => sendText(input);
 
   return (
     <div className="home-chat-column">
@@ -199,8 +197,11 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
               {t("ai.quick_questions", language)}
             </Typography.Text>
             <div className="home-chat-starter-chips">
+              {/* FIX-008: starters send immediately, matching /ai-chat's
+                  handleChipClick → handleSend, instead of only filling the
+                  composer. */}
               {HOME_STARTER_KEYS.map((key) => (
-                <Button key={key} size="small" className="home-chat-starter-chip" onClick={() => askStarter(t(key, language))}>
+                <Button key={key} size="small" className="home-chat-starter-chip" onClick={() => sendText(t(key, language))}>
                   {t(key, language)}
                 </Button>
               ))}

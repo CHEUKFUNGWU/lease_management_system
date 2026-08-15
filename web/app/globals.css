@@ -1806,6 +1806,9 @@ html {
 }
 .home-msg.is-user {
   justify-content: flex-end;
+  /* FIX-008: match /ai-chat — avatar on the right, bubble on the left of
+     the row-reverse flex, not avatar-first. */
+  flex-direction: row-reverse;
 }
 .home-msg-avatar {
   flex-shrink: 0;

@@ -6,6 +6,7 @@ package reporting
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -145,10 +146,15 @@ func (b *SnapshotBuilder) Build(ctx context.Context, request Request) (*Snapshot
 		}
 	}
 	facts := make([]ContractFact, 0, len(eligible))
+	missingRateNumbers := make([]string, 0)
 	for _, contract := range eligible {
 		rate, _, err := contractsvc.ResolveDiscountRateValues(0, globalRate, contract.DiscountRateValue, contract.LeaseScope)
 		if err != nil {
-			return nil, fmt.Errorf("contract %s: %w", contract.ID, err)
+			// Collect every affected contract so the caller can report the
+			// complete fix list in one round trip; the snapshot still refuses
+			// to build rather than measure with an invented rate.
+			missingRateNumbers = append(missingRateNumbers, contract.ContractNumber)
+			continue
 		}
 		fact := ContractFact{
 			Contract: contract, PaymentSchedules: filterPayments(mode, paymentMap[contract.ID]),
@@ -161,6 +167,10 @@ func (b *SnapshotBuilder) Build(ctx context.Context, request Request) (*Snapshot
 			}
 		}
 		facts = append(facts, fact)
+	}
+	if len(missingRateNumbers) > 0 {
+		sort.Strings(missingRateNumbers)
+		return nil, &DiscountRateMissingError{ContractNumbers: missingRateNumbers}
 	}
 	return &Snapshot{
 		ID: uuid.NewString(), PolicyVersion: policyVersion,

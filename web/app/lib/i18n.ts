@@ -40,6 +40,19 @@ const dict: TranslationDict = {
     "zh-HK": "請求的資料不存在或已被移除。",
     en: "The requested data does not exist or has been removed.",
   },
+  // FIX-002 data_unavailable detail reason: the engine refuses to measure
+  // lease liability while a contract has no confirmed discount rate. The fix
+  // is data entry, not retrying — AGENTS.md forbids guessing a rate.
+  "api.discount_rate_missing": {
+    "zh-CN": "合同 {contracts} 尚未确认折现率，无法计量租赁指标。请先在合同工作台补录折现率，或在系统设置配置全局折现率政策。",
+    "zh-HK": "合同 {contracts} 尚未確認折現率，無法計量租賃指標。請先在合同工作台補錄折現率，或在系統設定配置全域折現率政策。",
+    en: "Contract {contracts} has no confirmed discount rate, so lease metrics cannot be measured. Confirm the rate in the contract workspace first, or set a global rate policy in system settings.",
+  },
+  "api.discount_rate_missing_no_contracts": {
+    "zh-CN": "折现率缺失，无法计量租赁指标。请先在合同工作台确认折现率，或在系统设置配置全局折现率政策。",
+    "zh-HK": "折現率缺失，無法計量租賃指標。請先在合同工作台確認折現率，或在系統設定配置全域折現率政策。",
+    en: "The discount rate is missing, so lease metrics cannot be measured. Confirm the rate in the contract workspace first, or set a global rate policy in system settings.",
+  },
   "api.server_unavailable": {
     "zh-CN": "服务暂时不可用，请稍后重试。",
     "zh-HK": "服務暫時不可用，請稍後重試。",

@@ -477,7 +477,7 @@ function MessageContent({
 
 // ─── Typewriter Effect ─────────────────────────────────────────
 
-function TypewriterMessage({ content, sources, model, thinking, toolCalls, confidence, i18nLang }: { content: string; sources?: Array<string | RuntimeSource>; model?: string; thinking?: string; toolCalls?: AgentToolCall[]; confidence?: number; i18nLang: Language }) {
+function TypewriterMessage({ content, sources, model, thinking, toolCalls, confidence, confidenceReason, i18nLang }: { content: string; sources?: Array<string | RuntimeSource>; model?: string; thinking?: string; toolCalls?: AgentToolCall[]; confidence?: number; confidenceReason?: string; i18nLang: Language }) {
   const [displayedContent, setDisplayedContent] = useState("");
   const contentRef = useRef(content);
   const indexRef = useRef(0);
@@ -2171,6 +2171,7 @@ function AIChatPageContent() {
                             thinking={msg.thinking}
                             toolCalls={msg.toolCalls}
                             confidence={msg.confidence}
+                            confidenceReason={msg.confidenceReason}
                             i18nLang={language}
                           />
                         ) : (
@@ -2181,6 +2182,7 @@ function AIChatPageContent() {
                             thinking={msg.thinking}
                             toolCalls={msg.toolCalls}
                             confidence={msg.confidence}
+                            confidenceReason={msg.confidenceReason}
                             i18nLang={language}
                             role={msg.role}
                           />

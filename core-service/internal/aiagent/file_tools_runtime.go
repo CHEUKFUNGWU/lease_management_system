@@ -171,18 +171,18 @@ func (h *Agent) parseEventToolHandler(ctx context.Context, call agenttools.ToolC
 	}, nil
 }
 
-func (h *Agent) executeFileParseTool(ctx context.Context, toolRuntime *agenttools.Runtime, toolName string, arguments fileParseArguments) (agenttools.ToolResult, error) {
-	result, err := h.executeToolCall(ctx, toolRuntime, toolName, arguments, fileParseIdempotencyKey(toolName, arguments))
+func (h *Agent) executeFileParseTool(ctx context.Context, toolRuntime *agenttools.Runtime, toolName string, arguments fileParseArguments) (agenttools.ToolResult, *int64, error) {
+	result, durationMs, err := h.executeToolCall(ctx, toolRuntime, toolName, arguments, fileParseIdempotencyKey(toolName, arguments))
 	if err != nil {
-		return agenttools.ToolResult{}, err
+		return agenttools.ToolResult{}, durationMs, err
 	}
 	if result.Error != nil {
-		return result, errors.New(result.Error.Message)
+		return result, durationMs, errors.New(result.Error.Message)
 	}
 	if result.Status != agenttools.StatusCompleted && result.Status != agenttools.StatusNeedsReview {
-		return result, fmt.Errorf("file parse tool returned status %s", result.Status)
+		return result, durationMs, fmt.Errorf("file parse tool returned status %s", result.Status)
 	}
-	return result, nil
+	return result, durationMs, nil
 }
 
 func fileParseIdempotencyKey(toolName string, arguments fileParseArguments) string {

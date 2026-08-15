@@ -66,8 +66,14 @@ type AIChatMessage struct {
 	Sources     json.RawMessage `json:"sources"`
 	Attachments json.RawMessage `json:"attachments"`
 	Model       *string         `json:"model"`
-	CreatedBy   *string         `json:"created_by"`
-	CreatedAt   time.Time       `json:"created_at"`
+	// Confidence and ConfidenceReason are the assistant message's measured
+	// answer confidence and its degradation reason, persisted so a reloaded
+	// session can still render the ConfidenceBadge. NULL means the message
+	// carries no confidence — absent is never fabricated.
+	Confidence       *float64  `json:"confidence,omitempty"`
+	ConfidenceReason *string   `json:"confidence_reason,omitempty"`
+	CreatedBy        *string   `json:"created_by"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type AIChatRunEvent struct {
@@ -421,12 +427,14 @@ func (r *AIChatRuntimeRepository) CreateMessage(ctx context.Context, message *AI
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO ai_chat_messages (
 			id, session_id, run_id, role, message_type, sequence_no, content,
-			content_json, sources, attachments, model, created_by, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11, $12, $13)
+			content_json, sources, attachments, model, confidence, confidence_reason,
+			created_by, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11, $12, $13, $14, $15)
 	`,
 		message.ID, message.SessionID, message.RunID, message.Role, message.MessageType, message.SequenceNo, message.Content,
 		normalizeJSON(message.ContentJSON, "null"), normalizeJSON(message.Sources, "null"),
-		normalizeJSON(message.Attachments, "null"), message.Model, message.CreatedBy, message.CreatedAt,
+		normalizeJSON(message.Attachments, "null"), message.Model, message.Confidence,
+		message.ConfidenceReason, message.CreatedBy, message.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ai chat message: %w", err)
@@ -464,7 +472,8 @@ func (r *AIChatRuntimeRepository) ListMessagesBySession(ctx context.Context, ses
 	rows, err := r.db.Query(ctx, `
 		SELECT id, session_id, run_id, role, message_type, sequence_no, content,
 		       COALESCE(content_json, 'null'::jsonb), COALESCE(sources, 'null'::jsonb),
-		       COALESCE(attachments, 'null'::jsonb), model, created_by, created_at
+		       COALESCE(attachments, 'null'::jsonb), model, confidence, confidence_reason,
+		       created_by, created_at
 		FROM ai_chat_messages
 		WHERE session_id = $1
 		ORDER BY sequence_no DESC
@@ -481,7 +490,8 @@ func (r *AIChatRuntimeRepository) ListMessagesBySession(ctx context.Context, ses
 		if err := rows.Scan(
 			&message.ID, &message.SessionID, &message.RunID, &message.Role, &message.MessageType,
 			&message.SequenceNo, &message.Content, &message.ContentJSON, &message.Sources,
-			&message.Attachments, &message.Model, &message.CreatedBy, &message.CreatedAt,
+			&message.Attachments, &message.Model, &message.Confidence, &message.ConfidenceReason,
+			&message.CreatedBy, &message.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan ai chat message: %w", err)
 		}
@@ -495,14 +505,16 @@ func (r *AIChatRuntimeRepository) GetMessageByID(ctx context.Context, messageID,
 	err := r.db.QueryRow(ctx, `
 		SELECT m.id, m.session_id, m.run_id, m.role, m.message_type, m.sequence_no, m.content,
 		       COALESCE(m.content_json, 'null'::jsonb), COALESCE(m.sources, 'null'::jsonb),
-		       COALESCE(m.attachments, 'null'::jsonb), m.model, m.created_by, m.created_at
+		       COALESCE(m.attachments, 'null'::jsonb), m.model, m.confidence, m.confidence_reason,
+		       m.created_by, m.created_at
 		FROM ai_chat_messages m
 		INNER JOIN ai_chat_sessions s ON s.id = m.session_id
 		WHERE m.id = $1 AND s.user_id = $2
 	`, messageID, userID).Scan(
 		&message.ID, &message.SessionID, &message.RunID, &message.Role, &message.MessageType,
 		&message.SequenceNo, &message.Content, &message.ContentJSON, &message.Sources,
-		&message.Attachments, &message.Model, &message.CreatedBy, &message.CreatedAt,
+		&message.Attachments, &message.Model, &message.Confidence, &message.ConfidenceReason,
+		&message.CreatedBy, &message.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat message: %w", err)

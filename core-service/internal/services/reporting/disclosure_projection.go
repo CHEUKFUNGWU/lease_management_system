@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/ifrs16"
 )
@@ -20,105 +21,105 @@ const MaturityBandCount = 6
 // with the reconciliation to the discounted carrying liability. Keeping the row at
 // contract level is what makes every disclosed figure drillable in the workpaper.
 type MaturityRow struct {
-	ContractID          string                     `json:"contract_id"`
-	ContractNumber      string                     `json:"contract_number"`
-	ContractName        string                     `json:"contract_name"`
-	StoreName           string                     `json:"store_name,omitempty"`
-	AssetType           string                     `json:"asset_type"`
-	Currency            string                     `json:"currency"`
-	LeaseEndDate        string                     `json:"lease_end_date"`
-	DiscountRate        float64                    `json:"discount_rate"`
-	Bands               [MaturityBandCount]float64 `json:"bands"`
-	TotalUndiscounted   float64                    `json:"total_undiscounted"`
-	CarryingLiability   float64                    `json:"carrying_liability"`
-	UnearnedFinanceCost float64                    `json:"unearned_finance_cost"`
+	ContractID          string                          `json:"contract_id"`
+	ContractNumber      string                          `json:"contract_number"`
+	ContractName        string                          `json:"contract_name"`
+	StoreName           string                          `json:"store_name,omitempty"`
+	AssetType           string                          `json:"asset_type"`
+	Currency            string                          `json:"currency"`
+	LeaseEndDate        string                          `json:"lease_end_date"`
+	DiscountRate        float64                         `json:"discount_rate"`
+	Bands               [MaturityBandCount]money.Amount `json:"bands"`
+	TotalUndiscounted   money.Amount                    `json:"total_undiscounted"`
+	CarryingLiability   money.Amount                    `json:"carrying_liability"`
+	UnearnedFinanceCost money.Amount                    `json:"unearned_finance_cost"`
 }
 
 // ROUReconciliationRow is the right-of-use asset roll-forward for one asset class.
 type ROUReconciliationRow struct {
-	AssetType        string  `json:"asset_type"`
-	ContractCount    int     `json:"contract_count"`
-	Opening          float64 `json:"opening"`
-	Additions        float64 `json:"additions"`
-	Depreciation     float64 `json:"depreciation"`
-	Remeasurement    float64 `json:"remeasurement"`
-	Impairment       float64 `json:"impairment"`
-	OtherAdjustments float64 `json:"other_adjustments"`
-	Closing          float64 `json:"closing"`
+	AssetType        string       `json:"asset_type"`
+	ContractCount    int          `json:"contract_count"`
+	Opening          money.Amount `json:"opening"`
+	Additions        money.Amount `json:"additions"`
+	Depreciation     money.Amount `json:"depreciation"`
+	Remeasurement    money.Amount `json:"remeasurement"`
+	Impairment       money.Amount `json:"impairment"`
+	OtherAdjustments money.Amount `json:"other_adjustments"`
+	Closing          money.Amount `json:"closing"`
 }
 
 // LiabilityRollforward is the lease liability roll-forward for the period.
 type LiabilityRollforward struct {
-	Opening          float64 `json:"opening"`
-	Additions        float64 `json:"additions"`
-	Interest         float64 `json:"interest"`
-	Payments         float64 `json:"payments"`
-	Remeasurement    float64 `json:"remeasurement"`
-	OtherAdjustments float64 `json:"other_adjustments"`
-	Closing          float64 `json:"closing"`
+	Opening          money.Amount `json:"opening"`
+	Additions        money.Amount `json:"additions"`
+	Interest         money.Amount `json:"interest"`
+	Payments         money.Amount `json:"payments"`
+	Remeasurement    money.Amount `json:"remeasurement"`
+	OtherAdjustments money.Amount `json:"other_adjustments"`
+	Closing          money.Amount `json:"closing"`
 }
 
 // ExpenseBreakdown decomposes lease-related profit or loss for the period.
 type ExpenseBreakdown struct {
-	Depreciation    float64 `json:"depreciation"`
-	Interest        float64 `json:"interest"`
-	ShortTermExempt float64 `json:"short_term_exempt"`
-	LowValueExempt  float64 `json:"low_value_exempt"`
-	VariableRent    float64 `json:"variable_rent"`
-	NonLease        float64 `json:"non_lease"`
-	Total           float64 `json:"total"`
+	Depreciation    money.Amount `json:"depreciation"`
+	Interest        money.Amount `json:"interest"`
+	ShortTermExempt money.Amount `json:"short_term_exempt"`
+	LowValueExempt  money.Amount `json:"low_value_exempt"`
+	VariableRent    money.Amount `json:"variable_rent"`
+	NonLease        money.Amount `json:"non_lease"`
+	Total           money.Amount `json:"total"`
 }
 
 // CashOutflowSummary is the total cash outflow for leases in the period (IFRS 16.53(g)).
 type CashOutflowSummary struct {
-	FixedPayments    float64 `json:"fixed_payments"`
-	PrepaidPayments  float64 `json:"prepaid_payments"`
-	VariablePayments float64 `json:"variable_payments"`
-	NonLeasePayments float64 `json:"non_lease_payments"`
-	Total            float64 `json:"total"`
+	FixedPayments    money.Amount `json:"fixed_payments"`
+	PrepaidPayments  money.Amount `json:"prepaid_payments"`
+	VariablePayments money.Amount `json:"variable_payments"`
+	NonLeasePayments money.Amount `json:"non_lease_payments"`
+	Total            money.Amount `json:"total"`
 }
 
 // AuditWorkpaperRow is the contract-level evidence row behind the aggregated
 // disclosure sections. It is intentionally built from the same disclosureFact
 // so the UI and an auditor never receive a second accounting calculation.
 type AuditWorkpaperRow struct {
-	ContractID                string  `json:"contract_id"`
-	ContractNumber            string  `json:"contract_number"`
-	ContractName              string  `json:"contract_name"`
-	LegalEntityID             string  `json:"legal_entity_id,omitempty"`
-	StoreName                 string  `json:"store_name,omitempty"`
-	AssetType                 string  `json:"asset_type"`
-	Currency                  string  `json:"currency"`
-	LeaseScope                string  `json:"lease_scope"`
-	ApprovalStatus            string  `json:"approval_status"`
-	ReportMode                string  `json:"report_mode"`
-	CommencementDate          string  `json:"commencement_date"`
-	LeaseEndDate              string  `json:"lease_end_date"`
-	DiscountRate              float64 `json:"discount_rate"`
-	DiscountRateType          string  `json:"discount_rate_type,omitempty"`
-	DiscountRateVersion       string  `json:"discount_rate_version,omitempty"`
-	DiscountRateSource        string  `json:"discount_rate_source,omitempty"`
-	DiscountRateConfirmedAt   string  `json:"discount_rate_confirmed_at,omitempty"`
-	PaymentScheduleCount      int     `json:"payment_schedule_count"`
-	EventAdjustmentCount      int     `json:"event_adjustment_count"`
-	InitialLiability          float64 `json:"initial_liability"`
-	InitialROUAsset           float64 `json:"initial_rou_asset"`
-	OpeningLiability          float64 `json:"opening_liability"`
-	Additions                 float64 `json:"additions"`
-	Interest                  float64 `json:"interest"`
-	Payments                  float64 `json:"payments"`
-	LiabilityRemeasurement    float64 `json:"liability_remeasurement"`
-	LiabilityOtherAdjustments float64 `json:"liability_other_adjustments"`
-	ClosingLiability          float64 `json:"closing_liability"`
-	OpeningROU                float64 `json:"opening_rou"`
-	ROUAdditions              float64 `json:"rou_additions"`
-	Depreciation              float64 `json:"depreciation"`
-	ROURemeasurement          float64 `json:"rou_remeasurement"`
-	Impairment                float64 `json:"impairment"`
-	ROUOtherAdjustments       float64 `json:"rou_other_adjustments"`
-	ClosingROU                float64 `json:"closing_rou"`
-	LiabilityTieOut           float64 `json:"liability_tie_out"`
-	ROUTieOut                 float64 `json:"rou_tie_out"`
+	ContractID                string       `json:"contract_id"`
+	ContractNumber            string       `json:"contract_number"`
+	ContractName              string       `json:"contract_name"`
+	LegalEntityID             string       `json:"legal_entity_id,omitempty"`
+	StoreName                 string       `json:"store_name,omitempty"`
+	AssetType                 string       `json:"asset_type"`
+	Currency                  string       `json:"currency"`
+	LeaseScope                string       `json:"lease_scope"`
+	ApprovalStatus            string       `json:"approval_status"`
+	ReportMode                string       `json:"report_mode"`
+	CommencementDate          string       `json:"commencement_date"`
+	LeaseEndDate              string       `json:"lease_end_date"`
+	DiscountRate              float64      `json:"discount_rate"`
+	DiscountRateType          string       `json:"discount_rate_type,omitempty"`
+	DiscountRateVersion       string       `json:"discount_rate_version,omitempty"`
+	DiscountRateSource        string       `json:"discount_rate_source,omitempty"`
+	DiscountRateConfirmedAt   string       `json:"discount_rate_confirmed_at,omitempty"`
+	PaymentScheduleCount      int          `json:"payment_schedule_count"`
+	EventAdjustmentCount      int          `json:"event_adjustment_count"`
+	InitialLiability          money.Amount `json:"initial_liability"`
+	InitialROUAsset           money.Amount `json:"initial_rou_asset"`
+	OpeningLiability          money.Amount `json:"opening_liability"`
+	Additions                 money.Amount `json:"additions"`
+	Interest                  money.Amount `json:"interest"`
+	Payments                  money.Amount `json:"payments"`
+	LiabilityRemeasurement    money.Amount `json:"liability_remeasurement"`
+	LiabilityOtherAdjustments money.Amount `json:"liability_other_adjustments"`
+	ClosingLiability          money.Amount `json:"closing_liability"`
+	OpeningROU                money.Amount `json:"opening_rou"`
+	ROUAdditions              money.Amount `json:"rou_additions"`
+	Depreciation              money.Amount `json:"depreciation"`
+	ROURemeasurement          money.Amount `json:"rou_remeasurement"`
+	Impairment                money.Amount `json:"impairment"`
+	ROUOtherAdjustments       money.Amount `json:"rou_other_adjustments"`
+	ClosingROU                money.Amount `json:"closing_rou"`
+	LiabilityTieOut           money.Amount `json:"liability_tie_out"`
+	ROUTieOut                 money.Amount `json:"rou_tie_out"`
 }
 
 type AuditWorkpaperTotals struct {
@@ -243,9 +244,9 @@ func buildAuditWorkpaper(facts []disclosureFact, periodStart, periodEnd time.Tim
 			StoreName: contract.StoreName, AssetType: contract.AssetType, Currency: contract.Currency,
 			LeaseScope: ifrs16.NormalizeLeaseScope(contract.LeaseScope), ApprovalStatus: contract.ApprovalStatus,
 			ReportMode: string(mode), CommencementDate: contract.CommencementDate.Format("2006-01-02"),
-			LeaseEndDate: contract.LeaseEndDate.Format("2006-01-02"), DiscountRate: roundProjection(fact.rate),
+			LeaseEndDate: contract.LeaseEndDate.Format("2006-01-02"), DiscountRate: roundRate(fact.rate),
 			PaymentScheduleCount: len(fact.payments), EventAdjustmentCount: len(fact.adjustments),
-			InitialLiability: roundProjection(fact.calculation.InitialLiability.Float64()), InitialROUAsset: roundProjection(fact.calculation.InitialROUAsset.Float64()),
+			InitialLiability: fact.calculation.InitialLiability, InitialROUAsset: fact.calculation.InitialROUAsset,
 		}
 		if contract.LegalEntityID != nil {
 			row.LegalEntityID = *contract.LegalEntityID
@@ -266,52 +267,60 @@ func buildAuditWorkpaper(facts []disclosureFact, periodStart, periodEnd time.Tim
 		row.OpeningLiability, row.OpeningROU = carryingAmountsAt(fact.calculation.DailyAmortization, periodStart.AddDate(0, 0, -1))
 		row.ClosingLiability, row.ClosingROU = carryingAmountsAt(fact.calculation.DailyAmortization, periodEnd)
 		if !contract.CommencementDate.Before(periodStart) && !contract.CommencementDate.After(periodEnd) {
-			row.Additions = fact.calculation.InitialLiability.Float64()
-			row.ROUAdditions = fact.calculation.InitialROUAsset.Float64()
+			row.Additions = fact.calculation.InitialLiability
+			row.ROUAdditions = fact.calculation.InitialROUAsset
 		}
 		for _, entry := range fact.calculation.DailyAmortization {
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			row.Interest += entry.InterestExpense.Float64()
-			row.Payments += entry.Payment.Float64()
-			row.LiabilityOtherAdjustments += entry.LiabilityAdjustment.Float64()
-			row.Depreciation += entry.Depreciation.Float64()
-			row.ROUOtherAdjustments += entry.ROUAdjustment.Float64()
+			row.Interest = row.Interest.Add(entry.InterestExpense)
+			row.Payments = row.Payments.Add(entry.Payment)
+			row.LiabilityOtherAdjustments = row.LiabilityOtherAdjustments.Add(entry.LiabilityAdjustment)
+			row.Depreciation = row.Depreciation.Add(entry.Depreciation)
+			row.ROUOtherAdjustments = row.ROUOtherAdjustments.Add(entry.ROUAdjustment)
 		}
 		for _, adjustment := range fact.adjustments {
 			if adjustment.EffectiveDate.Before(periodStart) || adjustment.EffectiveDate.After(periodEnd) {
 				continue
 			}
+			// Event adjustment amounts are stored decimals read as float64;
+			// the conversion happens once, at this seam.
 			if adjustment.AdjustmentType == "impairment" {
-				written := math.Abs(adjustment.ROUAdjustment)
-				if written == 0 {
-					written = adjustment.PnLLoss
+				written := money.NewFromFloat(math.Abs(adjustment.ROUAdjustment))
+				if written.IsZero() {
+					written = money.NewFromFloat(adjustment.PnLLoss)
 				}
-				row.Impairment += written
+				row.Impairment = row.Impairment.Add(written)
 				continue
 			}
-			row.LiabilityRemeasurement += adjustment.LiabilityAdjustment
-			row.ROURemeasurement += adjustment.ROUAdjustment
+			row.LiabilityRemeasurement = row.LiabilityRemeasurement.Add(money.NewFromFloat(adjustment.LiabilityAdjustment))
+			row.ROURemeasurement = row.ROURemeasurement.Add(money.NewFromFloat(adjustment.ROUAdjustment))
 		}
-		row.LiabilityTieOut = roundProjection(row.OpeningLiability + row.Additions + row.Interest - row.Payments + row.LiabilityRemeasurement + row.LiabilityOtherAdjustments - row.ClosingLiability)
-		row.ROUTieOut = roundProjection(row.OpeningROU + row.ROUAdditions - row.Depreciation + row.ROURemeasurement - row.Impairment + row.ROUOtherAdjustments - row.ClosingROU)
-		row.InitialLiability = roundProjection(row.InitialLiability)
-		row.InitialROUAsset = roundProjection(row.InitialROUAsset)
-		row.OpeningLiability = roundProjection(row.OpeningLiability)
-		row.Additions = roundProjection(row.Additions)
-		row.Interest = roundProjection(row.Interest)
-		row.Payments = roundProjection(row.Payments)
-		row.LiabilityRemeasurement = roundProjection(row.LiabilityRemeasurement)
-		row.LiabilityOtherAdjustments = roundProjection(row.LiabilityOtherAdjustments)
-		row.ClosingLiability = roundProjection(row.ClosingLiability)
-		row.OpeningROU = roundProjection(row.OpeningROU)
-		row.ROUAdditions = roundProjection(row.ROUAdditions)
-		row.Depreciation = roundProjection(row.Depreciation)
-		row.ROURemeasurement = roundProjection(row.ROURemeasurement)
-		row.Impairment = roundProjection(row.Impairment)
-		row.ROUOtherAdjustments = roundProjection(row.ROUOtherAdjustments)
-		row.ClosingROU = roundProjection(row.ClosingROU)
+		row.LiabilityTieOut = row.OpeningLiability.Add(row.Additions).Add(row.Interest).Sub(row.Payments).
+			Add(row.LiabilityRemeasurement).Add(row.LiabilityOtherAdjustments).Sub(row.ClosingLiability)
+		row.ROUTieOut = row.OpeningROU.Add(row.ROUAdditions).Sub(row.Depreciation).
+			Add(row.ROURemeasurement).Sub(row.Impairment).Add(row.ROUOtherAdjustments).Sub(row.ClosingROU)
+
+		// The workpaper is what an auditor reads: every disclosed amount is
+		// quantised once, at the contract currency's precision.
+		round := func(amount money.Amount) money.Amount { return amount.Round(row.Currency) }
+		row.InitialLiability = round(row.InitialLiability)
+		row.InitialROUAsset = round(row.InitialROUAsset)
+		row.OpeningLiability = round(row.OpeningLiability)
+		row.Additions = round(row.Additions)
+		row.Interest = round(row.Interest)
+		row.Payments = round(row.Payments)
+		row.LiabilityRemeasurement = round(row.LiabilityRemeasurement)
+		row.LiabilityOtherAdjustments = round(row.LiabilityOtherAdjustments)
+		row.ClosingLiability = round(row.ClosingLiability)
+		row.OpeningROU = round(row.OpeningROU)
+		row.ROUAdditions = round(row.ROUAdditions)
+		row.Depreciation = round(row.Depreciation)
+		row.ROURemeasurement = round(row.ROURemeasurement)
+		row.Impairment = round(row.Impairment)
+		row.ROUOtherAdjustments = round(row.ROUOtherAdjustments)
+		row.ClosingROU = round(row.ClosingROU)
 		rows = append(rows, row)
 		totals.RowCount++
 		if fact.calculation.MeasurementBasis == "capitalized" {
@@ -349,15 +358,24 @@ func maturityBandIndex(paymentDate, asOf time.Time) int {
 // carryingAmountsAt returns the closing liability and ROU from the daily schedule
 // as of the given date, i.e. the latest daily entry on or before it. Both are zero
 // when the lease has not commenced by that date.
-func carryingAmountsAt(entries []ifrs16.DailyEntry, date time.Time) (liability, rou float64) {
+func carryingAmountsAt(entries []ifrs16.DailyEntry, date time.Time) (liability, rou money.Amount) {
+	liability = money.NewFromInt64(0)
+	rou = money.NewFromInt64(0)
 	for _, entry := range entries {
 		if entry.Date.After(date) {
 			break
 		}
-		liability = entry.ClosingLiability.Float64()
-		rou = entry.ClosingROUAsset.Float64()
+		liability = entry.ClosingLiability
+		rou = entry.ClosingROUAsset
 	}
 	return liability, rou
+}
+
+// roundRate quantises the discount-rate display at the same two decimal places
+// the pre-migration workpaper emitted. It is a rate, not a money amount; the
+// rounding is display precision, preserved so the wire value does not change.
+func roundRate(value float64) float64 {
+	return math.Round(value*100) / 100
 }
 
 func buildMaturityAnalysis(facts []disclosureFact, asOf time.Time) ([]MaturityRow, MaturityRow) {
@@ -395,38 +413,44 @@ func buildMaturityAnalysis(facts []disclosureFact, asOf time.Time) ([]MaturityRo
 			if !payment.Date.After(asOf) {
 				continue
 			}
-			row.Bands[maturityBandIndex(payment.Date, asOf)] += payment.Amount.Float64()
-			row.TotalUndiscounted += payment.Amount.Float64()
+			row.Bands[maturityBandIndex(payment.Date, asOf)] = row.Bands[maturityBandIndex(payment.Date, asOf)].Add(payment.Amount)
+			row.TotalUndiscounted = row.TotalUndiscounted.Add(payment.Amount)
 		}
 
 		liability, _ := carryingAmountsAt(fact.calculation.DailyAmortization, asOf)
 		row.CarryingLiability = liability
-		row.UnearnedFinanceCost = row.TotalUndiscounted - liability
+		row.UnearnedFinanceCost = row.TotalUndiscounted.Sub(liability)
 
-		if row.TotalUndiscounted == 0 && row.CarryingLiability == 0 {
+		if row.TotalUndiscounted.IsZero() && row.CarryingLiability.IsZero() {
 			continue
 		}
 
-		row.TotalUndiscounted = roundProjection(row.TotalUndiscounted)
-		row.CarryingLiability = roundProjection(row.CarryingLiability)
-		row.UnearnedFinanceCost = roundProjection(row.UnearnedFinanceCost)
+		// Each disclosed figure is quantised once, at the contract currency's
+		// precision (the maturity analysis is per contract, so each row knows
+		// its own currency).
 		for band := range row.Bands {
-			row.Bands[band] = roundProjection(row.Bands[band])
-			totals.Bands[band] += row.Bands[band]
+			row.Bands[band] = row.Bands[band].Round(row.Currency)
+			totals.Bands[band] = totals.Bands[band].Add(row.Bands[band])
 		}
-		totals.TotalUndiscounted += row.TotalUndiscounted
-		totals.CarryingLiability += row.CarryingLiability
-		totals.UnearnedFinanceCost += row.UnearnedFinanceCost
+		row.TotalUndiscounted = row.TotalUndiscounted.Round(row.Currency)
+		row.CarryingLiability = row.CarryingLiability.Round(row.Currency)
+		row.UnearnedFinanceCost = row.UnearnedFinanceCost.Round(row.Currency)
+		totals.TotalUndiscounted = totals.TotalUndiscounted.Add(row.TotalUndiscounted)
+		totals.CarryingLiability = totals.CarryingLiability.Add(row.CarryingLiability)
+		totals.UnearnedFinanceCost = totals.UnearnedFinanceCost.Add(row.UnearnedFinanceCost)
 		rows = append(rows, row)
 	}
 
 	sort.Slice(rows, func(i, j int) bool { return rows[i].ContractNumber < rows[j].ContractNumber })
 
-	totals.TotalUndiscounted = roundProjection(totals.TotalUndiscounted)
-	totals.CarryingLiability = roundProjection(totals.CarryingLiability)
-	totals.UnearnedFinanceCost = roundProjection(totals.UnearnedFinanceCost)
+	// The totals row spans contracts that may use different currencies; it
+	// quantises at the default two-decimal scale, as the pre-migration report
+	// did.
+	totals.TotalUndiscounted = totals.TotalUndiscounted.RoundTo(2)
+	totals.CarryingLiability = totals.CarryingLiability.RoundTo(2)
+	totals.UnearnedFinanceCost = totals.UnearnedFinanceCost.RoundTo(2)
 	for band := range totals.Bands {
-		totals.Bands[band] = roundProjection(totals.Bands[band])
+		totals.Bands[band] = totals.Bands[band].RoundTo(2)
 	}
 	return rows, totals
 }
@@ -444,37 +468,39 @@ func buildROUReconciliation(facts []disclosureFact, periodStart, periodEnd time.
 		_, opening := carryingAmountsAt(fact.calculation.DailyAmortization, dayBeforeStart)
 		_, closing := carryingAmountsAt(fact.calculation.DailyAmortization, periodEnd)
 
-		var additions float64
+		var additions money.Amount
 		if !contract.CommencementDate.Before(periodStart) && !contract.CommencementDate.After(periodEnd) {
-			additions = fact.calculation.InitialROUAsset.Float64()
+			additions = fact.calculation.InitialROUAsset
 		}
 
-		var depreciation, engineAdjustment float64
+		var depreciation, engineAdjustment money.Amount
 		for _, entry := range fact.calculation.DailyAmortization {
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			depreciation += entry.Depreciation.Float64()
-			engineAdjustment += entry.ROUAdjustment.Float64()
+			depreciation = depreciation.Add(entry.Depreciation)
+			engineAdjustment = engineAdjustment.Add(entry.ROUAdjustment)
 		}
 
-		var remeasurement, impairment float64
+		var remeasurement, impairment money.Amount
 		for _, adjustment := range fact.adjustments {
 			if adjustment.EffectiveDate.Before(periodStart) || adjustment.EffectiveDate.After(periodEnd) {
 				continue
 			}
+			// Event adjustment amounts are stored decimals read as float64;
+			// the conversion happens once, at this seam.
 			if adjustment.AdjustmentType == "impairment" {
-				written := math.Abs(adjustment.ROUAdjustment)
-				if written == 0 {
-					written = adjustment.PnLLoss
+				written := money.NewFromFloat(math.Abs(adjustment.ROUAdjustment))
+				if written.IsZero() {
+					written = money.NewFromFloat(adjustment.PnLLoss)
 				}
-				impairment += written
+				impairment = impairment.Add(written)
 				continue
 			}
-			remeasurement += adjustment.ROUAdjustment
+			remeasurement = remeasurement.Add(money.NewFromFloat(adjustment.ROUAdjustment))
 		}
 
-		if opening == 0 && closing == 0 && additions == 0 && depreciation == 0 && remeasurement == 0 && impairment == 0 {
+		if opening.IsZero() && closing.IsZero() && additions.IsZero() && depreciation.IsZero() && remeasurement.IsZero() && impairment.IsZero() {
 			continue
 		}
 
@@ -488,45 +514,48 @@ func buildROUReconciliation(facts []disclosureFact, periodStart, periodEnd time.
 			byAssetType[assetType] = row
 		}
 		row.ContractCount++
-		row.Opening += opening
-		row.Additions += additions
-		row.Depreciation += depreciation
-		row.Remeasurement += remeasurement
-		row.Impairment += impairment
-		row.OtherAdjustments += engineAdjustment
-		row.Closing += closing
+		row.Opening = row.Opening.Add(opening)
+		row.Additions = row.Additions.Add(additions)
+		row.Depreciation = row.Depreciation.Add(depreciation)
+		row.Remeasurement = row.Remeasurement.Add(remeasurement)
+		row.Impairment = row.Impairment.Add(impairment)
+		row.OtherAdjustments = row.OtherAdjustments.Add(engineAdjustment)
+		row.Closing = row.Closing.Add(closing)
 	}
 
 	rows := make([]ROUReconciliationRow, 0, len(byAssetType))
 	totals := ROUReconciliationRow{AssetType: "total"}
 	for _, row := range byAssetType {
-		row.Opening = roundProjection(row.Opening)
-		row.Additions = roundProjection(row.Additions)
-		row.Depreciation = roundProjection(row.Depreciation)
-		row.Remeasurement = roundProjection(row.Remeasurement)
-		row.Impairment = roundProjection(row.Impairment)
-		row.OtherAdjustments = roundProjection(row.OtherAdjustments)
-		row.Closing = roundProjection(row.Closing)
+		// An asset-class row may span contracts in different currencies; it
+		// quantises at the default two-decimal scale, as the pre-migration
+		// report did.
+		row.Opening = row.Opening.RoundTo(2)
+		row.Additions = row.Additions.RoundTo(2)
+		row.Depreciation = row.Depreciation.RoundTo(2)
+		row.Remeasurement = row.Remeasurement.RoundTo(2)
+		row.Impairment = row.Impairment.RoundTo(2)
+		row.OtherAdjustments = row.OtherAdjustments.RoundTo(2)
+		row.Closing = row.Closing.RoundTo(2)
 		rows = append(rows, *row)
 
 		totals.ContractCount += row.ContractCount
-		totals.Opening += row.Opening
-		totals.Additions += row.Additions
-		totals.Depreciation += row.Depreciation
-		totals.Remeasurement += row.Remeasurement
-		totals.Impairment += row.Impairment
-		totals.OtherAdjustments += row.OtherAdjustments
-		totals.Closing += row.Closing
+		totals.Opening = totals.Opening.Add(row.Opening)
+		totals.Additions = totals.Additions.Add(row.Additions)
+		totals.Depreciation = totals.Depreciation.Add(row.Depreciation)
+		totals.Remeasurement = totals.Remeasurement.Add(row.Remeasurement)
+		totals.Impairment = totals.Impairment.Add(row.Impairment)
+		totals.OtherAdjustments = totals.OtherAdjustments.Add(row.OtherAdjustments)
+		totals.Closing = totals.Closing.Add(row.Closing)
 	}
 	sortROUReconciliationRows(rows)
 
-	totals.Opening = roundProjection(totals.Opening)
-	totals.Additions = roundProjection(totals.Additions)
-	totals.Depreciation = roundProjection(totals.Depreciation)
-	totals.Remeasurement = roundProjection(totals.Remeasurement)
-	totals.Impairment = roundProjection(totals.Impairment)
-	totals.OtherAdjustments = roundProjection(totals.OtherAdjustments)
-	totals.Closing = roundProjection(totals.Closing)
+	totals.Opening = totals.Opening.RoundTo(2)
+	totals.Additions = totals.Additions.RoundTo(2)
+	totals.Depreciation = totals.Depreciation.RoundTo(2)
+	totals.Remeasurement = totals.Remeasurement.RoundTo(2)
+	totals.Impairment = totals.Impairment.RoundTo(2)
+	totals.OtherAdjustments = totals.OtherAdjustments.RoundTo(2)
+	totals.Closing = totals.Closing.RoundTo(2)
 	return rows, totals
 }
 
@@ -560,20 +589,20 @@ func buildLiabilityRollforward(facts []disclosureFact, periodStart, periodEnd ti
 
 		opening, _ := carryingAmountsAt(fact.calculation.DailyAmortization, dayBeforeStart)
 		closing, _ := carryingAmountsAt(fact.calculation.DailyAmortization, periodEnd)
-		rollforward.Opening += opening
-		rollforward.Closing += closing
+		rollforward.Opening = rollforward.Opening.Add(opening)
+		rollforward.Closing = rollforward.Closing.Add(closing)
 
 		if !contract.CommencementDate.Before(periodStart) && !contract.CommencementDate.After(periodEnd) {
-			rollforward.Additions += fact.calculation.InitialLiability.Float64()
+			rollforward.Additions = rollforward.Additions.Add(fact.calculation.InitialLiability)
 		}
 
 		for _, entry := range fact.calculation.DailyAmortization {
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			rollforward.Interest += entry.InterestExpense.Float64()
-			rollforward.Payments += entry.Payment.Float64()
-			rollforward.OtherAdjustments += entry.LiabilityAdjustment.Float64()
+			rollforward.Interest = rollforward.Interest.Add(entry.InterestExpense)
+			rollforward.Payments = rollforward.Payments.Add(entry.Payment)
+			rollforward.OtherAdjustments = rollforward.OtherAdjustments.Add(entry.LiabilityAdjustment)
 		}
 
 		for _, adjustment := range fact.adjustments {
@@ -581,18 +610,23 @@ func buildLiabilityRollforward(facts []disclosureFact, periodStart, periodEnd ti
 				continue
 			}
 			if adjustment.AdjustmentType != "impairment" {
-				rollforward.Remeasurement += adjustment.LiabilityAdjustment
+				// Event adjustment amounts are stored decimals read as float64;
+				// the conversion happens once, at this seam.
+				rollforward.Remeasurement = rollforward.Remeasurement.Add(money.NewFromFloat(adjustment.LiabilityAdjustment))
 			}
 		}
 	}
 
-	rollforward.Opening = roundProjection(rollforward.Opening)
-	rollforward.Additions = roundProjection(rollforward.Additions)
-	rollforward.Interest = roundProjection(rollforward.Interest)
-	rollforward.Payments = roundProjection(rollforward.Payments)
-	rollforward.Remeasurement = roundProjection(rollforward.Remeasurement)
-	rollforward.OtherAdjustments = roundProjection(rollforward.OtherAdjustments)
-	rollforward.Closing = roundProjection(rollforward.Closing)
+	// The roll-forward spans contracts that may use different currencies; it
+	// quantises at the default two-decimal scale, as the pre-migration report
+	// did.
+	rollforward.Opening = rollforward.Opening.RoundTo(2)
+	rollforward.Additions = rollforward.Additions.RoundTo(2)
+	rollforward.Interest = rollforward.Interest.RoundTo(2)
+	rollforward.Payments = rollforward.Payments.RoundTo(2)
+	rollforward.Remeasurement = rollforward.Remeasurement.RoundTo(2)
+	rollforward.OtherAdjustments = rollforward.OtherAdjustments.RoundTo(2)
+	rollforward.Closing = rollforward.Closing.RoundTo(2)
 	return rollforward
 }
 
@@ -605,28 +639,31 @@ func buildExpenseBreakdown(facts []disclosureFact, periodStart, periodEnd time.T
 			if entry.Date.Before(periodStart) || entry.Date.After(periodEnd) {
 				continue
 			}
-			breakdown.Depreciation += entry.Depreciation.Float64()
-			breakdown.Interest += entry.InterestExpense.Float64()
-			breakdown.VariableRent += entry.VariableRentExpense.Float64()
-			breakdown.NonLease += entry.NonLeaseExpense.Float64()
+			breakdown.Depreciation = breakdown.Depreciation.Add(entry.Depreciation)
+			breakdown.Interest = breakdown.Interest.Add(entry.InterestExpense)
+			breakdown.VariableRent = breakdown.VariableRent.Add(entry.VariableRentExpense)
+			breakdown.NonLease = breakdown.NonLease.Add(entry.NonLeaseExpense)
 			switch scope {
 			case ifrs16.LeaseScopeShortTermExempt:
-				breakdown.ShortTermExempt += entry.ExemptLeaseExpense.Float64()
+				breakdown.ShortTermExempt = breakdown.ShortTermExempt.Add(entry.ExemptLeaseExpense)
 			case ifrs16.LeaseScopeLowValueExempt:
-				breakdown.LowValueExempt += entry.ExemptLeaseExpense.Float64()
+				breakdown.LowValueExempt = breakdown.LowValueExempt.Add(entry.ExemptLeaseExpense)
 			}
 		}
 	}
 
-	breakdown.Depreciation = roundProjection(breakdown.Depreciation)
-	breakdown.Interest = roundProjection(breakdown.Interest)
-	breakdown.ShortTermExempt = roundProjection(breakdown.ShortTermExempt)
-	breakdown.LowValueExempt = roundProjection(breakdown.LowValueExempt)
-	breakdown.VariableRent = roundProjection(breakdown.VariableRent)
-	breakdown.NonLease = roundProjection(breakdown.NonLease)
+	// The breakdown spans contracts that may use different currencies; it
+	// quantises at the default two-decimal scale, as the pre-migration report
+	// did.
+	breakdown.Depreciation = breakdown.Depreciation.RoundTo(2)
+	breakdown.Interest = breakdown.Interest.RoundTo(2)
+	breakdown.ShortTermExempt = breakdown.ShortTermExempt.RoundTo(2)
+	breakdown.LowValueExempt = breakdown.LowValueExempt.RoundTo(2)
+	breakdown.VariableRent = breakdown.VariableRent.RoundTo(2)
+	breakdown.NonLease = breakdown.NonLease.RoundTo(2)
 	// Non-lease components are disclosed separately and stay out of the lease total.
-	breakdown.Total = roundProjection(breakdown.Depreciation + breakdown.Interest +
-		breakdown.ShortTermExempt + breakdown.LowValueExempt + breakdown.VariableRent)
+	breakdown.Total = breakdown.Depreciation.Add(breakdown.Interest).
+		Add(breakdown.ShortTermExempt).Add(breakdown.LowValueExempt).Add(breakdown.VariableRent).RoundTo(2)
 	return breakdown
 }
 
@@ -640,24 +677,27 @@ func buildCashOutflow(facts []disclosureFact, periodStart, periodEnd time.Time) 
 			}
 			switch payment.Type {
 			case "variable":
-				summary.VariablePayments += payment.Amount.Float64()
+				summary.VariablePayments = summary.VariablePayments.Add(payment.Amount)
 			case "non_lease":
-				summary.NonLeasePayments += payment.Amount.Float64()
+				summary.NonLeasePayments = summary.NonLeasePayments.Add(payment.Amount)
 			default:
 				if payment.Timing == "prepaid" && !payment.Date.After(fact.contract.CommencementDate) {
-					summary.PrepaidPayments += payment.Amount.Float64()
+					summary.PrepaidPayments = summary.PrepaidPayments.Add(payment.Amount)
 				} else {
-					summary.FixedPayments += payment.Amount.Float64()
+					summary.FixedPayments = summary.FixedPayments.Add(payment.Amount)
 				}
 			}
 		}
 	}
 
-	summary.FixedPayments = roundProjection(summary.FixedPayments)
-	summary.PrepaidPayments = roundProjection(summary.PrepaidPayments)
-	summary.VariablePayments = roundProjection(summary.VariablePayments)
-	summary.NonLeasePayments = roundProjection(summary.NonLeasePayments)
-	summary.Total = roundProjection(summary.FixedPayments + summary.PrepaidPayments +
-		summary.VariablePayments + summary.NonLeasePayments)
+	// The outflow spans contracts that may use different currencies; it
+	// quantises at the default two-decimal scale, as the pre-migration report
+	// did.
+	summary.FixedPayments = summary.FixedPayments.RoundTo(2)
+	summary.PrepaidPayments = summary.PrepaidPayments.RoundTo(2)
+	summary.VariablePayments = summary.VariablePayments.RoundTo(2)
+	summary.NonLeasePayments = summary.NonLeasePayments.RoundTo(2)
+	summary.Total = summary.FixedPayments.Add(summary.PrepaidPayments).
+		Add(summary.VariablePayments).Add(summary.NonLeasePayments).RoundTo(2)
 	return summary
 }

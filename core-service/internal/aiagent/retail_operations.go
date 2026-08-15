@@ -483,7 +483,13 @@ func (h *Agent) executeRetailOperations(ctx context.Context, req Request, emit f
 func (h *Agent) executeRetailTool(ctx context.Context, runtime *agenttools.Runtime, name string, arguments any, emit func(context.Context, string, any) error) (agenttools.ToolResult, AgentToolCall, error) {
 	call := AgentToolCall{Tool: name, Skill: "零售经营分析 Agent", Status: "running", InputSummary: "读取服务端零售事实", OutputSummary: "确定性服务结果", RequiresReview: false}
 	_ = emitAgentEvent(ctx, emit, "tool_start", map[string]any{"tool": name, "status": "running"})
-	result, err := h.executeToolCall(ctx, runtime, name, arguments, "")
+	result, durationMs, err := h.executeToolCall(ctx, runtime, name, arguments, "")
+	// The tool actually ran: its wall-clock duration is measured and carried
+	// on the call, whether it completed or failed. Only calls that never ran
+	// leave duration_ms absent.
+	if durationMs != nil {
+		call.DurationMs = durationMs
+	}
 	if err != nil || result.Status != agenttools.StatusCompleted || result.Error != nil {
 		call.Status = "failed"
 		call.OutputSummary = "数据不可用或查询被拒绝"

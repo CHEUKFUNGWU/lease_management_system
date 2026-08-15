@@ -449,13 +449,13 @@ func closePackFiles(closePack map[string]any, disclosure map[string]any) (map[st
 			row.AssetType, row.Currency, row.LeaseScope, row.ApprovalStatus, row.ReportMode,
 			fmt.Sprintf("%.10f", row.DiscountRate), row.DiscountRateSource,
 			strconv.Itoa(row.PaymentScheduleCount), strconv.Itoa(row.EventAdjustmentCount),
-			fmt.Sprintf("%.2f", row.OpeningLiability), fmt.Sprintf("%.2f", row.Additions),
-			fmt.Sprintf("%.2f", row.Interest), fmt.Sprintf("%.2f", row.Payments),
-			fmt.Sprintf("%.2f", row.LiabilityRemeasurement), fmt.Sprintf("%.2f", row.ClosingLiability),
-			fmt.Sprintf("%.2f", row.OpeningROU), fmt.Sprintf("%.2f", row.ROUAdditions),
-			fmt.Sprintf("%.2f", row.Depreciation), fmt.Sprintf("%.2f", row.Impairment),
-			fmt.Sprintf("%.2f", row.ClosingROU), fmt.Sprintf("%.2f", row.LiabilityTieOut),
-			fmt.Sprintf("%.2f", row.ROUTieOut),
+			fmt.Sprintf("%.2f", row.OpeningLiability.Float64()), fmt.Sprintf("%.2f", row.Additions.Float64()),
+			fmt.Sprintf("%.2f", row.Interest.Float64()), fmt.Sprintf("%.2f", row.Payments.Float64()),
+			fmt.Sprintf("%.2f", row.LiabilityRemeasurement.Float64()), fmt.Sprintf("%.2f", row.ClosingLiability.Float64()),
+			fmt.Sprintf("%.2f", row.OpeningROU.Float64()), fmt.Sprintf("%.2f", row.ROUAdditions.Float64()),
+			fmt.Sprintf("%.2f", row.Depreciation.Float64()), fmt.Sprintf("%.2f", row.Impairment.Float64()),
+			fmt.Sprintf("%.2f", row.ClosingROU.Float64()), fmt.Sprintf("%.2f", row.LiabilityTieOut.Float64()),
+			fmt.Sprintf("%.2f", row.ROUTieOut.Float64()),
 		}); err != nil {
 			return nil, err
 		}

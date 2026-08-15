@@ -7,45 +7,46 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/money"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
 type AmortizationRow struct {
-	GroupKey            string  `json:"group_key"`
-	GroupLabel          string  `json:"group_label"`
-	ContractID          string  `json:"contract_id,omitempty"`
-	ContractNumber      string  `json:"contract_number,omitempty"`
-	ContractName        string  `json:"contract_name,omitempty"`
-	StoreName           string  `json:"store_name,omitempty"`
-	PeriodKey           string  `json:"period_key"`
-	PeriodStart         string  `json:"period_start"`
-	PeriodEnd           string  `json:"period_end"`
-	OpeningLiability    float64 `json:"opening_liability"`
-	InterestExpense     float64 `json:"interest_expense"`
-	Payment             float64 `json:"payment"`
-	PrepaidPayment      float64 `json:"prepaid_payment"`
-	LiabilityAdjustment float64 `json:"liability_adjustment"`
-	ClosingLiability    float64 `json:"closing_liability"`
-	OpeningROUAsset     float64 `json:"opening_rou_asset"`
-	Depreciation        float64 `json:"depreciation"`
-	Impairment          float64 `json:"impairment"`
-	ROUAdjustment       float64 `json:"rou_adjustment"`
-	ClosingROUAsset     float64 `json:"closing_rou_asset"`
-	VariableRentExpense float64 `json:"variable_rent_expense"`
-	NonLeaseExpense     float64 `json:"non_lease_expense"`
-	PnLAdjustment       float64 `json:"pnl_adjustment"`
-	Currency            string  `json:"currency,omitempty"`
+	GroupKey            string       `json:"group_key"`
+	GroupLabel          string       `json:"group_label"`
+	ContractID          string       `json:"contract_id,omitempty"`
+	ContractNumber      string       `json:"contract_number,omitempty"`
+	ContractName        string       `json:"contract_name,omitempty"`
+	StoreName           string       `json:"store_name,omitempty"`
+	PeriodKey           string       `json:"period_key"`
+	PeriodStart         string       `json:"period_start"`
+	PeriodEnd           string       `json:"period_end"`
+	OpeningLiability    money.Amount `json:"opening_liability"`
+	InterestExpense     money.Amount `json:"interest_expense"`
+	Payment             money.Amount `json:"payment"`
+	PrepaidPayment      money.Amount `json:"prepaid_payment"`
+	LiabilityAdjustment money.Amount `json:"liability_adjustment"`
+	ClosingLiability    money.Amount `json:"closing_liability"`
+	OpeningROUAsset     money.Amount `json:"opening_rou_asset"`
+	Depreciation        money.Amount `json:"depreciation"`
+	Impairment          money.Amount `json:"impairment"`
+	ROUAdjustment       money.Amount `json:"rou_adjustment"`
+	ClosingROUAsset     money.Amount `json:"closing_rou_asset"`
+	VariableRentExpense money.Amount `json:"variable_rent_expense"`
+	NonLeaseExpense     money.Amount `json:"non_lease_expense"`
+	PnLAdjustment       money.Amount `json:"pnl_adjustment"`
+	Currency            string       `json:"currency,omitempty"`
 }
 
 type amortizationBucket struct {
 	contractID, contractNumber, contractName, storeName, currency string
 	periodKey                                                     string
 	periodStart, periodEnd                                        time.Time
-	openingLiability, openingROU                                  float64
-	interest, payment, prepaidPayment                             float64
-	liabilityAdjustment, closingLiability                         float64
-	depreciation, impairment, rouAdjustment, closingROU           float64
-	variableRent, nonLease, pnlAdjustment                         float64
+	openingLiability, openingROU                                  money.Amount
+	interest, payment, prepaidPayment                             money.Amount
+	liabilityAdjustment, closingLiability                         money.Amount
+	depreciation, impairment, rouAdjustment, closingROU           money.Amount
+	variableRent, nonLease, pnlAdjustment                         money.Amount
 	seen                                                          bool
 }
 
@@ -96,20 +97,20 @@ func projectAmortization(snapshot *Snapshot, request ProjectionRequest) (Project
 			key := projectionBucketKey(entry.Date, request.Granularity)
 			bucket := ensureAmortizationBucket(buckets, key, entry.Date, request.Granularity, contract)
 			if !bucket.seen {
-				bucket.openingLiability = entry.OpeningLiability.Float64()
-				bucket.openingROU = entry.OpeningROUAsset.Float64()
+				bucket.openingLiability = entry.OpeningLiability
+				bucket.openingROU = entry.OpeningROUAsset
 				bucket.seen = true
 			}
-			bucket.interest += entry.InterestExpense.Float64()
-			bucket.payment += entry.Payment.Float64()
-			bucket.prepaidPayment += entry.PrepaidPayment.Float64()
-			bucket.liabilityAdjustment += entry.LiabilityAdjustment.Float64()
-			bucket.closingLiability = entry.ClosingLiability.Float64()
-			bucket.depreciation += entry.Depreciation.Float64()
-			bucket.rouAdjustment += entry.ROUAdjustment.Float64()
-			bucket.closingROU = entry.ClosingROUAsset.Float64()
-			bucket.variableRent += entry.VariableRentExpense.Float64()
-			bucket.nonLease += entry.NonLeaseExpense.Float64()
+			bucket.interest = bucket.interest.Add(entry.InterestExpense)
+			bucket.payment = bucket.payment.Add(entry.Payment)
+			bucket.prepaidPayment = bucket.prepaidPayment.Add(entry.PrepaidPayment)
+			bucket.liabilityAdjustment = bucket.liabilityAdjustment.Add(entry.LiabilityAdjustment)
+			bucket.closingLiability = entry.ClosingLiability
+			bucket.depreciation = bucket.depreciation.Add(entry.Depreciation)
+			bucket.rouAdjustment = bucket.rouAdjustment.Add(entry.ROUAdjustment)
+			bucket.closingROU = entry.ClosingROUAsset
+			bucket.variableRent = bucket.variableRent.Add(entry.VariableRentExpense)
+			bucket.nonLease = bucket.nonLease.Add(entry.NonLeaseExpense)
 		}
 		for _, adjustment := range fact.EventAdjustments {
 			if adjustment.EffectiveDate.Before(request.StartDate) || adjustment.EffectiveDate.After(request.EndDate) {
@@ -118,16 +119,18 @@ func projectAmortization(snapshot *Snapshot, request ProjectionRequest) (Project
 			key := projectionBucketKey(adjustment.EffectiveDate, request.Granularity)
 			bucket := ensureAmortizationBucket(buckets, key, adjustment.EffectiveDate, request.Granularity, contract)
 			if adjustment.AdjustmentType == "impairment" {
-				impairment := math.Abs(adjustment.ROUAdjustment)
-				if impairment == 0 {
-					impairment = adjustment.PnLLoss
+				// Event adjustment amounts are stored decimals read as float64;
+				// the conversion happens once, at this seam.
+				impairment := money.NewFromFloat(math.Abs(adjustment.ROUAdjustment))
+				if impairment.IsZero() {
+					impairment = money.NewFromFloat(adjustment.PnLLoss)
 				}
-				bucket.impairment += impairment
+				bucket.impairment = bucket.impairment.Add(impairment)
 			} else {
-				bucket.liabilityAdjustment += adjustment.LiabilityAdjustment
-				bucket.rouAdjustment += adjustment.ROUAdjustment
+				bucket.liabilityAdjustment = bucket.liabilityAdjustment.Add(money.NewFromFloat(adjustment.LiabilityAdjustment))
+				bucket.rouAdjustment = bucket.rouAdjustment.Add(money.NewFromFloat(adjustment.ROUAdjustment))
 			}
-			bucket.pnlAdjustment += adjustment.PnLGain - adjustment.PnLLoss
+			bucket.pnlAdjustment = bucket.pnlAdjustment.Add(money.NewFromFloat(adjustment.PnLGain).Sub(money.NewFromFloat(adjustment.PnLLoss)))
 		}
 		for _, bucket := range buckets {
 			contractRows = append(contractRows, *bucket)
@@ -258,35 +261,38 @@ func projectionGroups(bucket amortizationBucket, contractTags map[string][]strin
 }
 
 func addAmortization(row *AmortizationRow, bucket amortizationBucket) {
-	row.OpeningLiability += bucket.openingLiability
-	row.InterestExpense += bucket.interest
-	row.Payment += bucket.payment
-	row.PrepaidPayment += bucket.prepaidPayment
-	row.LiabilityAdjustment += bucket.liabilityAdjustment
-	row.ClosingLiability += bucket.closingLiability
-	row.OpeningROUAsset += bucket.openingROU
-	row.Depreciation += bucket.depreciation
-	row.Impairment += bucket.impairment
-	row.ROUAdjustment += bucket.rouAdjustment
-	row.ClosingROUAsset += bucket.closingROU
-	row.VariableRentExpense += bucket.variableRent
-	row.NonLeaseExpense += bucket.nonLease
-	row.PnLAdjustment += bucket.pnlAdjustment
+	row.OpeningLiability = row.OpeningLiability.Add(bucket.openingLiability)
+	row.InterestExpense = row.InterestExpense.Add(bucket.interest)
+	row.Payment = row.Payment.Add(bucket.payment)
+	row.PrepaidPayment = row.PrepaidPayment.Add(bucket.prepaidPayment)
+	row.LiabilityAdjustment = row.LiabilityAdjustment.Add(bucket.liabilityAdjustment)
+	row.ClosingLiability = row.ClosingLiability.Add(bucket.closingLiability)
+	row.OpeningROUAsset = row.OpeningROUAsset.Add(bucket.openingROU)
+	row.Depreciation = row.Depreciation.Add(bucket.depreciation)
+	row.Impairment = row.Impairment.Add(bucket.impairment)
+	row.ROUAdjustment = row.ROUAdjustment.Add(bucket.rouAdjustment)
+	row.ClosingROUAsset = row.ClosingROUAsset.Add(bucket.closingROU)
+	row.VariableRentExpense = row.VariableRentExpense.Add(bucket.variableRent)
+	row.NonLeaseExpense = row.NonLeaseExpense.Add(bucket.nonLease)
+	row.PnLAdjustment = row.PnLAdjustment.Add(bucket.pnlAdjustment)
 }
 
+// applyProjectionExchangeRate translates a row into the report currency. The
+// rate is a policy float; each amount is multiplied at full precision.
 func applyProjectionExchangeRate(row *AmortizationRow, rate float64) {
-	row.OpeningLiability *= rate
-	row.InterestExpense *= rate
-	row.Payment *= rate
-	row.PrepaidPayment *= rate
-	row.LiabilityAdjustment *= rate
-	row.ClosingLiability *= rate
-	row.OpeningROUAsset *= rate
-	row.Depreciation *= rate
-	row.Impairment *= rate
-	row.ROUAdjustment *= rate
-	row.ClosingROUAsset *= rate
-	row.VariableRentExpense *= rate
-	row.NonLeaseExpense *= rate
-	row.PnLAdjustment *= rate
+	factor := money.NewFromFloat(rate)
+	row.OpeningLiability = row.OpeningLiability.Mul(factor)
+	row.InterestExpense = row.InterestExpense.Mul(factor)
+	row.Payment = row.Payment.Mul(factor)
+	row.PrepaidPayment = row.PrepaidPayment.Mul(factor)
+	row.LiabilityAdjustment = row.LiabilityAdjustment.Mul(factor)
+	row.ClosingLiability = row.ClosingLiability.Mul(factor)
+	row.OpeningROUAsset = row.OpeningROUAsset.Mul(factor)
+	row.Depreciation = row.Depreciation.Mul(factor)
+	row.Impairment = row.Impairment.Mul(factor)
+	row.ROUAdjustment = row.ROUAdjustment.Mul(factor)
+	row.ClosingROUAsset = row.ClosingROUAsset.Mul(factor)
+	row.VariableRentExpense = row.VariableRentExpense.Mul(factor)
+	row.NonLeaseExpense = row.NonLeaseExpense.Mul(factor)
+	row.PnLAdjustment = row.PnLAdjustment.Mul(factor)
 }

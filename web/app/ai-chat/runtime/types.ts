@@ -159,6 +159,7 @@ export interface Message {
   model?: string;
   thinking?: string;
   confidence?: number;
+  confidenceReason?: string;
   agentMode?: boolean;
   agentPlan?: AgentPlanStep[];
   toolCalls?: AgentToolCall[];

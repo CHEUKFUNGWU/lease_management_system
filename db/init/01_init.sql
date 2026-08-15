@@ -511,6 +511,8 @@ CREATE TABLE IF NOT EXISTS ai_chat_messages (
     sources JSONB,
     attachments JSONB,
     model VARCHAR(100),
+    confidence DOUBLE PRECISION,
+    confidence_reason TEXT,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     CHECK (role IN ('system', 'user', 'assistant', 'tool')),

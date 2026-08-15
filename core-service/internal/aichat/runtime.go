@@ -368,6 +368,7 @@ func (r *Runtime[T]) persistAssistantMessage(ctx context.Context, prepared *prep
 		SessionID: prepared.session.ID, RunID: &prepared.run.ID, Role: "assistant",
 		MessageType: "text", SequenceNo: nextSequence, Content: result.Answer,
 		Model: &result.Model, CreatedBy: &prepared.input.UserID, Sources: marshalJSON(result.Sources),
+		Confidence: result.Confidence, ConfidenceReason: result.ConfidenceReason,
 	}
 	if err := r.store.CreateMessage(ctx, message); err != nil {
 		return fmt.Errorf("persist AI assistant message: %w", err)
@@ -375,6 +376,7 @@ func (r *Runtime[T]) persistAssistantMessage(ctx context.Context, prepared *prep
 	return r.appendEvent(ctx, prepared, "message_end", map[string]any{
 		"message_id": message.ID, "role": "assistant", "content": result.Answer,
 		"model": result.Model, "sources": result.Sources,
+		"confidence": result.Confidence, "confidence_reason": result.ConfidenceReason,
 	}, false)
 }
 

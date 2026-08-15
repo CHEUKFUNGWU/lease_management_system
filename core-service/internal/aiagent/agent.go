@@ -371,11 +371,37 @@ func hasGlobalPermission(permissions []string) bool {
 	return false
 }
 
+// confidencePointer carries the answer confidence forward for persistence;
+// a zero or unset confidence is treated as absent rather than fabricated.
+func confidencePointer(confidence float64) *float64 {
+	if confidence <= 0 {
+		return nil
+	}
+	return &confidence
+}
+
+// confidenceReasonFor derives the degradation reason from signals the agent
+// already produced. It explains why the confidence is what it is; the
+// confidence calculation itself is untouched.
+func confidenceReasonFor(response Response) *string {
+	if strings.EqualFold(response.Model, "fallback") {
+		reason := "AI 服务暂不可用，以下为系统数据摘要"
+		return &reason
+	}
+	if len(response.ReviewPrompts) > 0 {
+		reason := "部分内容需人工复核"
+		return &reason
+	}
+	return nil
+}
+
 func ProjectResult(response Response) aichat.Result {
 	result := aichat.Result{
 		Answer: response.Answer, Model: response.Model, Sources: response.Sources,
 		ToolCalls: response.ToolCalls, ReviewPrompts: response.ReviewPrompts,
-		ReviewRequired: len(response.ReviewPrompts) > 0,
+		ReviewRequired:   len(response.ReviewPrompts) > 0,
+		Confidence:       confidencePointer(response.Confidence),
+		ConfidenceReason: confidenceReasonFor(response),
 	}
 	if len(response.DraftContracts) > 0 {
 		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
@@ -599,6 +625,10 @@ type AgentToolCall struct {
 	InputSummary   string `json:"input_summary"`
 	OutputSummary  string `json:"output_summary"`
 	RequiresReview bool   `json:"requires_review"`
+	// DurationMs is the wall-clock time a tool execution took, set only for
+	// calls that actually ran. Planned or LLM-suggested calls leave it absent —
+	// a missing duration is never fabricated as zero (AGENTS.md: 不用 0 填补缺失).
+	DurationMs *int64 `json:"duration_ms,omitempty"`
 }
 
 // LLMToolCall represents a tool call returned by the LLM (OpenAI/DeepSeek format).
@@ -744,7 +774,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 		switch selectedTool {
 		case "parse_contract_batch":
-			toolResult, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_contract_batch", fileParseArguments{
+			toolResult, durationMs, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_contract_batch", fileParseArguments{
 				FileID: req.FileID, ObjectName: req.ObjectName, ContentType: req.ContentType,
 			})
 			if err != nil {
@@ -760,6 +790,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			batchResult, ok := toolResult.Data.(*BatchParseResult)
 			if !ok || batchResult == nil {
 				return Response{Answer: "文件解析失败: 解析结果格式无效", Sources: sources, Confidence: 0.5, IsOfficial: false, Model: "fallback"}, fmt.Errorf("contract batch parse returned unexpected result")
+			}
+			// The LLM-selected call in the chain is the one that actually ran;
+			// its duration belongs on it. Calls that never ran stay without one.
+			if len(toolExecutionChain) > 0 {
+				toolExecutionChain[0].DurationMs = durationMs
 			}
 			resp := Response{
 				Answer:         batchResult.SummaryText,
@@ -778,7 +813,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			return resp, nil
 
 		case "parse_payment_schedule":
-			toolResult, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_payment_schedule", fileParseArguments{
+			toolResult, durationMs, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_payment_schedule", fileParseArguments{
 				FileID: req.FileID, ObjectName: req.ObjectName, ContentType: req.ContentType, ContractID: contractID,
 			})
 			if err != nil {
@@ -794,6 +829,9 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			scheduleResult, ok := toolResult.Data.(*PaymentScheduleParseResult)
 			if !ok || scheduleResult == nil {
 				return Response{Answer: "租金表解析失败: 解析结果格式无效", Sources: sources, Confidence: 0.5, IsOfficial: false, Model: "fallback"}, fmt.Errorf("payment schedule parse returned unexpected result")
+			}
+			if len(toolExecutionChain) > 0 {
+				toolExecutionChain[0].DurationMs = durationMs
 			}
 			resp := Response{
 				Answer:                 scheduleResult.SummaryText,
@@ -812,7 +850,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			return resp, nil
 
 		default:
-			toolResult, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_contract", fileParseArguments{
+			toolResult, _, err := h.executeFileParseTool(ctx, toolRuntime, "lease.file.parse_contract", fileParseArguments{
 				FileID: req.FileID, ObjectName: req.ObjectName, ContentType: req.ContentType,
 			})
 			if err != nil {
@@ -1497,25 +1535,26 @@ func (h *Agent) retrieveContractDetail(ctx context.Context, contractID string, c
 }
 
 func (h *Agent) executeReadTool(ctx context.Context, toolRuntime *agenttools.Runtime, toolName string, arguments any) (agenttools.ToolResult, bool) {
-	result, err := h.executeToolCall(ctx, toolRuntime, toolName, arguments, "")
+	result, _, err := h.executeToolCall(ctx, toolRuntime, toolName, arguments, "")
 	if err != nil || result.Status != agenttools.StatusCompleted || result.Error != nil {
 		return agenttools.ToolResult{}, false
 	}
 	return result, true
 }
 
-func (h *Agent) executeToolCall(ctx context.Context, toolRuntime *agenttools.Runtime, toolName string, arguments any, idempotencyKey string) (agenttools.ToolResult, error) {
+func (h *Agent) executeToolCall(ctx context.Context, toolRuntime *agenttools.Runtime, toolName string, arguments any, idempotencyKey string) (agenttools.ToolResult, *int64, error) {
 	if toolRuntime == nil {
-		return agenttools.ToolResult{}, fmt.Errorf("tool runtime is unavailable")
+		return agenttools.ToolResult{}, nil, fmt.Errorf("tool runtime is unavailable")
 	}
 	execution, err := agenttools.RequireExecutionContext(ctx)
 	if err != nil {
-		return agenttools.ToolResult{}, err
+		return agenttools.ToolResult{}, nil, err
 	}
 	encoded, err := json.Marshal(arguments)
 	if err != nil {
-		return agenttools.ToolResult{}, err
+		return agenttools.ToolResult{}, nil, err
 	}
+	startedAt := time.Now()
 	result, err := toolRuntime.Execute(ctx, agenttools.ToolCall{
 		CallID:         toolName + "-" + execution.RunID,
 		RunID:          execution.RunID,
@@ -1525,7 +1564,8 @@ func (h *Agent) executeToolCall(ctx context.Context, toolRuntime *agenttools.Run
 		Arguments:      encoded,
 		IdempotencyKey: idempotencyKey,
 	})
-	return result, err
+	durationMs := time.Since(startedAt).Milliseconds()
+	return result, &durationMs, err
 }
 
 // appendReportsContext appends report page context info from the frontend payload.

@@ -163,7 +163,11 @@ export const antdTheme = {
     Modal: {
       borderRadiusLG: radius["2xl"],
       titleFontSize: typography.sizes.h1.size,
-      titleLineHeight: typography.sizes.h1.lineHeight,
+      // FIX-019: AntD consumes titleLineHeight as a ratio (line-height
+      // multiplier), not pixels — 32 here rendered line-height: 768px on a
+      // 24px title (32 × 24). The global token below (line 48) already does
+      // the division; this one missed it.
+      titleLineHeight: typography.sizes.h1.lineHeight / typography.sizes.h1.size,
       headerBg: colors.background.page,
       contentBg: colors.background.page,
       footerBg: colors.background.page,

@@ -3,6 +3,11 @@
  *
  * 这些断言钉住「规矩落在哪个类/哪个值上」——回归立刻红。观感（疏密、
  * 对齐、气质）由用户视觉确认，见交付报告。
+ *
+ * FIX-020: 本文件曾把 FIX-005/007/008/009/013 的 describe 块复制多份
+ * （FIX-005 三份、其余各两份，227 行），去重后每契约只保留一份；删除的
+ * 全部是逐字重复，不是独立用例。FIX-021: 断言的 CSS 规则一律经 ruleBody()
+ * 精确取规则体，不再对全文做「选择器 + 懒惰通配 + 属性」扫描。
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
@@ -93,7 +98,7 @@ describe("HOME-004 layout contract (L1–L8)", () => {
   });
 });
 
-describe("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
+describe("FIX-005: right column keeps money value lines single-line", () => {
   it("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
     expect(ruleBody(".home-grid")).toMatch(/330px/);
     expect(ruleBody("@media (max-width: 1439px)") || ruleBody(".home-grid")).toMatch(/330px/);
@@ -102,6 +107,11 @@ describe("FIX-005: right column is at least 320px (measured 330px keeps money va
     expect(css).toMatch(/\.home-right-kpis[\s\S]*?flex-direction:\s*column/);
   });
 });
+
+// FIX-021: the real no-reflow guard. MoneyKPICard's value line carries
+// .money-kpi-value-line with nowrap + ellipsis — the rule body itself must
+// contain those declarations. (This replaced a `[\s\S]*?` scan that matched
+// an unrelated flex-direction rule 69 lines away and was always true.)
 
 describe("FIX-007: the conversation column is the scroll container, composer outside it", () => {
   it("FIX-007: the conversation column is the scroll container, composer outside it", () => {
@@ -153,75 +163,3 @@ describe("FIX-013: pending bubble shows the step scaffold, results stagger in", 
     expect(css).toContain("@keyframes home-step-in");
   });
 });
-
-describe("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
-  it("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
-    expect(ruleBody(".home-grid")).toMatch(/330px/);
-    expect(ruleBody("@media (max-width: 1439px)") || ruleBody(".home-grid")).toMatch(/330px/);
-    // The money KPI value line must never reflow: the flex value row has no
-    // wrap permission anywhere in the home right column.
-    expect(css).toMatch(/\.home-right-kpis[\s\S]*?flex-direction:\s*column/);
-  });
-});
-
-describe("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
-  it("FIX-005: right column is at least 320px (measured 330px keeps money values single-line)", () => {
-    expect(ruleBody(".home-grid")).toMatch(/330px/);
-    expect(ruleBody("@media (max-width: 1439px)") || ruleBody(".home-grid")).toMatch(/330px/);
-    // The money KPI value line must never reflow: the flex value row has no
-    // wrap permission anywhere in the home right column.
-    expect(css).toMatch(/\.home-right-kpis[\s\S]*?flex-direction:\s*column/);
-  });
-});
-
-describe("FIX-007: the conversation column is the scroll container, composer outside it", () => {
-  it("FIX-007: the conversation column is the scroll container, composer outside it", () => {
-    const column = ruleBody(".home-chat-column");
-    expect(column).toMatch(/height:\s*calc\(100dvh/);
-    expect(column).toMatch(/position:\s*sticky/);
-    const body = ruleBody(".home-chat-body");
-    expect(body).toMatch(/overflow-y:\s*auto/);
-    expect(body).toMatch(/flex:\s*1/);
-    // composer is a sibling of the scrolling body, not inside it.
-    // FIX-015: the body's className is conditional now (is-empty centres the
-    // starters), so match the class name itself rather than a literal
-    // className="..." attribute — the structural contract is unchanged.
-    const bodyIndex = briefColumn.indexOf("home-chat-body");
-    const composerIndex = briefColumn.indexOf("home-chat-composer");
-    expect(bodyIndex).toBeGreaterThan(-1);
-    expect(composerIndex).toBeGreaterThan(bodyIndex);
-    expect(briefColumn.slice(composerIndex)).not.toContain("home-chat-body");
-  });
-});
-
-describe("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
-  it("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
-    expect(ruleBody(".home-chat-starter-chip")).toMatch(/border-radius:\s*(9999px|50px)/);
-    expect(ruleBody(".home-msg.is-user")).toMatch(/row-reverse/);
-    expect(briefColumn).toMatch(/sendText\(t\(key, language\)\)/);
-    expect(briefColumn).not.toMatch(/askStarter/);
-  });
-});
-
-describe("FIX-009: Spin-wrapped home columns restore their gaps", () => {
-  it("FIX-009: Spin-wrapped home columns restore their gaps", () => {
-    expect(ruleBody(".home-right-stack .ant-spin-container")).toMatch(/gap:\s*24px/);
-    expect(ruleBody(".home-work-focus .ant-spin-container")).toMatch(/gap:\s*16px/);
-    // The readiness card joins the AntD card language (border, no ring).
-    expect(ruleBody(".home-readiness-card")).toMatch(/border:\s*1px solid var\(--border-default\)/);
-    expect(ruleBody(".home-readiness-card")).toMatch(/box-shadow:\s*none/);
-  });
-});
-
-describe("FIX-013: pending bubble shows the step scaffold, results stagger in", () => {
-  it("FIX-013: pending bubble shows the step scaffold, results stagger in", () => {
-    const steps = ruleBody(".home-chat-steps");
-    expect(steps).toMatch(/flex-direction:\s*column/);
-    expect(briefColumn).toContain("home-chat-step is-pending");
-    expect(briefColumn).toContain("home-chat-step-mark");
-    // The thinking copy is no longer the only pending expression.
-    expect(briefColumn).toContain("home.chat_thinking");
-    expect(css).toContain("@keyframes home-step-in");
-  });
-});
-

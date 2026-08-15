@@ -301,6 +301,11 @@ const dict: TranslationDict = {
     "zh-HK": "重試",
     en: "Retry",
   },
+  // STATE-003: StateBlock shared presentation labels
+  "state.empty_label": { "zh-CN": "暂无数据", "zh-HK": "暫無數據", en: "No data" },
+  "state.actionable_label": { "zh-CN": "需要操作", "zh-HK": "需要操作", en: "Action needed" },
+  "state.failed_label": { "zh-CN": "加载失败", "zh-HK": "載入失敗", en: "Failed to load" },
+  "state.scope_denied_label": { "zh-CN": "数据范围外", "zh-HK": "數據範圍外", en: "Outside your scope" },
   "common.refresh": {
     "zh-CN": "刷新",
     "zh-HK": "刷新",

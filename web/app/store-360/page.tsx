@@ -14,6 +14,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { StatusTag } from "../components/StatusTag";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { store360HelpContent } from "../components/help-content";
+import { StateBlock } from "../components/StateBlock";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -235,29 +236,21 @@ function Store360Inner() {
     {optionsError && <Alert type="error" showIcon message={t("store360.options_error", language)} description={optionsError} action={<Button size="small" onClick={() => setRetry((value) => value + 1)}>{t("common.retry", language)}</Button>} />}
     {query.classification && !optionsLoading && !optionsError && options.length === 0 && <Alert type="info" showIcon message={t("store360.no_authorized_stores", language)} description={t("store360.no_authorized_desc", language)} />}
     {loading && <Card><Flex justify="center" align="center" className="store360-loading-block"><Spin tip={t("store360.loading", language)} /></Flex></Card>}
-    {diagState.kind === "actionable" && (
-      <Alert
-        type="warning"
-        showIcon
-        message={diagState.message}
-        action={
-          <Button
-            size="small"
-            onClick={() => writeQuery(router, {
-              classification: "simulated",
-              datasetVersion: latest?.dataset_version || "",
-              asOf: latest ? latestAnomalyDate(latest) : query.asOf,
-              windowDays: query.windowDays,
-              returnQuery: query.returnQuery,
-            })}
-          >
-            {diagState.actionLabel}
-          </Button>
-        }
-      />
-    )}
-    {diagState.kind === "failed" && <Alert type="error" showIcon message={t("store360.unavailable", language)} description={diagState.message} action={<Button size="small" onClick={diagRetry}>{t("common.retry", language)}</Button>} />}
-    {diagState.kind === "scope_denied" && <Alert type="error" showIcon message={diagState.message} />}
+    {/* STATE-003: the three data states render through the shared StateBlock —
+        actionable (switch to simulated), failed (retry), scope_denied (kept
+        distinct, reason preserved). */}
+    <StateBlock
+      state={diagState}
+      language={language}
+      onAction={() => writeQuery(router, {
+        classification: "simulated",
+        datasetVersion: latest?.dataset_version || "",
+        asOf: latest ? latestAnomalyDate(latest) : query.asOf,
+        windowDays: query.windowDays,
+        returnQuery: query.returnQuery,
+      })}
+      onRetry={diagRetry}
+    />
     {!loading && diagState.kind === "empty" && query.storeID && <Card><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("store360.pick_filters", language)} /></Card>}
     {response && !response.decision_ready && response.evidence.observed_store_days === 0 && <Alert className="store360-block-margin" type="warning" showIcon message={t("store360.no_facts_title", language)} description={t("store360.no_facts_desc", language)} />}
     {response && <>

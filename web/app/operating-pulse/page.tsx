@@ -21,6 +21,8 @@ import { t, type Language } from "../lib/i18n";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { pulseHelpContent } from "../components/help-content";
+import { StateBlock } from "../components/StateBlock";
+import type { DataState } from "../lib/dataState";
 import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, signalMix, switchClassification, trendValue, type PulseMetricCode } from "./logic";
 import { tableScrollX } from "../lib/tableScroll";
@@ -180,15 +182,20 @@ function OperatingPulseInner() {
     fetcher: (p, t) => retailAnalyticsApi.operatingPulse(p, t),
   });
   const response = pulseState.kind === "ready" ? pulseState.data ?? null : null;
-  const error = classification === "simulated" && !datasetVersion
-    ? t("pulse.err_missing_dataset_version", language)
-    : !validWindow
-      ? t("pulse.err_invalid_window", language)
-      : pulseState.kind === "failed"
-        ? pulseState.message ?? null
-        : pulseState.kind === "scope_denied"
-          ? pulseState.message ?? null
-          : null;
+  // STATE-003: surface the fetch states through the shared StateBlock. The
+  // parameter-validation errors (missing dataset version / invalid window)
+  // are user-fixable, so they render as actionable; fetch failures and
+  // scope refusals keep their own kinds.
+  const pulseDisplayState: DataState<unknown> =
+    classification === "simulated" && !datasetVersion
+      ? { kind: "actionable", message: t("pulse.err_missing_dataset_version", language) }
+      : !validWindow
+        ? { kind: "actionable", message: t("pulse.err_invalid_window", language) }
+        : pulseState.kind === "failed"
+          ? { kind: "failed", message: pulseState.message }
+          : pulseState.kind === "scope_denied"
+            ? { kind: "scope_denied", message: pulseState.message }
+            : { kind: "ready" };
 
   // Keep the currency partition selection valid as the response changes.
   useEffect(() => {
@@ -250,7 +257,7 @@ function OperatingPulseInner() {
 
   const partition = response ? effectivePartition(response, selectedCurrency) : null;
   const partitions = response ? responsePartitions(response) : [];
-  const isEmptyInitial = latest === null && !response && !error;
+  const isEmptyInitial = latest === null && !response && pulseDisplayState.kind === "ready";
   const isScoped = storeIDs.length > 0;
   const displaySummary = partition?.summary || response?.summary || {};
   const latestMetadata = latest && currentClassification === "simulated" && latest.dataset_version === datasetVersion ? latest : undefined;
@@ -295,7 +302,9 @@ function OperatingPulseInner() {
       </Flex>
     </Card>
     {isEmptyInitial && <Card><Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<Space direction="vertical"><Typography.Text strong>{t("pulse.no_dataset_title", language)}</Typography.Text><Typography.Text type="secondary">{t("pulse.no_dataset_desc", language)}</Typography.Text>{hasRole(user, "admin") ? <Button type="primary" loading={generating} onClick={generate}>{t("pulse.generate_demo", language)}</Button> : <Typography.Text>{t("pulse.contact_admin", language)}</Typography.Text>}</Space>} /></Card>}
-    {error && <Alert type="error" showIcon message={t("pulse.unavailable_title", language)} description={error} action={<Button size="small" onClick={refresh}>{t("common.retry", language)}</Button>} />}
+    {/* STATE-003: parameter errors (actionable), fetch failures (failed) and
+        scope refusals (scope_denied) render through the shared StateBlock. */}
+    <StateBlock state={pulseDisplayState} language={language} onRetry={pulseRetry} />
     {loading && !response && !isEmptyInitial && <Card><Flex justify="center" align="center" className="pulse-loading-block"><Spin tip={t("pulse.loading", language)} /></Flex></Card>}
       {response && partition && <>
       <DataTrustBar envelope={response.envelope} basis={response.basis} detailExtra={<span>generator: {latestMetadata?.generator_version || "—"}</span>} />

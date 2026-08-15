@@ -2385,3 +2385,16 @@ html {
   display: inline-block;
   vertical-align: middle;
 }
+
+/* STATE-003: shared data-state presentation (StateBlock). The four states
+   reuse the alert/empty components; these rules only give the block a
+   consistent rhythm between sections. */
+.state-block,
+.state-block-scope-denied,
+.state-block-failed,
+.state-block-actionable {
+  margin: 16px 0;
+}
+.state-block-empty {
+  padding: 24px 0;
+}

@@ -1,9 +1,10 @@
 "use client";
 
-import { Alert, Button, Empty, Typography } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+import { Empty, Typography } from "antd";
 import DataTrustBar from "../components/DataTrustBar";
+import { StateBlock } from "../components/StateBlock";
 import { t, type Language } from "../lib/i18n";
+import type { DataState } from "../lib/dataState";
 import type { HomeBriefState } from "./logic";
 import type { HomeBriefResult } from "./types";
 
@@ -21,38 +22,23 @@ export interface BriefViewProps {
  * What remains here are the degraded presentations — loading is handled by
  * the band, and scope_denied is never softened into "no data" (AGENTS.md:
  * 权限拒绝必须保持原因).
+ *
+ * STATE-003: the degraded states map onto the shared DataState kinds and
+ * render through StateBlock; not_decision_ready keeps its DataTrustBar
+ * preamble (the trust evidence must stay visible).
  */
 export default function BriefView({ state, result, error, language, onRetry }: BriefViewProps) {
-  if (state === "error") {
-    return (
-      <Alert
-        type="error"
-        showIcon
-        message={t("home.brief_error_title", language)}
-        description={error || ""}
-        action={<Button size="small" icon={<ReloadOutlined />} onClick={onRetry}>{t("common.retry", language)}</Button>}
-      />
-    );
-  }
-  if (state === "scope_denied") {
-    // B4: scope_denied must stay honest — never softened into "no data".
-    return (
-      <Alert
-        type="error"
-        showIcon
-        className="home-brief-state"
-        message={t("api.scope_denied", language)}
-        description={result?.answer || undefined}
-      />
-    );
-  }
-  if (state === "no_data") {
-    return (
-      <div className="home-brief-state">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("home.brief_no_data", language)} />
-      </div>
-    );
-  }
+  const blockState: DataState<unknown> =
+    state === "error"
+      ? { kind: "failed", message: t("home.brief_error_title", language), reason: error || undefined }
+      : state === "scope_denied"
+        ? { kind: "scope_denied", message: t("api.scope_denied", language), reason: result?.answer || undefined }
+        : state === "no_data"
+          ? { kind: "empty", reason: t("home.brief_no_data", language) }
+          : state === "needs_input"
+            ? { kind: "actionable", message: t("home.brief_needs_input_title", language), reason: result?.answer || undefined }
+            : { kind: "ready" };
+
   if (state === "not_decision_ready") {
     return (
       <div className="home-brief-state">
@@ -70,18 +56,12 @@ export default function BriefView({ state, result, error, language, onRetry }: B
       </div>
     );
   }
-  if (state === "needs_input") {
-    return (
-      <div className="home-brief-state">
-        <Alert
-          type="warning"
-          showIcon
-          message={t("home.brief_needs_input_title", language)}
-          description={result?.answer || undefined}
-        />
-      </div>
-    );
-  }
-  // loading / ready are rendered by BriefBand; nothing left to do here.
-  return null;
+
+  if (blockState.kind === "ready") return null;
+
+  return (
+    <div className="home-brief-state">
+      <StateBlock state={blockState} language={language} onRetry={state === "error" ? onRetry : undefined} />
+    </div>
+  );
 }

@@ -31,7 +31,7 @@
 |---|---|---|---|
 | 语义层（纯函数） | retailkpi 差异计算（M1）、预算对比（M4） | — | 单元测试（testdata 先例） |
 | 期间解析（纯函数） | retailperiod（M2） | — | 单元测试：边界 |
-| 导出（纯函数 + handler 接线） | retailexport（M3） | CSV writer（Go）/ XLSX（前端既有库） | 单元测试 + handler 测试 |
+| 导出（纯函数 + handler 接线） | retailexport（M3） | CSV（Go）/ XLSX（Go excelize，公式）/ PPTX（web pptxgenjs，原生对象） | 单元测试 + handler 测试 |
 | 服务构建 | retailpulse 扩展（M5） | — | 单元测试 + handler 测试 |
 | plan 数据源 | M4 的 PlanReader | fpna_plan_lines / 模拟 plan（两个适配器） | 集成测试 + 单测 |
 | agent 护栏 | agentguard（M6） | 内存计数 / DB 计数（两个适配器） | 单元测试 |
@@ -85,24 +85,30 @@ func Normalize(p Period) (Period, error)      // 枚举合法性、日历边界
 
 **边界**：不做 fiscal 日历（`period_basis` 里的 fiscal_month 留待真实客户需求）；不改动既有 URL 参数形态（`window_days` 继续可用，新增 `period` 参数与其互斥）。
 
-## 5. M3 零售导出 — retailexport（新模块）
+## 5. M3 平台导出 — retailexport（新模块）
 
-**目标**：零售三页的导出行为与口径头只实现一次。导出与展示共享同一受控响应，不重读仓库（对齐既有 projection 纪律：先有受控响应，再投影导出）。
+**目标**：导出行为与口径头只实现一次，且是**平台级**能力——零售三页先行，其余功能页（performance、月结、报表等）按同一列/公式描述符接入。导出与展示共享同一受控响应，不重读仓库（对齐既有 projection 纪律：先有受控响应，再投影导出）。
 
 **接口**：
 
 ```go
-type ExportKind string   // "operating_pulse" | "store_diagnostics" | "scenario"
-type Format    string    // "csv" | "xlsx"
+type ExportKind string   // "operating_pulse" | "store_diagnostics" | "scenario" | ...
+type Format    string    // "csv" | "xlsx" | "pptx"
+type ColumnSpec struct {
+    Key, Header string
+    Formula     *FormulaSpec   // 可选：合计 SUM / 列间算术 / 比率（IF 除零保护）
+}
 
 func Export(kind ExportKind, format Format, response any, envelope sourceenvelope.Envelope) (filename string, content []byte, err error)
 ```
 
-**藏在接口后面**：口径头生成（data_classification、dataset_version、as_of、formula_version、period/窗口、group_by、法人）；Working/模拟标识（文件名 `operating-pulse-2026-08-15-working.csv` + 表头标记）；CSV 转义与 BOM；XLSX 工作簿组装（多 sheet：KPI 卡/表/桥/明细）；列名与排序的单一来源。
+**藏在接口后面**：口径头生成（data_classification、dataset_version、as_of、formula_version、period/窗口、group_by、法人）；Working/模拟标识（文件名 + 表头标记）；CSV 转义与 BOM；**公式生成**——每种导出 kind 声明自己的列/公式描述符（合计行 =SUM(range)、差异列 =A−B、达成率 =IF(ISERROR(A/B),"",A/B)），模块统一生成公式字符串，文件由 Excel/LibreOffice 打开时自动重算（不依赖计算引擎；实施时验证所选库能否同时写缓存值）；**公式注入防护**——数据文本中形如 `= + - @` 开头的单元格一律转义，只有白名单描述符能产生公式；XLSX 工作簿组装（多 sheet：KPI 卡/表/桥/明细）；PPTX 用原生对象（文本框/表格/图表）组装**可编辑**幻灯片（非图片贴图）；列名与排序的单一来源。
 
-**接缝与适配器**：handler 层同一 GET 端点带 `format=csv|xlsx` 参数，响应即数据源。适配器决策：服务端只出 CSV（Go 标准库，口径权威、审计可复演）；XLSX 由前端用既有工作簿库从同源响应生成。两个适配器（服务端 CSV / 前端 XLSX）⇒ 真实接缝。CSV 先行，XLSX 跟进。**后续扩展**：PPTX 为 P1 后续项（PRD P1-19），生成位置（服务端或前端库）与格式枚举扩展待真实汇报需求确认后决定；口径头与 Working/模拟标识必须与 CSV/XLSX 一致。
+**接缝与适配器**：handler 层同一 GET 端点带 `format=csv|xlsx|pptx` 参数，响应即数据源。适配器决策：服务端出 CSV（Go 标准库，口径权威）与 XLSX（excelize，MIT、纯 Go；公式 + 可选缓存值）；PPTX 由前端 pptxgenjs（MIT、浏览器端）从同源响应生成原生可编辑对象（Go 无成熟 pptx 库）。三个适配器 ⇒ 接缝真实。既有报表页的 SheetJS 导出保持不动（底线：不破坏既有功能）。
 
-**测试面**：行结构、口径头、转义、文件名、分类标识、非法 kind/format 的错误路径。
+**删除测试**：删除后，口径头、公式生成、注入转义、文件命名逻辑重新扩散到 N 个页面，且大概率各自为政再次漂移。
+
+**测试面**：行结构、口径头、CSV 转义、文件名、分类标识；公式字符串与缓存值一致性（用工作簿库回读断言）、除零/空值公式用例、`= + - @` 注入转义用例；PPTX 解包断言原生对象存在（非图片）；非法 kind/format 的错误路径。
 
 ## 6. M4 预算对比 — retailkpi.ComparePlan + PlanReader 适配器
 
@@ -270,19 +276,18 @@ func Commit(ctx, rows [][]string, mapping Mapping, envelope Envelope, idempotenc
 ### P1 小项（同样不改模块形状）
 
 11. 原始事实列表 API 增加 `data_classification` 过滤参数：收紧列表读取面（PRD P1-18；聚合路径保持现状安全）。测试：handler 参数回显与错误路径。
-12. 导出格式枚举扩展 PPTX（PRD P1-19，后续项）：无真实汇报需求可延后；口径头与 Working/模拟标识与 CSV/XLSX 一致。
 
 ### P5 小项（同样不改模块形状）
 
-13. 月度导入器僵尸收口：/performance 补导入 UI（客户端 API 已存在，纯接线）或明确 deprecated 标注（PRD P5-48）。测试：上传路径可用性或页面无死链。
-14. 解析格式补齐：ai-service 解析适配器引入 AnyDoc（Rust/MIT/纯本地）接管 office 家族（docx/doc、ppt、xls/xlsb、odt、rtf、epub → GFM Markdown），CSV 用标准库确定性解析；PDF/图片路径不动（PaddleOCR 保持）；docx 无坐标体系，证据降级为 quote 锚点（PRD P5-51）。测试：docx/ppt/xls 中文用例、加密/超限错误路径、quote 锚点证据。
+12. 月度导入器僵尸收口：/performance 补导入 UI（客户端 API 已存在，纯接线）或明确 deprecated 标注（PRD P5-48）。测试：上传路径可用性或页面无死链。
+13. 解析格式补齐：ai-service 解析适配器引入 AnyDoc（Rust/MIT/纯本地）接管 office 家族（docx/doc、ppt、xls/xlsb、odt、rtf、epub → GFM Markdown），CSV 用标准库确定性解析；PDF/图片路径不动（PaddleOCR 保持）；docx 无坐标体系，证据降级为 quote 锚点（PRD P5-51）。测试：docx/ppt/xls 中文用例、加密/超限错误路径、quote 锚点证据。
 
 ## 12. 测试策略
 
 - **接口即测试面**：每个模块的测试从它的接口驱动；不测穿接口内部。
 - M1：负基数方向（−100→−50 显示改善）、零分母、空值、既有输出回归（golden 对数）。
 - M2：月末/季末边界、as_of 交互、默认值全产品一致、非法输入错误路径。
-- M3：口径头、转义、文件名、分类标识；handler 集成（`format` 参数）。
+- M3：口径头、转义、文件名、分类标识；公式与缓存值一致性、除零保护、`= + - @` 注入转义；PPTX 原生对象断言；handler 集成（`format` 参数）。
 - M4：覆盖率不足、混币、材料性阈值、null（缺 plan 行 ≠ 0）；PlanReader 双适配器。
 - M5：`GroupBy=""` 零回归；分组信号、门槛、多币种处理。
 - M6：路由命中（自然问法）、引用空回退、护栏拒绝语义 + 预算记录；agenttools 只读属性回归。
@@ -294,7 +299,7 @@ func Commit(ctx, rows [][]string, mapping Mapping, envelope Envelope, idempotenc
 
 ```
 P0:  M1 + 快速修复清单                        （无新依赖，直接修可信度）
-P1:  M2（期间）+ M3（导出）+ M5（区域视图）+ 事实列表过滤与 PPT 后续小项
+P1:  M2（期间）+ M3（平台导出：公式 XLSX + 可编辑 PPTX）+ M5（区域视图）+ 事实列表过滤小项
 P2:  M4（预算对比，依赖 M2）+ fpna-version-lifecycle 落地
 P3:  M6（路由 + 引用 + 护栏 + 工程收尾）
 P4:  M7（决策卡，依赖既有 snapshot/projection 与折现率解析）

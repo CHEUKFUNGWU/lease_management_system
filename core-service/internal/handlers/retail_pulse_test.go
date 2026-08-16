@@ -147,3 +147,53 @@ func TestRetailPulseHandlerCalendarPeriod(t *testing.T) {
 		t.Fatalf("custom rolling period status=%d body=%s", rolling.Code, rolling.Body.String())
 	}
 }
+
+// M3: format=csv on the pulse read streams the attention ranking with the
+// provenance header instead of JSON.
+func TestRetailPulseHandlerCSVExport(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewRetailPulseHandler(pulseHandlerReader{set: &repository.RetailKPIFactSet{Facts: []retailkpi.DailyFact{}, ExpectedStoreCount: 0}})
+	router := gin.New()
+	router.GET("/pulse", func(c *gin.Context) { c.Set("legal_entity_id", "entity-a"); handler.OperatingPulse(c) })
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/pulse?as_of=2026-01-31&window_days=7&data_classification=production&format=csv", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("csv status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if recorder.Header().Get("Content-Type") != "text/csv; charset=utf-8" {
+		t.Fatalf("content type=%q", recorder.Header().Get("Content-Type"))
+	}
+	if disposition := recorder.Header().Get("Content-Disposition"); disposition == "" || disposition[:11] != "attachment;" {
+		t.Fatalf("disposition=%q", disposition)
+	}
+	body := recorder.Body.String()
+	if len(body) < 4 || body[:3] != "\uFEFF" {
+		t.Fatalf("BOM missing: %q", body[:min(len(body), 12)])
+	}
+	if !contains(body, "data_classification=production") || !contains(body, "近 7 天") {
+		t.Fatalf("provenance missing: %s", body[:min(len(body), 200)])
+	}
+	if !contains(body, "门店/分组") {
+		t.Fatalf("descriptor header missing: %s", body[:min(len(body), 300)])
+	}
+}
+
+func contains(haystack, needle string) bool {
+	return len(needle) == 0 || (len(haystack) >= len(needle) && indexOf(haystack, needle) >= 0)
+}
+
+func indexOf(haystack, needle string) int {
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return i
+		}
+	}
+	return -1
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

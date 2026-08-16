@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"errors"
 	"net/http"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailexport"
 	"github.com/lease-management-system/core-service/internal/services/retailstore360"
 )
 
@@ -100,6 +102,24 @@ func (h *RetailStoreDiagnosticsHandler) Diagnostics(c *gin.Context) {
 		default:
 			writeSystemFailure(c, http.StatusInternalServerError, err)
 		}
+		return
+	}
+	if strings.TrimSpace(c.Query("format")) == "csv" {
+		descriptor, descriptorErr := retailexport.Descriptor(retailexport.KindStoreDiagnostics)
+		if descriptorErr != nil {
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, descriptorErr.Error(), nil)
+			return
+		}
+		filename, content, exportErr := retailexport.ExportCSV(descriptor, retailexport.Envelope{
+			Basis: result.Basis, DataClassification: result.DataClassification, DatasetVersion: result.DatasetVersion,
+			PeriodLabel: fmt.Sprintf("%s ~ %s", result.Current.DateFrom, result.Current.DateTo), AsOf: result.Current.DateTo,
+			FormulaVersion: result.FormulaVersion, SourceSystems: nil, // per-metric evidence sources are in the row payload GeneratedAt: result.GeneratedAt,
+		}, DiagnosticsExportRows(result))
+		if exportErr != nil {
+			writeSystemFailure(c, http.StatusInternalServerError, exportErr)
+			return
+		}
+		writeExportCSV(c, filename, content)
 		return
 	}
 	c.JSON(http.StatusOK, result)

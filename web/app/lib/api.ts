@@ -1889,6 +1889,7 @@ export type RetailIngestPreviewResponse = {
   headers: string[];
   column_profiles: RetailIngestColumnProfile[];
   suggested_mapping: Record<string, string>;
+  suggested_mapping_source?: "ai" | "rule";
   mapping: Record<string, string>;
   rows_preview: string[][];
   resolution: { matched_count: number; unmatched: string[] };

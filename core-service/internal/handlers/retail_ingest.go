@@ -81,6 +81,7 @@ type RetailIngestHandler struct {
 	population retailIngestPopulationReader
 	store      retailIngestStore
 	audit      retailStoreDayFactAuditor
+	mappingAI  retailingest.MappingSuggester
 }
 
 func NewRetailIngestHandler(population retailIngestPopulationReader, store retailIngestStore, auditLogger any) *RetailIngestHandler {
@@ -94,7 +95,7 @@ func NewRetailIngestHandler(population retailIngestPopulationReader, store retai
 	default:
 		panic("unsupported retail ingest audit logger")
 	}
-	return &RetailIngestHandler{population: population, store: store, audit: auditor}
+	return &RetailIngestHandler{population: population, store: store, audit: auditor, mappingAI: NewRetailMappingAI()}
 }
 
 // Preview runs the deterministic pipeline without writing: parse, suggest
@@ -120,7 +121,10 @@ func (h *RetailIngestHandler) Preview(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
-	suggested := retailingest.SuggestMapping(headers)
+	entity, _ := tenantEntity(c)
+	service := retailingest.NewService(retailIngestDirectory{reader: h.population}, retailIngestSink{store: h.store, entity: entity, userID: userIDFromContext(c), audit: h.audit, ginCtx: c}).WithMappingSuggester(h.mappingAI)
+	profiles := retailingest.ColumnProfiles(headers, rows)
+	suggested, suggestionSource := service.SuggestMappingAssisted(c.Request.Context(), headers, profiles)
 	mapping := suggested
 	if raw := strings.TrimSpace(c.PostForm("mapping")); raw != "" {
 		confirmed := retailingest.Mapping{}
@@ -130,8 +134,6 @@ func (h *RetailIngestHandler) Preview(c *gin.Context) {
 		}
 		mapping = confirmed
 	}
-	entity, _ := tenantEntity(c)
-	service := retailingest.NewService(retailIngestDirectory{reader: h.population}, retailIngestSink{store: h.store, entity: entity, userID: userIDFromContext(c), audit: h.audit, ginCtx: c})
 	resolution, err := service.ResolveStores(c.Request.Context(), legalEntityID, mapping, headers, rows)
 	if err != nil {
 		writeSystemFailure(c, http.StatusInternalServerError, err)
@@ -153,7 +155,7 @@ func (h *RetailIngestHandler) Preview(c *gin.Context) {
 		"standard_fields":   retailingest.AllFields,
 		"headers":           headers,
 		"column_profiles":   retailingest.ColumnProfiles(headers, rows),
-		"suggested_mapping": suggested, "mapping": mapping, "rows_preview": previewRows,
+		"suggested_mapping": suggested, "suggested_mapping_source": suggestionSource, "mapping": mapping, "rows_preview": previewRows,
 		"resolution": gin.H{"matched_count": len(resolution.RawToStoreID), "unmatched": resolution.Unmatched},
 		"report":     report,
 	})
@@ -196,7 +198,7 @@ func (h *RetailIngestHandler) Commit(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
-	mapping := retailingest.SuggestMapping(headers)
+	mapping := retailingest.SuggestMapping(headers, retailingest.ColumnProfiles(headers, rows))
 	if raw := strings.TrimSpace(c.PostForm("mapping")); raw != "" {
 		confirmed := retailingest.Mapping{}
 		if err := json.Unmarshal([]byte(raw), &confirmed); err != nil {

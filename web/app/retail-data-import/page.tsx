@@ -9,6 +9,7 @@ import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StateBlock } from "../components/StateBlock";
+import { StatusTag } from "../components/StatusTag";
 import { apiErrorMessage, fpnaPlanImportApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
 import { tableScrollX } from "../lib/tableScroll";
 import { useAuth } from "../context/AuthContext";
@@ -204,13 +205,13 @@ export default function RetailDataImportPage() {
         {(report.ambiguous_mappings || []).length > 0 && <Alert className="retail-import-block-gap" type="warning" showIcon message={t("retail_import.ambiguous", language) + (report.ambiguous_mappings || []).join("; ")} />}
         {(report.unmatched_stores || []).length > 0 && <Alert className="retail-import-block-gap" type="warning" showIcon message={t("retail_import.unmatched_stores", language)} description={<Space wrap>{(report.unmatched_stores || []).map((store) => <Tag key={store}>{store}</Tag>)}</Space>} />}
 
-        <Card title={t("retail_import.mapping_title", language)} className="retail-import-block-gap" size="small">
+        <Card title={<Space>{t("retail_import.mapping_title", language)}<StatusTag kind={preview.suggested_mapping_source === "ai" ? "processing" : "neutral"}>{preview.suggested_mapping_source === "ai" ? t("retail_import.mapping_source_ai", language) : t("retail_import.mapping_source_rule", language)}</StatusTag></Space>} className="retail-import-block-gap" size="small">
           <Table
             size="small" pagination={false} rowKey="field"
             dataSource={preview.standard_fields.map((field) => ({ field, required: REQUIRED_FIELDS.includes(field) }))}
             scroll={tableScrollX(preview.standard_fields.length, 640)}
             columns={[
-              { title: t("retail_import.field", language), render: (_: unknown, row: { field: string; required: boolean }) => <Space>{row.required ? <Tag color="red">{t("retail_import.required", language)}</Tag> : null}{fieldLabel(row.field, language)}</Space> },
+              { title: t("retail_import.field", language), render: (_: unknown, row: { field: string; required: boolean }) => <Space>{row.required ? <StatusTag kind="error">{t("retail_import.required", language)}</StatusTag> : null}{fieldLabel(row.field, language)}</Space> },
               { title: t("retail_import.file_column", language), render: (_: unknown, row: { field: string }) => (
                 <select
                   className="retail-import-mapping-select"
@@ -240,7 +241,7 @@ export default function RetailDataImportPage() {
               dataSource={rowErrors} scroll={tableScrollX(rowErrors.length, 720)}
               columns={[
                 { title: t("retail_import.error_row", language), dataIndex: "row", width: 80 },
-                { title: t("retail_import.error_code", language), dataIndex: "code", width: 180, render: (code: string) => <Tag color="orange">{code}</Tag> },
+                { title: t("retail_import.error_code", language), dataIndex: "code", width: 180, render: (code: string) => <StatusTag kind="warning">{code}</StatusTag> },
                 { title: t("retail_import.error_message", language), dataIndex: "message" },
               ]}
             />
@@ -251,7 +252,7 @@ export default function RetailDataImportPage() {
     <Card size="small" className="retail-import-block-gap" title={t("plan_import.title", language)}>
       <Flex gap={12} wrap="wrap" align="center">
         <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input" value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder={t("plan_import.name", language)} />
-        <select aria-label={t("plan_import.version_type", language)} className="retail-import-mapping-select" style={{ maxWidth: 140 }} value={planType} onChange={(event) => setPlanType(event.target.value)}>
+        <select aria-label={t("plan_import.version_type", language)} className="retail-import-type-select" value={planType} onChange={(event) => setPlanType(event.target.value)}>
           <option value="budget">budget</option>
           <option value="forecast">forecast</option>
           <option value="scenario">scenario</option>

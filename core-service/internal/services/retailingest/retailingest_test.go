@@ -93,7 +93,7 @@ func TestParseTemplateRejectsEmptyTemplates(t *testing.T) {
 
 func TestSuggestMappingUsesAliasesFirstWins(t *testing.T) {
 	headers := []string{"门店编号", "门店名称", "日期", "币种", "销售额", "毛利"}
-	mapping := SuggestMapping(headers)
+	mapping := SuggestMapping(headers, nil)
 	if mapping["门店编号"] != FieldStore || mapping["日期"] != FieldBusinessDate ||
 		mapping["币种"] != FieldCurrency || mapping["销售额"] != FieldRevenue || mapping["毛利"] != FieldGrossProfit {
 		t.Fatalf("mapping=%v", mapping)
@@ -302,5 +302,41 @@ func TestParseTemplateXLSXRoundTrip(t *testing.T) {
 	}
 	if len(headers) != 2 || headers[0] != "门店编号" || len(rows) != 1 || rows[0][0] != "S001" {
 		t.Fatalf("headers=%v rows=%v", headers, rows)
+	}
+}
+
+type fakeMappingAI struct{ suggestions Mapping; err error }
+
+func (f fakeMappingAI) SuggestMapping(ctx context.Context, headers []string, columnProfiles []ColumnProfile) (Mapping, error) {
+	return f.suggestions, f.err
+}
+
+// M8 second adapter: the AI assist proposal fills what the deterministic
+// table missed, aliases stay deterministic, failures fall back to rules.
+func TestSuggestMappingAssistedOverlayAndFallback(t *testing.T) {
+	headers := []string{"门店编号", "神秘列A", "日期"}
+	profiles := []ColumnProfile{
+		{Header: "门店编号", NonEmpty: 3},
+		{Header: "神秘列A", NonEmpty: 3, Numeric: 3},
+		{Header: "日期", NonEmpty: 3, DateLike: 3},
+	}
+	service, _ := sampleService(nil)
+	// No AI attached → rule source; the date-like header gets business_date.
+	mapping, source := service.SuggestMappingAssisted(context.Background(), headers, profiles)
+	if source != "rule" || mapping["门店编号"] != FieldStore || mapping["日期"] != FieldBusinessDate {
+		t.Fatalf("rule mapping=%v source=%q", mapping, source)
+	}
+	// AI attached and working → ai source; alias hits stay deterministic,
+	// the AI fills the unknown column.
+	service.WithMappingSuggester(fakeMappingAI{suggestions: Mapping{"神秘列A": FieldRevenue}})
+	mapping, source = service.SuggestMappingAssisted(context.Background(), headers, profiles)
+	if source != "ai" || mapping["门店编号"] != FieldStore || mapping["神秘列A"] != FieldRevenue {
+		t.Fatalf("ai mapping=%v source=%q", mapping, source)
+	}
+	// AI failing → graceful rule fallback.
+	service.WithMappingSuggester(fakeMappingAI{err: errors.New("ai down")})
+	mapping, source = service.SuggestMappingAssisted(context.Background(), headers, profiles)
+	if source != "rule" || mapping["门店编号"] != FieldStore {
+		t.Fatalf("fallback mapping=%v source=%q", mapping, source)
 	}
 }

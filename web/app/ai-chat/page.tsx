@@ -2411,6 +2411,9 @@ function AIChatPageContent() {
                     <span className="sty-879ad78b">
                       {t("ai.thinking", language)}
                     </span>
+                    <Typography.Text type="secondary" className="ai-thinking-progress">
+                      {t("ai.thinking_progress", language)}
+                    </Typography.Text>
                   </div>
                 </motion.div>
               )}

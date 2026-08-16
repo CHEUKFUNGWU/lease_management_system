@@ -1399,7 +1399,9 @@ func buildAuditPackRunbook() *AgentRunbook {
 func (h *Agent) appendAgentPortfolioContext(ctx context.Context, toolRuntime *agenttools.Runtime, legalEntityID string, contextData *strings.Builder, sources *[]Source) {
 	result, ok := h.executeReadTool(ctx, toolRuntime, "lease.contract.search", agenttooldefs.ContractSearchArguments{})
 	if !ok {
-		contextData.WriteString("\n## Agent 组合数据\n当前权限范围内未检索到合同组合数据。\n")
+		// The refusal keeps its nature: a denied read is never softened into
+		// "no data" (AGENTS.md red line).
+		contextData.WriteString("\n## Agent 组合数据\n组合数据读取失败或当前身份无权访问，无法提供组合数据。\n")
 		return
 	}
 	data, dataOK := result.Data.(agenttooldefs.ContractSearchData)

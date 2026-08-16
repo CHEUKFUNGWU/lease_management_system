@@ -51,7 +51,10 @@ export default function PerformancePage() {
         ? await operatingFactsApi.importStoresXLSX(file, token, source)
         : await operatingFactsApi.importStoresCSV(file, token, source);
       const payload = result as { saved_count?: number; failed_count?: number; idempotent_replay?: boolean };
-      message.success(`月度导入完成：成功 ${payload.saved_count ?? 0} 行，失败 ${payload.failed_count ?? 0} 行${payload.idempotent_replay ? "（幂等重放）" : ""}`);
+      const text = t("perf.import_done", language)
+        .replace("{saved}", String(payload.saved_count ?? 0))
+        .replace("{failed}", String(payload.failed_count ?? 0));
+      message.success(payload.idempotent_replay ? `${text}（${t("perf.import_replay", language)}）` : text);
       applyPeriod();
     } catch (err) {
       message.error(apiErrorMessage(err));
@@ -173,7 +176,7 @@ export default function PerformancePage() {
       meta={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
       help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
     />
-    <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={periodDraft} onChange={event => setPeriodDraft(event.target.value)} onPressEnter={applyPeriod} status={periodDraftValid ? undefined : "error"} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={applyPeriod} disabled={!periodDraftValid} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button><Input aria-label="导入来源系统" value={importSource} onChange={(event) => setImportSource(event.target.value)} placeholder="来源系统" style={{ width: 120 }} className="perf-import-source" /><Upload accept=".csv,.xlsx" maxCount={1} showUploadList={false} beforeUpload={(file) => { void handleMonthlyImport(file); return false; }}><Button icon={<UploadOutlined />} loading={importing}>导入月度事实（CSV/XLSX）</Button></Upload></Space></Card>
+    <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={periodDraft} onChange={event => setPeriodDraft(event.target.value)} onPressEnter={applyPeriod} status={periodDraftValid ? undefined : "error"} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={applyPeriod} disabled={!periodDraftValid} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button><Input aria-label={t("perf.import_source", language)} value={importSource} onChange={(event) => setImportSource(event.target.value)} placeholder={t("perf.import_source", language)} className="perf-import-source" /><Upload accept=".csv,.xlsx" maxCount={1} showUploadList={false} beforeUpload={(file) => { void handleMonthlyImport(file); return false; }}><Button icon={<UploadOutlined />} loading={importing}>{t("perf.import_monthly", language)}</Button></Upload></Space></Card>
     {overview && <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="门店事实" value={overview.store_fact_count} suffix={<Typography.Text type="secondary">/ {overview.store_fact_ready_count} 已对账</Typography.Text>} /></Card></Col>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="设备事实" value={overview.equipment_fact_count} /></Card></Col>

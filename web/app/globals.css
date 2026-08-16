@@ -1700,10 +1700,14 @@ html {
   display: block;
   font-size: 12px;
 }
+.ai-thinking-progress {
+  font-size: 12px;
+  max-width: 320px;
+}
 .plan-variance-exceeded {
   display: block;
   font-size: 12px;
-  color: var(--color-error, #cf1322);
+  color: var(--state-error-text);
 }
 .plan-block-gap {
   margin-top: 16px;
@@ -1722,6 +1726,9 @@ html {
 .retail-import-mapping-select {
   width: 100%;
   max-width: 320px;
+}
+.retail-import-type-select {
+  max-width: 140px;
 }
 .pulse-block-margin,
 .contract-block-gap-bottom,

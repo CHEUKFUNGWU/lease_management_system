@@ -230,13 +230,46 @@ type ImportReport struct {
 
 // Service owns the import pipeline behind the directory and sink adapters.
 type Service struct {
-	directory StoreDirectory
-	sink      FactSink
+	directory   StoreDirectory
+	sink        FactSink
+	aiSuggester MappingSuggester
 }
 
 // NewService builds the importer; both adapters are required.
 func NewService(directory StoreDirectory, sink FactSink) *Service {
 	return &Service{directory: directory, sink: sink}
+}
+
+// WithMappingSuggester attaches the AI assist adapter (Assist Mode); the
+// deterministic table remains the fallback whenever it is absent or fails.
+func (s *Service) WithMappingSuggester(suggester MappingSuggester) *Service {
+	s.aiSuggester = suggester
+	return s
+}
+
+// SuggestMappingAssisted returns the AI proposal when the adapter is
+// attached and succeeds; otherwise the deterministic suggestion. The source
+// ("ai" | "rule") is surfaced to the UI so the human knows what they are
+// confirming.
+func (s *Service) SuggestMappingAssisted(ctx context.Context, headers []string, columnProfiles []ColumnProfile) (Mapping, string) {
+	if s.aiSuggester != nil {
+		if aiMapping, err := s.aiSuggester.SuggestMapping(ctx, headers, columnProfiles); err == nil && len(aiMapping) > 0 {
+			// The AI proposal only fills what the deterministic table
+			// missed; alias hits stay deterministic.
+			ruleMapping := SuggestMapping(headers, columnProfiles)
+			merged := Mapping{}
+			for header, field := range aiMapping {
+				merged[header] = field
+			}
+			for header, field := range ruleMapping {
+				if _, exists := merged[header]; !exists {
+					merged[header] = field
+				}
+			}
+			return merged, "ai"
+		}
+	}
+	return SuggestMapping(headers, columnProfiles), "rule"
 }
 
 var dateLayouts = []string{"2006-01-02", "2006/01/02", "2006/1/2", "2006-1-2"}
@@ -347,11 +380,17 @@ func ColumnProfiles(headers []string, rows [][]string) []ColumnProfile {
 }
 
 // SuggestMapping proposes file columns for the standard fields using the
-// deterministic alias table below. The proposal is Assist Mode material: the
-// UI confirms or corrects it before validate/commit, and an LLM assist
-// adapter may refine it later — suggestions alone never touch data.
-func SuggestMapping(headers []string) Mapping {
+// deterministic alias table plus the column profiles (date-like columns and
+// numeric columns bias their target fields when the alias table misses). The
+// proposal is Assist Mode material: the UI confirms or corrects it before
+// validate/commit, and the AI assist adapter may refine it — suggestions
+// alone never touch data, and raw values never leave Go.
+func SuggestMapping(headers []string, columnProfiles []ColumnProfile) Mapping {
 	mapping := Mapping{}
+	profileByHeader := map[string]ColumnProfile{}
+	for _, profile := range columnProfiles {
+		profileByHeader[profile.Header] = profile
+	}
 	for _, header := range headers {
 		normalized := normalizeKey(header)
 		if _, exists := mapping[normalized]; exists {
@@ -359,9 +398,23 @@ func SuggestMapping(headers []string) Mapping {
 		}
 		if field, ok := headerAliases[normalized]; ok {
 			mapping[header] = field
+			continue
+		}
+		// Profile-driven fallback: an unrecognized header that is strongly
+		// date-like or numeric still gets a sensible suggestion.
+		profile := profileByHeader[header]
+		if profile.NonEmpty > 0 && profile.DateLike > 0 && profile.DateLike >= profile.Numeric {
+			mapping[header] = FieldBusinessDate
 		}
 	}
 	return mapping
+}
+
+// MappingSuggester is the AI assist adapter (second adapter next to the
+// deterministic table): it only produces Mapping proposals — the human
+// confirms, and deterministic parsing takes over afterwards.
+type MappingSuggester interface {
+	SuggestMapping(ctx context.Context, headers []string, columnProfiles []ColumnProfile) (Mapping, error)
 }
 
 // ResolveStores matches the mapped store column against the entity's store

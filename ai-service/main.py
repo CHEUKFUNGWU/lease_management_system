@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.services.llm import llm_client
-from app.routers import agent_plan, files, parse, chat
+from app.routers import agent_plan, files, parse, chat, mapping
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.include_router(files.router, prefix="/api/v1", tags=["files"])
 app.include_router(parse.router, prefix="/api/v1", tags=["parse"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(agent_plan.router, prefix="/api/v1", tags=["agent-planner"])
+app.include_router(mapping.router, prefix="/api/v1", tags=["mapping"])
 
 
 @app.get("/health")

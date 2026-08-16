@@ -1,8 +1,10 @@
 "use client";
 
-import { Alert, Card, Flex, Progress, Space, Tag, Typography } from "antd";
+import { Alert, Card, Flex, Progress, Space, Typography } from "antd";
 import type { RetailPlanComparison, RetailPlanVariance } from "../lib/api";
 import { t, type Language } from "../lib/i18n";
+import { StatusTag } from "./StatusTag";
+import { formatKPIValue } from "../operating-pulse/logic";
 
 const STRIP_KPIS = ["revenue", "gross_profit", "store_contribution"];
 
@@ -24,7 +26,7 @@ export function PlanComparisonPanel({ plan, currency, language }: { plan: Retail
     <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
       <span>{t("plan.title", language)} · {plan.period}</span>
       <Space size={4} wrap>
-        <Tag color={plan.plan_is_official ? "blue" : "default"}>{plan.plan_version_type || "budget"}{plan.plan_is_official ? " · official" : " · working"}</Tag>
+        <StatusTag kind={plan.plan_is_official ? "processing" : "neutral"}>{plan.plan_version_type || "budget"}{plan.plan_is_official ? " · official" : " · working"}</StatusTag>
         <Typography.Text type="secondary">{plan.plan_version_name}</Typography.Text>
       </Space>
     </Flex>
@@ -38,8 +40,8 @@ export function PlanComparisonPanel({ plan, currency, language }: { plan: Retail
         return <div key={variance.kpi} className="plan-kpi">
           <Typography.Text type="secondary">{label}</Typography.Text>
           <div className="plan-kpi-values">
-            <span>{variance.plan != null ? `${variance.plan.toLocaleString("zh-CN", { maximumFractionDigits: 2 })} ${currency || ""}` : "—"}</span>
-            <Typography.Text type="secondary">{t("plan.actual", language)} {variance.actual != null ? variance.actual.toLocaleString("zh-CN", { maximumFractionDigits: 2 }) : "—"}</Typography.Text>
+            <span>{formatKPIValue({ value: variance.plan ?? null } as never, currency, language)}</span>
+            <Typography.Text type="secondary">{t("plan.actual", language)} {formatKPIValue({ value: variance.actual ?? null } as never, currency, language)}</Typography.Text>
           </div>
           <Progress percent={attainment == null ? undefined : Math.min(Math.round(attainment), 999)} size="small" status={attainment == null ? "exception" : exceeded ? "exception" : "normal"} format={() => attainment == null ? "—" : `${Math.round(attainment)}%`} />
           <Typography.Text className={exceeded ? "plan-variance-exceeded" : "plan-variance"}>{varianceText(variance, language)}</Typography.Text>

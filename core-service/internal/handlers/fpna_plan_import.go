@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/csv"
-	"errors"
 	"io"
 	"net/http"
 	"regexp"
@@ -11,10 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/access"
-	"github.com/lease-management-system/core-service/internal/controlledxlsx"
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/controlledintake"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
@@ -40,12 +38,6 @@ func NewFPnAPlanImportHandler(population retailIngestPopulationReader, plans pla
 }
 
 var planPeriodPattern = regexp.MustCompile(`^\d{4}-(0[1-9]|1[0-2])$`)
-
-type planImportRowError struct {
-	Row     int    `json:"row"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
 
 func (h *FPnAPlanImportHandler) Import(c *gin.Context) {
 	fileHeader, err := c.FormFile("file")
@@ -95,15 +87,14 @@ func (h *FPnAPlanImportHandler) Import(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "file cannot be read", nil)
 		return
 	}
-	grid, err := planImportGrid(data, fileHeader.Filename)
+	headers, rows, err := controlledintake.Parse(controlledintake.Source{Filename: fileHeader.Filename, Data: data})
 	if err != nil {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
-	headers, rows := planImportTemplate(grid)
-	if len(rows) == 0 {
-		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "template contains no data rows", nil)
-		return
+	headerMap := map[string]int{}
+	for index, value := range headers {
+		headerMap[strings.ToLower(strings.TrimSpace(value))] = index
 	}
 
 	// Business-level idempotency: (entity, name, as_of_period) is unique;
@@ -115,7 +106,7 @@ func (h *FPnAPlanImportHandler) Import(c *gin.Context) {
 	}
 	for _, version := range existing {
 		if version.Name == name && version.AsOfPeriod == asOfPeriod {
-			c.JSON(http.StatusOK, gin.H{"basis": "Working", "version": version, "accepted_rows": 0, "rejected_rows": 0, "idempotent_replay": true, "errors": []planImportRowError{}})
+			c.JSON(http.StatusOK, gin.H{"basis": "Working", "version": version, "accepted_rows": 0, "rejected_rows": 0, "idempotent_replay": true, "errors": []controlledintake.RowError{}})
 			return
 		}
 	}
@@ -143,10 +134,10 @@ func (h *FPnAPlanImportHandler) Import(c *gin.Context) {
 		return
 	}
 
-	rowErrors := make([]planImportRowError, 0)
+	rowErrors := make([]controlledintake.RowError, 0)
 	accepted := 0
 	for index, row := range rows {
-		line, rowErr := planImportLine(row, index, headers, storeByCode, version, currency)
+		line, rowErr := planImportLine(row, index, headerMap, storeByCode, version, currency)
 		if rowErr != nil {
 			rowErrors = append(rowErrors, *rowErr)
 			continue
@@ -170,40 +161,18 @@ func jsonRawScope(legalEntityID, fromPeriod, toPeriod string) []byte {
 	return []byte(`{"legal_entity_id":"` + legalEntityID + `","from_period":"` + fromPeriod + `","to_period":"` + toPeriod + `"}`)
 }
 
-func planImportGrid(data []byte, filename string) ([][]string, error) {
-	if strings.HasSuffix(strings.ToLower(filename), ".xlsx") {
-		return controlledxlsx.Read(data)
-	}
-	reader := csv.NewReader(strings.NewReader(string(data)))
-	reader.TrimLeadingSpace = true
-	reader.FieldsPerRecord = -1
-	rows, err := reader.ReadAll()
-	if err != nil {
-		return nil, errors.New("invalid CSV")
-	}
-	return rows, nil
-}
-
-// planImportTemplate normalizes the controlled template: the header row is
-// matched case-insensitively against the fixed column contract.
-func planImportTemplate(grid [][]string) (map[string]int, [][]string) {
-	if len(grid) < 2 {
-		return nil, nil
-	}
-	header := map[string]int{}
-	for index, value := range grid[0] {
-		header[strings.ToLower(strings.TrimSpace(value))] = index
-	}
-	required := []string{"store_code", "period", "currency"}
-	for _, key := range required {
-		if _, ok := header[key]; !ok {
-			return nil, nil
+// planHeaderIndex normalizes the controlled template header case for the
+// fixed column contract.
+func planHeaderIndex(headers []string, key string) (int, bool) {
+	for index, value := range headers {
+		if strings.EqualFold(strings.TrimSpace(value), key) {
+			return index, true
 		}
 	}
-	return header, grid[1:]
+	return -1, false
 }
 
-func planImportLine(row []string, index int, headers map[string]int, storeByCode map[string]retailkpi.StorePopulation, version *repository.FPnAPlanVersion, defaultCurrency string) (*repository.FPnAPlanLine, *planImportRowError) {
+func planImportLine(row []string, index int, headers map[string]int, storeByCode map[string]retailkpi.StorePopulation, version *repository.FPnAPlanVersion, defaultCurrency string) (*repository.FPnAPlanLine, *controlledintake.RowError) {
 	get := func(key string) string {
 		position, ok := headers[key]
 		if !ok || position >= len(row) {
@@ -214,23 +183,23 @@ func planImportLine(row []string, index int, headers map[string]int, storeByCode
 	storeCode := get("store_code")
 	store, ok := storeByCode[strings.ToLower(storeCode)]
 	if !ok {
-		return nil, &planImportRowError{Row: index + 2, Code: "unmatched_store", Message: "store_code " + storeCode + " is not in this entity's store master"}
+		return nil, &controlledintake.RowError{Row: index + 2, Code: "unmatched_store", Message: "store_code " + storeCode + " is not in this entity's store master"}
 	}
 	period := get("period")
 	if !planPeriodPattern.MatchString(period) {
-		return nil, &planImportRowError{Row: index + 2, Code: "bad_period", Message: "period must be YYYY-MM"}
+		return nil, &controlledintake.RowError{Row: index + 2, Code: "bad_period", Message: "period must be YYYY-MM"}
 	}
 	if period < version.FromPeriod || period > version.ToPeriod {
-		return nil, &planImportRowError{Row: index + 2, Code: "period_out_of_range", Message: "period " + period + " is outside the version range"}
+		return nil, &controlledintake.RowError{Row: index + 2, Code: "period_out_of_range", Message: "period " + period + " is outside the version range"}
 	}
 	currency := strings.ToUpper(get("currency"))
 	if currency == "" {
 		currency = strings.ToUpper(defaultCurrency)
 	}
 	if currency == "" {
-		return nil, &planImportRowError{Row: index + 2, Code: "missing_currency", Message: "currency is required (row or version default)"}
+		return nil, &controlledintake.RowError{Row: index + 2, Code: "missing_currency", Message: "currency is required (row or version default)"}
 	}
-	numeric := func(key string) (*float64, *planImportRowError) {
+	numeric := func(key string) (*float64, *controlledintake.RowError) {
 		raw := get(key)
 		if raw == "" {
 			return nil, nil
@@ -240,7 +209,7 @@ func planImportLine(row []string, index int, headers map[string]int, storeByCode
 		}
 		value := parseCSVFloat(raw)
 		if value == nil || *value < 0 {
-			return nil, &planImportRowError{Row: index + 2, Code: "bad_number", Message: key + " must be a non-negative number"}
+			return nil, &controlledintake.RowError{Row: index + 2, Code: "bad_number", Message: key + " must be a non-negative number"}
 		}
 		return value, nil
 	}

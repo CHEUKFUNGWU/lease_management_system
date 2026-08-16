@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/csv"
+	"io"
 	"encoding/hex"
 	"errors"
 	"net/http"
@@ -16,6 +16,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/controlledintake"
 )
 
 // TrialBalanceHandler imports and lists versioned, content-identified GL
@@ -73,20 +74,18 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 		return
 	}
 	defer opened.Close()
-	reader := csv.NewReader(opened)
-	reader.TrimLeadingSpace = true
-	reader.FieldsPerRecord = -1
-	rows, err := reader.ReadAll()
+	data, err := io.ReadAll(opened)
 	if err != nil {
-		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "invalid CSV", nil)
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "file cannot be read", nil)
 		return
 	}
-	if len(rows) < 2 {
-		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "CSV must have a header and at least one line", nil)
+	headers, parsedRows, err := controlledintake.Parse(controlledintake.Source{Filename: fileHeader.Filename, Data: data})
+	if err != nil {
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	header := map[string]int{}
-	for index, value := range rows[0] {
+	for index, value := range headers {
 		header[strings.ToLower(strings.TrimSpace(value))] = index
 	}
 	for _, required := range []string{"account_code", "debit", "credit"} {
@@ -95,14 +94,15 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 			return
 		}
 	}
+	rows := parsedRows
 	// Content identity: canonical normalized rows hashed — the same extract
 	// in any encoding yields the same hash and replays the same version.
 	canonical := make([]string, 0, len(rows)-1)
 	var totalDebit, totalCredit float64
-	lineErrors := make([]gin.H, 0)
+	lineErrors := controlledintake.NewReporter()
 	parsed := make([]repository.TrialBalanceLine, 0)
 	seenAccounts := map[string]bool{}
-	for index, row := range rows[1:] {
+	for index, row := range rows {
 		get := func(key string) string {
 			position, ok := header[key]
 			if !ok || position >= len(row) {
@@ -112,21 +112,21 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 		}
 		code := get("account_code")
 		if code == "" {
-			lineErrors = append(lineErrors, gin.H{"row": index + 2, "code": "missing_account_code", "message": "account_code is required"})
+			lineErrors.Add(index+2, "missing_account_code", "account_code is required")
 			continue
 		}
 		// P1-2: a repeated account code within one file is a data error, not
 		// a silent drop — otherwise the stored lines would no longer add up
 		// to the reported totals.
 		if seenAccounts[code] {
-			lineErrors = append(lineErrors, gin.H{"row": index + 2, "code": "duplicate_account_code", "message": "account_code " + code + " appears more than once"})
+			lineErrors.Add(index+2, "duplicate_account_code", "account_code "+code+" appears more than once")
 			continue
 		}
 		seenAccounts[code] = true
 		debit, debitErr := strconv.ParseFloat(strings.ReplaceAll(get("debit"), ",", ""), 64)
 		credit, creditErr := strconv.ParseFloat(strings.ReplaceAll(get("credit"), ",", ""), 64)
 		if debitErr != nil || creditErr != nil || debit < 0 || credit < 0 {
-			lineErrors = append(lineErrors, gin.H{"row": index + 2, "code": "bad_amount", "message": "debit/credit must be non-negative numbers"})
+			lineErrors.Add(index+2, "bad_amount", "debit/credit must be non-negative numbers")
 			continue
 		}
 		canonical = append(canonical, code+"|"+strconv.FormatFloat(debit, 'f', 2, 64)+"|"+strconv.FormatFloat(credit, 'f', 2, 64))
@@ -135,7 +135,7 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 		parsed = append(parsed, repository.TrialBalanceLine{AccountCode: code, AccountName: get("account_name"), Debit: debit, Credit: credit})
 	}
 	if len(parsed) == 0 {
-		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeInvalidArguments, "every row failed validation", gin.H{"errors": lineErrors})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeInvalidArguments, "every row failed validation", gin.H{"errors": lineErrors.Errors()})
 		return
 	}
 	content := strings.Join(canonical, "\n")
@@ -153,7 +153,7 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 			writeSystemFailure(c, http.StatusInternalServerError, resolveErr)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"basis": "Working", "version": existing, "accepted_rows": 0, "rejected_rows": 0, "idempotent_replay": true, "errors": []gin.H{}})
+		c.JSON(http.StatusOK, gin.H{"basis": "Working", "version": existing, "accepted_rows": 0, "rejected_rows": 0, "idempotent_replay": true, "errors": []controlledintake.RowError{}})
 		return
 	}
 	if err != nil {
@@ -171,7 +171,7 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"basis": "Working", "version": created, "accepted_rows": len(parsed),
-		"rejected_rows": len(lineErrors), "idempotent_replay": false, "errors": lineErrors,
+		"rejected_rows": lineErrors.Count(), "idempotent_replay": false, "errors": lineErrors.Errors(),
 		"balanced": totalDebit == totalCredit,
 	})
 }

@@ -29,6 +29,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/lease-management-system/core-service/internal/services/controlledintake"
 	"github.com/lease-management-system/core-service/internal/controlledxlsx"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
@@ -166,13 +167,11 @@ func (r StoreResolution) Resolved(raw string) (string, bool) {
 	return id, ok
 }
 
-// RowError is one row-level validation failure.
-type RowError struct {
-	Row     int    `json:"row"`
-	Column  string `json:"column,omitempty"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
+// RowError is the single row-level contract shared by every importer
+// (controlledintake); the Column field is the store-day importer's extra
+// context. Kept as an alias so callers and tests crossing this seam keep
+// one shape.
+type RowError = controlledintake.RowError
 
 // CoverageEstimate previews the overlap of a file with existing facts.
 type CoverageEstimate struct {

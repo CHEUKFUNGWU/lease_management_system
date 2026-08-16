@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/controlledintake"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
@@ -98,7 +99,7 @@ func TestFPnAPlanImportPartialSuccessAndReplay(t *testing.T) {
 		Accepted  int    `json:"accepted_rows"`
 		Rejected  int    `json:"rejected_rows"`
 		Replay    bool   `json:"idempotent_replay"`
-		Errors    []planImportRowError `json:"errors"`
+		Errors    []controlledintake.RowError `json:"errors"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)

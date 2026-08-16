@@ -578,7 +578,68 @@ func retailScenarioEvidence(response *retailscenario.Response) string {
 	}
 	return "complete"
 }
+// P3-35: retail confidence is derived from real signals — coverage rate,
+// sample size and rule-hit strength — instead of a hard-coded status table.
+// The output stays a 0..1 float (backward compatible) with the derivation
+// documented; low samples and partial coverage push the number down, never
+// up.
+
+func retailCoveragePenalty(coverage retailkpi.Coverage) float64 {
+	if coverage.CoverageRate == nil {
+		return 0.15
+	}
+	switch {
+	case *coverage.CoverageRate >= 100:
+		return 0
+	case *coverage.CoverageRate >= 90:
+		return 0.05
+	case *coverage.CoverageRate >= 70:
+		return 0.15
+	default:
+		return 0.25
+	}
+}
+
+func retailSamplePenalty(observedStoreDays int) float64 {
+	if observedStoreDays == 0 {
+		return 0.15
+	}
+	if observedStoreDays < 28 {
+		return 0.05
+	}
+	return 0
+}
+
+func retailRuleStrengthBoost(attention []retailpulse.Attention) float64 {
+	maxScore := 0.0
+	for _, item := range attention {
+		if item.Score > maxScore {
+			maxScore = item.Score
+		}
+	}
+	switch {
+	case len(attention) == 0:
+		return -0.05 // a clean read without rule hits is weaker evidence of "interesting", not of accuracy
+	case maxScore >= 3:
+		return 0.05
+	default:
+		return 0
+	}
+}
+
+func clampRetailConfidence(value float64) float64 {
+	if value < 0.35 {
+		return 0.35
+	}
+	if value > 0.95 {
+		return 0.95
+	}
+	return math.Round(value*100) / 100
+}
+
 func confidenceForRetail(status string) float64 {
+	// The status-only path (context summaries without coverage data) keeps
+	// its anchor points as the base of the derived scale.
 	switch status {
 	case "complete":
 		return 0.90
@@ -593,34 +654,41 @@ func retailPulseConfidence(response *retailpulse.Response) float64 {
 	if response == nil || !response.DecisionReady {
 		return 0.40
 	}
+	base := 0.90
 	for _, metric := range response.Summary {
 		if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
-			return 0.70
+			base = 0.70
 		}
 	}
-	return 0.90
+	base -= retailCoveragePenalty(response.CurrentCoverage)
+	base -= retailSamplePenalty(response.CurrentCoverage.ObservedStoreDays)
+	base += retailRuleStrengthBoost(response.Attention)
+	return clampRetailConfidence(base)
 }
 
 func retailDiagnosticsConfidence(response *retailstore360.Response) float64 {
 	if response == nil || !response.DecisionReady {
 		return 0.40
 	}
+	base := 0.90
 	for _, metric := range response.Summary {
 		if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
-			return 0.40
+			base = 0.70
 		}
 	}
 	for _, peer := range response.PeerBenchmark {
 		if peer.Status != "complete" {
-			return 0.70
+			base -= 0.05
 		}
 	}
 	for _, bridge := range response.Bridges {
 		if bridge.Status != "complete" {
-			return 0.70
+			base -= 0.05
 		}
 	}
-	return 0.90
+	base -= retailCoveragePenalty(response.TargetCoverage)
+	base -= retailSamplePenalty(response.TargetCoverage.ObservedStoreDays)
+	return clampRetailConfidence(base)
 }
 
 func retailNeedsInput(intent string, filters retailAgentFilters, reason string) Response {

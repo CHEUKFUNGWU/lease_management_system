@@ -80,7 +80,9 @@ describe("V2/V3: retail pages summon AI in-page and keep the /ai-chat entry", ()
   it("the three pages no longer router.push to /ai-chat for the AI button", () => {
     for (const page of pages) {
       const source = readFileSync(path.join(process.cwd(), page), "utf8");
-      expect(source, `${page} still jumps to /ai-chat`).not.toMatch(/router\.push\(retailAIHref/);
+      // P3-33: the deep-link constructor is deleted; pages embed the
+      // drawer instead of navigating to /ai-chat.
+      expect(source, `${page} still jumps to /ai-chat`).not.toMatch(/router\.(push|replace)\(["'`]\/ai-chat/);
     }
   });
 

@@ -136,3 +136,26 @@ func TestExplicitSkillSelectionCannotBypassRoleRestriction(t *testing.T) {
 		t.Fatal("explicit skill selection must still enforce allowed roles")
 	}
 }
+
+// M6.1: natural phrasing routes to the retail skill without keyword
+// memorization, while a bare "为什么" does NOT hijack lease questions.
+func TestRetailSkillNaturalPhrasingRouting(t *testing.T) {
+	registry := ProductionRegistry()
+	for _, message := range []string{
+		"A 门店毛利为什么下滑",
+		"Store006 毛利下滑的原因",
+		"帮我看看这个月哪些门店同群掉队",
+		"北区闭店影响有多大",
+		"给我做一下续租测算",
+	} {
+		definition, ok := registry.Select(Intent{Message: message, Role: "editor"})
+		if !ok || definition.ID != "retail_operations" {
+			t.Fatalf("%q routed to %+v ok=%v", message, definition, ok)
+		}
+	}
+	// A bare causal question without retail markers must not be captured by
+	// the retail skill.
+	if definition, ok := registry.Select(Intent{Message: "为什么租赁负债上升了", Role: "editor"}); ok && definition.ID == "retail_operations" {
+		t.Fatalf("lease why-question captured by retail skill: %+v", definition)
+	}
+}

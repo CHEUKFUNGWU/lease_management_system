@@ -26,6 +26,7 @@ const (
 	CodeCancelled        Code = "cancelled"
 	CodeNotFound         Code = "not_found"
 	CodeConflict         Code = "conflict"
+	CodeRateLimited      Code = "rate_limited"
 	CodeDataUnavailable  Code = "data_unavailable"
 )
 

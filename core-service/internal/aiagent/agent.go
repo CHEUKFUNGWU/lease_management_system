@@ -883,7 +883,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	}
 
 	if agentRunbook != nil && agentRunbook.NeedsPortfolioContext {
-		h.appendAgentPortfolioContext(ctx, legalEntityID, &contextData, &sources)
+		h.appendAgentPortfolioContext(ctx, toolRuntime, legalEntityID, &contextData, &sources)
 	}
 
 	// 2. Page-context-aware data retrieval
@@ -899,7 +899,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 	// 2c. Monthly closing page context
 	if req.PageContext != nil && req.PageContext.Page == "monthly-closing" {
-		h.appendMonthlyClosingContext(ctx, req.PageContext, &contextData, &sources)
+		h.appendMonthlyClosingContext(ctx, toolRuntime, req.PageContext, &contextData, &sources)
 	}
 
 	// 3. Keyword-based retrieval (backward compatible, works alongside page context)
@@ -910,19 +910,22 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 	// Contract list queries (only if no specific contract ID is resolved)
 	if effectiveContractID == "" && containsAny(msgLower, []string{"合同", "租赁", "门店", "承租", "出租", "lease", "contract"}) {
-		contracts, err := h.contractRepo.GetAll(ctx, legalEntityID)
-		if err == nil && len(contracts) > 0 {
-			contextData.WriteString(fmt.Sprintf("\n## 合同数据（共 %d 份）\n", len(contracts)))
-			for _, contract := range contracts {
-				contextData.WriteString(fmt.Sprintf("- ID: %s, 编号: %s, 名称: %s, 状态: %s, 承租方: %s, 出租方: %s\n",
-					contract.ID, contract.ContractNumber, contract.ContractName,
-					contract.ApprovalStatus, contract.LesseeName, contract.LessorName))
-				sources = append(sources, Source{
-					Type:    "contract",
-					ID:      contract.ID,
-					Title:   contract.ContractName,
-					Snippet: fmt.Sprintf("编号: %s, 状态: %s", contract.ContractNumber, contract.ApprovalStatus),
-				})
+		// P3-34: the contract list flows through the tool runtime — audited,
+		// dimension-scoped — instead of a direct repository read.
+		if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.contract.search", agenttooldefs.ContractSearchArguments{}); ok {
+			if data, dataOK := result.Data.(agenttooldefs.ContractSearchData); dataOK && len(data.Items) > 0 {
+				contextData.WriteString(fmt.Sprintf("\n## 合同数据（共 %d 份）\n", len(data.Items)))
+				for _, contract := range data.Items {
+					contextData.WriteString(fmt.Sprintf("- ID: %s, 编号: %s, 名称: %s, 状态: %s, 承租方: %s, 出租方: %s\n",
+						contract.ID, contract.ContractNumber, contract.ContractName,
+						contract.ApprovalStatus, contract.LesseeName, contract.LessorName))
+					sources = append(sources, Source{
+						Type:    "contract",
+						ID:      contract.ID,
+						Title:   contract.ContractName,
+						Snippet: fmt.Sprintf("编号: %s, 状态: %s", contract.ContractNumber, contract.ApprovalStatus),
+					})
+				}
 			}
 		}
 	}
@@ -1391,12 +1394,20 @@ func buildAuditPackRunbook() *AgentRunbook {
 	}
 }
 
-func (h *Agent) appendAgentPortfolioContext(ctx context.Context, legalEntityID string, contextData *strings.Builder, sources *[]Source) {
-	contracts, err := h.contractRepo.GetAll(ctx, legalEntityID)
-	if err != nil || len(contracts) == 0 {
+// P3-34: the portfolio read flows through the audited, scope-narrowing tool
+// runtime instead of a direct repository query.
+func (h *Agent) appendAgentPortfolioContext(ctx context.Context, toolRuntime *agenttools.Runtime, legalEntityID string, contextData *strings.Builder, sources *[]Source) {
+	result, ok := h.executeReadTool(ctx, toolRuntime, "lease.contract.search", agenttooldefs.ContractSearchArguments{})
+	if !ok {
 		contextData.WriteString("\n## Agent 组合数据\n当前权限范围内未检索到合同组合数据。\n")
 		return
 	}
+	data, dataOK := result.Data.(agenttooldefs.ContractSearchData)
+	if !dataOK || len(data.Items) == 0 {
+		contextData.WriteString("\n## Agent 组合数据\n当前权限范围内未检索到合同组合数据。\n")
+		return
+	}
+	contracts := data.Items
 
 	statusCounts := make(map[string]int)
 	showCount := len(contracts)
@@ -1599,7 +1610,7 @@ func (h *Agent) appendReportsContext(pc *PageContext, contextData *strings.Build
 
 // appendMonthlyClosingContext appends monthly closing page context and queries
 // journal entries for the selected period if provided.
-func (h *Agent) appendMonthlyClosingContext(ctx context.Context, pc *PageContext, contextData *strings.Builder, sources *[]Source) {
+func (h *Agent) appendMonthlyClosingContext(ctx context.Context, toolRuntime *agenttools.Runtime, pc *PageContext, contextData *strings.Builder, sources *[]Source) {
 	contextData.WriteString("\n## 当前结账中心上下文\n")
 	if pc.Period != "" {
 		contextData.WriteString(fmt.Sprintf("- 选定期间: %s\n", pc.Period))
@@ -1609,38 +1620,37 @@ func (h *Agent) appendMonthlyClosingContext(ctx context.Context, pc *PageContext
 	}
 
 	if pc.Period != "" {
-		entries, err := h.mcRepo.GetJournalEntries(ctx, "", pc.Period, "")
-		if err == nil && len(entries) > 0 {
-			showCount := len(entries)
-			if showCount > 20 {
-				showCount = 20
-			}
-			postedCount := 0
-			for _, e := range entries {
-				if e.PostingStatus == "posted" {
-					postedCount++
+		// P3-34: journal entries flow through the audited tool runtime.
+		if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.journal.list", agenttooldefs.JournalListArguments{Period: pc.Period}); ok {
+			if data, dataOK := result.Data.(agenttooldefs.JournalListData); dataOK && len(data.Items) > 0 {
+				entries := data.Items
+				showCount := len(entries)
+				if showCount > 20 {
+					showCount = 20
 				}
-			}
-			contextData.WriteString(fmt.Sprintf("\n### 期间 %s 的会计分录（共 %d 条，显示前 %d 条）\n", pc.Period, len(entries), showCount))
-			for i, e := range entries {
-				if i >= showCount {
-					break
+				postedCount := 0
+				for _, e := range entries {
+					if e.PostingStatus == "posted" {
+						postedCount++
+					}
 				}
-				desc := ""
-				if e.Description != nil {
-					desc = *e.Description
+				contextData.WriteString(fmt.Sprintf("\n### 期间 %s 的会计分录（共 %d 条，显示前 %d 条）\n", pc.Period, len(entries), showCount))
+				for i, e := range entries {
+					if i >= showCount {
+						break
+					}
+					contextData.WriteString(fmt.Sprintf("- 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
+						e.EntryType, e.DebitAccount, e.CreditAccount,
+						e.Amount, e.Currency, e.PostingStatus, e.Description))
 				}
-				contextData.WriteString(fmt.Sprintf("- 合同: %s, 类型: %s, 借方: %s, 贷方: %s, 金额: %.2f %s, 状态: %s, 描述: %s\n",
-					e.ContractID, e.EntryType, e.DebitAccount, e.CreditAccount,
-					e.Amount.Float64(), e.Currency, e.PostingStatus, desc))
+				contextData.WriteString(fmt.Sprintf("\n汇总: 共 %d 条分录，其中 %d 条已过账\n", len(entries), postedCount))
+				*sources = append(*sources, Source{
+					Type:    "journal",
+					ID:      pc.Period,
+					Title:   fmt.Sprintf("期间 %s 会计分录", pc.Period),
+					Snippet: fmt.Sprintf("共 %d 条", len(entries)),
+				})
 			}
-			contextData.WriteString(fmt.Sprintf("\n汇总: 共 %d 条分录，其中 %d 条已过账\n", len(entries), postedCount))
-			*sources = append(*sources, Source{
-				Type:    "journal",
-				ID:      pc.Period,
-				Title:   fmt.Sprintf("期间 %s 会计分录", pc.Period),
-				Snippet: fmt.Sprintf("共 %d 条", len(entries)),
-			})
 		}
 	}
 }
@@ -1958,8 +1968,13 @@ func extractSourcesFromAnswer(answer string, knownSources []Source) []Source {
 	re := regexp.MustCompile(`（来源[：:]\s*([^）)]+)）`)
 	matches := re.FindAllStringSubmatch(answer, -1)
 
+	// M6.2 citation fidelity: sources are ONLY the citations the model
+	// explicitly wrote that intersect the known sources. An answer with no
+	// citations carries an empty list — the UI labels it 「未附来源」 — and
+	// citations that match nothing are dropped, never widened into "all
+	// known sources" the model never claimed.
 	if len(matches) == 0 {
-		return knownSources
+		return nil
 	}
 
 	// Build a set of cited source tokens
@@ -1988,15 +2003,6 @@ func extractSourcesFromAnswer(answer string, knownSources []Source) []Source {
 			cited = append(cited, s)
 			seen[s.ID] = true
 		}
-	}
-
-	// If no sources matched citations but citations exist, return known sources
-	if len(cited) == 0 && len(matches) > 0 {
-		return knownSources
-	}
-	// If nothing was cited, return known sources (LLM used context data)
-	if len(cited) == 0 {
-		return knownSources
 	}
 
 	return cited

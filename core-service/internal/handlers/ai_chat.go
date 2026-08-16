@@ -13,7 +13,9 @@ import (
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aiagent"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/aichat"
+	"github.com/lease-management-system/core-service/internal/services/agentguard"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
@@ -117,6 +119,7 @@ type AIChatHandler struct {
 	agentRuntime  *aichat.Runtime[aiagent.Response]
 	toolRuntime   *agenttools.Runtime
 	skillRegistry *agentskill.Registry
+	guard *agentguard.Guard
 }
 
 func NewAIChatHandler(
@@ -288,6 +291,13 @@ func (h *AIChatHandler) WithAuditRepository(reader AgentAuditReader) *AIChatHand
 // WithWorkerRunStore enables the lease-protected event stream used by an
 // external Runner. It is deliberately optional so the legacy AI Chat handler
 // and lightweight test adapters remain owner-scoped and source-compatible.
+// WithGuard attaches the M6.3 budget guard (rate + cost + history bounds);
+// a nil guard keeps the previous behaviour.
+func (h *AIChatHandler) WithGuard(guard *agentguard.Guard) *AIChatHandler {
+	h.guard = guard
+	return h
+}
+
 func (h *AIChatHandler) WithWorkerRunStore(store AgentWorkerRunStore) *AIChatHandler {
 	if h == nil {
 		return h
@@ -385,7 +395,24 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	if req.Language == "" {
 		req.Language = "zh-CN"
 	}
+	// M6.3: the budget guard refuses before any LLM call; the reason is
+	// preserved verbatim in the 429 body (never softened).
+	if h.guard != nil {
+		if guardErr := h.guard.Check(c.Request.Context(), userIDFromContext(c), "chat"); guardErr != nil {
+			writeCodedError(c, http.StatusTooManyRequests, errcontract.CodeRateLimited, guardErr.Error(), nil)
+			return
+		}
+		req.History = agentguard.BoundHistory(h.guard, req.History, func(message ChatMessage) string {
+			return message.Role + "\n" + message.Content
+		})
+	}
 	completed, err := h.agentRuntime.Run(c.Request.Context(), runtimeInput(c, req))
+	if err == nil && h.guard != nil {
+		// Token usage is not observable on the sync path yet; the event is
+		// still booked so the per-minute rate window counts, and cost
+		// accrues once usage is plumbed.
+		_ = h.guard.Record(c.Request.Context(), userIDFromContext(c), "chat", 0)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to run AI agent: " + err.Error()})
 		return

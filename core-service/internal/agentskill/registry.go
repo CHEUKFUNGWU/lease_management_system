@@ -125,7 +125,10 @@ func ProductionRegistry() *Registry {
 			IntentExamples: []string{"经营脉搏", "门店诊断", "分析 Store006", "人工下降 10% 情景", "生成行动提议"},
 			// FIX-029: 「门店贡献」改名为「门店经营利润」是展示层改动，匹配词只增不减——
 			// 老说法仍要能路由到本 skill，行业说法「四墙利润」一并收进来。
-			MatchTerms:     []string{"经营脉搏", "门店诊断", "门店分析", "经营情景", "零售经营", "客流", "转化", "客单", "人工", "占用现金成本", "门店经营利润", "门店贡献", "四墙利润", "同群", "门店异常", "行动草稿", "retail operations", "store diagnostics", "operating pulse"},
+			// M6.1: natural-phrasing coverage — compound terms keep the deterministic
+// match from hijacking lease questions ("为什么" alone is too greedy;
+// "毛利为什么下滑" is not).
+MatchTerms:     []string{"经营脉搏", "门店诊断", "门店分析", "经营情景", "零售经营", "客流", "转化", "客单", "人工", "占用现金成本", "门店经营利润", "门店贡献", "四墙利润", "同群", "门店异常", "行动草稿", "毛利", "毛利下滑", "为什么下滑", "为何下滑", "为咩", "下滑原因", "闭店", "门店续租", "续租测算", "续租决策", "租金谈判", "retail operations", "store diagnostics", "operating pulse"},
 			AllowedRoles:   []string{"admin", "editor", "reviewer", "approver", "auditor", "readonly"},
 			RequiredInputs: []string{"message"}, RequiredContext: []string{"retail_filters"},
 			AllowedTools:  []string{"retail.operating_pulse.read", "retail.store_diagnostics.read", "retail.store.scenario.evaluate"},

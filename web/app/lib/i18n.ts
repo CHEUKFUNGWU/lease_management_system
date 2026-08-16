@@ -1898,6 +1898,11 @@ const dict: TranslationDict = {
     "zh-HK": "引用來源:",
     en: "Sources:",
   },
+  "ai.no_sources": {
+    "zh-CN": "未附来源",
+    "zh-HK": "未附來源",
+    en: "No sources cited",
+  },
   "ai.model": {
     "zh-CN": "模型: ",
     "zh-HK": "模型: ",

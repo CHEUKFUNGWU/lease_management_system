@@ -35,12 +35,40 @@ interface DrawerMessage {
 // The chat panel is exported separately from the Drawer shell so tests can
 // render it without AntD's client-side portal (rc-drawer returns null in
 // static markup).
+const drawerSessionKey = (page: string) => `retail-ai-drawer:${page}`;
+
+function loadDrawerSession(page: string): { messages: DrawerMessage[]; sessionId: string } {
+  try {
+    const raw = window.sessionStorage.getItem(drawerSessionKey(page));
+    if (raw) {
+      const parsed = JSON.parse(raw) as { messages?: DrawerMessage[]; session_id?: string };
+      return { messages: parsed.messages || [], sessionId: parsed.session_id || "" };
+    }
+  } catch {
+    // Corrupted session storage falls back to a fresh conversation.
+  }
+  return { messages: [], sessionId: "" };
+}
+
 export function RetailAIDrawerPanel({ pageContext }: { pageContext: RetailAIDrawerContext }) {
   const { token } = useAuth();
   const { language } = useLanguage();
-  const [messages, setMessages] = useState<DrawerMessage[]>([]);
+  // P3-32: the conversation survives page navigation — transcript and
+  // session id persist per page in sessionStorage and the server resumes
+  // the same session (042/043 session entities) when the id is sent.
+  const [persisted] = useState(() => loadDrawerSession(pageContext.page));
+  const [messages, setMessages] = useState<DrawerMessage[]>(persisted.messages);
+  const [sessionId, setSessionId] = useState(persisted.sessionId);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const persist = (nextMessages: DrawerMessage[], nextSessionId: string) => {
+    try {
+      window.sessionStorage.setItem(drawerSessionKey(pageContext.page), JSON.stringify({ messages: nextMessages, session_id: nextSessionId }));
+    } catch {
+      // Storage unavailable — the conversation still lives in component state.
+    }
+  };
 
   const send = async () => {
     const message = input.trim();
@@ -50,17 +78,26 @@ export function RetailAIDrawerPanel({ pageContext }: { pageContext: RetailAIDraw
     setMessages((current) => [...current, { role: "user", content: message }]);
     try {
       const response = await aiChatApi.chat(
-        { message, language, page_context: { page: pageContext.page, title: pageContext.title, filters: pageContext.filters, summary: pageContext.summary } },
+        {
+          message, language, session_id: sessionId || undefined,
+          history: messages.filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role as "user" | "assistant", content: item.content })),
+          page_context: { page: pageContext.page, title: pageContext.title, filters: pageContext.filters, summary: pageContext.summary },
+        },
         token
       );
-      setMessages((current) => [...current, {
-        role: "assistant",
-        content: response.answer || t("ai.drawer.no_answer", language),
-        sources: response.sources,
-        confidence: typeof response.confidence === "number" ? response.confidence : undefined,
-        toolCalls: response.tool_calls,
-        envelope: response.retail_action_proposal?.envelope || response.retail_operations?.envelope,
-      }]);
+      setMessages((current) => {
+        const next = [...current, {
+          role: "assistant" as const,
+          content: response.answer || t("ai.drawer.no_answer", language),
+          sources: response.sources,
+          confidence: typeof response.confidence === "number" ? response.confidence : undefined,
+          toolCalls: response.tool_calls,
+          envelope: response.retail_action_proposal?.envelope || response.retail_operations?.envelope,
+        }];
+        persist(next, response.session_id || sessionId);
+        return next;
+      });
+      if (response.session_id) setSessionId(response.session_id);
     } catch (error) {
       setMessages((current) => [...current, { role: "assistant", content: apiErrorMessage(error) }]);
     } finally {

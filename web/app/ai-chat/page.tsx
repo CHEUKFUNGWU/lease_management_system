@@ -450,6 +450,13 @@ function MessageContent({
           })}
         </div>
       )}
+      {/* M6.2: an answer without citations is labeled honestly, never padded
+          with "all known sources" the model never claimed. */}
+      {!thinking && content && sources && sources.length === 0 && (
+        <div className="sty-c9f7b4b7">
+          <Text type="secondary" className="sty-090832a7">{t("ai.no_sources", i18nLang)}</Text>
+        </div>
+      )}
 
       {model && (
         <Text type="secondary" className="sty-14aa9694">

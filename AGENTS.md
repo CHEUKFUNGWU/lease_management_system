@@ -28,7 +28,7 @@
 
 ## 当前工程事实
 
-- `db/init/01_init.sql`：70 张表；增量迁移到 `040_agent_artifact_retail_proposal.sql`
+- `db/init/01_init.sql`：70 张表；增量迁移到 `041_ai_chat_message_confidence.sql`
 - `core-service/internal/services/`：22 个业务包，其中 `retailkpi` / `retailpulse` / `retailstore360` / `retailscenario` / `retailsimulation` 为零售经营分析
 - `web/app/`：26 个页面，零售主线为 `/operating-pulse`、`/store-360`、`/scenario-workbench`
 - Agent Tool：`lease.*` 29 个；零售只读 Tool 3 个（`retail.operating_pulse.read`、`retail.store_diagnostics.read`、`retail.store.scenario.evaluate`）

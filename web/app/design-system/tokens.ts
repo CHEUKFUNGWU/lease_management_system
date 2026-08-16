@@ -29,6 +29,12 @@ export const colors = {
     elevated: "#FFFFFF",    // Modal, dropdown — same as page but with shadow
     inset: "#F0F0F0",       // Table headers, secondary panels
     code: "#F7F7F7",        // Code blocks, diff backgrounds
+    // DARK-003: the login brand slab is an identity surface, not a foreground.
+    // It used var(--fg-primary), so the dark theme flipped it white — the black
+    // slab is the brand, and it stays black in both themes. Its text is pinned
+    // the same way: `--fg-inverse` follows the theme and went dark-on-black.
+    brandSlab: "#000000",
+    onBrandSlab: "#FFFFFF",
   },
 
   foreground: {
@@ -273,5 +279,59 @@ export const layout = {
     xl: 1280,
     "2xl": 1440,
     "3xl": 1920,
+  },
+} as const;
+
+// ─── Dark Theme Colors (DARK-001) ───────────────────────────────
+//
+// Same semantic slots as `colors`, dark values. Every text/status/chart
+// pair below was verified against WCAG 2.1 AA (>= 4.5:1) on its expected
+// background — see the delivery report's contrast table. Charts get their
+// own brighter values because dark mode does not invert them.
+export const darkColors = {
+  background: {
+    page: "#141414",
+    surface: "#1E1E1E",
+    elevated: "#1E1E1E",
+    inset: "#262626",
+    code: "#1E1E1E",
+    brandSlab: "#000000",
+    onBrandSlab: "#FFFFFF",
+  },
+  foreground: {
+    primary: "#FFFFFF",
+    secondary: "#D9D9D9",
+    tertiary: "#A6A6A6",
+    muted: "#8C8C8C",
+    inverse: "#141414",
+  },
+  border: {
+    default: "#3A3A3A",
+    strong: "#595959",
+    subtle: "#2E2E2E",
+    inverse: "rgba(255,255,255,0.1)",
+  },
+  state: {
+    success: "#66BB6A",
+    warning: "#FFB74D",
+    error: "#F0625C",
+    info: "#64B5F6",
+  },
+  status: {
+    success: { bg: "#1B3A22", text: "#66BB6A", border: "#2E5A38" },
+    processing: { bg: "#12293A", text: "#64B5F6", border: "#1E4A6A" },
+    warning: { bg: "#3A2E10", text: "#FFB74D", border: "#5A4A1E" },
+    error: { bg: "#3A1616", text: "#F0625C", border: "#5A2626" },
+    neutral: { bg: "#262626", text: "#A6A6A6", border: "#3A3A3A" },
+  },
+  chart: {
+    blue: "#4FC3F7",
+    purple: "#B39DDB",
+  },
+  // Brand mark stays the same in both themes; only the inverse variant
+  // flips. Surface slots (admin sider / code) are the same dark values.
+  surface: {
+    admin: "#001529",
+    code: "#1E1E1E",
   },
 } as const;

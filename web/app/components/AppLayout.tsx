@@ -33,6 +33,7 @@ import { t } from "../lib/i18n";
 import { pageTransition } from "../design-system/animations";
 import GlobalSearch from "./GlobalSearch";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
 import BrandIcon from "./BrandIcon";
 
 const { Header, Sider, Content } = Layout;
@@ -282,6 +283,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           {/* Notifications */}
           <NotificationBell />
+
+          {/* DARK-001: theme toggle (follows OS by default, manual choice persists) */}
+          <ThemeToggle />
 
           {/* Language switcher — shown only once more than one language is offered.
               See SUPPORTED_LANGUAGES for why it is currently a single language. */}

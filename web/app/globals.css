@@ -5,6 +5,13 @@
 /* ─── CSS Design Tokens ─────────────────────────────────────── */
 
 :root {
+  /* DARK-002: the browser paints form controls, scrollbars and the caret from
+     its own UA styles, and it picks light or dark from `color-scheme` — not
+     from our variables. Without this the dark theme rendered a white input
+     under white text (contrast 1.00: you could not see what you typed), which
+     is exactly what a palette-level contrast table cannot catch. */
+  color-scheme: light;
+
   /* Monochrome Scale — only levels consumed by the application */
   --mono-0: #000000;
   --mono-20: #262626;
@@ -22,6 +29,9 @@
   --bg-elevated: var(--mono-100);
   --bg-inset: var(--mono-95);
   --bg-code: var(--mono-98);
+  /* DARK-003: identity surface — the brand slab is black in both themes. */
+  --bg-brand-slab: #000000;
+  --fg-on-brand-slab: #FFFFFF;
 
   /* Foreground */
   --fg-primary: var(--mono-0);
@@ -71,6 +81,69 @@
   --ease-micro: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-enter: cubic-bezier(0, 0, 0.2, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* ─── Dark Theme (DARK-001) ─────────────────────────────────────
+   Same semantic slots as :root, dark values mirrored from
+   tokens.ts darkColors. The [data-theme] attribute selector has equal
+   specificity to :root, and this block comes later, so it wins without
+   any forced-importance flag. All pairs verified >= 4.5:1 (delivery
+   report table). */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --mono-0: #FFFFFF;
+  --mono-20: #D9D9D9;
+  --mono-40: #A6A6A6;
+  --mono-60: #8C8C8C;
+  --mono-70: #595959;
+  --mono-90: #3A3A3A;
+  --mono-95: #2E2E2E;
+  --mono-98: #1E1E1E;
+  --mono-100: #141414;
+
+  --bg-page: var(--mono-100);
+  --bg-surface: var(--mono-98);
+  --bg-elevated: var(--mono-98);
+  --bg-inset: var(--mono-95);
+  --bg-code: var(--mono-98);
+  /* DARK-003: identity surface — the brand slab is black in both themes. */
+  --bg-brand-slab: #000000;
+  --fg-on-brand-slab: #FFFFFF;
+
+  --fg-primary: var(--mono-0);
+  --fg-secondary: var(--mono-20);
+  --fg-tertiary: var(--mono-40);
+  --fg-muted: var(--mono-60);
+  --fg-inverse: var(--mono-100);
+
+  --border-default: var(--mono-90);
+  --border-strong: var(--mono-70);
+  --border-subtle: var(--mono-95);
+
+  --state-success-bg: #1B3A22;
+  --state-success-text: #66BB6A;
+  --state-success-border: #2E5A38;
+  --state-info-bg: #12293A;
+  --state-info-text: #64B5F6;
+  --state-info-border: #1E4A6A;
+  --state-warning-bg: #3A2E10;
+  --state-warning-text: #FFB74D;
+  --state-warning-border: #5A4A1E;
+  --state-error-bg: #3A1616;
+  --state-error-text: #F0625C;
+  --state-error-border: #5A2626;
+  --chart-blue: #4FC3F7;
+  --chart-purple: #B39DDB;
+  --admin-surface: #001529;
+  --code-surface: #1E1E1E;
+
+  /* Shadows carry less weight on dark — the elevated surface reads via
+     its lighter inset tone instead of a black halo. */
+  --shadow-static: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-dropdown: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.6);
 }
 
 /* ─── Base Styles ───────────────────────────────────────────── */
@@ -2209,8 +2282,8 @@ html {
   align-items: center;
   overflow: hidden;
   padding: 72px 64px;
-  background: var(--fg-primary);
-  color: var(--fg-inverse);
+  background: var(--bg-brand-slab);
+  color: var(--fg-on-brand-slab);
 }
 
 /* A hairline grid keeps the dark panel from reading as a flat slab. */
@@ -2300,10 +2373,19 @@ html {
 }
 
 .login-panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 48px 32px;
+}
+
+/* DARK-003: the theme toggle sits in the panel's top corner — the login screen
+   has no app header to host it. */
+.login-panel-actions {
+  position: absolute;
+  top: 20px;
+  right: 24px;
 }
 
 .login-panel-inner {
@@ -3571,4 +3653,11 @@ html {
   margin-top: 12;
   display: grid;
   gap: 8;
+}
+
+/* DARK-001: the header theme toggle is a quiet icon button; nothing to
+   style beyond what AntD's text button provides — the class exists as a
+   stable hook. */
+.theme-toggle {
+  color: var(--fg-secondary);
 }

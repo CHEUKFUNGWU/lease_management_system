@@ -14,6 +14,7 @@ import {
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { StateBlock } from "../components/StateBlock";
 import { ApiError, authApi, exchangeRateApi, reportApi, settingsApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -722,13 +723,7 @@ export default function SettingsPage() {
         <Card>
           <Spin spinning={loading}>
             {!loading && !data.length ? (
-              <Empty
-                description={
-                  <span>
-                    {t("settings.empty_no_tags", language)}
-                  </span>
-                }
-              />
+              <StateBlock state={{ kind: "empty", reason: t("settings.empty_no_tags", language) }} language={language} />
             ) : (
               <Table
                 columns={columns}

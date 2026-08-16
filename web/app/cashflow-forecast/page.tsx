@@ -16,6 +16,7 @@ import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { ScenarioPanel } from "./ScenarioPanel";
 import { reportApi } from "../lib/api";
+import { useRetailQuery } from "../retail/useRetailQuery";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -106,8 +107,6 @@ function CashflowForecastPage() {
   const [contractId, setContractId] = useState("");
   const [store, setStore] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [tagLoading, setTagLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   /* ---- data ---- */
@@ -115,22 +114,15 @@ function CashflowForecastPage() {
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
 
-  /* ---- fetch tags on mount ---- */
-  useEffect(() => {
-    if (!token) return;
-    const fetchTags = async () => {
-      setTagLoading(true);
-      try {
-        const res = await reportApi.tags(token);
-        setAvailableTags(res.tags || []);
-      } catch {
-        // tags endpoint may not exist; swallow silently
-      } finally {
-        setTagLoading(false);
-      }
-    };
-    fetchTags();
-  }, [token]);
+  /* ---- fetch tags on mount (FETCH-003: seam-owned) ---- */
+  const tagsQuery = useRetailQuery<{ tags: string[] }, Record<string, never>>({
+    token,
+    params: {},
+    paramsKey: "cashflow-tags",
+    fetcher: async (_p, t) => ({ tags: (await reportApi.tags(t)).tags || [] }),
+  });
+  const availableTags = tagsQuery.state.kind === "ready" ? tagsQuery.state.data?.tags ?? [] : [];
+  const tagLoading = tagsQuery.loading;
 
   /* ---- fetch data ---- */
   const fetchData = async () => {

@@ -2,7 +2,7 @@
 
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Typography, message } from "antd";
 import { ReloadOutlined, RobotOutlined, CheckCircleOutlined, DownloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -13,7 +13,9 @@ import { HelpTrigger } from "../components/HelpDrawer";
 import { performanceHelpContent } from "../components/help-content";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 import { performanceApi } from "../lib/api";
+import { useRetailQuery } from "../retail/useRetailQuery";
 import { notifyError } from "../lib/notify";
 
 type Overview = { period: string; store_fact_count: number; store_fact_ready_count: number; store_fact_missing_count: number; store_fact_unmapped_count: number; store_fact_unreconciled_count: number; equipment_fact_count: number; equipment_fact_unreconciled_count: number; open_action_count: number; open_action_impact: number; latest_store_as_of?: string; latest_equipment_as_of?: string };
@@ -39,42 +41,46 @@ export default function PerformancePage() {
   const applyPeriod = () => {
     const next = periodDraft.trim();
     if (!periodDraftValid) return;
-    if (next === period) load();
+    if (next === period) retry();
     else setPeriod(next);
   };
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [stores, setStores] = useState<FourWall[]>([]);
-  const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
-  const [actions, setActions] = useState<Action[]>([]);
   const [selectedActionIds, setSelectedActionIds] = useState<string[]>([]);
   const [scenarioInput, setScenarioInput] = useState({ sales: 100000, rent: 12000, margin: 40, discount: 0.12 });
   const [scenarioResult, setScenarioResult] = useState<any[] | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
+  // FETCH-003: the cockpit loads four views for the applied period through
+  // the shared fetch seam — the period drives the params, the seam owns
+  // loading, the race gate and the error exit.
+  const { loading, state: cockpitState, retry } = useRetailQuery({
+    token,
+    params: { period },
+    paramsKey: `cockpit-${period}`,
+    fetcher: async (p, t) => {
       const [overviewResult, storeResult, equipmentResult, actionResult] = await Promise.all([
-        performanceApi.overview(period, token),
-        performanceApi.storePerformance(period, token),
-        performanceApi.equipmentPerformance(period, token),
-        performanceApi.actions({ period }, token),
+        performanceApi.overview(p.period, t),
+        performanceApi.storePerformance(p.period, t),
+        performanceApi.equipmentPerformance(p.period, t),
+        performanceApi.actions({ period: p.period }, t),
       ]);
-      setOverview(overviewResult);
-      setStores(storeResult.data || []);
-      setEquipment(equipmentResult.data || []);
-      setActions(actionResult.data || []);
-    } catch (error: any) {
-      notifyError(error?.message || "经营数据加载失败");
-    } finally { setLoading(false); }
-  }, [period, token]);
-
-  useEffect(() => { load(); }, [load]);
+      return {
+        overview: overviewResult,
+        stores: storeResult.data || [],
+        equipment: equipmentResult.data || [],
+        actions: actionResult.data || [],
+      };
+    },
+  });
+  const overview = cockpitState.kind === "ready" ? (cockpitState.data?.overview ?? null) : null;
+  const stores: FourWall[] = cockpitState.kind === "ready" ? (cockpitState.data?.stores ?? []) : [];
+  const equipment: EquipmentItem[] = cockpitState.kind === "ready" ? (cockpitState.data?.equipment ?? []) : [];
+  const actions: Action[] = cockpitState.kind === "ready" ? (cockpitState.data?.actions ?? []) : [];
+  useEffect(() => {
+    if (cockpitState.kind === "failed") notifyError(cockpitState.message || t("performance.load_failed", language));
+  }, [cockpitState, language]);
 
   const acknowledge = async (action: Action) => {
     if (!token) return;
-    try { await performanceApi.updateAction(action.id, { status: "acknowledged" }, token); message.success("已确认行动"); load(); }
+    try { await performanceApi.updateAction(action.id, { status: "acknowledged" }, token); message.success("已确认行动"); retry(); }
     catch (error: any) { notifyError(error?.message || "行动更新失败"); }
   };
 
@@ -84,7 +90,7 @@ export default function PerformancePage() {
       await performanceApi.bulkUpdateActions({ ids: selectedActionIds, status: "acknowledged" }, token);
       message.success(`已确认 ${selectedActionIds.length} 项行动`);
       setSelectedActionIds([]);
-      load();
+      retry();
     } catch (error: any) { notifyError(error?.message || "批量更新失败"); }
   };
 

@@ -11,6 +11,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { portfolioHelpContent } from "../components/help-content";
 import { reportApi } from "../lib/api";
+import { useRetailQuery } from "../retail/useRetailQuery";
 import { fmtMoney } from "../lib/format";
 import { RentToSalesPanel } from "./RentToSalesPanel";
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +20,7 @@ import { motion } from "framer-motion";
 import { useUrlState } from "../hooks/useUrlState";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
+import { t } from "../lib/i18n";
 
 interface PortfolioRow {
   asset_type: string;
@@ -89,11 +91,35 @@ function PortfolioPage() {
   const [groupingParam, setGroupingParam] = useUrlState("group_by", "store");
   const mode: "working" | "official" = modeParam === "official" ? "official" : "working";
   const grouping: UnitPriceGrouping = ["store", "brand", "region"].includes(groupingParam) ? groupingParam as UnitPriceGrouping : "store";
-  const [rows, setRows] = useState<PortfolioRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [unitPriceRows, setUnitPriceRows] = useState<UnitPriceRow[]>([]);
-  const [contractsWithoutArea, setContractsWithoutArea] = useState(0);
-  const [unitPriceLoading, setUnitPriceLoading] = useState(false);
+  // FETCH-003: both portfolio queries run through the shared fetch seam —
+  // mode/grouping drive the params, the seam owns loading, the race gate
+  // and the error exit.
+  const summaryQuery = useRetailQuery({
+    token,
+    params: { mode },
+    paramsKey: `portfolio-summary-${mode}`,
+    fetcher: (p, t) => reportApi.portfolioSummary(p.mode, t).then((res) => res.data ?? []),
+  });
+  const unitPriceQuery = useRetailQuery({
+    token,
+    params: { mode, grouping },
+    paramsKey: `portfolio-unitprice-${mode}-${grouping}`,
+    fetcher: async (p, t) => {
+      const res = await reportApi.unitPrice({ mode: p.mode, group_by: p.grouping }, t);
+      return { rows: res.data || [], contractsWithoutArea: res.contracts_without_area || 0 };
+    },
+  });
+  const loading = summaryQuery.loading;
+  const unitPriceLoading = unitPriceQuery.loading;
+  const rows: PortfolioRow[] = summaryQuery.state.kind === "ready" ? (summaryQuery.state.data ?? []) : [];
+  const unitPriceRows: UnitPriceRow[] = unitPriceQuery.state.kind === "ready" ? (unitPriceQuery.state.data?.rows ?? []) : [];
+  const contractsWithoutArea = unitPriceQuery.state.kind === "ready" ? (unitPriceQuery.state.data?.contractsWithoutArea ?? 0) : 0;
+  useEffect(() => {
+    if (summaryQuery.state.kind === "failed") notifyError(summaryQuery.state.message || t("portfolio.summary_failed", language));
+  }, [summaryQuery.state, language]);
+  useEffect(() => {
+    if (unitPriceQuery.state.kind === "failed") notifyError(unitPriceQuery.state.message || t("portfolio.unit_price_failed", language));
+  }, [unitPriceQuery.state, language]);
 
   const totals = useMemo(() => {
     return rows.reduce(
@@ -125,40 +151,6 @@ function PortfolioPage() {
   const totalsCurrency =
     totals.currencies.size === 1 ? Array.from(totals.currencies)[0] : null;
 
-  const loadData = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const res = await reportApi.portfolioSummary(mode, token);
-      setRows(res.data || []);
-    } catch (error: any) {
-      notifyError(error.message || "组合分析加载失败");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadUnitPrice = async () => {
-    if (!token) return;
-    setUnitPriceLoading(true);
-    try {
-      const res = await reportApi.unitPrice({ mode, group_by: grouping }, token);
-      setUnitPriceRows(res.data || []);
-      setContractsWithoutArea(res.contracts_without_area || 0);
-    } catch (error: any) {
-      notifyError(error.message || "单价对比加载失败");
-    } finally {
-      setUnitPriceLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [token, mode]);
-
-  useEffect(() => {
-    loadUnitPrice();
-  }, [token, mode, grouping]);
 
   return (
     <ProtectedRoute>
@@ -179,7 +171,7 @@ function PortfolioPage() {
                       { label: "Official", value: "official" },
                     ]}
                   />
-                  <Button icon={<ReloadOutlined />} onClick={loadData} loading={loading}>
+                  <Button icon={<ReloadOutlined />} onClick={summaryQuery.retry} loading={loading}>
                     刷新
                   </Button>
                 </Space>

@@ -418,6 +418,7 @@ const dict: TranslationDict = {
   "help.performance.s3.heading": { "zh-CN": "零售四墙与方案模拟", "zh-HK": "零售四牆與方案模擬", en: "Store walls and simulation" },
   "help.performance.s3.body": { "zh-CN": "零售四墙与制造设备页签逐店展示事实与对账状态；门店方案模拟只进入确定性模拟，不会覆盖预算、创建正式合同或触发会计重算。", "zh-HK": "零售四牆與製造設備頁簽逐店展示事實與對賬狀態；門店方案模擬只進入確定性模擬，不會覆蓋預算、創建正式合同或觸發會計重算。", en: "The retail-walls and equipment tabs list per-store facts with reconciliation status; the store simulation is deterministic only — it never overwrites budgets, creates contracts or triggers accounting recalculation." },
   "help.portfolio.title": { "zh-CN": "组合分析使用教程", "zh-HK": "組合分析使用教程", en: "Portfolio analysis guide" },
+  "performance.load_failed": { "zh-CN": "经营数据加载失败", "zh-HK": "經營數據載入失敗", en: "Failed to load operating data" },
   "help.portfolio.flow.mode": { "zh-CN": "选 Working / Official", "zh-HK": "選 Working / Official", en: "Pick mode" },
   "help.portfolio.flow.group": { "zh-CN": "选分组维度", "zh-HK": "選分組維度", en: "Grouping" },
   "help.portfolio.flow.read": { "zh-CN": "读组合指标", "zh-HK": "讀組合指標", en: "Read metrics" },
@@ -433,6 +434,8 @@ const dict: TranslationDict = {
     "zh-HK": "交給 AI 分析",
     en: "Analyze with AI",
   },
+  "portfolio.summary_failed": { "zh-CN": "组合分析加载失败", "zh-HK": "組合分析載入失敗", en: "Failed to load portfolio summary" },
+  "portfolio.unit_price_failed": { "zh-CN": "单价对比加载失败", "zh-HK": "單價對比載入失敗", en: "Failed to load unit-price comparison" },
   "common.source_system": {
     "zh-CN": "来源系统",
     "zh-HK": "來源系統",

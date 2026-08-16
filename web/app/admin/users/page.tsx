@@ -24,6 +24,7 @@ import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { useRouter } from "next/navigation";
 import { adminApi, legalEntityApi } from "../../lib/api";
+import { useRetailQuery } from "../../retail/useRetailQuery";
 import { t } from "../../lib/i18n";
 import { notifyError } from "../../lib/notify";
 
@@ -39,8 +40,6 @@ interface User {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [legalEntities, setLegalEntities] = useState<any[]>([]);
@@ -55,22 +54,21 @@ export default function AdminUsersPage() {
       router.push("/login");
       return;
     }
-    fetchUsers();
     fetchLegalEntities();
   }, [isLoading, user, token]);
 
-  const fetchUsers = async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const data = await adminApi.listUsers(token);
-      setUsers(data.data || []);
-    } catch (error: any) {
-      notifyError(error.message || t("admin_users.load_failed", language));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // FETCH-003: the user list runs through the shared fetch seam.
+  const usersQuery = useRetailQuery({
+    token,
+    params: { all: true as const },
+    paramsKey: "admin-users",
+    fetcher: (p, t) => adminApi.listUsers(t).then((res) => res.data ?? []),
+  });
+  const users: User[] = usersQuery.state.kind === "ready" ? (usersQuery.state.data ?? []) : [];
+  const loading = usersQuery.loading;
+  useEffect(() => {
+    if (usersQuery.state.kind === "failed") notifyError(usersQuery.state.message || t("admin_users.load_failed", language));
+  }, [usersQuery.state, language]);
 
   const fetchLegalEntities = async () => {
     if (!token) return;
@@ -98,7 +96,7 @@ export default function AdminUsersPage() {
       message.success(t("admin_users.create_success", language));
       setModalVisible(false);
       form.resetFields();
-      fetchUsers();
+      usersQuery.retry();
     } catch (error: any) {
       notifyError(error.message || t("admin_users.create_failed", language));
     }

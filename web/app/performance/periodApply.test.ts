@@ -22,11 +22,13 @@ describe("FIX-026: period is applied explicitly", () => {
 
   it("binds the field to the draft and the loader to the applied value", () => {
     expect(page).toMatch(/<Input\s+value=\{periodDraft\}/);
-    // The loader's dependency list must not contain the draft.
-    const loadDeps = /\}\s*,\s*\[([^\]]*)\]\);\s*\n\s*useEffect\(\(\)\s*=>\s*\{\s*load\(\)/.exec(page);
-    expect(loadDeps, "the load callback still has a dependency list").not.toBeNull();
-    expect(loadDeps![1]).toContain("period");
-    expect(loadDeps![1]).not.toContain("periodDraft");
+    // FETCH-003: the loader now runs through the fetch seam keyed by the
+    // APPLIED period. The paramsKey must derive from `period`, never from
+    // the draft — that is what keeps typing "2026-0" from firing requests.
+    const keySource = /paramsKey:\s*`cockpit-\$\{([^}]*)\}`/.exec(page);
+    expect(keySource, "paramsKey derives from the applied period").not.toBeNull();
+    expect(keySource![1]).toContain("period");
+    expect(keySource![1]).not.toContain("periodDraft");
   });
 
   it("refuses to apply anything that is not a well-formed YYYY-MM", () => {

@@ -2,7 +2,7 @@
 
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   Table,
@@ -22,6 +22,7 @@ import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { auditApi } from "../lib/api";
+import { useRetailQuery } from "../retail/useRetailQuery";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -49,9 +50,6 @@ const ACTION_COLORS: Record<string, string> = {
 export default function AuditLogsPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
-  const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 50 });
 
   // Filters
@@ -115,38 +113,45 @@ export default function AuditLogsPage() {
     recalculate: t("audit.action_recalculate", language),
   };
 
-  const fetchLogs = useCallback(async (page = 1, pageSize = 50) => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const params: any = {
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-      };
-      if (tableName) params.table_name = tableName;
-      if (action) params.action = action;
-      if (recordId) params.record_id = recordId;
-      if (runId) params.run_id = runId;
-      if (toolName) params.tool_name = toolName;
-      if (dateRange && dateRange[0]) params.start_date = dateRange[0].format("YYYY-MM-DD");
-      if (dateRange && dateRange[1]) params.end_date = dateRange[1].format("YYYY-MM-DD");
-
-      const data = await auditApi.list(params, token);
-      setLogs(data.data || []);
-      setTotal(data.total || 0);
-    } catch (err: any) {
-      notifyError(t("audit.query_failed", language) + ": " + (err.message || ""));
-    } finally {
-      setLoading(false);
-    }
-  }, [token, tableName, action, recordId, runId, toolName, dateRange]);
-
+  // FETCH-003: the audit log is a filter + pagination query — it runs
+  // through the shared fetch seam (race gate / token injection / STATE-001
+  // exit) instead of a hand-rolled effect. Search/reset change the filter
+  // state, which changes paramsKey and refetches.
+  const listParams = {
+    tableName,
+    action,
+    recordId,
+    runId,
+    toolName,
+    startDate: dateRange?.[0] ? dateRange[0].format("YYYY-MM-DD") : "",
+    endDate: dateRange?.[1] ? dateRange[1].format("YYYY-MM-DD") : "",
+    page: pagination.current,
+    pageSize: pagination.pageSize,
+  };
+  const listParamsKey = JSON.stringify(listParams);
+  const { loading, state: logsState, retry } = useRetailQuery({
+    token,
+    params: listParams,
+    paramsKey: listParamsKey,
+    fetcher: (p, t) => {
+      const params: any = { limit: p.pageSize, offset: (p.page - 1) * p.pageSize };
+      if (p.tableName) params.table_name = p.tableName;
+      if (p.action) params.action = p.action;
+      if (p.recordId) params.record_id = p.recordId;
+      if (p.runId) params.run_id = p.runId;
+      if (p.toolName) params.tool_name = p.toolName;
+      if (p.startDate) params.start_date = p.startDate;
+      if (p.endDate) params.end_date = p.endDate;
+      return auditApi.list(params, t);
+    },
+  });
+  const logs = logsState.kind === "ready" ? logsState.data?.data ?? [] : [];
+  const total = logsState.kind === "ready" ? logsState.data?.total ?? 0 : 0;
   useEffect(() => {
-    fetchLogs(1, pagination.pageSize);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (logsState.kind === "failed") notifyError(t("audit.query_failed", language) + ": " + (logsState.message || ""));
+  }, [logsState, language]);
 
   const handleSearch = () => {
-    fetchLogs(1, pagination.pageSize);
     setPagination({ ...pagination, current: 1 });
   };
 
@@ -160,8 +165,8 @@ export default function AuditLogsPage() {
   };
 
   const handleTableChange = (pag: any) => {
+    // FETCH-003: changing pagination updates the params, the seam refetches.
     setPagination(pag);
-    fetchLogs(pag.current, pag.pageSize);
   };
 
   const formatJsonContent = (jsonStr: string | null | undefined) => {

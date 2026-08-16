@@ -10,6 +10,7 @@ import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi, reportApi } from "../lib/api";
+import { useRetailQuery } from "../retail/useRetailQuery";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
@@ -41,7 +42,6 @@ function SensitivityPage() {
   const [contractParam, setContractParam] = useUrlState("contract_id", "");
   const [baseRateParam, setBaseRateParam] = useUrlState("base_rate", "");
   const [shockParam, setShockParam] = useUrlState("shock", "1");
-  const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [rows, setRows] = useState<ScenarioRow[]>([]);
   const [meta, setMeta] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -59,13 +59,15 @@ function SensitivityPage() {
     );
   }, [rows]);
 
-  useEffect(() => {
-    if (!token) return;
-    contractApi
-      .list(token, { status: "approved", sort_by: "created_at", sort_order: "desc" })
-      .then((res) => setContracts(res.data || []))
-      .catch((error: any) => notifyError(error.message || "合同列表加载失败"));
-  }, [token]);
+  // FETCH-003: the approved-contract dropdown runs through the shared
+  // fetch seam (race gate / token injection / error exit).
+  const { state: contractsState } = useRetailQuery({
+    token,
+    params: { status: "approved" as const, sort_by: "created_at" as const, sort_order: "desc" as const },
+    paramsKey: "approved-contracts",
+    fetcher: (p, t) => contractApi.list(t, p).then((res) => res.data ?? []),
+  });
+  const contracts: ContractOption[] = contractsState.kind === "ready" ? (contractsState.data ?? []) : [];
 
   const runAnalysis = async (values: any) => {
     if (!token) return;

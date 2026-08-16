@@ -1803,6 +1803,74 @@ export const retailAnalyticsApi = {
   },
 };
 
+export type RetailIngestColumnProfile = {
+  header: string;
+  non_empty: number;
+  numeric_like: number;
+  date_like: number;
+  masked_sample?: string;
+};
+
+export type RetailIngestRowError = { row: number; column?: string; code: string; message: string };
+
+export type RetailIngestReport = {
+  total_rows: number;
+  valid_rows: number;
+  errors?: RetailIngestRowError[];
+  unmatched_stores?: string[];
+  missing_fields?: string[];
+  ambiguous_mappings?: string[];
+  coverage: { store_count: number; date_from?: string; date_to?: string; overlap_store_days: number; new_store_days: number };
+};
+
+export type RetailIngestPreviewResponse = {
+  basis: string;
+  format: string;
+  source_file: string;
+  standard_fields: string[];
+  headers: string[];
+  column_profiles: RetailIngestColumnProfile[];
+  suggested_mapping: Record<string, string>;
+  mapping: Record<string, string>;
+  rows_preview: string[][];
+  resolution: { matched_count: number; unmatched: string[] };
+  report: RetailIngestReport;
+};
+
+export type RetailIngestCommitResponse = {
+  basis: string;
+  batch: { id: string; status: string; accepted_rows: number; rejected_rows: number; source_system: string };
+  report: {
+    batch_id: string; total_rows: number; accepted_rows: number; rejected_rows: number;
+    chunks: number; chunk_size: number; replay_detected: boolean;
+    new_store_days: number; superseded_store_days: number;
+    errors?: RetailIngestRowError[];
+  };
+  saved_count: number;
+  failed_count: number;
+  idempotent_replay: boolean;
+  envelope: { source_system: string; import_batch_id: string; as_of_at: string };
+};
+
+export const retailIngestApi = {
+  preview: (file: File, sourceSystem: string, mapping: Record<string, string> | null, token: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("source_system", sourceSystem);
+    if (mapping) form.append("mapping", JSON.stringify(mapping));
+    return apiRequest("/api/v1/retail/operating-facts/store-days/import/preview", { method: "POST", body: form, token }) as Promise<RetailIngestPreviewResponse>;
+  },
+  commit: (file: File, sourceSystem: string, asOfAt: string, mapping: Record<string, string> | null, idempotencyKey: string, token: string) => {
+    if (!idempotencyKey) throw new Error("Idempotency-Key is required");
+    const form = new FormData();
+    form.append("file", file);
+    form.append("source_system", sourceSystem);
+    form.append("as_of_at", asOfAt);
+    if (mapping) form.append("mapping", JSON.stringify(mapping));
+    return apiRequest("/api/v1/retail/operating-facts/store-days/import/commit", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: form, token }) as Promise<RetailIngestCommitResponse>;
+  },
+};
+
 export const operatingFactsApi = {
   upsertStores: (items: Record<string, unknown>[], token: string, sourceFile?: string, sourceSystem?: string) =>
     apiRequest(`/api/v1/operating-facts/stores`, { method: "POST", body: JSON.stringify({ items, source_file: sourceFile, source_system: sourceSystem }), token }),

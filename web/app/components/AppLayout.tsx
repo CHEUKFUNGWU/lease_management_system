@@ -23,6 +23,7 @@ import {
   SwapOutlined,
   FileSearchOutlined,
   DashboardOutlined,
+  CloudUploadOutlined,
 } from "@ant-design/icons";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -65,6 +66,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     admin: t("nav.admin", language as any),
     users: t("nav.users", language as any),
     new: t("nav.new", language as any),
+    "retail-data-import": t("nav.retail_data_import", language as any),
   };
 }
 
@@ -110,11 +112,11 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
         type: "group",
         key: "daily-work",
         label: t("nav.group_daily", language as any),
-        children: [
-          item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
-          item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
-          item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
-        ],
+          children: [
+            item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
+            item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
+            item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
+          ],
       });
       if (canViewAccounting) {
         groups.push({
@@ -123,6 +125,7 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
           label: t("nav.group_accounting", language as any),
           children: [
             item("/reports", "/reports", <BarChartOutlined />, t("nav.reports", language as any)),
+            item("/retail-data-import", "/retail-data-import", <CloudUploadOutlined />, t("nav.retail_data_import", language as any)),
             item("/monthly-closing", "/monthly-closing", <CalculatorOutlined />, t("nav.monthly_closing", language as any)),
             item("/standards", "/standards", <SafetyOutlined />, t("nav.standards", language as any)),
             item("/audit-logs", "/audit-logs", <AuditOutlined />, t("nav.audit_logs", language as any)),

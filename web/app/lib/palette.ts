@@ -72,6 +72,7 @@ export const PALETTE_PAGES: PalettePageDef[] = [
 
   // 会计与合规（admin / auditor / editor / reviewer / approver）
   { path: "/reports", labelKey: "nav.reports", group: "accounting", visible: byGroup("accounting") },
+  { path: "/retail-data-import", labelKey: "nav.retail_data_import", group: "accounting", visible: byGroup("accounting") },
   { path: "/monthly-closing", labelKey: "nav.monthly_closing", group: "accounting", visible: byGroup("accounting") },
   { path: "/standards", labelKey: "nav.standards", group: "accounting", visible: byGroup("accounting") },
   { path: "/audit-logs", labelKey: "nav.audit_logs", group: "accounting", visible: byGroup("accounting") },

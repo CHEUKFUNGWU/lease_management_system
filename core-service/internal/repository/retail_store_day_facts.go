@@ -299,6 +299,39 @@ func (r *OperatingFactsRepository) ListRetailStoreDayFacts(ctx context.Context, 
 	return page.Data, nil
 }
 
+// RetailStoreDayExistingState returns the current max fact version per
+// "storeID|businessDate" key for one source system's production facts; pairs
+// with no row simply stay absent. This is the read side of the M8 correction
+// policy: a re-imported (store, date) gets max+1 and supersedes, history
+// stays queryable.
+func (r *OperatingFactsRepository) RetailStoreDayExistingState(ctx context.Context, storeIDs, businessDates []string, sourceSystem string) (map[string]int, error) {
+	if len(storeIDs) == 0 || len(businessDates) == 0 {
+		return map[string]int{}, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT s.id::text, d.day::text, COALESCE(MAX(f.version), 0)
+		FROM unnest($1::uuid[]) AS s(id)
+		CROSS JOIN unnest($2::date[]) AS d(day)
+		LEFT JOIN retail_store_day_facts f
+			ON f.store_id = s.id AND f.business_date = d.day
+			AND f.source_system = $3 AND f.data_classification = 'production'
+		GROUP BY s.id, d.day`, storeIDs, businessDates, sourceSystem)
+	if err != nil {
+		return nil, fmt.Errorf("query retail store-day existing state: %w", err)
+	}
+	defer rows.Close()
+	state := map[string]int{}
+	for rows.Next() {
+		var storeID, businessDate string
+		var version int
+		if err := rows.Scan(&storeID, &businessDate, &version); err != nil {
+			return nil, fmt.Errorf("scan retail store-day existing state: %w", err)
+		}
+		state[storeID+"|"+businessDate] = version
+	}
+	return state, rows.Err()
+}
+
 func (r *OperatingFactsRepository) prepareRetailStoreDayFact(fact *RetailStoreDayFact) {
 	if fact.ID == "" {
 		fact.ID = uuid.NewString()

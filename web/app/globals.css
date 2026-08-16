@@ -1657,6 +1657,28 @@ html {
 .scenario-block-gap-sm {
   margin-top: 12px;
 }
+/* Retail data import page (M8) — own rules, kept out of the shared groups
+   the STY-006 guards pin. */
+.retail-import-page {
+  display: block;
+}
+.retail-import-block-gap {
+  margin-top: 16px;
+}
+.retail-import-block-gap-sm {
+  margin-top: 12px;
+}
+.retail-import-source-input {
+  width: 220px;
+}
+.retail-import-hint {
+  display: block;
+  margin-top: 8px;
+}
+.retail-import-mapping-select {
+  width: 100%;
+  max-width: 320px;
+}
 .pulse-block-margin,
 .contract-block-gap-bottom,
 .store360-block-margin {

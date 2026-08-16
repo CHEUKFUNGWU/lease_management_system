@@ -15,6 +15,8 @@ const pulseBackend = readFileSync(path.join(repoRoot, "core-service/internal/ser
 const kpiBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailkpi/retail_kpi.go"), "utf8");
 const plFlowBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailstore360/pl_flow.go"), "utf8");
 const plFlowPanel = readFileSync(path.join(import.meta.dirname, "../store-360/ProfitFlowPanel.tsx"), "utf8");
+const ingestBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailingest/retailingest.go"), "utf8");
+const ingestPage = readFileSync(path.join(import.meta.dirname, "../retail-data-import/page.tsx"), "utf8");
 
 function quotedTokens(source: string, pattern: RegExp): string[] {
   return Array.from(source.matchAll(pattern), (m) => m[1]);
@@ -54,6 +56,30 @@ describe("CONTRACT-001 code-list contracts", () => {
     const linkRefs = quotedTokens(plFlowBackend, /\{From: "([^"]+)"/g).concat(quotedTokens(plFlowBackend, /To: "([^"]+)"/g));
     for (const ref of linkRefs) {
       expect(nodeKeys, `link ref ${ref} has a node`).toContain(ref);
+    }
+  });
+
+  it("导入页必填字段清单 = retailingest.RequiredFields（单一来源）", () => {
+    // The Go module declares fields as constants; resolve FieldX -> value
+    // first, then map the RequiredFields identifiers through them.
+    const fieldConstants = new Map<string, string>();
+    for (const match of ingestBackend.matchAll(/(Field\w+)\s+=\s+"([^"]+)"/g)) {
+      fieldConstants.set(match[1], match[2]);
+    }
+    expect(fieldConstants.size, "retailingest field constants found").toBeGreaterThan(10);
+    const backendMatch = /RequiredFields = \[\]string\{([^}]*)\}/.exec(ingestBackend);
+    expect(backendMatch, "retailingest RequiredFields found").not.toBeNull();
+    const backendRequired = backendMatch![1].split(",").map((token) => fieldConstants.get(token.trim()) ?? "").filter(Boolean).sort();
+    expect(backendRequired.length, "RequiredFields resolves to string values").toBe(4);
+    const pageMatch = /REQUIRED_FIELDS = \[([^}]*)\]/.exec(ingestPage);
+    expect(pageMatch, "import page REQUIRED_FIELDS found").not.toBeNull();
+    const pageRequired = quotedTokens(pageMatch![1], /"([^"]+)"/g).sort();
+    expect(pageRequired, "page required fields mirror the backend list").toEqual(backendRequired);
+    // The full standard-field list comes from the preview response, never a
+    // front-end copy — the optional fields must not appear as literals.
+    expect(ingestPage).toContain("standard_fields.map");
+    for (const optionalField of ["\"gross_profit\"", "\"area_sqm\"", "\"other_controllable_cost\""]) {
+      expect(ingestPage, `page must not copy the backend field list (${optionalField})`).not.toContain(optionalField);
     }
   });
 });

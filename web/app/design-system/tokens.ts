@@ -29,6 +29,12 @@ export const colors = {
     elevated: "#FFFFFF",    // Modal, dropdown — same as page but with shadow
     inset: "#F0F0F0",       // Table headers, secondary panels
     code: "#F7F7F7",        // Code blocks, diff backgrounds
+    // DARK-003: the login brand slab is an identity surface, not a foreground.
+    // It used var(--fg-primary), so the dark theme flipped it white — the black
+    // slab is the brand, and it stays black in both themes. Its text is pinned
+    // the same way: `--fg-inverse` follows the theme and went dark-on-black.
+    brandSlab: "#000000",
+    onBrandSlab: "#FFFFFF",
   },
 
   foreground: {
@@ -289,6 +295,8 @@ export const darkColors = {
     elevated: "#1E1E1E",
     inset: "#262626",
     code: "#1E1E1E",
+    brandSlab: "#000000",
+    onBrandSlab: "#FFFFFF",
   },
   foreground: {
     primary: "#FFFFFF",

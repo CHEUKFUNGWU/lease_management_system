@@ -29,6 +29,9 @@
   --bg-elevated: var(--mono-100);
   --bg-inset: var(--mono-95);
   --bg-code: var(--mono-98);
+  /* DARK-003: identity surface — the brand slab is black in both themes. */
+  --bg-brand-slab: #000000;
+  --fg-on-brand-slab: #FFFFFF;
 
   /* Foreground */
   --fg-primary: var(--mono-0);
@@ -103,6 +106,9 @@
   --bg-elevated: var(--mono-98);
   --bg-inset: var(--mono-95);
   --bg-code: var(--mono-98);
+  /* DARK-003: identity surface — the brand slab is black in both themes. */
+  --bg-brand-slab: #000000;
+  --fg-on-brand-slab: #FFFFFF;
 
   --fg-primary: var(--mono-0);
   --fg-secondary: var(--mono-20);
@@ -2276,8 +2282,8 @@ html {
   align-items: center;
   overflow: hidden;
   padding: 72px 64px;
-  background: var(--fg-primary);
-  color: var(--fg-inverse);
+  background: var(--bg-brand-slab);
+  color: var(--fg-on-brand-slab);
 }
 
 /* A hairline grid keeps the dark panel from reading as a flat slab. */
@@ -2367,10 +2373,19 @@ html {
 }
 
 .login-panel {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 48px 32px;
+}
+
+/* DARK-003: the theme toggle sits in the panel's top corner — the login screen
+   has no app header to host it. */
+.login-panel-actions {
+  position: absolute;
+  top: 20px;
+  right: 24px;
 }
 
 .login-panel-inner {

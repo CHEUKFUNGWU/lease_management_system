@@ -15,6 +15,12 @@ export function buildTheme(palette: typeof colors | typeof darkColors) {
     // STY-007: primary-button hover used to be painted foreground.secondary by CSS; antd
     // derives the hover fill from colorPrimaryHover.
     colorPrimaryHover: palette.foreground.secondary,
+    // DARK-003: the text antd paints on a solid primary surface. It defaults to
+    // white, which is right while colorPrimary is black — but the dark theme's
+    // primary IS white, so the login button rendered white-on-#DCDCDC at 1.37:1.
+    // Tying it to the page canvas keeps it the inverse of the primary surface in
+    // both themes.
+    colorTextLightSolid: palette.background.page,
     colorInfo: palette.state.info,
     // STY-007: antd's Statistic title renders with colorTextDescription;
     // the old CSS forced foreground.tertiary — carry the rendered value.

@@ -1,26 +1,33 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { ConfigProvider, theme as antdTheme } from "antd";
 import { MotionConfig } from "framer-motion";
 import { antdTheme as lightTheme, antdDarkTheme } from "../design-system/theme";
+import { THEME_COOKIE, THEME_COOKIE_MAX_AGE, type AppTheme } from "../lib/theme-cookie";
 
-export type AppTheme = "light" | "dark";
-
-const THEME_STORAGE_KEY = "app-theme";
+export type { AppTheme };
 
 /**
- * DARK-001: theme switching.
+ * DARK-003: the theme is decided by the server and never changes while a page
+ * is alive.
  *
- * The default follows the OS preference (prefers-color-scheme); a manual
- * choice in the header overrides it and is persisted in localStorage. The
- * active theme is written onto <html data-theme="dark"> — globals.css
- * overrides the semantic CSS variables there (equal specificity to :root,
- * later in the file, no forced-importance flag) — and AntD switches to
- * darkAlgorithm.
+ * DARK-001 switched the ConfigProvider theme on the client. That produced a
+ * defect no palette-level check could see: antd generated its styles under the
+ * new theme's cache hash while the mounted elements kept the class names from
+ * the first render, so in dark mode every antd component matched no rule at
+ * all — the login form rendered unstyled and collapsed.
  *
- * The provider renders a stable context so the header toggle can read and
- * flip the current theme without prop drilling.
+ * The fix is to remove the transition rather than to chase it. The choice
+ * lives in a cookie, the server reads it and renders <html data-theme>, and
+ * this provider takes that value as a prop. Within one page lifetime the theme
+ * is constant, so the class names on the elements and the injected styles are
+ * always generated from the same config.
+ *
+ * The cost is a reload when the user flips the toggle, which is the honest
+ * trade: a themed document is a server-rendered artifact here, not client
+ * state. It also removes the flash of the wrong theme on first paint, since
+ * the markup arrives already correct.
  */
 export const ThemeContext = React.createContext<{ theme: AppTheme; setTheme: (t: AppTheme) => void }>({
   theme: "light",
@@ -31,44 +38,27 @@ export function useAppTheme() {
   return React.useContext(ThemeContext);
 }
 
-function systemPrefersDark(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+export function writeThemeCookie(next: AppTheme) {
+  document.cookie = `${THEME_COOKIE}=${next}; path=/; max-age=${THEME_COOKIE_MAX_AGE}; samesite=lax`;
 }
 
-export default function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<AppTheme>(() => {
-    if (typeof window === "undefined") return "light";
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === "light" || stored === "dark") return stored;
-    return systemPrefersDark() ? "dark" : "light";
-  });
+export default function ThemeProvider({
+  initialTheme,
+  children,
+}: {
+  initialTheme: AppTheme;
+  children: React.ReactNode;
+}) {
+  // Deliberately not state: the theme cannot change without a reload, and
+  // pretending otherwise is what broke DARK-001.
+  const theme = initialTheme;
 
   const setTheme = (next: AppTheme) => {
-    setThemeState(next);
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch {
-      // storage can be unavailable (private mode); the in-memory theme still works
-    }
+    if (next === theme) return;
+    writeThemeCookie(next);
+    // The server owns the rendered theme, so ask it for the other one.
+    window.location.reload();
   };
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
-
-  // Follow OS changes only while the user has not made an explicit choice.
-  useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-    if (!mq) return;
-    const onChange = (e: MediaQueryListEvent) => {
-      const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored === "light" || stored === "dark") return;
-      setThemeState(e.matches ? "dark" : "light");
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>

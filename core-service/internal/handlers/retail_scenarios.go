@@ -189,7 +189,7 @@ func (h *RetailScenarioHandler) parseQueryOnly(c *gin.Context) (retailscenario.Q
 	if raw := strings.TrimSpace(c.Query("window_days")); raw != "" {
 		parsed, scanErr := strconv.Atoi(raw)
 		if scanErr != nil {
-			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be one of 7, 14 or 28", nil)
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
 			return retailscenario.Query{}, false
 		}
 		windowDays = parsed

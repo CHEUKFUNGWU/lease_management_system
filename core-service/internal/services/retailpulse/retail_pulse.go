@@ -11,12 +11,13 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 const (
 	PulseVersion          = "retail-pulse-v1"
-	DefaultWindowDays     = 7
+	DefaultWindowDays     = retailperiod.DefaultRollingDays
 	DefaultAttentionLimit = 10
 	UnknownCurrencyStatus = "unknown"
 )
@@ -34,6 +35,19 @@ type Query struct {
 	SourceSystem   string
 	StoreIDs       []string
 	AttentionLimit int
+	// M5: group the attention ranking — "" and "total" keep the per-store
+	// ranking (zero regression); "store" labels it; "region"/"brand" rank
+	// groups built from the same facts and signal rules.
+	GroupBy string
+	// M2 calendar periods: when the handler resolves a period like 2026-07
+	// through retailperiod it passes the four boundaries here; they override
+	// the rolling derivation below. WindowDays then carries the current
+	// window's day count for sizing, never for derivation.
+	DateFrom          time.Time
+	DateTo            time.Time
+	ComparisonDateFrom time.Time
+	ComparisonDateTo   time.Time
+	PeriodLabel       string
 }
 
 type Period struct {
@@ -84,6 +98,9 @@ type Evidence struct {
 
 type Attention struct {
 	Rank            int                           `json:"rank"`
+	GroupBy         string                        `json:"group_by,omitempty"`
+	GroupKey        string                        `json:"group_key,omitempty"`
+	GroupLabel      string                        `json:"group_label,omitempty"`
 	StoreID         string                        `json:"store_id"`
 	StoreCode       string                        `json:"store_code"`
 	StoreName       string                        `json:"store_name"`
@@ -101,6 +118,9 @@ type Attention struct {
 }
 
 type SuppressedAttention struct {
+	GroupBy            string             `json:"group_by,omitempty"`
+	GroupKey           string             `json:"group_key,omitempty"`
+	GroupLabel         string             `json:"group_label,omitempty"`
 	StoreID            string             `json:"store_id"`
 	StoreCode          string             `json:"store_code"`
 	StoreName          string             `json:"store_name"`
@@ -144,6 +164,8 @@ type Response struct {
 	HighestAsOf               *time.Time                  `json:"highest_as_of,omitempty"`
 	MultiCurrency             bool                        `json:"multi_currency"`
 	MixedCurrencyStores       int                         `json:"mixed_currency_stores,omitempty"`
+	PeriodLabel               string                      `json:"period_label,omitempty"`
+	GroupBy                   string                      `json:"group_by,omitempty"`
 	Currency                  string                      `json:"currency,omitempty"`
 	CurrencyStatus            string                      `json:"currency_status,omitempty"`
 	Current                   Period                      `json:"current"`
@@ -181,11 +203,16 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 	if query.LegalEntityID == "" {
 		return nil, fmt.Errorf("legal entity scope is required")
 	}
-	if query.WindowDays == 0 {
+	if query.DateTo.IsZero() != query.DateFrom.IsZero() || query.ComparisonDateFrom.IsZero() != query.ComparisonDateTo.IsZero() || query.DateTo.IsZero() != query.ComparisonDateTo.IsZero() {
+		return nil, fmt.Errorf("explicit period boundaries must be complete (from/to for current and comparison)")
+	}
+	if query.WindowDays == 0 && query.DateTo.IsZero() {
 		query.WindowDays = DefaultWindowDays
 	}
-	if query.WindowDays < 7 || query.WindowDays > 28 {
-		return nil, fmt.Errorf("window_days must be between 7 and 28")
+	if query.DateTo.IsZero() {
+		if _, err := retailperiod.ParseRollingDays(query.WindowDays); err != nil {
+			return nil, fmt.Errorf("window_days must be between 7 and 28")
+		}
 	}
 	if query.AsOf.IsZero() {
 		return nil, fmt.Errorf("as_of is required")
@@ -199,6 +226,11 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 	if query.Classification == "production" && query.DatasetVersion != "" {
 		return nil, fmt.Errorf("dataset version is not allowed for production data")
 	}
+	switch query.GroupBy {
+	case "", "total", "region", "brand", "store":
+	default:
+		return nil, fmt.Errorf("group_by must be one of total, region, brand, store")
+	}
 	if query.AttentionLimit == 0 {
 		query.AttentionLimit = DefaultAttentionLimit
 	}
@@ -209,6 +241,15 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 	currentStart := currentEnd.AddDate(0, 0, -(query.WindowDays - 1))
 	comparisonEnd := currentStart.AddDate(0, 0, -1)
 	comparisonStart := comparisonEnd.AddDate(0, 0, -(query.WindowDays - 1))
+	periodLabel := fmt.Sprintf("近 %d 天", query.WindowDays)
+	if !query.DateTo.IsZero() {
+		// Calendar period: the handler resolved the boundaries through
+		// retailperiod (previous calendar month/quarter as comparison).
+		currentStart, currentEnd = dateOnly(query.DateFrom), dateOnly(query.DateTo)
+		comparisonStart, comparisonEnd = dateOnly(query.ComparisonDateFrom), dateOnly(query.ComparisonDateTo)
+		query.WindowDays = inclusiveDays(currentStart, currentEnd)
+		periodLabel = query.PeriodLabel
+	}
 	dateFrom, dateTo := comparisonStart.Format("2006-01-02"), currentEnd.Format("2006-01-02")
 	set, err := s.reader.QueryFacts(ctx, query.LegalEntityID, dateFrom, dateTo, query.Classification, query.DatasetVersion, query.SourceSystem, query.StoreIDs)
 	if err != nil {
@@ -232,6 +273,8 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 		MixedCurrencyStores:       mixedCurrencyStores(set.Facts),
 		Current:                   Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")},
 		Comparison:                Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")},
+		PeriodLabel:               periodLabel,
+		GroupBy:                   query.GroupBy,
 		GeneratedAt:               s.now(), DefinitionsURL: "/api/v1/retail/kpis/definitions",
 		KPIDrilldownURL:           drilldownTemplate(linkQuery, "{group_by}", "{store_id}", "{date_from}", "{date_to}"),
 		StoreDrilldownURL:         drilldownTemplate(linkQuery, "store", "{store_id}", "{date_from}", "{date_to}"),
@@ -495,28 +538,31 @@ type signalRule struct {
 
 var signalRules = []signalRule{{"revenue_decline", "revenue", "down", "percent", -15, false}, {"footfall_decline", "footfall", "down", "percent", -15, false}, {"conversion_drop", "conversion_rate", "down", "percentage_point", -3, true}, {"average_ticket_drop", "average_transaction_value", "down", "percent", -15, false}, {"gross_margin_compression", "gross_margin_rate", "down", "percentage_point", -5, true}, {"labor_cost_rate_spike", "labor_cost_rate", "up", "percentage_point", 5, true}, {"occupancy_cost_rate_spike", "occupancy_cash_cost_rate", "up", "percentage_point", 5, true}}
 
+// attentionTarget is one attention unit: a store, or a region/brand group
+// when the request groups the view (M5). The evaluation core below is
+// identical for both — suppression, signal rules, scoring and evidence.
+type attentionTarget struct {
+	groupBy, groupKey, groupLabel, sortKey string
+	storeID, storeCode, storeName, brand, region string
+	expectedStores int
+	facts          []retailkpi.DailyFact
+}
+
 func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, limit int, currentStart, currentEnd, comparisonStart, comparisonEnd time.Time, set *repository.RetailKPIFactSet) ([]Attention, []SuppressedAttention) {
-	byStore := map[string][]retailkpi.DailyFact{}
-	metadata := map[string]retailkpi.DailyFact{}
-	for _, fact := range facts {
-		key := fact.StoreID
-		byStore[key] = append(byStore[key], fact)
-		metadata[key] = fact
-	}
+	targets := attentionTargets(facts, query, set)
 	type candidate struct{ attention Attention }
 	candidates := []candidate{}
 	suppressed := []SuppressedAttention{}
-	for storeID, storeFacts := range byStore {
-		store := metadata[storeID]
-		currentFacts, comparisonFacts := between(storeFacts, currentStart, currentEnd), between(storeFacts, comparisonStart, comparisonEnd)
-		currentAgg, currentCoverage := totalAggregate(currentFacts, currentStart, currentEnd, 1)
-		comparisonAgg, comparisonCoverage := totalAggregate(comparisonFacts, comparisonStart, comparisonEnd, 1)
+	for _, target := range targets {
+		currentFacts, comparisonFacts := between(target.facts, currentStart, currentEnd), between(target.facts, comparisonStart, comparisonEnd)
+		currentAgg, currentCoverage := totalAggregate(currentFacts, currentStart, currentEnd, target.expectedStores)
+		comparisonAgg, comparisonCoverage := totalAggregate(comparisonFacts, comparisonStart, comparisonEnd, target.expectedStores)
 		reasons := suppressionReasons(currentAgg, comparisonAgg, currentCoverage, comparisonCoverage)
 		if len(reasons) > 0 || currentAgg == nil || comparisonAgg == nil || !currentAgg.DecisionReady || !comparisonAgg.DecisionReady {
 			if len(reasons) == 0 {
 				reasons = []string{"partial_or_unavailable_kpi"}
 			}
-			suppressed = append(suppressed, SuppressedAttention{StoreID: storeID, StoreCode: store.StoreCode, StoreName: store.StoreName, Brand: store.Brand, Region: store.Region, Currency: currency, CurrencyStatus: currencyStatus(currency), Reason: primarySuppressionReason(reasons), Reasons: reasons, CurrentCoverage: currentCoverage, ComparisonCoverage: comparisonCoverage})
+			suppressed = append(suppressed, SuppressedAttention{GroupBy: target.groupBy, GroupKey: target.groupKey, GroupLabel: target.groupLabel, StoreID: target.storeID, StoreCode: target.storeCode, StoreName: target.storeName, Brand: target.brand, Region: target.region, Currency: currency, CurrencyStatus: currencyStatus(currency), Reason: primarySuppressionReason(reasons), Reasons: reasons, CurrentCoverage: currentCoverage, ComparisonCoverage: comparisonCoverage})
 			continue
 		}
 		signals := make([]Signal, 0)
@@ -536,23 +582,27 @@ func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, l
 			score += signal.ScoreContribution
 		}
 		sort.Slice(signals, func(i, j int) bool { return signals[i].SignalCode < signals[j].SignalCode })
-		storeSourceSystems, storeDatasetVersions := factEnvelope(append(append([]retailkpi.DailyFact{}, currentFacts...), comparisonFacts...))
-		candidates = append(candidates, candidate{attention: Attention{StoreID: storeID, StoreCode: store.StoreCode, StoreName: store.StoreName, Brand: store.Brand, Region: store.Region, Currency: currency, CurrencyStatus: currencyStatus(currency), Score: round(score), Severity: severity(score), ObservedSignals: signals, CurrentKPIs: currentAgg.KPIs, ComparisonKPIs: comparisonAgg.KPIs, Evidence: Evidence{Current: Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")}, Comparison: Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")}, CurrentFactCount: len(currentFacts), ComparisonFactCount: len(comparisonFacts), SourceSystems: storeSourceSystems, DatasetVersions: storeDatasetVersions, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: PulseVersion}, Drilldown: map[string]string{"store_id": storeID, "store_code": store.StoreCode, "currency": currency, "data_classification": query.Classification, "simulation_dataset_version": query.DatasetVersion, "source_system": query.SourceSystem, "current_date_from": currentStart.Format("2006-01-02"), "current_date_to": currentEnd.Format("2006-01-02"), "comparison_date_from": comparisonStart.Format("2006-01-02"), "comparison_date_to": comparisonEnd.Format("2006-01-02"), "current_url": drilldownURL(query, "store", storeID, currentStart, currentEnd), "comparison_url": drilldownURL(query, "store", storeID, comparisonStart, comparisonEnd)}}})
+		unitFacts := append(append([]retailkpi.DailyFact{}, currentFacts...), comparisonFacts...)
+		unitSources, unitDatasets := factEnvelope(unitFacts)
+		drilldownGroupBy := "store"
+		drilldownStoreID := target.storeID
+		if target.groupBy == "region" || target.groupBy == "brand" {
+			drilldownGroupBy = target.groupBy
+			drilldownStoreID = ""
+		}
+		candidates = append(candidates, candidate{attention: Attention{GroupBy: target.groupBy, GroupKey: target.groupKey, GroupLabel: target.groupLabel, StoreID: target.storeID, StoreCode: target.storeCode, StoreName: target.storeName, Brand: target.brand, Region: target.region, Currency: currency, CurrencyStatus: currencyStatus(currency), Score: round(score), Severity: severity(score), ObservedSignals: signals, CurrentKPIs: currentAgg.KPIs, ComparisonKPIs: comparisonAgg.KPIs, Evidence: Evidence{Current: Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")}, Comparison: Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")}, CurrentFactCount: len(currentFacts), ComparisonFactCount: len(comparisonFacts), SourceSystems: unitSources, DatasetVersions: unitDatasets, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: PulseVersion}, Drilldown: map[string]string{"group_by": drilldownGroupBy, "store_id": drilldownStoreID, "store_code": target.storeCode, "currency": currency, "data_classification": query.Classification, "simulation_dataset_version": query.DatasetVersion, "source_system": query.SourceSystem, "current_date_from": currentStart.Format("2006-01-02"), "current_date_to": currentEnd.Format("2006-01-02"), "comparison_date_from": comparisonStart.Format("2006-01-02"), "comparison_date_to": comparisonEnd.Format("2006-01-02"), "current_url": drilldownURL(query, drilldownGroupBy, drilldownStoreID, currentStart, currentEnd), "comparison_url": drilldownURL(query, drilldownGroupBy, drilldownStoreID, comparisonStart, comparisonEnd)}}})
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		if candidates[i].attention.Score != candidates[j].attention.Score {
 			return candidates[i].attention.Score > candidates[j].attention.Score
 		}
-		return candidates[i].attention.StoreCode < candidates[j].attention.StoreCode
+		return attentionSortKey(candidates[i].attention) < attentionSortKey(candidates[j].attention)
 	})
 	if len(candidates) > limit {
 		candidates = candidates[:limit]
 	}
 	sort.SliceStable(suppressed, func(i, j int) bool {
-		if suppressed[i].StoreCode != suppressed[j].StoreCode {
-			return suppressed[i].StoreCode < suppressed[j].StoreCode
-		}
-		return suppressed[i].StoreID < suppressed[j].StoreID
+		return suppressed[i].StoreCode+suppressed[i].GroupLabel < suppressed[j].StoreCode+suppressed[j].GroupLabel
 	})
 	result := make([]Attention, len(candidates))
 	for i := range candidates {
@@ -560,6 +610,70 @@ func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, l
 		result[i].Rank = i + 1
 	}
 	return result, suppressed
+}
+
+// attentionTargets splits the partition facts into attention units. The
+// default (and group_by=store) keeps the per-store ranking — zero regression;
+// region/brand group the same facts per group value with the expected store
+// count taken from the authorized population so missing stores suppress
+// rather than vanish.
+func attentionTargets(facts []retailkpi.DailyFact, query Query, set *repository.RetailKPIFactSet) []attentionTarget {
+	if query.GroupBy != "region" && query.GroupBy != "brand" {
+		byStore := map[string][]retailkpi.DailyFact{}
+		metadata := map[string]retailkpi.DailyFact{}
+		for _, fact := range facts {
+			byStore[fact.StoreID] = append(byStore[fact.StoreID], fact)
+			metadata[fact.StoreID] = fact
+		}
+		targets := make([]attentionTarget, 0, len(byStore))
+		for storeID, storeFacts := range byStore {
+			store := metadata[storeID]
+			targets = append(targets, attentionTarget{groupBy: query.GroupBy, groupKey: storeID, groupLabel: store.StoreName, sortKey: store.StoreCode, storeID: storeID, storeCode: store.StoreCode, storeName: store.StoreName, brand: store.Brand, region: store.Region, expectedStores: 1, facts: storeFacts})
+		}
+		return targets
+	}
+	byGroup := map[string][]retailkpi.DailyFact{}
+	storesInGroup := map[string]map[string]bool{}
+	for _, fact := range facts {
+		key := fact.Region
+		if query.GroupBy == "brand" {
+			key = fact.Brand
+		}
+		byGroup[key] = append(byGroup[key], fact)
+		if storesInGroup[key] == nil {
+			storesInGroup[key] = map[string]bool{}
+		}
+		storesInGroup[key][fact.StoreID] = true
+	}
+	expectedByGroup := map[string]int{}
+	for _, store := range set.ExpectedStores {
+		key := store.Region
+		if query.GroupBy == "brand" {
+			key = store.Brand
+		}
+		expectedByGroup[key]++
+	}
+	keys := make([]string, 0, len(byGroup))
+	for key := range byGroup {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	targets := make([]attentionTarget, 0, len(keys))
+	for _, key := range keys {
+		expected := expectedByGroup[key]
+		if expected == 0 {
+			expected = len(storesInGroup[key])
+		}
+		targets = append(targets, attentionTarget{groupBy: query.GroupBy, groupKey: key, groupLabel: key, sortKey: key, expectedStores: expected, facts: byGroup[key]})
+	}
+	return targets
+}
+
+func attentionSortKey(attention Attention) string {
+	if attention.StoreCode != "" {
+		return attention.StoreCode
+	}
+	return attention.GroupLabel
 }
 
 func evaluateSignal(rule signalRule, current, comparison retailkpi.Aggregate) (Signal, bool) {

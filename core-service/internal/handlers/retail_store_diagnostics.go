@@ -76,7 +76,7 @@ func (h *RetailStoreDiagnosticsHandler) Diagnostics(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query("window_days")); raw != "" {
 		windowDays, err = strconv.Atoi(raw)
 		if err != nil {
-			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be one of 7, 14 or 28", nil)
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
 			return
 		}
 	}
@@ -127,7 +127,7 @@ func (h *RetailStoreDiagnosticsHandler) PlFlow(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query("window_days")); raw != "" {
 		windowDays, err = strconv.Atoi(raw)
 		if err != nil {
-			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be one of 7, 14 or 28", nil)
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
 			return
 		}
 	}

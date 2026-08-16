@@ -176,7 +176,7 @@ var benchmarkCodes = []string{"revenue", "gross_profit", "gross_margin_rate", "f
 var summaryCodes = []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost", "occupancy_cash_cost", "other_controllable_cost", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"}
 
 func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
-	if s.reader == nil || strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || (q.WindowDays != 7 && q.WindowDays != 14 && q.WindowDays != 28) || (q.Classification != "production" && q.Classification != "simulated") {
+	if s.reader == nil || strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || (q.WindowDays < 7 || q.WindowDays > 28) || (q.Classification != "production" && q.Classification != "simulated") {
 		return nil, ErrInvalidQuery
 	}
 	if q.Classification == "simulated" && strings.TrimSpace(q.DatasetVersion) == "" {

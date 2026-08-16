@@ -263,7 +263,7 @@ func scenarioFillEnvelope(response *Response, q Query, facts []retailkpi.DailyFa
 }
 
 func validateQuery(q Query) error {
-	if strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || (q.WindowDays != 7 && q.WindowDays != 14 && q.WindowDays != 28) || (q.Classification != "production" && q.Classification != "simulated") {
+	if strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || (q.WindowDays < 7 || q.WindowDays > 28) || (q.Classification != "production" && q.Classification != "simulated") {
 		return ErrInvalidRequest
 	}
 	if q.Classification == "simulated" && strings.TrimSpace(q.DatasetVersion) == "" {

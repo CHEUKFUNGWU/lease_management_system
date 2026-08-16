@@ -29,11 +29,11 @@ func TestRetailStoreDayFactsTenantIsolationByIDsCharacterization(t *testing.T) {
 
 	// The paged list scopes by the caller's legal entity even when the caller
 	// supplies another entity's store ids.
-	pageB, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, pair.entityB), "2026-08-01", "2026-08-01", []string{pair.storeA}, 10, 0)
+	pageB, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, pair.entityB), "2026-08-01", "2026-08-01", []string{pair.storeA}, "", 10, 0)
 	if err != nil || pageB.Total != 0 || len(pageB.Data) != 0 {
 		t.Fatalf("entity B page with entity A store ids = total %d rows %d, err %v; want 0/0", pageB.Total, len(pageB.Data), err)
 	}
-	pageA, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, pair.entityA), "2026-08-01", "2026-08-01", []string{pair.storeA}, 10, 0)
+	pageA, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, pair.entityA), "2026-08-01", "2026-08-01", []string{pair.storeA}, "", 10, 0)
 	if err != nil || pageA.Total != 1 || len(pageA.Data) != 1 {
 		t.Fatalf("entity A page with own store ids = total %d rows %d, err %v; want 1/1", pageA.Total, len(pageA.Data), err)
 	}

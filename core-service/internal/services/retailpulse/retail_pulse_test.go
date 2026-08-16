@@ -26,6 +26,10 @@ func (f *fakeReader) QueryFacts(context.Context, string, string, string, string,
 	return f.set, f.err
 }
 
+// Queries in this file are pinned to 7-day windows — the fixed-seed and
+// coverage expectations were derived under that span. The M2 product
+// default is now 14 (retailperiod.DefaultRollingDays); pinning keeps these
+// regressions meaningful regardless of the default.
 func TestFixedSeedPulseSignalsAndSingleRead(t *testing.T) {
 	plan, err := retailsimulation.Build("entity-a", retailsimulation.Input{})
 	if err != nil {
@@ -43,7 +47,7 @@ func TestFixedSeedPulseSignalsAndSingleRead(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		asOf, _ := time.Parse("2006-01-02", testCase.asOf)
-		response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: asOf, Classification: "simulated", DatasetVersion: plan.DatasetVersion, AttentionLimit: 50})
+		response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: asOf, WindowDays: 7, Classification: "simulated", DatasetVersion: plan.DatasetVersion, AttentionLimit: 50})
 		if err != nil {
 			t.Fatalf("%s: %v", testCase.asOf, err)
 		}
@@ -92,7 +96,7 @@ func TestPulseSummaryDrilldownPreservesExplicitStoreScope(t *testing.T) {
 	storeIDs := []string{"store-a", "store-b"}
 	reader := &fakeReader{set: &repository.RetailKPIFactSet{Facts: simulationFacts(plan), ExpectedStoreCount: 60, SourceSystems: []string{"retail_simulator"}, DatasetVersions: []string{plan.DatasetVersion}}}
 	asOf, _ := time.Parse("2006-01-02", "2026-06-05")
-	response, err := NewService(reader).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: asOf, Classification: "simulated", DatasetVersion: plan.DatasetVersion, StoreIDs: storeIDs})
+	response, err := NewService(reader).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: asOf, WindowDays: 7, Classification: "simulated", DatasetVersion: plan.DatasetVersion, StoreIDs: storeIDs})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +113,7 @@ func TestPulseResponseCarriesRequestedStoreMetadataForEmptyScope(t *testing.T) {
 		ExpectedStoreCount: 1,
 		ExpectedStores:     []retailkpi.StorePopulation{{StoreID: "store-1", StoreCode: "S001", StoreName: "店一", Brand: "Brand A", Region: "North"}},
 	}
-	response, err := NewService(&fakeReader{set: set}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production"})
+	response, err := NewService(&fakeReader{set: set}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +130,7 @@ func TestPulseSuppressedAttentionOrderingAndSeverityBoundaries(t *testing.T) {
 			facts = append(facts, dailyFact(store.id, store.code, "CNY", from.AddDate(0, 0, i), 100))
 		}
 	}
-	response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 2}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production", AttentionLimit: 10})
+	response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 2}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +288,7 @@ func TestPulseCoverageSuppressionAndMultiCurrency(t *testing.T) {
 	facts := []retailkpi.DailyFact{dailyFact("s1", "S1", "CNY", from, 100), dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, 1), 100), dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, 2), 100), dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, 3), 100), dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, 4), 100), dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, 5), 100), dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, 6), 100), dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, 7), 100), dailyFact("s1", "S1", "USD", from, 100), dailyFact("s1", "S1", "USD", from.AddDate(0, 0, 1), 100), dailyFact("s1", "S1", "USD", from.AddDate(0, 0, 2), 100), dailyFact("s1", "S1", "USD", from.AddDate(0, 0, 3), 100), dailyFact("s1", "S1", "USD", from.AddDate(0, 0, 4), 100), dailyFact("s1", "S1", "USD", from.AddDate(0, 0, 5), 100), dailyFact("s1", "S1", "USD", from.AddDate(0, 0, 6), 100)}
 	reader := &fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1}}
 	service := NewService(reader)
-	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 7), Classification: "production", AttentionLimit: 10})
+	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 7), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,7 +303,7 @@ func TestPulseCoverageSuppressionAndMultiCurrency(t *testing.T) {
 	}
 
 	reader.set = &repository.RetailKPIFactSet{Facts: facts[:7], ExpectedStoreCount: 1}
-	response, err = service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 7), Classification: "production", AttentionLimit: 10})
+	response, err = service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 7), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +363,7 @@ func TestPulseInvalidFactsAreSuppressed(t *testing.T) {
 		facts = append(facts, fact)
 	}
 	service := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1}})
-	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production", AttentionLimit: 10})
+	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +375,7 @@ func TestPulseInvalidFactsAreSuppressed(t *testing.T) {
 func TestPulseSuppressionReasons(t *testing.T) {
 	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	build := func(facts []retailkpi.DailyFact) *Response {
-		response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production", AttentionLimit: 10})
+		response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -422,7 +426,7 @@ func TestPulseEvidenceUsesOnlyStoreFacts(t *testing.T) {
 		storeB.SimulationDatasetVersion = &datasetB
 		facts = append(facts, storeA, storeB)
 	}
-	response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 2}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production", AttentionLimit: 10})
+	response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 2}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +451,7 @@ func TestContributionTurnsNegativeUsesFixedOneScoreException(t *testing.T) {
 		}
 		facts = append(facts, fact)
 	}
-	response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production", AttentionLimit: 10})
+	response, err := NewService(&fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1}}).Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +505,7 @@ func TestPulseMixedCurrencyStoreAttributionIsDeterministic(t *testing.T) {
 	}
 	reader := &fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 2, ExpectedStores: []retailkpi.StorePopulation{{StoreID: "s1", StoreCode: "S1", StoreName: "One", Brand: "Brand", Region: "Region"}, {StoreID: "s2", StoreCode: "S2", StoreName: "Two", Brand: "Brand", Region: "Region"}}}}
 	service := NewService(reader)
-	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production", AttentionLimit: 10})
+	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,5 +521,75 @@ func TestPulseMixedCurrencyStoreAttributionIsDeterministic(t *testing.T) {
 	// silently lost s1 and fell back to a distinct-store count.
 	if expectedByCurrency["CNY"] != 14 || expectedByCurrency["USD"] != 7 {
 		t.Fatalf("expected store-days by currency = %+v, want CNY=14 USD=7", expectedByCurrency)
+	}
+}
+
+// M5: region grouping ranks groups built from the same facts and signal
+// rules; store identity is replaced by group identity and the expected
+// population comes from the authorized store master.
+func TestPulseRegionGroupingAttention(t *testing.T) {
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	regionalFact := func(storeID, code, region string, date time.Time, revenue float64) retailkpi.DailyFact {
+		fact := dailyFact(storeID, code, "CNY", date, revenue)
+		fact.Region = region
+		fact.Brand = "Brand"
+		return fact
+	}
+	facts := make([]retailkpi.DailyFact, 0, 42)
+	// North region collapses hard in the current window (signals); South is
+	// stable (no attention row).
+	for day := 0; day < 14; day++ {
+		date := from.AddDate(0, 0, day)
+		s1Revenue := 100.0
+		if day >= 7 {
+			s1Revenue = 40
+		}
+		facts = append(facts,
+			regionalFact("s1", "S1", "North", date, s1Revenue),
+			regionalFact("s2", "S2", "North", date, 100),
+			regionalFact("s3", "S3", "South", date, 100),
+		)
+	}
+	reader := &fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 3, ExpectedStores: []retailkpi.StorePopulation{
+		{StoreID: "s1", StoreCode: "S1", StoreName: "One", Brand: "Brand", Region: "North"},
+		{StoreID: "s2", StoreCode: "S2", StoreName: "Two", Brand: "Brand", Region: "North"},
+		{StoreID: "s3", StoreCode: "S3", StoreName: "Three", Brand: "Brand", Region: "South"},
+	}}}
+	service := NewService(reader)
+	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10, GroupBy: "region"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.GroupBy != "region" {
+		t.Fatalf("response group_by=%q", response.GroupBy)
+	}
+	if len(response.Attention) == 0 {
+		t.Fatal("region attention empty")
+	}
+	for _, attention := range response.Attention {
+		if attention.GroupBy != "region" || attention.GroupKey != "North" || attention.GroupLabel != "North" {
+			t.Fatalf("attention identity=%+v", attention)
+		}
+		if attention.StoreID != "" {
+			t.Fatalf("group attention carries store identity: %+v", attention)
+		}
+		if attention.Evidence.CurrentFactCount == 0 {
+			t.Fatalf("group evidence empty: %+v", attention.Evidence)
+		}
+	}
+	if len(response.Attention) > 1 {
+		t.Fatalf("stable region should not appear in attention: %+v", response.Attention)
+	}
+	// GroupBy="" keeps the per-store ranking (zero-regression anchor).
+	ungrouped, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ungrouped.Attention) == 0 || ungrouped.Attention[0].StoreID == "" {
+		t.Fatalf("ungrouped attention=%+v", ungrouped.Attention)
+	}
+	// Invalid group value is rejected.
+	if _, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", GroupBy: "city"}); err == nil {
+		t.Fatal("invalid group_by accepted")
 	}
 }

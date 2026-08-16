@@ -180,11 +180,11 @@ func TestRetailSimulationPostgresDefaultScaleIsolationIdempotencyAndIFRSBoundary
 	if planA.DatasetVersion == planB.DatasetVersion {
 		t.Fatal("A/B dataset versions unexpectedly collide")
 	}
-	rowsA, err := NewOperatingFactsRepository(pool).ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-01-01", "2026-06-30", nil)
+	rowsA, err := NewOperatingFactsRepository(pool).ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-01-01", "2026-06-30", nil, "")
 	if err != nil || len(rowsA) != 10860 {
 		t.Fatalf("entity A fact visibility=%d err=%v", len(rowsA), err)
 	}
-	rowsB, err := NewOperatingFactsRepository(pool).ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-01-01", "2026-06-30", nil)
+	rowsB, err := NewOperatingFactsRepository(pool).ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-01-01", "2026-06-30", nil, "")
 	if err != nil || len(rowsB) != 10860 {
 		t.Fatalf("entity B fact visibility=%d err=%v", len(rowsB), err)
 	}

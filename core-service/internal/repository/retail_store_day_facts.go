@@ -255,11 +255,11 @@ func (r *OperatingFactsRepository) UpsertRetailStoreDayFactsAtomic(
 }
 
 // ListRetailStoreDayFactsPage returns a bounded page and a reliable total.
-func (r *OperatingFactsRepository) ListRetailStoreDayFactsPage(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string, pageSize, offset int) (*RetailStoreDayFactsPage, error) {
+func (r *OperatingFactsRepository) ListRetailStoreDayFactsPage(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string, dataClassification string, pageSize, offset int) (*RetailStoreDayFactsPage, error) {
 	if pageSize < 0 || offset < 0 {
 		return nil, fmt.Errorf("retail store-day page size and offset must not be negative")
 	}
-	fromWhere, args, nextArg := retailStoreDayFactFilter(ctx, entity, dateFrom, dateTo, storeIDs)
+	fromWhere, args, nextArg := retailStoreDayFactFilter(ctx, entity, dateFrom, dateTo, storeIDs, dataClassification)
 	var total int
 	if err := r.db.QueryRow(ctx, "SELECT COUNT(*)"+fromWhere, args...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("count retail store-day facts: %w", err)
@@ -291,8 +291,8 @@ func (r *OperatingFactsRepository) ListRetailStoreDayFactsPage(ctx context.Conte
 
 // ListRetailStoreDayFacts remains source-compatible with the first MAX-001
 // implementation but no longer silently truncates at 50,000 rows.
-func (r *OperatingFactsRepository) ListRetailStoreDayFacts(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string) ([]*RetailStoreDayFact, error) {
-	page, err := r.ListRetailStoreDayFactsPage(ctx, entity, dateFrom, dateTo, storeIDs, 0, 0)
+func (r *OperatingFactsRepository) ListRetailStoreDayFacts(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string, dataClassification string) ([]*RetailStoreDayFact, error) {
+	page, err := r.ListRetailStoreDayFactsPage(ctx, entity, dateFrom, dateTo, storeIDs, dataClassification, 0, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +455,7 @@ func (r *OperatingFactsRepository) listRetailStoreDayFactsByIDs(ctx context.Cont
 	return result, nil
 }
 
-func retailStoreDayFactFilter(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string) (string, []any, int) {
+func retailStoreDayFactFilter(ctx context.Context, entity access.EntityFilter, dateFrom, dateTo string, storeIDs []string, dataClassification string) (string, []any, int) {
 	if storeIDs == nil {
 		storeIDs = []string{}
 	}
@@ -463,6 +463,16 @@ func retailStoreDayFactFilter(ctx context.Context, entity access.EntityFilter, d
 		WHERE f.business_date BETWEEN $1::date AND $2::date
 		AND (cardinality($3::text[])=0 OR f.store_id::text=ANY($3::text[]))`
 	args := []any{dateFrom, dateTo, storeIDs}
+	// P1-18: the raw list read can be narrowed to one classification so a
+	// reader never mistakes simulated rows for production rows; empty keeps
+	// the aggregate-safe legacy behaviour (both classes visible).
+	if dataClassification != "" {
+		if dataClassification != "production" && dataClassification != "simulated" {
+			return "", nil, 0
+		}
+		fromWhere += fmt.Sprintf(" AND f.data_classification=$%d", len(args)+1)
+		args = append(args, dataClassification)
+	}
 	if clause, arg, err := entity.SQLClause("s.legal_entity_id", len(args)+1); err != nil {
 		// The filter helper is only reachable with a constructed filter; a
 		// zero value must never degrade into unfiltered access.

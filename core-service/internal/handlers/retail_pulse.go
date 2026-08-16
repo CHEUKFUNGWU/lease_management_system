@@ -11,6 +11,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 )
 
@@ -35,7 +36,12 @@ func (h *RetailPulseHandler) OperatingPulse(c *gin.Context) {
 		return
 	}
 	windowDays := retailpulse.DefaultWindowDays
+	periodSpec := strings.TrimSpace(c.Query("period"))
 	if raw := strings.TrimSpace(c.Query("window_days")); raw != "" {
+		if periodSpec != "" {
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "period and window_days are mutually exclusive", nil)
+			return
+		}
 		parsed, parseErr := strconv.Atoi(raw)
 		if parseErr != nil {
 			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
@@ -52,13 +58,29 @@ func (h *RetailPulseHandler) OperatingPulse(c *gin.Context) {
 		}
 		attentionLimit = parsed
 	}
-	if windowDays < 7 || windowDays > 28 {
+	if periodSpec == "" && (windowDays < 7 || windowDays > 28) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
 		return
 	}
 	if attentionLimit < 1 || attentionLimit > 50 {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "attention_limit must be an integer between 1 and 50", nil)
 		return
+	}
+	// M2: a period spec (rolling days, YYYY-MM, YYYY-Qn, last-month,
+	// this-quarter) resolves through the shared period module; calendar
+	// kinds override the rolling derivation with explicit boundaries.
+	var calendarWindow *retailperiod.Window
+	if periodSpec != "" {
+		window, periodErr := retailperiod.Parse(periodSpec, asOf)
+		if periodErr != nil {
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, periodErr.Error(), nil)
+			return
+		}
+		if window.Period.Kind == retailperiod.KindRolling {
+			windowDays = window.Period.Days
+		} else {
+			calendarWindow = &window
+		}
 	}
 	classification := strings.TrimSpace(c.Query("data_classification"))
 	datasetVersion := strings.TrimSpace(c.Query("dataset_version"))
@@ -82,7 +104,13 @@ func (h *RetailPulseHandler) OperatingPulse(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, storeErr, nil)
 		return
 	}
-	result, err := h.service.Build(c.Request.Context(), retailpulse.Query{LegalEntityID: legalEntityID, AsOf: asOf, WindowDays: windowDays, Classification: classification, DatasetVersion: datasetVersion, SourceSystem: strings.TrimSpace(c.Query("source_system")), StoreIDs: storeIDs, AttentionLimit: attentionLimit})
+	pulseQuery := retailpulse.Query{LegalEntityID: legalEntityID, AsOf: asOf, WindowDays: windowDays, Classification: classification, DatasetVersion: datasetVersion, SourceSystem: strings.TrimSpace(c.Query("source_system")), StoreIDs: storeIDs, AttentionLimit: attentionLimit, GroupBy: strings.TrimSpace(c.Query("group_by"))}
+	if calendarWindow != nil {
+		pulseQuery.DateFrom, pulseQuery.DateTo = calendarWindow.From, calendarWindow.To
+		pulseQuery.ComparisonDateFrom, pulseQuery.ComparisonDateTo = calendarWindow.CompareFrom, calendarWindow.CompareTo
+		pulseQuery.PeriodLabel = calendarWindow.Label
+	}
+	result, err := h.service.Build(c.Request.Context(), pulseQuery)
 	if err != nil {
 		if errors.Is(err, repository.ErrRetailKPISourceConflict) {
 			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})

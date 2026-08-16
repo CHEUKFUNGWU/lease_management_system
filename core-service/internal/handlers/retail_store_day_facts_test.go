@@ -101,7 +101,7 @@ func (f *fakeRetailStoreDayFactRepo) UpsertRetailStoreDayFactsAtomic(ctx context
 	return &repository.RetailStoreDayFactWriteResult{Facts: saved}, nil
 }
 
-func (f *fakeRetailStoreDayFactRepo) ListRetailStoreDayFactsPage(_ context.Context, entity access.EntityFilter, _, _ string, _ []string, pageSize, offset int) (*repository.RetailStoreDayFactsPage, error) {
+func (f *fakeRetailStoreDayFactRepo) ListRetailStoreDayFactsPage(_ context.Context, entity access.EntityFilter, _, _ string, _ []string, _ string, pageSize, offset int) (*repository.RetailStoreDayFactsPage, error) {
 	f.listTenant, _ = entity.LegalEntityID()
 	f.pageSize, f.pageOffset = pageSize, offset
 	if f.listErr != nil {

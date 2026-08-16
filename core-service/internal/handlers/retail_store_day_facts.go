@@ -37,7 +37,7 @@ var (
 
 type retailStoreDayFactStore interface {
 	UpsertRetailStoreDayFactsAtomic(context.Context, access.EntityFilter, []*repository.RetailStoreDayFact, string, string, *string, repository.RetailStoreDayFactAuditFunc) (*repository.RetailStoreDayFactWriteResult, error)
-	ListRetailStoreDayFactsPage(context.Context, access.EntityFilter, string, string, []string, int, int) (*repository.RetailStoreDayFactsPage, error)
+	ListRetailStoreDayFactsPage(context.Context, access.EntityFilter, string, string, []string, string, int, int) (*repository.RetailStoreDayFactsPage, error)
 }
 
 type retailStoreDayFactAuditor interface {
@@ -199,12 +199,19 @@ func (h *RetailStoreDayFactsHandler) List(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, paginationError, nil)
 		return
 	}
+	// P1-18: optional narrowing of the raw list read; the aggregate paths
+	// stay untouched (they were already safe).
+	dataClassification := strings.TrimSpace(c.Query("data_classification"))
+	if dataClassification != "" && !stringIn(dataClassification, "production", "simulated") {
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "data_classification must be production or simulated", nil)
+		return
+	}
 	entity, ok := tenantEntity(c)
 	if !ok {
 		writeCodedError(c, http.StatusForbidden, errcontract.CodePermissionDenied, "legal entity scope is required", nil)
 		return
 	}
-	result, err := h.repo.ListRetailStoreDayFactsPage(c.Request.Context(), entity, dateFrom, dateTo, storeIDs, pageSize, offset)
+	result, err := h.repo.ListRetailStoreDayFactsPage(c.Request.Context(), entity, dateFrom, dateTo, storeIDs, dataClassification, pageSize, offset)
 	if err != nil {
 		writeSystemFailure(c, http.StatusInternalServerError, err)
 		return

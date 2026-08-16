@@ -100,7 +100,8 @@ func TestBuildTenantAndQueryValidation(t *testing.T) {
 	if !errors.Is(err, ErrStoreNotFound) {
 		t.Fatalf("missing store err = %v", err)
 	}
-	_, err = svc.Build(context.Background(), Query{LegalEntityID: "entity-a", StoreID: "store-a", AsOf: time.Now(), WindowDays: 10, Classification: "simulated", DatasetVersion: "planA-v1"})
+	// M2 range contract: 10 is a valid custom window now; 30 is out of range.
+	_, err = svc.Build(context.Background(), Query{LegalEntityID: "entity-a", StoreID: "store-a", AsOf: time.Now(), WindowDays: 30, Classification: "simulated", DatasetVersion: "planA-v1"})
 	if !errors.Is(err, ErrInvalidQuery) {
 		t.Fatalf("invalid window err = %v", err)
 	}

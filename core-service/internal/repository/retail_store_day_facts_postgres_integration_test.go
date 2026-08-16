@@ -106,14 +106,14 @@ func TestRetailStoreDayFactsPostgresConstraintsIdempotencyAndTenantScope(t *test
 		t.Fatalf("idempotent row count = %d, want 1", count)
 	}
 
-	rowsA, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-08-01", "2026-08-01", nil)
+	rowsA, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-08-01", "2026-08-01", nil, "")
 	if err != nil {
 		t.Fatalf("list tenant A facts: %v", err)
 	}
 	if len(rowsA) != 1 || rowsA[0].StoreID != storeA || rowsA[0].StoreCode == "" || rowsA[0].Brand == "" || rowsA[0].Region == "" {
 		t.Fatalf("tenant A rows = %+v; expected one row with store metadata", rowsA)
 	}
-	rowsB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-08-01", "2026-08-01", nil)
+	rowsB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-08-01", "2026-08-01", nil, "")
 	if err != nil {
 		t.Fatalf("list tenant B facts: %v", err)
 	}
@@ -127,14 +127,14 @@ func TestRetailStoreDayFactsPostgresConstraintsIdempotencyAndTenantScope(t *test
 	if _, err := repo.UpsertRetailStoreDayFact(ctx, mustEntityFilter(t, entityB), productionB); err != nil {
 		t.Fatalf("tenant B own production upsert: %v", err)
 	}
-	rowsAAfterB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-08-01", "2026-08-01", nil)
+	rowsAAfterB, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), mustEntityFilter(t, entityA), "2026-08-01", "2026-08-01", nil, "")
 	if err != nil {
 		t.Fatalf("list tenant A after tenant B write: %v", err)
 	}
 	if len(rowsAAfterB) != 1 || rowsAAfterB[0].StoreID != storeA {
 		t.Fatalf("tenant A isolation after tenant B write failed: %+v", rowsAAfterB)
 	}
-	rowsBOwn, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-08-01", "2026-08-01", nil)
+	rowsBOwn, err := repo.ListRetailStoreDayFacts(access.WithScope(ctx, access.Scope{LegalEntityID: entityB}), mustEntityFilter(t, entityB), "2026-08-01", "2026-08-01", nil, "")
 	if err != nil || len(rowsBOwn) != 1 || rowsBOwn[0].StoreID != storeB {
 		t.Fatalf("tenant B own fact visibility = %+v, err=%v", rowsBOwn, err)
 	}
@@ -311,11 +311,11 @@ func TestRetailStoreDayFactsPostgresPaginationHasReliableTotal(t *testing.T) {
 			t.Fatalf("seed page fact %s: %v", date, err)
 		}
 	}
-	first, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, entityID), "2026-08-20", "2026-08-22", nil, 2, 0)
+	first, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, entityID), "2026-08-20", "2026-08-22", nil, "", 2, 0)
 	if err != nil || first.Total != 3 || first.Returned != 2 {
 		t.Fatalf("first page = %+v, err %v", first, err)
 	}
-	second, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, entityID), "2026-08-20", "2026-08-22", nil, 2, 2)
+	second, err := repo.ListRetailStoreDayFactsPage(ctx, mustEntityFilter(t, entityID), "2026-08-20", "2026-08-22", nil, "", 2, 2)
 	if err != nil || second.Total != 3 || second.Returned != 1 {
 		t.Fatalf("second page = %+v, err %v", second, err)
 	}

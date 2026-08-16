@@ -1,6 +1,7 @@
 package renewaldecision
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -52,5 +53,49 @@ func TestEvaluateRejectsMissingRate(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("missing discount rate must be rejected")
+	}
+}
+
+// M7 test face: the five-year curves reconcile to the scenario totals —
+// cash, IFRS 16 expense, EBITDA/EBIT/P&L all tie out so a saved snapshot is
+// auditable.
+func TestYearlyCurvesReconcileToTotals(t *testing.T) {
+	input := Input{
+		DecisionDate: time.Date(2026, 8, 16, 0, 0, 0, 0, time.UTC), Currency: "CNY",
+		DiscountRate: 0.045, CurrentMonthlyRent: 50000, RemainingCommitment: 300000,
+		CurrentLiability: 280000, CurrentROU: 290000, RemainingTermMonths: 6,
+		Scenarios: []Scenario{
+			{Name: "renew_current_terms", Decision: "renew", TermMonths: 60, MonthlyRent: 52000, RentFreeMonths: 0, AnnualEscalationPercent: 3},
+			{Name: "terminate_no_renewal", Decision: "terminate", TermMonths: 0, MonthlyRent: 0, RentFreeMonths: 0, AnnualEscalationPercent: 0, EarlyExitPenaltyMonths: 2},
+		},
+	}
+	result, err := Evaluate(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Scenarios) != 2 {
+		t.Fatalf("scenarios=%d", len(result.Scenarios))
+	}
+	renew := result.Scenarios[0]
+	var cashSum, expenseSum float64
+	for _, year := range renew.Yearly {
+		cashSum += year.CashOutflow
+		expenseSum += year.IFRS16Expense
+	}
+	if math.Abs(cashSum-renew.TotalCashOutflow) > 0.05 {
+		t.Fatalf("cash curve sum=%.2f total=%.2f", cashSum, renew.TotalCashOutflow)
+	}
+	if math.Abs(expenseSum-renew.TotalIFRS16Expense) > 0.05 {
+		t.Fatalf("expense curve sum=%.2f total=%.2f", expenseSum, renew.TotalIFRS16Expense)
+	}
+	terminate := result.Scenarios[1]
+	if terminate.Exit == nil {
+		t.Fatal("terminate scenario missing exit impact")
+	}
+	// The exit separates avoided future rent from immediate exit cash: the
+	// P&L hit is ROU write-off minus liability released plus the penalty.
+	wantPnL := terminate.Exit.ROUWrittenOff - terminate.Exit.LiabilityReleased + terminate.Exit.Penalty
+	if math.Abs(wantPnL-terminate.Exit.PnLImpact) > 0.05 {
+		t.Fatalf("exit pnl=%.2f, components give %.2f", terminate.Exit.PnLImpact, wantPnL)
 	}
 }

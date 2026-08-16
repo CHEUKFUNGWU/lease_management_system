@@ -61,6 +61,50 @@ export const colors = {
     error: { bg: "#FDEDED", text: "#A8071A", border: "#F5C9C9" },
     neutral: { bg: "#F0F0F0", text: "#595959", border: "#E0E0E0" },
   },
+
+  // Chart series — grouped separately because dark mode does not invert
+  // chart colours the way it inverts surfaces and text (DARK-001).
+  chart: {
+    blue: "#1677FF",
+    purple: "#722ED1",
+  },
+
+  // Brand mark (BrandIcon) — graphic-specific values, not UI semantics.
+  // Dark mode keeps the same mark; only the inverse variant flips.
+  brand: {
+    frame: "#111827",
+    bar: "#1F2937",
+    arrow: "#4B5563",
+    arrowHighlight: "#9CA3AF",
+    ring: "#6B7280",
+    hub: "#374151",
+    node: "#1F2937",
+    inverse: {
+      frame: "#FFFFFF",
+      bar: "#E5E7EB",
+      arrow: "#F3F4F6",
+      arrowHighlight: "#FFFFFF",
+      ring: "#9CA3AF",
+      hub: "#D1D5DB",
+      node: "#FFFFFF",
+    },
+    // White-alpha overlays on the dark brand panel (login screen) — the
+    // brand panel is a fixed dark surface in both themes, so these stay
+    // white-based rather than following the theme's text colours.
+    overlay: {
+      badge: "rgba(255, 255, 255, 0.08)",
+      badgeBorder: "rgba(255, 255, 255, 0.15)",
+      point: "rgba(255, 255, 255, 0.38)",
+      text: "rgba(255, 255, 255, 0.72)",
+    },
+  },
+
+  // Dark-only surfaces (admin sider, code blocks) — kept as explicit
+  // semantic slots so a theme can override them independently.
+  surface: {
+    admin: "#001529",
+    code: "#1E1E1E",
+  },
 } as const;
 
 // ─── Typography Tokens ─────────────────────────────────────────

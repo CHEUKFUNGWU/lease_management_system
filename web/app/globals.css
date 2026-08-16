@@ -54,6 +54,12 @@
   --admin-surface: #001529;
   --code-surface: #1E1E1E;
 
+  /* Brand panel overlays (login) — white alpha on the fixed dark panel */
+  --brand-overlay-badge: rgba(255, 255, 255, 0.08);
+  --brand-overlay-badge-border: rgba(255, 255, 255, 0.15);
+  --brand-overlay-point: rgba(255, 255, 255, 0.38);
+  --brand-overlay-text: rgba(255, 255, 255, 0.72);
+
   /* Depth */
   --shadow-static: 0 0 0 1px rgba(0, 0, 0, 0.04);
   --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
@@ -2216,8 +2222,8 @@ html {
     linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
   background-size: 96px 96px;
-  -webkit-mask-image: radial-gradient(130% 110% at 0% 0%, #000, transparent 78%);
-  mask-image: radial-gradient(130% 110% at 0% 0%, #000, transparent 78%);
+  -webkit-mask-image: radial-gradient(130% 110% at 0% 0%, var(--fg-primary), transparent 78%);
+  mask-image: radial-gradient(130% 110% at 0% 0%, var(--fg-primary), transparent 78%);
   pointer-events: none;
 }
 
@@ -2247,8 +2253,8 @@ html {
 }
 
 .login-brand .login-badge {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+  background: var(--brand-overlay-badge);
+  box-shadow: 0 0 0 1px var(--brand-overlay-badge-border);
 }
 
 .login-lockup-name {
@@ -2281,7 +2287,7 @@ html {
   gap: 14px;
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--brand-overlay-text);
 }
 
 .login-point::before {
@@ -2289,7 +2295,7 @@ html {
   flex: none;
   width: 16px;
   height: 1px;
-  background: rgba(255, 255, 255, 0.38);
+  background: var(--brand-overlay-point);
   transform: translateY(-4px);
 }
 

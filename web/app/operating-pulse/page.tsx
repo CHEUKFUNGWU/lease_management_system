@@ -26,6 +26,9 @@ import type { DataState } from "../lib/dataState";
 import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
 import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, signalMix, switchClassification, trendValue, type PulseMetricCode } from "./logic";
 import { tableScrollX } from "../lib/tableScroll";
+import { RetailExportMenu } from "../components/RetailExportMenu";
+import { retailExportApi } from "../lib/api";
+import { envelopeFromPulse, pulseRowsFromResponse } from "../lib/retail-export";
 
 const WINDOW_OPTIONS = [7, 14, 28] as const;
 // M2 (2026-08-16 decision): the unified product default is 14; custom
@@ -333,7 +336,15 @@ function OperatingPulseInner() {
   };
 
   return <ProtectedRoute><AppLayout><div className="operating-pulse-page">
-    <PageHeader title={t("pulse.title", language)} help={<HelpTrigger content={pulseHelpContent(language)} language={language} />} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button>} />
+    <PageHeader title={t("pulse.title", language)} help={<HelpTrigger content={pulseHelpContent(language)} language={language} />} primaryAction={<Button icon={<ReloadOutlined />} onClick={refresh} loading={loading}>{t("common.refresh", language)}</Button>} secondaryAction={<Space><RetailExportMenu kind="operating_pulse" disabled={!response} envelope={response ? envelopeFromPulse(response) : null} rows={() => (response ? pulseRowsFromResponse(response) : [])} csvDownload={() => retailExportApi.downloadPulseCSV({
+        data_classification: currentClassification,
+        dataset_version: currentClassification === "simulated" ? datasetVersion : undefined,
+        as_of: asOf || TODAY,
+        ...(period ? { period } : { window_days: validWindow ? windowDays : DEFAULT_WINDOW_DAYS }),
+        source_system: sourceSystem || undefined,
+        store_ids: storeIDs,
+        group_by: groupBy !== "total" ? groupBy : undefined,
+      }, token!)} /><Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button></Space>} />
     <Card size="small" className="pulse-filter-card pulse-block-margin">
       <Flex gap={12} wrap="wrap" align="center">
         <Radio.Group value={currentClassification} onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />

@@ -1645,6 +1645,11 @@ const dict: TranslationDict = {
     "zh-HK": "Agent 運營",
     en: "Agent Operations",
   },
+  "retail_export.menu": { "zh-CN": "导出", "zh-HK": "導出", en: "Export" },
+  "retail_export.csv": { "zh-CN": "CSV", "zh-HK": "CSV", en: "CSV" },
+  "retail_export.csv_server": { "zh-CN": "CSV（服务端口径）", "zh-HK": "CSV（服務端口徑）", en: "CSV (server-rendered)" },
+  "retail_export.xlsx": { "zh-CN": "Excel（带公式）", "zh-HK": "Excel（帶公式）", en: "Excel (with formulas)" },
+  "retail_export.pptx": { "zh-CN": "PowerPoint（可编辑）", "zh-HK": "PowerPoint（可編輯）", en: "PowerPoint (editable)" },
   "nav.retail_data_import": {
     "zh-CN": "经营数据导入",
     "zh-HK": "經營數據導入",

@@ -316,6 +316,8 @@ export interface RetailPulsePartition {
 }
 
 export interface RetailPulseResponse extends RetailPulsePartition {
+  period_label?: string;
+  group_by?: string;
   basis: "Working" | string;
   envelope?: SourceEnvelope;
   pulse_version: string;
@@ -1869,6 +1871,35 @@ export type RetailIngestCommitResponse = {
   failed_count: number;
   idempotent_replay: boolean;
   envelope: { source_system: string; import_batch_id: string; as_of_at: string };
+};
+
+export const retailExportApi = {
+  /** Server-authoritative CSV of the current pulse read (provenance header
+   * + escaping live on the Go side). Returns a download filename from the
+   * Content-Disposition header plus the blob. */
+  downloadPulseCSV: async (params: RetailPulseQueryParams, token: string): Promise<{ filename: string; blob: Blob }> => {
+    const query = new URLSearchParams();
+    query.set("data_classification", params.data_classification);
+    query.set("as_of", params.as_of);
+    if (params.period) query.set("period", params.period);
+    else if (params.window_days !== undefined) query.set("window_days", String(params.window_days));
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    if (params.source_system) query.set("source_system", params.source_system);
+    (params.store_ids || []).forEach((storeID) => query.append("store_id", storeID));
+    if (params.attention_limit !== undefined) query.set("attention_limit", String(params.attention_limit));
+    if (params.group_by) query.set("group_by", params.group_by);
+    query.set("format", "csv");
+    const blob = await downloadBlob(`/api/v1/retail/operating-pulse?${query.toString()}`, token);
+    return { filename: `operating_pulse_export.csv`, blob };
+  },
+  downloadDiagnosticsCSV: async (params: { store_id: string; data_classification: RetailDataClassification; dataset_version?: string; as_of: string; window_days: number; source_system?: string }, token: string): Promise<{ filename: string; blob: Blob }> => {
+    const query = new URLSearchParams({ store_id: params.store_id, data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    if (params.source_system) query.set("source_system", params.source_system);
+    query.set("format", "csv");
+    const blob = await downloadBlob(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/diagnostics?${query.toString()}`, token);
+    return { filename: `store_diagnostics_export.csv`, blob };
+  },
 };
 
 export const retailIngestApi = {

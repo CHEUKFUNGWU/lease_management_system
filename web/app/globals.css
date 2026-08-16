@@ -1681,6 +1681,10 @@ html {
 .perf-import-source {
   width: 120px;
 }
+.retail-export-menu {
+  display: inline-flex;
+  align-items: center;
+}
 .retail-import-hint {
   display: block;
   margin-top: 8px;

@@ -1,5 +1,23 @@
+const path = require("path");
+
 const nextConfig = {
   reactStrictMode: true,
+  webpack: (config) => {
+    // M3 export libs: pptxgenjs resolves its ESM entry for "import" which
+    // pulls node:fs/node:https; the prebuilt browser bundle is the same
+    // library without the node shims.
+    config.resolve.alias["pptxgenjs$"] = path.resolve(__dirname, "node_modules/pptxgenjs/dist/pptxgen.bundle.js");
+    // The bundle keeps guarded node: requires; in the browser they are dead
+    // code — scheme requests bypass resolve.alias, so stub them as externals.
+    config.externals = config.externals || [];
+    config.externals.push((context, request, callback) => {
+      if (typeof request === "string" && request.startsWith("node:")) {
+        return callback(null, "var {}");
+      }
+      return callback();
+    });
+    return config;
+  },
   async rewrites() {
     // Server-side rewrites use Docker internal URLs (SERVER_* vars)
     // Client-side fetches use browser-accessible URLs (NEXT_PUBLIC_* vars)

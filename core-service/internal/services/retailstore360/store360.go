@@ -39,6 +39,10 @@ type Query struct {
 	Classification string
 	DatasetVersion string
 	SourceSystem   string
+	// M4: attach the store's actual-vs-plan comparison for the calendar
+	// month of the window end; threshold from system settings via handler.
+	PlanComparison              bool
+	PlanMaterialityThresholdPct float64
 }
 
 type Period struct {
@@ -155,6 +159,7 @@ type Response struct {
 	Bridges             []Bridge                 `json:"bridges"`
 	Observations        []Observation            `json:"observations"`
 	Evidence            Evidence                 `json:"evidence"`
+	Plan                *retailkpi.PlanComparison `json:"plan,omitempty"`
 	SourceSystems       []string                 `json:"source_systems"`
 	DatasetVersions     []string                 `json:"dataset_versions"`
 	FactVersionMin      int                      `json:"fact_version_min"`
@@ -165,11 +170,18 @@ type Response struct {
 }
 
 type Service struct {
-	reader FactReader
-	now    func() time.Time
+	reader     FactReader
+	now        func() time.Time
+	planReader retailkpi.PlanReader
 }
 
 func NewService(reader FactReader) *Service { return &Service{reader: reader, now: time.Now} }
+
+// WithPlanReader enables the M4 plan comparison block for the store.
+func (s *Service) WithPlanReader(reader retailkpi.PlanReader) *Service {
+	s.planReader = reader
+	return s
+}
 
 var benchmarkCodes = []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"}
 
@@ -292,7 +304,48 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 	response.FactVersionMax = env.FactVersionMax
 	response.HighestAsOf = env.HighestAsOf
 	response.Evidence = Evidence{Current: response.Current, Comparison: response.Comparison, ObservedStoreDays: currentCoverage.ObservedStoreDays + comparisonCoverage.ObservedStoreDays, ExpectedStoreDays: currentCoverage.ExpectedStoreDays + comparisonCoverage.ExpectedStoreDays, RequiredFields: requiredFields(), FormulaVersion: retailkpi.FormulaVersion, SourceSystems: response.SourceSystems, DatasetVersions: response.DatasetVersions, FactVersionMin: env.FactVersionMin, FactVersionMax: env.FactVersionMax, HighestAsOf: response.HighestAsOf, DataQualityIssues: quality, KPIDrilldownURL: response.KPIDrilldownURL}
+	if s.planReader != nil && q.PlanComparison {
+		storeFacts := filterPeriod(filterStore(set.Facts, q.StoreID), currentStart, currentEnd, "")
+		if err := s.attachPlanComparison(ctx, q, storeFacts, response); err != nil {
+			return nil, err
+		}
+	}
 	return response, nil
+}
+
+// attachPlanComparison pairs this store's current-window facts with its
+// plan line for the calendar month (M4); the store's expected count is 1.
+func (s *Service) attachPlanComparison(ctx context.Context, q Query, facts []retailkpi.DailyFact, response *Response) error {
+	planPeriod := monthOf(response.Current.DateTo)
+	planSet, err := s.planReader.ReadPlan(ctx, q.LegalEntityID, planPeriod)
+	if err != nil {
+		return err
+	}
+	if planSet == nil {
+		return nil
+	}
+	comparison, err := retailkpi.ComparePlan(facts, planSet.Facts, retailkpi.ComparePlanRequest{
+		Period: planPeriod, ExpectedStoreCount: 1,
+		MaterialityThresholdPct: q.PlanMaterialityThresholdPct,
+	})
+	if err != nil {
+		return fmt.Errorf("plan comparison: %w", err)
+	}
+	comparison.PlanVersionID = planSet.VersionID
+	comparison.PlanVersionName = planSet.VersionName
+	comparison.PlanVersionType = planSet.VersionType
+	comparison.PlanAsOfPeriod = planSet.AsOfPeriod
+	comparison.PlanSource = planSet.Source
+	comparison.PlanIsOfficial = planSet.IsOfficial
+	response.Plan = comparison
+	return nil
+}
+
+func monthOf(dateTo string) string {
+	if len(dateTo) >= 7 {
+		return dateTo[:7]
+	}
+	return ""
 }
 
 func storeDecisionReadyReason(decisionReady bool, quality []string) string {

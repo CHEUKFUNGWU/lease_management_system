@@ -25,12 +25,26 @@ type retailStoreDiagnosticsReader interface {
 }
 
 type RetailStoreDiagnosticsHandler struct {
-	service *retailstore360.Service
-	repo    retailStoreDiagnosticsReader
+	service            *retailstore360.Service
+	repo               retailStoreDiagnosticsReader
+	planMaterialityPct func(context.Context) float64
 }
 
 func NewRetailStoreDiagnosticsHandler(repo retailStoreDiagnosticsReader) *RetailStoreDiagnosticsHandler {
-	return &RetailStoreDiagnosticsHandler{service: retailstore360.NewService(repo), repo: repo}
+	return &RetailStoreDiagnosticsHandler{service: retailstore360.NewService(repo), repo: repo, planMaterialityPct: func(context.Context) float64 { return 5 }}
+}
+
+// WithPlanReader enables the M4 actual-vs-plan block on diagnostics reads.
+func (h *RetailStoreDiagnosticsHandler) WithPlanReader(reader retailkpi.PlanReader) *RetailStoreDiagnosticsHandler {
+	h.service.WithPlanReader(reader)
+	return h
+}
+
+func (h *RetailStoreDiagnosticsHandler) WithPlanMateriality(getter func(context.Context) float64) *RetailStoreDiagnosticsHandler {
+	if getter != nil {
+		h.planMaterialityPct = getter
+	}
+	return h
 }
 
 func (h *RetailStoreDiagnosticsHandler) StoreOptions(c *gin.Context) {
@@ -89,6 +103,7 @@ func (h *RetailStoreDiagnosticsHandler) Diagnostics(c *gin.Context) {
 	result, err := h.service.Build(c.Request.Context(), retailstore360.Query{
 		LegalEntityID: legalEntityID, StoreID: storeID, AsOf: asOf, WindowDays: windowDays,
 		Classification: classification, DatasetVersion: datasetVersion,
+		PlanComparison: true, PlanMaterialityThresholdPct: h.planMaterialityPct(c.Request.Context()),
 		SourceSystem: strings.TrimSpace(c.Query("source_system")),
 	})
 	if err != nil {

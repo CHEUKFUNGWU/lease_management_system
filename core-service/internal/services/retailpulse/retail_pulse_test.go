@@ -593,3 +593,56 @@ func TestPulseRegionGroupingAttention(t *testing.T) {
 		t.Fatal("invalid group_by accepted")
 	}
 }
+
+type fakePlanReader struct{ set *retailkpi.PlanSet }
+
+func (f *fakePlanReader) ReadPlan(context.Context, string, string) (*retailkpi.PlanSet, error) {
+	return f.set, nil
+}
+
+// M4: the plan block appears when a plan version covers the window's
+// calendar month and carries the version provenance.
+func TestPulsePlanComparisonBlock(t *testing.T) {
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	facts := make([]retailkpi.DailyFact, 0, 14)
+	for day := 0; day < 14; day++ {
+		facts = append(facts, dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, day), 100))
+	}
+	reader := &fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1, ExpectedStores: []retailkpi.StorePopulation{{StoreID: "s1", StoreCode: "S1", StoreName: "One", Brand: "B", Region: "R"}}}}
+	plan := &fakePlanReader{set: &retailkpi.PlanSet{
+		VersionID: "plan-1", VersionName: "FY2026 Budget", VersionType: "budget", AsOfPeriod: "2025-12", Source: "approved_budget", IsOfficial: true,
+		Facts: []retailkpi.PlanFact{{StoreID: "s1", Period: "2026-01", Currency: "CNY", Revenue: floatPtr(2000)}},
+	}}
+	service := NewService(reader).WithPlanReader(plan)
+	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10, PlanComparison: true, PlanMaterialityThresholdPct: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Plan == nil {
+		t.Fatal("plan block missing")
+	}
+	if response.Plan.PlanVersionName != "FY2026 Budget" || !response.Plan.PlanIsOfficial || response.Plan.PlanVersionType != "budget" {
+		t.Fatalf("plan provenance=%+v", response.Plan)
+	}
+	if response.Plan.Period != "2026-01" {
+		t.Fatalf("plan period=%q", response.Plan.Period)
+	}
+	// ComparePlan aggregates the whole calendar month (14 days x 100 =
+	// 1400) vs plan 2000 → attainment 70, variance -30% exceeds the 5%
+	// materiality threshold.
+	revenue := response.Plan.Variances[0]
+	if revenue.AttainmentPct == nil || *revenue.AttainmentPct != 70 || !revenue.MaterialityExceeded {
+		t.Fatalf("revenue variance=%+v", revenue)
+	}
+	// No plan version → no block, zero regression for readers without one.
+	service = NewService(reader).WithPlanReader(&fakePlanReader{})
+	response, err = service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), WindowDays: 7, Classification: "production", AttentionLimit: 10, PlanComparison: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Plan != nil {
+		t.Fatalf("plan block fabricated without a version: %+v", response.Plan)
+	}
+}
+
+func floatPtr(value float64) *float64 { return &value }

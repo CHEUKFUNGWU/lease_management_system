@@ -123,8 +123,10 @@ func main() {
 	retailExportHandler := handlers.NewRetailExportHandler()
 	retailSimulationHandler := handlers.NewRetailSimulationHandler(retailSimulationRepo, auditLogger)
 	retailKPIHandler := handlers.NewRetailKPIHandler(retailKPIRepo)
-	retailPulseHandler := handlers.NewRetailPulseHandler(retailKPIRepo)
-	retailStoreDiagnosticsHandler := handlers.NewRetailStoreDiagnosticsHandler(retailKPIRepo)
+	planReader := handlers.NewRetailPlanReader(fpnaGovernanceRepo)
+	planMateriality := func(ctx context.Context) float64 { return systemSettingRepo.GetFloat64(ctx, "retail_plan_variance_materiality_pct", 5) }
+	retailPulseHandler := handlers.NewRetailPulseHandler(retailKPIRepo).WithPlanReader(planReader).WithPlanMateriality(planMateriality)
+	retailStoreDiagnosticsHandler := handlers.NewRetailStoreDiagnosticsHandler(retailKPIRepo).WithPlanReader(planReader).WithPlanMateriality(planMateriality)
 	retailScenarioHandler := handlers.NewRetailScenarioHandler(retailKPIRepo, operatingFactsRepo)
 	fpnaGovernanceHandler := handlers.NewFPnAGovernanceHandler(fpnaGovernanceRepo, operatingFactsRepo, auditLogger)
 	decisionScenarioHandler := handlers.NewDecisionScenarioHandler(draftService)

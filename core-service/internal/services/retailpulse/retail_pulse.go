@@ -35,6 +35,11 @@ type Query struct {
 	SourceSystem   string
 	StoreIDs       []string
 	AttentionLimit int
+	// M4: attach the actual-vs-plan comparison for the calendar month of
+	// the current window end; the threshold comes from system settings via
+	// the handler (0 = service default of 5%).
+	PlanComparison               bool
+	PlanMaterialityThresholdPct  float64
 	// M5: group the attention ranking — "" and "total" keep the per-store
 	// ranking (zero regression); "store" labels it; "region"/"brand" rank
 	// groups built from the same facts and signal rules.
@@ -165,6 +170,7 @@ type Response struct {
 	MultiCurrency             bool                        `json:"multi_currency"`
 	MixedCurrencyStores       int                         `json:"mixed_currency_stores,omitempty"`
 	PeriodLabel               string                      `json:"period_label,omitempty"`
+	Plan                      *retailkpi.PlanComparison   `json:"plan,omitempty"`
 	GroupBy                   string                      `json:"group_by,omitempty"`
 	Currency                  string                      `json:"currency,omitempty"`
 	CurrencyStatus            string                      `json:"currency_status,omitempty"`
@@ -189,9 +195,17 @@ type Response struct {
 	ComparisonKPIDrilldownURL string                      `json:"comparison_kpi_drilldown_url"`
 }
 
+// WithPlanReader enables the M4 plan comparison block on Build responses;
+// a nil reader keeps the response unchanged (zero regression).
+func (s *Service) WithPlanReader(reader retailkpi.PlanReader) *Service {
+	s.planReader = reader
+	return s
+}
+
 type Service struct {
 	reader FactReader
 	now    func() time.Time
+	planReader retailkpi.PlanReader
 }
 
 func NewService(reader FactReader) *Service { return &Service{reader: reader, now: time.Now} }
@@ -316,7 +330,49 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 	response.FactVersionMin = env.FactVersionMin
 	response.FactVersionMax = env.FactVersionMax
 	response.HighestAsOf = env.HighestAsOf
+	if s.planReader != nil && query.PlanComparison {
+		if err := s.attachPlanComparison(ctx, query, set, expectedStores, response); err != nil {
+			return nil, err
+		}
+	}
 	return response, nil
+}
+
+// attachPlanComparison pairs the current window's facts with the plan basis
+// of its calendar month (M4); no version covering the month means no block —
+// the absence is honest, not a zero.
+func (s *Service) attachPlanComparison(ctx context.Context, query Query, set *repository.RetailKPIFactSet, expectedStores int, response *Response) error {
+	planPeriod := currentEndOf(response).Format("2006-01")
+	planSet, err := s.planReader.ReadPlan(ctx, query.LegalEntityID, planPeriod)
+	if err != nil {
+		return err
+	}
+	if planSet == nil {
+		return nil
+	}
+	comparison, err := retailkpi.ComparePlan(set.Facts, planSet.Facts, retailkpi.ComparePlanRequest{
+		Period: planPeriod, ExpectedStoreCount: expectedStores,
+		MaterialityThresholdPct: query.PlanMaterialityThresholdPct,
+	})
+	if err != nil {
+		return fmt.Errorf("plan comparison: %w", err)
+	}
+	comparison.PlanVersionID = planSet.VersionID
+	comparison.PlanVersionName = planSet.VersionName
+	comparison.PlanVersionType = planSet.VersionType
+	comparison.PlanAsOfPeriod = planSet.AsOfPeriod
+	comparison.PlanSource = planSet.Source
+	comparison.PlanIsOfficial = planSet.IsOfficial
+	response.Plan = comparison
+	return nil
+}
+
+func currentEndOf(response *Response) time.Time {
+	parsed, err := time.Parse("2006-01-02", response.Current.DateTo)
+	if err != nil {
+		return time.Time{}
+	}
+	return parsed
 }
 
 // pulseDecisionReadyReason names the first reason a pulse read is not

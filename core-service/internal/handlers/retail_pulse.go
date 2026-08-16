@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -18,11 +19,27 @@ import (
 )
 
 type RetailPulseHandler struct {
-	service *retailpulse.Service
+	service            *retailpulse.Service
+	planMaterialityPct func(context.Context) float64
 }
 
 func NewRetailPulseHandler(reader retailKPIReader) *RetailPulseHandler {
-	return &RetailPulseHandler{service: retailpulse.NewService(reader)}
+	return &RetailPulseHandler{service: retailpulse.NewService(reader), planMaterialityPct: func(context.Context) float64 { return 5 }}
+}
+
+// WithPlanReader enables the M4 actual-vs-plan block on every pulse read.
+func (h *RetailPulseHandler) WithPlanReader(reader retailkpi.PlanReader) *RetailPulseHandler {
+	h.service.WithPlanReader(reader)
+	return h
+}
+
+// WithPlanMateriality sets the materiality source (system settings via the
+// caller); the fallback stays 5% when unset.
+func (h *RetailPulseHandler) WithPlanMateriality(getter func(context.Context) float64) *RetailPulseHandler {
+	if getter != nil {
+		h.planMaterialityPct = getter
+	}
+	return h
 }
 
 func (h *RetailPulseHandler) OperatingPulse(c *gin.Context) {
@@ -106,7 +123,7 @@ func (h *RetailPulseHandler) OperatingPulse(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, storeErr, nil)
 		return
 	}
-	pulseQuery := retailpulse.Query{LegalEntityID: legalEntityID, AsOf: asOf, WindowDays: windowDays, Classification: classification, DatasetVersion: datasetVersion, SourceSystem: strings.TrimSpace(c.Query("source_system")), StoreIDs: storeIDs, AttentionLimit: attentionLimit, GroupBy: strings.TrimSpace(c.Query("group_by"))}
+	pulseQuery := retailpulse.Query{LegalEntityID: legalEntityID, AsOf: asOf, WindowDays: windowDays, Classification: classification, DatasetVersion: datasetVersion, SourceSystem: strings.TrimSpace(c.Query("source_system")), StoreIDs: storeIDs, AttentionLimit: attentionLimit, GroupBy: strings.TrimSpace(c.Query("group_by")), PlanComparison: true, PlanMaterialityThresholdPct: h.planMaterialityPct(c.Request.Context())}
 	if calendarWindow != nil {
 		pulseQuery.DateFrom, pulseQuery.DateTo = calendarWindow.From, calendarWindow.To
 		pulseQuery.ComparisonDateFrom, pulseQuery.ComparisonDateTo = calendarWindow.CompareFrom, calendarWindow.CompareTo

@@ -860,3 +860,28 @@ func (r *FPnAGovernanceRepository) ListAgentSignals(ctx context.Context, entity 
 	}
 	return result, rows.Err()
 }
+
+// ResolvePlanVersionForPeriod picks the authoritative plan version covering
+// one calendar month for a version type: official versions win, then the
+// newest as_of snapshot (spec decision 1/2: frozen versions, official is a
+// governance flag, comparison uses the same basis).
+func (r *FPnAGovernanceRepository) ResolvePlanVersionForPeriod(ctx context.Context, entity access.EntityFilter, period, versionType string) (*FPnAPlanVersion, error) {
+	args := []any{versionType, period}
+	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE version_type=$1 AND from_period<=$2 AND to_period>=$2`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	query += ` ORDER BY is_official DESC, as_of_period DESC, created_at DESC LIMIT 1`
+	item := &FPnAPlanVersion{}
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve FP&A plan version: %w", err)
+	}
+	return item, nil
+}

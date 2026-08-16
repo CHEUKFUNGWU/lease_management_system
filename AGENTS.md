@@ -28,7 +28,7 @@
 
 ## 当前工程事实
 
-- `db/init/01_init.sql`：70 张表；增量迁移到 `041_ai_chat_message_confidence.sql`
+- `db/init/01_init.sql`：70 张表；增量迁移到 `043_retag_home_brief_sessions.sql`
 - `core-service/internal/services/`：22 个业务包，其中 `retailkpi` / `retailpulse` / `retailstore360` / `retailscenario` / `retailsimulation` 为零售经营分析
 - `web/app/`：26 个页面，零售主线为 `/operating-pulse`、`/store-360`、`/scenario-workbench`
 - Agent Tool：`lease.*` 29 个；零售只读 Tool 3 个（`retail.operating_pulse.read`、`retail.store_diagnostics.read`、`retail.store.scenario.evaluate`）
@@ -60,7 +60,7 @@
 
 ## 架构分层
 
-- **Web** (Next.js + TypeScript + Ant Design + Recharts)：经营脉搏、门店 360、情景工作台、合同台账、AI 录入、月结、报表、组合分析等 26 个页面
+- **Web** (Next.js + TypeScript + Ant Design + Recharts)：经营脉搏、门店 360、租金谈判测算、合同台账、AI 录入、月结、报表、组合分析等 26 个页面
 - **Core Service** (Go + Gin)：权限、合同主数据、付款计划、事件、IFRS 16 计量、月结、ERP 导出/回写、审计日志、零售 KPI 语义层与经营分析服务、Agent Gateway
 - **AI Service** (Python + FastAPI)：文件解析、PaddleOCR、LLM 字段抽取、草稿生成、置信度与原文定位
 - **PostgreSQL**：正式业务数据、经营事实、AI 草稿、任务状态、审核记录

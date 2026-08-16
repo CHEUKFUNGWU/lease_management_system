@@ -322,3 +322,76 @@ func TestCoverageIncompleteSingleVerdict(t *testing.T) {
 		})
 	}
 }
+
+// M1 / P0-3: the percent change denominator takes |comparison| so a negative
+// base keeps a stable direction. This is the GUARD-001 rule-body proof that
+// the replacement formula is live: improving from -100 to -50 must read as
+// +50 (improvement), which the retired (c/p-1) form reported as -50.
+func TestChangeRateNegativeBaseDirection(t *testing.T) {
+	current, comparison := -50.0, -100.0
+	got, reason := ChangeRate(&current, &comparison, "percent")
+	if reason != "" || got == nil || *got != 50 {
+		t.Fatalf("ChangeRate(-50, -100, percent) = (%+v, %q), want (+50, \"\")", got, reason)
+	}
+	// Worsening on a negative base reads as negative: -100 back to -150.
+	current, comparison = -150.0, -100.0
+	got, reason = ChangeRate(&current, &comparison, "percent")
+	if reason != "" || got == nil || *got != -50 {
+		t.Fatalf("ChangeRate(-150, -100, percent) = (%+v, %q), want (-50, \"\")", got, reason)
+	}
+	// Positive bases keep the classic ratio result: 120 vs 80 stays +50.
+	current, comparison = 120.0, 80.0
+	got, reason = ChangeRate(&current, &comparison, "percent")
+	if reason != "" || got == nil || *got != 50 {
+		t.Fatalf("ChangeRate(120, 80, percent) = (%+v, %q), want (+50, \"\")", got, reason)
+	}
+	// Percentage-point changes remain plain differences on any base sign.
+	current, comparison = 20.0, 35.0
+	got, reason = ChangeRate(&current, &comparison, "percentage_point")
+	if reason != "" || got == nil || *got != -15 {
+		t.Fatalf("ChangeRate(20, 35, percentage_point) = (%+v, %q), want (-15, \"\")", got, reason)
+	}
+}
+
+// P0-8: duplicated (store, business_date) rows are over-coverage with
+// polluted sums — the alarm is the symmetric counterpart of the incomplete
+// verdict, and it downgrades decision readiness instead of hiding behind a
+// >100% coverage rate.
+func TestAggregateDuplicateStoreDayRowsAlarm(t *testing.T) {
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	newFact := func(day int) DailyFact {
+		return DailyFact{StoreID: "s1", StoreCode: "S1", StoreName: "One", Brand: "A", Region: "N", Currency: "CNY", BusinessDate: base.AddDate(0, 0, day), Revenue: ptr(100), GrossProfit: ptr(40), Transactions: ptr(10), Footfall: ptr(20), AreaSqm: ptr(50), LaborCost: ptr(10), FixedRent: ptr(5), VariableRent: ptr(2), NonLeaseCost: ptr(3), OtherControllableCost: ptr(4), MappingStatus: "mapped"}
+	}
+	req := Request{DateFrom: base, DateTo: base.AddDate(0, 0, 6), RequestedDateFrom: "2026-01-01", RequestedDateTo: "2026-01-07", GroupBy: "total", ExpectedStoreCount: 1}
+	clean := make([]DailyFact, 0, 8)
+	for day := 0; day < 7; day++ {
+		clean = append(clean, newFact(day))
+	}
+	rows, coverage, err := AggregateFacts(clean, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if coverage.DuplicateStoreDays != 0 || !rows[0].DecisionReady {
+		t.Fatalf("clean read should stay ready: coverage=%+v ready=%v", coverage, rows[0].DecisionReady)
+	}
+	duplicated := append(append([]DailyFact{}, clean...), newFact(3))
+	rows, coverage, err = AggregateFacts(duplicated, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if coverage.DuplicateStoreDays != 1 || coverage.ObservedStoreDays != 8 {
+		t.Fatalf("duplicate accounting = %+v", coverage)
+	}
+	if rows[0].DecisionReady {
+		t.Fatal("duplicated store-day rows must downgrade decision readiness")
+	}
+	found := false
+	for _, issue := range rows[0].DataQualityIssues {
+		if issue == "duplicate_store_day_rows" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("duplicate alarm missing from issues: %+v", rows[0].DataQualityIssues)
+	}
+}

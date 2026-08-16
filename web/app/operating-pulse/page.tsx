@@ -158,6 +158,9 @@ function OperatingPulseInner() {
   const latestLoaded = useRef(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [latestRetryNonce, setLatestRetryNonce] = useState(0);
+  // P0-10: the source filter is applied, not typed — draft state mirrors the
+  // URL value and commits on Enter / Apply (store-360 precedent).
+  const [sourceInput, setSourceInput] = useState(searchParams.get("source_system") || "");
 
   const classification = (searchParams.get("data_classification") || "") as "production" | "simulated" | "";
   const datasetVersion = searchParams.get("dataset_version") || "";
@@ -167,6 +170,10 @@ function OperatingPulseInner() {
   const sourceSystem = searchParams.get("source_system") || "";
   const validWindow = WINDOW_OPTIONS.includes(windowDays as (typeof WINDOW_OPTIONS)[number]);
   const currentClassification = classification === "production" || classification === "simulated" ? classification : "simulated";
+
+  useEffect(() => {
+    setSourceInput(sourceSystem);
+  }, [sourceSystem]);
 
   // FETCH-001: loadPulse now runs through the shared fetch seam (race gate /
   // token injection / STATE-001 exit) instead of the hand-rolled requestGate.
@@ -275,6 +282,7 @@ function OperatingPulseInner() {
   };
   const onStoreSelect = (storeID: string) => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs: [storeID], sourceSystem });
   const clearStore = () => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs: [], sourceSystem });
+  const applySourceFilter = () => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs, sourceSystem: sourceInput.trim() });
   const refresh = () => { latestLoaded.current = false; setLatestRetryNonce((value) => value + 1); setRefreshNonce((value) => value + 1); };
 
   const kpiCards = PULSE_KPI_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><KPIValueCard code={code} metric={displaySummary[code]} currency={partition?.currency || response?.currency || ""} notReady={!response?.decision_ready} language={language} /></Col>);
@@ -296,7 +304,8 @@ function OperatingPulseInner() {
         <Radio.Group value={currentClassification} onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />
         {currentClassification === "simulated" && anomalies.length > 0 && <Select aria-label={t("pulse.anomaly_select", language)} value={currentAnomaly?.id || "all"} className="pulse-select-min" options={[{ label: t("pulse.all_anomalies", language), value: "all" }, ...anomalies.map((item) => ({ label: `${item.store_code} · ${signalLabel(item.type, language)}`, value: item.id }))]} onChange={(id) => { const selected = anomalies.find((item) => item.id === id); if (selected) updateQuery(router, { classification: "simulated", datasetVersion, asOf: selected.date_to, windowDays: 7, storeIDs, sourceSystem }); }} />}
         <DatePicker aria-label={t("pulse.as_of", language)} value={asOf ? dayjs(asOf) : undefined} onChange={(date) => date && updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: date.format("YYYY-MM-DD"), windowDays: validWindow ? windowDays : 7, storeIDs, sourceSystem })} allowClear={false} />
-        <Input aria-label={t("common.source_system", language)} allowClear placeholder={t("common.source_system_optional", language)} value={sourceSystem} onChange={(event) => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs, sourceSystem: event.target.value.trim() })} className="pulse-source-input" />
+        <Input aria-label={t("common.source_system", language)} allowClear placeholder={t("common.source_system_optional", language)} value={sourceInput} onChange={(event) => setSourceInput(event.target.value)} onPressEnter={applySourceFilter} className="pulse-source-input" />
+        <Button onClick={applySourceFilter}>{t("pulse.apply_source", language)}</Button>
         <Segmented aria-label={t("pulse.window", language)} value={validWindow ? windowDays : 7} onChange={onWindowChange} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />
         {isScoped ? <Button onClick={clearStore}>{t("pulse.back_all_stores", language)}</Button> : <Tag>{t("pulse.all_authorized_stores", language)}</Tag>}
       </Flex>

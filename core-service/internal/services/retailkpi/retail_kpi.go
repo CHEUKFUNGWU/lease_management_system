@@ -119,6 +119,7 @@ type Coverage struct {
 	ObservedDateTo    string   `json:"observed_date_to,omitempty"`
 	ObservedStoreDays int      `json:"observed_store_days"`
 	ExpectedStoreDays int      `json:"expected_store_days"`
+	DuplicateStoreDays int     `json:"duplicate_store_days,omitempty"`
 	CoverageRate      *float64 `json:"coverage_rate"`
 	MissingFields     []string `json:"missing_fields,omitempty"`
 }
@@ -174,7 +175,10 @@ func ChangeRateType(code string) string {
 // ChangeRate computes the period-over-period change of two KPI values under
 // retail-kpi-v1 null semantics. A missing side yields nil with a reason; a
 // percentage_point change is a plain difference; a percent change against a
-// zero comparison is refused (no fabricated change).
+// zero comparison is refused (no fabricated change). The percent denominator
+// takes the absolute value of the comparison so a negative base keeps a
+// stable direction: improving from -100 to -50 is +50 (an improvement), the
+// single product-wide contract (P0-3 / M1).
 func ChangeRate(current, comparison *float64, changeType string) (*float64, string) {
 	if current == nil || comparison == nil {
 		return nil, "missing_value"
@@ -186,7 +190,7 @@ func ChangeRate(current, comparison *float64, changeType string) (*float64, stri
 	if *comparison == 0 {
 		return nil, "zero_comparison"
 	}
-	value := (*current / *comparison - 1) * 100
+	value := (*current - *comparison) / math.Abs(*comparison) * 100
 	return roundPtr(&value), ""
 }
 
@@ -249,6 +253,16 @@ func AggregateFacts(facts []DailyFact, req Request) ([]Aggregate, Coverage, erro
 			results[i].DecisionReady = false
 		}
 	}
+	// P0-8: over-coverage from duplicated (store, business_date) rows is a
+	// data-quality alarm, not extra confidence — the symmetric counterpart
+	// of the incomplete verdict above. Sums are polluted, so nothing built
+	// on this read stays decision-ready.
+	if coverage.DuplicateStoreDays > 0 {
+		for i := range results {
+			results[i].DataQualityIssues = appendUniqueIssue(results[i].DataQualityIssues, "duplicate_store_day_rows")
+			results[i].DecisionReady = false
+		}
+	}
 	return results, coverage, nil
 }
 
@@ -267,10 +281,17 @@ func buildCoverage(facts []DailyFact, req Request) Coverage {
 	c := Coverage{RequestedDateFrom: req.RequestedDateFrom, RequestedDateTo: req.RequestedDateTo, ExpectedStoreDays: req.ExpectedStoreCount * inclusiveDays(req.DateFrom, req.DateTo)}
 	dates := map[string]bool{}
 	stores := map[string]bool{}
+	seenStoreDays := map[string]bool{}
 	missing := map[string]bool{}
 	for _, f := range facts {
 		dates[f.BusinessDate.Format("2006-01-02")] = true
 		stores[f.StoreID] = true
+		storeDay := f.StoreID + "\x00" + f.BusinessDate.Format("2006-01-02")
+		if seenStoreDays[storeDay] {
+			c.DuplicateStoreDays++
+		} else {
+			seenStoreDays[storeDay] = true
+		}
 		for _, d := range definitions {
 			for _, field := range d.RequiredFields {
 				if fieldValue(f, field) == nil {

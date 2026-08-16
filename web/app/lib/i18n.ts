@@ -727,6 +727,11 @@ const dict: TranslationDict = {
     "zh-HK": "應用來源",
     en: "Apply source",
   },
+  "pulse.apply_source": {
+    "zh-CN": "应用来源",
+    "zh-HK": "應用來源",
+    en: "Apply source",
+  },
   "store360.no_dataset_title": {
     "zh-CN": "还没有可用的模拟数据集",
     "zh-HK": "還沒有可用的模擬數據集",
@@ -1152,6 +1157,21 @@ const dict: TranslationDict = {
     "zh-CN": "重新计算",
     "zh-HK": "重新計算",
     en: "Re-evaluate",
+  },
+  "scenario.not_evaluated_title": {
+    "zh-CN": "尚未评估任何情景",
+    "zh-HK": "尚未評估任何情景",
+    en: "No scenario evaluated yet",
+  },
+  "scenario.not_evaluated_desc": {
+    "zh-CN": "选择门店并点击「开始测算」后，这里才会显示数据口径与可信度信息；在此之前不展示任何就绪状态。",
+    "zh-HK": "選擇門店並點擊「開始測算」後，這裡才會顯示數據口徑與可信度信息；在此之前不展示任何就緒狀態。",
+    en: "Data lineage and trust information appear only after you pick a store and run an evaluation; no readiness is implied before that.",
+  },
+  "scenario.option_baseline": {
+    "zh-CN": "Baseline（什么都不做）",
+    "zh-HK": "Baseline（什麼都不做）",
+    en: "Baseline (do nothing)",
   },
   "scenario.unavailable": {
     "zh-CN": "情景不可用",

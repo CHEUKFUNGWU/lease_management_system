@@ -215,7 +215,10 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
     const selected = scenario.scenarios.find((item) => item.key !== "baseline") || scenario.scenarios[0];
     if (!selected) return;
     const days = Math.round((new Date(scenario.current.date_to).getTime() - new Date(scenario.current.date_from).getTime()) / 86400000) + 1;
-    const windowDays = days === 7 || days === 14 || days === 28 ? days : 7;
+    // P0-6: round the verification window UP to the nearest allowed size so
+    // it never collapses below the evaluated span (10 evaluated days used to
+    // shrink to 7).
+    const windowDays = days <= 7 ? 7 : days <= 14 ? 14 : 28;
     const scope = {
       store_id: scenario.store.store_id,
       data_classification: scenario.data_classification as RetailDataClassification,
@@ -1457,7 +1460,9 @@ function AIChatPageContent() {
     };
   }, [searchParams]);
 
-  const [input, setInput] = useState("");
+  // P0-4: `?message=` prefills the composer — same URL-parameter contract as
+  // the page/title/tags keys handled in pageContext above.
+  const [input, setInput] = useState(() => searchParams.get("message") || "");
   const [selectedSkill, setSelectedSkill] = useState<{ id: string; version: string } | undefined>(undefined);
 
   useEffect(() => {

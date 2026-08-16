@@ -488,3 +488,34 @@ func valueOrZero(value *float64) float64 {
 	}
 	return *value
 }
+
+// P0-7: a store whose facts span currencies counts toward the expected
+// population of EVERY currency partition where it has facts — deterministic,
+// never whichever currency iteration happened to write last.
+func TestPulseMixedCurrencyStoreAttributionIsDeterministic(t *testing.T) {
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	facts := make([]retailkpi.DailyFact, 0, 42)
+	for day := 0; day < 14; day++ {
+		date := from.AddDate(0, 0, day)
+		facts = append(facts, dailyFact("s1", "S1", "CNY", date, 100), dailyFact("s1", "S1", "USD", date, 100), dailyFact("s2", "S2", "CNY", date, 100))
+	}
+	reader := &fakeReader{set: &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 2, ExpectedStores: []retailkpi.StorePopulation{{StoreID: "s1", StoreCode: "S1", StoreName: "One", Brand: "Brand", Region: "Region"}, {StoreID: "s2", StoreCode: "S2", StoreName: "Two", Brand: "Brand", Region: "Region"}}}}
+	service := NewService(reader)
+	response, err := service.Build(context.Background(), Query{LegalEntityID: "entity-a", AsOf: from.AddDate(0, 0, 13), Classification: "production", AttentionLimit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !response.MultiCurrency || response.MixedCurrencyStores != 1 || len(response.Partitions) != 2 {
+		t.Fatalf("mixed currency header: multi=%v mixed=%d partitions=%d", response.MultiCurrency, response.MixedCurrencyStores, len(response.Partitions))
+	}
+	expectedByCurrency := map[string]int{}
+	for _, partition := range response.Partitions {
+		expectedByCurrency[partition.Currency] = partition.CurrentCoverage.ExpectedStoreDays
+	}
+	// s1 (CNY+USD) and s2 (CNY): the CNY partition expects both stores, the
+	// USD partition expects s1 alone — under last-write-wins the CNY side
+	// silently lost s1 and fell back to a distinct-store count.
+	if expectedByCurrency["CNY"] != 14 || expectedByCurrency["USD"] != 7 {
+		t.Fatalf("expected store-days by currency = %+v, want CNY=14 USD=7", expectedByCurrency)
+	}
+}

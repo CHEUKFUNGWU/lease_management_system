@@ -197,8 +197,8 @@ function Store360Inner() {
 
   useEffect(() => {
     if (query.classification || !latest || discoveryLoading) return;
-    writeQuery(router, { classification: "simulated", datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest), windowDays: 14, returnQuery: query.returnQuery });
-  }, [query.classification, latest, discoveryLoading, router]);
+    writeQuery(router, { classification: "simulated", datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest), windowDays: validWindow(query.windowDays) ? query.windowDays : 14, storeID: query.storeID, sourceSystem: query.sourceSystem, returnQuery: query.returnQuery });
+  }, [query.classification, query.windowDays, query.storeID, query.sourceSystem, latest, discoveryLoading, router]);
 
   useEffect(() => {
     if (query.classification !== "simulated" || query.datasetVersion || !latest || discoveryLoading) return;

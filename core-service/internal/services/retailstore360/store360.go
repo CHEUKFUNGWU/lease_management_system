@@ -400,14 +400,10 @@ func makeSummary(current, comparison *retailkpi.Aggregate) map[string]SummaryMet
 			reason = firstReason(c.Reason, p.Reason)
 		}
 		if c.Value != nil && p.Value != nil {
-			if typ == "percentage_point" {
-				v := *c.Value - *p.Value
-				change = &v
-			} else if *p.Value == 0 {
-				reason = "zero_comparison"
-			} else {
-				v := (*c.Value - *p.Value) / math.Abs(*p.Value) * 100
-				change = &v
+			var changeReason string
+			change, changeReason = retailkpi.ChangeRate(c.Value, p.Value, typ)
+			if changeReason != "" {
+				reason = changeReason
 			}
 		}
 		out[code] = SummaryMetric{Current: c, Comparison: p, ChangeValue: change, ChangeType: typ, Status: status, Reason: reason}

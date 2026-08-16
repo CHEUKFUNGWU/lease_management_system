@@ -143,6 +143,7 @@ type Response struct {
 	FactVersionMax            int                         `json:"fact_version_max"`
 	HighestAsOf               *time.Time                  `json:"highest_as_of,omitempty"`
 	MultiCurrency             bool                        `json:"multi_currency"`
+	MixedCurrencyStores       int                         `json:"mixed_currency_stores,omitempty"`
 	Currency                  string                      `json:"currency,omitempty"`
 	CurrencyStatus            string                      `json:"currency_status,omitempty"`
 	Current                   Period                      `json:"current"`
@@ -228,6 +229,7 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 		RequestedScope:            map[string]any{"legal_entity_id": query.LegalEntityID, "store_ids": query.StoreIDs},
 		RequestedStores:           set.ExpectedStores,
 		MultiCurrency:             distinctCurrencies(set.Facts) > 1,
+		MixedCurrencyStores:       mixedCurrencyStores(set.Facts),
 		Current:                   Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")},
 		Comparison:                Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")},
 		GeneratedAt:               s.now(), DefinitionsURL: "/api/v1/retail/kpis/definitions",
@@ -325,6 +327,18 @@ func templateValue(value string) string {
 }
 
 func (s *Service) buildPartitions(set *repository.RetailKPIFactSet, query Query, currentStart, currentEnd, comparisonStart, comparisonEnd time.Time) []Partition {
+	// P0-7: population attribution derives from each store's full currency
+	// set, never from fact iteration order. A store whose facts span
+	// currencies stays in every currency partition where it has facts and
+	// counts toward each partition's expected population — instead of
+	// landing in whichever currency happened to be written last.
+	storeCurrencies := map[string]map[string]bool{}
+	for _, fact := range set.Facts {
+		if storeCurrencies[fact.StoreID] == nil {
+			storeCurrencies[fact.StoreID] = map[string]bool{}
+		}
+		storeCurrencies[fact.StoreID][fact.Currency] = true
+	}
 	byCurrency := map[string][]retailkpi.DailyFact{}
 	for _, fact := range set.Facts {
 		byCurrency[fact.Currency] = append(byCurrency[fact.Currency], fact)
@@ -335,15 +349,16 @@ func (s *Service) buildPartitions(set *repository.RetailKPIFactSet, query Query,
 	}
 	sort.Strings(currencies)
 	populationByCurrency := map[string]int{}
-	observedStoreCurrency := map[string]string{}
-	for _, fact := range set.Facts {
-		observedStoreCurrency[fact.StoreID] = fact.Currency
+	observedStoreCurrency := map[string]bool{}
+	for storeID, currencySet := range storeCurrencies {
+		observedStoreCurrency[storeID] = true
+		for currency := range currencySet {
+			populationByCurrency[currency]++
+		}
 	}
 	unobserved := make([]retailkpi.StorePopulation, 0)
 	for _, store := range set.ExpectedStores {
-		if currency, ok := observedStoreCurrency[store.StoreID]; ok {
-			populationByCurrency[currency]++
-		} else {
+		if !observedStoreCurrency[store.StoreID] {
 			unobserved = append(unobserved, store)
 		}
 	}
@@ -710,6 +725,26 @@ func distinctCurrencies(facts []retailkpi.DailyFact) int {
 		currencies[fact.Currency] = true
 	}
 	return len(currencies)
+}
+
+// mixedCurrencyStores counts stores whose facts span more than one currency —
+// the P0-7 signal surfaced on the response so partition readers can see the
+// attribution basis, not just the partition split.
+func mixedCurrencyStores(facts []retailkpi.DailyFact) int {
+	byStore := map[string]map[string]bool{}
+	for _, fact := range facts {
+		if byStore[fact.StoreID] == nil {
+			byStore[fact.StoreID] = map[string]bool{}
+		}
+		byStore[fact.StoreID][fact.Currency] = true
+	}
+	count := 0
+	for _, currencies := range byStore {
+		if len(currencies) > 1 {
+			count++
+		}
+	}
+	return count
 }
 func currencyStatus(currency string) string {
 	if currency == "" {

@@ -1,10 +1,11 @@
 "use client";
 
-import { Alert, Empty, Typography } from "antd";
+import { Typography } from "antd";
 import { ResponsiveContainer, Sankey, Tooltip as ChartTooltip } from "recharts";
 import { t, type Language } from "../lib/i18n";
 import type { RetailPlFlowResponse } from "../lib/api";
 import { fmtMoney } from "../lib/format";
+import { StateBlock } from "../components/StateBlock";
 
 /**
  * SANKEY-001 一期：门店利润流向。单一「营业额」节点 → 四项费用 + 门店贡献。
@@ -47,11 +48,13 @@ export default function ProfitFlowPanel({ flow, error, currency, language }: { f
   // FIX-024: a failed request is not an empty one. It gets its own presentation
   // with the reason attached, so "the endpoint is not deployed" can never read
   // as "this store has no profit flow".
+  // STATE-004: both degraded states render through StateBlock (failed keeps
+  // the reason and no retry affordance — the panel has no retry channel).
   if (error) {
-    return <Alert type="error" showIcon message={t("store360.pl_flow.load_failed", language)} description={error} />;
+    return <StateBlock state={{ kind: "failed", message: t("store360.pl_flow.load_failed", language), reason: error }} language={language} />;
   }
   if (!flow || flow.status === "unavailable") {
-    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={flow?.reason ? t("store360.pl_flow.unavailable", language) : t("store360.pl_flow.pick_store", language)} />;
+    return <StateBlock state={{ kind: "empty", reason: flow?.reason ? t("store360.pl_flow.unavailable", language) : t("store360.pl_flow.pick_store", language) }} language={language} />;
   }
   const unit = currency || flow.currency || "";
   const indexByKey = new Map(flow.nodes.map((node, index) => [node.key, index]));

@@ -28,6 +28,7 @@ import {
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { StateBlock } from "../components/StateBlock";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { agentUsageApi } from "../lib/api";
@@ -185,14 +186,7 @@ export default function AgentMetricsPage() {
             style={{ marginBottom: 16 }}
           />
         )}
-        {error && (
-          <Alert
-            type="error"
-            showIcon
-            message={error}
-            style={{ marginBottom: 16 }}
-          />
-        )}
+        {error && <StateBlock state={{ kind: "failed", message: error }} language={language} />}
 
         {loading && !summary ? (
           <Card><Spin /></Card>

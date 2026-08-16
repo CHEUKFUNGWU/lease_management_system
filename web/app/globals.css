@@ -5,6 +5,13 @@
 /* ─── CSS Design Tokens ─────────────────────────────────────── */
 
 :root {
+  /* DARK-002: the browser paints form controls, scrollbars and the caret from
+     its own UA styles, and it picks light or dark from `color-scheme` — not
+     from our variables. Without this the dark theme rendered a white input
+     under white text (contrast 1.00: you could not see what you typed), which
+     is exactly what a palette-level contrast table cannot catch. */
+  color-scheme: light;
+
   /* Monochrome Scale — only levels consumed by the application */
   --mono-0: #000000;
   --mono-20: #262626;
@@ -80,6 +87,7 @@
    any forced-importance flag. All pairs verified >= 4.5:1 (delivery
    report table). */
 [data-theme="dark"] {
+  color-scheme: dark;
   --mono-0: #FFFFFF;
   --mono-20: #D9D9D9;
   --mono-40: #A6A6A6;

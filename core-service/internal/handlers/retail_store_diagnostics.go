@@ -16,6 +16,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailexport"
+	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/services/retailstore360"
 )
 
@@ -89,9 +90,35 @@ func (h *RetailStoreDiagnosticsHandler) Diagnostics(c *gin.Context) {
 		return
 	}
 	windowDays := 14
+	periodSpec := strings.TrimSpace(c.Query("period"))
 	if raw := strings.TrimSpace(c.Query("window_days")); raw != "" {
+		if periodSpec != "" {
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "period and window_days are mutually exclusive", nil)
+			return
+		}
 		windowDays, err = strconv.Atoi(raw)
 		if err != nil {
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
+			return
+		}
+	}
+	// M2: a period spec resolves through the shared period module; calendar
+	// kinds override the rolling derivation with explicit boundaries.
+	var calendarWindow *retailperiod.Window
+	if periodSpec != "" {
+		window, periodErr := retailperiod.Parse(periodSpec, asOf)
+		if periodErr != nil {
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, periodErr.Error(), nil)
+			return
+		}
+		if window.Period.Kind == retailperiod.KindRolling {
+			windowDays = window.Period.Days
+		} else {
+			calendarWindow = &window
+		}
+	}
+	if calendarWindow == nil {
+		if _, rangeErr := retailperiod.ParseRollingDays(windowDays); rangeErr != nil {
 			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
 			return
 		}
@@ -100,12 +127,18 @@ func (h *RetailStoreDiagnosticsHandler) Diagnostics(c *gin.Context) {
 	if !ok {
 		return
 	}
-	result, err := h.service.Build(c.Request.Context(), retailstore360.Query{
+	diagnosticsQuery := retailstore360.Query{
 		LegalEntityID: legalEntityID, StoreID: storeID, AsOf: asOf, WindowDays: windowDays,
 		Classification: classification, DatasetVersion: datasetVersion,
 		PlanComparison: true, PlanMaterialityThresholdPct: h.planMaterialityPct(c.Request.Context()),
 		SourceSystem: strings.TrimSpace(c.Query("source_system")),
-	})
+	}
+	if calendarWindow != nil {
+		diagnosticsQuery.DateFrom, diagnosticsQuery.DateTo = calendarWindow.From, calendarWindow.To
+		diagnosticsQuery.ComparisonDateFrom, diagnosticsQuery.ComparisonDateTo = calendarWindow.CompareFrom, calendarWindow.CompareTo
+		diagnosticsQuery.PeriodLabel = calendarWindow.Label
+	}
+	result, err := h.service.Build(c.Request.Context(), diagnosticsQuery)
 	if err != nil {
 		switch {
 		case errors.Is(err, retailstore360.ErrInvalidQuery):

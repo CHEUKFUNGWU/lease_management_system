@@ -15,6 +15,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 	"github.com/lease-management-system/core-service/internal/services/retailstore360"
 	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
@@ -263,7 +264,7 @@ func scenarioFillEnvelope(response *Response, q Query, facts []retailkpi.DailyFa
 }
 
 func validateQuery(q Query) error {
-	if strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || (q.WindowDays < 7 || q.WindowDays > 28) || (q.Classification != "production" && q.Classification != "simulated") {
+	if strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || func() bool { _, err := retailperiod.ParseRollingDays(q.WindowDays); return err != nil }() || (q.Classification != "production" && q.Classification != "simulated") {
 		return ErrInvalidRequest
 	}
 	if q.Classification == "simulated" && strings.TrimSpace(q.DatasetVersion) == "" {

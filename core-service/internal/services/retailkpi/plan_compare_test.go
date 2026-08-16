@@ -119,3 +119,40 @@ func TestComparePlanMaterialityUsesNegativeBaseDirection(t *testing.T) {
 		t.Fatalf("materiality/attainment=%+v", revenue)
 	}
 }
+
+// c1: a store with only half the month of facts against a full-month plan is
+// a coverage mismatch — the comparison downgrades instead of reporting a
+// "variance" that is really missing days.
+func TestComparePlanDayCoverageDowngrades(t *testing.T) {
+	actual := monthFacts("s1", 15, 100) // half of July only
+	plan := []PlanFact{{StoreID: "s1", Period: "2026-07", Currency: "CNY", Revenue: planPtr(3100)}}
+	comparison, err := ComparePlan(actual, plan, ComparePlanRequest{Period: "2026-07", ExpectedStoreCount: 1, ExpectedDaysInMonth: 31, MaterialityThresholdPct: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if comparison.DecisionReady {
+		t.Fatalf("half-month actual against full-month plan must downgrade: %+v", comparison)
+	}
+	if !strings.Contains(comparison.DowngradeReason, "actual_day_coverage_insufficient") {
+		t.Fatalf("reason=%q", comparison.DowngradeReason)
+	}
+	// Full month coverage clears the day gate (other KPI downgrades here are
+	// legitimate — the plan only carries revenue — so assert the absence of
+	// the day-coverage reason specifically).
+	full := monthFacts("s1", 31, 100)
+	ready, err := ComparePlan(full, plan, ComparePlanRequest{Period: "2026-07", ExpectedStoreCount: 1, ExpectedDaysInMonth: 31, MaterialityThresholdPct: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(ready.DowngradeReason, "actual_day_coverage_insufficient") {
+		t.Fatalf("full-month coverage still day-downgraded: %q", ready.DowngradeReason)
+	}
+	// Zero gate keeps the legacy behaviour (no day check).
+	legacy, err := ComparePlan(actual, plan, ComparePlanRequest{Period: "2026-07", ExpectedStoreCount: 1, MaterialityThresholdPct: 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(legacy.DowngradeReason, "actual_day_coverage_insufficient") {
+		t.Fatalf("zero gate introduced a day downgrade: %q", legacy.DowngradeReason)
+	}
+}

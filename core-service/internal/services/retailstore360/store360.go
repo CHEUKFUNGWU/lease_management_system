@@ -11,6 +11,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
@@ -39,6 +40,13 @@ type Query struct {
 	Classification string
 	DatasetVersion string
 	SourceSystem   string
+	// M2 calendar periods: explicit boundaries override the rolling
+	// derivation below (same contract as the pulse Query).
+	DateFrom           time.Time
+	DateTo             time.Time
+	ComparisonDateFrom time.Time
+	ComparisonDateTo   time.Time
+	PeriodLabel        string
 	// M4: attach the store's actual-vs-plan comparison for the calendar
 	// month of the window end; threshold from system settings via handler.
 	PlanComparison              bool
@@ -188,7 +196,7 @@ var benchmarkCodes = []string{"revenue", "gross_profit", "gross_margin_rate", "f
 var summaryCodes = []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost", "occupancy_cash_cost", "other_controllable_cost", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"}
 
 func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
-	if s.reader == nil || strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || (q.WindowDays < 7 || q.WindowDays > 28) || (q.Classification != "production" && q.Classification != "simulated") {
+	if s.reader == nil || strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || func() bool { _, err := retailperiod.ParseRollingDays(q.WindowDays); return err != nil }() || (q.Classification != "production" && q.Classification != "simulated") {
 		return nil, ErrInvalidQuery
 	}
 	if q.Classification == "simulated" && strings.TrimSpace(q.DatasetVersion) == "" {
@@ -201,6 +209,13 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 	currentStart := currentEnd.AddDate(0, 0, -(q.WindowDays - 1))
 	comparisonEnd := currentStart.AddDate(0, 0, -1)
 	comparisonStart := comparisonEnd.AddDate(0, 0, -(q.WindowDays - 1))
+	periodLabel := fmt.Sprintf("近 %d 天", q.WindowDays)
+	if !q.DateTo.IsZero() {
+		currentStart, currentEnd = dateOnly(q.DateFrom), dateOnly(q.DateTo)
+		comparisonStart, comparisonEnd = dateOnly(q.ComparisonDateFrom), dateOnly(q.ComparisonDateTo)
+		periodLabel = q.PeriodLabel
+	}
+	_ = periodLabel
 	dateFrom, dateTo := comparisonStart.Format("2006-01-02"), currentEnd.Format("2006-01-02")
 	set, err := s.reader.QueryFacts(ctx, q.LegalEntityID, dateFrom, dateTo, q.Classification, q.DatasetVersion, q.SourceSystem, nil)
 	if err != nil {
@@ -324,8 +339,13 @@ func (s *Service) attachPlanComparison(ctx context.Context, q Query, facts []ret
 	if planSet == nil {
 		return nil
 	}
+	monthWindow, periodErr := retailperiod.Parse(planPeriod, time.Time{})
+	if periodErr != nil {
+		return periodErr
+	}
 	comparison, err := retailkpi.ComparePlan(facts, planSet.Facts, retailkpi.ComparePlanRequest{
 		Period: planPeriod, ExpectedStoreCount: 1,
+		ExpectedDaysInMonth:    inclusiveDays(monthWindow.From, monthWindow.To),
 		MaterialityThresholdPct: q.PlanMaterialityThresholdPct,
 	})
 	if err != nil {
@@ -339,6 +359,10 @@ func (s *Service) attachPlanComparison(ctx context.Context, q Query, facts []ret
 	comparison.PlanIsOfficial = planSet.IsOfficial
 	response.Plan = comparison
 	return nil
+}
+
+func inclusiveDays(from, to time.Time) int {
+	return int(to.Sub(from).Hours()/24) + 1
 }
 
 func monthOf(dateTo string) string {

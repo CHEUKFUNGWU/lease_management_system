@@ -32,6 +32,7 @@ type trialBalanceStore interface {
 	GetTrialBalanceVersionByContent(ctx context.Context, entity access.EntityFilter, sourceSystem, period, sha256 string) (*repository.TrialBalanceVersion, error)
 	CreateTrialBalanceLine(ctx context.Context, item *repository.TrialBalanceLine) (*repository.TrialBalanceLine, error)
 	ListTrialBalanceVersions(ctx context.Context, entity access.EntityFilter, period string) ([]*repository.TrialBalanceVersion, error)
+	DeleteTrialBalanceVersion(ctx context.Context, id string) error
 }
 
 func NewTrialBalanceHandler(repo trialBalanceStore) *TrialBalanceHandler { return &TrialBalanceHandler{repo: repo} }
@@ -100,6 +101,7 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 	var totalDebit, totalCredit float64
 	lineErrors := make([]gin.H, 0)
 	parsed := make([]repository.TrialBalanceLine, 0)
+	seenAccounts := map[string]bool{}
 	for index, row := range rows[1:] {
 		get := func(key string) string {
 			position, ok := header[key]
@@ -113,6 +115,14 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 			lineErrors = append(lineErrors, gin.H{"row": index + 2, "code": "missing_account_code", "message": "account_code is required"})
 			continue
 		}
+		// P1-2: a repeated account code within one file is a data error, not
+		// a silent drop — otherwise the stored lines would no longer add up
+		// to the reported totals.
+		if seenAccounts[code] {
+			lineErrors = append(lineErrors, gin.H{"row": index + 2, "code": "duplicate_account_code", "message": "account_code " + code + " appears more than once"})
+			continue
+		}
+		seenAccounts[code] = true
 		debit, debitErr := strconv.ParseFloat(strings.ReplaceAll(get("debit"), ",", ""), 64)
 		credit, creditErr := strconv.ParseFloat(strings.ReplaceAll(get("credit"), ",", ""), 64)
 		if debitErr != nil || creditErr != nil || debit < 0 || credit < 0 {
@@ -153,6 +163,8 @@ func (h *TrialBalanceHandler) Import(c *gin.Context) {
 	for index := range parsed {
 		parsed[index].TrialBalanceVersionID = created.ID
 		if _, err := h.repo.CreateTrialBalanceLine(c.Request.Context(), &parsed[index]); err != nil {
+			// P1-2: compensate the partial version (cascade removes lines).
+			_ = h.repo.DeleteTrialBalanceVersion(c.Request.Context(), created.ID)
 			writeCodedFailure(c, http.StatusUnprocessableEntity, err, nil)
 			return
 		}

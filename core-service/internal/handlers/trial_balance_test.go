@@ -18,6 +18,7 @@ type fakeTrialBalanceStore struct {
 	versions []*repository.TrialBalanceVersion
 	lines    []*repository.TrialBalanceLine
 	replay   *repository.TrialBalanceVersion
+	deleted  bool
 }
 
 func (f *fakeTrialBalanceStore) CreateTrialBalanceVersion(_ context.Context, item *repository.TrialBalanceVersion) (*repository.TrialBalanceVersion, error) {
@@ -39,6 +40,11 @@ func (f *fakeTrialBalanceStore) CreateTrialBalanceLine(_ context.Context, item *
 
 func (f *fakeTrialBalanceStore) ListTrialBalanceVersions(context.Context, access.EntityFilter, string) ([]*repository.TrialBalanceVersion, error) {
 	return f.versions, nil
+}
+
+func (f *fakeTrialBalanceStore) DeleteTrialBalanceVersion(context.Context, string) error {
+	f.deleted = true
+	return nil
 }
 
 func newTBMultipart(t *testing.T, csvContent string, fields map[string]string) (*bytes.Buffer, string) {
@@ -124,5 +130,42 @@ func TestTrialBalanceImportContentIdentityAndReplay(t *testing.T) {
 	}
 	if !replay.IdempotentReplay || len(store.lines) != 2 {
 		t.Fatalf("replay=%+v lines=%d", replay, len(store.lines))
+	}
+}
+
+// P1-2: a repeated account code is a reported data error, never a silent
+// drop that would desync totals from the stored lines.
+func TestTrialBalanceImportRejectsDuplicateAccountCode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &fakeTrialBalanceStore{}
+	handler := NewTrialBalanceHandler(store)
+	csvContent := "account_code,debit,credit\n1001,100.00,0.00\n1001,0.00,100.00\n"
+	body, contentType := newTBMultipart(t, csvContent, map[string]string{
+		"name": "TB dup", "source_system": "gl", "period": "2026-07", "functional_currency": "CNY",
+	})
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/gl/trial-balances/import", body)
+	request.Header.Set("Content-Type", contentType)
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = request
+	c.Set("legal_entity_id", "legal-entity-a")
+	c.Set("access_scope", access.Scope{LegalEntityID: "legal-entity-a"})
+	c.Set("user_id", "user-a")
+	handler.Import(c)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Accepted int `json:"accepted_rows"`
+		Rejected int `json:"rejected_rows"`
+		Errors   []struct {
+			Code string `json:"code"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Accepted != 1 || response.Rejected != 1 || len(response.Errors) != 1 || response.Errors[0].Code != "duplicate_account_code" {
+		t.Fatalf("response=%+v", response)
 	}
 }

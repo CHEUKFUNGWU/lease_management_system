@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
+	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 )
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ type PlFlowResult struct {
 // sankey (phase one). The amount fields are first-party DECIMAL(18,2)
 // columns; nothing is derived by multiplying ratios back.
 func (s *Service) PlFlow(ctx context.Context, q Query) (*PlFlowResult, error) {
-	if s.reader == nil || strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || (q.WindowDays < 7 || q.WindowDays > 28) || (q.Classification != "production" && q.Classification != "simulated") {
+	if s.reader == nil || strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || func() bool { _, err := retailperiod.ParseRollingDays(q.WindowDays); return err != nil }() || (q.Classification != "production" && q.Classification != "simulated") {
 		return nil, ErrInvalidQuery
 	}
 	if q.Classification == "simulated" && strings.TrimSpace(q.DatasetVersion) == "" {

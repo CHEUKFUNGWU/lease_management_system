@@ -32,6 +32,7 @@ type planImportStore interface {
 	CreatePlanVersion(context.Context, *repository.FPnAPlanVersion) (*repository.FPnAPlanVersion, error)
 	ListPlanVersions(context.Context, access.EntityFilter, string) ([]*repository.FPnAPlanVersion, error)
 	CreatePlanLine(context.Context, *repository.FPnAPlanLine) (*repository.FPnAPlanLine, error)
+	DeletePlanVersion(context.Context, string, access.EntityFilter) error
 }
 
 func NewFPnAPlanImportHandler(population retailIngestPopulationReader, plans planImportStore) *FPnAPlanImportHandler {
@@ -151,6 +152,9 @@ func (h *FPnAPlanImportHandler) Import(c *gin.Context) {
 			continue
 		}
 		if _, err := h.plans.CreatePlanLine(c.Request.Context(), line); err != nil {
+			// P1-2: a partial write must not leave an orphan version behind
+			// — compensate by deleting the just-created version (cascade).
+			_ = h.plans.DeletePlanVersion(c.Request.Context(), version.ID, entity)
 			writeCodedFailure(c, http.StatusUnprocessableEntity, err, nil)
 			return
 		}

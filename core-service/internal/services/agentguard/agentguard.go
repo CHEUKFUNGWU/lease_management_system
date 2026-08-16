@@ -56,11 +56,11 @@ func (c Config) withDefaults() Config {
 
 // BudgetStore is the counting seam: the memory adapter serves single
 // instances and tests, the DB adapter spans instances (two adapters ⇒ a real
-// seam). Allow refuses when the user's rate or daily cost ceiling is spent;
-// Record books one usage event.
+// seam). Consume atomically checks the user's rate and daily cost ceiling
+// and books the usage event in one step — a concurrent caller can never
+// slip past the ceiling between a check and a record.
 type BudgetStore interface {
-	Allow(ctx context.Context, userID, kind string) (bool, string, error)
-	Record(ctx context.Context, userID, kind string, tokens int, costUSD float64) error
+	Consume(ctx context.Context, userID, kind string, tokens int, costUSD float64) (bool, string, error)
 }
 
 // Guard is the enforced view over a store.
@@ -73,10 +73,12 @@ func New(store BudgetStore, cfg Config) *Guard {
 	return &Guard{store: store, cfg: cfg.withDefaults()}
 }
 
-// Check refuses the call when the budget is spent; the reason is preserved
-// for the caller's 429 body.
-func (g *Guard) Check(ctx context.Context, userID, kind string) error {
-	allowed, reason, err := g.store.Allow(ctx, userID, kind)
+// Consume atomically checks the budget and books the event; the reason is
+// preserved for the caller's 429 body. tokens may be 0 when the caller
+// cannot observe them (rate counting still applies, cost accrues once token
+// usage is plumbed).
+func (g *Guard) Consume(ctx context.Context, userID, kind string, tokens int) error {
+	allowed, reason, err := g.store.Consume(ctx, userID, kind, tokens, float64(tokens)*g.cfg.CostPerTokenUSD)
 	if err != nil {
 		return err
 	}
@@ -89,13 +91,6 @@ func (g *Guard) Check(ctx context.Context, userID, kind string) error {
 		}
 	}
 	return nil
-}
-
-// Record books one completed usage event; tokens may be 0 when the caller
-// cannot observe them (rate counting still applies, cost accrues when token
-// usage is plumbed).
-func (g *Guard) Record(ctx context.Context, userID, kind string, tokens int) error {
-	return g.store.Record(ctx, userID, kind, tokens, float64(tokens)*g.cfg.CostPerTokenUSD)
 }
 
 // HistoryMessageLimit / HistoryCharBudget expose the assembly budget.
@@ -140,7 +135,7 @@ func NewMemoryStore(perMinute int, dailyLimitUSD float64) *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) Allow(_ context.Context, userID, kind string) (bool, string, error) {
+func (s *MemoryStore) Consume(_ context.Context, userID, kind string, _ int, costUSD float64) (bool, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := userID + "|" + kind
@@ -159,15 +154,8 @@ func (s *MemoryStore) Allow(_ context.Context, userID, kind string) (bool, strin
 	if s.dailyCost[day] >= s.dailyLimit {
 		return false, "cost", nil
 	}
+	s.minuteEvents[key] = append(kept, s.now())
+	s.dailyCost[day] += costUSD
 	return true, "", nil
-}
-
-func (s *MemoryStore) Record(_ context.Context, userID, kind string, _ int, costUSD float64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	key := userID + "|" + kind
-	s.minuteEvents[key] = append(s.minuteEvents[key], s.now())
-	s.dailyCost[s.dayKey()] += costUSD
-	return nil
 }
 

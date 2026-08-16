@@ -1678,6 +1678,9 @@ html {
 .scenario-custom-window {
   width: 84px;
 }
+.store360-select-min {
+  min-width: 120px;
+}
 .perf-import-source {
   width: 120px;
 }

@@ -18,6 +18,7 @@ import (
 type fakePlanImportStore struct {
 	versions []*repository.FPnAPlanVersion
 	lines    []*repository.FPnAPlanLine
+	deleted  bool
 }
 
 func (f *fakePlanImportStore) CreatePlanVersion(_ context.Context, item *repository.FPnAPlanVersion) (*repository.FPnAPlanVersion, error) {
@@ -35,6 +36,11 @@ func (f *fakePlanImportStore) ListPlanVersions(context.Context, access.EntityFil
 func (f *fakePlanImportStore) CreatePlanLine(_ context.Context, item *repository.FPnAPlanLine) (*repository.FPnAPlanLine, error) {
 	f.lines = append(f.lines, item)
 	return item, nil
+}
+
+func (f *fakePlanImportStore) DeletePlanVersion(context.Context, string, access.EntityFilter) error {
+	f.deleted = true
+	return nil
 }
 
 func newPlanImportMultipart(t *testing.T, csvContent string, fields map[string]string) (*bytes.Buffer, string) {

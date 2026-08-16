@@ -37,16 +37,18 @@ function queryFromURL(searchParams: URLSearchParams) {
   const datasetVersion = searchParams.get("dataset_version") || "";
   const asOf = searchParams.get("as_of") || "";
   const rawWindow = Number(searchParams.get("window_days") || 14);
-  return { storeID: searchParams.get("store_id") || "", classification: classification === "production" || classification === "simulated" ? classification : "", datasetVersion, asOf, windowDays: rawWindow, sourceSystem: searchParams.get("source_system") || "", returnQuery: searchParams.get("return_query") || "" };
+  return { storeID: searchParams.get("store_id") || "", classification: classification === "production" || classification === "simulated" ? classification : "", datasetVersion, asOf, windowDays: rawWindow, period: searchParams.get("period") || "", sourceSystem: searchParams.get("source_system") || "", returnQuery: searchParams.get("return_query") || "" };
 }
 
-function writeQuery(router: ReturnType<typeof useRouter>, value: { storeID?: string; classification: RetailDataClassification; datasetVersion?: string; asOf: string; windowDays: number; sourceSystem?: string; returnQuery?: string }) {
+function writeQuery(router: ReturnType<typeof useRouter>, value: { storeID?: string; classification: RetailDataClassification; datasetVersion?: string; asOf: string; windowDays: number; period?: string; sourceSystem?: string; returnQuery?: string }) {
   const query = new URLSearchParams();
   if (value.storeID) query.set("store_id", value.storeID);
   query.set("data_classification", value.classification);
   if (value.classification === "simulated" && value.datasetVersion) query.set("dataset_version", value.datasetVersion);
   query.set("as_of", value.asOf);
-  query.set("window_days", String(validWindow(value.windowDays) ? value.windowDays : 14));
+  // M2: calendar periods replace window_days on the URL (pulse contract).
+  if (value.period) query.set("period", value.period);
+  else query.set("window_days", String(validWindow(value.windowDays) ? value.windowDays : 14));
   if (value.sourceSystem) query.set("source_system", value.sourceSystem);
   if (value.returnQuery) query.set("return_query", value.returnQuery);
   router.replace(`/store-360?${query.toString()}`);
@@ -163,11 +165,11 @@ function Store360Inner() {
 
   // FETCH-001: both queries run through the shared fetch seam (race gate /
   // token injection / STATE-001 exit).
-  const queryReady = Boolean(query.storeID && query.classification && query.asOf && validWindow(query.windowDays) && (query.classification !== "simulated" || query.datasetVersion));
+  const queryReady = Boolean(query.storeID && query.classification && query.asOf && (query.period !== "" || validWindow(query.windowDays)) && (query.classification !== "simulated" || query.datasetVersion));
   const diagParams = queryReady
-    ? { store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, window_days: query.windowDays as 7 | 14 | 28, source_system: query.sourceSystem || undefined }
+    ? { store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, ...(query.period ? { period: query.period } : { window_days: query.windowDays }), source_system: query.sourceSystem || undefined }
     : null;
-  const diagKey = [query.storeID, query.classification, query.datasetVersion, query.asOf, query.windowDays, query.sourceSystem].join("|");
+  const diagKey = [query.storeID, query.classification, query.datasetVersion, query.asOf, query.period, query.windowDays, query.sourceSystem].join("|");
   const { loading, state: diagState, retry: diagRetry } = useRetailQuery({
     token,
     params: diagParams,
@@ -185,7 +187,7 @@ function Store360Inner() {
   // FIX-024: a failed pl-flow request must reach the panel — a broken link
   // is never presented as an empty one.
   const plFlowParams = queryReady
-    ? { store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, window_days: query.windowDays as 7 | 14 | 28, source_system: query.sourceSystem || undefined }
+    ? { store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, ...(query.period ? { period: query.period } : { window_days: query.windowDays }), source_system: query.sourceSystem || undefined }
     : null;
   const { state: plFlowState } = useRetailQuery({
     token,
@@ -208,7 +210,18 @@ function Store360Inner() {
   // source filter, never typed-as-queried.
   const applyCustomWindow = () => {
     const next = Math.round(windowInput);
-    if (next >= 7 && next <= 28) change({ windowDays: next });
+    if (next >= 7 && next <= 28) change({ windowDays: next, period: "" });
+  };
+  // M2: calendar period switching (pulse contract) — rolling / last-month /
+  // this-quarter / a picked month.
+  const periodMode = query.period === "" ? "rolling" : query.period === "last-month" ? "last-month" : query.period === "this-quarter" ? "this-quarter" : "month";
+  const onPeriodModeChange = (mode: string) => {
+    if (mode === "month") return; // waits for the month picker below
+    change({ period: mode === "rolling" ? "" : mode });
+  };
+  const onPeriodMonthChange = (date: dayjs.Dayjs | null) => {
+    if (!date) return;
+    change({ period: date.format("YYYY-MM") });
   };
 
   useEffect(() => {
@@ -232,7 +245,7 @@ function Store360Inner() {
   }, [searchParams]);
   const noQuery = !query.classification && !discoveryLoading && latest === null;
 
-  const change = (next: Partial<typeof query>) => writeQuery(router, { classification: (next.classification || query.classification || "simulated") as RetailDataClassification, datasetVersion: next.datasetVersion ?? query.datasetVersion, asOf: next.asOf || query.asOf || TODAY, windowDays: next.windowDays ?? (validWindow(query.windowDays) ? query.windowDays : 14), sourceSystem: next.sourceSystem ?? query.sourceSystem, storeID: next.storeID ?? query.storeID, returnQuery: query.returnQuery });
+  const change = (next: Partial<typeof query>) => writeQuery(router, { classification: (next.classification || query.classification || "simulated") as RetailDataClassification, datasetVersion: next.datasetVersion ?? query.datasetVersion, asOf: next.asOf || query.asOf || TODAY, windowDays: next.windowDays ?? (validWindow(query.windowDays) ? query.windowDays : 14), period: next.period !== undefined ? next.period : query.period, sourceSystem: next.sourceSystem ?? query.sourceSystem, storeID: next.storeID ?? query.storeID, returnQuery: query.returnQuery });
 
   return <ProtectedRoute><AppLayout><div className="store-360-page">
     <PageHeader title={t("store360.title", language)} meta={t("store360.scope_note", language)} help={<HelpTrigger content={store360HelpContent(language)} language={language} />} primaryAction={<Button icon={<ReloadOutlined />} loading={loading || discoveryLoading} onClick={() => setRetry((value) => value + 1)}>{t("common.refresh", language)}</Button>} secondaryAction={<Space><RetailExportMenu kind="store_diagnostics" disabled={!response} envelope={response ? envelopeFromDiagnostics(response) : null} rows={() => (response ? diagnosticsRowsFromResponse(response) : [])} csvDownload={() => retailExportApi.downloadDiagnosticsCSV({ store_id: query.storeID, data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined, as_of: query.asOf, window_days: query.windowDays, source_system: query.sourceSystem || undefined }, token!)} /><Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button><Button onClick={() => router.push(scenarioURL)}>{t("store360.scenario_analysis", language)}</Button><Button icon={<ArrowLeftOutlined />} onClick={() => router.push(backURL)}>{t("store360.back_pulse", language)}</Button></Space>} />
@@ -241,9 +254,11 @@ function Store360Inner() {
         <Radio.Group value={query.classification || "simulated"} onChange={(event) => { const next = event.target.value as RetailDataClassification; if (next === "production") change({ classification: next, datasetVersion: "", asOf: TODAY }); else if (latest) change({ classification: next, datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest) }); else change({ classification: next, datasetVersion: "" }); }} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />
         <Select showSearch allowClear value={query.storeID || undefined} placeholder={t("store360.select_store", language)} className="store360-store-select" loading={discoveryLoading || optionsLoading} notFoundContent={optionsLoading ? t("store360.loading_stores", language) : t("store360.no_selectable_stores", language)} options={options.map((option) => { const item = optionFields(option); return { label: `${item.storeCode} · ${item.storeName}`, value: item.storeID, search: `${item.storeCode} ${item.storeName} ${item.brand} ${item.region}` }; })} optionFilterProp="search" onChange={(value) => change({ storeID: value || "" })} />
         <DatePicker allowClear={false} value={query.asOf ? dayjs(query.asOf) : undefined} onChange={(date) => date && change({ asOf: date.format("YYYY-MM-DD") })} />
-        <Segmented value={validWindow(query.windowDays) ? query.windowDays : 14} onChange={(value) => change({ windowDays: Number(value) })} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />
-        <InputNumber aria-label={t("pulse.custom_window", language)} min={7} max={28} value={windowInput} onChange={(value) => setWindowInput(value ?? 14)} onPressEnter={applyCustomWindow} className="store360-custom-window" />
-        {windowInput !== query.windowDays && <Button onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>}
+        <Select aria-label={t("pulse.period_mode", language)} value={periodMode} className="store360-select-min" options={[{ label: t("pulse.period_rolling", language), value: "rolling" }, { label: t("pulse.period_last_month", language), value: "last-month" }, { label: t("pulse.period_this_quarter", language), value: "this-quarter" }, { label: t("pulse.period_month", language), value: "month" }]} onChange={(value) => onPeriodModeChange(String(value))} />
+        {periodMode === "month" && <DatePicker picker="month" aria-label={t("pulse.period_month", language)} onChange={onPeriodMonthChange} />}
+        {periodMode === "rolling" && <Segmented value={validWindow(query.windowDays) ? query.windowDays : 14} onChange={(value) => change({ windowDays: Number(value), period: "" })} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />}
+        {periodMode === "rolling" && <InputNumber aria-label={t("pulse.custom_window", language)} min={7} max={28} value={windowInput} onChange={(value) => setWindowInput(value ?? 14)} onPressEnter={applyCustomWindow} className="store360-custom-window" />}
+        {periodMode === "rolling" && windowInput !== query.windowDays && <Button onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>}
         <Input aria-label={t("common.source_system", language)} value={sourceInput} onChange={(event) => setSourceInput(event.target.value)} onPressEnter={() => change({ sourceSystem: sourceInput.trim() })} placeholder={t("common.source_system_optional", language)} className="store360-source-input" />
         <Button onClick={() => change({ sourceSystem: sourceInput.trim() })}>{t("store360.apply_source", language)}</Button>
       </Flex>

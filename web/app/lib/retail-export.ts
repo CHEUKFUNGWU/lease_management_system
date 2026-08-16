@@ -14,7 +14,7 @@
  */
 import type { RetailPulseResponse, RetailStoreDiagnosticsResponse, RetailScenarioResponse } from "./api";
 
-export type ExportFormulaSpec = { kind: "sum" | "delta" | "ratio"; source?: string[] };
+export type ExportFormulaSpec = { kind: "sum" | "delta" | "ratio"; source?: string[]; scale?: number };
 export type ExportColumnSpec = { key: string; header: string; formula?: ExportFormulaSpec; sum?: boolean };
 export type ExportDescriptor = { kind: string; title: string; columns: ExportColumnSpec[] };
 
@@ -153,7 +153,9 @@ export async function buildXLSX(descriptor: ExportDescriptor, envelope: ExportEn
       if (column.formula!.kind === "delta" && operands.length === 2 && operands.every(Number.isFinite)) {
         cell.value = { formula: `${ref(column.formula!.source![0])}-${ref(column.formula!.source![1])}`, result: operands[0] - operands[1] };
       } else if (column.formula!.kind === "ratio" && operands.length === 2 && operands.every(Number.isFinite) && operands[1] !== 0) {
-        cell.value = { formula: `IF(ISERROR(${ref(column.formula!.source![0])}/${ref(column.formula!.source![1])}),"",${ref(column.formula!.source![0])}/${ref(column.formula!.source![1])})`, result: operands[0] / operands[1] };
+        const scale = column.formula!.scale || 1;
+        const ratio = `(${ref(column.formula!.source![0])}/${ref(column.formula!.source![1])})${scale !== 1 ? `*${scale}` : ""}`;
+        cell.value = { formula: `IF(ISERROR(${ref(column.formula!.source![0])}/${ref(column.formula!.source![1])}),"",${ratio})`, result: (operands[0] / operands[1]) * scale };
       } else {
         cell.value = null;
       }
@@ -266,12 +268,17 @@ export function scenarioRowsFromResponse(response: RetailScenarioResponse, selec
   return metrics.map((code) => {
     const baseline = response.baseline.metrics[code];
     const plan = scenario.metrics[code];
+    const baselineValue = baseline?.result ?? null;
+    const planValue = plan?.result ?? null;
     return {
       metric: code,
       unit: baseline?.unit || plan?.unit || "",
-      baseline: baseline?.result ?? null,
-      plan: plan?.result ?? null,
+      baseline: baselineValue,
+      plan: planValue,
       delta: plan?.delta ?? null,
+      // attainment feeds the ratio formula with the IF-guard zero protection;
+      // null when the denominator is missing or zero.
+      attainment: typeof planValue === "number" && typeof baselineValue === "number" && baselineValue !== 0 ? (planValue / baselineValue) * 100 : null,
       status: plan?.status || "",
     };
   });

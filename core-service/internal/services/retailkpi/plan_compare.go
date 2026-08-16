@@ -79,6 +79,11 @@ type PlanReader interface {
 type ComparePlanRequest struct {
 	Period                 string  // "YYYY-MM"
 	ExpectedStoreCount     int
+	// ExpectedDaysInMonth is the calendar month's day count; when set, every
+	// store compared on both sides must have at least this many distinct
+	// observed days, otherwise the comparison downgrades — actual for half a
+	// month against a full-month plan is a mismatch, not a variance (c1).
+	ExpectedDaysInMonth    int
 	MaterialityThresholdPct float64
 }
 
@@ -151,6 +156,12 @@ func ComparePlan(actual []DailyFact, plan []PlanFact, request ComparePlanRequest
 	}
 	if comparison.PlanStoreCount < request.ExpectedStoreCount {
 		reasons = append(reasons, fmt.Sprintf("plan_coverage_insufficient_%d_of_%d", comparison.PlanStoreCount, request.ExpectedStoreCount))
+	}
+	if request.ExpectedDaysInMonth > 0 {
+		shortDays, minObserved := monthDayCoverage(actualByStore, planByStore, request.ExpectedDaysInMonth)
+		if shortDays > 0 {
+			reasons = append(reasons, fmt.Sprintf("actual_day_coverage_insufficient_%d_stores_min_%d_of_%d_days", shortDays, minObserved, request.ExpectedDaysInMonth))
+		}
 	}
 
 	comparison.Variances = make([]PlanVariance, 0, len(planKPIs)+1)
@@ -259,6 +270,30 @@ func compareContribution(actualByStore map[string][]DailyFact, planByStore map[s
 		variance.DowngradeReason = joinReasons(reasons)
 	}
 	return variance
+}
+
+// monthDayCoverage counts how many stores compared on both sides fell short
+// of the expected distinct days in the month, and the smallest observed day
+// count among them.
+func monthDayCoverage(actualByStore map[string][]DailyFact, planByStore map[string]PlanFact, expectedDays int) (shortStores, minObserved int) {
+	compared := 0
+	for storeID, facts := range actualByStore {
+		if _, ok := planByStore[storeID]; !ok {
+			continue
+		}
+		days := map[string]bool{}
+		for _, fact := range facts {
+			days[fact.BusinessDate.Format("2006-01-02")] = true
+		}
+		compared++
+		if compared == 1 || len(days) < minObserved {
+			minObserved = len(days)
+		}
+		if len(days) < expectedDays {
+			shortStores++
+		}
+	}
+	return shortStores, minObserved
 }
 
 func sumActual(kpi planKPI, actualByStore map[string][]DailyFact, planByStore map[string]PlanFact) (total *float64, missing int) {

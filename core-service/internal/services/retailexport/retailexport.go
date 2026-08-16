@@ -41,6 +41,10 @@ const (
 type FormulaSpec struct {
 	Kind   FormulaKind `json:"kind"`
 	Source []string    `json:"source,omitempty"` // operand column keys
+	// Scale multiplies the computed ratio (e.g. 100 turns plan/baseline
+	// into an attainment percentage); the cached result uses the same
+	// scaling so the workbook value equals the response value.
+	Scale int `json:"scale,omitempty"`
 }
 
 // ColumnSpec is one export column; Key addresses the row cell, Header is the
@@ -112,8 +116,8 @@ func storeDiagnosticsDescriptor() ExportDescriptor {
 	return ExportDescriptor{Kind: KindStoreDiagnostics, Title: "门店360·指标摘要", Columns: []ColumnSpec{
 		{Key: "metric", Header: "指标"},
 		{Key: "unit", Header: "单位"},
-		{Key: "current", Header: "本期"},
-		{Key: "comparison", Header: "对比期"},
+		{Key: "current", Header: "本期", Sum: true},
+		{Key: "comparison", Header: "对比期", Sum: true},
 		{Key: "change", Header: "变化", Formula: &FormulaSpec{Kind: FormulaDelta, Source: []string{"current", "comparison"}}},
 		{Key: "status", Header: "状态"},
 	}}
@@ -123,9 +127,10 @@ func scenarioDescriptor() ExportDescriptor {
 	return ExportDescriptor{Kind: KindScenario, Title: "租金谈判测算·情景对比", Columns: []ColumnSpec{
 		{Key: "metric", Header: "指标"},
 		{Key: "unit", Header: "单位"},
-		{Key: "baseline", Header: "Baseline"},
-		{Key: "plan", Header: "方案"},
+		{Key: "baseline", Header: "Baseline", Sum: true},
+		{Key: "plan", Header: "方案", Sum: true},
 		{Key: "delta", Header: "差异", Formula: &FormulaSpec{Kind: FormulaDelta, Source: []string{"plan", "baseline"}}},
+		{Key: "attainment", Header: "达成率%", Formula: &FormulaSpec{Kind: FormulaRatio, Source: []string{"plan", "baseline"}, Scale: 100}},
 		{Key: "status", Header: "状态"},
 	}}
 }

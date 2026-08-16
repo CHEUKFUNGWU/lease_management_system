@@ -12,7 +12,7 @@ import ExcelJS from "exceljs";
 import {
   buildCSV, buildPPTX, buildXLSX, escapeCell, exportFilename, provenanceLines,
   setExportDescriptorCacheForTests, diagnosticsRowsFromResponse, pulseRowsFromResponse,
-  type ExportDescriptor, type ExportEnvelope,
+  scenarioRowsFromResponse, type ExportDescriptor, type ExportEnvelope,
 } from "./retail-export";
 
 const repoRoot = path.join(import.meta.dirname, "../../../");
@@ -98,6 +98,35 @@ describe("M3 web export", () => {
   it("provenance lines distinguish classifications", () => {
     expect(provenanceLines({ ...envelope, dataClassification: "production" })[0]).toContain("Working");
     expect(provenanceLines({ ...envelope, dataClassification: "mixed" })[0]).toContain("mixed");
+  });
+
+  it("P0-3: scenario attainment ratio formula + IF zero guard + cached result", async () => {
+    const scenarioDescriptor: ExportDescriptor = {
+      kind: "scenario", title: "租金谈判测算·情景对比",
+      columns: [
+        { key: "metric", header: "指标" }, { key: "unit", header: "单位" },
+        { key: "baseline", header: "Baseline", sum: true }, { key: "plan", header: "方案", sum: true },
+        { key: "delta", header: "差异", formula: { kind: "delta", source: ["plan", "baseline"] } },
+        { key: "attainment", header: "达成率%", formula: { kind: "ratio", source: ["plan", "baseline"], scale: 100 } },
+        { key: "status", header: "状态" },
+      ],
+    };
+    const scenarioRows = scenarioRowsFromResponse({
+      baseline: { metrics: { revenue: { result: 100, unit: "currency" }, margin: { result: 0, unit: "percent" } } },
+      scenarios: [{ key: "plan", metrics: { revenue: { result: 120, unit: "currency" }, margin: { result: 5, unit: "percent" } } }],
+    } as never, "plan");
+    const buffer = await buildXLSX(scenarioDescriptor, { ...envelope, dataClassification: "production" }, scenarioRows);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.worksheets[0];
+    // attainment cell: formula carries the IF guard AND the *100 scale,
+    // cached result = 120/100*100 = 120.
+    const attainment = sheet.getCell("F6").value as ExcelJS.CellFormulaValue;
+    expect(String(attainment.formula)).toContain("IF(ISERROR(");
+    expect(String(attainment.formula)).toContain("*100");
+    expect(attainment.result).toBe(120);
+    // zero baseline: cached result must be null — the guard refused it.
+    expect(sheet.getCell("F7").value).toBeNull();
   });
 
   it("CONTRACT-001: extractor row keys ⊆ Go descriptor columns (no second list)", async () => {

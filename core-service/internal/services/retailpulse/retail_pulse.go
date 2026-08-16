@@ -350,8 +350,13 @@ func (s *Service) attachPlanComparison(ctx context.Context, query Query, set *re
 	if planSet == nil {
 		return nil
 	}
+	monthWindow, periodErr := retailperiod.Parse(planPeriod, time.Time{})
+	if periodErr != nil {
+		return periodErr
+	}
 	comparison, err := retailkpi.ComparePlan(set.Facts, planSet.Facts, retailkpi.ComparePlanRequest{
 		Period: planPeriod, ExpectedStoreCount: expectedStores,
+		ExpectedDaysInMonth:    inclusiveDays(monthWindow.From, monthWindow.To),
 		MaterialityThresholdPct: query.PlanMaterialityThresholdPct,
 	})
 	if err != nil {

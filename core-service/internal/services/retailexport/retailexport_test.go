@@ -39,14 +39,24 @@ func TestDescriptorRegistryCoversTheThreeRetailKinds(t *testing.T) {
 		t.Fatal("unknown kind accepted")
 	}
 	// Formula declarations exist for the computed columns the workbook side
-	// derives — delta on diagnostics and scenario.
+	// derives — delta, totals (sum) and the zero-protected attainment ratio.
 	diagnostics, _ := Descriptor(KindStoreDiagnostics)
 	scenario, _ := Descriptor(KindScenario)
 	if diagnostics.Columns[4].Formula == nil || diagnostics.Columns[4].Formula.Kind != FormulaDelta {
 		t.Fatalf("diagnostics change formula missing: %+v", diagnostics.Columns[4])
 	}
+	if !diagnostics.Columns[2].Sum || !diagnostics.Columns[3].Sum {
+		t.Fatalf("diagnostics totals flags missing: %+v", diagnostics.Columns[2:4])
+	}
 	if scenario.Columns[4].Formula == nil || scenario.Columns[4].Formula.Kind != FormulaDelta {
 		t.Fatalf("scenario delta formula missing: %+v", scenario.Columns[4])
+	}
+	attainment := scenario.Columns[5]
+	if attainment.Formula == nil || attainment.Formula.Kind != FormulaRatio || attainment.Formula.Scale != 100 {
+		t.Fatalf("scenario attainment formula missing: %+v", attainment)
+	}
+	if !scenario.Columns[2].Sum || !scenario.Columns[3].Sum {
+		t.Fatalf("scenario totals flags missing: %+v", scenario.Columns[2:4])
 	}
 }
 

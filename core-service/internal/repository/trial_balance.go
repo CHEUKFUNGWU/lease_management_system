@@ -110,3 +110,12 @@ func (r *OperatingFactsRepository) ListTrialBalanceVersions(ctx context.Context,
 	}
 	return result, rows.Err()
 }
+
+// DeleteTrialBalanceVersion compensates a failed import: removing the
+// version cascades to its lines (P1-2).
+func (r *OperatingFactsRepository) DeleteTrialBalanceVersion(ctx context.Context, id string) error {
+	if _, err := r.db.Exec(ctx, `DELETE FROM gl_trial_balance_versions WHERE id=$1`, id); err != nil {
+		return fmt.Errorf("delete trial balance version: %w", err)
+	}
+	return nil
+}

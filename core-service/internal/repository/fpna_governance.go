@@ -885,3 +885,21 @@ func (r *FPnAGovernanceRepository) ResolvePlanVersionForPeriod(ctx context.Conte
 	}
 	return item, nil
 }
+
+// DeletePlanVersion compensates a failed import: removing the version
+// cascades to its lines so a partial write never leaves an orphan version
+// behind (P1-2).
+func (r *FPnAGovernanceRepository) DeletePlanVersion(ctx context.Context, id string, entity access.EntityFilter) error {
+	args := []any{id}
+	query := `DELETE FROM fpna_plan_versions WHERE id=$1`
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	if _, err := r.db.Exec(ctx, query, args...); err != nil {
+		return fmt.Errorf("delete FP&A plan version: %w", err)
+	}
+	return nil
+}

@@ -398,7 +398,12 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	// M6.3: the budget guard refuses before any LLM call; the reason is
 	// preserved verbatim in the 429 body (never softened).
 	if h.guard != nil {
-		if guardErr := h.guard.Check(c.Request.Context(), userIDFromContext(c), "chat"); guardErr != nil {
+		// M6.3: the budget is consumed atomically (check + book in one
+		// step) before any LLM call; the reason is preserved verbatim in
+		// the 429 body (never softened). Token usage is not observable on
+		// this path yet, so the rate window counts and cost accrues once
+		// usage is plumbed.
+		if guardErr := h.guard.Consume(c.Request.Context(), userIDFromContext(c), "chat", 0); guardErr != nil {
 			writeCodedError(c, http.StatusTooManyRequests, errcontract.CodeRateLimited, guardErr.Error(), nil)
 			return
 		}
@@ -407,12 +412,6 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 		})
 	}
 	completed, err := h.agentRuntime.Run(c.Request.Context(), runtimeInput(c, req))
-	if err == nil && h.guard != nil {
-		// Token usage is not observable on the sync path yet; the event is
-		// still booked so the per-minute rate window counts, and cost
-		// accrues once usage is plumbed.
-		_ = h.guard.Record(c.Request.Context(), userIDFromContext(c), "chat", 0)
-	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to run AI agent: " + err.Error()})
 		return

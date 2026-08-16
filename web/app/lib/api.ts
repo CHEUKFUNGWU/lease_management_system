@@ -1649,7 +1649,9 @@ export interface RetailStore360QueryParams {
   data_classification: RetailDataClassification;
   dataset_version?: string;
   as_of: string;
-  window_days: number; // M2: custom rolling windows, 7-28
+  /** M2: calendar period spec — mutually exclusive with window_days. */
+  period?: string;
+  window_days?: number; // M2: custom rolling windows, 7-28
   source_system?: string;
 }
 
@@ -1820,7 +1822,9 @@ export const retailAnalyticsApi = {
   storeDiagnostics: (params: RetailStore360QueryParams, token: string) => {
     if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated store diagnostics requires dataset_version");
     if (params.data_classification === "production" && params.dataset_version) throw new Error("production store diagnostics cannot include dataset_version");
-    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of });
+    if (params.period) query.set("period", params.period);
+    else if (params.window_days !== undefined) query.set("window_days", String(params.window_days));
     if (params.dataset_version) query.set("dataset_version", params.dataset_version);
     if (params.source_system) query.set("source_system", params.source_system);
     return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/diagnostics?${query.toString()}`, { token }) as Promise<RetailStoreDiagnosticsResponse>;
@@ -1829,7 +1833,9 @@ export const retailAnalyticsApi = {
   plFlow: (params: RetailStore360QueryParams, token: string) => {
     if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated pl-flow requires dataset_version");
     if (params.data_classification === "production" && params.dataset_version) throw new Error("production pl-flow cannot include dataset_version");
-    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
+    const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of });
+    if (params.period) query.set("period", params.period);
+    else if (params.window_days !== undefined) query.set("window_days", String(params.window_days));
     if (params.dataset_version) query.set("dataset_version", params.dataset_version);
     if (params.source_system) query.set("source_system", params.source_system);
     return apiRequest(`/api/v1/retail/stores/${encodeURIComponent(params.store_id)}/pl-flow?${query.toString()}`, { token }) as Promise<RetailPlFlowResponse>;

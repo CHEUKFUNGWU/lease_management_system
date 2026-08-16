@@ -1,6 +1,8 @@
 package retailingest
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -279,5 +281,26 @@ func TestCommitPropagatesReplayFlag(t *testing.T) {
 	}
 	if !report.ReplayDetected {
 		t.Fatal("replay flag not propagated")
+	}
+}
+
+// GUARD-001 (P1-1): ParseTemplate's XLSX path goes through the shared
+// controlledxlsx reader — a workbook round-trip proves the full template
+// parse works end to end.
+func TestParseTemplateXLSXRoundTrip(t *testing.T) {
+	var buffer bytes.Buffer
+	archive := zip.NewWriter(&buffer)
+	sheet, err := archive.Create("xl/worksheets/sheet1.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = sheet.Write([]byte(`<worksheet><sheetData><row><c r="A1" t="inlineStr"><is><t>门店编号</t></is></c><c r="B1" t="inlineStr"><is><t>日期</t></is></c></row><row><c r="A2" t="inlineStr"><is><t>S001</t></is></c><c r="B2" t="inlineStr"><is><t>2026-07-01</t></is></c></row></sheetData></worksheet>`))
+	_ = archive.Close()
+	headers, rows, err := ParseTemplate(buffer.Bytes(), FormatXLSX)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(headers) != 2 || headers[0] != "门店编号" || len(rows) != 1 || rows[0][0] != "S001" {
+		t.Fatalf("headers=%v rows=%v", headers, rows)
 	}
 }

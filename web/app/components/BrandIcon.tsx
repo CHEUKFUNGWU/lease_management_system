@@ -1,4 +1,5 @@
 import React from "react";
+import { colors } from "../design-system/tokens";
 
 interface BrandIconProps {
   size?: number | string;
@@ -14,15 +15,17 @@ export const BrandIcon: React.FC<BrandIconProps> = ({
   ariaHidden = true,
 }) => {
   const isInverse = variant === "inverse";
+  const brand = isInverse ? colors.brand.inverse : colors.brand;
 
-  // Color tokens
-  const frameColor = isInverse ? "#FFFFFF" : "#111827";
-  const barColor = isInverse ? "#E5E7EB" : "#1F2937";
-  const arrowColor = isInverse ? "#F3F4F6" : "#4B5563";
-  const arrowHighlight = isInverse ? "#FFFFFF" : "#9CA3AF";
-  const ringColor = isInverse ? "#9CA3AF" : "#6B7280";
-  const hubColor = isInverse ? "#D1D5DB" : "#374151";
-  const nodeColor = isInverse ? "#FFFFFF" : "#1F2937";
+  // TOKEN-001: brand colours live in tokens.ts (colors.brand) — the mark
+  // keeps its own semantic slots so a theme can flip them independently.
+  const frameColor = brand.frame;
+  const barColor = brand.bar;
+  const arrowColor = brand.arrow;
+  const arrowHighlight = brand.arrowHighlight;
+  const ringColor = brand.ring;
+  const hubColor = brand.hub;
+  const nodeColor = brand.node;
 
   return (
     <svg

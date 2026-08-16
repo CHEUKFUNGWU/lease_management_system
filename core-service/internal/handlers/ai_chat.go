@@ -409,6 +409,7 @@ func runtimeInput(c *gin.Context, req AIChatRequest) aichat.Input {
 		FileID: req.FileID, ObjectName: req.ObjectName, ContentType: req.ContentType,
 		Language: req.Language, PageContext: req.PageContext,
 		SkillID: req.SkillID, SkillVersion: req.SkillVersion,
+		Initiator: req.Initiator,
 		UserID: userIDString, LegalEntityID: middleware.GetTenantID(c),
 		Role: roleString, Permissions: append([]string(nil), permissionStrings...),
 		AuthHeader: c.GetHeader("Authorization"),

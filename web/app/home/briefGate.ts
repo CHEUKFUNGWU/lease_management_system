@@ -37,6 +37,11 @@ export function runHomeBrief(params: HomeBriefParams): Promise<HomeBriefResult> 
         language: params.language,
         skill_id: "retail_operations",
         skill_version: "v1",
+        // CHAT-001: this run is system-initiated — the backend marks its
+        // session so the user-facing AI Chat sidebar does not fill with
+        // "请读取当前经营脉搏并生成…" entries on every home visit, while the
+        // run, messages and audit trail are recorded exactly as before.
+        initiator: "system",
         page_context: { page: "home", title: params.title, filters: params.filters },
       },
       params.token,

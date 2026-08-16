@@ -53,6 +53,13 @@ const dict: TranslationDict = {
     "zh-HK": "折現率缺失，無法計量租賃指標。請先在合同工作台確認折現率，或在系統設定配置全域折現率政策。",
     en: "The discount rate is missing, so lease metrics cannot be measured. Confirm the rate in the contract workspace first, or set a global rate policy in system settings.",
   },
+  // DIAG-001: rent-to-sales needs its healthy/warning ceilings from policy
+  // settings — a config gap, so the copy says what to configure, not retry.
+  "api.policy_thresholds_missing": {
+    "zh-CN": "租售比健康线与预警线尚未配置，无法计算租售比。请到系统设置的参数配置中补齐后重试。",
+    "zh-HK": "租售比健康線與預警線尚未配置，無法計算租售比。請到系統設定的參數配置中補齊後重試。",
+    en: "The rent-to-sales healthy and warning ceilings are not configured. Set them under system settings parameters, then retry.",
+  },
   "api.server_unavailable": {
     "zh-CN": "服务暂时不可用，请稍后重试。",
     "zh-HK": "服務暫時不可用，請稍後重試。",
@@ -70,6 +77,13 @@ const dict: TranslationDict = {
     "zh-CN": "请求未成功，请重试。",
     "zh-HK": "請求未成功，請重試。",
     en: "The request did not succeed. Please try again.",
+  },
+  // DIAG-001: the unclassified fallback names the failing capability so the
+  // toast points at the broken call instead of hiding it.
+  "api.request_failed_with_endpoint": {
+    "zh-CN": "请求未成功（{endpoint}），请重试。",
+    "zh-HK": "請求未成功（{endpoint}），請重試。",
+    en: "The request to {endpoint} did not succeed. Please try again.",
   },
 
   // I18N-001 — retail shared labels (CONTEXT.md terminology)
@@ -98,9 +112,13 @@ const dict: TranslationDict = {
     "zh-HK": "轉化率",
     en: "Conversion rate",
   },
+  // FIX-029: 「门店贡献」是行话，用户看不懂就得问。改叫「门店经营利润」——
+  // 保留「利润」的白话，用「门店」限定范围，避免被当成利润表的营业利润
+  // （本指标不含折旧摊销与总部分摊，且用现金租金而非 IFRS 16 租赁费用）。
+  // 英文保持 store contribution：那是零售业对这个指标的标准叫法，不存在同名歧义。
   "retail.kpi.store_contribution": {
-    "zh-CN": "门店贡献",
-    "zh-HK": "門店貢獻",
+    "zh-CN": "门店经营利润",
+    "zh-HK": "門店經營利潤",
     en: "Store contribution",
   },
   "retail.kpi.average_transaction_value": {
@@ -124,8 +142,8 @@ const dict: TranslationDict = {
     en: "Occupancy cash cost rate",
   },
   "retail.kpi.store_contribution_margin": {
-    "zh-CN": "门店贡献率",
-    "zh-HK": "門店貢獻率",
+    "zh-CN": "门店经营利润率",
+    "zh-HK": "門店經營利潤率",
     en: "Store contribution margin",
   },
   "retail.kpi.sales_per_sqm": {
@@ -219,8 +237,8 @@ const dict: TranslationDict = {
     en: "Occupancy cost burden",
   },
   "retail.signal.contribution_turns_negative": {
-    "zh-CN": "门店贡献转负",
-    "zh-HK": "門店貢獻轉負",
+    "zh-CN": "门店经营利润转负",
+    "zh-HK": "門店經營利潤轉負",
     en: "Contribution turns negative",
   },
   "retail.unit.currency": {
@@ -283,6 +301,11 @@ const dict: TranslationDict = {
     "zh-HK": "重試",
     en: "Retry",
   },
+  // STATE-003: StateBlock shared presentation labels
+  "state.empty_label": { "zh-CN": "暂无数据", "zh-HK": "暫無數據", en: "No data" },
+  "state.actionable_label": { "zh-CN": "需要操作", "zh-HK": "需要操作", en: "Action needed" },
+  "state.failed_label": { "zh-CN": "加载失败", "zh-HK": "載入失敗", en: "Failed to load" },
+  "state.scope_denied_label": { "zh-CN": "数据范围外", "zh-HK": "數據範圍外", en: "Outside your scope" },
   "common.refresh": {
     "zh-CN": "刷新",
     "zh-HK": "刷新",
@@ -347,11 +370,72 @@ const dict: TranslationDict = {
   },
 
   // I18N-001 — operating-pulse page
+  // HELP-001: usage tutorial panel（样板页：经营脉搏 + 租金谈判测算）
+  "help.open_tutorial": { "zh-CN": "使用教程", "zh-HK": "使用教程", en: "Usage guide" },
+  "help.pulse.title": { "zh-CN": "经营脉搏使用教程", "zh-HK": "經營脈搏使用教程", en: "Operating pulse guide" },
+  "help.pulse.flow.classification": { "zh-CN": "选数据分类", "zh-HK": "選數據分類", en: "Pick data" },
+  "help.pulse.flow.window": { "zh-CN": "设窗口与截止日", "zh-HK": "設窗口與截止日", en: "Set window" },
+  "help.pulse.flow.read": { "zh-CN": "看指标与关注门店", "zh-HK": "看指標與關注門店", en: "Read KPIs" },
+  "help.pulse.flow.drill": { "zh-CN": "下钻或追问", "zh-HK": "下鑽或追問", en: "Drill down" },
+  "help.pulse.s1.heading": { "zh-CN": "数据分类", "zh-HK": "數據分類", en: "Data classification" },
+  "help.pulse.s1.body": { "zh-CN": "模拟数据来自固定 seed，正式数据来自 POS 导入。切换分类会改变全部指标口径，页面顶部会标注当前来源。", "zh-HK": "模擬數據來自固定 seed，正式數據來自 POS 導入。切換分類會改變全部指標口徑，頁面頂部會標注當前來源。", en: "Simulated data comes from a fixed seed; production data comes from POS imports. Switching classification changes every metric's basis, and the source is always labelled at the top." },
+  "help.pulse.s2.heading": { "zh-CN": "窗口与截止日", "zh-HK": "窗口與截止日", en: "Window and as-of" },
+  "help.pulse.s2.body": { "zh-CN": "7 / 14 / 28 天窗口与 as-of 截止日决定「当前 vs 对比」两个区间；指标变化与关注门店都相对这两个区间计算。", "zh-HK": "7 / 14 / 28 天窗口與 as-of 截止日決定「當前 vs 對比」兩個區間；指標變化與關注門店都相對這兩個區間計算。", en: "The 7 / 14 / 28-day window and the as-of date define the current vs comparison spans; changes and attention stores are all relative to them." },
+  "help.pulse.s3.heading": { "zh-CN": "关注门店", "zh-HK": "關注門店", en: "Attention stores" },
+  "help.pulse.s3.body": { "zh-CN": "异常门店按严重度排序，信号标注指标与变化量。点「查看门店脉搏」下钻到门店 360 看拆解。", "zh-HK": "異常門店按嚴重度排序，信號標注指標與變化量。點「查看門店脈搏」下鑽到門店 360 看拆解。", en: "Anomalous stores rank by severity with the metric and change on each signal. Open a store's pulse to drill into its 360 breakdown." },
+  "help.scenario.title": { "zh-CN": "租金谈判测算使用教程", "zh-HK": "租金談判測算使用教程", en: "Rent negotiation guide" },
+  "help.scenario.flow.pick": { "zh-CN": "选门店与数据", "zh-HK": "選門店與數據", en: "Pick store" },
+  "help.scenario.flow.assume": { "zh-CN": "调整假设", "zh-HK": "調整假設", en: "Adjust inputs" },
+  "help.scenario.flow.result": { "zh-CN": "看利润变化", "zh-HK": "看利潤變化", en: "See impact" },
+  "help.scenario.flow.act": { "zh-CN": "沉淀行动草稿", "zh-HK": "沉澱行動草稿", en: "Draft action" },
+  "help.scenario.s1.heading": { "zh-CN": "门店与数据", "zh-HK": "門店與數據", en: "Store and data" },
+  "help.scenario.s1.body": { "zh-CN": "先选门店，再确认模拟 / 正式分类与 as-of 基准日；基准决定整张表的起点。", "zh-HK": "先選門店，再確認模擬 / 正式分類與 as-of 基準日；基準決定整張表的起點。", en: "Pick a store, then confirm the simulated / production classification and the as-of baseline; the baseline anchors every figure." },
+  "help.scenario.s2.heading": { "zh-CN": "调整假设", "zh-HK": "調整假設", en: "Adjusting inputs" },
+  "help.scenario.s2.body": { "zh-CN": "租金、销售、人工三组假设按百分比步进调整；结果由服务端基于同一 Working 事实重算。", "zh-HK": "租金、銷售、人工三組假設按百分比步進調整；結果由服務端基於同一 Working 事實重算。", en: "Rent, sales and labor inputs step in percentages; the server recomputes on the same Working facts." },
+  "help.scenario.s3.heading": { "zh-CN": "沉淀行动草稿", "zh-HK": "沉澱行動草稿", en: "Drafting an action" },
+  "help.scenario.s3.body": { "zh-CN": "把结论写成行动草稿（负责人、期限、验证期间），确认前不写入任何业务表。", "zh-HK": "把結論寫成行動草稿（負責人、期限、驗證期間），確認前不寫入任何業務表。", en: "Turn the conclusion into an action draft (owner, due date, verification period); nothing is written before you confirm." },
+  // HELP-002: 教程面板铺开（门店 360 / 经营驾驶舱 / 组合分析）
+  "help.store360.title": { "zh-CN": "门店 360 使用教程", "zh-HK": "門店 360 使用教程", en: "Store 360 guide" },
+  "help.store360.flow.pick": { "zh-CN": "选门店与分类", "zh-HK": "選門店與分類", en: "Pick store" },
+  "help.store360.flow.read": { "zh-CN": "读六项指标", "zh-HK": "讀六項指標", en: "Read KPIs" },
+  "help.store360.flow.bridge": { "zh-CN": "看利润流向", "zh-HK": "看利潤流向", en: "Profit flow" },
+  "help.store360.flow.act": { "zh-CN": "对比与行动", "zh-HK": "對比與行動", en: "Benchmark" },
+  "help.store360.s1.heading": { "zh-CN": "门店与数据分类", "zh-HK": "門店與數據分類", en: "Store and classification" },
+  "help.store360.s1.body": { "zh-CN": "先选门店，再确认模拟 / 正式分类与 as-of 截止日。正式数据下没有该门店的经营事实时，页面会提示切换模拟数据或先导入正式数据。", "zh-HK": "先選門店，再確認模擬 / 正式分類與 as-of 截止日。正式數據下沒有該門店的經營事實時，頁面會提示切換模擬數據或先導入正式數據。", en: "Pick a store, then confirm the simulated / production classification and the as-of date. If production data has no facts for the store, the page offers switching to simulated data or importing production facts first." },
+  "help.store360.s2.heading": { "zh-CN": "六项指标", "zh-HK": "六項指標", en: "The six KPIs" },
+  "help.store360.s2.body": { "zh-CN": "营收、毛利、交易、客流、人工与租金占用按同一套 retail-kpi-v1 口径计算；覆盖不足或币种混杂时指标会显式降级为不可决策，不会编造数据点。", "zh-HK": "營收、毛利、交易、客流、人工與租金佔用按同一套 retail-kpi-v1 口徑計算；覆蓋不足或幣種混雜時指標會顯式降級為不可決策，不會編造數據點。", en: "Revenue, gross profit, transactions, traffic, labor and rent occupancy share one retail-kpi-v1 basis; insufficient coverage or mixed currencies degrade a metric to not-decision-ready explicitly — no fabricated points." },
+  "help.store360.s3.heading": { "zh-CN": "利润流向与同群对比", "zh-HK": "利潤流向與同群對比", en: "Profit flow and peers" },
+  "help.store360.s3.body": { "zh-CN": "桑基图展示营收如何分流到人工、租金、非租赁成本与其他成本，残差与状态显式标注。同群对比在样本不足或币种混杂时降级，不给出看似确定的结论。", "zh-HK": "桑基圖展示營收如何分流到人工、租金、非租賃成本與其他成本，殘差與狀態顯式標注。同群對比在樣本不足或幣種混雜時降級，不給出看似確定的結論。", en: "The Sankey shows how revenue flows into labor, rent, non-lease and other costs, with residual and status explicit. Peer benchmarks degrade when the sample is thin or currencies mix — no false certainty." },
+  "help.performance.title": { "zh-CN": "经营驾驶舱使用教程", "zh-HK": "經營駕駛艙使用教程", en: "Performance cockpit guide" },
+  "help.performance.flow.period": { "zh-CN": "选分析期间", "zh-HK": "選分析期間", en: "Pick period" },
+  "help.performance.flow.overview": { "zh-CN": "看四格概览", "zh-HK": "看四格概覽", en: "Overview" },
+  "help.performance.flow.actions": { "zh-CN": "处理行动", "zh-HK": "處理行動", en: "Actions" },
+  "help.performance.flow.ask": { "zh-CN": "让 AI 解释", "zh-HK": "讓 AI 解釋", en: "Ask AI" },
+  "help.performance.s1.heading": { "zh-CN": "分析期间", "zh-HK": "分析期間", en: "Analysis period" },
+  "help.performance.s1.body": { "zh-CN": "输入 YYYY-MM 切换分析期间；概览四格与行动中心都相对该期间计算。页面顶部标注 Working 经营事实与数据截止时刻。", "zh-HK": "輸入 YYYY-MM 切換分析期間；概覽四格與行動中心都相對該期間計算。頁面頂部標注 Working 經營事實與數據截止時刻。", en: "Enter YYYY-MM to switch the analysis period; the overview and action center recompute relative to it. The header labels the Working facts basis and the data cutoff." },
+  "help.performance.s2.heading": { "zh-CN": "行动中心与数据治理", "zh-HK": "行動中心與數據治理", en: "Actions and governance" },
+  "help.performance.s2.body": { "zh-CN": "行动中心列出待处理行动，可按状态确认或批量确认并导出 Working CSV。数据治理边界把缺失、未映射、未对账分开展示，AI 只引用系统事实。", "zh-HK": "行動中心列出待處理行動，可按狀態確認或批量確認並導出 Working CSV。數據治理邊界把缺失、未映射、未對賬分開展示，AI 只引用系統事實。", en: "The action center lists open actions; acknowledge individually or in batch and export a Working CSV. The governance banner separates missing, unmapped and unreconciled facts; AI cites only system facts." },
+  "help.performance.s3.heading": { "zh-CN": "零售四墙与方案模拟", "zh-HK": "零售四牆與方案模擬", en: "Store walls and simulation" },
+  "help.performance.s3.body": { "zh-CN": "零售四墙与制造设备页签逐店展示事实与对账状态；门店方案模拟只进入确定性模拟，不会覆盖预算、创建正式合同或触发会计重算。", "zh-HK": "零售四牆與製造設備頁簽逐店展示事實與對賬狀態；門店方案模擬只進入確定性模擬，不會覆蓋預算、創建正式合同或觸發會計重算。", en: "The retail-walls and equipment tabs list per-store facts with reconciliation status; the store simulation is deterministic only — it never overwrites budgets, creates contracts or triggers accounting recalculation." },
+  "help.portfolio.title": { "zh-CN": "组合分析使用教程", "zh-HK": "組合分析使用教程", en: "Portfolio analysis guide" },
+  "performance.load_failed": { "zh-CN": "经营数据加载失败", "zh-HK": "經營數據載入失敗", en: "Failed to load operating data" },
+  "help.portfolio.flow.mode": { "zh-CN": "选 Working / Official", "zh-HK": "選 Working / Official", en: "Pick mode" },
+  "help.portfolio.flow.group": { "zh-CN": "选分组维度", "zh-HK": "選分組維度", en: "Grouping" },
+  "help.portfolio.flow.read": { "zh-CN": "读组合指标", "zh-HK": "讀組合指標", en: "Read metrics" },
+  "help.portfolio.flow.export": { "zh-CN": "导出与下钻", "zh-HK": "導出與下鑽", en: "Export" },
+  "help.portfolio.s1.heading": { "zh-CN": "Working 与 Official", "zh-HK": "Working 與 Official", en: "Working vs Official" },
+  "help.portfolio.s1.body": { "zh-CN": "Working 报表可含草稿与待审批数据，用于内部试算；Official 报表只含已审批数据，用于正式财务与审计。两种模式都标注数据来源与版本。", "zh-HK": "Working 報表可含草稿與待審批數據，用於內部試算；Official 報表只含已審批數據，用於正式財務與審計。兩種模式都標注數據來源與版本。", en: "Working reports may include draft and pending-approval data for internal runs; Official reports contain only approved data for finance and audit. Both modes label source and version." },
+  "help.portfolio.s2.heading": { "zh-CN": "分组与指标", "zh-HK": "分組與指標", en: "Grouping and metrics" },
+  "help.portfolio.s2.body": { "zh-CN": "按法人、品牌、区域或门店分组查看租赁负债、使用权资产与费用分布；切换分组会重算同组小计与占比。", "zh-HK": "按法人、品牌、區域或門店分組查看租賃負債、使用權資產與費用分佈；切換分組會重算同組小計與佔比。", en: "Group by legal entity, brand, region or store to see the distribution of lease liabilities, right-of-use assets and expenses; switching groups recomputes subtotals and shares." },
+  "help.portfolio.s3.heading": { "zh-CN": "导出与下钻", "zh-HK": "導出與下鑽", en: "Export and drill-down" },
+  "help.portfolio.s3.body": { "zh-CN": "组合视图可导出当前口径的明细；导出文件标注 Working / Official，与页面口径一致，不会混入另一种模式的数据。", "zh-HK": "組合視圖可導出當前口徑的明細；導出文件標注 Working / Official，與頁面口徑一致，不會混入另一種模式的數據。", en: "Export the current view's detail; the file carries the Working / Official label matching the page basis — the two modes never mix." },
   "common.ai_analysis": {
     "zh-CN": "交给 AI 分析",
     "zh-HK": "交給 AI 分析",
     en: "Analyze with AI",
   },
+  "portfolio.summary_failed": { "zh-CN": "组合分析加载失败", "zh-HK": "組合分析載入失敗", en: "Failed to load portfolio summary" },
+  "portfolio.unit_price_failed": { "zh-CN": "单价对比加载失败", "zh-HK": "單價對比載入失敗", en: "Failed to load unit-price comparison" },
   "common.source_system": {
     "zh-CN": "来源系统",
     "zh-HK": "來源系統",
@@ -382,10 +466,20 @@ const dict: TranslationDict = {
     "zh-HK": "經營脈搏",
     en: "Operating Pulse",
   },
-  "pulse.subtitle": {
-    "zh-CN": "两分钟完成整体表现、数据可信度与优先门店晨检。",
-    "zh-HK": "兩分鐘完成整體表現、數據可信度與優先門店晨檢。",
-    en: "A two-minute check of overall performance, data trust, and priority stores.",
+  "pulse.signal_mix_title": {
+    "zh-CN": "信号构成",
+    "zh-HK": "信號構成",
+    en: "Signal mix",
+  },
+  "pulse.signal_mix_weight": {
+    "zh-CN": "累计权重",
+    "zh-HK": "累計權重",
+    en: "Cumulative weight",
+  },
+  "pulse.signal_mix_stores": {
+    "zh-CN": "涉及 {count} 家门店",
+    "zh-HK": "涉及 {count} 家門店",
+    en: "{count} stores affected",
   },
   "pulse.trend_title": {
     "zh-CN": "每日趋势",
@@ -598,10 +692,10 @@ const dict: TranslationDict = {
     "zh-HK": "門店 360",
     en: "Store 360",
   },
-  "store360.subtitle": {
-    "zh-CN": "围绕单店的事实、同群对比与变化贡献；仅供 Working 经营分析，不作解释性判断。",
-    "zh-HK": "圍繞單店的事實、同群對比與變化貢獻；僅供 Working 經營分析，不作解釋性判斷。",
-    en: "Facts, peer comparison and change contribution for one store; Working analysis only, never an interpretive judgment.",
+  "store360.scope_note": {
+    "zh-CN": "仅供 Working 经营分析，不作解释性判断。",
+    "zh-HK": "僅供 Working 經營分析，不作解釋性判斷。",
+    en: "Working analysis only, never an interpretive judgment.",
   },
   "store360.scenario_analysis": {
     "zh-CN": "情景分析",
@@ -733,6 +827,22 @@ const dict: TranslationDict = {
     "zh-HK": "經營佔用現金成本僅用於經營分析，未混入 IFRS 16 計量或 Official 過賬鏈路。",
     en: "Operating cash occupancy cost is for operating analysis only and never enters IFRS 16 measurement or the Official posting chain.",
   },
+  // SANKEY-001 一期：利润流向桑基图
+  "store360.pl_flow.title": { "zh-CN": "利润流向", "zh-HK": "利潤流向", en: "Profit flow" },
+  "store360.pl_flow.status": { "zh-CN": "状态", "zh-HK": "狀態", en: "Status" },
+  "store360.pl_flow.residual": { "zh-CN": "未归因金额", "zh-HK": "未歸因金額", en: "Unattributed" },
+  "store360.pl_flow.missing": { "zh-CN": "缺失字段", "zh-HK": "缺失字段", en: "Missing fields" },
+  "store360.pl_flow.formula": { "zh-CN": "口径", "zh-HK": "口徑", en: "Formula" },
+  "store360.pl_flow.unavailable": { "zh-CN": "当前窗口没有可用于利润流向的经营事实", "zh-HK": "當前窗口沒有可用於利潤流向的經營事實", en: "No operating facts in the current window for a profit-flow view" },
+  "store360.pl_flow.pick_store": { "zh-CN": "选择门店后展示利润流向", "zh-HK": "選擇門店後展示利潤流向", en: "Pick a store to see its profit flow" },
+  // STATE-001：门店 360 正式数据下无事实（404）→ actionable
+  "store360.actionable_production_empty": { "zh-CN": "正式数据下没有该门店的经营事实。切换到模拟数据，或先导入正式数据。", "zh-HK": "正式數據下沒有該門店的經營事實。切換到模擬數據，或先導入正式數據。", en: "No operating facts for this store under production data. Switch to simulated data, or import production facts first." },
+  "store360.actionable_switch_simulated": { "zh-CN": "切换到模拟数据", "zh-HK": "切換到模擬數據", en: "Switch to simulated" },
+  // STATE-001：合同详情无付款计划时计量 → actionable
+  "contract_detail.calculate_no_schedules": { "zh-CN": "该合同还没有付款计划，无法计量。已为你打开付款计划页签，去添加付款计划。", "zh-HK": "該合同還沒有付款計劃，無法計量。已為你打開付款計劃頁簽，去添加付款計劃。", en: "This contract has no payment schedule yet, so it cannot be measured. The payments tab is open — add a schedule there." },
+  // STATE-001：设置页标签统计被折现率缺失阻塞 → actionable
+  "settings.tags_actionable": { "zh-CN": "标签统计需要先补全折现率：{contracts}。请到合同工作台补录，或在本页配置全局折现率。", "zh-HK": "標籤統計需要先補全折現率：{contracts}。請到合同工作台補錄，或在本頁配置全域折現率。", en: "Tag statistics need a confirmed discount rate first: {contracts}. Confirm it on the contract, or set a global rate on this page." },
+  "store360.pl_flow.load_failed": { "zh-CN": "利润流向加载失败", "zh-HK": "利潤流向載入失敗", en: "Profit flow failed to load" },
   "store360.peer_benchmark": {
     "zh-CN": "同群基准",
     "zh-HK": "同群基準",
@@ -833,6 +943,26 @@ const dict: TranslationDict = {
     "zh-HK": "守恆殘差",
     en: "conservation residual",
   },
+  "store360.bridge.chart_title": {
+    "zh-CN": "变化贡献分解",
+    "zh-HK": "變化貢獻分解",
+    en: "Change contribution breakdown",
+  },
+  "store360.bridge.start": {
+    "zh-CN": "期初",
+    "zh-HK": "期初",
+    en: "Opening",
+  },
+  "store360.bridge.end": {
+    "zh-CN": "期末",
+    "zh-HK": "期末",
+    en: "Closing",
+  },
+  "store360.bridge.no_complete": {
+    "zh-CN": "本期没有可分解的完整变化贡献",
+    "zh-HK": "本期沒有可分解的完整變化貢獻",
+    en: "No complete change bridge to break down this period",
+  },
   "store360.bridge.item": {
     "zh-CN": "变化项",
     "zh-HK": "變化項",
@@ -849,13 +979,16 @@ const dict: TranslationDict = {
     en: "Daily trend (target store / peer median)",
   },
 
-  // I18N-001 — scenario-workbench page
+  // I18N-001 — scenario-workbench page（FIX-014：用户定名「租金谈判测算」；
+  // 路由 /scenario-workbench 与组件名、API 路径不变）
   "scenario.title": {
-    "zh-CN": "情景工作台",
-    "zh-HK": "情景工作台",
-    en: "Scenario Workbench",
+    "zh-CN": "租金谈判测算",
+    "zh-HK": "租金談判測算",
+    en: "Rent Negotiation Scenario",
   },
-  "scenario.subtitle": {
+  // FIX-014: the compliance wording stays — it moves under the plain
+  // subtitle as the scope note, exactly as before, only repositioned.
+  "scenario.scope_note": {
     "zh-CN": "门店经营 What-if；服务端基于同一 Working 事实重算 30-day run-rate，不输出最优方案或 IFRS 16 影响。",
     "zh-HK": "門店經營 What-if；服務端基於同一 Working 事實重算 30-day run-rate，不輸出最優方案或 IFRS 16 影響。",
     en: "Store what-if; the server recomputes a 30-day run-rate on the same Working facts, with no optimal plan or IFRS 16 impact.",
@@ -1457,9 +1590,9 @@ const dict: TranslationDict = {
     en: "Store 360",
   },
   "nav.scenario_workbench": {
-    "zh-CN": "情景工作台",
-    "zh-HK": "情景工作台",
-    en: "Scenario Workbench",
+    "zh-CN": "租金谈判测算",
+    "zh-HK": "租金談判測算",
+    en: "Rent Negotiation Scenario",
   },
   "nav.cashflow": {
     "zh-CN": "现金流预测",
@@ -1485,11 +1618,6 @@ const dict: TranslationDict = {
     "zh-CN": "Agent 运营与用量",
     "zh-HK": "Agent 運營與用量",
     en: "Agent Operations & Usage",
-  },
-  "agent_metrics.description": {
-    "zh-CN": "查看当前权限范围内 Planner 跨 Run 的调用、Token 和成本核算状态。数据来自持久化 Trace，不展示业务数据或敏感提示词。",
-    "zh-HK": "查看當前權限範圍內 Planner 跨 Run 的調用、Token 和成本核算狀態。數據來自持久化 Trace，不展示業務數據或敏感提示詞。",
-    en: "Review Planner calls, tokens, and cost-accounting status across Runs in your authorized scope. The data comes from persisted traces and excludes business data and sensitive prompts.",
   },
   "agent_metrics.range_24h": {
     "zh-CN": "最近 24 小时",
@@ -2178,9 +2306,9 @@ const dict: TranslationDict = {
     en: "Contract Ledger",
   },
   "contracts.subtitle": {
-    "zh-CN": "共 {count} 份合同，管理您的 IFRS 16 租赁合约",
-    "zh-HK": "共 {count} 份合同，管理您的 IFRS 16 租賃合約",
-    en: "{count} contracts, managing your IFRS 16 lease contracts",
+    "zh-CN": "共 {count} 份合同",
+    "zh-HK": "共 {count} 份合同",
+    en: "{count} contracts",
   },
   "contracts.add_contract": {
     "zh-CN": "新增合同",
@@ -2878,11 +3006,6 @@ const dict: TranslationDict = {
     "zh-CN": "结账中心",
     "zh-HK": "結賬中心",
     en: "Monthly Closing",
-  },
-  "monthly.subtitle": {
-    "zh-CN": "IFRS 16 租赁负债月结生成、分录预览与过账管理",
-    "zh-HK": "IFRS 16 租賃負債月結生成、分錄預覽與過賬管理",
-    en: "IFRS 16 lease liability monthly closing, entry preview and posting management",
   },
   "monthly.current_period": {
     "zh-CN": "当前期间",
@@ -3582,11 +3705,6 @@ const dict: TranslationDict = {
     "zh-CN": "新增合同",
     "zh-HK": "新增合同",
     en: "New Contract",
-  },
-  "contract_new.subtitle": {
-    "zh-CN": "手工录入 · 也可改用 AI 上传解析",
-    "zh-HK": "手工錄入 · 也可改用 AI 上載解析",
-    en: "Manual entry · or use AI upload and parsing",
   },
   "contract_new.back": {
     "zh-CN": "返回",
@@ -4833,11 +4951,6 @@ const dict: TranslationDict = {
     "zh-HK": "未來租金現金流預測",
     en: "Future Rent Cashflow Forecast",
   },
-  "cashflow.description": {
-    "zh-CN": "基于合同与付款计划预测未来期间的租金现金流出",
-    "zh-HK": "基於合同與付款計劃預測未來期間的租金現金流出",
-    en: "Forecast future rent cash outflows based on contracts and payment schedules",
-  },
   "cashflow.report_mode": {
     "zh-CN": "报表模式",
     "zh-HK": "報表模式",
@@ -5090,10 +5203,13 @@ const dict: TranslationDict = {
   },
 
   // ─── Settings ──────────────────────────────────────────────────
+  // FIX-032: the page was a tag manager once. It now holds device sessions,
+  // the group discount rate, rent-to-sales policy, budget variance policy and
+  // journal materiality — the nav calls it 设置 and the header said 标签总管.
   "settings.title": {
-    "zh-CN": "标签总管",
-    "zh-HK": "標籤總管",
-    en: "Tag Manager",
+    "zh-CN": "设置",
+    "zh-HK": "設置",
+    en: "Settings",
   },
   "settings.group_device_sessions": {
     "zh-CN": "设备会话",
@@ -5179,11 +5295,6 @@ const dict: TranslationDict = {
     "zh-CN": "全部设备会话撤销失败",
     "zh-HK": "全部設備會話撤銷失敗",
     en: "Failed to revoke all device sessions",
-  },
-  "settings.description": {
-    "zh-CN": "标签用于驱动 IFRS 16 摊销报表的多维度分组与汇总分析",
-    "zh-HK": "標籤用於驅動 IFRS 16 攤銷報表的多維度分組與匯總分析",
-    en: "Tags are used to drive multi-dimensional grouping and summary analysis in IFRS 16 amortization reports",
   },
   "settings.group_discount_rate": {
     "zh-CN": "集团默认折现率",
@@ -5687,9 +5798,9 @@ const dict: TranslationDict = {
     en: "User Management",
   },
   "admin_users.subtitle": {
-    "zh-CN": "共 {count} 个用户 · 管理员可创建和维护账号",
-    "zh-HK": "共 {count} 個用戶 · 管理員可建立及維護帳號",
-    en: "{count} users · Admins can create and maintain accounts",
+    "zh-CN": "共 {count} 个用户",
+    "zh-HK": "共 {count} 個用戶",
+    en: "{count} users",
   },
   "admin_users.new_user": {
     "zh-CN": "新建用户",
@@ -6496,11 +6607,6 @@ const dict: TranslationDict = {
     "zh-CN": "损益调整",
     "zh-HK": "損益調整",
     en: "P&L Adjustment",
-  },
-  "reports.subtitle": {
-    "zh-CN": "租赁负债滚动表与摊销报表查询",
-    "zh-HK": "租賃負債滾動表與攤銷報表查詢",
-    en: "Lease Liability Roll-forward & Amortization Report Query",
   },
   "reports.working_hint": {
     "zh-CN": "工作报表：包含 Draft / Pending Approval 数据，用于内部试算",
@@ -7450,9 +7556,20 @@ const dict: TranslationDict = {
   "home.brief_needs_input_title": { "zh-CN": "需要补充数据上下文", "zh-HK": "需要補充數據上下文", en: "Data context required" },
   "home.brief_error_title": { "zh-CN": "今日经营简报生成失败", "zh-HK": "今日經營簡報生成失敗", en: "Failed to generate today's brief" },
   "home.brief_attention": { "zh-CN": "关注门店", "zh-HK": "關注門店", en: "Attention stores" },
+  // HOME-004: the collapsed brief band carries the attention count beside the
+  // title so one strip answers "how many stores need attention" unexpanded.
+  "home.band_attention_count": { "zh-CN": "关注门店 {count}", "zh-HK": "關注門店 {count}", en: "Attention stores: {count}" },
+  "home.severity_critical": { "zh-CN": "严重", "zh-HK": "嚴重", en: "Critical" },
+  "home.severity_high": { "zh-CN": "高", "zh-HK": "高", en: "High" },
+  "home.severity_medium": { "zh-CN": "中", "zh-HK": "中", en: "Medium" },
+  "home.severity_low": { "zh-CN": "低", "zh-HK": "低", en: "Low" },
+  // HOME-004 §3: the home conversation — pending bubble copy and the
+  // starters reuse the /ai-chat quick-question keys (ai.chip_*).
+  "home.chat_thinking": { "zh-CN": "正在思考…", "zh-HK": "正在思考…", en: "Thinking…" },
   "home.brief_plan_trace": { "zh-CN": "推理轨迹", "zh-HK": "推理軌跡", en: "Reasoning trace" },
   "home.proposals_title": { "zh-CN": "待确认建议", "zh-HK": "待確認建議", en: "Proposals to confirm" },
   "home.proposals_empty": { "zh-CN": "暂无待确认建议；Agent 提出的行动建议会出现在这里。", "zh-HK": "暫無待確認建議；Agent 提出的行動建議會出現在這裡。", en: "No proposals awaiting confirmation; agent action proposals will appear here." },
+  "home.proposals_empty_short": { "zh-CN": "暂无待确认建议", "zh-HK": "暫無待確認建議", en: "No proposals awaiting confirmation" },
   "contracts.col_identity": { "zh-CN": "合同标识", "zh-HK": "合同標識", en: "Contract" },
   "contracts.col_liability": { "zh-CN": "租赁负债余额", "zh-HK": "租賃負債餘額", en: "Lease liability" },
   "contracts.col_rou": { "zh-CN": "ROU 余额", "zh-HK": "ROU 餘額", en: "ROU balance" },
@@ -7974,6 +8091,137 @@ const dict: TranslationDict = {
   "landing.footer_desc": { "zh-CN": "面向连锁零售承租方的经营决策与租赁合规工作站，连接销售、毛利、排班、占用成本与 IFRS 16 准则计量。", "zh-HK": "面向連鎖零售承租方的經營決策與租賃合規工作站，連接銷售、毛利、排班、佔用成本與 IFRS 16 準則計量。", en: "Retail performance workstation for chain retail tenants, bridging sales, gross margin, labor, occupancy costs and IFRS 16 compliance." },
   "landing.footer_rights": { "zh-CN": "保留所有权利。", "zh-HK": "保留所有權利。", en: "All rights reserved." },
   "landing.footer_compliance_tag": { "zh-CN": "IFRS 16 / 企业会计准则第 21 号规范对齐", "zh-HK": "IFRS 16 / 企業會計準則第 21 號規範對齊", en: "Aligned with IFRS 16 / ASC 842 Standards" },
+  // FIX-023: ROI 测算页接入 i18n（此前零接线，22 处硬编码中文）
+  "roi.title": { "zh-CN": "ROI 测算", "zh-HK": "ROI 測算", en: "ROI Calculator" },
+  "roi.header_count": { "zh-CN": "当前假设 · {count} 份合同", "zh-HK": "當前假設 · {count} 份合同", en: "Current assumptions · {count} contracts" },
+  "roi.card_assumptions": { "zh-CN": "测算参数", "zh-HK": "測算參數", en: "Assumptions" },
+  "roi.assumption_contracts": { "zh-CN": "合同数量", "zh-HK": "合同數量", en: "Contracts" },
+  "roi.assumption_intake": { "zh-CN": "单份录入节省", "zh-HK": "單份錄入節省", en: "Intake hours saved" },
+  "roi.assumption_close": { "zh-CN": "月结节省", "zh-HK": "月結節省", en: "Close saved" },
+  "roi.assumption_audit": { "zh-CN": "审计返工减少", "zh-HK": "審計返工減少", en: "Audit rework saved" },
+  "roi.note_contracts": { "zh-CN": "门店/设备租赁合同总量", "zh-HK": "門店/設備租賃合同總量", en: "Total store and equipment lease contracts" },
+  "roi.note_intake": { "zh-CN": "传统 Excel/表单录入 vs AI 草稿确认", "zh-HK": "傳統 Excel/表單錄入 vs AI 草稿確認", en: "Manual Excel/form entry vs AI draft confirmation" },
+  "roi.note_close": { "zh-CN": "分录生成、复核、锁账、报表导出", "zh-HK": "分錄生成、複核、鎖賬、報表導出", en: "Entry generation, review, lock, export" },
+  "roi.note_audit": { "zh-CN": "对数报告、审批留痕、范围判定减少返工", "zh-HK": "對數報告、審批留痕、範圍判定減少返工", en: "Reconciliation reports, approval trails, scope decisions" },
+  "roi.unit_hours": { "zh-CN": "小时", "zh-HK": "小時", en: "hours" },
+  "roi.unit_hours_per_month": { "zh-CN": "人天/月", "zh-HK": "人天/月", en: "person-days/month" },
+  "roi.unit_hours_per_year": { "zh-CN": "小时/年", "zh-HK": "小時/年", en: "hours/year" },
+  "roi.label_currency": { "zh-CN": "计价币种", "zh-HK": "計價幣種", en: "Pricing currency" },
+  "roi.label_hourly_cost": { "zh-CN": "财务人员小时成本", "zh-HK": "財務人員小時成本", en: "Finance hourly cost" },
+  "roi.label_manual_hours": { "zh-CN": "传统单份录入小时", "zh-HK": "傳統單份錄入小時", en: "Manual hours per entry" },
+  "roi.label_ai_hours": { "zh-CN": "AI 草稿确认小时", "zh-HK": "AI 草稿確認小時", en: "AI draft hours per entry" },
+  "roi.label_close_days": { "zh-CN": "传统月结人天/月", "zh-HK": "傳統月結人天/月", en: "Manual close person-days/month" },
+  "roi.label_system_close_days": { "zh-CN": "系统月结人天/月", "zh-HK": "系統月結人天/月", en: "System close person-days/month" },
+  "roi.label_audit_hours": { "zh-CN": "年度审计返工减少小时", "zh-HK": "年度審計返工減少小時", en: "Annual audit rework saved hours" },
+  "roi.stat_hours_saved": { "zh-CN": "年度节省工时", "zh-HK": "年度節省工時", en: "Hours saved per year" },
+  "roi.stat_labor_savings": { "zh-CN": "年度人力成本节省", "zh-HK": "年度人力成本節省", en: "Labor cost saved per year" },
+  "roi.stat_ai_saved": { "zh-CN": "AI 录入节省", "zh-HK": "AI 錄入節省", en: "AI entry saved" },
+  "roi.stat_audit_reduced": { "zh-CN": "审计返工减少", "zh-HK": "審計返工減少", en: "Audit rework reduced" },
+  "roi.card_basis": { "zh-CN": "测算口径", "zh-HK": "測算口徑", en: "Calculation basis" },
+  "roi.col_item": { "zh-CN": "项目", "zh-HK": "項目", en: "Item" },
+  "roi.col_value": { "zh-CN": "数值", "zh-HK": "數值", en: "Value" },
+  "roi.col_note": { "zh-CN": "说明", "zh-HK": "說明", en: "Note" },
+
+  // FIX-023: 签约前决策页接入 i18n（49 处硬编码中文）
+  "pre_deal.title": { "zh-CN": "签约前决策", "zh-HK": "簽約前決策", en: "Pre-signing decision" },
+  "pre_deal.header_count": { "zh-CN": "{currency} · {count} 个年度期间", "zh-HK": "{currency} · {count} 個年度期間", en: "{currency} · {count} annual periods" },
+  "pre_deal.rate_source": { "zh-CN": "集团 IBR · 5 年期 · 2026-07 版", "zh-HK": "集團 IBR · 5 年期 · 2026-07 版", en: "Group IBR · 5-year · 2026-07" },
+  "pre_deal.rate_overridden": { "zh-CN": "已覆盖默认值", "zh-HK": "已覆蓋默認值", en: "Overriding the default" },
+  "pre_deal.rate_default": { "zh-CN": "当前使用默认值", "zh-HK": "當前使用默認值", en: "Using the default" },
+  "pre_deal.rate_note": { "zh-CN": "仅用于本次情景测算", "zh-HK": "僅用於本次情景測算", en: "Used for this scenario only" },
+  "pre_deal.card_terms": { "zh-CN": "条款草案", "zh-HK": "條款草案", en: "Term draft" },
+  "pre_deal.label_name": { "zh-CN": "方案名称", "zh-HK": "方案名稱", en: "Plan name" },
+  "pre_deal.err_name": { "zh-CN": "请填写名称", "zh-HK": "請填寫名稱", en: "Name is required" },
+  "pre_deal.label_start": { "zh-CN": "起租日", "zh-HK": "起租日", en: "Commencement" },
+  "pre_deal.err_start": { "zh-CN": "请选择起租日", "zh-HK": "請選擇起租日", en: "Commencement date is required" },
+  "pre_deal.label_term": { "zh-CN": "租期（月）", "zh-HK": "租期（月）", en: "Term (months)" },
+  "pre_deal.err_term": { "zh-CN": "请填写租期", "zh-HK": "請填寫租期", en: "Term is required" },
+  "pre_deal.label_rent": { "zh-CN": "月租金", "zh-HK": "月租金", en: "Monthly rent" },
+  "pre_deal.err_rent": { "zh-CN": "请填写月租金", "zh-HK": "請填寫月租金", en: "Monthly rent is required" },
+  "pre_deal.label_rate": { "zh-CN": "折现率", "zh-HK": "折現率", en: "Discount rate" },
+  "pre_deal.err_rate": { "zh-CN": "请填写折现率", "zh-HK": "請填寫折現率", en: "Discount rate is required" },
+  "pre_deal.label_currency": { "zh-CN": "币种", "zh-HK": "幣種", en: "Currency" },
+  "pre_deal.err_currency": { "zh-CN": "请填写币种", "zh-HK": "請填寫幣種", en: "Currency is required" },
+  "pre_deal.label_free": { "zh-CN": "免租期（月）", "zh-HK": "免租期（月）", en: "Rent-free (months)" },
+  "pre_deal.label_escalation": { "zh-CN": "年递增（%）", "zh-HK": "年遞增（%）", en: "Annual escalation (%)" },
+  "pre_deal.label_direct_cost": { "zh-CN": "初始直接费用", "zh-HK": "初始直接費用", en: "Initial direct cost" },
+  "pre_deal.hint_direct_cost": { "zh-CN": "计入资产，不计入负债", "zh-HK": "計入資產，不計入負債", en: "Capitalized to the asset, not the liability" },
+  "pre_deal.label_exit_penalty": { "zh-CN": "提前退出罚金（月租金）", "zh-HK": "提前退出罰金（月租金）", en: "Early-exit penalty (months of rent)" },
+  "pre_deal.hint_exit_penalty": { "zh-CN": "按退出时点在租的租金计", "zh-HK": "按退出時點在租的租金計", en: "Based on rent in force at exit" },
+  "pre_deal.btn_brief": { "zh-CN": "生成决策简报", "zh-HK": "生成決策簡報", en: "Build decision briefing" },
+  "pre_deal.err_failed": { "zh-CN": "测算失败", "zh-HK": "測算失敗", en: "Calculation failed" },
+  "pre_deal.alert_title": { "zh-CN": "决策简报", "zh-HK": "決策簡報", en: "Decision briefing" },
+  "pre_deal.stat_liability": { "zh-CN": "入表负债", "zh-HK": "入表負債", en: "Balance-sheet liability" },
+  "pre_deal.stat_rou": { "zh-CN": "使用权资产", "zh-HK": "使用權資產", en: "Right-of-use asset" },
+  "pre_deal.stat_commitment": { "zh-CN": "全期承诺（未折现）", "zh-HK": "全期承諾（未折現）", en: "Full-term commitment (undiscounted)" },
+  "pre_deal.stat_discount_effect": { "zh-CN": "折现影响", "zh-HK": "折現影響", en: "Discounting effect" },
+  "pre_deal.card_expense_curve": { "zh-CN": "IFRS 16 费用曲线 vs 直线租金", "zh-HK": "IFRS 16 費用曲線 vs 直線租金", en: "IFRS 16 expense vs straight-line rent" },
+  "pre_deal.expense_curve_note": { "zh-CN": "利息在负债最大时最高，因此会计费用前高后低。两条线交叉之前的年份，实际入账费用高于按租金做的预算——本方案前 {years} 年如此，之后反向，全期相抵。", "zh-HK": "利息在負債最大時最高，因此會計費用前高後低。兩條線交叉之前的年份，實際入賬費用高於按租金做的預算——本方案前 {years} 年如此，之後反向，全期相抵。", en: "Interest peaks when the liability peaks, so accounting expense is front-loaded. Until the two lines cross, booked expense runs above the rent-based budget — {years} years for this plan, then the reverse, netting out over the term." },
+  "pre_deal.year_suffix": { "zh-CN": "第{value}年", "zh-HK": "第{value}年", en: "Year {value}" },
+  "pre_deal.axis_wan": { "zh-CN": "{value}万", "zh-HK": "{value}萬", en: "{value}0k" },
+  "pre_deal.series_ifrs16": { "zh-CN": "IFRS 16 费用", "zh-HK": "IFRS 16 費用", en: "IFRS 16 expense" },
+  "pre_deal.series_straight": { "zh-CN": "直线租金", "zh-HK": "直線租金", en: "Straight-line rent" },
+  "pre_deal.series_cash": { "zh-CN": "现金租金", "zh-HK": "現金租金", en: "Cash rent" },
+  "pre_deal.card_ebitda": { "zh-CN": "EBITDA 三层影响", "zh-HK": "EBITDA 三層影響", en: "EBITDA three-layer impact" },
+  "pre_deal.ebitda_note": { "zh-CN": "租金从 EBITDA 线上移到线下，EBITDA 被动抬升——业务没有任何改善。抬升额等于原本计入经营费用的租金，它去了折旧（EBITDA 与 EBIT 之间）和利息（EBIT 与净利润之间）。", "zh-HK": "租金從 EBITDA 線上移到線下，EBITDA 被動抬升——業務沒有任何改善。抬升額等於原本計入經營費用的租金，它去了折舊（EBITDA 與 EBIT 之間）和利息（EBIT 與淨利潤之間）。", en: "Rent moves below the EBITDA line, passively lifting EBITDA — the business is unchanged. The uplift equals the rent that used to sit in operating expense; it lands in depreciation (between EBITDA and EBIT) and interest (between EBIT and net profit)." },
+  "pre_deal.series_ebitda_uplift": { "zh-CN": "EBITDA 抬升", "zh-HK": "EBITDA 抬升", en: "EBITDA uplift" },
+  "pre_deal.series_depreciation": { "zh-CN": "折旧（线下）", "zh-HK": "折舊（線下）", en: "Depreciation (below the line)" },
+  "pre_deal.series_interest": { "zh-CN": "利息（EBIT 之下）", "zh-HK": "利息（EBIT 之下）", en: "Interest (below EBIT)" },
+  "pre_deal.series_net_profit": { "zh-CN": "净利润影响", "zh-HK": "淨利潤影響", en: "Net profit impact" },
+  "pre_deal.card_exit": { "zh-CN": "退出成本曲线", "zh-HK": "退出成本曲線", en: "Exit cost curve" },
+  "pre_deal.exit_note": { "zh-CN": "策略变化时才会问、却没人备着答案的问题：第 N 年退出要花多少。剩余租金因退出而免付，故不计入「退出现金支出」；罚金按退出时点在租的租金计算。", "zh-HK": "策略變化時才會問、卻沒人備著答案的問題：第 N 年退出要花多少。剩餘租金因退出而免付，故不計入「退出現金支出」；罰金按退出時點在租的租金計算。", en: "The question nobody keeps an answer for until strategy changes: what does exiting in year N cost. Remaining rent is waived on exit, so it stays out of cash-to-exit; the penalty follows the rent in force at the exit point." },
+  "pre_deal.col_exit_point": { "zh-CN": "退出时点", "zh-HK": "退出時點", en: "Exit point" },
+  "pre_deal.col_remaining": { "zh-CN": "剩余承诺（免付）", "zh-HK": "剩餘承諾（免付）", en: "Remaining commitment (waived)" },
+  "pre_deal.col_released": { "zh-CN": "解除负债", "zh-HK": "解除負債", en: "Liability released" },
+  "pre_deal.col_rou": { "zh-CN": "核销使用权资产", "zh-HK": "核銷使用權資產", en: "ROU written off" },
+  "pre_deal.col_penalty": { "zh-CN": "罚金", "zh-HK": "罰金", en: "Penalty" },
+  "pre_deal.col_pnl": { "zh-CN": "损益影响", "zh-HK": "損益影響", en: "P&L impact" },
+  "pre_deal.col_cash_out": { "zh-CN": "退出现金支出", "zh-HK": "退出現金支出", en: "Cash to exit" },
+  "pre_deal.exit_year": { "zh-CN": "第 {value} 年末", "zh-HK": "第 {value} 年末", en: "End of year {value}" },
+
+  // FIX-023: 条款比价页接入 i18n（39 处硬编码中文）
+  "deal_compare.title": { "zh-CN": "条款比价", "zh-HK": "條款比價", en: "Term comparison" },
+  "deal_compare.header_count": { "zh-CN": "已比较 {count} 个方案", "zh-HK": "已比較 {count} 個方案", en: "Compared {count} plans" },
+  "deal_compare.plan_a": { "zh-CN": "方案 A", "zh-HK": "方案 A", en: "Plan A" },
+  "deal_compare.plan_b": { "zh-CN": "方案 B", "zh-HK": "方案 B", en: "Plan B" },
+  "deal_compare.label_rate": { "zh-CN": "折现率（年化，小数）", "zh-HK": "折現率（年化，小數）", en: "Discount rate (annual, decimal)" },
+  "deal_compare.err_rate": { "zh-CN": "请填写折现率", "zh-HK": "請填寫折現率", en: "Discount rate is required" },
+  "deal_compare.hint_rate": { "zh-CN": "排序结果取决于它，系统不会替你假设一个", "zh-HK": "排序結果取決於它，系統不會替你假設一個", en: "Ranking depends on it; the system never assumes one" },
+  "deal_compare.label_currency": { "zh-CN": "币种", "zh-HK": "幣種", en: "Currency" },
+  "deal_compare.err_currency": { "zh-CN": "请填写币种", "zh-HK": "請填寫幣種", en: "Currency is required" },
+  "deal_compare.err_name": { "zh-CN": "请填写方案名称", "zh-HK": "請填寫方案名稱", en: "Plan name is required" },
+  "deal_compare.label_term": { "zh-CN": "租期（月）", "zh-HK": "租期（月）", en: "Term (months)" },
+  "deal_compare.err_term": { "zh-CN": "请填写租期", "zh-HK": "請填寫租期", en: "Term is required" },
+  "deal_compare.label_rent": { "zh-CN": "月租金", "zh-HK": "月租金", en: "Monthly rent" },
+  "deal_compare.err_rent": { "zh-CN": "请填写月租金", "zh-HK": "請填寫月租金", en: "Monthly rent is required" },
+  "deal_compare.label_free": { "zh-CN": "免租期（月）", "zh-HK": "免租期（月）", en: "Rent-free (months)" },
+  "deal_compare.label_esc": { "zh-CN": "年递增（%）", "zh-HK": "年遞增（%）", en: "Annual escalation (%)" },
+  "deal_compare.label_other": { "zh-CN": "月度其他成本", "zh-HK": "月度其他成本", en: "Other monthly cost" },
+  "deal_compare.hint_other": { "zh-CN": "物业费等，不随调租变动", "zh-HK": "物業費等，不隨調租變動", en: "Property fees etc., fixed across the term" },
+  "deal_compare.label_area": { "zh-CN": "面积（㎡）", "zh-HK": "面積（㎡）", en: "Area (sqm)" },
+  "deal_compare.hint_area": { "zh-CN": "留空则不出每平米单价", "zh-HK": "留空則不出每平米單價", en: "Leave blank to skip per-sqm pricing" },
+  "deal_compare.label_upfront": { "zh-CN": "前期投入", "zh-HK": "前期投入", en: "Upfront cost" },
+  "deal_compare.label_contrib": { "zh-CN": "出租方装修补贴", "zh-HK": "出租方裝修補貼", en: "Landlord fit-out contribution" },
+  "deal_compare.add_plan": { "zh-CN": "添加方案", "zh-HK": "添加方案", en: "Add plan" },
+  "deal_compare.plan_name": { "zh-CN": "方案 {letter}", "zh-HK": "方案 {letter}", en: "Plan {letter}" },
+  "deal_compare.btn_compare": { "zh-CN": "比价", "zh-HK": "比價", en: "Compare" },
+  "deal_compare.err_failed": { "zh-CN": "比价失败", "zh-HK": "比價失敗", en: "Comparison failed" },
+  "deal_compare.agree": { "zh-CN": "两个口径结论一致", "zh-HK": "兩個口徑結論一致", en: "Both measures agree" },
+  "deal_compare.disagree": { "zh-CN": "两个口径结论不一致", "zh-HK": "兩個口徑結論不一致", en: "The two measures disagree" },
+  "deal_compare.card_result": { "zh-CN": "条款比价结果", "zh-HK": "條款比價結果", en: "Comparison results" },
+  "deal_compare.col_plan": { "zh-CN": "方案", "zh-HK": "方案", en: "Plan" },
+  "deal_compare.badge_pv": { "zh-CN": "现值最优", "zh-HK": "現值最優", en: "Best by PV" },
+  "deal_compare.badge_rent": { "zh-CN": "有效租金最优", "zh-HK": "有效租金最優", en: "Best by effective rent" },
+  "deal_compare.col_eff_rent": { "zh-CN": "有效租金（月）", "zh-HK": "有效租金（月）", en: "Effective rent (monthly)" },
+  "deal_compare.col_eff_sqm": { "zh-CN": "每平米有效单价", "zh-HK": "每平米有效單價", en: "Effective rate per sqm" },
+  "deal_compare.col_first_year": { "zh-CN": "首年租金", "zh-HK": "首年租金", en: "First-year rent" },
+  "deal_compare.col_total_rent": { "zh-CN": "全期租金", "zh-HK": "全期租金", en: "Total rent" },
+  "deal_compare.col_total_cost": { "zh-CN": "全期总成本", "zh-HK": "全期總成本", en: "Total cost" },
+  "deal_compare.col_pv": { "zh-CN": "现值", "zh-HK": "現值", en: "Present value" },
+  "deal_compare.card_cash": { "zh-CN": "累计现金支出", "zh-HK": "累計現金支出", en: "Cumulative cash outflow" },
+  "deal_compare.cash_note": { "zh-CN": "免租期是一段平线，年递增是一段逐渐变陡的曲线——两条线交叉的位置，就是两个方案成本反超的时点。", "zh-HK": "免租期是一段平線，年遞增是一段逐漸變陡的曲線——兩條線交叉的位置，就是兩個方案成本反超的時點。", en: "A rent-free period is a flat run, an escalation a steepening curve — where the lines cross is when one plan's cumulative cost overtakes the other." },
+  "deal_compare.month_suffix": { "zh-CN": "{value}月", "zh-HK": "{value}月", en: "Month {value}" },
+  "deal_compare.axis_wan": { "zh-CN": "{value}万", "zh-HK": "{value}萬", en: "{value}0k" },
 };
 
 export function t(key: string, lang: Language, replacements?: Record<string, string>): string {

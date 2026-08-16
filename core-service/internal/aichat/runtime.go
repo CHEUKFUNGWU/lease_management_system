@@ -62,7 +62,7 @@ func (r *Runtime[T]) OpenSession(ctx context.Context, command SessionCommand) (*
 	}
 	session := &repository.AIChatSession{
 		UserID: command.UserID, Title: strings.TrimSpace(command.Title),
-		ContextSnapshot: marshalJSON(command.ContextSnapshot),
+		ContextSnapshot: marshalJSON(command.ContextSnapshot), Initiator: command.Initiator,
 	}
 	if command.LegalEntityID != "" {
 		session.LegalEntityID = &command.LegalEntityID
@@ -150,7 +150,7 @@ func (r *Runtime[T]) prepare(ctx context.Context, input Input, session *reposito
 		} else {
 			session = &repository.AIChatSession{
 				UserID: input.UserID, Title: summarizeTitle(input.Message),
-				ContextSnapshot: marshalJSON(input.PageContext),
+				ContextSnapshot: marshalJSON(input.PageContext), Initiator: input.Initiator,
 			}
 			if input.LegalEntityID != "" {
 				session.LegalEntityID = &input.LegalEntityID

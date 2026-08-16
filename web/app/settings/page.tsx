@@ -4,21 +4,23 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  Card, Typography, Table, Spin, Statistic, Row, Col, Input, InputNumber,
+  Alert, Card, Typography, Table, Spin, Statistic, Row, Col, Input, InputNumber,
   Button, Space, Tag, Modal, Empty, message, Select,
 } from "antd";
 import {
   SearchOutlined, CopyOutlined, EyeOutlined, BarChartOutlined,
-  TagOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
+  TagOutlined, SettingOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { authApi, exchangeRateApi, reportApi, settingsApi } from "../lib/api";
+import { StateBlock } from "../components/StateBlock";
+import { ApiError, authApi, exchangeRateApi, reportApi, settingsApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { useRouter } from "next/navigation";
+import { classifyDataState } from "../lib/dataState";
 import { notifyError } from "../lib/notify";
 
 const { Title, Text, Paragraph } = Typography;
@@ -270,15 +272,32 @@ export default function SettingsPage() {
   const [modalContracts, setModalContracts] = useState<ContractRef[]>([]);
 
   /* ---- fetch ---- */
+  const [tagLoadError, setTagLoadError] = useState<string | null>(null);
   useEffect(() => {
     if (!token) return;
     setLoading(true);
+    setTagLoadError(null);
     reportApi
       .tagSummary(token)
       .then((res) => setData(res.data || []))
-      .catch(() => notifyError(t("settings.load_tags_failed", language)))
+      .catch((err) => {
+        // STATE-001：标签统计被折现率缺失阻塞（422 data_unavailable）是
+        // 「用户能自己解决」——inline 呈现下一步，而不是红色 toast。
+        const state = classifyDataState({
+          error: err,
+          data: null,
+          actionFor: (e) => {
+            if (!(e instanceof ApiError) || e.status !== 422 || e.code !== "data_unavailable") return null;
+            const contracts = (e.detail as { details?: { contracts?: string[] } })?.details?.contracts;
+            const list = contracts && contracts.length > 0 ? contracts.join("、") : "";
+            return { message: t("settings.tags_actionable", language, { contracts: list }), actionLabel: "" };
+          },
+        });
+        if (state.kind === "actionable" && state.message) setTagLoadError(state.message);
+        else notifyError(t("settings.load_tags_failed", language));
+      })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, language]);
 
   /* ---- derived ---- */
   const filtered = useMemo(() => {
@@ -399,8 +418,7 @@ export default function SettingsPage() {
     <ProtectedRoute>
       <AppLayout>
         <PageHeader
-          title={<><TagOutlined style={{ marginRight: 8 }} />{t("settings.title", language)}</>}
-          subtitle={t("settings.description", language)}
+          title={<><SettingOutlined style={{ marginRight: 8 }} />{t("settings.title", language)}</>}
         />
 
         <Card
@@ -558,6 +576,7 @@ export default function SettingsPage() {
 
         {/* summary cards */}
         <Spin spinning={loading}>
+          {tagLoadError && <Alert type="warning" showIcon className="settings-tags-actionable" message={tagLoadError} />}
           <Row gutter={16} style={{ marginBottom: 24 }}>
             <Col span={8}>
               <Card size="small">
@@ -704,13 +723,7 @@ export default function SettingsPage() {
         <Card>
           <Spin spinning={loading}>
             {!loading && !data.length ? (
-              <Empty
-                description={
-                  <span>
-                    {t("settings.empty_no_tags", language)}
-                  </span>
-                }
-              />
+              <StateBlock state={{ kind: "empty", reason: t("settings.empty_no_tags", language) }} language={language} />
             ) : (
               <Table
                 columns={columns}

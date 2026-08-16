@@ -73,6 +73,23 @@ describe("DataTrustBar", () => {
     const html = renderBar(envelope());
     expect(html).toContain(`${t("trust.comparison", "zh-CN")} 7/7`);
   });
+
+  it("FIX-006: uncontrolled mode keeps the built-in toggle", () => {
+    const html = renderBar(envelope());
+    expect(html).toContain("data-trust-bar-toggle");
+    expect(html).toContain(t("trust.expand", "zh-CN"));
+  });
+
+  it("FIX-006: controlled mode hides the bar's own toggle (one expander wins)", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(
+        LanguageProvider,
+        null,
+        React.createElement(DataTrustBar, { envelope: envelope(), expanded: false, onToggle: () => {} })
+      )
+    );
+    expect(html).not.toContain("data-trust-bar-toggle");
+  });
 });
 
 describe("KPIReadyBadge", () => {

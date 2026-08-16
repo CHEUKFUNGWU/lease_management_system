@@ -215,6 +215,14 @@ xs sm md  lg  xl  2xl 3xl 4xl
 
 在这些组件建成前，**不要在页面里现搓一个同名功能**——现在 `/operating-pulse` 用 `Empty` + `Spin` + `Alert` 拼出三套空/载/错语言，就是这么来的。
 
+### 8.1 容器原语（PRIM-001，2026-08-15）
+
+两个容器坑各已发生一次，规则如下，**守卫测试强制**（`web/scripts/container-primitives.test.ts`）：
+
+1. **表格横向滚动必须走 `tableScrollX(rowCount, width)`**（`web/app/lib/tableScroll.ts`）。直接写 `scroll={{ x: 数字 }}` 会在空表上渲染一个幽灵横向滚动条（FIX-004 的原始缺陷，六周后在付款计划页签再次被抓到）。例外：表格本身在「有数据才渲染」的条件分支里（`rows.length ? <Table/> : <Empty/>`），此时空表不存在，可保留字面量——守卫按行检查 `?` 条件放行。
+2. **recharts 图表（LineChart / BarChart / Sankey / AreaChart 等）必须包在 `<ResponsiveContainer>` 里**。裸图表拿不到宽度，画出一个空盒子（FIX-028：桑基图「状态: complete」下面是个高盒子）。图表容器高度是唯一允许的静态内联（动态值条款）。
+3. **第三类容器检查结论**：虚拟列表全仓不存在；Drawer 内表格同样受规则 1 约束（Drawer 宽度固定，横向滚动仍按数据行数走）。
+
 ---
 
 ## 9. AI 界面规范

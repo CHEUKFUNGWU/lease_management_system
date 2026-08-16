@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Empty, Skeleton, Spin } from "antd";
+import { Button, Skeleton, Spin } from "antd";
 import dayjs from "dayjs";
 import ApprovalCard, { type ApprovalProposalLike } from "../components/ApprovalCard";
 import { t, type Language } from "../lib/i18n";
@@ -82,9 +82,7 @@ export default function RightColumn({
           {proposals.length > 0 && <span className="home-proposals-count">{proposals.length}</span>}
         </div>
         {proposals.length === 0 ? (
-          <div className="home-proposals-empty">
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("home.proposals_empty", language)} />
-          </div>
+          <div className="home-proposals-empty-line">{t("home.proposals_empty_short", language)}</div>
         ) : (
           <div className="home-proposals-list">
             {proposals.map((item) => (

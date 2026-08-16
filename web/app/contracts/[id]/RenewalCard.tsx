@@ -5,11 +5,13 @@ import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, Col, Input, InputNumber, Row, Space, Statistic, Table, Tag, message } from "antd";
 import { contractApi } from "../../lib/api";
+import { useRetailQuery } from "../../retail/useRetailQuery";
 import { fmtMoney, fmtNum } from "../../lib/format";
 import { useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { t } from "../../lib/i18n";
 import { notifyError } from "../../lib/notify";
+import { tableScrollX } from "../../lib/tableScroll";
 
 interface OfferResult {
   name: string;
@@ -100,42 +102,33 @@ export function RenewalCard({ contractId }: { contractId: string }) {
   const [rentFreeMonths, setRentFreeMonths] = useState<number | null>(null);
   const [annualEscalation, setAnnualEscalation] = useState<number | null>(null);
   const [exitPenaltyMonths, setExitPenaltyMonths] = useState<number | null>(null);
-  const [card, setCard] = useState<Card | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [savingDecision, setSavingDecision] = useState(false);
   const [ownerName, setOwnerName] = useState("");
   const [businessOpinion, setBusinessOpinion] = useState("");
   const [evidence, setEvidence] = useState("");
   const [historyCount, setHistoryCount] = useState(0);
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    setError(null);
-    if (term == null || uplift == null || rentFreeMonths == null || annualEscalation == null || exitPenaltyMonths == null) {
-      setCard(null);
-      setLoading(false);
-      return;
-    }
-    try {
-      setCard(await contractApi.renewalCard(contractId, {
-        renewal_term_months: term, uplift_percent: uplift, rent_free_months: rentFreeMonths,
-        annual_escalation_percent: annualEscalation, early_exit_penalty_months: exitPenaltyMonths,
-      }, token));
-    } catch (err: any) {
-      // A missing discount rate is the expected reason this cannot be answered,
-      // and saying so is more use than an empty card.
-      setError(err?.message || t("renewal.load_failed", language));
-      setCard(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, contractId, term, uplift, rentFreeMonths, annualEscalation, exitPenaltyMonths, language]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  // FETCH-003: the renewal card is a parameter-driven query — term/uplift/
+  // rent-free/escaltion/exit drive the params, the seam owns loading, the
+  // race gate and the error exit. Incomplete params disable the query
+  // (params === null), matching the old early-return.
+  const renewalParams =
+    term == null || uplift == null || rentFreeMonths == null || annualEscalation == null || exitPenaltyMonths == null
+      ? null
+      : { contractId, term, uplift, rentFreeMonths, annualEscalation, exitPenaltyMonths };
+  const renewalKey = JSON.stringify(renewalParams);
+  const { loading, state: renewalState } = useRetailQuery({
+    token,
+    params: renewalParams,
+    paramsKey: renewalKey,
+    fetcher: (p, t) =>
+      contractApi.renewalCard(p.contractId, {
+        renewal_term_months: p.term, uplift_percent: p.uplift, rent_free_months: p.rentFreeMonths,
+        annual_escalation_percent: p.annualEscalation, early_exit_penalty_months: p.exitPenaltyMonths,
+      }, t),
+  });
+  const card: Card | null = renewalState.kind === "ready" ? renewalState.data ?? null : null;
+  const error: string | null = renewalState.kind === "failed" ? renewalState.message ?? null : null;
 
   const saveDecision = async () => {
     if (!token || !card?.decision_scenarios) return;
@@ -248,7 +241,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                 pagination={false}
                 size="small"
                 style={{ marginBottom: 12 }}
-                scroll={{ x: 600 }}
+                scroll={tableScrollX((card.renewal_comparison.offers || []).length, 600)}
                 columns={[
                   { title: t("renewal.offer", language), dataIndex: "name", render: (name: string) => <strong>{scenarioLabel(name)}</strong> },
                   {
@@ -293,7 +286,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                 rowKey="name"
                 pagination={false}
                 size="small"
-                scroll={{ x: 900 }}
+                scroll={tableScrollX((card.decision_scenarios.scenarios || []).length, 900)}
                 expandable={{
                   expandedRowRender: (scenario: ScenarioResult) => scenario.decision === "terminate" && scenario.exit_curve?.length ? (
                     <Table

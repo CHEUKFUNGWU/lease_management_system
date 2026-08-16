@@ -2,15 +2,20 @@
 
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Typography, message } from "antd";
 import { ReloadOutlined, RobotOutlined, CheckCircleOutlined, DownloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { HelpTrigger } from "../components/HelpDrawer";
+import { performanceHelpContent } from "../components/help-content";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 import { performanceApi } from "../lib/api";
+import { useRetailQuery } from "../retail/useRetailQuery";
 import { notifyError } from "../lib/notify";
 
 type Overview = { period: string; store_fact_count: number; store_fact_ready_count: number; store_fact_missing_count: number; store_fact_unmapped_count: number; store_fact_unreconciled_count: number; equipment_fact_count: number; equipment_fact_unreconciled_count: number; open_action_count: number; open_action_impact: number; latest_store_as_of?: string; latest_equipment_as_of?: string };
@@ -23,40 +28,59 @@ const pct = (value?: number) => value == null ? "—" : `${value.toFixed(2)}%`;
 
 export default function PerformancePage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
+  // FIX-026: `period` is the *applied* period — the only thing the loader
+  // depends on. `periodDraft` is what the text field holds while it is being
+  // edited. They used to be one state in the effect's dependency list, so
+  // editing "2026-07" fired a request at every keystroke and the half-typed
+  // "2026-0" came back rejected as「请求未成功」. Nothing loads until the draft
+  // is a well-formed YYYY-MM and the user applies it.
   const [period, setPeriod] = useState(dayjs().format("YYYY-MM"));
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [stores, setStores] = useState<FourWall[]>([]);
-  const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
-  const [actions, setActions] = useState<Action[]>([]);
+  const [periodDraft, setPeriodDraft] = useState(period);
+  const periodDraftValid = /^\d{4}-(0[1-9]|1[0-2])$/.test(periodDraft.trim());
+  const applyPeriod = () => {
+    const next = periodDraft.trim();
+    if (!periodDraftValid) return;
+    if (next === period) retry();
+    else setPeriod(next);
+  };
   const [selectedActionIds, setSelectedActionIds] = useState<string[]>([]);
   const [scenarioInput, setScenarioInput] = useState({ sales: 100000, rent: 12000, margin: 40, discount: 0.12 });
   const [scenarioResult, setScenarioResult] = useState<any[] | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
+  // FETCH-003: the cockpit loads four views for the applied period through
+  // the shared fetch seam — the period drives the params, the seam owns
+  // loading, the race gate and the error exit.
+  const { loading, state: cockpitState, retry } = useRetailQuery({
+    token,
+    params: { period },
+    paramsKey: `cockpit-${period}`,
+    fetcher: async (p, t) => {
       const [overviewResult, storeResult, equipmentResult, actionResult] = await Promise.all([
-        performanceApi.overview(period, token),
-        performanceApi.storePerformance(period, token),
-        performanceApi.equipmentPerformance(period, token),
-        performanceApi.actions({ period }, token),
+        performanceApi.overview(p.period, t),
+        performanceApi.storePerformance(p.period, t),
+        performanceApi.equipmentPerformance(p.period, t),
+        performanceApi.actions({ period: p.period }, t),
       ]);
-      setOverview(overviewResult);
-      setStores(storeResult.data || []);
-      setEquipment(equipmentResult.data || []);
-      setActions(actionResult.data || []);
-    } catch (error: any) {
-      notifyError(error?.message || "经营数据加载失败");
-    } finally { setLoading(false); }
-  }, [period, token]);
-
-  useEffect(() => { load(); }, [load]);
+      return {
+        overview: overviewResult,
+        stores: storeResult.data || [],
+        equipment: equipmentResult.data || [],
+        actions: actionResult.data || [],
+      };
+    },
+  });
+  const overview = cockpitState.kind === "ready" ? (cockpitState.data?.overview ?? null) : null;
+  const stores: FourWall[] = cockpitState.kind === "ready" ? (cockpitState.data?.stores ?? []) : [];
+  const equipment: EquipmentItem[] = cockpitState.kind === "ready" ? (cockpitState.data?.equipment ?? []) : [];
+  const actions: Action[] = cockpitState.kind === "ready" ? (cockpitState.data?.actions ?? []) : [];
+  useEffect(() => {
+    if (cockpitState.kind === "failed") notifyError(cockpitState.message || t("performance.load_failed", language));
+  }, [cockpitState, language]);
 
   const acknowledge = async (action: Action) => {
     if (!token) return;
-    try { await performanceApi.updateAction(action.id, { status: "acknowledged" }, token); message.success("已确认行动"); load(); }
+    try { await performanceApi.updateAction(action.id, { status: "acknowledged" }, token); message.success("已确认行动"); retry(); }
     catch (error: any) { notifyError(error?.message || "行动更新失败"); }
   };
 
@@ -66,7 +90,7 @@ export default function PerformancePage() {
       await performanceApi.bulkUpdateActions({ ids: selectedActionIds, status: "acknowledged" }, token);
       message.success(`已确认 ${selectedActionIds.length} 项行动`);
       setSelectedActionIds([]);
-      load();
+      retry();
     } catch (error: any) { notifyError(error?.message || "批量更新失败"); }
   };
 
@@ -124,9 +148,10 @@ export default function PerformancePage() {
   return <ProtectedRoute><AppLayout><div>
     <PageHeader
       title="经营驾驶舱"
-      subtitle={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
+      meta={`${period} · Working 经营事实 · 数据截至 ${dayjs().format("YYYY-MM-DD HH:mm")} · 不替代 Official 关账。`}
+      help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
     />
-    <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={period} onChange={event => setPeriod(event.target.value)} onPressEnter={load} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={load} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button></Space></Card>
+    <Card size="small" style={{ marginBottom: 16 }}><Space wrap><span>分析期间</span><Input value={periodDraft} onChange={event => setPeriodDraft(event.target.value)} onPressEnter={applyPeriod} status={periodDraftValid ? undefined : "error"} style={{ width: 120 }} placeholder="YYYY-MM" /><Button icon={<ReloadOutlined />} onClick={applyPeriod} disabled={!periodDraftValid} loading={loading}>刷新</Button><Button icon={<RobotOutlined />} onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(`请生成 ${period} 的经营日报，并列出最重要的偏差和行动`)}`}>让 AI 解释</Button></Space></Card>
     {overview && <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="门店事实" value={overview.store_fact_count} suffix={<Typography.Text type="secondary">/ {overview.store_fact_ready_count} 已对账</Typography.Text>} /></Card></Col>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="设备事实" value={overview.equipment_fact_count} /></Card></Col>

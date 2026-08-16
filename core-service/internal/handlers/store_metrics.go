@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
@@ -168,6 +169,20 @@ func (h *StoreMetricsHandler) RentToSales(c *gin.Context) {
 		Period: period, HealthyCeiling: healthy, WarningCeiling: warning, Stores: stores,
 	})
 	if err != nil {
+		// DIAG-001: policy thresholds missing is a data condition the user
+		// can fix (configure the ceilings), not a server fault — and the
+		// code must be a contract code, never a raw error string that the
+		// client would read as "request failed".
+		var missingPolicy bool
+		if strings.Contains(err.Error(), "必须通过政策配置提供") {
+			missingPolicy = true
+		}
+		if missingPolicy {
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeDataUnavailable,
+				"rent-to-sales thresholds are not configured: set healthy and warning ceilings in system settings",
+				gin.H{"reason": "policy_thresholds_missing", "resource": "rent-to-sales"})
+			return
+		}
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}

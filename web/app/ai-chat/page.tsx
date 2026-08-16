@@ -245,31 +245,26 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
   };
 
   return (
-    <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+    <div className="sty-4a94ec25">
       {genericArtifacts.map((artifact) => (
         <div
           key={artifact.id}
-          style={{
-            border: "1px solid var(--state-info-border)",
-            borderRadius: 8,
-            padding: 12,
-            background: "var(--state-info-bg)",
-          }}
+          className="sty-1e27758a"
         >
           <Space wrap>
-            <FileTextOutlined style={{ color: "var(--chart-blue)" }} />
+            <FileTextOutlined className="sty-edb10ce4" />
             <Text strong>{artifact.title || artifact.artifact_type}</Text>
             <StatusTag kind={statusKindFromAntColor(artifact.status === "confirmed" ? "green" : "blue")}>{artifact.status || "ready"}</StatusTag>
             {artifact.evidence_complete ? <StatusTag kind="success">证据完整</StatusTag> : <StatusTag kind="warning">需补证据</StatusTag>}
           </Space>
           {artifact.review_reasons && artifact.review_reasons.length > 0 && (
-            <div style={{ marginTop: 6, color: "var(--fg-tertiary)", fontSize: 12 }}>
+            <div className="sty-2c2c74e0">
               复核项：{artifact.review_reasons.join("、")}
             </div>
           )}
           {artifact.artifact_type === "retail_action_proposal" && artifact.data && (
-            <div style={{ marginTop: 8 }}>
-              <Text type="secondary" style={{ display: "block", marginBottom: 6 }}>{t("ai.approval.notice", language)}</Text>
+            <div className="sty-f82c4a7a">
+              <Text type="secondary" className="sty-2c2c74e0">{t("ai.approval.notice", language)}</Text>
               <ApprovalCard
                 proposal={{ ...artifact.data, envelope: artifact.data.envelope, next_url: artifact.data.next_url } as ApprovalProposalLike}
                 adopting={adoptingArtifact === artifact.id}
@@ -282,9 +277,9 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
               />
             </div>
           )}
-          <details style={{ marginTop: 8 }}>
-            <summary style={{ cursor: "pointer", color: "var(--chart-blue)" }}>查看结构化 Artifact</summary>
-            <pre style={{ marginTop: 8, maxHeight: 260, overflow: "auto", fontSize: 11 }}>
+          <details className="sty-4b5b9834">
+            <summary className="sty-b673d124">查看结构化 Artifact</summary>
+            <pre className="sty-77dd66d1">
               {JSON.stringify(artifact.data || {}, null, 2)}
             </pre>
           </details>
@@ -323,27 +318,19 @@ function CodeBlock({ code, language, i18nLang }: { code: string; language: strin
   };
 
   return (
-    <div style={{ position: "relative", marginTop: 8, marginBottom: 8 }}>
+    <div className="sty-721b1879">
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "4px 12px",
-          background: "var(--code-surface)",
-          borderRadius: "8px 8px 0 0",
-          borderBottom: "1px solid var(--border-strong)",
-        }}
+        className="sty-ea8440d7"
       >
-        <span style={{ fontSize: 11, color: "var(--fg-muted)", fontFamily: "monospace" }}>
+        <span className="sty-8d1e93e5">
           {language || "code"}
         </span>
         <Button
           type="text"
           
-          icon={copied ? <CheckOutlined style={{ color: "var(--state-success-text)" }} /> : <CopyOutlined />}
+          icon={copied ? <CheckOutlined className="sty-f46f799b" /> : <CopyOutlined />}
           onClick={handleCopy}
-          style={{ color: "var(--fg-muted)", fontSize: 12, height: 24, padding: "0 8px" }}
+          className="sty-5822ad35"
         >
           {copied ? t("ai.copied", i18nLang) : t("ai.copy", i18nLang)}
         </Button>
@@ -419,7 +406,7 @@ function MessageContent({
   return (
     <div>
       {thinking && (
-        <div style={{ marginBottom: 8 }}>
+        <div className="sty-5822ad35">
           <ThinkingTrace thinking={thinking} />
         </div>
       )}
@@ -430,12 +417,7 @@ function MessageContent({
         ) : (
           <Text
             key={idx}
-            style={{
-              whiteSpace: "pre-wrap",
-              lineHeight: 1.7,
-              fontSize: 14,
-              color: textColor,
-            }}
+            className="sty-6cefd92f"
           >
             {part.content}
           </Text>
@@ -455,8 +437,8 @@ function MessageContent({
       )}
 
       {sources && sources.length > 0 && (
-        <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
-          <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>
+        <div className="sty-c9f7b4b7">
+          <Text type="secondary" className="sty-090832a7">
             {t("ai.sources", i18nLang)}
           </Text>
           {sources.map((source, idx) => {
@@ -467,7 +449,7 @@ function MessageContent({
       )}
 
       {model && (
-        <Text type="secondary" style={{ fontSize: 11, marginTop: 8, display: "block" }}>
+        <Text type="secondary" className="sty-14aa9694">
           {t("ai.model_label", i18nLang)} {model}
         </Text>
       )}
@@ -546,36 +528,24 @@ function AgentTracePanel({
 
   return (
     <div
-      style={{
-        marginTop: 12,
-        border: "1px solid var(--border-default)",
-        borderRadius: 8,
-        overflow: "hidden",
-        background: "var(--fg-inverse)",
-      }}
+      className="sty-6eac3fc5"
     >
       <div
-        style={{
-          padding: "10px 12px",
-          borderBottom: "1px solid var(--bg-inset)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
+        className="sty-3974a389"
       >
-        <ToolOutlined style={{ color: "var(--fg-secondary)" }} />
+        <ToolOutlined className="sty-e3e86ee5" />
         <Text strong style={{ fontSize: 13 }}>
           {t("ai.agent_trace_title", language)}
         </Text>
       </div>
 
       {plan.length > 0 && (
-        <div style={{ padding: "10px 12px", borderBottom: toolCalls.length > 0 ? "1px solid var(--bg-inset)" : "none" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className="sty-e24ca831">
+          <div className="sty-57670c22">
             {plan.map((step) => {
               const meta = statusMeta(step.status, language);
               return (
-                <StatusTag key={step.id} kind={statusKindFromAntColor(meta.color as any)} icon={meta.icon} style={{ borderRadius: 4, marginInlineEnd: 0 }}>
+                <StatusTag key={step.id} kind={statusKindFromAntColor(meta.color as any)} icon={meta.icon} className="sty-51302e56">
                   {step.title}
                 </StatusTag>
               );
@@ -591,23 +561,20 @@ function AgentTracePanel({
             return (
               <div
                 key={`${call.tool}-${index}`}
-                style={{
-                  padding: "10px 12px",
-                  borderBottom: index === toolCalls.length - 1 ? "none" : "1px solid var(--bg-inset)",
-                }}
+                className="sty-1696a1bb"
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <Text strong style={{ fontSize: 12 }}>
+                <div className="sty-32c4a785">
+                  <Text strong className="sty-f1e765ee">
                     {call.skill}
                   </Text>
-                  <StatusTag kind={statusKindFromAntColor(meta.color as any)} style={{ borderRadius: 4, fontSize: 11 }}>
+                  <StatusTag kind={statusKindFromAntColor(meta.color as any)} className="sty-6319d0fa">
                     {meta.label}
                   </StatusTag>
-                  <Text type="secondary" style={{ fontSize: 11 }}>
+                  <Text type="secondary" className="sty-1f609006">
                     {call.tool}
                   </Text>
                 </div>
-                <Text style={{ display: "block", fontSize: 12, color: "var(--fg-tertiary)", marginTop: 4 }}>
+                <Text className="sty-14aa9694">
                   {call.output_summary || call.input_summary}
                 </Text>
               </div>
@@ -641,25 +608,13 @@ function AgentReviewPanel({
 
   return (
     <div
-      style={{
-        marginTop: 12,
-        border: "1px solid var(--border-default)",
-        borderRadius: 8,
-        overflow: "hidden",
-        background: "var(--fg-inverse)",
-      }}
+      className="sty-6eac3fc5"
     >
       <div
-        style={{
-          padding: "10px 12px",
-          borderBottom: "1px solid var(--bg-inset)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
+        className="sty-e5092e30"
       >
-        <ExclamationCircleOutlined style={{ color: "var(--state-warning-text)" }} />
-        <Text strong style={{ fontSize: 13 }}>
+        <ExclamationCircleOutlined className="sty-e3e86ee5" />
+        <Text strong className="sty-51302e56">
           {t("ai.agent_review_title", language)}
         </Text>
       </div>
@@ -670,30 +625,26 @@ function AgentReviewPanel({
           return (
             <div
               key={prompt.id || index}
-              style={{
-                padding: "10px 12px",
-                borderBottom: index === prompts.length - 1 ? "none" : "1px solid var(--bg-inset)",
-                background: meta.background,
-              }}
+              className="sty-1696a1bb"
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <Text strong style={{ fontSize: 12, color: meta.color }}>
                   {prompt.title}
                 </Text>
-                <StatusTag style={{ borderRadius: 4, color: meta.color, borderColor: meta.border, background: "var(--fg-inverse)", fontSize: 11 }}>
+                <StatusTag className="sty-1f609006">
                   {prompt.severity === "critical" ? t("ai.agent_severity_critical", language) : prompt.severity === "warning" ? t("ai.agent_severity_warning", language) : t("ai.agent_severity_info", language)}
                 </StatusTag>
               </div>
-              <Text style={{ display: "block", fontSize: 12, color: "var(--fg-tertiary)", marginTop: 4 }}>
+              <Text className="sty-d9bf0a72">
                 {prompt.description}
               </Text>
-              <Text style={{ display: "block", fontSize: 12, color: "var(--fg-secondary)", marginTop: 4 }}>
+              <Text className="sty-8d0db302">
                 {prompt.action}
               </Text>
               {prompt.contract_numbers && prompt.contract_numbers.length > 0 && (
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                <div className="sty-c60b95f4">
                   {prompt.contract_numbers.map((contractNumber) => (
-                    <StatusTag key={contractNumber} style={{ borderRadius: 4, marginInlineEnd: 0, fontSize: 11 }}>
+                    <StatusTag key={contractNumber} className="sty-14aa9694">
                       {contractNumber}
                     </StatusTag>
                   ))}
@@ -721,25 +672,13 @@ function ReviewActionHistoryPanel({
 
   return (
     <div
-      style={{
-        marginTop: 12,
-        border: "1px solid var(--border-default)",
-        borderRadius: 8,
-        overflow: "hidden",
-        background: "var(--fg-inverse)",
-      }}
+      className="sty-6eac3fc5"
     >
       <div
-        style={{
-          padding: "10px 12px",
-          borderBottom: "1px solid var(--bg-inset)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
+        className="sty-6af63e1e"
       >
-        <ClockCircleOutlined style={{ color: "var(--fg-tertiary)" }} />
-        <Text strong style={{ fontSize: 13 }}>
+        <ClockCircleOutlined className="sty-e3e86ee5" />
+        <Text strong className="sty-51302e56">
           {t("ai.review_action_history", language)}
         </Text>
       </div>
@@ -748,25 +687,17 @@ function ReviewActionHistoryPanel({
         {actions.map((action, index) => (
           <div
             key={action.id}
-            style={{
-              padding: "10px 12px",
-              borderBottom: index === actions.length - 1 ? "none" : "1px solid var(--bg-inset)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
+            className="sty-1696a1bb"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <StatusTag style={{ borderRadius: 4, marginInlineEnd: 0 }}>
+            <div className="sty-57670c22">
+              <StatusTag className="sty-32c4a785">
                 {reviewActionLabel(action.actionType, language)}
               </StatusTag>
-              <Text type="secondary" style={{ fontSize: 12 }}>
+              <Text type="secondary" className="sty-53077cb2">
                 {formatTime(action.actedAt)}
               </Text>
               {action.comment && (
-                <Text style={{ fontSize: 12, color: "var(--fg-tertiary)" }}>
+                <Text className="sty-ea458b5c">
                   {action.comment}
                 </Text>
               )}
@@ -777,7 +708,7 @@ function ReviewActionHistoryPanel({
               size="small"
               icon={<MessageOutlined />}
               onClick={() => onContinue(action)}
-              style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
+              className="sty-8b7f5990"
             >
               {t("ai.continue_from_action", language)}
             </Button>
@@ -807,27 +738,12 @@ function SessionSidebar({
 
   return (
     <div
-      className="ai-chat-session-sidebar"
-      style={{
-        width: 260,
-        borderRight: "1px solid var(--border-default)",
-        background: "var(--bg-surface)",
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-      }}
-    >
+     className="ai-chat-session-sidebar sty-8b7f5990 sty-70ad7596">
       {/* Header */}
       <div
-        style={{
-          padding: "16px 12px",
-          borderBottom: "1px solid var(--border-default)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
+        className="sty-bd560a9e"
       >
-        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-primary)" }}>
+        <span className="sty-73be230f">
           {t("nav.ai_chat", language)}
         </span>
          <Tooltip title={t("ai.new_session_btn", language)}>
@@ -835,18 +751,18 @@ function SessionSidebar({
             type="text"
             icon={<PlusOutlined />}
             onClick={onNew}
-            style={{ color: "var(--fg-primary)" }}
+            className="sty-1abe0e2d"
           />
         </Tooltip>
       </div>
 
       {/* Session List */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
+      <div className="sty-083a8ea2">
         {sessions.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={t("ai.no_sessions", language)}
-            style={{ marginTop: 40 }}
+            className="sty-51a6ccfa"
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -897,13 +813,9 @@ function SessionSidebar({
                   }}
                 >
                   <MessageOutlined
-                    style={{
-                      fontSize: 14,
-                      flexShrink: 0,
-                      color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-muted)",
-                    }}
+                    className="sty-4a80e398"
                   />
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="sty-d246bf5e">
                     <div
                       style={{
                         fontSize: 13,
@@ -917,14 +829,7 @@ function SessionSidebar({
                       {session.title}
                     </div>
                     <div
-                      style={{
-                        fontSize: 11,
-                        color: activeSessionId === session.id ? "rgba(255,255,255,0.6)" : "var(--fg-muted)",
-                        marginTop: 2,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
+                      className="sty-10d6972d"
                     >
                       <ClockCircleOutlined style={{ fontSize: 10 }} />
                       {formatTime(session.updatedAt)}
@@ -956,16 +861,7 @@ function SessionSidebar({
                     aria-label={`删除会话 ${session.title}`}
                     icon={<MoreOutlined />}
                     onClick={(e) => e.stopPropagation()}
-                    style={{
-                      opacity: 0,
-                      transition: "opacity 0.15s",
-                      color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-muted)",
-                      padding: 0,
-                      width: 24,
-                      height: 24,
-                      flexShrink: 0,
-                    }}
-                    className={AI_CHAT_SESSION_MORE_CLASS}
+                    className={`${AI_CHAT_SESSION_MORE_CLASS} sty-f1151548`}
                   />
                 </Dropdown>
               </motion.div>
@@ -1042,19 +938,19 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
     c.confidence < 0.8 || (c.scope_confidence ?? 1) < 0.8 || c.missing_fields.length > 0;
 
   return (
-    <div style={{ marginTop: 12, border: "1px solid var(--border-default)", borderRadius: 12, overflow: "hidden" }}>
+    <div className="sty-586c0725">
       {/* Header */}
-      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderBottom: "1px solid var(--border-default)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="sty-c3336829">
+        <div className="sty-b032ab3e">
           <div>
-            <Text strong style={{ fontSize: 14 }}>
+            <Text strong className="sty-df813d4e">
               {t("ai.draft_panel_title", language)}
             </Text>
-            <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+            <Text type="secondary" className="sty-94051f6b">
               {t("ai.draft_panel_subtitle", language, { total: String(summary.total_count), confidence: String((summary.overall_confidence * 100).toFixed(0)) })}
             </Text>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="sty-af8ee755">
             <Button size="small" onClick={toggleSelectAll}>
               {selectedIndices.size === editedContracts.length ? t("ai.deselect_all", language) : t("ai.select_all", language)}
             </Button>
@@ -1064,16 +960,16 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
           </div>
         </div>
         {summary.requires_human_confirmation && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--state-warning-bg)", borderRadius: 6, border: "1px solid var(--state-warning-border)" }}>
-            <Text style={{ fontSize: 12, color: "var(--state-warning-text)" }}>
+          <div className="sty-77f17887">
+            <Text className="sty-2c2c74e0">
               ⚠️ {t("ai.draft_warning", language)}
             </Text>
           </div>
         )}
         {summary.warnings.length > 0 && (
-          <div style={{ marginTop: 8 }}>
+          <div className="sty-5ebea2d1">
             {summary.warnings.slice(0, 3).map((w, i) => (
-              <Text key={i} style={{ fontSize: 11, color: "var(--state-error-text)", display: "block" }}>
+              <Text key={i} className="sty-f6e0794d">
                 • {w}
               </Text>
             ))}
@@ -1086,208 +982,203 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
         {editedContracts.map((contract, index) => (
           <div
             key={index}
-            style={{
-              padding: "12px 16px",
-              borderBottom: "1px solid var(--bg-inset)",
-              background: selectedIndices.has(index) ? "var(--state-success-bg)" : "var(--fg-inverse)",
-              opacity: selectedIndices.has(index) ? 1 : 0.6,
-            }}
+            className="sty-b76fb200"
           >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div className="sty-7fb4a862">
               <input
                 type="checkbox"
                 checked={selectedIndices.has(index)}
                 onChange={() => toggleSelect(index)}
-                style={{ marginTop: 4 }}
+                className="sty-83725d2c"
               />
-              <div style={{ flex: 1 }}>
+              <div className="sty-90cfbbc8">
                 {/* Row 1: Basic info */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ flex: "1 1 200px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_contract_number", language)}</Text>
+                <div className="sty-11a714e0">
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_contract_number", language)}</Text>
                     <Input
                       size="small"
                       value={contract.contract_number}
                       onChange={(e) => updateContract(index, "contract_number", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-11a714e0"
                     />
                   </div>
-                  <div style={{ flex: "1 1 200px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_contract_name", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_contract_name", language)}</Text>
                     <Input
                       size="small"
                       value={contract.contract_name}
                       onChange={(e) => updateContract(index, "contract_name", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-0b1fa162"
                     />
                   </div>
-                  <div style={{ flex: "1 1 150px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_currency", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_currency", language)}</Text>
                     <Input
                       size="small"
                       value={contract.currency}
                       onChange={(e) => updateContract(index, "currency", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-90cfbbc8"
                       status={!contract.currency ? "error" : ""}
                     />
                   </div>
                 </div>
 
                 {/* Row 2: Parties */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ flex: "1 1 200px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_lessee", language)}</Text>
+                <div className="sty-11a714e0">
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_lessee", language)}</Text>
                     <Input
                       size="small"
                       value={contract.lessee}
                       onChange={(e) => updateContract(index, "lessee", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-11a714e0"
                     />
                   </div>
-                  <div style={{ flex: "1 1 200px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_lessor", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_lessor", language)}</Text>
                     <Input
                       size="small"
                       value={contract.lessor}
                       onChange={(e) => updateContract(index, "lessor", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-0b1fa162"
                     />
                   </div>
-                  <div style={{ flex: "1 1 150px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_store", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_store", language)}</Text>
                     <Input
                       size="small"
                       value={contract.store_name}
                       onChange={(e) => updateContract(index, "store_name", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-90cfbbc8"
                     />
                   </div>
                 </div>
 
                 {/* Row 3: Dates */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ flex: "1 1 150px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_commencement_date", language)}</Text>
+                <div className="sty-0b1fa162">
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_commencement_date", language)}</Text>
                     <Input
                       size="small"
                       value={contract.commencement_date}
                       onChange={(e) => updateContract(index, "commencement_date", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-0b1fa162"
                     />
                   </div>
-                  <div style={{ flex: "1 1 150px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_lease_start", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_lease_start", language)}</Text>
                     <Input
                       size="small"
                       value={contract.lease_start_date}
                       onChange={(e) => updateContract(index, "lease_start_date", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-0b1fa162"
                     />
                   </div>
-                  <div style={{ flex: "1 1 150px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_lease_end", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_lease_end", language)}</Text>
                     <Input
                       size="small"
                       value={contract.lease_end_date}
                       onChange={(e) => updateContract(index, "lease_end_date", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-90cfbbc8"
                     />
                   </div>
                 </div>
 
                 {/* Row 4: Financial */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_fixed_rent", language)}</Text>
+                <div className="sty-ed8b9551">
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_fixed_rent", language)}</Text>
                     <Input
                       size="small"
                       value={contract.fixed_rent_amount}
                       onChange={(e) => updateContract(index, "fixed_rent_amount", parseFloat(e.target.value) || 0)}
-                      style={{ fontSize: 13 }}
+                      className="sty-ed8b9551"
                     />
                   </div>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_payment_timing", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_payment_timing", language)}</Text>
                     <Input
                       size="small"
                       value={contract.payment_timing}
                       onChange={(e) => updateContract(index, "payment_timing", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-ed8b9551"
                     />
                   </div>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_discount_rate", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">{t("ai.draft_discount_rate", language)}</Text>
                     <Input
                       size="small"
                       value={contract.discount_rate}
                       onChange={(e) => updateContract(index, "discount_rate", parseFloat(e.target.value) || 0)}
-                      style={{ fontSize: 13 }}
+                      className="sty-90cfbbc8"
                       status={!contract.discount_rate ? "warning" : ""}
                     />
                   </div>
                 </div>
 
                 {/* Row 5: Scope gate */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>资产类型</Text>
+                <div className="sty-82cf7cd4">
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">资产类型</Text>
                     <Input
                       size="small"
                       value={contract.asset_type || ""}
                       onChange={(e) => updateContract(index, "asset_type", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-bbe582ff"
                     />
                   </div>
-                  <div style={{ flex: "1 1 160px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>租赁范围</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">租赁范围</Text>
                     <Input
                       size="small"
                       value={contract.lease_scope || contract.suggested_scope || ""}
                       onChange={(e) => updateContract(index, "lease_scope", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-82cf7cd4"
                       status={!contract.lease_scope && !contract.suggested_scope ? "warning" : ""}
                     />
                   </div>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>范围置信度</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">范围置信度</Text>
                     <Input
                       size="small"
                       value={contract.scope_confidence ?? ""}
                       onChange={(e) => updateContract(index, "scope_confidence", parseFloat(e.target.value) || 0)}
-                      style={{ fontSize: 13 }}
+                      className="sty-4cb899b8"
                       status={(contract.scope_confidence ?? 1) < 0.8 ? "warning" : ""}
                     />
                   </div>
-                  <div style={{ flex: "1 1 180px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>豁免/排除原因</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-e3e86ee5">豁免/排除原因</Text>
                     <Input
                       size="small"
                       value={contract.exemption_reason || ""}
                       onChange={(e) => updateContract(index, "exemption_reason", e.target.value)}
-                      style={{ fontSize: 13 }}
+                      className="sty-1696a1bb"
                     />
                   </div>
                 </div>
 
                 {/* Warnings & Confidence */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div className="sty-6319d0fa">
                   {hasLowConfidence(contract) && (
-                    <StatusTag kind="warning" style={{ fontSize: 11 }}>
+                    <StatusTag kind="warning" className="sty-6319d0fa">
                       {t("ai.draft_confidence", language, { value: String((contract.confidence * 100).toFixed(0)) })}
                     </StatusTag>
                   )}
                   {contract.lease_scope && (
-                    <StatusTag kind={statusKindFromAntColor(contract.lease_scope === "in_scope" ? "blue" : "orange")} style={{ fontSize: 11 }}>
+                    <StatusTag kind={statusKindFromAntColor(contract.lease_scope === "in_scope" ? "blue" : "orange")} className="sty-6319d0fa">
                       Scope: {contract.lease_scope}
                     </StatusTag>
                   )}
                   {contract.missing_fields.length > 0 && (
-                    <StatusTag kind="error" style={{ fontSize: 11 }}>
+                    <StatusTag kind="error" className="sty-afdb217d">
                       {t("ai.draft_missing_fields", language, { fields: contract.missing_fields.join(", ") })}
                     </StatusTag>
                   )}
                   {contract.warnings.slice(0, 2).map((w, i) => (
-                    <Text key={i} style={{ fontSize: 11, color: "var(--state-error-text)" }}>
+                    <Text key={i} className="sty-0ec5707c">
                       {w}
                     </Text>
                   ))}
@@ -1299,8 +1190,8 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderTop: "1px solid var(--border-default)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+      <div className="sty-32c4a785">
+        <Text type="secondary" className="sty-9b921b3e">
           {t("ai.draft_selected_count", language, { selected: String(selectedIndices.size), total: String(editedContracts.length) })}
         </Text>
         <Button
@@ -1308,7 +1199,7 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
           loading={creating}
           disabled={selectedIndices.size === 0}
           onClick={handleConfirm}
-          style={{ background: "var(--fg-primary)", borderColor: "var(--fg-primary)" }}
+          className="sty-f1151548"
         >
           {t("ai.draft_confirm_import", language)}
         </Button>
@@ -1393,18 +1284,18 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
   };
 
   return (
-    <div style={{ marginTop: 12, border: "1px solid var(--border-default)", borderRadius: 12, overflow: "hidden" }}>
-      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderBottom: "1px solid var(--border-default)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+    <div className="sty-586c0725">
+      <div className="sty-b586e929">
+        <div className="sty-b032ab3e">
           <div>
-            <Text strong style={{ fontSize: 14 }}>
+            <Text strong className="sty-df813d4e">
               {t("ai.schedule_panel_title", language)}
             </Text>
-            <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+            <Text type="secondary" className="sty-94051f6b">
               {t("ai.draft_panel_subtitle", language, { total: String(summary.total_count), confidence: String((summary.overall_confidence * 100).toFixed(0)) })}
             </Text>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="sty-52c0468d">
             <Button size="small" onClick={toggleSelectAll}>
               {selectedIndices.size === editedSchedules.length ? t("ai.deselect_all", language) : t("ai.select_all", language)}
             </Button>
@@ -1414,15 +1305,15 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
           </div>
         </div>
         {!summary.can_import && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--state-error-bg)", borderRadius: 6, border: "1px solid var(--state-error-border)" }}>
-            <Text style={{ fontSize: 12, color: "var(--state-error-text)" }}>
+          <div className="sty-2a40f57c">
+            <Text className="sty-af8ee755">
               {t("ai.schedule_bind_contract_first", language)}
             </Text>
           </div>
         )}
         {(summary.requires_human_confirmation || summary.warnings.length > 0) && (
-          <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--state-warning-bg)", borderRadius: 6, border: "1px solid var(--state-warning-border)" }}>
-            <Text style={{ fontSize: 12, color: "var(--state-warning-text)" }}>
+          <div className="sty-77f17887">
+            <Text className="sty-5a47b5f2">
               {t("ai.schedule_review_warning", language)}
             </Text>
           </div>
@@ -1433,67 +1324,62 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
         {editedSchedules.map((schedule, index) => (
           <div
             key={index}
-            style={{
-              padding: "12px 16px",
-              borderBottom: "1px solid var(--bg-inset)",
-              background: selectedIndices.has(index) ? "var(--state-success-bg)" : "var(--fg-inverse)",
-              opacity: selectedIndices.has(index) ? 1 : 0.6,
-            }}
+            className="sty-b76fb200"
           >
-            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <div className="sty-7fb4a862">
               <input
                 type="checkbox"
                 checked={selectedIndices.has(index)}
                 onChange={() => toggleSelect(index)}
-                style={{ marginTop: 4 }}
+                className="sty-83725d2c"
               />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_period_start", language)}</Text>
+              <div className="sty-90cfbbc8">
+                <div className="sty-ed8b9551">
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-ed8b9551">{t("ai.schedule_period_start", language)}</Text>
                     <Input size="small" value={schedule.period_start} onChange={(e) => updateSchedule(index, "period_start", e.target.value)} />
                   </div>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_period_end", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-ed8b9551">{t("ai.schedule_period_end", language)}</Text>
                     <Input size="small" value={schedule.period_end} onChange={(e) => updateSchedule(index, "period_end", e.target.value)} />
                   </div>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_due_date", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-d9e0af7d">{t("ai.schedule_due_date", language)}</Text>
                     <Input size="small" value={schedule.due_date} onChange={(e) => updateSchedule(index, "due_date", e.target.value)} />
                   </div>
-                  <div style={{ flex: "1 1 110px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_amount", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-90cfbbc8">{t("ai.schedule_amount", language)}</Text>
                     <Input size="small" value={schedule.amount} onChange={(e) => updateSchedule(index, "amount", parseFloat(e.target.value) || 0)} status={schedule.amount <= 0 ? "error" : ""} />
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-                  <div style={{ flex: "1 1 110px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_currency", language)}</Text>
+                <div className="sty-d9e0af7d">
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-ed8b9551">{t("ai.draft_currency", language)}</Text>
                     <Input size="small" value={schedule.currency || ""} onChange={(e) => updateSchedule(index, "currency", e.target.value)} status={!schedule.currency ? "warning" : ""} />
                   </div>
-                  <div style={{ flex: "1 1 120px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.draft_payment_timing", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-82cf7cd4">{t("ai.draft_payment_timing", language)}</Text>
                     <Input size="small" value={schedule.payment_timing} onChange={(e) => updateSchedule(index, "payment_timing", e.target.value)} />
                   </div>
-                  <div style={{ flex: "1 1 140px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_amount_type", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-5904eb2a">{t("ai.schedule_amount_type", language)}</Text>
                     <Input size="small" value={schedule.amount_type} onChange={(e) => updateSchedule(index, "amount_type", e.target.value)} />
                   </div>
-                  <div style={{ flex: "1 1 130px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_is_fixed", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-0b1fa162">{t("ai.schedule_is_fixed", language)}</Text>
                     <Input size="small" value={schedule.is_fixed ? "true" : "false"} onChange={(e) => updateSchedule(index, "is_fixed", e.target.value === "true")} />
                   </div>
-                  <div style={{ flex: "1 1 150px" }}>
-                    <Text type="secondary" style={{ fontSize: 11 }}>{t("ai.schedule_is_lease_component", language)}</Text>
+                  <div className="sty-6319d0fa">
+                    <Text type="secondary" className="sty-1696a1bb">{t("ai.schedule_is_lease_component", language)}</Text>
                     <Input size="small" value={schedule.is_lease_component ? "true" : "false"} onChange={(e) => updateSchedule(index, "is_lease_component", e.target.value === "true")} />
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <StatusTag kind={statusKindFromAntColor(schedule.confidence < 0.8 ? "warning" : "green")} style={{ fontSize: 11 }}>
+                <div className="sty-6319d0fa">
+                  <StatusTag kind={statusKindFromAntColor(schedule.confidence < 0.8 ? "warning" : "green")} className="sty-6319d0fa">
                     {t("ai.draft_confidence", language, { value: String((schedule.confidence * 100).toFixed(0)) })}
                   </StatusTag>
-                  {!schedule.is_fixed && <StatusTag kind="warning" style={{ fontSize: 11 }}>{t("ai.schedule_variable_rent", language)}</StatusTag>}
-                  {!schedule.is_lease_component && <StatusTag kind="warning" style={{ fontSize: 11 }}>{t("ai.schedule_non_lease_component", language)}</StatusTag>}
+                  {!schedule.is_fixed && <StatusTag kind="warning" className="sty-6319d0fa">{t("ai.schedule_variable_rent", language)}</StatusTag>}
+                  {!schedule.is_lease_component && <StatusTag kind="warning" className="sty-0ec5707c">{t("ai.schedule_non_lease_component", language)}</StatusTag>}
                 </div>
               </div>
             </div>
@@ -1501,8 +1387,8 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
         ))}
       </div>
 
-      <div style={{ padding: "12px 16px", background: "var(--bg-surface)", borderTop: "1px solid var(--border-default)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
+      <div className="sty-32c4a785">
+        <Text type="secondary" className="sty-9b921b3e">
           {t("ai.draft_selected_count", language, { selected: String(selectedIndices.size), total: String(editedSchedules.length) })}
         </Text>
         <Button
@@ -1510,7 +1396,7 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
           loading={creating}
           disabled={selectedIndices.size === 0 || !summary.can_import}
           onClick={handleConfirm}
-          style={{ background: "var(--fg-primary)", borderColor: "var(--fg-primary)" }}
+          className="sty-e2ea03b3"
         >
           {t("ai.schedule_confirm_import", language)}
         </Button>
@@ -1653,10 +1539,10 @@ function AIChatPageContent() {
   };
 
   const getFileIcon = (type: string) => {
-    if (type.includes("pdf")) return <FilePdfOutlined style={{ color: "var(--state-error-text)" }} />;
+    if (type.includes("pdf")) return <FilePdfOutlined className="sty-8d1e93e5" />;
     if (type.includes("excel") || type.includes("sheet"))
-      return <FileExcelOutlined style={{ color: "var(--state-success-text)" }} />;
-    return <FileImageOutlined style={{ color: "var(--fg-tertiary)" }} />;
+      return <FileExcelOutlined className="sty-6af63e1e" />;
+    return <FileImageOutlined className="sty-f0618391" />;
   };
 
   const getSkillIcon = (icon: string) => {
@@ -1913,14 +1799,7 @@ function AIChatPageContent() {
     <ProtectedRoute>
       <AppLayout>
         <div
-          className="ai-chat-shell"
-          style={{
-            display: "flex",
-            height: "calc(100vh - 64px)",
-            margin: "-32px -48px",
-            overflow: "hidden",
-          }}
-        >
+         className="ai-chat-shell sty-f0618391 sty-ad852cb6">
           {/* Session Sidebar */}
           {responsiveState.showDesktopSidebar && (
             <SessionSidebar
@@ -1933,21 +1812,12 @@ function AIChatPageContent() {
           )}
 
           {/* Chat Area */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div className="sty-cf94ad70">
             {/* Top Bar */}
             <div
-              style={{
-                height: 56,
-                borderBottom: "1px solid var(--border-default)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0 20px",
-                background: "var(--fg-inverse)",
-                flexShrink: 0,
-              }}
+              className="sty-99f2d520"
             >
-              <div className="ai-chat-header-left" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+              <div className="ai-chat-header-left sty-99f2d520 sty-73be230f" >
                 {responsiveState.showMobileSessionTrigger && (
                   <Button
                     ref={sessionDrawerTriggerRef}
@@ -1955,16 +1825,16 @@ function AIChatPageContent() {
                     aria-label="打开会话"
                     icon={<MessageOutlined />}
                     onClick={() => transitionSessionDrawer("open")}
-                    style={{ color: "var(--fg-primary)" }}
+                    className="sty-d35324fb"
                   />
                 )}
-                <RobotOutlined style={{ fontSize: 18, color: "var(--fg-primary)", flexShrink: 0 }} />
-                <span className="ai-chat-header-title" style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <RobotOutlined className="sty-94360367" />
+                <span className="ai-chat-header-title sty-94360367 sty-9b426ce2" >
                   {activeSession?.title || t("ai.assistant_name", language)}
                 </span>
               </div>
 
-              <div className="ai-chat-header-actions" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+              <div className="ai-chat-header-actions sty-9b426ce2 sty-b8bb6f7b" >
                 {/* Model Selector */}
                 <Dropdown
                   menu={{
@@ -1977,13 +1847,12 @@ function AIChatPageContent() {
                 >
                   <Button
                     type="text"
-                    className="ai-chat-model-button"
+                    className="ai-chat-model-button sty-b8bb6f7b sty-d2b9dfbe"
                     aria-label={`选择模型，当前 ${MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}`}
-                    style={{ fontSize: 13, color: "var(--fg-tertiary)" }}
                   >
                     <span className="ai-chat-model-label">{MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}</span>
                     <span className="ai-chat-model-short" aria-hidden="true">AI</span>
-                    <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />
+                    <DownOutlined className="sty-73be230f" />
                   </Button>
                 </Dropdown>
 
@@ -1992,7 +1861,7 @@ function AIChatPageContent() {
                     type="text"
                     icon={<PlusOutlined />}
                     onClick={createNewSession}
-                    style={{ color: "var(--fg-primary)" }}
+                    className="sty-20b42614"
                   />
                 </Tooltip>
               </div>
@@ -2000,52 +1869,35 @@ function AIChatPageContent() {
 
             {/* Messages Area */}
             <div
-              className="ai-chat-messages"
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: "20px 20%",
-                background: "var(--fg-inverse)",
-              }}
-            >
+             className="ai-chat-messages sty-20b42614 sty-cdfdac9c">
               {/* Context strip */}
               {pageContext && (
                 <motion.div
                   initial={false}
                   animate={{ opacity: 1, y: 0 }}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border-default)",
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                  }}
+                  className="sty-3c01e428"
                 >
-                  <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>
+                  <Text type="secondary" className="sty-31eb049e">
                     {t("ai.context", language)}
                   </Text>
-                  <StatusTag style={{ borderRadius: 4 }}>
+                  <StatusTag className="sty-31eb049e">
                     {pageContext.title || pageContext.page}
                   </StatusTag>
                   {pageContext.contract_id && (
-                    <StatusTag style={{ borderRadius: 4 }}>
+                    <StatusTag className="sty-31eb049e">
                       {pageContext.contract_id}
                     </StatusTag>
                   )}
                   {pageContext.period && (
-                    <StatusTag style={{ borderRadius: 4 }}>
+                    <StatusTag className="sty-31eb049e">
                       {pageContext.period}
                     </StatusTag>
                   )}
                   {pageContext.filters?.classification && <StatusTag kind={pageContext.filters.classification === "simulated" ? "warning" : "processing"}>{pageContext.filters.classification === "simulated" ? "模拟 · Working" : "正式 · Working"}</StatusTag>}
-                  {pageContext.filters?.dataset_version && <StatusTag style={{ borderRadius: 4 }}>dataset: {pageContext.filters.dataset_version}</StatusTag>}
-                  {pageContext.filters?.source_system && <StatusTag style={{ borderRadius: 4 }}>source: {pageContext.filters.source_system}</StatusTag>}
-                  {pageContext.filters?.as_of && <StatusTag style={{ borderRadius: 4 }}>as of: {pageContext.filters.as_of}</StatusTag>}
-                  {pageContext.filters?.window_days && <StatusTag style={{ borderRadius: 4 }}>window: {pageContext.filters.window_days}天</StatusTag>}
+                  {pageContext.filters?.dataset_version && <StatusTag className="sty-31eb049e">dataset: {pageContext.filters.dataset_version}</StatusTag>}
+                  {pageContext.filters?.source_system && <StatusTag className="sty-31eb049e">source: {pageContext.filters.source_system}</StatusTag>}
+                  {pageContext.filters?.as_of && <StatusTag className="sty-31eb049e">as of: {pageContext.filters.as_of}</StatusTag>}
+                  {pageContext.filters?.window_days && <StatusTag className="sty-c53970c1">window: {pageContext.filters.window_days}天</StatusTag>}
                 </motion.div>
               )}
 
@@ -2054,15 +1906,9 @@ function AIChatPageContent() {
                 <motion.div
                   initial={false}
                   animate={{ opacity: 1 }}
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginBottom: 12,
-                    alignItems: "center",
-                  }}
+                  className="sty-c9f7b4b7"
                 >
-                  <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>
+                  <Text type="secondary" className="sty-6e7d2f45">
                     {t("ai.agent_skills", language)}
                   </Text>
                   {agentSkillStarters.map((skill) => (
@@ -2075,12 +1921,7 @@ function AIChatPageContent() {
                         setSelectedSkill(skill.skillId ? { id: skill.skillId, version: skill.skillVersion || "v1" } : undefined);
                       }}
                       disabled={loading}
-                      style={{
-                        fontSize: 12,
-                        borderRadius: 6,
-                        borderColor: "var(--border-strong)",
-                        color: "var(--fg-secondary)",
-                      }}
+                      className="sty-93477e31"
                     >
                       {t(skill.labelKey, language)}
                     </Button>
@@ -2093,15 +1934,9 @@ function AIChatPageContent() {
                 <motion.div
                   initial={false}
                   animate={{ opacity: 1 }}
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginBottom: 20,
-                    alignItems: "center",
-                  }}
+                  className="sty-c9f7b4b7"
                 >
-                  <Text type="secondary" style={{ fontSize: 12, marginRight: 4 }}>
+                  <Text type="secondary" className="sty-f9cd36d3">
                     {t("ai.quick_questions", language)}
                   </Text>
                   {chips.map((chipKey, idx) => (
@@ -2155,13 +1990,7 @@ function AIChatPageContent() {
                       />
 
                       <div
-                        style={{
-                          padding: "12px 16px",
-                          borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                          backgroundColor: msg.role === "user" ? "var(--fg-primary)" : "var(--bg-surface)",
-                          border: msg.role === "user" ? "none" : "1px solid var(--border-default)",
-                          color: msg.role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)",
-                        }}
+                        className="sty-10c79dbd"
                       >
                         {msg.role === "assistant" && typingMessageId === msg.id ? (
                           <TypewriterMessage
@@ -2475,10 +2304,7 @@ function AIChatPageContent() {
                                   size="small"
                                   icon={<ClockCircleOutlined />}
                                   onClick={() => handleOpenTrace(msg.runId!)}
-                                  style={{
-                                    paddingInline: 8,
-                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
-                                  }}
+                                  className="sty-ff4a32d8"
                                 >
                                   {t("ai.view_trace", language)}
                                 </Button>
@@ -2491,7 +2317,7 @@ function AIChatPageContent() {
                                       icon={<CloseCircleOutlined />}
                                       disabled={!loading}
                                       onClick={() => handleRunControl(msg.runId!, "cancel")}
-                                      style={{ paddingInline: 8 }}
+                                      className="sty-ea458b5c"
                                     >
                                       {t("ai.run_cancel", language)}
                                     </Button>
@@ -2501,7 +2327,7 @@ function AIChatPageContent() {
                                       icon={<MessageOutlined />}
                                       disabled={loading === false}
                                       onClick={() => handleRunControl(msg.runId!, "steer")}
-                                      style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
+                                      className="sty-ea458b5c"
                                     >
                                       {t("ai.run_steer", language)}
                                     </Button>
@@ -2511,7 +2337,7 @@ function AIChatPageContent() {
                                       icon={<MessageOutlined />}
                                       disabled={loading}
                                       onClick={() => handleRunControl(msg.runId!, "follow-up")}
-                                      style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
+                                      className="sty-ea458b5c"
                                     >
                                       {t("ai.run_follow_up", language)}
                                     </Button>
@@ -2542,10 +2368,7 @@ function AIChatPageContent() {
                                     id: msg.artifacts?.[0]?.id || msg.contractDraftArtifactId || msg.paymentScheduleArtifactId!,
                                   })
                                 }
-                                style={{
-                                  paddingInline: 8,
-                                  color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
-                                }}
+                                className="sty-e6452550"
                               >
                                 {t("ai.continue_from_artifact", language)}
                               </Button>
@@ -2562,23 +2385,18 @@ function AIChatPageContent() {
                 <motion.div
                   initial={false}
                   animate={{ opacity: 1 }}
-                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}
+                  className="sty-ab5dc9e7"
                 >
                   <Avatar
                     icon={<RobotOutlined />}
-                    style={{ background: "var(--fg-primary)", flexShrink: 0 }}
+                    className="sty-e495fd05"
                     size={32}
                   />
                   <div
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: "16px 16px 16px 4px",
-                      background: "var(--bg-surface)",
-                      border: "1px solid var(--border-default)",
-                    }}
+                    className="sty-b561115b"
                   >
                     <Spin />
-                    <span style={{ marginLeft: 8, fontSize: 13, color: "var(--fg-muted)" }}>
+                    <span className="sty-879ad78b">
                       {t("ai.thinking", language)}
                     </span>
                   </div>
@@ -2590,54 +2408,26 @@ function AIChatPageContent() {
 
             {/* Input Area */}
             <div
-              className="ai-chat-input"
-              style={{
-                padding: "16px 20%",
-                borderTop: "1px solid var(--border-default)",
-                background: "var(--fg-inverse)",
-                flexShrink: 0,
-              }}
-            >
+             className="ai-chat-input sty-879ad78b sty-6f1cfedd">
               {activePendingUpload && (
                 <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 8,
-                    padding: "6px 12px",
-                    background: "var(--bg-inset)",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    color: "var(--fg-tertiary)",
-                  }}
+                  className="sty-4ccd7199"
                 >
-                  <PaperClipOutlined style={{ fontSize: 14 }} />
-                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <PaperClipOutlined className="sty-b032ab3e" />
+                  <span className="sty-05d4bcf4">
                     {activePendingUpload.original_name}
                   </span>
                   <Button
                     type="text"
                     size="small"
-                    icon={<CloseCircleOutlined style={{ fontSize: 14, color: "var(--fg-muted)" }} />}
+                    icon={<CloseCircleOutlined className="sty-cf3aaed5" />}
                     onClick={() => activeSessionId && setPendingUpload(activeSessionId, null)}
-                    style={{ padding: 0, height: 22, width: 22 }}
+                    className="sty-cf56331d"
                   />
                 </div>
               )}
               <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-end",
-                  gap: 8,
-                  background: "var(--bg-surface)",
-                  borderRadius: 24,
-                  padding: "8px 16px",
-                  border: "1px solid var(--border-default)",
-                  transition: "border-color 0.15s",
-                }}
-                className="chat-input-wrapper"
-              >
+               className="sty-2b11dad0 chat-input-wrapper sty-cf56331d">
                 <Upload
                   customRequest={handleFileUpload}
                   showUploadList={false}
@@ -2666,9 +2456,9 @@ function AIChatPageContent() {
                   <Tooltip title={t("ai.upload_file_tooltip", language)}>
                     <Button
                       type="text"
-                      icon={<PaperClipOutlined style={{ fontSize: 18, color: "var(--fg-muted)" }} />}
+                      icon={<PaperClipOutlined className="sty-ac4110ca" />}
                       disabled={loading}
-                      style={{ height: 36, width: 36, padding: 0 }}
+                      className="sty-41c51a74"
                     />
                   </Tooltip>
                 </Upload>
@@ -2704,25 +2494,13 @@ function AIChatPageContent() {
                   onClick={() => handleSend()}
                   loading={loading}
                   disabled={loading || (!input.trim() && !activePendingUpload)}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    flexShrink: 0,
-                    background: input.trim() || activePendingUpload ? "var(--fg-primary)" : "var(--border-strong)",
-                    borderColor: input.trim() || activePendingUpload ? "var(--fg-primary)" : "var(--border-strong)",
-                  }}
+                  className="sty-d4712ed6"
                 />
               </div>
 
               <Text
                 type="secondary"
-                style={{
-                  fontSize: 11,
-                  textAlign: "center",
-                  display: "block",
-                  marginTop: 8,
-                  color: "var(--fg-muted)",
-                }}
+                className="sty-abba5ae3"
               >
                 {t("ai.disclaimer", language)}
               </Text>
@@ -2765,12 +2543,12 @@ function AIChatPageContent() {
           }}
         >
           {traceLoading ? (
-            <div style={{ padding: 32, textAlign: "center" }}>
+            <div className="sty-37c08d18">
               <Spin />
             </div>
           ) : traceData ? (
             <div>
-              <Space wrap style={{ marginBottom: 12 }}>
+              <Space wrap className="sty-2122cedf">
                 <StatusTag kind="processing">{String(traceData.run?.status || "unknown")}</StatusTag>
                 <StatusTag>{`events: ${Array.isArray(traceData.events) ? traceData.events.length : 0}`}</StatusTag>
                 <StatusTag>{`artifacts: ${Array.isArray(traceData.artifacts) ? traceData.artifacts.length : 0}`}</StatusTag>
@@ -2787,17 +2565,7 @@ function AIChatPageContent() {
                 )}
               </Space>
               <pre
-                style={{
-                  maxHeight: 480,
-                  overflow: "auto",
-                  padding: 12,
-                  margin: 0,
-                  background: "var(--fg-secondary)",
-                  color: "var(--border-default)",
-                  borderRadius: 6,
-                  fontSize: 11,
-                  lineHeight: 1.5,
-                }}
+                className="sty-50db4c92"
               >
                 {JSON.stringify(traceData, null, 2)}
               </pre>

@@ -1,16 +1,11 @@
 "use client";
 
-import { Alert, Button, Empty, Skeleton, Typography } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
-import ConfidenceBadge from "../components/ConfidenceBadge";
+import { Empty, Typography } from "antd";
 import DataTrustBar from "../components/DataTrustBar";
-import { SeverityDot, toSeverity } from "../components/SeverityDot";
-import SourceCitation from "../components/SourceCitation";
-import ThinkingTrace from "../components/ThinkingTrace";
-import ToolChip from "../components/ToolChip";
+import { StateBlock } from "../components/StateBlock";
 import { t, type Language } from "../lib/i18n";
-import { formatSignalValue, signalLabel } from "../operating-pulse/logic";
-import { briefAttentionCards, planToThinking, type HomeBriefState } from "./logic";
+import type { DataState } from "../lib/dataState";
+import type { HomeBriefState } from "./logic";
 import type { HomeBriefResult } from "./types";
 
 export interface BriefViewProps {
@@ -22,48 +17,28 @@ export interface BriefViewProps {
 }
 
 /**
- * HOME-002: the auto-generated morning brief. Renders the agent run
- * through the shared explainability components (DESIGN.md §9) — the brief
- * never re-implements trust, confidence, citations or severity rendering.
+ * HOME-002 introduced this view for the auto-run brief; HOME-004 demoted the
+ * brief to a band (BriefBand) and the band now renders the ready state.
+ * What remains here are the degraded presentations — loading is handled by
+ * the band, and scope_denied is never softened into "no data" (AGENTS.md:
+ * 权限拒绝必须保持原因).
+ *
+ * STATE-003: the degraded states map onto the shared DataState kinds and
+ * render through StateBlock; not_decision_ready keeps its DataTrustBar
+ * preamble (the trust evidence must stay visible).
  */
 export default function BriefView({ state, result, error, language, onRetry }: BriefViewProps) {
-  if (state === "loading") {
-    return (
-      <div className="home-brief-state">
-        <Skeleton active paragraph={{ rows: 6 }} />
-      </div>
-    );
-  }
-  if (state === "error") {
-    return (
-      <Alert
-        type="error"
-        showIcon
-        message={t("home.brief_error_title", language)}
-        description={error || ""}
-        action={<Button size="small" icon={<ReloadOutlined />} onClick={onRetry}>{t("common.retry", language)}</Button>}
-      />
-    );
-  }
-  if (state === "scope_denied") {
-    // B4: scope_denied must stay honest — never softened into "no data".
-    return (
-      <Alert
-        type="error"
-        showIcon
-        className="home-brief-state"
-        message={t("api.scope_denied", language)}
-        description={result?.answer || undefined}
-      />
-    );
-  }
-  if (state === "no_data") {
-    return (
-      <div className="home-brief-state">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("home.brief_no_data", language)} />
-      </div>
-    );
-  }
+  const blockState: DataState<unknown> =
+    state === "error"
+      ? { kind: "failed", message: t("home.brief_error_title", language), reason: error || undefined }
+      : state === "scope_denied"
+        ? { kind: "scope_denied", message: t("api.scope_denied", language), reason: result?.answer || undefined }
+        : state === "no_data"
+          ? { kind: "empty", reason: t("home.brief_no_data", language) }
+          : state === "needs_input"
+            ? { kind: "actionable", message: t("home.brief_needs_input_title", language), reason: result?.answer || undefined }
+            : { kind: "ready" };
+
   if (state === "not_decision_ready") {
     return (
       <div className="home-brief-state">
@@ -81,64 +56,12 @@ export default function BriefView({ state, result, error, language, onRetry }: B
       </div>
     );
   }
-  if (state === "needs_input") {
-    return (
-      <div className="home-brief-state">
-        <Alert
-          type="warning"
-          showIcon
-          message={t("home.brief_needs_input_title", language)}
-          description={result?.answer || undefined}
-        />
-      </div>
-    );
-  }
 
-  const pulse = result?.retail_operations?.pulse;
-  const attention = briefAttentionCards(pulse);
-  const thinking = planToThinking(result?.agent_plan);
-  const sources = result?.sources || [];
+  if (blockState.kind === "ready") return null;
+
   return (
-    <div className="home-brief" data-testid="home-brief">
-      <DataTrustBar envelope={pulse?.envelope} basis={pulse?.basis} />
-      {typeof result?.confidence === "number" && <ConfidenceBadge confidence={result.confidence} />}
-      {result?.tool_calls && result.tool_calls.length > 0 && (
-        <div className="ai-tool-row">
-          {result.tool_calls.map((call, index) => <ToolChip key={index} call={call} />)}
-        </div>
-      )}
-      <Typography.Paragraph className="home-brief-answer">{result?.answer}</Typography.Paragraph>
-      {attention.length > 0 && (
-        <div className="home-brief-attention">
-          <div className="home-brief-attention-title">{t("home.brief_attention", language)}</div>
-          {attention.map((card) => (
-            <div key={card.store_id} className="home-brief-attention-card">
-              <span className="home-brief-attention-rank">#{card.rank}</span>
-              <SeverityDot severity={toSeverity(card.severity)} />
-              <span className="home-brief-attention-store">{card.store_code} · {card.store_name}</span>
-              <span className="home-brief-attention-citation">[{card.rank}]</span>
-              <div className="home-brief-attention-signals">
-                {card.signals.map((signal) => (
-                  <span key={signal.signal_code} className="home-brief-attention-signal">
-                    {signalLabel(signal.signal_code, language)} {formatSignalValue(signal.observed_change, signal.unit, card.currency, language)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {thinking && <ThinkingTrace thinking={thinking} />}
-      {sources.length > 0 && (
-        <div className="home-brief-sources">
-          {sources.map((source, index) => (
-            <span key={index} className="home-brief-source">
-              <span className="home-brief-source-index">[{index + 1}]</span>
-              <SourceCitation source={source} />
-            </span>
-          ))}
-        </div>
-      )}
+    <div className="home-brief-state">
+      <StateBlock state={blockState} language={language} onRetry={state === "error" ? onRetry : undefined} />
     </div>
   );
 }

@@ -37,12 +37,14 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { notifyError } from "../lib/notify";
+import { t } from "../lib/i18n";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Text } = Typography;
 
 const DEFAULT_DISCOUNT_RATE = 0.0485;
-const DEFAULT_DISCOUNT_RATE_SOURCE = "集团 IBR · 5 年期 · 2026-07 版";
 
 interface YearlyImpact {
   year: number;
@@ -94,6 +96,7 @@ interface Briefing {
 
 export default function PreDealPage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const [form] = Form.useForm();
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loading, setLoading] = useState(false);
@@ -123,7 +126,7 @@ export default function PreDealPage() {
         )
       );
     } catch (error: any) {
-      notifyError(error?.message || "测算失败");
+      notifyError(error?.message || t("pre_deal.err_failed", language));
       setBriefing(null);
     } finally {
       setLoading(false);
@@ -137,8 +140,7 @@ export default function PreDealPage() {
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
           <PageHeader
-            title="签约前决策"
-            subtitle={briefing ? `最近测算：${currency || "未定币种"} · ${briefing.yearly?.length || 0} 个年度期间` : "尚未生成方案 · 填写条款参数后开始测算"}
+            title={<>{t("pre_deal.title", language)}<span className="page-header-count">{t("pre_deal.header_count", language, { currency: currency || "—", count: String(briefing?.yearly?.length ?? 0) })}</span></>}
           />
 
           <Form
@@ -147,36 +149,36 @@ export default function PreDealPage() {
             initialValues={{ discount_rate: DEFAULT_DISCOUNT_RATE }}
             onFinish={handleBuild}
           >
-            <Card title="条款草案" style={{ borderRadius: 10, marginBottom: 16 }}>
+            <Card title={t("pre_deal.card_terms", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
               <Row gutter={16}>
                 <Col xs={24} md={6}>
-                  <Form.Item label="方案名称" name="name" rules={[{ required: true, message: "请填写名称" }]}>
+                  <Form.Item label={t("pre_deal.label_name", language)} name="name" rules={[{ required: true, message: t("pre_deal.err_name", language) }]}>
                     <Input />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
-                  <Form.Item label="起租日" name="commencement_date" rules={[{ required: true, message: "请选择起租日" }]}>
+                  <Form.Item label={t("pre_deal.label_start", language)} name="commencement_date" rules={[{ required: true, message: t("pre_deal.err_start", language) }]}>
                     <DatePicker style={{ width: "100%" }} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={3}>
-                  <Form.Item label="租期（月）" name="term_months" rules={[{ required: true, message: "请填写租期" }]}>
+                  <Form.Item label={t("pre_deal.label_term", language)} name="term_months" rules={[{ required: true, message: t("pre_deal.err_term", language) }]}>
                     <InputNumber style={{ width: "100%" }} min={1} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
-                  <Form.Item label="月租金" name="monthly_rent" rules={[{ required: true, message: "请填写月租金" }]}>
+                  <Form.Item label={t("pre_deal.label_rent", language)} name="monthly_rent" rules={[{ required: true, message: t("pre_deal.err_rent", language) }]}>
                     <InputNumber style={{ width: "100%" }} min={0} precision={2} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={3}>
                   <Form.Item
-                    label="折现率"
+                    label={t("pre_deal.label_rate", language)}
                     name="discount_rate"
-                    rules={[{ required: true, message: "请填写折现率" }]}
+                    rules={[{ required: true, message: t("pre_deal.err_rate", language) }]}
                     extra={
                       <span>
-                        {DEFAULT_DISCOUNT_RATE_SOURCE} · {discountRateOverridden ? "已覆盖默认值" : "当前使用默认值"} · 仅用于本次情景测算
+                        {t("pre_deal.rate_source", language)} · {discountRateOverridden ? t("pre_deal.rate_overridden", language) : t("pre_deal.rate_default", language)} · {t("pre_deal.rate_note", language)}
                       </span>
                     }
                   >
@@ -184,36 +186,36 @@ export default function PreDealPage() {
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
-                  <Form.Item label="币种" name="currency" rules={[{ required: true, message: "请填写币种" }]}>
+                  <Form.Item label={t("pre_deal.label_currency", language)} name="currency" rules={[{ required: true, message: t("pre_deal.err_currency", language) }]}>
                     <Input />
                   </Form.Item>
                 </Col>
               </Row>
               <Row gutter={16}>
                 <Col xs={12} md={4}>
-                  <Form.Item label="免租期（月）" name="rent_free_months">
+                  <Form.Item label={t("pre_deal.label_free", language)} name="rent_free_months">
                     <InputNumber style={{ width: "100%" }} min={0} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
-                  <Form.Item label="年递增（%）" name="annual_escalation_percent">
+                  <Form.Item label={t("pre_deal.label_escalation", language)} name="annual_escalation_percent">
                     <InputNumber style={{ width: "100%" }} precision={2} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={5}>
-                  <Form.Item label="初始直接费用" name="initial_direct_cost" extra="计入资产，不计入负债">
+                  <Form.Item label={t("pre_deal.label_direct_cost", language)} name="initial_direct_cost" extra={t("pre_deal.hint_direct_cost", language)}>
                     <InputNumber style={{ width: "100%" }} min={0} precision={2} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={5}>
-                  <Form.Item label="提前退出罚金（月租金）" name="early_exit_penalty_months" extra="按退出时点在租的租金计">
+                  <Form.Item label={t("pre_deal.label_exit_penalty", language)} name="early_exit_penalty_months" extra={t("pre_deal.hint_exit_penalty", language)}>
                     <InputNumber style={{ width: "100%" }} min={0} precision={1} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={6}>
                   <Form.Item label=" ">
                     <Button type="primary" icon={<FileSearchOutlined />} htmlType="submit" loading={loading} block>
-                      生成决策简报
+                      {t("pre_deal.btn_brief", language)}
                     </Button>
                   </Form.Item>
                 </Col>
@@ -227,7 +229,7 @@ export default function PreDealPage() {
                 type="info"
                 showIcon
                 style={{ marginBottom: 16, borderRadius: 10 }}
-                message="决策简报"
+                message={t("pre_deal.alert_title", language)}
                 description={briefing.headline}
               />
 
@@ -235,7 +237,7 @@ export default function PreDealPage() {
                 <Col xs={12} md={6}>
                   <Card style={{ borderRadius: 10 }}>
                     <Statistic
-                      title="入表负债"
+                      title={t("pre_deal.stat_liability", language)}
                       value={briefing.balance_sheet.initial_liability}
                       formatter={() => fmtMoney(briefing.balance_sheet.initial_liability, currency)}
                     />
@@ -244,7 +246,7 @@ export default function PreDealPage() {
                 <Col xs={12} md={6}>
                   <Card style={{ borderRadius: 10 }}>
                     <Statistic
-                      title="使用权资产"
+                      title={t("pre_deal.stat_rou", language)}
                       value={briefing.balance_sheet.initial_rou}
                       formatter={() => fmtMoney(briefing.balance_sheet.initial_rou, currency)}
                     />
@@ -253,7 +255,7 @@ export default function PreDealPage() {
                 <Col xs={12} md={6}>
                   <Card style={{ borderRadius: 10 }}>
                     <Statistic
-                      title="全期承诺（未折现）"
+                      title={t("pre_deal.stat_commitment", language)}
                       value={briefing.balance_sheet.undiscounted_commitment}
                       formatter={() => fmtMoney(briefing.balance_sheet.undiscounted_commitment, currency)}
                     />
@@ -262,7 +264,7 @@ export default function PreDealPage() {
                 <Col xs={12} md={6}>
                   <Card style={{ borderRadius: 10 }}>
                     <Statistic
-                      title="折现影响"
+                      title={t("pre_deal.stat_discount_effect", language)}
                       value={briefing.balance_sheet.discounting_effect}
                       formatter={() => fmtMoney(briefing.balance_sheet.discounting_effect, currency)}
                     />
@@ -270,89 +272,86 @@ export default function PreDealPage() {
                 </Col>
               </Row>
 
-              <Card title="IFRS 16 费用曲线 vs 直线租金" style={{ borderRadius: 10, marginBottom: 16 }}>
+              <Card title={t("pre_deal.card_expense_curve", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
                 <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
-                  利息在负债最大时最高，因此会计费用前高后低。两条线交叉之前的年份，实际入账费用高于按租金做的预算——
-                  本方案前 {briefing.front_loaded_years} 年如此，之后反向，全期相抵。
+                  {t("pre_deal.expense_curve_note", language, { years: String(briefing.front_loaded_years) })}
                 </div>
                 <div style={{ width: "100%", height: 300 }}>
                   <ResponsiveContainer>
                     <LineChart data={briefing.yearly}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" tickFormatter={(value) => `第${value}年`} />
-                      <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 10000)}万`} />
+                      <XAxis dataKey="year" tickFormatter={(value) => t("pre_deal.year_suffix", language, { value: String(value) })} />
+                      <YAxis tickFormatter={(value) => t("pre_deal.axis_wan", language, { value: String(Math.round(Number(value) / 10000)) })} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value), currency)} />
                       <Legend />
-                      <Line isAnimationActive={false} type="monotone" dataKey="ifrs16_expense" name="IFRS 16 费用" stroke="var(--state-error-text)" strokeWidth={2} dot={false} />
-                      <Line isAnimationActive={false} type="monotone" dataKey="straight_line_rent" name="直线租金" stroke="var(--chart-blue)" strokeWidth={2} strokeDasharray="5 5" dot={false} />
-                      <Line isAnimationActive={false} type="monotone" dataKey="cash_rent" name="现金租金" stroke="var(--fg-muted)" strokeWidth={1} dot={false} />
+                      <Line isAnimationActive={false} type="monotone" dataKey="ifrs16_expense" name={t("pre_deal.series_ifrs16", language)} stroke="var(--state-error-text)" strokeWidth={2} dot={false} />
+                      <Line isAnimationActive={false} type="monotone" dataKey="straight_line_rent" name={t("pre_deal.series_straight", language)} stroke="var(--chart-blue)" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                      <Line isAnimationActive={false} type="monotone" dataKey="cash_rent" name={t("pre_deal.series_cash", language)} stroke="var(--fg-muted)" strokeWidth={1} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
 
-              <Card title="EBITDA 三层影响" style={{ borderRadius: 10, marginBottom: 16 }}>
+              <Card title={t("pre_deal.card_ebitda", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
                 <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
-                  租金从 EBITDA 线上移到线下，EBITDA 被动抬升——业务没有任何改善。抬升额等于原本计入经营费用的租金，
-                  它去了折旧（EBITDA 与 EBIT 之间）和利息（EBIT 与净利润之间）。
+                  {t("pre_deal.ebitda_note", language)}
                 </div>
                 <div style={{ width: "100%", height: 280 }}>
                   <ResponsiveContainer>
                     <BarChart data={briefing.ebitda_bridge}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" tickFormatter={(value) => `第${value}年`} />
-                      <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 10000)}万`} />
+                      <XAxis dataKey="year" tickFormatter={(value) => t("pre_deal.year_suffix", language, { value: String(value) })} />
+                      <YAxis tickFormatter={(value) => t("pre_deal.axis_wan", language, { value: String(Math.round(Number(value) / 10000)) })} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value), currency)} />
                       <Legend />
                       <ReferenceLine y={0} stroke="var(--fg-primary)" />
-                      <Bar isAnimationActive={false} dataKey="ebitda_uplift" name="EBITDA 抬升" fill="var(--state-success-text)" />
-                      <Bar isAnimationActive={false} dataKey="depreciation_below_ebitda" name="折旧（线下）" fill="var(--chart-blue)" />
-                      <Bar isAnimationActive={false} dataKey="interest_below_ebit" name="利息（EBIT 之下）" fill="var(--state-warning-text)" />
-                      <Bar isAnimationActive={false} dataKey="net_profit_impact" name="净利润影响" fill="var(--state-error-text)" />
+                      <Bar isAnimationActive={false} dataKey="ebitda_uplift" name={t("pre_deal.series_ebitda_uplift", language)} fill="var(--state-success-text)" />
+                      <Bar isAnimationActive={false} dataKey="depreciation_below_ebitda" name={t("pre_deal.series_depreciation", language)} fill="var(--chart-blue)" />
+                      <Bar isAnimationActive={false} dataKey="interest_below_ebit" name={t("pre_deal.series_interest", language)} fill="var(--state-warning-text)" />
+                      <Bar isAnimationActive={false} dataKey="net_profit_impact" name={t("pre_deal.series_net_profit", language)} fill="var(--state-error-text)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
 
-              <Card title="退出成本曲线" style={{ borderRadius: 10 }}>
+              <Card title={t("pre_deal.card_exit", language)} style={{ borderRadius: 10 }}>
                 <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
-                  策略变化时才会问、却没人备着答案的问题：第 N 年退出要花多少。剩余租金因退出而免付，故不计入「退出现金支出」；
-                  罚金按退出时点在租的租金计算。
+                  {t("pre_deal.exit_note", language)}
                 </div>
                 <Table
                   dataSource={briefing.exit_curve}
                   rowKey="year"
                   pagination={false}
                   size="small"
-                  scroll={{ x: 800 }}
+                  scroll={tableScrollX((briefing.exit_curve || []).length, 800)}
                   columns={[
-                    { title: "退出时点", dataIndex: "year", render: (value: number) => `第 ${value} 年末` },
+                    { title: t("pre_deal.col_exit_point", language), dataIndex: "year", render: (value: number) => t("pre_deal.exit_year", language, { value: String(value) }) },
                     {
-                      title: "剩余承诺（免付）",
+                      title: t("pre_deal.col_remaining", language),
                       dataIndex: "remaining_commitment",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "解除负债",
+                      title: t("pre_deal.col_released", language),
                       dataIndex: "liability_released",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "核销使用权资产",
+                      title: t("pre_deal.col_rou", language),
                       dataIndex: "rou_written_off",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "罚金",
+                      title: t("pre_deal.col_penalty", language),
                       dataIndex: "penalty",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),
                     },
                     {
-                      title: "损益影响",
+                      title: t("pre_deal.col_pnl", language),
                       dataIndex: "pnl_impact",
                       align: "right" as const,
                       render: (value: number) => (
@@ -362,7 +361,7 @@ export default function PreDealPage() {
                       ),
                     },
                     {
-                      title: "退出现金支出",
+                      title: t("pre_deal.col_cash_out", language),
                       dataIndex: "total_cash_to_exit",
                       align: "right" as const,
                       render: (value: number) => fmtMoney(value, currency),

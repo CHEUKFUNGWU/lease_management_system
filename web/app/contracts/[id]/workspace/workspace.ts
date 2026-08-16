@@ -17,6 +17,7 @@ import {
   buildObligationPayload,
   buildSchedulePayload,
 } from "./forms";
+import { ApiError } from "../../../lib/api";
 
 export interface ContractWorkspaceTransport {
   loadContract(): Promise<ContractDetail>;
@@ -415,6 +416,13 @@ export class ContractWorkspace {
       this.options.notify({ kind: "success", key: "contract_detail.ifrs16_calculated" });
       return true;
     } catch (error) {
+      // STATE-001：无付款计划是「用户能自己解决」，不是失败——给出下一步
+      // 并直接打开付款计划页签，而不是「请求未成功（/calculate）」。
+      if (isActionableCalculateError(error)) {
+        this.patch({ activeTab: "payments" });
+        this.options.notify({ kind: "warning", key: "contract_detail.calculate_no_schedules" });
+        return false;
+      }
       this.options.notify({
         kind: "error",
         key: "contract_detail.calculate_failed",
@@ -547,4 +555,18 @@ export class ContractWorkspace {
 
 export function createContractWorkspace(options: ContractWorkspaceOptions): ContractWorkspace {
   return new ContractWorkspace(options);
+}
+
+/**
+ * STATE-001：calculate 的 422「payment schedules are required」是用户能
+ * 自己解决的（去加付款计划），不是失败。判定独立成纯函数便于测试。
+ */
+export function isActionableCalculateError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  if (error.status !== 422) return false;
+  const message =
+    typeof error.detail === "object" && error.detail !== null
+      ? String((error.detail as { error?: unknown }).error || error.message)
+      : error.message;
+  return message.includes("payment schedules are required");
 }

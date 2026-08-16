@@ -10,10 +10,12 @@ import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi, reportApi } from "../lib/api";
+import { useRetailQuery } from "../retail/useRetailQuery";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
 import { notifyError } from "../lib/notify";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Text } = Typography;
 
@@ -42,7 +44,6 @@ const fmt = (value: number) => value.toLocaleString(undefined, { maximumFraction
 export default function StandardsPage() {
   const { token } = useAuth();
   const [form] = Form.useForm();
-  const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [rows, setRows] = useState<StandardRow[]>([]);
   const [meta, setMeta] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -54,13 +55,15 @@ export default function StandardsPage() {
     return operating.first_period_expense - ifrs.first_period_expense;
   }, [rows]);
 
-  useEffect(() => {
-    if (!token) return;
-    contractApi
-      .list(token, { status: "approved", sort_by: "created_at", sort_order: "desc" })
-      .then((res) => setContracts(res.data || []))
-      .catch((error: any) => notifyError(error.message || "合同列表加载失败"));
-  }, [token]);
+  // FETCH-003: the approved-contract dropdown runs through the shared
+  // fetch seam (race gate / token injection / error exit).
+  const { state: contractsState } = useRetailQuery({
+    token,
+    params: { status: "approved" as const, sort_by: "created_at" as const, sort_order: "desc" as const },
+    paramsKey: "approved-contracts",
+    fetcher: (p, t) => contractApi.list(t, p).then((res) => res.data ?? []),
+  });
+  const contracts: ContractOption[] = contractsState.kind === "ready" ? (contractsState.data ?? []) : [];
 
   const runComparison = async (values: any) => {
     if (!token) return;
@@ -90,7 +93,7 @@ export default function StandardsPage() {
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <PageHeader
               title="多准则对比"
-              subtitle="对同一合同展示 IFRS 16、ASC 842 与中国租赁准则下的资产负债表和损益表差异。"
+
             />
 
             <Card>
@@ -176,7 +179,7 @@ export default function StandardsPage() {
                 rowKey="standard"
                 size="small"
                 pagination={false}
-                scroll={{ x: 1320 }}
+                scroll={tableScrollX((rows || []).length, 1320)}
                 columns={[
                   { title: "准则", dataIndex: "standard_name", width: 210, fixed: "left" },
                   { title: "分类", dataIndex: "classification", width: 160, render: (v: string) => <StatusTag kind="processing">{v}</StatusTag> },

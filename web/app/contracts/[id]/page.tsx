@@ -50,6 +50,7 @@ import type {
   PaymentSchedule,
 } from "./workspace/types";
 import { useContractWorkspace } from "./workspace/useContractWorkspace";
+import { tableScrollX } from "../../lib/tableScroll";
 
 export default function ContractDetailPage() {
   const params = useParams();
@@ -362,8 +363,7 @@ export default function ContractDetailPage() {
     <ProtectedRoute>
       <AppLayout>
         <PageHeader
-          title={contract?.contract_name || t("contract.detail_title", language)}
-          subtitle={contract?.contract_number}
+          title={<>{contract?.contract_name || t("contract.detail_title", language)}{contract?.contract_number && <span className="page-header-count">{contract.contract_number}</span>}</>}
           meta={contract && (
             <StatusTag kind={statusKindFromAntColor(statusColors[contract.approval_status])}>
               {statusLabels[contract.approval_status]}
@@ -568,7 +568,7 @@ export default function ContractDetailPage() {
               <Tabs
                 activeKey={activeTab}
                 onChange={setActiveTab}
-                style={{ marginTop: 16 }}
+                className="contract-block-gap"
                 items={[
                   {
                     key: "info",
@@ -637,7 +637,7 @@ export default function ContractDetailPage() {
                       rowKey="id"
                       pagination={{ pageSize: 12 }}
                       size="small"
-                      scroll={{ x: 900 }}
+                      scroll={tableScrollX((schedules || []).length, 900)}
                       locale={{ emptyText: t("contract.no_schedules", language) }}
                     />
                   </Card>
@@ -819,7 +819,7 @@ export default function ContractDetailPage() {
                           rowKey="id"
                           pagination={{ pageSize: 8 }}
                           size="small"
-                          scroll={{ x: 980 }}
+                          scroll={tableScrollX((obligations || []).length, 980)}
                         />
                       </Card>
                     ),
@@ -961,7 +961,7 @@ export default function ContractDetailPage() {
                           rowKey="id"
                           pagination={{ pageSize: 10 }}
                           size="small"
-                          scroll={{ x: 1000 }}
+                          scroll={tableScrollX((events || []).length, 1000)}
                           locale={{ emptyText: t("contract.no_events", language) }}
                         />
                       </Card>
@@ -977,9 +977,9 @@ export default function ContractDetailPage() {
                           description={`范围判定：${leaseScopeLabels[calcResult.lease_scope || "in_scope"] || calcResult.lease_scope}`}
                           type={calcResult.measurement_basis === "capitalized" ? "info" : "warning"}
                           showIcon
-                          style={{ marginBottom: 16 }}
+                          className="contract-block-gap-bottom"
                         />
-                        <Row gutter={16} style={{ marginBottom: 16 }}>
+                        <Row gutter={16} className="contract-block-gap-bottom">
                           <Col span={8}>
                             <Card>
                               <Statistic
@@ -1017,15 +1017,15 @@ export default function ContractDetailPage() {
                             rowKey={(r: MonthlyEntry) => `${r.Year}-${r.Month}`}
                             pagination={{ pageSize: 12 }}
                             size="small"
-                            scroll={{ x: 1000 }}
+                            scroll={tableScrollX((sortedMonthly || []).length, 1000)}
                           />
                         </Card>
                       </>
                     ) : (
                       <Card>
-                        <div style={{ textAlign: "center", padding: 40 }}>
-                          <CalculatorOutlined style={{ fontSize: 48, color: "var(--fg-muted)" }} />
-                          <p style={{ marginTop: 16, color: "var(--fg-muted)" }}>
+                        <div className="contract-empty-block">
+                          <CalculatorOutlined className="contract-empty-icon" />
+                          <p className="contract-empty-note">
                             {t("contract.click_calculate", language)}
                           </p>
                         </div>

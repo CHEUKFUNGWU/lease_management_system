@@ -2,7 +2,7 @@
 
 > 配套文档：《PRD_零售经营分析工作站_BP日常支撑完善.md》（要什么）。
 > 本文用 codebase-design 词汇（**module / interface / seam / adapter / depth**）描述「模块长什么样、接缝在哪、藏在接口后面的行为、怎么测」。只描述接口与接缝，不写文件路径与实现细节；实施批次按接口契约落地。
-> 所有现状描述均已在仓库中验证（2026-08-15 两份 Review——BP/AI 双视角与数据链路「文件 → AI 解析 → 入库 → BI 展示」——实锤 + 代码复核；数据链路 9 项断言全部复核通过）。
+> 所有现状描述均已在仓库中验证（2026-08-15 两份 Review——BP/AI 双视角与数据链路「文件 → AI 解析 → 入库 → BI 展示」——实锤 + 代码复核；数据链路 9 项断言全部复核通过）。2026-08-16 walkthrough 评审再次复核 24 项断言（22 项属实、2 项修正已并入正文），并补齐 4 项接口级缺口：M3 接缝按栈拆分、M2 行为变更决策、M8 信封补全与门店身份解析、schema 变更双交付纪律。
 
 ## 0. 设计原则（判定标准）
 
@@ -16,7 +16,7 @@
 | 缺口 | 现状 | 为什么是问题 |
 |---|---|---|
 | 环比公式 | 两处实现：pulse 用 `(c/p−1)×100`，store360 桥用 `(c−p)/|p|×100` | 同一语义两套行为，负基数时方向相反（−100→−50：一处 −50%、一处 +50%）。修复要改两处、测试写两遍 |
-| 期间语义 | `window_days ∈ {7,14,28}` 在三处服务各自校验，默认值 7/14/14 不一致；页面硬编码重置为 7 天；as_of 语义三页不一 | 口径混乱是既成事实，无单点可修 |
+| 期间语义 | 窗口校验形态不一（脉搏为 7–28 范围校验、门店 360 与情景为 {7,14,28} 集合校验），默认值 7/14/14 不一致；页面硬编码重置为 7 天；as_of 语义三页不一 | 口径混乱是既成事实，无单点可修 |
 | 零售导出 | 三页零导出；先例存在：FP&A 行动 CSV 导出、前端工作簿库 | 无口径头、无分类标识规范，导出各自为政会再次制造口径漂移 |
 | 预算对比 | fpna-version-lifecycle spec 已写未实现；零售日粒度无 plan 比较 | FP&A 每日工作量的大头，语义层没有对应能力 |
 | 跨店视图 | 语义层聚合已支持 `group_by=total|region|brand|store`，KPI 端点已暴露；pulse 服务与页面未接 | 能力存在但被浅层接线挡住 |
@@ -31,7 +31,7 @@
 |---|---|---|---|
 | 语义层（纯函数） | retailkpi 差异计算（M1）、预算对比（M4） | — | 单元测试（testdata 先例） |
 | 期间解析（纯函数） | retailperiod（M2） | — | 单元测试：边界 |
-| 导出（纯函数 + handler 接线） | retailexport（M3） | CSV（Go 权威）/ XLSX（web ExcelJS，公式+缓存值+原生 Table）/ PPTX（web pptxgenjs，原生对象） | 单元测试 + handler 测试 |
+| 导出（两栈两条接缝，描述符单源） | retailexport（M3） | Go：CSV + 描述符下发；web：XLSX（ExcelJS，公式+缓存值+原生 Table）/ PPTX（pptxgenjs，原生对象）消费同一描述符 | Go 单测 + handler 测试；web vitest 回读断言 |
 | 服务构建 | retailpulse 扩展（M5） | — | 单元测试 + handler 测试 |
 | plan 数据源 | M4 的 PlanReader | fpna_plan_lines / 模拟 plan（两个适配器） | 集成测试 + 单测 |
 | agent 护栏 | agentguard（M6） | 内存计数 / DB 计数（两个适配器） | 单元测试 |
@@ -83,7 +83,7 @@ func Normalize(p Period) (Period, error)      // 枚举合法性、日历边界
 
 **为什么深**：三处服务校验 + 三页默认值 + 导出口径 + 预算对比的期间配对，全部收敛到一个解析入口。删除测试：删除后，默认值不一致、硬编码重置、as_of 漂移的复杂度重新扩散到 6+ 处。
 
-**边界**：不做 fiscal 日历（`period_basis` 里的 fiscal_month 留待真实客户需求）；不改动既有 URL 参数形态（`window_days` 继续可用，新增 `period` 参数与其互斥）。
+**边界**：不做 fiscal 日历（`period_basis` 里的 fiscal_month 留待真实客户需求）；不改动既有 URL 参数形态（`window_days` 继续可用，新增 `period` 参数与其互斥）。**两个先定后动的决策（2026-08-16 评审）**：统一默认滚动 14 改变脉搏现状默认 7（用户可见变更，回归既有深链并公告）；校验收紧为 {7,14,28} 枚举会使脉搏既有 7–28 范围内的合法值（如 8、21）变 4xx——保留范围兼容或提供显式迁移策略，实现前定死。
 
 ## 5. M3 平台导出 — retailexport（新模块）
 
@@ -92,23 +92,30 @@ func Normalize(p Period) (Period, error)      // 枚举合法性、日历边界
 **接口**：
 
 ```go
+// Go 侧（服务端）：CSV 权威生成 + 描述符单源
 type ExportKind string   // "operating_pulse" | "store_diagnostics" | "scenario" | ...
-type Format    string    // "csv" | "xlsx" | "pptx"
 type ColumnSpec struct {
     Key, Header string
     Formula     *FormulaSpec   // 可选：合计 SUM / 列间算术 / 比率（IF 除零保护）
 }
 
-func Export(kind ExportKind, format Format, response any, envelope sourceenvelope.Envelope) (filename string, content []byte, err error)
+func Descriptor(kind ExportKind) ExportDescriptor   // 列/公式/口径头描述符（JSON 可下发，两栈单源）
+func ExportCSV(kind ExportKind, response any, envelope sourceenvelope.Envelope) (filename string, content []byte, err error)
+```
+
+```ts
+// web 侧（浏览器）：消费同一受控响应 + 同一描述符
+buildWorkbook(kind, response, descriptor, envelope): Promise<XLSX>   // ExcelJS：{formula, result} + 原生 Table
+buildSlides(kind, response, descriptor, envelope): Promise<PPTX>     // pptxgenjs：原生可编辑对象
 ```
 
 **藏在接口后面**：口径头生成（data_classification、dataset_version、as_of、formula_version、period/窗口、group_by、法人）；Working/模拟标识（文件名 + 表头标记）；CSV 转义与 BOM；**公式生成**——每种导出 kind 声明自己的列/公式描述符（合计行 =SUM、差异列 =A−B、达成率 =IF(ISERROR(A/B),"",A/B)），公式统一写成**表列结构化引用**（如 `=IF(ISERROR([Actual]-[Budget]),"",[Actual]-[Budget])`），**缓存值与公式同写**（result 由模块从受控响应计算提供——写库库不代算，权威值正好在我们手里，打开即见数）；**原生 Excel Table**——每个数据 sheet 是命名表（totalsRow 合计、filterButton、冻结表头），用户增删行后公式与合计自动跟随、可加切片器/筛选；**公式注入防护**——数据文本中形如 `= + - @` 开头的单元格一律转义，只有白名单描述符能产生公式；PPTX 用原生对象（文本框/表格/图表）组装**可编辑**幻灯片（非图片贴图）；列名与排序的单一来源。
 
-**接缝与适配器**：handler 层同一 GET 端点带 `format=csv|xlsx|pptx` 参数，响应即数据源。适配器决策：服务端出 CSV（Go 标准库，口径权威）；XLSX 与 PPTX 由前端生成——ExcelJS（MIT、浏览器端；`{formula, result}` 公式 + 缓存值、原生 Table）与 pptxgenjs（MIT、浏览器端；原生可编辑对象），两者同为 JS 栈、均从同源受控响应生成。三个适配器 ⇒ 接缝真实。既有报表页的 SheetJS 导出保持不动（底线：不破坏既有功能）。
+**接缝与适配器（2026-08-16 评审修正：按栈拆成两条接缝）**：原设计的单一 `Export(kind, format, …) []byte` Go 签名暗示一条接缝，但 XLSX/PPTX 在浏览器生成，Go 函数无法返回其字节——真实形状是**两栈两条接缝共享一份描述符数据**。Go 侧：`format=csv` 走 `ExportCSV`（Go 标准库，口径权威），`Descriptor` 以 JSON 随端点下发；web 侧：ExcelJS（MIT、浏览器端；`{formula, result}` 公式 + 缓存值、原生 Table）与 pptxgenjs（MIT、浏览器端；原生可编辑对象）从同源受控响应 + 同一描述符生成——列/公式定义禁止两栈各写一份，否则恰好复刻本模块要消灭的口径漂移。**表名/列名 sanitize**：表头含 `[ ] # '` 等字符会破坏结构化引用语法，需转义或替换（与数据单元格的 `= + - @` 注入转义是两件事）；**体量预算**：浏览器端生成设行数/内存上限，超限显式提示降级 CSV。既有报表页的 SheetJS 导出保持不动（底线：不破坏既有功能）。
 
 **删除测试**：删除后，口径头、公式生成、注入转义、文件命名逻辑重新扩散到 N 个页面，且大概率各自为政再次漂移。
 
-**测试面**：行结构、口径头、CSV 转义、文件名、分类标识；公式字符串含结构化引用且缓存值与受控响应一致（用工作簿库回读断言）、除零/空值公式用例、`= + - @` 注入转义用例；表对象用例（命名表、totalsRow 合计、filterButton、冻结表头）；PPTX 解包断言原生对象存在（非图片）；非法 kind/format 的错误路径。
+**测试面**：行结构、口径头、CSV 转义、文件名、分类标识；公式字符串含结构化引用且缓存值与受控响应一致（用工作簿库回读断言）、除零/空值公式用例、`= + - @` 注入转义用例；表对象用例（命名表、totalsRow 合计、filterButton、冻结表头）；表名/列名转义（表头含 `[ ] # '` 时结构化引用存活）；PPTX 解包断言原生对象存在（非图片）；描述符两栈一致性（Go 下发 JSON 与 web 消费端结构同步）；非法 kind/format 的错误路径与超限降级。
 
 ## 6. M4 预算对比 — retailkpi.ComparePlan + PlanReader 适配器
 
@@ -237,7 +244,7 @@ func Save(card Card, owner, opinion, decisionDate, evidence string) (snapshot, e
 
 **目标**：把「POS/财务导出文件 → 受控的 production store-day 事实」整段行为藏在一个导入模块后面，复制合同侧已验证的流水线模式（受控模板 + 批次 + 数据质量留痕），解锁真实数据试点（PRD P5，Review 二判定的最高杠杆项）。
 
-**接口**（导入页的四个阶段对应四个函数，调用方只学四个签名）：
+**接口**（导入页的阶段对应阶段函数，调用方只学这几个签名）：
 
 ```go
 type RawRow   []string
@@ -245,18 +252,19 @@ type Mapping  map[string]string        // 文件列名 → 标准字段
 type Envelope struct { SourceSystem, ImportBatchID string; AsOfAt time.Time }
 
 func ParseTemplate(file []byte, format Format) (headers []string, rows [][]string, err error)
-func SuggestMapping(headers []string) (Mapping, error)          // AI 建议，Assist Mode，人工确认
-func Validate(mapping Mapping, rows [][]string) (ValidationReport, error)
-func Commit(ctx, rows [][]string, mapping Mapping, envelope Envelope, idempotencyKey string) (*ImportReport, error)
+func SuggestMapping(headers []string, columnProfiles []ColumnProfile) (Mapping, error)  // AI 建议，Assist Mode，人工确认；列画像 = Go 侧算好的类型直方图 / 日期格式识别 / 脱敏样本（数字不进 LLM）
+func ResolveStores(mapping Mapping, rows [][]string) (StoreResolution, error)           // 门店身份解析：名称/编码 → store_id + 法人归属；未匹配进报告，跨法人行拒绝或拆分
+func Validate(mapping Mapping, rows [][]string, resolution StoreResolution) (ValidationReport, error)
+func Commit(ctx, rows [][]string, mapping Mapping, resolution StoreResolution, envelope Envelope, idempotencyKey string) (*ImportReport, error)
 ```
 
-**藏在接口后面**：受控模板解析（表头规范化、列映射、位置解析）；行级错误收集与部分成功；预计覆盖率（对既有 store-day 数据的时间/门店重叠估计）；数值解析（Go 确定性——LLM 只建议映射，不读数字）；envelope 强制（source_system / import_batch_id / as_of_at 缺一拒绝）；500 行/批分块与既有原子 upsert 复用；幂等（Idempotency-Key + payload SHA，重放不产生第二条）；只产 production 事实；批次与数据质量留痕（与既有批次模式同构）。
+**藏在接口后面**：受控模板解析（表头规范化、列映射、位置解析）；行级错误收集与部分成功；预计覆盖率（对既有 store-day 数据的时间/门店重叠估计）；数值解析（Go 确定性——LLM 只建议映射，不读数字）；envelope 强制（source_system / import_batch_id / as_of_at 缺一拒绝）与**完整信封补全（2026-08-16 评审）**——`fact_version` / `dataset_version` 赋值策略显式定义（`retail-kpi-v1`「最高事实版本选择」依赖它），「导错一版、重导一版」的修正语义 = 新事实版本递增取代、旧版可追溯，不靠 upsert 默认行为隐式决定；**门店身份解析**——名称/编码 → 门店主数据 + 法人归属，未匹配门店进校验报告而非静默跳过，跨法人文件拒绝或按行拆分归属；500 行/批分块与既有原子 upsert 复用；幂等（Idempotency-Key + payload SHA，重放不产生第二条）；只产 production 事实；批次与数据质量留痕（与既有批次模式同构）。
 
 **接缝与适配器**：新 handler 端点（沿用既有 store-day 写入权限）+ 新「经营数据导入」页。适配器：受控模板解析（Go 确定性）与 AI 列映射建议（LLM adapter，Assist Mode）两个适配器 ⇒ 真实接缝；AI 输出只到映射建议为止，人工确认后才进入确定性路径。
 
 **删除测试**：删除后，「文件 → 事实」的表头校验、行级错误、信封、幂等、分批逻辑重新扩散到页面与 handler，且大概率各自为政再次漂移。
 
-**测试面**：幂等重放（同文件 + 同 Key 只落一批）、行级错误与部分成功、覆盖率报告、envelope 缺字段拒绝、分批边界；AI 映射建议不含数值；集成断言只写 store-day、零写 IFRS 16 正式表。
+**测试面**：幂等重放（同文件 + 同 Key 只落一批）、行级错误与部分成功、覆盖率报告、envelope 缺字段拒绝、fact_version / dataset_version 赋值与修正重传（新版本取代后查询取最新且旧版可追溯）、门店身份解析（未匹配进报告、跨法人拒绝或拆分）、分批边界；AI 映射建议不含数值；集成断言只写 store-day、零写 IFRS 16 正式表。
 
 ## 11. 快速修复清单（不改模块形状）
 

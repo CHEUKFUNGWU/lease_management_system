@@ -112,11 +112,11 @@ function CloseProcessRail({
   const current = isLocked ? 5 : summary?.posted_count ? 4 : summary?.approved_count ? 3 : summary?.total ? 2 : result ? 1 : 0;
   const nextLabel = current === 0 ? t("monthly.process_generate", language) : current === 1 ? t("monthly.process_review", language) : current === 2 ? t("monthly.process_approve", language) : current === 3 ? t("monthly.process_post", language) : current === 4 ? t("monthly.process_lock", language) : t("monthly.process_complete", language);
   return (
-    <Card styles={{ body: { padding: "16px 20px" } }} style={{ marginBottom: 16, borderRadius: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 12 }}>
+    <Card styles={{ body: { padding: "16px 20px" } }} className="sty-0ee503b7">
+      <div className="sty-4757b38c">
         <div>
-          <div style={{ fontSize: 12, color: "var(--fg-tertiary)", marginBottom: 4 }}>{period || t("monthly.process_select_period", language)}</div>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>{t("monthly.process_title", language)}</div>
+          <div className="sty-99d8c40b">{period || t("monthly.process_select_period", language)}</div>
+          <div className="sty-6319d0fa">{t("monthly.process_title", language)}</div>
         </div>
         <Button type="primary" onClick={onNext} disabled={!period && current > 0}>{nextLabel}</Button>
       </div>
@@ -609,7 +609,7 @@ function MonthlyClosingPage() {
             </StatusTag>
             {/* A reversing entry is only readable next to what it cancels. */}
             {record.reversal_of_entry_id && (
-              <StatusTag kind="warning" style={{ fontSize: 11 }}>
+              <StatusTag kind="warning" className="sty-96007dcc">
                 {t("monthly.is_reversal_entry", language)}
               </StatusTag>
             )}
@@ -683,7 +683,7 @@ function MonthlyClosingPage() {
           );
         }
         if (actions.length === 0) {
-          return <span style={{ color: "var(--fg-muted)" }}>-</span>;
+          return <span className="sty-96007dcc">-</span>;
         }
         return <Space size={0}>{actions}</Space>;
       },
@@ -718,7 +718,7 @@ function MonthlyClosingPage() {
       width: 220,
       render: (_: any, record: any) => {
         if (!canManage)
-          return <span style={{ color: "var(--fg-muted)" }}>-</span>;
+          return <span className="sty-e242b586">-</span>;
         return (
           <Space size={0}>
             <Popconfirm
@@ -756,14 +756,14 @@ function MonthlyClosingPage() {
   // ─── Skeleton Loading for Entries ───────────────────────────
 
   const EntrySkeleton = () => (
-    <div style={{ padding: "8px 0" }}>
+    <div className="sty-8da2ac96">
       {Array.from({ length: 5 }).map((_, i) => (
         <Skeleton
           key={i}
           active
           paragraph={{ rows: 1, width: ["100%"] }}
           title={false}
-          style={{ padding: "8px 16px" }}
+          className="sty-e242b586"
         />
       ))}
     </div>
@@ -772,14 +772,14 @@ function MonthlyClosingPage() {
   // ─── Skeleton Loading for Batches ───────────────────────────
 
   const BatchSkeleton = () => (
-    <div style={{ padding: "8px 0" }}>
+    <div className="sty-8da2ac96">
       {Array.from({ length: 4 }).map((_, i) => (
         <Skeleton
           key={i}
           active
           paragraph={{ rows: 1, width: ["100%"] }}
           title={false}
-          style={{ padding: "8px 16px" }}
+          className="sty-5b498286"
         />
       ))}
     </div>
@@ -794,7 +794,7 @@ function MonthlyClosingPage() {
       children: (
         <Card
           title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            <span className="sty-70ea3314">
               {t("monthly.generate_closing", language)}
             </span>
           }
@@ -808,7 +808,7 @@ function MonthlyClosingPage() {
                   rules={[{ required: true, message: t("monthly.select_period", language) }]}
                 >
                   <DatePicker.MonthPicker
-                    style={{ width: "100%" }}
+                    className="sty-73be230f"
                     placeholder="YYYY-MM"
                   />
                 </Form.Item>
@@ -837,7 +837,7 @@ function MonthlyClosingPage() {
                 <Space direction="vertical">
                   <span>
                     {t("monthly.batch_number", language)}:{" "}
-                    <strong style={{ color: "var(--fg-primary)" }}>
+                    <strong className="sty-ac87a46f">
                       {result.batch_number}
                     </strong>
                   </span>
@@ -856,7 +856,7 @@ function MonthlyClosingPage() {
               }
               type="info"
               showIcon
-              style={{ marginTop: 24 }}
+              className="sty-5b498286"
             />
           )}
         </Card>
@@ -868,7 +868,7 @@ function MonthlyClosingPage() {
       children: (
         <Card
           title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            <span className="sty-477fa20b">
               {t("monthly.entries_preview", language)}
             </span>
           }
@@ -880,7 +880,7 @@ function MonthlyClosingPage() {
                   value={erpTemplate}
                   onChange={(event) => setErpTemplate(event.target.value)}
                   placeholder={t("monthly.export_template_placeholder", language)}
-                  style={{ width: 150 }}
+                  className="sty-7f21e1ba"
                 />
                 <Button
                   size="small"
@@ -956,10 +956,10 @@ function MonthlyClosingPage() {
             ) : undefined
           }
         >
-          <Space wrap size={12} style={{ marginBottom: 16 }}>
-            <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>会计期间</span>
+          <Space wrap size={12} className="sty-b8bb6f7b">
+            <span className="sty-7b32b26b">会计期间</span>
             <Select
-              style={{ width: 260 }}
+              className="sty-cee1122c"
               value={selectedPeriod || undefined}
               onChange={changeEntryPeriod}
               placeholder="选择一个有分录的期间"
@@ -972,7 +972,7 @@ function MonthlyClosingPage() {
               }))}
             />
             <Select
-              style={{ width: 140 }}
+              className="sty-6a67d1fd"
               allowClear
               value={entryStatus}
               onChange={(value) => {
@@ -984,7 +984,7 @@ function MonthlyClosingPage() {
               options={ENTRY_STATUS_OPTIONS}
             />
             <Select
-              style={{ width: 160 }}
+              className="sty-c6e381ce"
               allowClear
               value={entryType}
               onChange={(value) => {
@@ -996,7 +996,7 @@ function MonthlyClosingPage() {
               options={ENTRY_TYPE_OPTIONS}
             />
             {entrySummary && (
-              <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+              <span className="sty-7f21e1ba">
                 共 {entrySummary.total} 笔 · {entrySummary.contract_count} 份合同 · 合计{" "}
                 {entrySummary.total_amount.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
@@ -1011,7 +1011,7 @@ function MonthlyClosingPage() {
               message={t("monthly.locked_warning", language, { period: selectedPeriod })}
               type="warning"
               showIcon
-              style={{ marginBottom: 16 }}
+              className="sty-5b498286"
             />
           )}
           {entriesLoading && !entriesLoaded ? (
@@ -1060,7 +1060,7 @@ function MonthlyClosingPage() {
       children: (
         <Card
           title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            <span className="sty-5b498286">
               {t("monthly.batch_history", language)}
             </span>
           }
@@ -1098,7 +1098,7 @@ function MonthlyClosingPage() {
       children: (
         <Card
           title={
-            <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            <span className="sty-63811967">
               {t("monthly.lock_control", language)}
             </span>
           }
@@ -1109,70 +1109,41 @@ function MonthlyClosingPage() {
               description={t("monthly.lock_first", language)}
             />
           ) : lockStatusLoading ? (
-            <div style={{ padding: "24px 0" }}>
+            <div className="sty-63811967">
               <Skeleton active paragraph={{ rows: 2 }} />
             </div>
           ) : (
             <>
               {/* Lock Status Indicator */}
               <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 20,
-                  padding: "24px 28px",
-                  borderRadius: 10,
-                  marginBottom: 24,
-                  border: `1px solid ${
-                    isLocked ? "var(--border-strong)" : "var(--border-default)"
-                  }`,
-                  background: isLocked
-                    ? "var(--bg-inset)"
-                    : "var(--bg-page)",
-                }}
+                className="sty-8d9ffc18"
               >
                 <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 22,
-                    background: isLocked
-                      ? "var(--fg-primary)"
-                      : "var(--bg-inset)",
-                    color: isLocked ? "var(--fg-inverse)" : "var(--fg-tertiary)",
-                    flexShrink: 0,
-                  }}
+                  className="sty-83725d2c"
                 >
                   {isLocked ? <LockOutlined /> : <UnlockOutlined />}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 2 }}>
+                <div className="sty-c1108b12">
+                  <div className="sty-c6e381ce">
                     {t("monthly.accounting_period_label", language)} {selectedPeriod}
                   </div>
                   <div
-                    style={{
-                      fontSize: 13,
-                      color: "var(--fg-muted)",
-                    }}
+                    className="sty-867764b6"
                   >
                     {isLocked
                       ? t("monthly.lock_desc_locked", language)
                       : t("monthly.lock_desc_unlocked", language)}
                   </div>
                 </div>
-                <div style={{ flexShrink: 0 }}>
+                <div className="sty-f0c37429">
                   {isLocked ? (
-                    <StatusTag kind="error" style={{ margin: 0, fontSize: 13 }}>
-                      <LockOutlined style={{ marginRight: 4 }} />
+                    <StatusTag kind="error" className="sty-65ab137c">
+                      <LockOutlined className="sty-f0c37429" />
                       {t("monthly.locked", language)}
                     </StatusTag>
                   ) : (
-                    <StatusTag kind="success" style={{ margin: 0, fontSize: 13 }}>
-                      <UnlockOutlined style={{ marginRight: 4 }} />
+                    <StatusTag kind="success" className="sty-65ab137c">
+                      <UnlockOutlined className="sty-d822a7a7" />
                       {t("monthly.unlocked", language)}
                     </StatusTag>
                   )}
@@ -1214,7 +1185,7 @@ function MonthlyClosingPage() {
                   message={t("monthly.contact_admin", language)}
                   type="info"
                   showIcon
-                  style={{ marginTop: 16 }}
+                  className="sty-2c2c74e0"
                 />
               )}
             </>
@@ -1238,12 +1209,12 @@ function MonthlyClosingPage() {
             title={t("monthly.title", language)}
 
             meta={selectedPeriod ? (
-              <Space size={12} style={{ marginTop: 8 }}>
-                <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>
-                  {t("monthly.current_period", language)}：<strong style={{ color: "var(--fg-primary)" }}>{selectedPeriod}</strong>
+              <Space size={12} className="sty-b8bb6f7b">
+                <span className="sty-73be230f">
+                  {t("monthly.current_period", language)}：<strong className="sty-60d6ce74">{selectedPeriod}</strong>
                 </span>
-                <span style={{ color: "var(--border-strong)" }}>·</span>
-                <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+                <span className="sty-c6e381ce">·</span>
+                <span className="sty-7f21e1ba">
                   {t("monthly.status_summary", language, {
                     draftCount: String(entrySummary?.draft_count ?? 0),
                     approvedCount: String(entrySummary?.approved_count ?? 0),
@@ -1304,7 +1275,7 @@ function MonthlyClosingPage() {
               showIcon
               message="粘贴 ERP 返回结果，每行格式：entry_id,erp_reference,voucher_number"
               description="导出的 CSV 第一列就是 entry_id。回写成功后，系统会记录 ERP 引用与凭证号，并将对应已审批分录标记为已过账。"
-              style={{ marginBottom: 16 }}
+              className="sty-d4418b43"
             />
             <Input.TextArea
               rows={8}
@@ -1327,11 +1298,11 @@ function MonthlyClosingPage() {
             okText={t("monthly.ok", language) + t("monthly.post_entry", language)}
             cancelText={t("monthly.cancel", language)}
           >
-            <p style={{ marginBottom: 16, color: "var(--fg-secondary)" }}>
+            <p className="sty-7f21e1ba">
               {t("monthly.posting_confirm_desc", language)}
             </p>
             {postingEntry && (
-              <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+              <Descriptions bordered size="small" column={1} className="sty-d4418b43">
                 <Descriptions.Item label={t("monthly.entry_type", language)}>
                   <StatusTag kind="processing">{postingEntry.entry_type}</StatusTag>
                 </Descriptions.Item>
@@ -1362,11 +1333,11 @@ function MonthlyClosingPage() {
             okButtonProps={{ danger: true }}
             cancelText={t("monthly.cancel", language)}
           >
-            <p style={{ marginBottom: 16, color: "var(--fg-secondary)" }}>
+            <p className="sty-7f21e1ba">
               {t("monthly.reject_desc", language)}
             </p>
             {rejectingEntry && (
-              <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+              <Descriptions bordered size="small" column={1} className="sty-d4418b43">
                 <Descriptions.Item label={t("monthly.entry_type", language)}>
                   <StatusTag kind="processing">{rejectingEntry.entry_type}</StatusTag>
                 </Descriptions.Item>
@@ -1398,11 +1369,11 @@ function MonthlyClosingPage() {
             okButtonProps={{ danger: true }}
             cancelText={t("monthly.cancel", language)}
           >
-            <p style={{ marginBottom: 16, color: "var(--fg-secondary)" }}>
+            <p className="sty-7f21e1ba">
               {t("monthly.reverse_desc", language)}
             </p>
             {reversingEntry && (
-              <Descriptions bordered size="small" column={1} style={{ marginBottom: 16 }}>
+              <Descriptions bordered size="small" column={1} className="sty-8d9ffc18">
                 <Descriptions.Item label={t("monthly.entry_type", language)}>
                   <StatusTag kind="processing">{reversingEntry.entry_type}</StatusTag>
                 </Descriptions.Item>
@@ -1447,7 +1418,7 @@ function MonthlyClosingPage() {
 
 export default function MonthlyClosingPageWithUrlState() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+    <Suspense fallback={<div className="sty-8d9ffc18" />}>
       <MonthlyClosingPage />
     </Suspense>
   );

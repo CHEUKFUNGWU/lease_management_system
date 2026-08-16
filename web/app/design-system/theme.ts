@@ -11,7 +11,13 @@ export const antdTheme = {
   token: {
     // ── Core Colors ──
     colorPrimary: colors.foreground.primary,      // #000000
+    // STY-007: primary-button hover used to be painted #262626 by CSS; antd
+    // derives the hover fill from colorPrimaryHover.
+    colorPrimaryHover: colors.foreground.secondary,
     colorInfo: colors.state.info,
+    // STY-007: antd's Statistic title renders with colorTextDescription;
+    // the old CSS forced --fg-tertiary (#595959) — carry the rendered value.
+    colorTextDescription: colors.foreground.tertiary,
     colorInfoBg: colors.status.processing.bg,
     colorInfoBorder: colors.status.processing.border,
     colorInfoText: colors.status.processing.text,
@@ -71,12 +77,16 @@ export const antdTheme = {
       controlHeight: 36,
       controlHeightSM: 28,
       controlHeightLG: 44,
-      fontWeight: typography.weights.semibold,
+      // STY-007: the global override used to force 500 via CSS; the token
+      // must match what the UI actually rendered, not the old 600 intent.
+      fontWeight: typography.weights.medium,
       defaultBg: colors.background.page,
       defaultBorderColor: colors.border.default,
       defaultColor: colors.foreground.primary,
       defaultHoverBg: colors.background.surface,
-      defaultHoverBorderColor: colors.border.strong,
+      // STY-007: the override painted the hover border with the primary
+      // foreground; keep that rendered value.
+      defaultHoverBorderColor: colors.foreground.primary,
       defaultHoverColor: colors.foreground.primary,
       defaultActiveBg: colors.background.inset,
       defaultActiveBorderColor: colors.foreground.primary,
@@ -92,6 +102,11 @@ export const antdTheme = {
       headerBg: colors.background.page,
       headerFontSize: typography.sizes.h2.size,
       headerHeight: 52,
+      // STY-007: the card-body override used to force 20px; antd's default
+      // body padding is 24px (12px for size="small"), so both tokens must
+      // carry the value the override rendered.
+      bodyPadding: 20,
+      bodyPaddingSM: 20,
       boxShadow: "none",
       boxShadowTertiary: "none",
     },
@@ -99,6 +114,8 @@ export const antdTheme = {
     // ── Menu ──
     Menu: {
       itemBorderRadius: radius.md,
+      // STY-007: submenu titles carried the same 6px radius via CSS.
+      subMenuItemBorderRadius: radius.md,
       activeBarBorderWidth: 0,
       itemSelectedBg: colors.background.inset,
       itemSelectedColor: colors.foreground.primary,
@@ -132,6 +149,13 @@ export const antdTheme = {
       rowSelectedHoverBg: colors.background.inset,
       cellPaddingBlock: 12,
       cellPaddingInline: 16,
+      // STY-007: size="small" tables used to be forced to the same 12/16
+      // padding by a CSS override flagged important; without it antd's small
+      // defaults (4px inline) change every small table's look. Pin the small
+      // tokens to the same values so deleting the override does not change
+      // rendered output.
+      cellPaddingBlockSM: 12,
+      cellPaddingInlineSM: 16,
       cellFontSize: typography.sizes.body.size,
       headerSplitColor: colors.border.subtle,
     },
@@ -203,8 +227,11 @@ export const antdTheme = {
     // ── Statistic ──
     Statistic: {
       titleFontSize: typography.sizes.caption.size,
-      contentFontSize: typography.sizes.h1.size,
-      contentFontWeight: typography.weights.semibold,
+      // STY-007: the content-value override forced 28px; the token used to
+      // say 24 (h1) — align with what the UI actually rendered.
+      contentFontSize: typography.sizes.display.size,
+      // Note: contentFontWeight is NOT consumed by antd's Statistic styles
+      // (verified against 5.29 source) — the 600 weight is carried by CSS.
     },
 
     // ── Tabs ──
@@ -310,6 +337,12 @@ export const antdTheme = {
     Badge: {
       colorError: colors.foreground.primary,
       colorWarning: colors.foreground.secondary,
+      // STY-007: the badge-count override forced 10px/600/16px; antd's
+      // defaults are 12px and 20px — pin the tokens to the rendered values.
+      textFontSize: 10,
+      textFontWeight: typography.weights.semibold,
+      indicatorHeight: 16,
+      indicatorHeightSM: 16,
     },
 
     // ── Avatar ──

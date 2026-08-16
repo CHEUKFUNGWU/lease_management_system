@@ -233,7 +233,7 @@ body {
   gap: 12px;
   align-items: baseline;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 0 0 var(--border-subtle);
   font-size: 13px;
 }
 
@@ -267,11 +267,13 @@ body {
 .store-360-page .ant-table-cell { font-variant-numeric: tabular-nums; }
 
 @media (max-width: 767px) {
-  .operating-pulse-page .ant-card-body { padding: 16px !important; }
+  /* STY-008: mobile density for the retail pages — body prefix beats
+     antd's injected .ant-card .ant-card-body rule at equal specificity. */
+  body .operating-pulse-page .ant-card-body { padding: 16px; }
   .operating-pulse-page .ant-segmented { max-width: 100%; overflow-x: auto; }
   .pulse-filter-card .ant-picker { width: 100%; }
   .pulse-kpi-card { height: 136px; }
-  .store-360-page .ant-card-body { padding: 16px !important; }
+  body .store-360-page .ant-card-body { padding: 16px; }
   .store-360-page .ant-segmented { max-width: 100%; overflow-x: auto; }
   .store-360-filter-card .ant-picker { width: 100%; }
   .store-360-kpi-card { height: 136px; }
@@ -321,258 +323,223 @@ h3 {
 
 /* ─── Ant Design Component Overrides ────────────────────────── */
 
-/* Card: subtle border, no heavy shadow */
+/* Card: subtle border, no heavy shadow.
+   STY-007: border/radius/shadow and the 20px body padding live in theme.ts
+   (Card.borderRadiusLG, colorBorderSecondary, boxShadow, bodyPadding).
+   What stays: the hover interaction (tokens have no card-hover state) and
+   the asymmetric head padding (antd's headerPadding token is a single
+   value, cannot express 16px 20px). body prefix out-specifies antd's
+   later-injected equal-specificity rules. */
 .ant-card {
-  border: 1px solid var(--border-default) !important;
-  box-shadow: none !important;
-  border-radius: 10px !important;
   transition: border-color 0.15s var(--ease-micro), box-shadow 0.15s var(--ease-micro);
 }
 
 .ant-card.card-interactive:hover {
-  border-color: var(--border-strong) !important;
-  box-shadow: var(--shadow-hover) !important;
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover);
 }
 
-.ant-card-head {
-  border-bottom: 1px solid var(--border-subtle) !important;
-  padding: 16px 20px !important;
+body .ant-card-head {
+  box-shadow: 0 1px 0 0 var(--border-subtle);
+  padding: 16px 20px;
 }
 
-.ant-card-body {
-  padding: 20px !important;
-}
-
-/* Button: refined press state */
-.ant-btn {
-  font-weight: 500 !important;
-  transition: all 0.1s var(--ease-micro) !important;
+/* Button: refined press state.
+   STY-007: weight / primary fill / hover colours now live in theme.ts
+   (Button.fontWeight 500, colorPrimary, colorPrimaryHover,
+   defaultHoverBorderColor). Only the motion stays here — tokens cannot
+   express it — and it is prefixed with body to out-specify antd's later
+   injected rules. */
+body .ant-btn {
+  transition: all 0.1s var(--ease-micro);
 }
 
 .ant-btn:active {
   transform: scale(0.98);
 }
 
-.ant-btn-primary {
-  background: var(--fg-primary) !important;
-  border-color: var(--fg-primary) !important;
+/* Table: refined headers and rows.
+   STY-007: headerBg / headerColor / headerSplitColor / cellPaddingBlock /
+   cellPaddingInline / rowHoverBg / rowSelectedBg / borderColor /
+   cellFontSize now live in theme.ts (components.Table). These rules keep
+   only what the token system cannot express — weight, size, tracking and
+   the body-cell color. AntD's runtime rules are injected later and carry
+   the same specificity (:where() contributes zero), so each retained rule
+   is prefixed with `body` to win without !important. */
+body .ant-table-wrapper .ant-table-thead > tr > th {
+  font-weight: 600;
+  color: var(--fg-tertiary);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0.01em;
 }
 
-.ant-btn-primary:not(:disabled):hover {
-  background: var(--fg-secondary) !important;
-  border-color: var(--fg-secondary) !important;
-}
-
-.ant-btn-default:not(:disabled):hover {
-  border-color: var(--fg-primary) !important;
-  color: var(--fg-primary) !important;
-}
-
-/* Table: refined headers and rows */
-.ant-table-wrapper .ant-table-thead > tr > th {
-  font-weight: 600 !important;
-  color: var(--fg-tertiary) !important;
-  font-size: 12px !important;
-  text-transform: none !important;
-  letter-spacing: 0.01em !important;
-  background: var(--bg-inset) !important;
-  border-bottom: 1px solid var(--border-subtle) !important;
-  padding: 12px 16px !important;
-}
-
-.ant-table-wrapper .ant-table-tbody > tr > td {
-  font-size: 14px !important;
-  color: var(--fg-secondary) !important;
-  padding: 12px 16px !important;
-  border-bottom: 1px solid var(--border-subtle) !important;
+body .ant-table-wrapper .ant-table-tbody > tr > td {
+  font-size: 14px;
+  color: var(--fg-secondary);
   transition: background 0.1s var(--ease-micro);
 }
 
-.ant-table-wrapper .ant-table-tbody > tr:hover > td {
-  background: var(--bg-surface) !important;
-}
-
-.ant-table-wrapper .ant-table-tbody > tr.ant-table-row-selected > td {
-  background: var(--bg-inset) !important;
-}
-
-.ant-table-wrapper,
-.ant-table-container {
+body .ant-table-wrapper,
+body .ant-table-container {
   max-width: 100%;
-  overflow-x: auto !important;
+  overflow-x: auto;
 }
 
 .ant-table {
   min-width: max-content;
 }
 
-/* Tag: minimal */
-.ant-tag {
-  border-radius: 4px !important;
-  font-weight: 500 !important;
-  font-size: 12px !important;
-  padding: 2px 8px !important;
-  line-height: 18px !important;
-  border-width: 1px !important;
-  border-style: solid !important;
+/* Tag: minimal.
+   STY-007: defaultBg/defaultColor live in theme.ts (Tag.defaultBg inset,
+   defaultColor secondary). Every other declaration below has no Tag
+   token — antd derives tag size from the global fontSize (14) and its
+   line-height from tagLineHeight, so 12px/18px cannot be expressed as
+   tokens — hence the retained rules, without the flag, prefixed with
+   body to beat antd's injected single-class rule. */
+body .ant-tag {
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 2px 8px;
+  line-height: 18px;
+  border-width: 1px;
+  border-style: solid;
 }
 
 /* Input focused state. Inputs nested in an affix wrapper (prefix/suffix icons)
    are borderless children — styling them here draws a second, square ring
-   inside the wrapper, so the wrapper alone carries the focused look. */
-.ant-input:not(.ant-input-affix-wrapper .ant-input):focus,
-.ant-input-focused,
-.ant-select-focused .ant-select-selector,
-.ant-picker-focused {
-  border-color: var(--fg-primary) !important;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06) !important;
-}
+   inside the wrapper, so the wrapper alone carries the focused look.
+   STY-007: the focused border and halo are antd's own (controlOutline
+   token, 0.08/3px); the override forced 0.06/2px — dropped as redundant,
+   the rendered difference is a barely-tighter halo of the same black
+   border. */
 
-/* Modal */
-.ant-modal-content {
-  border-radius: 12px !important;
+/* Modal.
+   STY-007: radius, paddings, backgrounds and shadow already live in
+   theme.ts (components.Modal) with identical values. Only the dividers
+   and the clipped overflow stay here — the token system has no
+   header/footer divider — and body out-specifies antd's injected rules. */
+body .ant-modal-content {
   overflow: hidden;
-  box-shadow: var(--shadow-modal) !important;
 }
 
-.ant-modal-header {
-  border-radius: 12px 12px 0 0 !important;
-  border-bottom: 1px solid var(--border-subtle) !important;
-  padding: 20px 24px !important;
+body .ant-modal .ant-modal-header {
+  box-shadow: 0 1px 0 0 var(--border-subtle);
 }
 
-.ant-modal-body {
-  padding: 0 24px 24px !important;
+body .ant-modal .ant-modal-footer {
+  box-shadow: 0 -1px 0 0 var(--border-subtle);
 }
 
-.ant-modal-footer {
-  border-top: 1px solid var(--border-subtle) !important;
-  padding: 16px 24px !important;
+/* Menu.
+   STY-007: item radius, selected/hover backgrounds live in theme.ts
+   (Menu.itemBorderRadius 6, itemSelectedBg inset, itemHoverBg surface).
+   Kept without the flag: margins, the selected weight, the border removal
+   and the transitions — no Menu token covers them. */
+body .ant-menu {
+  border-right: none;
 }
 
-/* Menu */
-.ant-menu {
-  border-right: none !important;
+body .ant-menu .ant-menu-item {
+  margin: 2px 8px;
+  transition: all 0.15s var(--ease-micro);
 }
 
-.ant-menu-item {
-  border-radius: 6px !important;
-  margin: 2px 8px !important;
-  transition: all 0.15s var(--ease-micro) !important;
+body .ant-menu .ant-menu-item-selected {
+  font-weight: 600;
 }
 
-.ant-menu-item-selected {
-  background: var(--bg-inset) !important;
-  font-weight: 600 !important;
+body .ant-menu .ant-menu-submenu-title {
+  margin: 2px 8px;
 }
 
-.ant-menu-item:hover:not(.ant-menu-item-selected) {
-  background: var(--bg-surface) !important;
+/* Dropdown.
+   STY-007: no Dropdown token covers radius/shadow/padding — the rules
+   stay without the flag, body-prefixed to beat antd's injected rules. */
+body .ant-dropdown-menu {
+  border-radius: 10px;
+  box-shadow: var(--shadow-dropdown);
+  padding: 4px;
 }
 
-/* Menu submenu */
-.ant-menu-submenu-title {
-  border-radius: 6px !important;
-  margin: 2px 8px !important;
-}
-
-/* Dropdown */
-.ant-dropdown-menu {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-dropdown) !important;
-  padding: 4px !important;
-}
-
-.ant-dropdown-menu-item {
-  border-radius: 6px !important;
+body .ant-dropdown-menu-item {
+  border-radius: 6px;
   transition: background 0.1s var(--ease-micro);
 }
 
-/* Tooltip */
-.ant-tooltip-inner {
-  border-radius: 6px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  padding: 6px 10px !important;
+/* Tooltip.
+   STY-007: radius lives in theme.ts (Tooltip.borderRadius 6); size,
+   weight and padding have no token. */
+body .ant-tooltip-inner {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 10px;
 }
 
-/* Select dropdown */
-.ant-select-dropdown {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-dropdown) !important;
-  padding: 4px !important;
+/* Select dropdown — same situation as Dropdown. */
+body .ant-select-dropdown {
+  border-radius: 10px;
+  box-shadow: var(--shadow-dropdown);
+  padding: 4px;
 }
 
-.ant-select-item {
-  border-radius: 6px !important;
+body .ant-select-item {
+  border-radius: 6px;
   transition: background 0.1s var(--ease-micro);
 }
 
-/* DatePicker panel */
-.ant-picker-panel {
-  border-radius: 10px !important;
+/* DatePicker panel — no panel-radius token. */
+body .ant-picker-panel {
+  border-radius: 10px;
 }
 
-/* Tabs */
-.ant-tabs-tab {
-  transition: color 0.15s var(--ease-micro) !important;
+/* Tabs — no token for the ink-bar height or the active weight. */
+body .ant-tabs-tab {
+  transition: color 0.15s var(--ease-micro);
 }
 
-.ant-tabs-tab-active {
-  font-weight: 600 !important;
+body .ant-tabs-tab-active {
+  font-weight: 600;
 }
 
-.ant-tabs-ink-bar {
-  height: 2px !important;
-  border-radius: 1px !important;
+body .ant-tabs-ink-bar {
+  height: 2px;
+  border-radius: 1px;
 }
 
-/* Pagination */
-.ant-pagination-item {
-  border-radius: 6px !important;
-  transition: all 0.1s var(--ease-micro) !important;
+/* Pagination.
+   STY-007: item radius and active colours live in theme.ts (borderRadius
+   6, itemActiveBg primary, itemActiveColor inverse). The transition has
+   no token. */
+body .ant-pagination-item {
+  transition: all 0.1s var(--ease-micro);
 }
 
-.ant-pagination-item-active {
-  background: var(--fg-primary) !important;
-  border-color: var(--fg-primary) !important;
-}
-
-.ant-pagination-item-active a {
-  color: var(--fg-inverse) !important;
-}
-
-/* Steps */
-.ant-steps-item-icon {
-  transition: all 0.2s var(--ease-micro) !important;
-}
-
-/* Descriptions */
-.ant-descriptions-item-label {
-  color: var(--fg-tertiary) !important;
-  font-weight: 500 !important;
-}
-
-.ant-descriptions-item-content {
-  color: var(--fg-secondary) !important;
-}
-
-/* Timeline */
-.ant-timeline-item-head {
+/* Steps — transition only, no token. */
+body .ant-steps-item-icon {
   transition: all 0.2s var(--ease-micro);
 }
 
-/* Statistic */
-.ant-statistic-content-value {
-  font-weight: 600 !important;
-  letter-spacing: -0.03em !important;
-  font-size: 28px !important;
+/* Descriptions.
+   STY-007: label/content colours live in theme.ts (labelColor tertiary,
+   contentColor secondary); the label weight has no token. */
+body .ant-descriptions-item-label {
+  font-weight: 500;
 }
 
-.ant-statistic-title {
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  color: var(--fg-tertiary) !important;
+/* Statistic.
+   STY-007: title/content sizes live in theme.ts (content fontSize 28,
+   title caption) and the title colour in colorTextDescription. The
+   weights have no Statistic token — antd's contentFontWeight is not
+   consumed — so they stay here. */
+body .ant-statistic-content-value {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+body .ant-statistic-title {
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -590,87 +557,61 @@ h3 {
   100% { background-position: -200% 0; }
 }
 
-/* Empty state */
-.ant-empty-description {
-  color: var(--fg-muted) !important;
+/* Empty — STY-007: colour lives in theme.ts (Empty.colorText muted). */
+
+/* Notification.
+   STY-007: radius lives in theme.ts (Notification.borderRadius 10); the
+   shadow has no token. */
+body .ant-notification-notice {
+  box-shadow: var(--shadow-card);
 }
 
-/* Notification */
-.ant-notification-notice {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-card) !important;
+/* Message — no Message token covers radius or shadow. */
+body .ant-message-notice-content {
+  border-radius: 8px;
+  box-shadow: var(--shadow-dropdown);
 }
 
-/* Message */
-.ant-message-notice-content {
-  border-radius: 8px !important;
-  box-shadow: var(--shadow-dropdown) !important;
+/* Popover.
+   STY-007: radius lives in theme.ts (Popover.borderRadius 10); the
+   shadow has no token. */
+body .ant-popover-inner {
+  box-shadow: var(--shadow-dropdown);
 }
 
-/* Popover */
-.ant-popover-inner {
-  border-radius: 10px !important;
-  box-shadow: var(--shadow-dropdown) !important;
+/* Drawer — no Drawer token covers the shadow. */
+body .ant-drawer-content {
+  box-shadow: var(--shadow-modal);
 }
 
-/* Drawer */
-.ant-drawer-content {
-  box-shadow: var(--shadow-modal) !important;
+/* Checkbox / Radio.
+   STY-007: checked fills live in theme.ts (colorPrimary). The
+   indeterminate marker fill has no token. */
+body .ant-checkbox-indeterminate .ant-checkbox-inner::after {
+  background: var(--fg-primary);
 }
 
-/* Switch */
-.ant-switch-checked {
-  background: var(--fg-primary) !important;
+/* Slider.
+   STY-007: track colour lives in theme.ts (trackBg primary); the handle
+   ring has no token. */
+body .ant-slider-handle::after {
+  box-shadow: 0 0 0 2px var(--fg-primary);
 }
 
-/* Checkbox / Radio */
-.ant-checkbox-checked .ant-checkbox-inner,
-.ant-radio-checked .ant-radio-inner {
-  background: var(--fg-primary) !important;
-  border-color: var(--fg-primary) !important;
+/* Segmented — the selected weight has no token. */
+body .ant-segmented-item-selected {
+  font-weight: 600;
 }
 
-.ant-checkbox-indeterminate .ant-checkbox-inner::after {
-  background: var(--fg-primary) !important;
+/* Collapse — the header weight has no token. */
+body .ant-collapse-header {
+  font-weight: 500;
 }
 
-/* Slider */
-.ant-slider-track {
-  background: var(--fg-primary) !important;
-}
-
-.ant-slider-handle::after {
-  box-shadow: 0 0 0 2px var(--fg-primary) !important;
-}
-
-/* Progress */
-.ant-progress-bg {
-  background: var(--fg-primary) !important;
-}
-
-/* Segmented */
-.ant-segmented-item-selected {
-  font-weight: 600 !important;
-}
-
-/* Collapse */
-.ant-collapse-header {
-  font-weight: 500 !important;
-}
-
-/* Result */
-.ant-result-title {
-  font-weight: 600 !important;
-  letter-spacing: -0.02em !important;
-}
-
-/* Badge */
-.ant-badge-count {
-  font-weight: 600 !important;
-  font-size: 10px !important;
-  min-width: 16px !important;
-  height: 16px !important;
-  line-height: 16px !important;
+/* Result — the title weight/tracking has no token. */
+body .ant-result-title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 /* ─── Scrollbar ─────────────────────────────────────────────── */
@@ -734,7 +675,7 @@ h3 {
   width: 100%;
   padding: 10px 16px;
   border: 0;
-  border-top: 1px solid var(--border-subtle);
+  box-shadow: 0 -1px 0 0 var(--border-subtle);
   background: var(--bg-page);
   color: var(--fg-secondary);
   text-align: left;
@@ -781,7 +722,7 @@ h3 {
 .command-palette-hint kbd,
 .ant-modal kbd {
   padding: 1px 5px;
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 4px;
   color: var(--fg-muted);
   background: var(--bg-page);
@@ -803,7 +744,7 @@ h3 {
   gap: 10px;
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid transparent;
+  box-shadow: 0 0 0 1px transparent;
   border-radius: 8px;
   color: var(--fg-secondary);
   background: transparent;
@@ -875,10 +816,11 @@ h3 {
 
 .contract-mobile-card {
   padding: 16px;
-  border: 1px solid var(--border-default);
   border-radius: 10px;
   background: var(--bg-elevated);
-  box-shadow: var(--shadow-static);
+  /* STY-008: border -> ring shadow; the card's elevation shadow is
+     layered on top so neither is lost. */
+  box-shadow: var(--shadow-static), 0 0 0 1px var(--border-default);
 }
 
 .contract-mobile-card-header,
@@ -960,10 +902,12 @@ h3 {
   font-size: 11px;
 }
 
-/* Keep a visible keyboard focus ring for native and Ant Design controls. */
-.ant-btn:focus-visible,
-.ant-select:focus-visible {
-  outline: 2px solid var(--fg-primary) !important;
+/* Keep a visible keyboard focus ring for native and Ant Design controls.
+   STY-008: these are a11y rules for our own focus handling — no antd rule
+   competes at this specificity once the body prefix is added. */
+body .ant-btn:focus-visible,
+body .ant-select:focus-visible {
+  outline: 2px solid var(--fg-primary);
   outline-offset: 2px;
 }
 
@@ -991,66 +935,74 @@ html {
 }
 
 @media (max-width: 1023px) {
-  .ant-layout-header {
-    padding: 0 20px !important;
+  /* STY-008: response-specific sizes, no token equivalent — body prefix
+     beats antd's injected .ant-layout-* rules. */
+  body .ant-layout-header {
+    padding: 0 20px;
   }
 
-  .ant-layout-content {
-    padding: 24px !important;
+  body .ant-layout-content {
+    padding: 24px;
   }
 }
 
 @media (max-width: 767px) {
+  /* STY-008: these are our own classes — nothing else targets them, so the
+     important flags were defensive only. Removed; specificity unchanged. */
   .ai-chat-shell {
-    margin: -16px !important;
+    margin: -16px;
     width: calc(100% + 32px);
   }
 
   .ai-chat-session-sidebar {
-    width: 260px !important;
+    width: 260px;
   }
 
   .ai-chat-messages,
   .ai-chat-input {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .ai-chat-header-left {
-    min-width: 0 !important;
+    min-width: 0;
     overflow: hidden;
   }
 
   .ai-chat-header-title {
-    min-width: 0 !important;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .ai-chat-header-actions {
-    gap: 4px !important;
+    gap: 4px;
   }
 
   .ai-chat-model-button {
-    padding-inline: 4px !important;
+    padding-inline: 4px;
   }
 
   .ai-chat-model-label {
-    display: none !important;
+    display: none;
   }
 
   .ai-chat-model-short {
-    display: inline !important;
+    display: inline;
   }
 
-  .ant-layout-header {
-    height: 56px !important;
-    padding: 0 12px !important;
+  /* STY-008: layout overrides are antd-token-driven on desktop (60px /
+     0 32px); the mobile sizes are response-specific and have no token
+     equivalent, so they stay — body-prefixed to beat antd's later
+     injected .ant-layout-header rule. */
+  body .ant-layout-header {
+    height: 56px;
+    padding: 0 12px;
   }
 
-  .ant-layout-header > div:first-child {
-    gap: 8px !important;
+  body .ant-layout-header > div:first-child {
+    gap: 8px;
   }
 
   .app-logo span {
@@ -1072,8 +1024,8 @@ html {
     display: none;
   }
 
-  .ant-layout-content {
-    padding: 16px !important;
+  body .ant-layout-content {
+    padding: 16px;
   }
 
   .ant-table-wrapper {
@@ -1146,19 +1098,22 @@ html {
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* AI Chat Session Sidebar - show delete button on hover */
+/* AI Chat Session Sidebar - show delete button on hover.
+   STY-008: our own classes, nothing else targets them — the flags were
+   defensive only. The hover/focus rules out-specify the base rule by
+   class count, so no flag is needed. */
 .session-more-btn {
-  opacity: 0 !important;
+  opacity: 0;
 }
 
 .ai-chat-session-row:hover .session-more-btn,
 .ai-chat-session-row:focus-within .session-more-btn {
-  opacity: 1 !important;
+  opacity: 1;
 }
 
 .session-more-btn:focus,
 .session-more-btn:focus-visible {
-  opacity: 1 !important;
+  opacity: 1;
 }
 
 /* This mobile override intentionally follows the global hide rule so touch
@@ -1166,7 +1121,7 @@ html {
 @media (max-width: 767px) {
   .ant-drawer .session-more-btn,
   .ai-chat-session-sidebar .session-more-btn {
-    opacity: 1 !important;
+    opacity: 1;
   }
 }
 
@@ -1210,7 +1165,7 @@ html {
   align-items: center;
   justify-content: space-between;
   background: var(--fg-inverse);
-  border-bottom: 1px solid var(--border-default);
+  box-shadow: 0 1px 0 0 var(--border-default);
   padding: 0 32px;
   height: 60px;
   position: sticky;
@@ -1347,7 +1302,7 @@ html {
 }
 .app-sider {
   background: var(--fg-inverse);
-  border-right: 1px solid var(--border-default);
+  box-shadow: 1px 0 0 0 var(--border-default);
   flex-shrink: 0;
   /* FIX-011: the sider is a flex column — the menu scrolls internally and
      the footer returns to normal flow instead of floating over the last
@@ -1369,7 +1324,7 @@ html {
 }
 .app-sider-footer {
   padding: 12px 16px;
-  border-top: 1px solid var(--bg-inset);
+  box-shadow: 0 -1px 0 0 var(--bg-inset);
   font-size: 11px;
   color: var(--fg-muted);
   text-align: center;
@@ -1410,7 +1365,7 @@ html {
    degrades the whole bar (status-warning surface); KPI cards carry the
    .kpi-not-ready-badge. Classification is a status dot, not a fill. */
 .data-trust-bar {
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 8px;
   padding: 10px 14px;
   background: var(--bg-surface);
@@ -1465,7 +1420,7 @@ html {
   line-height: 16px;
   padding: 0 6px;
   border-radius: 4px;
-  border: 1px solid var(--state-warning-border);
+  box-shadow: 0 0 0 1px var(--state-warning-border);
   background: var(--state-warning-bg);
   color: var(--state-warning-text);
   white-space: nowrap;
@@ -1476,7 +1431,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 6px;
   padding: 2px 8px;
   background: var(--bg-surface);
@@ -1497,7 +1452,7 @@ html {
   margin: 6px 0 0;
   padding: 8px 12px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 6px;
   font-size: 12px;
   color: var(--fg-tertiary);
@@ -1511,7 +1466,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid var(--border-default);
+  box-shadow: 0 0 0 1px var(--border-default);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 11px;
@@ -1529,10 +1484,10 @@ html {
   border-radius: 9999px;
   padding: 1px 8px;
   font-size: 12px;
-  border: 1px solid;
+  box-shadow: 0 0 0 1px var(--border-default);
 }
 .ai-confidence-dot { width: 8px; height: 8px; border-radius: 50%; }
-.ai-confidence-badge.is-low { border-color: var(--state-error-border); color: var(--state-error-text); }
+.ai-confidence-badge.is-low { box-shadow: 0 0 0 1px var(--state-error-border); color: var(--state-error-text); }
 .ai-confidence-badge.is-low .ai-confidence-dot { background: var(--state-error-text); }
 .ai-confidence-badge.is-medium { border-color: var(--state-warning-border); color: var(--state-warning-text); }
 .ai-confidence-badge.is-medium .ai-confidence-dot { background: var(--state-warning-text); }
@@ -1543,7 +1498,7 @@ html {
 
 /* ── AI-002: ApprovalCard + RetailAIDrawer ─────────────────────── */
 .approval-card {
-  border: 1px solid var(--state-info-border);
+  box-shadow: 0 0 0 1px var(--state-info-border);
   border-radius: 8px;
   padding: 12px;
   background: var(--state-info-bg);
@@ -1785,9 +1740,10 @@ html {
   text-overflow: ellipsis;
 }
 .home-readiness-card {
-  /* FIX-009: unify the hand-written card onto the AntD card language
-     (1px border-default, no ring shadow) — the hairline shadow version
-     was invisible on the white page background. */
+  /* FIX-009: unify the hand-written card onto the AntD card language.
+     STY-008: this card keeps a real border on purpose — the 1px hairline
+     ring-shadow version was invisible on the white page background
+     (recorded in FIX-009); the border uses the border token either way. */
   background: var(--bg-page);
   border: 1px solid var(--border-default);
   border-radius: 10px;
@@ -2287,12 +2243,12 @@ html {
   height: 40px;
   border-radius: 11px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
+  box-shadow: 0 0 0 1px var(--border-subtle);
 }
 
 .login-brand .login-badge {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
 .login-lockup-name {
@@ -2399,7 +2355,7 @@ html {
   gap: 6px;
   margin: 32px 0 0;
   padding-top: 20px;
-  border-top: 1px solid var(--border-subtle);
+  box-shadow: 0 -1px 0 0 var(--border-subtle);
   color: var(--fg-muted);
   font-size: 12px;
   line-height: 1.5;
@@ -2428,4 +2384,548 @@ html {
 .brand-icon {
   display: inline-block;
   vertical-align: middle;
+}
+
+/* STATE-003: shared data-state presentation (StateBlock). The four states
+   reuse the alert/empty components; these rules only give the block a
+   consistent rhythm between sections. */
+.state-block,
+.state-block-scope-denied,
+.state-block-failed,
+.state-block-actionable {
+  margin: 16px 0;
+}
+.state-block-empty {
+  padding: 24px 0;
+}
+
+/* STY-009: static inline styles converted to classes (auto-generated). */
+
+.sty-6319d0fa {
+  font-size: 11;
+}
+
+.sty-5b498286 {
+  font-size: 15;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sty-db94ac11 {
+  display: flex;
+  align-items: center;
+  gap: 8;
+}
+
+.sty-dc5ff6d2 {
+  font-size: 11;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.sty-9c9b5eff {
+  border-radius: 10;
+}
+
+.sty-7f21e1ba {
+  margin-bottom: 16;
+}
+
+.sty-9d628f2f {
+  margin-bottom: 16;
+  padding: 10px 14px;
+  border-radius: 8;
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--border-default);
+  font-size: 12;
+  color: var(--fg-muted);
+}
+
+.sty-96b7455d {
+  font-size: 12;
+  padding: 2px 10px;
+}
+
+.sty-9b30e5cd {
+  font-size: 12;
+  color: var(--fg-muted);
+}
+
+.sty-51a6ccfa {
+  display: flex;
+  flex-direction: column;
+  gap: 4;
+}
+
+.sty-70ea3314 {
+  width: 100%;
+}
+
+.sty-869f4e9b {
+  margin-top: 10;
+}
+
+.sty-12c0845e {
+  margin-left: 8;
+}
+
+.sty-084409c0 {
+  font-weight: 600;
+  color: var(--fg-tertiary);
+}
+
+.sty-8465c002 {
+  margin-top: 12;
+  padding: 10px 14px;
+  border-radius: 8;
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--border-default);
+  font-size: 12;
+  color: var(--fg-muted);
+}
+
+.sty-2c2c74e0 {
+  margin-top: 8;
+}
+
+.sty-f8c8af9b {
+  padding: 0;
+  font-size: 12;
+}
+
+.sty-68c261a9 {
+  width: 220;
+}
+
+.sty-b8bb6f7b {
+  font-size: 13;
+  color: var(--fg-tertiary);
+}
+
+.sty-37a031a7 {
+  width: 90;
+}
+
+.sty-7ded11c1 {
+  width: 110;
+}
+
+.sty-48ccdf03 {
+  margin-left: auto;
+  padding: 0;
+  font-size: 12;
+}
+
+.sty-520d3a53 {
+  opacity: 0.5;
+}
+
+.sty-4678905e {
+  margin-bottom: 16;
+  padding: 10px 14px;
+  border-radius: 8;
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--border-default);
+  display: flex;
+  align-items: center;
+  gap: 8;
+  flex-wrap: wrap;
+  font-size: 13;
+  color: var(--fg-tertiary);
+}
+
+.sty-e947dcf7 {
+  margin-bottom: 20;
+}
+
+.sty-f1dd2ad9 {
+  font-size: 12;
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  gap: 4;
+}
+
+.sty-bd560a9e {
+  font-weight: 600;
+  font-size: 14;
+  color: var(--fg-primary);
+}
+
+.sty-924d87a1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12;
+}
+
+.sty-3f98b05a {
+  color: var(--fg-muted);
+  margin-bottom: 12;
+}
+
+.sty-f44aea36 {
+  padding: 24px 12px;
+  text-align: center;
+}
+
+.sty-1f723465 {
+  display: block;
+  padding: 120;
+  text-align: center;
+}
+
+.sty-80333e75 {
+  font-size: 12;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.sty-4278d539 {
+  border-radius: 10;
+  height: 100%;
+}
+
+.sty-8d9ffc18 {
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+.sty-d4418b43 {
+  margin-bottom: 16;
+  color: var(--fg-secondary);
+}
+
+.sty-c6e381ce {
+  font-size: 13;
+  color: var(--fg-muted);
+}
+
+.sty-60d6ce74 {
+  color: var(--border-strong);
+}
+
+.sty-73be230f {
+  color: var(--fg-primary);
+}
+
+.sty-d822a7a7 {
+  margin-top: 16;
+}
+
+.sty-65ab137c {
+  margin-right: 4;
+}
+
+.sty-f0c37429 {
+  margin: 0;
+  font-size: 13;
+}
+
+.sty-867764b6 {
+  flex-shrink: 0;
+}
+
+.sty-c1108b12 {
+  font-size: 15;
+  font-weight: 600;
+  color: var(--fg-primary);
+  margin-bottom: 2;
+}
+
+.sty-83725d2c {
+  flex: 1;
+}
+
+.sty-63811967 {
+  padding: 24px 0;
+}
+
+.sty-6a67d1fd {
+  width: 160;
+}
+
+.sty-cee1122c {
+  width: 140;
+}
+
+.sty-7b32b26b {
+  width: 260;
+}
+
+.sty-477fa20b {
+  width: 150;
+}
+
+.sty-ac87a46f {
+  margin-top: 24;
+}
+
+.sty-8da2ac96 {
+  padding: 8px 16px;
+}
+
+.sty-e242b586 {
+  padding: 8px 0;
+}
+
+.sty-96007dcc {
+  color: var(--fg-muted);
+}
+
+.sty-99d8c40b {
+  font-size: 15;
+  font-weight: 600;
+}
+
+.sty-4757b38c {
+  font-size: 12;
+  color: var(--fg-tertiary);
+  margin-bottom: 4;
+}
+
+.sty-0ee503b7 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16;
+  margin-bottom: 12;
+}
+
+.sty-5ab5e82b {
+  margin-bottom: 16;
+  border-radius: 10;
+}
+
+.sty-a8f26b1e {
+  font-weight: bold;
+  color: var(--fg-primary);
+}
+
+.sty-5822ad35 {
+  margin-bottom: 8;
+}
+
+.sty-37c08d18 {
+  margin-bottom: 12;
+}
+
+.sty-4ffb9b7c {
+  margin: 8px 0 16px;
+}
+
+.sty-dc0fa432 {
+  display: block;
+  margin-top: 3;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.sty-22a08c80 {
+  min-width: 0;
+}
+
+.sty-073b2a94 {
+  border-radius: 10;
+  overflow: visible;
+}
+
+.sty-e3e86ee5 {
+  font-size: 13;
+}
+
+.sty-4308db27 {
+  display: flex;
+  align-items: center;
+  gap: 12;
+  margin-bottom: 12;
+  padding: 10px 16px;
+  border-radius: 10;
+  background: var(--bg-inset);
+  box-shadow: 0 0 0 1px var(--border-default);
+}
+
+.sty-729b7a2c {
+  border-radius: 6;
+}
+
+.sty-f5911ea9 {
+  display: flex;
+  align-items: center;
+  gap: 6;
+  margin-left: auto;
+}
+
+.sty-ced30fdd {
+  width: 130;
+}
+
+.sty-05d4bcf4 {
+  color: var(--fg-muted);
+  font-size: 14;
+}
+
+.sty-a1f31e15 {
+  display: flex;
+  align-items: center;
+  gap: 6;
+}
+
+.sty-cceb8d9d {
+  padding-left: 36;
+  border-radius: 9999;
+  height: 36;
+  font-size: 13;
+}
+
+.sty-bb510439 {
+  position: absolute;
+  left: 12;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fg-muted);
+  font-size: 14;
+  z-index: 1;
+}
+
+.sty-e63acfbd {
+  position: relative;
+  flex: 1;
+  min-width: 280;
+  max-width: 400;
+}
+
+.sty-91b8ec7c {
+  display: flex;
+  gap: 12;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sty-cd77f5b4 {
+  border-radius: 9999;
+  font-weight: 500;
+}
+
+.sty-e16cb0e3 {
+  color: var(--fg-muted);
+  border-radius: 6;
+  width: 28;
+  height: 28;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sty-32c4a785 {
+  font-size: 12;
+}
+
+.sty-ab79ea2b {
+  margin: 0;
+}
+
+.sty-ef82e49c {
+  font-size: 11;
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+
+.sty-d7a8387d {
+  background: var(--fg-primary);
+  color: var(--fg-inverse);
+  font-size: 10;
+  font-weight: 600;
+  padding: 0 6px;
+  height: 18;
+  line-height: 18px;
+  border-radius: 4;
+}
+
+.sty-5e6ef0d9 {
+  font-weight: 500;
+  margin: 0;
+}
+
+.sty-0e5391a4 {
+  font-size: 13;
+  color: var(--fg-tertiary);
+  font-family: monospace;
+}
+
+.sty-3afd6deb {
+  font-size: 12;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+.sty-6ddf9e71 {
+  font-weight: 500;
+  font-size: 13;
+  color: var(--fg-tertiary);
+}
+
+.sty-9ac25994 {
+  margin-top: 5;
+  font-size: 11;
+  padding: 1px 7px;
+}
+
+.sty-17e511d4 {
+  color: var(--fg-secondary);
+  font-weight: 500;
+  margin-top: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sty-8e460f80 {
+  min-width: 220;
+}
+
+.sty-72ff3588 {
+  width: 120;
+}
+
+.sty-c0dde518 {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10;
+}
+
+.sty-33239bd4 {
+  color: var(--fg-tertiary);
+  margin-bottom: 12;
+  font-size: 13;
+}
+
+.sty-3aa6bafa {
+  margin-top: 12;
+  color: var(--fg-tertiary);
+  font-size: 13;
+}
+
+.sty-b20ac6af {
+  margin-top: 10;
+  color: var(--fg-tertiary);
+  font-size: 12;
+}
+
+.sty-a4d93741 {
+  width: 180;
+}
+
+.sty-300e6a8d {
+  margin-top: 12;
+  display: flex;
+  gap: 8;
+  align-items: center;
+  flex-wrap: wrap;
 }

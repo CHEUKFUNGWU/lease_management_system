@@ -300,6 +300,35 @@ export interface RetailSuppressedAttention {
   comparison_coverage: RetailCoverage;
 }
 
+export interface RetailPlanVariance {
+  kpi: string;
+  actual?: number | null;
+  plan?: number | null;
+  variance?: number | null;
+  variance_pct?: number | null;
+  attainment_pct?: number | null;
+  materiality_exceeded: boolean;
+  decision_ready: boolean;
+  downgrade_reason?: string;
+}
+
+export interface RetailPlanComparison {
+  period: string;
+  plan_version_id?: string;
+  plan_version_name?: string;
+  plan_version_type?: string;
+  plan_as_of_period?: string;
+  plan_source?: string;
+  plan_is_official: boolean;
+  currency?: string;
+  expected_store_count: number;
+  actual_store_count: number;
+  plan_store_count: number;
+  variances: RetailPlanVariance[];
+  decision_ready: boolean;
+  downgrade_reason?: string;
+}
+
 export interface RetailPulsePartition {
   currency?: string;
   currency_status?: string;
@@ -340,6 +369,7 @@ export interface RetailPulseResponse extends RetailPulsePartition {
   current_kpi_drilldown_url: string;
   comparison_kpi_drilldown_url: string;
   partitions?: RetailPulsePartition[];
+  plan?: RetailPlanComparison;
 }
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -1595,6 +1625,7 @@ export interface RetailStoreDiagnosticsResponse {
   highest_as_of?: string;
   data_quality_issues?: string[];
   kpi_drilldown_url: string;
+  plan?: RetailPlanComparison;
 }
 
 // SANKEY-001 一期：门店利润流向（单一营业额节点 → 四项费用 + 门店贡献）。
@@ -1871,6 +1902,32 @@ export type RetailIngestCommitResponse = {
   failed_count: number;
   idempotent_replay: boolean;
   envelope: { source_system: string; import_batch_id: string; as_of_at: string };
+};
+
+export const fpnaPlanImportApi = {
+  importPlanVersion: (file: File, fields: { name: string; version_type: string; source: string; as_of_period: string; from_period: string; to_period: string; is_official: boolean; currency?: string }, token: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    for (const [key, value] of Object.entries(fields)) form.append(key, String(value));
+    return apiRequest("/api/v1/fpna/plan-versions/import", { method: "POST", body: form, token }) as Promise<{
+      basis: string; version: { id: string; name: string; version_type: string; is_official: boolean };
+      accepted_rows: number; rejected_rows: number; idempotent_replay: boolean;
+      errors?: Array<{ row: number; code: string; message: string }>;
+    }>;
+  },
+};
+
+export const trialBalanceApi = {
+  importTB: (file: File, fields: { name: string; source_system: string; period: string; functional_currency: string }, token: string) => {
+    const form = new FormData();
+    form.append("file", file);
+    for (const [key, value] of Object.entries(fields)) form.append(key, value);
+    return apiRequest("/api/v1/gl/trial-balances/import", { method: "POST", body: form, token }) as Promise<{
+      basis: string; version: { id: string; name: string; content_sha256: string };
+      accepted_rows: number; rejected_rows: number; idempotent_replay: boolean; balanced: boolean;
+      errors?: Array<{ row: number; code: string; message: string }>;
+    }>;
+  },
 };
 
 export const retailExportApi = {

@@ -129,6 +129,8 @@ func main() {
 	retailStoreDiagnosticsHandler := handlers.NewRetailStoreDiagnosticsHandler(retailKPIRepo).WithPlanReader(planReader).WithPlanMateriality(planMateriality)
 	retailScenarioHandler := handlers.NewRetailScenarioHandler(retailKPIRepo, operatingFactsRepo)
 	fpnaGovernanceHandler := handlers.NewFPnAGovernanceHandler(fpnaGovernanceRepo, operatingFactsRepo, auditLogger)
+	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
+	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
 	decisionScenarioHandler := handlers.NewDecisionScenarioHandler(draftService)
 	agentGatewayHandler := handlers.NewAgentGatewayHandler(aiChatHandler.AgentToolRuntime(), handlers.NewAgentToolAuditRecorder(auditLogger)).WithCapabilityIssuer(capabilityIssuer).WithSkillRegistry(aiChatHandler.AgentSkillRegistry()).WithSessionStore(aiChatHandler.AgentSessionStore()).WithContractScopeReader(contractRepo).WithRunStore(aiChatHandler.AgentRunStore()).WithCheckpointStore(aiChatHandler.AgentRunCheckpointStore()).WithQueueStore(aiRunQueueRepo).WithWorkerRunStore(aiRunQueueRepo).WithTerminalAlertStore(aiChatRuntimeRepo).WithUsageStore(aiChatRuntimeRepo)
 
@@ -355,6 +357,9 @@ func main() {
 		// Budget versions freeze the measured forward schedule so later actuals
 		// can be explained against a stable plan.
 		protected.Handle(http.MethodGet, "/budget-versions", permission("reports", "read"), budgetHandler.ListVersions)
+		protected.Handle(http.MethodPost, "/fpna/plan-versions/import", permission("master_data", "manage"), fpnaPlanImportHandler.Import)
+		protected.Handle(http.MethodPost, "/gl/trial-balances/import", permission("master_data", "manage"), trialBalanceHandler.Import)
+		protected.Handle(http.MethodGet, "/gl/trial-balances", permission("reports", "read"), trialBalanceHandler.List)
 		protected.Handle(http.MethodPost, "/budget-versions", permission("reports", "read"), budgetHandler.CreateVersion)
 		protected.Handle(http.MethodGet, "/budget-versions/compare", permission("reports", "read"), budgetHandler.CompareVersions)
 		protected.Handle(http.MethodGet, "/budget-versions/management-brief", permission("reports", "read"), budgetHandler.ManagementBrief)

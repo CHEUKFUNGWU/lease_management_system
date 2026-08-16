@@ -9,7 +9,7 @@ import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StateBlock } from "../components/StateBlock";
-import { apiErrorMessage, retailIngestApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
+import { apiErrorMessage, fpnaPlanImportApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
 import { tableScrollX } from "../lib/tableScroll";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -75,6 +75,63 @@ export default function RetailDataImportPage() {
     }
     if (header) next[header] = field;
     setMapping(next);
+  };
+
+  // P5-3: budget/forecast/scenario plan version import (controlled template,
+  // business-level idempotency on name+as_of_period).
+  const [planFile, setPlanFile] = useState<File | null>(null);
+  const [planName, setPlanName] = useState("");
+  const [planType, setPlanType] = useState("budget");
+  const [planSource, setPlanSource] = useState("excel-import");
+  const [planFrom, setPlanFrom] = useState(dayjs().subtract(6, "month").format("YYYY-MM"));
+  const [planTo, setPlanTo] = useState(dayjs().add(6, "month").format("YYYY-MM"));
+  const [planAsOf, setPlanAsOf] = useState(dayjs().subtract(1, "month").format("YYYY-MM"));
+  const [planOfficial, setPlanOfficial] = useState(false);
+  const [planImporting, setPlanImporting] = useState(false);
+  const [planResult, setPlanResult] = useState<string | null>(null);
+  const importPlanVersion = async () => {
+    if (!token || !planFile || !planName.trim()) return;
+    setPlanImporting(true);
+    try {
+      const result = await fpnaPlanImportApi.importPlanVersion(planFile, {
+        name: planName.trim(), version_type: planType, source: planSource.trim(),
+        as_of_period: planAsOf, from_period: planFrom, to_period: planTo, is_official: planOfficial,
+      }, token);
+      setPlanResult(result.idempotent_replay
+        ? t("plan_import.replay", language)
+        : `${t("plan_import.done", language)} · ${result.version.name} · ${result.accepted_rows}/${result.accepted_rows + result.rejected_rows}${result.rejected_rows > 0 ? ` · ${result.rejected_rows} 行失败` : ""}`);
+      message.success(result.idempotent_replay ? t("plan_import.replay", language) : t("plan_import.done", language));
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    } finally {
+      setPlanImporting(false);
+    }
+  };
+
+  // P5-3b: GL trial balance import (content-identified version, functional
+  // currency basis — ADR-0009).
+  const [tbFile, setTbFile] = useState<File | null>(null);
+  const [tbName, setTbName] = useState("");
+  const [tbSource, setTbSource] = useState("gl-export");
+  const [tbPeriod, setTbPeriod] = useState(dayjs().subtract(1, "month").format("YYYY-MM"));
+  const [tbCurrency, setTbCurrency] = useState("CNY");
+  const [tbImporting, setTbImporting] = useState(false);
+  const [tbResult, setTbResult] = useState<string | null>(null);
+  const importTrialBalance = async () => {
+    if (!token || !tbFile || !tbName.trim()) return;
+    setTbImporting(true);
+    try {
+      const result = await trialBalanceApi.importTB(tbFile, {
+        name: tbName.trim(), source_system: tbSource.trim(), period: tbPeriod, functional_currency: tbCurrency.toUpperCase(),
+      }, token);
+      const balanced = result.balanced ? t("tb_import.balanced", language) : t("tb_import.unbalanced", language);
+      setTbResult(result.idempotent_replay ? t("tb_import.replay", language) : `${t("tb_import.done", language)} · ${result.accepted_rows} 行 · ${balanced}`);
+      message.success(result.idempotent_replay ? t("tb_import.replay", language) : t("tb_import.done", language));
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    } finally {
+      setTbImporting(false);
+    }
   };
 
   const commit = async () => {
@@ -191,5 +248,45 @@ export default function RetailDataImportPage() {
         </Card>
       </>
     )}
+    <Card size="small" className="retail-import-block-gap" title={t("plan_import.title", language)}>
+      <Flex gap={12} wrap="wrap" align="center">
+        <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input" value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder={t("plan_import.name", language)} />
+        <select aria-label={t("plan_import.version_type", language)} className="retail-import-mapping-select" style={{ maxWidth: 140 }} value={planType} onChange={(event) => setPlanType(event.target.value)}>
+          <option value="budget">budget</option>
+          <option value="forecast">forecast</option>
+          <option value="scenario">scenario</option>
+        </select>
+        <Input aria-label={t("plan_import.source", language)} className="retail-import-source-input" value={planSource} onChange={(event) => setPlanSource(event.target.value)} />
+        <span>{t("plan_import.from_period", language)}</span>
+        <DatePicker picker="month" allowClear={false} value={dayjs(planFrom)} onChange={(value) => value && setPlanFrom(value.format("YYYY-MM"))} />
+        <span>{t("plan_import.to_period", language)}</span>
+        <DatePicker picker="month" allowClear={false} value={dayjs(planTo)} onChange={(value) => value && setPlanTo(value.format("YYYY-MM"))} />
+        <span>{t("plan_import.as_of_period", language)}</span>
+        <DatePicker picker="month" allowClear={false} value={dayjs(planAsOf)} onChange={(value) => value && setPlanAsOf(value.format("YYYY-MM"))} />
+        <Upload accept=".csv,.xlsx" maxCount={1} showUploadList={false} beforeUpload={(selected) => { setPlanFile(selected); return false; }}>
+          <Button icon={<CloudUploadOutlined />}>{planFile ? planFile.name : t("plan_import.title", language)}</Button>
+        </Upload>
+        <span><input type="checkbox" checked={planOfficial} onChange={(event) => setPlanOfficial(event.target.checked)} /> {t("plan_import.official", language)}</span>
+        <Button type="primary" loading={planImporting} disabled={!planFile || !planName.trim()} onClick={() => { void importPlanVersion(); }}>{t("plan_import.commit", language)}</Button>
+      </Flex>
+      <Typography.Text type="secondary" className="retail-import-hint">{t("plan_import.hint", language)}</Typography.Text>
+      {planResult && <Alert className="retail-import-block-gap-sm" type="success" showIcon message={planResult} />}
+    </Card>
+    <Card size="small" className="retail-import-block-gap" title={t("tb_import.title", language)}>
+      <Flex gap={12} wrap="wrap" align="center">
+        <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input" value={tbName} onChange={(event) => setTbName(event.target.value)} placeholder={t("plan_import.name", language)} />
+        <Input aria-label={t("tb_import.source_system", language)} className="retail-import-source-input" value={tbSource} onChange={(event) => setTbSource(event.target.value)} />
+        <span>{t("tb_import.period", language)}</span>
+        <DatePicker picker="month" allowClear={false} value={dayjs(tbPeriod)} onChange={(value) => value && setTbPeriod(value.format("YYYY-MM"))} />
+        <span>{t("tb_import.currency", language)}</span>
+        <Input aria-label={t("tb_import.currency", language)} className="retail-import-source-input" value={tbCurrency} onChange={(event) => setTbCurrency(event.target.value.toUpperCase())} maxLength={3} />
+        <Upload accept=".csv" maxCount={1} showUploadList={false} beforeUpload={(selected) => { setTbFile(selected); return false; }}>
+          <Button icon={<CloudUploadOutlined />}>{tbFile ? tbFile.name : t("tb_import.title", language)}</Button>
+        </Upload>
+        <Button type="primary" loading={tbImporting} disabled={!tbFile || !tbName.trim()} onClick={() => { void importTrialBalance(); }}>{t("tb_import.commit", language)}</Button>
+      </Flex>
+      <Typography.Text type="secondary" className="retail-import-hint">{t("tb_import.hint", language)}</Typography.Text>
+      {tbResult && <Alert className="retail-import-block-gap-sm" type="success" showIcon message={tbResult} />}
+    </Card>
   </div></AppLayout></ProtectedRoute>;
 }

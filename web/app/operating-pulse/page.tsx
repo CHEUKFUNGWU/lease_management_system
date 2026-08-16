@@ -29,6 +29,7 @@ import { tableScrollX } from "../lib/tableScroll";
 import { RetailExportMenu } from "../components/RetailExportMenu";
 import { retailExportApi } from "../lib/api";
 import { envelopeFromPulse, pulseRowsFromResponse } from "../lib/retail-export";
+import { PlanComparisonPanel } from "../components/PlanComparisonPanel";
 
 const WINDOW_OPTIONS = [7, 14, 28] as const;
 // M2 (2026-08-16 decision): the unified product default is 14; custom
@@ -368,6 +369,7 @@ function OperatingPulseInner() {
     {loading && !response && !isEmptyInitial && <Card><Flex justify="center" align="center" className="pulse-loading-block"><Spin tip={t("pulse.loading", language)} /></Flex></Card>}
       {response && partition && <>
       <DataTrustBar envelope={response.envelope} basis={response.basis} detailExtra={<span>generator: {latestMetadata?.generator_version || "—"}</span>} />
+      {response.plan && <PlanComparisonPanel plan={response.plan} currency={partition.currency || response.currency || ""} language={language} />}
       {noFacts ? <div className="pulse-block-gap"><StateBlock state={{ kind: "empty", reason: `${t("pulse.no_facts_title", language)}\n${t("pulse.no_facts_desc", language)}` }} language={language} /></div> : <>
       {response.multi_currency && <Card size="small" className="pulse-block-gap"><Flex align="center" gap={8}><Typography.Text strong>{t("pulse.currency_partition", language)}</Typography.Text><Segmented value={selectedCurrency} onChange={(value) => setSelectedCurrency(String(value))} options={partitions.map((item) => ({ label: item.currency || t("pulse.unknown_currency", language), value: item.currency }))} /></Flex></Card>}
       <Row gutter={[12, 12]} className="pulse-block-gap">{kpiCards}</Row>

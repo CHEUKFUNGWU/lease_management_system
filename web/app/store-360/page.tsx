@@ -25,6 +25,7 @@ import { useRetailQuery } from "../retail/useRetailQuery";
 import { RetailExportMenu } from "../components/RetailExportMenu";
 import { retailExportApi } from "../lib/api";
 import { diagnosticsRowsFromResponse, envelopeFromDiagnostics } from "../lib/retail-export";
+import { PlanComparisonPanel } from "../components/PlanComparisonPanel";
 import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, type PulseMetricCode } from "../operating-pulse/logic";
 import { bridgeConservation, bridgeTone, bridgeWaterfall, bridgeWaterfallDomain, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, summaryStatus, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
 import ProfitFlowPanel from "./ProfitFlowPanel";
@@ -248,6 +249,7 @@ function Store360Inner() {
       </Flex>
     </Card>
     {response && <DataTrustBar envelope={response.envelope} basis={response.basis} detailExtra={latestMatches ? <span>generator: {latestMatches.generator_version} · latest anomaly: {latestAnomalyDate(latestMatches)}</span> : undefined} />}
+    {response && response.plan && <PlanComparisonPanel plan={response.plan} currency={response.currency || ""} language={language} />}
     {noQuery && <div className="store360-block-margin"><StateBlock state={{ kind: "actionable", message: t("store360.no_dataset_title", language), reason: t("store360.no_dataset_desc", language), actionLabel: t("common.go_pulse", language) }} language={language} onAction={() => router.push("/operating-pulse")} /></div>}
     {query.classification === "simulated" && !query.datasetVersion && !discoveryLoading && <div className="store360-block-margin"><StateBlock state={{ kind: "actionable", message: t("store360.missing_version_title", language), reason: t("store360.missing_version_desc", language), actionLabel: t("common.go_pulse", language) }} language={language} onAction={() => router.push("/operating-pulse")} /></div>}
     {optionsError && <div className="store360-block-margin"><StateBlock state={{ kind: "failed", message: optionsError }} language={language} onRetry={() => setRetry((value) => value + 1)} /></div>}

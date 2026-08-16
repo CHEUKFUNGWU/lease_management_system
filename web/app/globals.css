@@ -1681,6 +1681,33 @@ html {
 .perf-import-source {
   width: 120px;
 }
+.plan-comparison-card {
+  margin-top: 16px;
+}
+.plan-kpi {
+  min-width: 220px;
+  flex: 1;
+}
+.plan-kpi-values {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+}
+.plan-variance {
+  display: block;
+  font-size: 12px;
+}
+.plan-variance-exceeded {
+  display: block;
+  font-size: 12px;
+  color: var(--color-error, #cf1322);
+}
+.plan-block-gap {
+  margin-top: 16px;
+}
+.plan-block-gap-sm {
+  margin-bottom: 12px;
+}
 .retail-export-menu {
   display: inline-flex;
   align-items: center;

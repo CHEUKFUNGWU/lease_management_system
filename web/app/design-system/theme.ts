@@ -10,13 +10,13 @@ import { colors, typography, radius, depth } from "./tokens";
 export const antdTheme = {
   token: {
     // ── Core Colors ──
-    colorPrimary: colors.foreground.primary,      // #000000
-    // STY-007: primary-button hover used to be painted #262626 by CSS; antd
+    colorPrimary: colors.foreground.primary,      // colors.foreground.primary
+    // STY-007: primary-button hover used to be painted foreground.secondary by CSS; antd
     // derives the hover fill from colorPrimaryHover.
     colorPrimaryHover: colors.foreground.secondary,
     colorInfo: colors.state.info,
     // STY-007: antd's Statistic title renders with colorTextDescription;
-    // the old CSS forced --fg-tertiary (#595959) — carry the rendered value.
+    // the old CSS forced foreground.tertiary — carry the rendered value.
     colorTextDescription: colors.foreground.tertiary,
     colorInfoBg: colors.status.processing.bg,
     colorInfoBorder: colors.status.processing.border,
@@ -35,15 +35,15 @@ export const antdTheme = {
     colorErrorText: colors.status.error.text,
 
     // ── Base ──
-    colorBgBase: colors.background.page,          // #FFFFFF
-    colorTextBase: colors.foreground.primary,     // #000000
+    colorBgBase: colors.background.page,          // colors.background.page
+    colorTextBase: colors.foreground.primary,     // colors.foreground.primary
     borderRadius: radius.lg,                      // 8px
     wireframe: false,
     fontFamily: typography.fontFamily.sans,
 
     // ── Borders ──
-    colorBorder: colors.border.default,           // #E5E5E5
-    colorBorderSecondary: colors.border.subtle,   // #F0F0F0
+    colorBorder: colors.border.default,           // colors.border.default
+    colorBorderSecondary: colors.border.subtle,   // colors.border.subtle
 
     // ── Focus ──
     controlOutline: depth.focus.outline,          // rgba(0, 0, 0, 0.08)

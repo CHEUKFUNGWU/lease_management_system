@@ -37,7 +37,7 @@ function parseURL(params: { get(name: string): string | null }) {
   const classification = params.get("data_classification");
   const validClassification: RetailDataClassification = classification === "production" ? "production" : "simulated";
   const rawWindow = Number(params.get("window_days") || 14);
-  const windowDays = WINDOW_OPTIONS.includes(rawWindow as (typeof WINDOW_OPTIONS)[number]) ? rawWindow as 7 | 14 | 28 : 14;
+  const windowDays = Number.isInteger(rawWindow) && rawWindow >= 7 && rawWindow <= 28 ? rawWindow : 14;
   const defaults = defaultAssumptions();
   const assumptionKeys = Object.keys(defaults) as Array<keyof RetailScenarioAssumptions>;
   const assumptions = { ...defaults };
@@ -80,6 +80,7 @@ function ScenarioPageInner() {
   const { language } = useLanguage();
   const [aiOpen, setAiOpen] = useState(false);
   const query = useMemo(() => parseURL(searchParams), [searchParams]);
+  const [windowInput, setWindowInput] = useState(query.windowDays);
   const [latest, setLatest] = useState<import("../lib/api").RetailSimulationDatasetData | null | undefined>(undefined);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [optionsRetryNonce, setOptionsRetryNonce] = useState(0);
@@ -143,6 +144,16 @@ function ScenarioPageInner() {
   };
 
   useEffect(() => {
+    setWindowInput(query.windowDays);
+  }, [query.windowDays]);
+
+  // M2: custom rolling window (7-28), applied like the other draft inputs.
+  const applyCustomWindow = () => {
+    const next = Math.round(windowInput);
+    if (next >= 7 && next <= 28) setQuery({ windowDays: next });
+  };
+
+  useEffect(() => {
     if (query.classification !== "simulated" || query.datasetVersion || !latest) return;
     setQuery({ datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest) });
     // Latest discovery is read-only; no generation or store selection happens here.
@@ -192,7 +203,7 @@ function ScenarioPageInner() {
   return <ProtectedRoute><AppLayout><div className="scenario-workbench-page">
     <PageHeader title={t("scenario.title", language)} meta={t("scenario.scope_note", language)} help={<HelpTrigger content={scenarioHelpContent(language)} language={language} />} primaryAction={<Button type="primary" icon={<PlayCircleOutlined />} loading={loading} onClick={evaluate}>{t("scenario.calculate", language)}</Button>} secondaryAction={<Space><Button onClick={() => setAiOpen(true)}>{t("common.ai_analysis", language)}</Button><Button icon={<ArrowLeftOutlined />} onClick={() => router.push(backURL)}>{t("scenario.back_store360", language)}</Button></Space>} />
     {response ? <DataTrustBar envelope={response.envelope} basis="Scenario" detailExtra={latestMatches ? <span>generator: {latestMatches.generator_version} · latest anomaly: {latestAnomalyDate(latestMatches)}</span> : undefined} /> : <Alert className="scenario-block-gap" type="info" showIcon message={t("scenario.not_evaluated_title", language)} description={t("scenario.not_evaluated_desc", language)} />}
-    <Card size="small" className="scenario-block-gap"><Flex gap={12} wrap="wrap" align="center"><Radio.Group value={query.classification} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} onChange={(event) => { const next = event.target.value as RetailDataClassification; if (next === "production") setQuery({ classification: next, datasetVersion: "", storeID: "" }); else setQuery({ classification: next, datasetVersion: latest?.dataset_version || "", asOf: latest ? latestAnomalyDate(latest) : query.asOf, storeID: "" }); }} /><Select showSearch allowClear value={query.storeID || undefined} placeholder={t("store360.select_store", language)} loading={loadingOptions} className="scenario-store-select" options={options.map((item) => ({ label: `${item.store_code} · ${item.store_name}`, value: item.store_id, search: `${item.store_code} ${item.store_name} ${item.brand} ${item.region}` }))} optionFilterProp="search" onChange={(value) => setQuery({ storeID: value || "" })} /><DatePicker value={dayjs(query.asOf)} onChange={(value) => value && setQuery({ asOf: value.format("YYYY-MM-DD") })} /><Select value={query.windowDays} options={WINDOW_OPTIONS.map((value) => ({ label: `${value}${t("common.days_suffix", language)}`, value }))} onChange={(value) => setQuery({ windowDays: value })} /><Input value={query.sourceSystem} onChange={(event) => setQuery({ sourceSystem: event.target.value })} placeholder={t("common.source_system_optional", language)} className="scenario-source-input" /></Flex></Card>
+    <Card size="small" className="scenario-block-gap"><Flex gap={12} wrap="wrap" align="center"><Radio.Group value={query.classification} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} onChange={(event) => { const next = event.target.value as RetailDataClassification; if (next === "production") setQuery({ classification: next, datasetVersion: "", storeID: "" }); else setQuery({ classification: next, datasetVersion: latest?.dataset_version || "", asOf: latest ? latestAnomalyDate(latest) : query.asOf, storeID: "" }); }} /><Select showSearch allowClear value={query.storeID || undefined} placeholder={t("store360.select_store", language)} loading={loadingOptions} className="scenario-store-select" options={options.map((item) => ({ label: `${item.store_code} · ${item.store_name}`, value: item.store_id, search: `${item.store_code} ${item.store_name} ${item.brand} ${item.region}` }))} optionFilterProp="search" onChange={(value) => setQuery({ storeID: value || "" })} /><DatePicker value={dayjs(query.asOf)} onChange={(value) => value && setQuery({ asOf: value.format("YYYY-MM-DD") })} /><Select value={WINDOW_OPTIONS.includes(query.windowDays as (typeof WINDOW_OPTIONS)[number]) ? query.windowDays : undefined} placeholder={t("pulse.custom_window", language)} options={WINDOW_OPTIONS.map((value) => ({ label: `${value}${t("common.days_suffix", language)}`, value }))} onChange={(value) => setQuery({ windowDays: value })} /><InputNumber aria-label={t("pulse.custom_window", language)} min={7} max={28} value={windowInput} onChange={(value) => setWindowInput(value ?? 14)} onPressEnter={applyCustomWindow} className="scenario-custom-window" /><Input value={query.sourceSystem} onChange={(event) => setQuery({ sourceSystem: event.target.value })} placeholder={t("common.source_system_optional", language)} className="scenario-source-input" /></Flex></Card>
     {!query.storeID && <div className="scenario-block-gap"><StateBlock state={{ kind: "empty", reason: t("scenario.pick_store", language) }} language={language} /></div>}
     {query.classification === "simulated" && !query.datasetVersion && <Alert className="scenario-block-gap" type="warning" message={t("scenario.missing_version_title", language)} description={t("scenario.missing_version_desc", language)} action={<Button size="small" onClick={() => router.push("/operating-pulse")}>{t("common.go_pulse", language)}</Button>} />}
     {optionsState.kind === "failed" && <div className="scenario-block-gap"><StateBlock state={optionsState} language={language} onRetry={optionsRetry} /></div>}

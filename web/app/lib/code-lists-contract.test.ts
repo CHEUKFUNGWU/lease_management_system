@@ -63,7 +63,7 @@ describe("CONTRACT-001 code-list contracts", () => {
     // The Go module declares fields as constants; resolve FieldX -> value
     // first, then map the RequiredFields identifiers through them.
     const fieldConstants = new Map<string, string>();
-    for (const match of ingestBackend.matchAll(/(Field\w+)\s+=\s+"([^"]+)"/g)) {
+    for (const match of Array.from(ingestBackend.matchAll(/(Field\w+)\s+=\s+"([^"]+)"/g))) {
       fieldConstants.set(match[1], match[2]);
     }
     expect(fieldConstants.size, "retailingest field constants found").toBeGreaterThan(10);

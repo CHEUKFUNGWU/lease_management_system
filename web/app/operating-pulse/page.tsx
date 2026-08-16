@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Tooltip, Typography, message,
+  Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Tooltip, Typography, message,
 } from "antd";
 import { ArrowDownOutlined, ArrowUpOutlined, EyeOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
@@ -28,14 +28,20 @@ import { changeTone, formatChange, formatKPIValue, formatSignalValue, kpiLabel, 
 import { tableScrollX } from "../lib/tableScroll";
 
 const WINDOW_OPTIONS = [7, 14, 28] as const;
+// M2 (2026-08-16 decision): the unified product default is 14; custom
+// rolling windows anywhere in 7-28 stay legal on the server.
+const DEFAULT_WINDOW_DAYS = 14;
+const validWindowDays = (value: number) => Number.isInteger(value) && value >= 7 && value <= 28;
 const TODAY = dayjs().format("YYYY-MM-DD");
 
-function updateQuery(router: ReturnType<typeof useRouter>, params: { classification: "production" | "simulated"; datasetVersion?: string; asOf: string; windowDays: number; storeIDs: string[]; sourceSystem?: string }) {
+function updateQuery(router: ReturnType<typeof useRouter>, params: { classification: "production" | "simulated"; datasetVersion?: string; asOf: string; windowDays?: number; storeIDs: string[]; sourceSystem?: string; period?: string; groupBy?: string }) {
   const query = new URLSearchParams();
   query.set("data_classification", params.classification);
   if (params.classification === "simulated" && params.datasetVersion) query.set("dataset_version", params.datasetVersion);
   query.set("as_of", params.asOf);
-  query.set("window_days", String(params.windowDays));
+  if (params.period) query.set("period", params.period);
+  else if (params.windowDays !== undefined) query.set("window_days", String(params.windowDays));
+  if (params.groupBy && params.groupBy !== "total") query.set("group_by", params.groupBy);
   if (params.sourceSystem) query.set("source_system", params.sourceSystem);
   params.storeIDs.forEach((storeID) => query.append("store_id", storeID));
   router.replace(`/operating-pulse?${query.toString()}`);
@@ -130,19 +136,23 @@ function AttentionTable({ attention, onSelect, onStore360, language }: { attenti
   // narrow viewport scrolls horizontally instead of squeezing.
   const columns = [
     { title: t("pulse.col.priority", language), dataIndex: "rank", width: 56, render: (value: number) => <strong>#{value}</strong> },
-    { title: t("pulse.col.store", language), key: "store", width: 260, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={0}><strong>{row.store_code}</strong><Typography.Text>{row.store_name}</Typography.Text><Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text></Space> },
+    { title: t("pulse.col.store", language), key: "store", width: 260, render: (_: unknown, row: RetailAttention) => row.group_by === "region" || row.group_by === "brand"
+      ? <Space direction="vertical" size={0}><strong>{row.group_label}</strong><Typography.Text type="secondary">{row.group_by === "region" ? t("pulse.group_region", language) : t("pulse.group_brand", language)}</Typography.Text></Space>
+      : <Space direction="vertical" size={0}><strong>{row.store_code}</strong><Typography.Text>{row.store_name}</Typography.Text><Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text></Space> },
     { title: t("pulse.col.signal", language), key: "signals", width: 160, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signal.signal_code} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><span className="severity-label"><SeverityDot severity={toSeverity(row.severity)} />{signalLabel(signal.signal_code, language)}</span></Tooltip>)}</Space> },
     { title: t("pulse.col.change", language), key: "change", width: 340, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${t("common.current", language)} ${formatSignalValue(signal.current, signal.unit, row.currency, language)} · ${t("common.contrast", language)} ${formatSignalValue(signal.comparison, signal.unit, row.currency, language)} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><Typography.Text className="pulse-change-bad">{signalLabel(signal.signal_code, language)} {formatSignalValue(signal.observed_change, signal.unit, row.currency, language)} · {t("common.threshold", language)} {formatSignalValue(signal.threshold, signal.unit, row.currency, language)}</Typography.Text></Tooltip>)}</Space> },
     { title: t("pulse.col.score", language), key: "score", width: 112, render: (_: unknown, row: RetailAttention) => <Flex align="center" gap={8} wrap={false}><StatusTag kind={row.severity === "critical" || row.severity === "high" ? "error" : "warning"}>{row.severity}</StatusTag><span>{row.score.toFixed(2)}</span></Flex> },
     { title: t("pulse.col.source", language), key: "source", width: 150, render: (_: unknown, row: RetailAttention) => <Typography.Text type="secondary" ellipsis={{ tooltip: row.evidence.source_systems.join(", ") }}>{row.evidence.source_systems.join(", ") || "—"}</Typography.Text> },
-    { title: t("pulse.col.action", language), key: "action", width: 220, render: (_: unknown, row: RetailAttention) => <Space><Button size="small" icon={<EyeOutlined />} onClick={() => onSelect(row.store_id)}>{t("pulse.view_store_pulse", language)}</Button><Button size="small" onClick={() => onStore360(row.store_id)}>{t("common.store360", language)}</Button></Space> },
+    { title: t("pulse.col.action", language), key: "action", width: 220, render: (_: unknown, row: RetailAttention) => row.store_id
+      ? <Space><Button size="small" icon={<EyeOutlined />} onClick={() => onSelect(row.store_id)}>{t("pulse.view_store_pulse", language)}</Button><Button size="small" onClick={() => onStore360(row.store_id)}>{t("common.store360", language)}</Button></Space>
+      : <Typography.Text type="secondary">—</Typography.Text> },
   ];
-  return attention.length ? <Table rowKey="store_id" size="small" columns={columns} dataSource={attention} pagination={false} scroll={{ x: 1298 }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} />;
+  return attention.length ? <Table rowKey={(row: RetailAttention) => row.group_key || row.store_id} size="small" columns={columns} dataSource={attention} pagination={false} scroll={{ x: 1298 }} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} />;
 }
 
 function SuppressedPanel({ items, language }: { items: RetailSuppressedAttention[]; language: Language }) {
   if (!items.length) return null;
-  return <Collapse items={[{ key: "suppressed", label: `${t("pulse.suppressed_title", language)}（${items.length}）`, children: <Table size="small" rowKey={(row: RetailSuppressedAttention) => `${row.store_id}-${row.reason}`} pagination={false} scroll={tableScrollX(items.length, 760)} dataSource={items} columns={[{ title: t("pulse.col.store", language), render: (_: unknown, row: RetailSuppressedAttention) => `${row.store_code} · ${row.store_name}` }, { title: t("pulse.col.brand_region", language), render: (_: unknown, row: RetailSuppressedAttention) => `${row.brand || "—"} · ${row.region || "—"}` }, { title: t("pulse.col.reason", language), render: (_: unknown, row: RetailSuppressedAttention) => <Space wrap>{(row.reasons || [row.reason]).map((reason) => <Tag key={reason}>{reason}</Tag>)}</Space> }, { title: t("pulse.col.coverage", language), render: (_: unknown, row: RetailSuppressedAttention) => `${coverageText(row.current_coverage)} · ${coverageText(row.comparison_coverage)}` }]} /> }]} />;
+  return <Collapse items={[{ key: "suppressed", label: `${t("pulse.suppressed_title", language)}（${items.length}）`, children: <Table size="small" rowKey={(row: RetailSuppressedAttention) => `${row.store_id}-${row.reason}`} pagination={false} scroll={tableScrollX(items.length, 760)} dataSource={items} columns={[{ title: t("pulse.col.store", language), render: (_: unknown, row: RetailSuppressedAttention) => row.group_label || `${row.store_code} · ${row.store_name}` }, { title: t("pulse.col.brand_region", language), render: (_: unknown, row: RetailSuppressedAttention) => row.group_label ? (row.group_by === "region" ? t("pulse.group_region", language) : t("pulse.group_brand", language)) : `${row.brand || "—"} · ${row.region || "—"}` }, { title: t("pulse.col.reason", language), render: (_: unknown, row: RetailSuppressedAttention) => <Space wrap>{(row.reasons || [row.reason]).map((reason) => <Tag key={reason}>{reason}</Tag>)}</Space> }, { title: t("pulse.col.coverage", language), render: (_: unknown, row: RetailSuppressedAttention) => `${coverageText(row.current_coverage)} · ${coverageText(row.comparison_coverage)}` }]} /> }]} />;
 }
 
 function OperatingPulseInner() {
@@ -161,26 +171,34 @@ function OperatingPulseInner() {
   // P0-10: the source filter is applied, not typed — draft state mirrors the
   // URL value and commits on Enter / Apply (store-360 precedent).
   const [sourceInput, setSourceInput] = useState(searchParams.get("source_system") || "");
+  const [customWindowInput, setCustomWindowInput] = useState(() => Number(searchParams.get("window_days") || DEFAULT_WINDOW_DAYS));
 
   const classification = (searchParams.get("data_classification") || "") as "production" | "simulated" | "";
   const datasetVersion = searchParams.get("dataset_version") || "";
   const asOf = searchParams.get("as_of") || "";
-  const windowDays = Number(searchParams.get("window_days") || 7);
+  const windowDays = Number(searchParams.get("window_days") || DEFAULT_WINDOW_DAYS);
   const storeIDs = searchParams.getAll("store_id");
   const sourceSystem = searchParams.get("source_system") || "";
-  const validWindow = WINDOW_OPTIONS.includes(windowDays as (typeof WINDOW_OPTIONS)[number]);
+  const period = searchParams.get("period") || "";
+  const groupBy = searchParams.get("group_by") || "total";
+  const periodMode = period === "" ? "rolling" : period === "last-month" ? "last-month" : period === "this-quarter" ? "this-quarter" : "month";
+  const validWindow = validWindowDays(windowDays);
   const currentClassification = classification === "production" || classification === "simulated" ? classification : "simulated";
 
   useEffect(() => {
     setSourceInput(sourceSystem);
   }, [sourceSystem]);
 
+  useEffect(() => {
+    setCustomWindowInput(windowDays);
+  }, [windowDays]);
+
   // FETCH-001: loadPulse now runs through the shared fetch seam (race gate /
   // token injection / STATE-001 exit) instead of the hand-rolled requestGate.
   const storeKey = storeIDs.join("\x1f");
-  const pulseKey = `${classification}|${datasetVersion}|${asOf}|${windowDays}|${sourceSystem}|${storeKey}|${refreshNonce}`;
-  const pulseParams = (classification === "production" || classification === "simulated") && validWindow && asOf && (classification !== "simulated" || datasetVersion)
-    ? { data_classification: classification, dataset_version: datasetVersion || undefined, as_of: asOf, window_days: windowDays as 7 | 14 | 28, store_ids: storeIDs, source_system: sourceSystem || undefined }
+  const pulseKey = `${classification}|${datasetVersion}|${asOf}|${period}|${windowDays}|${sourceSystem}|${storeKey}|${groupBy}|${refreshNonce}`;
+  const pulseParams = (classification === "production" || classification === "simulated") && (period !== "" || validWindow) && asOf && (classification !== "simulated" || datasetVersion)
+    ? { data_classification: classification, dataset_version: datasetVersion || undefined, as_of: asOf, ...(period ? { period } : { window_days: windowDays }), store_ids: storeIDs, source_system: sourceSystem || undefined, group_by: groupBy !== "total" ? groupBy : undefined }
     : null;
   const { loading, state: pulseState, retry: pulseRetry } = useRetailQuery({
     token,
@@ -213,7 +231,7 @@ function OperatingPulseInner() {
 
   useEffect(() => {
     if (!token || !asOf) {
-      if (classification === "production" && asOf === "") updateQuery(router, { classification: "production", asOf: TODAY, windowDays, storeIDs, sourceSystem });
+      if (classification === "production" && asOf === "") applyQuery({ classification: "production", asOf: TODAY, windowDays, storeIDs, sourceSystem });
       return;
     }
   }, [asOf, classification, windowDays, storeIDs, sourceSystem, router]);
@@ -227,11 +245,11 @@ function OperatingPulseInner() {
       // discovery. Explicit production/simulated URLs remain the source of
       // truth while the discovery request populates the scenario selector.
       if (!searchParams.toString() && result.data) {
-        updateQuery(router, { classification: "simulated", datasetVersion: result.data.dataset_version, asOf: latestAnomalyDate(result.data), windowDays: 7, storeIDs: [], sourceSystem: "retail_simulator" });
+        applyQuery({ classification: "simulated", datasetVersion: result.data.dataset_version, asOf: latestAnomalyDate(result.data), windowDays: DEFAULT_WINDOW_DAYS, storeIDs: [], sourceSystem: "retail_simulator" });
       } else if (result.data && searchParams.get("data_classification") === "simulated" && !searchParams.get("dataset_version")) {
         // Direct simulated URLs still use latest discovery to hydrate the
         // scenario selector and complete the canonical query before fetching.
-        updateQuery(router, { classification: "simulated", datasetVersion: result.data.dataset_version, asOf: searchParams.get("as_of") || latestAnomalyDate(result.data), windowDays: validWindow ? windowDays : 7, storeIDs, sourceSystem: sourceSystem || "retail_simulator" });
+        applyQuery({ classification: "simulated", datasetVersion: result.data.dataset_version, asOf: searchParams.get("as_of") || latestAnomalyDate(result.data), windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem: sourceSystem || "retail_simulator" });
       }
     }).catch(() => { latestLoaded.current = false; });
   }, [router, searchParams, token, storeIDs, validWindow, windowDays, latestRetryNonce]);
@@ -258,7 +276,7 @@ function OperatingPulseInner() {
         created_at: generated.source.created_at,
       };
       setLatest(generatedDataset);
-      updateQuery(router, { classification: "simulated", datasetVersion: generated.dataset_version, asOf: latestAnomalyDate(generatedDataset), windowDays: 7, storeIDs: [], sourceSystem: "retail_simulator" });
+      applyQuery({ classification: "simulated", datasetVersion: generated.dataset_version, asOf: latestAnomalyDate(generatedDataset), windowDays: DEFAULT_WINDOW_DAYS, storeIDs: [], sourceSystem: "retail_simulator" });
     } catch (generationError) { message.error(apiErrorMessage(generationError)); } finally { setGenerating(false); }
   };
 
@@ -276,13 +294,30 @@ function OperatingPulseInner() {
   const scopedTitle = scopedStore ? `${scopedStore.store_code} · ${scopedStore.store_name} · ${scopedStore.brand || "—"} · ${scopedStore.region || "—"}` : storeIDs.join(", ");
   const noFacts = Boolean(response && partition && !response.decision_ready && partition.current_coverage.observed_store_days === 0 && partition.comparison_coverage.observed_store_days === 0);
 
+  // M2/M5 wrapper: preserves the active period/grouping across filter
+  // changes unless a handler explicitly switches them (period: "" clears).
+  const applyQuery = (params: Parameters<typeof updateQuery>[1]): void => updateQuery(router, { ...params, period: params.period !== undefined ? params.period : period, groupBy: params.groupBy !== undefined ? params.groupBy : groupBy });
+
   const onWindowChange = (value: number) => {
-    if (!asOf || !WINDOW_OPTIONS.includes(value as (typeof WINDOW_OPTIONS)[number])) return;
-    updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: value, storeIDs, sourceSystem });
+    if (!asOf || !validWindowDays(value)) return;
+    applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: value, storeIDs, sourceSystem, period: "" });
   };
-  const onStoreSelect = (storeID: string) => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs: [storeID], sourceSystem });
-  const clearStore = () => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs: [], sourceSystem });
-  const applySourceFilter = () => updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : 7, storeIDs, sourceSystem: sourceInput.trim() });
+  const applyCustomWindow = () => {
+    const next = Math.round(customWindowInput);
+    if (!validWindowDays(next)) return;
+    applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: next, storeIDs, sourceSystem, period: "" });
+  };
+  const onPeriodModeChange = (mode: string) => {
+    if (mode === "month") return; // waits for the month picker below
+    applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem, period: mode === "rolling" ? "" : mode });
+  };
+  const onPeriodMonthChange = (date: dayjs.Dayjs | null) => {
+    if (!date) return;
+    applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem, period: date.format("YYYY-MM") });
+  };
+  const onStoreSelect = (storeID: string) => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs: [storeID], sourceSystem });
+  const clearStore = () => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs: [], sourceSystem });
+  const applySourceFilter = () => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem: sourceInput.trim() });
   const refresh = () => { latestLoaded.current = false; setLatestRetryNonce((value) => value + 1); setRefreshNonce((value) => value + 1); };
 
   const kpiCards = PULSE_KPI_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><KPIValueCard code={code} metric={displaySummary[code]} currency={partition?.currency || response?.currency || ""} notReady={!response?.decision_ready} language={language} /></Col>);
@@ -294,7 +329,7 @@ function OperatingPulseInner() {
       router.replace("/operating-pulse");
       return;
     }
-    updateQuery(router, { classification: switchResult.classification, datasetVersion: switchResult.datasetVersion, asOf: switchResult.asOf, windowDays: 7, storeIDs: [], sourceSystem: switchResult.sourceSystem });
+    applyQuery({ classification: switchResult.classification, datasetVersion: switchResult.datasetVersion, asOf: switchResult.asOf, windowDays: DEFAULT_WINDOW_DAYS, storeIDs: [], sourceSystem: switchResult.sourceSystem });
   };
 
   return <ProtectedRoute><AppLayout><div className="operating-pulse-page">
@@ -302,11 +337,16 @@ function OperatingPulseInner() {
     <Card size="small" className="pulse-filter-card pulse-block-margin">
       <Flex gap={12} wrap="wrap" align="center">
         <Radio.Group value={currentClassification} onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")} optionType="button" buttonStyle="solid" options={[{ label: t("retail.classification.simulated", language), value: "simulated" }, { label: t("retail.classification.production", language), value: "production" }]} />
-        {currentClassification === "simulated" && anomalies.length > 0 && <Select aria-label={t("pulse.anomaly_select", language)} value={currentAnomaly?.id || "all"} className="pulse-select-min" options={[{ label: t("pulse.all_anomalies", language), value: "all" }, ...anomalies.map((item) => ({ label: `${item.store_code} · ${signalLabel(item.type, language)}`, value: item.id }))]} onChange={(id) => { const selected = anomalies.find((item) => item.id === id); if (selected) updateQuery(router, { classification: "simulated", datasetVersion, asOf: selected.date_to, windowDays: 7, storeIDs, sourceSystem }); }} />}
-        <DatePicker aria-label={t("pulse.as_of", language)} value={asOf ? dayjs(asOf) : undefined} onChange={(date) => date && updateQuery(router, { classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: date.format("YYYY-MM-DD"), windowDays: validWindow ? windowDays : 7, storeIDs, sourceSystem })} allowClear={false} />
+        {currentClassification === "simulated" && anomalies.length > 0 && <Select aria-label={t("pulse.anomaly_select", language)} value={currentAnomaly?.id || "all"} className="pulse-select-min" options={[{ label: t("pulse.all_anomalies", language), value: "all" }, ...anomalies.map((item) => ({ label: `${item.store_code} · ${signalLabel(item.type, language)}`, value: item.id }))]} onChange={(id) => { const selected = anomalies.find((item) => item.id === id); if (selected) applyQuery({ classification: "simulated", datasetVersion, asOf: selected.date_to, windowDays: DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem }); }} />}
+        <DatePicker aria-label={t("pulse.as_of", language)} value={asOf ? dayjs(asOf) : undefined} onChange={(date) => date && applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: date.format("YYYY-MM-DD"), windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem })} allowClear={false} />
         <Input aria-label={t("common.source_system", language)} allowClear placeholder={t("common.source_system_optional", language)} value={sourceInput} onChange={(event) => setSourceInput(event.target.value)} onPressEnter={applySourceFilter} className="pulse-source-input" />
         <Button onClick={applySourceFilter}>{t("pulse.apply_source", language)}</Button>
-        <Segmented aria-label={t("pulse.window", language)} value={validWindow ? windowDays : 7} onChange={onWindowChange} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />
+        <Select aria-label={t("pulse.period_mode", language)} value={periodMode} className="pulse-select-min" options={[{ label: t("pulse.period_rolling", language), value: "rolling" }, { label: t("pulse.period_last_month", language), value: "last-month" }, { label: t("pulse.period_this_quarter", language), value: "this-quarter" }, { label: t("pulse.period_month", language), value: "month" }]} onChange={(value) => onPeriodModeChange(String(value))} />
+        {periodMode === "month" && <DatePicker picker="month" aria-label={t("pulse.period_month", language)} onChange={onPeriodMonthChange} />}
+        {periodMode === "rolling" && <Segmented aria-label={t("pulse.window", language)} value={validWindow ? windowDays : DEFAULT_WINDOW_DAYS} onChange={onWindowChange} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />}
+        {periodMode === "rolling" && <InputNumber aria-label={t("pulse.custom_window", language)} min={7} max={28} value={customWindowInput} onChange={(value) => setCustomWindowInput(value ?? DEFAULT_WINDOW_DAYS)} onPressEnter={applyCustomWindow} className="pulse-custom-window" />}
+        {periodMode === "rolling" && customWindowInput !== windowDays && <Button onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>}
+        <Segmented aria-label={t("pulse.group_by", language)} value={groupBy} options={[{ label: t("pulse.group_total", language), value: "total" }, { label: t("pulse.group_region", language), value: "region" }, { label: t("pulse.group_brand", language), value: "brand" }]} onChange={(value) => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem, groupBy: String(value) })} />
         {isScoped ? <Button onClick={clearStore}>{t("pulse.back_all_stores", language)}</Button> : <Tag>{t("pulse.all_authorized_stores", language)}</Tag>}
       </Flex>
     </Card>
@@ -325,7 +365,7 @@ function OperatingPulseInner() {
       <div className="pulse-block-gap"><SuppressedPanel language={language} items={partition.suppressed_attention || []} /></div>
       </>}
     </>}
-    <RetailAIDrawer open={aiOpen} onClose={() => setAiOpen(false)} pageContext={{ page: "operating-pulse", title: t("pulse.title", language), filters: { as_of: asOf || TODAY, window_days: String(validWindow ? windowDays : 7), classification: currentClassification || "", dataset_version: currentClassification === "simulated" ? datasetVersion : "", source_system: sourceSystem || "", store_ids: storeIDs.join(",") } }} />
+    <RetailAIDrawer open={aiOpen} onClose={() => setAiOpen(false)} pageContext={{ page: "operating-pulse", title: t("pulse.title", language), filters: { as_of: asOf || TODAY, window_days: String(validWindow ? windowDays : DEFAULT_WINDOW_DAYS), period: period || "", group_by: groupBy, classification: currentClassification || "", dataset_version: currentClassification === "simulated" ? datasetVersion : "", source_system: sourceSystem || "", store_ids: storeIDs.join(",") } }} />
   </div></AppLayout></ProtectedRoute>;
 }
 

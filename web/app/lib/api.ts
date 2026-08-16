@@ -264,6 +264,9 @@ export interface RetailEvidence {
 
 export interface RetailAttention {
   rank: number;
+  group_by?: string;
+  group_key?: string;
+  group_label?: string;
   store_id: string;
   store_code: string;
   store_name: string;
@@ -281,6 +284,9 @@ export interface RetailAttention {
 }
 
 export interface RetailSuppressedAttention {
+  group_by?: string;
+  group_key?: string;
+  group_label?: string;
   store_id: string;
   store_code: string;
   store_name: string;
@@ -1459,10 +1465,16 @@ export interface RetailPulseQueryParams {
   data_classification: RetailDataClassification;
   dataset_version?: string;
   as_of: string;
-  window_days: 7 | 14 | 28;
+  /** M2: calendar period spec (YYYY-MM / YYYY-Qn / last-month / this-quarter);
+   * mutually exclusive with window_days on the server. */
+  period?: string;
+  /** M2: custom rolling windows — any integer 7-28, not just 7/14/28. */
+  window_days?: number;
   store_ids?: string[];
   source_system?: string;
   attention_limit?: number;
+  /** M5: group the attention ranking (total | region | brand | store). */
+  group_by?: string;
 }
 
 export interface RetailStore360Option {
@@ -1604,7 +1616,7 @@ export interface RetailStore360QueryParams {
   data_classification: RetailDataClassification;
   dataset_version?: string;
   as_of: string;
-  window_days: 7 | 14 | 28;
+  window_days: number; // M2: custom rolling windows, 7-28
   source_system?: string;
 }
 
@@ -1744,7 +1756,6 @@ export const retailAnalyticsApi = {
     const query = new URLSearchParams();
     query.set("data_classification", params.data_classification);
     query.set("as_of", params.as_of);
-    query.set("window_days", String(params.window_days));
     if (params.data_classification === "simulated") {
       if (!params.dataset_version) throw new Error("simulated pulse requires dataset_version");
       query.set("dataset_version", params.dataset_version);
@@ -1753,6 +1764,14 @@ export const retailAnalyticsApi = {
     }
     if (params.source_system) query.set("source_system", params.source_system);
     if (params.attention_limit !== undefined) query.set("attention_limit", String(params.attention_limit));
+    if (params.group_by) query.set("group_by", params.group_by);
+    if (params.period) {
+      query.set("period", params.period);
+    } else if (params.window_days !== undefined) {
+      query.set("window_days", String(params.window_days));
+    } else {
+      throw new Error("pulse query needs either period or window_days");
+    }
     (params.store_ids || []).forEach((storeID) => query.append("store_id", storeID));
     return apiRequest(`/api/v1/retail/operating-pulse?${query.toString()}`, { token }) as Promise<RetailPulseResponse>;
   },

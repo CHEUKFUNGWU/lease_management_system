@@ -6,8 +6,10 @@ export const STORE360_CODES = ["revenue", "gross_profit", "gross_margin_rate", "
 export const STORE360_AUX_CODES = ["average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution_margin", "sales_per_sqm"] as const;
 export const WINDOW_OPTIONS = [7, 14, 28] as const;
 
-export function validWindow(value: number): value is 7 | 14 | 28 {
-  return WINDOW_OPTIONS.includes(value as 7 | 14 | 28);
+export function validWindow(value: number): boolean {
+  // M2: custom rolling windows are legal anywhere in 7-28 (server contract);
+  // WINDOW_OPTIONS stays the quick-pick list.
+  return Number.isInteger(value) && value >= 7 && value <= 28;
 }
 
 export function optionFields(option: RetailStore360Option) {

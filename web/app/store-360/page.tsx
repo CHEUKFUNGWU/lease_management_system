@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Typography } from "antd";
 import { ArrowLeftOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
@@ -133,6 +133,7 @@ function Store360Inner() {
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [sourceInput, setSourceInput] = useState(query.sourceSystem);
+  const [windowInput, setWindowInput] = useState(query.windowDays);
 
   useEffect(() => {
     if (!token) return;
@@ -196,6 +197,17 @@ function Store360Inner() {
   }, [query.sourceSystem]);
 
   useEffect(() => {
+    setWindowInput(query.windowDays);
+  }, [query.windowDays]);
+
+  // M2: custom rolling window (7-28) — applied on Enter/Apply like the
+  // source filter, never typed-as-queried.
+  const applyCustomWindow = () => {
+    const next = Math.round(windowInput);
+    if (next >= 7 && next <= 28) change({ windowDays: next });
+  };
+
+  useEffect(() => {
     if (query.classification || !latest || discoveryLoading) return;
     writeQuery(router, { classification: "simulated", datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest), windowDays: validWindow(query.windowDays) ? query.windowDays : 14, storeID: query.storeID, sourceSystem: query.sourceSystem, returnQuery: query.returnQuery });
   }, [query.classification, query.windowDays, query.storeID, query.sourceSystem, latest, discoveryLoading, router]);
@@ -226,6 +238,8 @@ function Store360Inner() {
         <Select showSearch allowClear value={query.storeID || undefined} placeholder={t("store360.select_store", language)} className="store360-store-select" loading={discoveryLoading || optionsLoading} notFoundContent={optionsLoading ? t("store360.loading_stores", language) : t("store360.no_selectable_stores", language)} options={options.map((option) => { const item = optionFields(option); return { label: `${item.storeCode} · ${item.storeName}`, value: item.storeID, search: `${item.storeCode} ${item.storeName} ${item.brand} ${item.region}` }; })} optionFilterProp="search" onChange={(value) => change({ storeID: value || "" })} />
         <DatePicker allowClear={false} value={query.asOf ? dayjs(query.asOf) : undefined} onChange={(date) => date && change({ asOf: date.format("YYYY-MM-DD") })} />
         <Segmented value={validWindow(query.windowDays) ? query.windowDays : 14} onChange={(value) => change({ windowDays: Number(value) })} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />
+        <InputNumber aria-label={t("pulse.custom_window", language)} min={7} max={28} value={windowInput} onChange={(value) => setWindowInput(value ?? 14)} onPressEnter={applyCustomWindow} className="store360-custom-window" />
+        {windowInput !== query.windowDays && <Button onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>}
         <Input aria-label={t("common.source_system", language)} value={sourceInput} onChange={(event) => setSourceInput(event.target.value)} onPressEnter={() => change({ sourceSystem: sourceInput.trim() })} placeholder={t("common.source_system_optional", language)} className="store360-source-input" />
         <Button onClick={() => change({ sourceSystem: sourceInput.trim() })}>{t("store360.apply_source", language)}</Button>
       </Flex>

@@ -29,7 +29,8 @@ export function scenarioQueryKey(params: { store_id: string; data_classification
   return [params.store_id, params.data_classification, params.dataset_version || "", params.as_of, params.window_days, params.source_system || ""].join("|");
 }
 
-export function scenarioRequest(params: { store_id: string; data_classification: "production" | "simulated"; dataset_version?: string; as_of: string; window_days: 7 | 14 | 28; source_system?: string }): URLSearchParams {
+export function scenarioRequest(params: { store_id: string; data_classification: "production" | "simulated"; dataset_version?: string; as_of: string; window_days: number; // M2: custom rolling windows, 7-28
+  source_system?: string }): URLSearchParams {
   const query = new URLSearchParams({ data_classification: params.data_classification, as_of: params.as_of, window_days: String(params.window_days) });
   if (params.dataset_version) query.set("dataset_version", params.dataset_version);
   if (params.source_system) query.set("source_system", params.source_system);
@@ -45,7 +46,7 @@ export type ScenarioEvaluationScope = {
   data_classification: "production" | "simulated";
   dataset_version?: string;
   as_of: string;
-  window_days: 7 | 14 | 28;
+  window_days: number; // M2: custom rolling windows, 7-28
   source_system?: string;
 };
 

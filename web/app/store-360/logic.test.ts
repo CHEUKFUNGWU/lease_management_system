@@ -3,11 +3,13 @@ import type { RetailBridge, RetailStore360Trend } from "../lib/api";
 import { bridgeConservation, bridgeTone, bridgeWaterfall, bridgeWaterfallDomain, diagnosticQueryKey, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, trendValue, validWindow } from "./logic";
 
 describe("store 360 presentation contract", () => {
-  it("supports only the fixed windows and stable query keys", () => {
+  it("supports fixed and custom (7-28) windows with stable query keys", () => {
     expect(validWindow(7)).toBe(true);
     expect(validWindow(14)).toBe(true);
     expect(validWindow(28)).toBe(true);
-    expect(validWindow(8)).toBe(false);
+    expect(validWindow(8)).toBe(true); // M2: custom rolling windows are legal
+    expect(validWindow(6)).toBe(false);
+    expect(validWindow(29)).toBe(false);
     expect(diagnosticQueryKey({ storeID: "s", classification: "simulated", datasetVersion: "v", asOf: "2026-06-05", windowDays: 14, sourceSystem: "retail_simulator" })).toContain("s|simulated|v");
   });
 

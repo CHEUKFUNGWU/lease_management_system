@@ -5,45 +5,46 @@
  * visual language without individual style overrides.
  */
 
-import { colors, typography, radius, depth } from "./tokens";
+import { colors, darkColors, typography, radius, depth } from "./tokens";
 
-export const antdTheme = {
+export function buildTheme(palette: typeof colors | typeof darkColors) {
+  return {
   token: {
     // ── Core Colors ──
-    colorPrimary: colors.foreground.primary,      // colors.foreground.primary
+    colorPrimary: palette.foreground.primary,      // palette.foreground.primary
     // STY-007: primary-button hover used to be painted foreground.secondary by CSS; antd
     // derives the hover fill from colorPrimaryHover.
-    colorPrimaryHover: colors.foreground.secondary,
-    colorInfo: colors.state.info,
+    colorPrimaryHover: palette.foreground.secondary,
+    colorInfo: palette.state.info,
     // STY-007: antd's Statistic title renders with colorTextDescription;
     // the old CSS forced foreground.tertiary — carry the rendered value.
-    colorTextDescription: colors.foreground.tertiary,
-    colorInfoBg: colors.status.processing.bg,
-    colorInfoBorder: colors.status.processing.border,
-    colorInfoText: colors.status.processing.text,
-    colorSuccess: colors.state.success,
-    colorSuccessBg: colors.status.success.bg,
-    colorSuccessBorder: colors.status.success.border,
-    colorSuccessText: colors.status.success.text,
-    colorWarning: colors.state.warning,
-    colorWarningBg: colors.status.warning.bg,
-    colorWarningBorder: colors.status.warning.border,
-    colorWarningText: colors.status.warning.text,
-    colorError: colors.state.error,
-    colorErrorBg: colors.status.error.bg,
-    colorErrorBorder: colors.status.error.border,
-    colorErrorText: colors.status.error.text,
+    colorTextDescription: palette.foreground.tertiary,
+    colorInfoBg: palette.status.processing.bg,
+    colorInfoBorder: palette.status.processing.border,
+    colorInfoText: palette.status.processing.text,
+    colorSuccess: palette.state.success,
+    colorSuccessBg: palette.status.success.bg,
+    colorSuccessBorder: palette.status.success.border,
+    colorSuccessText: palette.status.success.text,
+    colorWarning: palette.state.warning,
+    colorWarningBg: palette.status.warning.bg,
+    colorWarningBorder: palette.status.warning.border,
+    colorWarningText: palette.status.warning.text,
+    colorError: palette.state.error,
+    colorErrorBg: palette.status.error.bg,
+    colorErrorBorder: palette.status.error.border,
+    colorErrorText: palette.status.error.text,
 
     // ── Base ──
-    colorBgBase: colors.background.page,          // colors.background.page
-    colorTextBase: colors.foreground.primary,     // colors.foreground.primary
+    colorBgBase: palette.background.page,          // palette.background.page
+    colorTextBase: palette.foreground.primary,     // palette.foreground.primary
     borderRadius: radius.lg,                      // 8px
     wireframe: false,
     fontFamily: typography.fontFamily.sans,
 
     // ── Borders ──
-    colorBorder: colors.border.default,           // colors.border.default
-    colorBorderSecondary: colors.border.subtle,   // colors.border.subtle
+    colorBorder: palette.border.default,           // palette.border.default
+    colorBorderSecondary: palette.border.subtle,   // palette.border.subtle
 
     // ── Focus ──
     controlOutline: depth.focus.outline,          // rgba(0, 0, 0, 0.08)
@@ -80,16 +81,16 @@ export const antdTheme = {
       // STY-007: the global override used to force 500 via CSS; the token
       // must match what the UI actually rendered, not the old 600 intent.
       fontWeight: typography.weights.medium,
-      defaultBg: colors.background.page,
-      defaultBorderColor: colors.border.default,
-      defaultColor: colors.foreground.primary,
-      defaultHoverBg: colors.background.surface,
+      defaultBg: palette.background.page,
+      defaultBorderColor: palette.border.default,
+      defaultColor: palette.foreground.primary,
+      defaultHoverBg: palette.background.surface,
       // STY-007: the override painted the hover border with the primary
       // foreground; keep that rendered value.
-      defaultHoverBorderColor: colors.foreground.primary,
-      defaultHoverColor: colors.foreground.primary,
-      defaultActiveBg: colors.background.inset,
-      defaultActiveBorderColor: colors.foreground.primary,
+      defaultHoverBorderColor: palette.foreground.primary,
+      defaultHoverColor: palette.foreground.primary,
+      defaultActiveBg: palette.background.inset,
+      defaultActiveBorderColor: palette.foreground.primary,
       primaryShadow: "none",
       dangerShadow: "none",
     },
@@ -98,8 +99,8 @@ export const antdTheme = {
     Card: {
       borderRadiusLG: radius.xl,
       borderRadiusSM: radius.md,
-      colorBorderSecondary: colors.border.default,
-      headerBg: colors.background.page,
+      colorBorderSecondary: palette.border.default,
+      headerBg: palette.background.page,
       headerFontSize: typography.sizes.h2.size,
       headerHeight: 52,
       // STY-007: the card-body override used to force 20px; antd's default
@@ -117,36 +118,36 @@ export const antdTheme = {
       // STY-007: submenu titles carried the same 6px radius via CSS.
       subMenuItemBorderRadius: radius.md,
       activeBarBorderWidth: 0,
-      itemSelectedBg: colors.background.inset,
-      itemSelectedColor: colors.foreground.primary,
-      itemHoverBg: colors.background.surface,
-      itemHoverColor: colors.foreground.secondary,
-      itemColor: colors.foreground.tertiary,
+      itemSelectedBg: palette.background.inset,
+      itemSelectedColor: palette.foreground.primary,
+      itemHoverBg: palette.background.surface,
+      itemHoverColor: palette.foreground.secondary,
+      itemColor: palette.foreground.tertiary,
       itemHeight: 40,
-      subMenuItemBg: colors.background.page,
-      groupTitleColor: colors.foreground.muted,
+      subMenuItemBg: palette.background.page,
+      groupTitleColor: palette.foreground.muted,
       groupTitleFontSize: typography.sizes.caption.size,
     },
 
     // ── Layout ──
     Layout: {
-      bodyBg: colors.background.page,
-      headerBg: colors.background.page,
-      siderBg: colors.background.page,
-      footerBg: colors.background.page,
+      bodyBg: palette.background.page,
+      headerBg: palette.background.page,
+      siderBg: palette.background.page,
+      footerBg: palette.background.page,
       headerHeight: 60,
       headerPadding: "0 32px",
     },
 
     // ── Table ──
     Table: {
-      headerBg: colors.background.inset,
+      headerBg: palette.background.inset,
       headerBorderRadius: radius.lg,
-      headerColor: colors.foreground.tertiary,
-      borderColor: colors.border.subtle,
-      rowHoverBg: colors.background.surface,
-      rowSelectedBg: colors.background.inset,
-      rowSelectedHoverBg: colors.background.inset,
+      headerColor: palette.foreground.tertiary,
+      borderColor: palette.border.subtle,
+      rowHoverBg: palette.background.surface,
+      rowSelectedBg: palette.background.inset,
+      rowSelectedHoverBg: palette.background.inset,
       cellPaddingBlock: 12,
       cellPaddingInline: 16,
       // STY-007: size="small" tables used to be forced to the same 12/16
@@ -157,16 +158,16 @@ export const antdTheme = {
       cellPaddingBlockSM: 12,
       cellPaddingInlineSM: 16,
       cellFontSize: typography.sizes.body.size,
-      headerSplitColor: colors.border.subtle,
+      headerSplitColor: palette.border.subtle,
     },
 
     // ── Input / Select / DatePicker ──
     Input: {
       borderRadius: radius.lg,
-      activeBorderColor: colors.foreground.primary,
-      hoverBorderColor: colors.border.strong,
-      colorBgContainer: colors.background.page,
-      colorTextPlaceholder: colors.foreground.muted,
+      activeBorderColor: palette.foreground.primary,
+      hoverBorderColor: palette.border.strong,
+      colorBgContainer: palette.background.page,
+      colorTextPlaceholder: palette.foreground.muted,
       controlHeight: 36,
       controlHeightLG: 44,
       controlHeightSM: 28,
@@ -174,9 +175,9 @@ export const antdTheme = {
     Select: {
       borderRadius: radius.lg,
       controlHeight: 36,
-      optionSelectedBg: colors.background.inset,
-      optionActiveBg: colors.background.surface,
-      optionSelectedColor: colors.foreground.primary,
+      optionSelectedBg: palette.background.inset,
+      optionActiveBg: palette.background.surface,
+      optionSelectedColor: palette.foreground.primary,
     },
     DatePicker: {
       borderRadius: radius.lg,
@@ -192,9 +193,9 @@ export const antdTheme = {
       // 24px title (32 × 24). The global token below (line 48) already does
       // the division; this one missed it.
       titleLineHeight: typography.sizes.h1.lineHeight / typography.sizes.h1.size,
-      headerBg: colors.background.page,
-      contentBg: colors.background.page,
-      footerBg: colors.background.page,
+      headerBg: palette.background.page,
+      contentBg: palette.background.page,
+      footerBg: palette.background.page,
       headerPadding: "20px 24px",
       contentPadding: "0 24px 24px",
       footerPadding: "16px 24px",
@@ -204,23 +205,23 @@ export const antdTheme = {
     // ── Tag ──
     Tag: {
       borderRadiusSM: radius.sm,
-      defaultBg: colors.background.inset,
-      defaultColor: colors.foreground.secondary,
+      defaultBg: palette.background.inset,
+      defaultColor: palette.foreground.secondary,
       lineHeight: 18,
     },
 
     // ── Descriptions ──
     Descriptions: {
       borderRadiusLG: radius.lg,
-      colorSplit: colors.border.subtle,
-      labelColor: colors.foreground.tertiary,
-      contentColor: colors.foreground.secondary,
+      colorSplit: palette.border.subtle,
+      labelColor: palette.foreground.tertiary,
+      contentColor: palette.foreground.secondary,
     },
 
     // ── Timeline ──
     Timeline: {
       dotBorderWidth: 2,
-      dotBg: colors.background.page,
+      dotBg: palette.background.page,
       itemPaddingBottom: 24,
     },
 
@@ -236,13 +237,13 @@ export const antdTheme = {
 
     // ── Tabs ──
     Tabs: {
-      cardBg: colors.background.inset,
+      cardBg: palette.background.inset,
       cardHeight: 40,
-      itemColor: colors.foreground.tertiary,
-      itemHoverColor: colors.foreground.secondary,
-      itemSelectedColor: colors.foreground.primary,
-      itemActiveColor: colors.foreground.primary,
-      inkBarColor: colors.foreground.primary,
+      itemColor: palette.foreground.tertiary,
+      itemHoverColor: palette.foreground.secondary,
+      itemSelectedColor: palette.foreground.primary,
+      itemActiveColor: palette.foreground.primary,
+      inkBarColor: palette.foreground.primary,
       horizontalItemGutter: 24,
     },
 
@@ -251,29 +252,29 @@ export const antdTheme = {
       borderRadius: radius.md,
       itemSize: 32,
       itemSizeSM: 24,
-      itemActiveBg: colors.foreground.primary,
-      itemActiveColor: colors.foreground.inverse,
-      itemActiveBgDisabled: colors.border.subtle,
+      itemActiveBg: palette.foreground.primary,
+      itemActiveColor: palette.foreground.inverse,
+      itemActiveBgDisabled: palette.border.subtle,
     },
 
     // ── Dropdown ──
     Dropdown: {
       borderRadius: radius.lg,
-      controlItemBgHover: colors.background.surface,
-      controlItemBgActive: colors.background.inset,
+      controlItemBgHover: palette.background.surface,
+      controlItemBgActive: palette.background.inset,
     },
 
     // ── Tooltip ──
     Tooltip: {
       borderRadius: radius.md,
-      colorBgSpotlight: colors.foreground.secondary,
-      colorTextLightSolid: colors.foreground.inverse,
+      colorBgSpotlight: palette.foreground.secondary,
+      colorTextLightSolid: palette.foreground.inverse,
     },
 
     // ── Popover ──
     Popover: {
       borderRadius: radius.xl,
-      colorBgElevated: colors.background.elevated,
+      colorBgElevated: palette.background.elevated,
     },
 
     // ── Notification ──
@@ -284,18 +285,18 @@ export const antdTheme = {
 
     // ── Breadcrumb ──
     Breadcrumb: {
-      lastItemColor: colors.foreground.primary,
-      linkColor: colors.foreground.tertiary,
-      linkHoverColor: colors.foreground.secondary,
-      separatorColor: colors.border.strong,
-      itemColor: colors.foreground.tertiary,
+      lastItemColor: palette.foreground.primary,
+      linkColor: palette.foreground.tertiary,
+      linkHoverColor: palette.foreground.secondary,
+      separatorColor: palette.border.strong,
+      itemColor: palette.foreground.tertiary,
     },
 
     // ── Steps ──
     Steps: {
-      colorPrimary: colors.foreground.primary,
-      colorText: colors.foreground.tertiary,
-      colorTextDescription: colors.foreground.muted,
+      colorPrimary: palette.foreground.primary,
+      colorText: palette.foreground.tertiary,
+      colorTextDescription: palette.foreground.muted,
       iconFontSize: 14,
       iconSize: 32,
     },
@@ -303,40 +304,40 @@ export const antdTheme = {
     // ── Checkbox / Radio ──
     Checkbox: {
       borderRadius: radius.sm,
-      colorPrimary: colors.foreground.primary,
+      colorPrimary: palette.foreground.primary,
     },
     Radio: {
       borderRadius: radius.full,
-      colorPrimary: colors.foreground.primary,
-      buttonSolidCheckedActiveBg: colors.foreground.primary,
-      buttonSolidCheckedBg: colors.foreground.primary,
-      buttonSolidCheckedHoverBg: colors.foreground.secondary,
+      colorPrimary: palette.foreground.primary,
+      buttonSolidCheckedActiveBg: palette.foreground.primary,
+      buttonSolidCheckedBg: palette.foreground.primary,
+      buttonSolidCheckedHoverBg: palette.foreground.secondary,
     },
 
     // ── Switch ──
     Switch: {
-      colorPrimary: colors.foreground.primary,
-      colorPrimaryHover: colors.foreground.secondary,
+      colorPrimary: palette.foreground.primary,
+      colorPrimaryHover: palette.foreground.secondary,
     },
 
     // ── Slider ──
     Slider: {
-      trackBg: colors.foreground.primary,
-      trackHoverBg: colors.foreground.secondary,
-      railBg: colors.border.default,
-      handleColor: colors.foreground.primary,
+      trackBg: palette.foreground.primary,
+      trackHoverBg: palette.foreground.secondary,
+      railBg: palette.border.default,
+      handleColor: palette.foreground.primary,
     },
 
     // ── Progress ──
     Progress: {
-      defaultColor: colors.foreground.primary,
-      remainingColor: colors.border.default,
+      defaultColor: palette.foreground.primary,
+      remainingColor: palette.border.default,
     },
 
     // ── Badge ──
     Badge: {
-      colorError: colors.foreground.primary,
-      colorWarning: colors.foreground.secondary,
+      colorError: palette.foreground.primary,
+      colorWarning: palette.foreground.secondary,
       // STY-007: the badge-count override forced 10px/600/16px; antd's
       // defaults are 12px and 20px — pin the tokens to the rendered values.
       textFontSize: 10,
@@ -348,25 +349,25 @@ export const antdTheme = {
     // ── Avatar ──
     Avatar: {
       borderRadius: radius.full,
-      colorBg: colors.background.inset,
-      colorText: colors.foreground.secondary,
+      colorBg: palette.background.inset,
+      colorText: palette.foreground.secondary,
     },
 
     // ── Segmented ──
     Segmented: {
       borderRadius: radius.md,
-      itemColor: colors.foreground.tertiary,
-      itemHoverColor: colors.foreground.secondary,
-      itemSelectedColor: colors.foreground.primary,
-      itemSelectedBg: colors.background.page,
-      trackBg: colors.background.inset,
+      itemColor: palette.foreground.tertiary,
+      itemHoverColor: palette.foreground.secondary,
+      itemSelectedColor: palette.foreground.primary,
+      itemSelectedBg: palette.background.page,
+      trackBg: palette.background.inset,
     },
 
     // ── Collapse ──
     Collapse: {
       borderRadius: radius.lg,
-      headerBg: colors.background.page,
-      contentBg: colors.background.page,
+      headerBg: palette.background.page,
+      contentBg: palette.background.page,
       headerPadding: "12px 16px",
     },
 
@@ -384,13 +385,13 @@ export const antdTheme = {
       itemPadding: "12px 16px",
       itemPaddingSM: "8px 12px",
       itemPaddingLG: "16px 24px",
-      emptyTextColor: colors.foreground.muted,
+      emptyTextColor: palette.foreground.muted,
     },
 
     // ── Empty ──
     Empty: {
-      colorText: colors.foreground.muted,
-      colorTextDescription: colors.foreground.muted,
+      colorText: palette.foreground.muted,
+      colorTextDescription: palette.foreground.muted,
     },
 
     // ── Result ──
@@ -398,18 +399,23 @@ export const antdTheme = {
       iconFontSize: 64,
       titleFontSize: typography.sizes.h1.size,
       subtitleFontSize: typography.sizes.body.size,
-      colorError: colors.foreground.primary,
-      colorSuccess: colors.foreground.primary,
-      colorWarning: colors.foreground.secondary,
-      colorInfo: colors.foreground.tertiary,
+      colorError: palette.foreground.primary,
+      colorSuccess: palette.foreground.primary,
+      colorWarning: palette.foreground.secondary,
+      colorInfo: palette.foreground.tertiary,
     },
 
     // ── Skeleton ──
     Skeleton: {
-      gradientFromColor: colors.background.inset,
-      gradientToColor: colors.background.surface,
+      gradientFromColor: palette.background.inset,
+      gradientToColor: palette.background.surface,
       paragraphLiHeight: 22,
       titleHeight: 16,
     },
   },
 } as const;
+}
+
+
+export const antdTheme = buildTheme(colors);
+export const antdDarkTheme = buildTheme(darkColors);

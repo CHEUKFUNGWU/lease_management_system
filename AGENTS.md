@@ -16,6 +16,7 @@
 | **改前端代码必须遵守的设计与样式约束** | **[DESIGN.md](DESIGN.md)** |
 | **一个业务词到底是什么意思、该叫什么** | **[CONTEXT.md](CONTEXT.md)** — 领域语言，命名与措辞以它为准 |
 | 为什么做这次转型、边界在哪、ICP 与产品蓝图 | [docs/线下零售经营分析工作站_产品转型可行性报告与规划.md](docs/线下零售经营分析工作站_产品转型可行性报告与规划.md) |
+| 进入哪个市场、怎么找到第一批客户 | [docs/GTM_零售经营工作站_中国大陆与香港市场进入策略.md](docs/GTM_零售经营工作站_中国大陆与香港市场进入策略.md) |
 | 零售 MVP 每一票的任务、评审与验收记录 | [docs/execution/转型执行看板.md](docs/execution/转型执行看板.md) |
 | 端到端验收证据（截图、trace、residual） | [docs/execution/evidence/MAX-009/index.md](docs/execution/evidence/MAX-009/index.md) |
 | UI/UX 现状诊断与改进计划 | [docs/UIUX改善方案.md](docs/UIUX改善方案.md) |

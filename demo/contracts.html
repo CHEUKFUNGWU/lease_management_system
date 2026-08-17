@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>合同台账 · 零售经营工作站</title>
+<script>
+  // URL 参数 > 本地偏好 > 系统偏好。参数优先是为了让并排对比页能把两个
+  // iframe 各自锁在一种风格上，而不受本地偏好干扰。
+  try {
+    var d = document.documentElement, p = new URLSearchParams(location.search);
+    d.dataset.theme = p.get("theme") || localStorage.getItem("demo.theme") ||
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    d.dataset.skin = p.get("skin") || localStorage.getItem("demo.skin") || "restrained";
+    if (p.get("embed")) d.dataset.embed = "1";
+  } catch (e) { document.documentElement.dataset.theme = "light"; document.documentElement.dataset.skin = "restrained"; }
+</script>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* 已保存视图：标签页形态，切换视图不改变表格结构，只改数据集与筛选 */
+  .views { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+  .views button {
+    height: 28px; padding: 0 var(--space-3); border: 0;
+    border-radius: var(--radius-control); background: transparent;
+    color: var(--fg-tertiary); font-size: var(--text-small); cursor: pointer;
+    transition: background-color var(--dur-fast) var(--ease-micro),
+                color var(--dur-fast) var(--ease-micro);
+  }
+  .views button:hover { background: var(--bg-hover); color: var(--fg-primary); }
+  .views button[aria-pressed="true"] {
+    background: var(--bg-selected); color: var(--fg-primary);
+    font-weight: var(--weight-medium);
+  }
+  .views button .count { color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+
+  /* 批量操作条：出现在选中之后，不常驻占位 */
+  .bulk {
+    display: none; align-items: center; gap: var(--space-3);
+    padding: var(--space-2) var(--space-3); margin-bottom: var(--space-2);
+    border-radius: var(--radius-control);
+    background: var(--accent-bg); box-shadow: inset 0 0 0 1px var(--border-hairline);
+    font-size: var(--text-small);
+  }
+  .bulk[data-visible="true"] { display: flex; }
+
+  /* th 上的 width 在 table-layout:auto 下只是建议值；行内编辑的 input 又是
+     width:100%，不贡献最小宽度，于是整列会被压扁到看不全数字。
+     给表格一个等于各列宽度之和的 min-width，让容器横向滚动——固定首列
+     就是为这种情况准备的。 */
+  #ledger { min-width: 1540px; }
+
+  /* 高级筛选抽屉里的条件行 */
+  .filter-row {
+    display: grid; grid-template-columns: 1fr 92px 1fr auto;
+    gap: var(--space-2); align-items: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <main class="main">
+    <div class="main__inner">
+
+      <div class="page-head">
+        <div>
+          <h1 class="t-display">合同台账</h1>
+          <p class="page-head__sub">
+            企业级表格四件套：固定表头与首列、行内编辑、可组合的高级筛选、可保存的常用视图。
+            目标是让常规修改不必再打开一层模态框。
+          </p>
+        </div>
+        <div class="row">
+          <button class="btn" id="open-filter">高级筛选</button>
+          <button class="btn btn--primary">新建合同</button>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <span class="filter-bar__label">已保存视图</span>
+        <div class="views" id="views" role="group" aria-label="已保存视图"></div>
+        <div class="grow"></div>
+        <input class="input" id="quick" placeholder="过滤合同号、门店、出租方…" aria-label="快速过滤" style="width:230px">
+        <span class="t-caption fg-muted" id="row-count"></span>
+      </div>
+
+      <div class="bulk" id="bulk" role="status">
+        <strong id="bulk-count"></strong>
+        <span class="fg-muted">已选中</span>
+        <div class="grow"></div>
+        <button class="btn btn--sm" data-bulk="submit">提交复核</button>
+        <button class="btn btn--sm" data-bulk="tag">批量打标签</button>
+        <button class="btn btn--sm" data-bulk="export">导出</button>
+        <button class="btn btn--ghost btn--sm" data-bulk="clear">取消选择</button>
+      </div>
+
+      <section class="card card--flush">
+        <div class="table-wrap" style="--table-max-h:calc(100vh - 300px)">
+          <table class="data" id="ledger">
+            <thead>
+              <tr>
+                <th class="col-sticky" style="width:38px">
+                  <input type="checkbox" id="select-all" aria-label="全选">
+                </th>
+                <th class="col-sticky" style="min-width:150px;left:38px">合同号</th>
+                <th style="min-width:170px">门店</th>
+                <th style="min-width:180px">出租方</th>
+                <th style="min-width:190px">租期</th>
+                <th style="width:56px">币种</th>
+                <th class="num-cell" style="width:96px">折现率</th>
+                <th class="num-cell" style="width:130px">租赁负债</th>
+                <th class="num-cell" style="width:130px">使用权资产</th>
+                <th class="num-cell" style="width:120px">月付租金</th>
+                <th style="width:100px">状态</th>
+                <th style="min-width:180px">关键日期</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="row row--wrap section-gap" style="gap:var(--space-4)">
+        <p class="t-caption fg-muted" style="max-width:70ch">
+          <b class="fg-secondary">折现率与月付租金可直接在单元格内改。</b>
+          改动立即落在界面上（乐观更新），同步期间单元格左侧有一道竖条表示尚未确认；
+          <span class="kbd">Esc</span> 撤销，<span class="kbd">↵</span> 提交。
+          真实系统里，折现率变更会触发重新计量并进入审批链——界面上的即时反馈不等于会计上的既成事实。
+        </p>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- 高级筛选走抽屉，不走模态框：筛选时还要能看见表格 -->
+<aside class="drawer" id="filter-drawer" data-open="false" role="dialog" aria-label="高级筛选">
+  <div class="drawer__head">
+    <strong class="t-h3 grow">高级筛选</strong>
+    <button class="btn btn--ghost btn--sm" data-drawer-close onclick="App.closeDrawer()">关闭</button>
+  </div>
+  <div class="drawer__body stack" style="gap:var(--space-4)">
+    <div class="stack">
+      <div class="filter-row">
+        <select class="input"><option>状态</option><option>币种</option><option>折现率</option><option>租赁负债</option></select>
+        <select class="input"><option>等于</option><option>不等于</option><option>包含</option></select>
+        <select class="input"><option>待复核</option><option>待过账</option><option>已过账</option><option>草稿</option></select>
+        <button class="btn btn--ghost btn--icon btn--sm" aria-label="删除条件">✕</button>
+      </div>
+      <div class="filter-row">
+        <select class="input"><option>租赁负债</option><option>状态</option><option>币种</option></select>
+        <select class="input"><option>大于</option><option>小于</option></select>
+        <input class="input" value="10000000" aria-label="值">
+        <button class="btn btn--ghost btn--icon btn--sm" aria-label="删除条件">✕</button>
+      </div>
+      <button class="btn btn--sm" style="align-self:flex-start">+ 增加条件</button>
+    </div>
+
+    <hr class="hr">
+
+    <div class="stack">
+      <label class="eyebrow" for="view-name">存为常用视图</label>
+      <input class="input" id="view-name" placeholder="例如：大额待复核合同">
+      <button class="btn btn--primary" id="save-view">保存视图</button>
+      <p class="t-caption fg-muted">
+        已保存视图是企业级表格里最被低估的一项：多数人每天其实只在三四组固定筛选之间来回切，
+        每次重新点一遍是纯粹的损耗。
+      </p>
+    </div>
+  </div>
+</aside>
+
+<script src="assets/data.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/app.js"></script>
+<script>
+App.mount({ page: "contracts", crumbs: ["日常工作", "合同台账"] });
+
+const F = DEMO.fmt;
+let views = DEMO.savedViews.slice();
+let currentView = "all";
+let quickText = "";
+const selected = new Set();
+
+const STATUS_KIND = { posted: "success", approved: "info", review: "warning", draft: "neutral" };
+
+function visibleRows() {
+  let rows = DEMO.contracts;
+  if (currentView === "mine") rows = rows.filter((r) => r.status === "review");
+  if (currentView === "critical") rows = rows.filter((r) => r.critical !== "—");
+  if (currentView === "hkd") rows = rows.filter((r) => r.ccy === "HKD");
+  if (quickText) {
+    const q = quickText.toLowerCase();
+    rows = rows.filter((r) =>
+      [r.id, r.store, r.lessor].some((field) => field.toLowerCase().includes(q))
+    );
+  }
+  return rows;
+}
+
+function rowHTML(row) {
+  return `
+    <tr data-id="${row.id}" aria-selected="${selected.has(row.id)}">
+      <td class="col-sticky"><input type="checkbox" data-select="${row.id}" ${selected.has(row.id) ? "checked" : ""}
+                 aria-label="选择 ${row.id}"></td>
+      <td class="col-sticky" style="left:38px">
+        <a class="t-small" href="#" style="font-weight:var(--weight-medium)">${row.id}</a>
+      </td>
+      <td><span class="t-small fg-secondary truncate">${row.store}</span></td>
+      <td><span class="t-small fg-tertiary truncate">${row.lessor}</span></td>
+      <td><span class="t-caption num fg-tertiary">${row.start} → ${row.end}</span></td>
+      <td><span class="t-caption fg-tertiary">${row.ccy}</span></td>
+      <td class="num-cell">
+        <input class="cell-edit" type="text" value="${row.rate.toFixed(2)}"
+               aria-label="${row.id} 折现率" style="text-align:right">
+      </td>
+      <td class="num-cell"><span class="num t-small">${F.moneyFull(row.liability)}</span></td>
+      <td class="num-cell"><span class="num t-small fg-tertiary">${F.moneyFull(row.rou)}</span></td>
+      <td class="num-cell">
+        <input class="cell-edit" type="text" value="${F.moneyFull(row.monthly)}"
+               aria-label="${row.id} 月付租金" style="text-align:right">
+      </td>
+      <td><span class="tag tag--${STATUS_KIND[row.status]}">${row.statusLabel}</span></td>
+      <td>${row.critical === "—"
+        ? `<span class="nil t-caption">—</span>`
+        : `<span class="t-caption" style="color:var(--warning-fg)">${row.critical}</span>`}</td>
+    </tr>`;
+}
+
+function renderViews() {
+  document.getElementById("views").innerHTML = views
+    .map((v) => `
+      <button data-view="${v.id}" aria-pressed="${v.id === currentView}">
+        ${v.label} <span class="count">${v.count}</span>
+      </button>`)
+    .join("");
+}
+
+function renderRows() {
+  const rows = visibleRows();
+  document.getElementById("rows").innerHTML = rows.length
+    ? rows.map(rowHTML).join("")
+    : `<tr><td colspan="12">
+         <div class="state">
+           <div class="state__title">没有符合条件的合同</div>
+           <div class="state__hint">当前视图「${views.find((v) => v.id === currentView)?.label}」叠加了快速过滤「${quickText}」。清空过滤即可看到全部。</div>
+         </div></td></tr>`;
+
+  document.getElementById("row-count").textContent = `${rows.length} / ${DEMO.contracts.length} 份`;
+  App.bindInlineEdit(document.getElementById("rows"));
+
+  document.querySelectorAll("[data-select]").forEach((box) =>
+    box.addEventListener("change", () => {
+      box.checked ? selected.add(box.dataset.select) : selected.delete(box.dataset.select);
+      box.closest("tr").setAttribute("aria-selected", String(box.checked));
+      renderBulk();
+    })
+  );
+}
+
+function renderBulk() {
+  const bar = document.getElementById("bulk");
+  bar.dataset.visible = String(selected.size > 0);
+  document.getElementById("bulk-count").textContent = `${selected.size} 份合同`;
+  const all = document.getElementById("select-all");
+  const rows = visibleRows();
+  all.checked = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  all.indeterminate = !all.checked && rows.some((r) => selected.has(r.id));
+}
+
+/* ── 事件 ─────────────────────────────────────────────────────────── */
+
+document.getElementById("views").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-view]");
+  if (!btn) return;
+  currentView = btn.dataset.view;
+  renderViews();
+  renderRows();
+  renderBulk();
+});
+
+document.getElementById("quick").addEventListener("input", (event) => {
+  quickText = event.target.value.trim();
+  renderRows();
+  renderBulk();
+});
+
+document.getElementById("select-all").addEventListener("change", (event) => {
+  const rows = visibleRows();
+  rows.forEach((r) => (event.target.checked ? selected.add(r.id) : selected.delete(r.id)));
+  renderRows();
+  renderBulk();
+});
+
+document.getElementById("bulk").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-bulk]");
+  if (!btn) return;
+  const kind = btn.dataset.bulk;
+  if (kind === "clear") {
+    selected.clear();
+    renderRows();
+    renderBulk();
+    return;
+  }
+  const label = { submit: "已提交复核", tag: "已打标签", export: "已导出" }[kind];
+  App.toast(`${label}：${selected.size} 份合同`);
+});
+
+document.getElementById("open-filter").addEventListener("click", () => App.openDrawer("filter-drawer"));
+
+document.getElementById("save-view").addEventListener("click", () => {
+  const name = document.getElementById("view-name").value.trim();
+  if (!name) { App.toast("先给视图起个名字"); return; }
+  views.push({ id: `v${views.length}`, label: name, count: visibleRows().length });
+  currentView = views[views.length - 1].id;
+  document.getElementById("view-name").value = "";
+  renderViews();
+  App.closeDrawer();
+  App.toast(`已保存视图「${name}」`);
+});
+
+App.filterHandlers = {
+  severity: () => App.toast("合同台账没有严重度维度"),
+  window: () => App.toast("合同台账没有对比窗口"),
+  classification: () => App.toast("合同数据始终为正式数据"),
+};
+
+renderViews();
+renderRows();
+renderBulk();
+</script>
+</body>
+</html>

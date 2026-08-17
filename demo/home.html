@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作台 · 零售经营工作站</title>
+<script>
+  // 在首帧之前定色，避免明暗闪烁
+  // URL 参数 > 本地偏好 > 系统偏好。参数优先是为了让并排对比页能把两个
+  // iframe 各自锁在一种风格上，而不受本地偏好干扰。
+  try {
+    var d = document.documentElement, p = new URLSearchParams(location.search);
+    d.dataset.theme = p.get("theme") || localStorage.getItem("demo.theme") ||
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    d.dataset.skin = p.get("skin") || localStorage.getItem("demo.skin") || "restrained";
+    if (p.get("embed")) d.dataset.embed = "1";
+  } catch (e) { document.documentElement.dataset.theme = "light"; document.documentElement.dataset.skin = "restrained"; }
+</script>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<div class="shell">
+  <main class="main">
+    <div class="main__inner">
+
+      <div class="page-head">
+        <div>
+          <h1 class="t-display">工作台</h1>
+          <p class="page-head__sub">
+            按角色分配空间：最重要的 1–2 个结论占 Hero 尺寸，其余按优先级递减。
+            切换角色可以看到同一批数据如何重排——空间权重跟着责任走，不跟着数据体积走。
+          </p>
+        </div>
+        <div class="row">
+          <div class="segmented" role="group" aria-label="角色视图" id="role-switch">
+            <button data-role="ops" aria-pressed="true">区域运营总监</button>
+            <button data-role="fpa" aria-pressed="false">财务 BP</button>
+            <button data-role="acct" aria-pressed="false">结账会计</button>
+          </div>
+          <button class="btn" data-action="open-ai">AI 追问</button>
+        </div>
+      </div>
+
+      <div id="trust-host"></div>
+
+      <div class="bento" id="bento"></div>
+
+    </div>
+  </main>
+</div>
+
+<!-- AI 抽屉：AI 出现在工作发生的地方，而不是跳走丢掉上下文 -->
+<aside class="drawer" id="drawer" data-open="false" role="dialog" aria-modal="false" aria-label="AI 追问">
+  <div class="drawer__head">
+    <strong class="t-h3 grow">AI 追问 · 工作台上下文</strong>
+    <button class="btn btn--ghost btn--sm" data-drawer-close onclick="App.closeDrawer()">关闭</button>
+  </div>
+  <div class="drawer__body stack" style="gap:var(--space-4)" id="drawer-body"></div>
+</aside>
+
+<script src="assets/data.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/app.js"></script>
+<script>
+App.mount({ page: "home", crumbs: ["工作台"] });
+
+const F = DEMO.fmt;
+
+/* ── 角色布局：同一批瓦片，不同的空间权重 ──────────────────────────
+   这是报告 §5.2A「角色导向」的具体落点。企业级软件绝不是全员统一视图：
+   运营总监先看异常门店，财务 BP 先看成本结构，会计先看结账阻断项。   */
+const ROLE_LAYOUT = {
+  ops: {
+    label: "区域运营总监",
+    order: ["brief", "contribution", "revenue", "occupancy", "attention", "trend", "tasks", "ranking"],
+    span: { brief: "t-hero", contribution: "t-metric", revenue: "t-metric", occupancy: "t-metric",
+            attention: "t-metric", trend: "t-two-thirds", tasks: "t-third", ranking: "t-full" },
+  },
+  fpa: {
+    label: "财务 BP",
+    order: ["occupancy", "contribution", "revenue", "attention", "closing", "trend", "brief", "ranking"],
+    span: { occupancy: "t-hero", contribution: "t-metric", revenue: "t-metric", attention: "t-metric",
+            closing: "t-metric", trend: "t-two-thirds", brief: "t-third", ranking: "t-full" },
+  },
+  acct: {
+    label: "结账会计",
+    order: ["closing", "tasks", "contribution", "revenue", "occupancy", "brief", "trend"],
+    span: { closing: "t-hero", tasks: "t-hero", contribution: "t-metric", revenue: "t-metric",
+            occupancy: "t-metric", brief: "t-metric", trend: "t-full" },
+  },
+};
+
+/* ── 瓦片 ─────────────────────────────────────────────────────────── */
+
+function kpiFromCode(code) {
+  return DEMO.kpis.find((k) => k.code === code);
+}
+
+/* 只有真的有日序列的指标才画走势线。给没有序列的指标配一条别的指标的线，
+   是最容易被当成"设计感"放进去、又最容易骗到读数的东西。 */
+const SPARK_SERIES = { revenue: "revenue", store_contribution: "contribution" };
+
+function kpiTile(code, { hero = false } = {}) {
+  const kpi = kpiFromCode(code);
+  const tone = F.tone(kpi.change_pct, kpi.good_when);
+  const ready = DEMO.envelope.decision_ready;
+  return `
+    <div class="kpi" data-ready="${ready}">
+      <div class="kpi__label">
+        <span>${kpi.label}</span>
+        <span class="row" style="gap:var(--space-1)">
+          ${!ready ? `<span class="not-ready-mark" title="数据不足以支撑决策">!</span>` : ""}
+          ${kpi.status === "partial"
+            ? `<span class="tag tag--warning" title="${kpi.status_reason}">部分</span>`
+            : ""}
+        </span>
+      </div>
+      <div class="kpi__value${hero ? " kpi__value--hero" : ""}">${F.kpiValue(kpi)}</div>
+      <div class="row" style="gap:var(--space-2)">
+        <span class="delta delta--${tone}">${F.delta(kpi.change_pct)}</span>
+        <span class="kpi__meta">对比 ${F.kpiComparison(kpi)}</span>
+      </div>
+      ${kpi.status_reason ? `<div class="kpi__meta">${kpi.status_reason}</div>` : ""}
+      ${SPARK_SERIES[code]
+        ? `<div class="kpi__foot"><div data-spark="${SPARK_SERIES[code]}" style="height:28px"></div></div>`
+        : ""}
+    </div>`;
+}
+
+const TILES = {
+  brief: () => `
+    <section class="card card--hero ${""}" aria-labelledby="brief-h">
+      <div class="card__head">
+        <div class="row" style="gap:var(--space-2)">
+          <span class="tag tag--info">AI 生成</span>
+          <span class="t-micro fg-muted">${DEMO.brief.generated_at}</span>
+        </div>
+        <div class="confidence" data-tone="mid" title="${DEMO.brief.confidence_reason}">
+          <span class="t-micro fg-muted">置信度</span>
+          <span class="confidence__track"><span class="confidence__fill" style="width:${DEMO.brief.confidence * 100}%"></span></span>
+          <span class="t-micro num fg-secondary">${DEMO.brief.confidence.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <h2 class="t-h1" id="brief-h" style="margin-bottom:var(--space-3)">${DEMO.brief.headline}</h2>
+
+      <ul class="stack" style="gap:var(--space-2);margin-bottom:var(--space-3)">
+        ${DEMO.brief.points.map((p) => `
+          <li class="row row--top" style="gap:var(--space-2)">
+            <span class="sev sev--none" aria-hidden="true"><span class="sev__dot"></span></span>
+            <span class="t-small fg-secondary">${p}</span>
+          </li>`).join("")}
+      </ul>
+
+      <p class="t-caption fg-muted" style="margin-bottom:var(--space-3)">
+        置信度降级原因：${DEMO.brief.confidence_reason}
+      </p>
+
+      <div class="row row--wrap" style="gap:var(--space-1);margin-bottom:var(--space-3)">
+        ${DEMO.brief.tools.map((t) => `
+          <span class="tool-chip" title="${t.name} · ${t.ms}ms · ${t.rows} 行">
+            ${t.name} <span class="fg-muted">${t.ms}ms</span>
+          </span>`).join("")}
+      </div>
+
+      <!-- AI 建议与正式数据视觉可分：左侧强调色标尺 + 不同底色 -->
+      <div class="ai-block stack" style="gap:var(--space-2)">
+        <div class="row row--between">
+          <strong class="t-h3">${DEMO.brief.proposal.title}</strong>
+          <span class="tag tag--neutral">待人工确认</span>
+        </div>
+        <div class="t-small fg-secondary">${DEMO.brief.proposal.benefit} · 负责人 ${DEMO.brief.proposal.owner} · 截至 ${DEMO.brief.proposal.due}</div>
+        <div class="t-caption fg-muted">依据：${DEMO.brief.proposal.basis}</div>
+        <div class="row" style="gap:var(--space-2);margin-top:var(--space-1)">
+          <button class="btn btn--primary btn--sm" data-proposal="adopt">采纳</button>
+          <button class="btn btn--sm" data-proposal="modify">修改</button>
+          <button class="btn btn--sm" data-proposal="reject">拒绝</button>
+          <span class="t-micro fg-muted" style="margin-left:auto">确认前不写入任何业务表</span>
+        </div>
+      </div>
+    </section>`,
+
+  contribution: () => `<section class="card">${kpiTile("store_contribution")}</section>`,
+  revenue: () => `<section class="card">${kpiTile("revenue")}</section>`,
+  occupancy: () => `<section class="card card--hero">${kpiTile("occupancy_cost_ratio", { hero: true })}
+      <p class="t-caption fg-muted" style="margin-top:var(--space-3)">
+        经营口径的持有成本 ÷ 营业额。<b class="fg-secondary">不是</b> IFRS 16 的折旧与利息——两套口径并存，互不替代。
+      </p>
+    </section>`,
+
+  attention: () => `
+    <section class="card">
+      <div class="kpi">
+        <div class="kpi__label"><span>进入关注排名的门店</span></div>
+        <div class="kpi__value">${DEMO.attention.length}</div>
+        <div class="row" style="gap:var(--space-2)">
+          <span class="sev sev--critical"><span class="sev__dot"></span><span class="t-caption">严重 2</span></span>
+          <span class="sev sev--high"><span class="sev__dot"></span><span class="t-caption">高 2</span></span>
+          <span class="sev sev--medium"><span class="sev__dot"></span><span class="t-caption">中 2</span></span>
+        </div>
+        <div class="kpi__foot">
+          <p class="t-caption" style="color:var(--warning-fg)">
+            另有 ${DEMO.suppressed.length} 家因证据不足被抑制——不代表表现正常。
+          </p>
+        </div>
+      </div>
+    </section>`,
+
+  trend: () => `
+    <section class="card">
+      <div class="card__head">
+        <h2 class="card__title">14 天趋势</h2>
+        <div class="segmented" role="group" aria-label="趋势指标" id="trend-metric">
+          <button data-metric="revenue" aria-pressed="true">营业额</button>
+          <button data-metric="contribution" aria-pressed="false">门店贡献</button>
+        </div>
+      </div>
+      <div id="trend-chart" style="height:200px"></div>
+      <p class="t-caption fg-muted" style="margin-top:var(--space-2)">
+        08-12 与 08-13 无回传，图上以底纹标出并断线。缺失不会被平滑，也不会用 0 顶替。
+      </p>
+    </section>`,
+
+  tasks: () => `
+    <section class="card card--flush">
+      <div class="card__head card__body-pad" style="margin-bottom:0">
+        <h2 class="card__title">任务中心</h2>
+        <a class="t-caption" href="closing.html">全部 ${DEMO.tasks.length} 项 →</a>
+      </div>
+      <div>${DEMO.tasks.slice(0, 4).map(taskRow).join("")}</div>
+    </section>`,
+
+  closing: () => `
+    <section class="card card--hero">
+      <div class="card__head">
+        <h2 class="card__title">${DEMO.closing.period} 结账就绪度</h2>
+        <span class="tag tag--error">${DEMO.closing.statusLabel}</span>
+      </div>
+      <div class="row" style="gap:var(--space-6);align-items:flex-end;margin-bottom:var(--space-4)">
+        <div>
+          <div class="t-micro fg-muted">评估覆盖</div>
+          <div class="kpi__value">${DEMO.closing.evaluated}<span class="t-h2 fg-muted">/${DEMO.closing.population}</span></div>
+        </div>
+        <div>
+          <div class="t-micro fg-muted">阻断项</div>
+          <div class="kpi__value" style="color:var(--error-fg)">${DEMO.closing.not_evaluated.length}</div>
+        </div>
+        <div class="grow"></div>
+        <div class="t-caption fg-muted">评估于 ${DEMO.closing.evaluated_at}</div>
+      </div>
+      <div class="row row--wrap" style="gap:var(--space-1);margin-bottom:var(--space-3)">
+        ${DEMO.closing.steps.map(stepChip).join("")}
+      </div>
+      <ul class="stack" style="gap:var(--space-1)">
+        ${DEMO.closing.not_evaluated.map((n) => `
+          <li class="row" style="gap:var(--space-2)">
+            <span class="sev sev--high" aria-hidden="true"><span class="sev__dot"></span></span>
+            <span class="t-small fg-secondary grow truncate">${n.subject}</span>
+            <span class="t-caption fg-muted">${n.reason}</span>
+            <span class="t-caption fg-tertiary">${n.owner}</span>
+          </li>`).join("")}
+      </ul>
+      <p class="t-caption fg-muted" style="margin-top:var(--space-3)">
+        每一个「未评估」都必须带原因。缺口不能靠缩小口径消失。
+      </p>
+    </section>`,
+
+  ranking: () => `
+    <section class="card card--flush">
+      <div class="card__head card__body-pad" style="margin-bottom:0">
+        <h2 class="card__title">关注排名</h2>
+        <span class="t-caption fg-muted">顺序由服务端产生，前端不重新打分</span>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th style="width:48px">#</th>
+            <th class="col-sticky" style="min-width:220px">门店</th>
+            <th style="min-width:180px">信号</th>
+            <th style="min-width:200px">变化 · 阈值</th>
+            <th class="num-cell" style="width:96px">分数</th>
+            <th style="width:120px"></th>
+          </tr></thead>
+          <tbody>${DEMO.attention.map(attentionRow).join("")}</tbody>
+        </table>
+      </div>
+    </section>`,
+};
+
+function taskRow(task) {
+  return `
+    <div class="task-item">
+      <span class="sev sev--${task.severity}" aria-hidden="true"><span class="sev__dot"></span></span>
+      <div style="min-width:0">
+        <div class="task-item__source">${task.source}${task.ai ? " · AI 生成" : ""}</div>
+        <div class="task-item__title truncate">${task.title}</div>
+        <div class="task-item__meta">${task.meta}</div>
+      </div>
+      <div class="task-item__actions">
+        <span class="tag tag--${task.severity === "critical" ? "error" : task.severity === "high" ? "warning" : "neutral"}">${task.sla}</span>
+      </div>
+    </div>`;
+}
+
+function stepChip(step) {
+  const kind = step.state === "done" ? "success" : step.state === "active" ? "info"
+    : step.state === "blocked" ? "error" : "neutral";
+  const mark = step.state === "done" ? "✓" : step.state === "blocked" ? "✕" : step.state === "active" ? "▸" : "·";
+  return `<span class="tag tag--${kind}">${mark} ${step.label}</span>`;
+}
+
+function attentionRow(row) {
+  return `
+    <tr>
+      <td class="num-cell"><strong class="num">${row.rank}</strong></td>
+      <td class="col-sticky">
+        <div class="t-small fg-primary" style="font-weight:var(--weight-medium)">${row.store_code}</div>
+        <div class="t-caption fg-muted truncate">${row.store_name} · ${row.brand} · ${row.region}</div>
+      </td>
+      <td>${row.signals.map((s) => `
+        <div class="sev sev--${row.severity}"><span class="sev__dot"></span><span class="t-caption">${s.label}</span></div>`).join("")}</td>
+      <td>${row.signals.map((s) => `
+        <div class="t-caption num fg-secondary">${F.delta(s.change)} <span class="fg-muted">· 阈值 ${F.delta(s.threshold)}</span></div>`).join("")}</td>
+      <td class="num-cell"><span class="num fg-primary">${row.score.toFixed(2)}</span></td>
+      <td><a class="btn btn--sm" href="store360.html">门店 360</a></td>
+    </tr>`;
+}
+
+/* ── 渲染 ─────────────────────────────────────────────────────────── */
+
+let currentRole = "ops";
+let trendMetric = "revenue";
+
+function render() {
+  document.getElementById("trust-host").innerHTML = App.trustBar(DEMO.envelope);
+  App.bindTrustBar();
+
+  const layout = ROLE_LAYOUT[currentRole];
+  document.getElementById("bento").innerHTML = layout.order
+    .map((key) => {
+      const node = TILES[key];
+      if (!node) return "";
+      return `<div class="${layout.span[key]}">${node()}</div>`;
+    })
+    .join("");
+
+  // 迷你走势线
+  document.querySelectorAll("[data-spark]").forEach((host) => {
+    Chart.spark(host, DEMO.trend.map((r) => r[host.dataset.spark]));
+  });
+
+  const chartHost = document.getElementById("trend-chart");
+  if (chartHost) Chart.line(chartHost, DEMO.trend, { key: trendMetric, title: "营业额" });
+
+  document.getElementById("trend-metric")?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-metric]");
+    if (!btn) return;
+    trendMetric = btn.dataset.metric;
+    document.querySelectorAll("#trend-metric [data-metric]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.metric === trendMetric))
+    );
+    Chart.line(document.getElementById("trend-chart"), DEMO.trend, { key: trendMetric });
+  });
+
+  document.querySelectorAll("[data-proposal]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const kind = btn.dataset.proposal;
+      App.toast(kind === "adopt" ? "已采纳，已生成待办并记录证据链"
+        : kind === "modify" ? "跳转情景工作台修改假设" : "已拒绝，原因将记入审计日志");
+    })
+  );
+}
+
+document.getElementById("role-switch").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-role]");
+  if (!btn) return;
+  currentRole = btn.dataset.role;
+  document.querySelectorAll("#role-switch [data-role]").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.role === currentRole))
+  );
+  render();
+  App.toast(`已切到「${ROLE_LAYOUT[currentRole].label}」视图`);
+});
+
+/* AI 抽屉 */
+document.querySelector('[data-action="open-ai"]').addEventListener("click", () => {
+  document.getElementById("drawer-body").innerHTML = `
+    <div class="note note--neutral">
+      当前上下文：${DEMO.envelope.current} · ${DEMO.envelope.dataset_version} · 全部授权门店 ·
+      口径 ${DEMO.envelope.formula_version}
+    </div>
+    <div class="ai-block stack">
+      <div class="row" style="gap:var(--space-1);flex-wrap:wrap">
+        ${DEMO.brief.tools.map((t) => `<span class="tool-chip">${t.name} <span class="fg-muted">${t.ms}ms · ${t.rows}行</span></span>`).join("")}
+      </div>
+      <p class="t-small" style="margin-top:var(--space-2)">${DEMO.brief.headline}</p>
+    </div>
+    <details>
+      <summary class="t-small fg-tertiary" style="cursor:pointer">推理轨迹（默认收起）</summary>
+      <ol class="stack t-caption fg-muted" style="gap:var(--space-2);margin-top:var(--space-2)">
+        <li>1 · 读取 operating_pulse，得到 271/308 store-days，覆盖率 88.0%</li>
+        <li>2 · 覆盖率低于阈值 95%，标记 decision_ready = false</li>
+        <li>3 · 华南区 4 家门店被 Suppressed Attention 排除，结论不覆盖该区域</li>
+        <li>4 · 对 SH-0412 调用 store_diagnostics，取得 Contribution Bridge</li>
+        <li>5 · 桥式分解残差 8,000 元（占总变动 1.9%），如实保留未配平</li>
+      </ol>
+    </details>
+    <div class="stack">
+      <div class="eyebrow">引用来源</div>
+      <a class="t-small" href="pulse.html">operating_pulse · retail_simulator · ${DEMO.envelope.dataset_version} →</a>
+      <a class="t-small" href="store360.html">store_diagnostics · SH-0412 · 14 store-days →</a>
+    </div>
+    <div class="note note--warning">
+      权限说明：本次查询未触及未授权范围。若发生 scope_denied，此处会如实显示"权限不足"，
+      不会软化成"暂无数据"。
+    </div>`;
+  App.openDrawer("drawer");
+});
+
+/* 命令面板里的筛选命令直接作用于本页 */
+App.filterHandlers = {
+  severity: () => App.toast("已筛选：仅严重级门店（演示）"),
+  window: (v) => App.toast(`对比窗口已改为 ${v} 天（演示）`),
+  classification: () => App.toast("已切到正式数据：当前无正式数据集"),
+};
+
+render();
+</script>
+</body>
+</html>

@@ -7,6 +7,12 @@
       "runtimeArgs": ["run", "dev", "--prefix", "web"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4187", "--directory", "demo"],
+      "port": 4187
     }
   ]
 }

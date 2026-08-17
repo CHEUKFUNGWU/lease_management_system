@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>经营脉搏 · 零售经营工作站</title>
+<script>
+  // URL 参数 > 本地偏好 > 系统偏好。参数优先是为了让并排对比页能把两个
+  // iframe 各自锁在一种风格上，而不受本地偏好干扰。
+  try {
+    var d = document.documentElement, p = new URLSearchParams(location.search);
+    d.dataset.theme = p.get("theme") || localStorage.getItem("demo.theme") ||
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    d.dataset.skin = p.get("skin") || localStorage.getItem("demo.skin") || "restrained";
+    if (p.get("embed")) d.dataset.embed = "1";
+  } catch (e) { document.documentElement.dataset.theme = "light"; document.documentElement.dataset.skin = "restrained"; }
+</script>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<div class="shell">
+  <main class="main">
+    <div class="main__inner">
+
+      <div class="page-head">
+        <div>
+          <h1 class="t-display">经营脉搏</h1>
+          <p class="page-head__sub">
+            全部授权门店在一个对比窗口内的经营摘要。关注排名由服务端一次产生，
+            界面呈现给定顺序，不重新打分。
+          </p>
+        </div>
+        <div class="row">
+          <button class="btn" data-action="open-ai">AI 分析</button>
+          <button class="btn btn--primary" id="refresh">刷新</button>
+        </div>
+      </div>
+
+      <!-- 筛选条：所有筛选也都能从 ⌘K 直接执行，不必回到这里点 -->
+      <div class="filter-bar">
+        <span class="filter-bar__label">数据</span>
+        <div class="segmented" role="group" aria-label="数据分类" id="classification">
+          <button data-value="simulated" aria-pressed="true">模拟</button>
+          <button data-value="production" aria-pressed="false">正式</button>
+        </div>
+
+        <span class="filter-bar__label" style="margin-left:var(--space-2)">截至</span>
+        <input class="input" type="date" value="2026-08-16" aria-label="截至日期" style="width:148px">
+
+        <span class="filter-bar__label" style="margin-left:var(--space-2)">对比窗口</span>
+        <div class="segmented" role="group" aria-label="对比窗口" id="window">
+          <button data-value="7" aria-pressed="true">7 天</button>
+          <button data-value="14" aria-pressed="false">14 天</button>
+          <button data-value="28" aria-pressed="false">28 天</button>
+        </div>
+
+        <span class="filter-bar__label" style="margin-left:var(--space-2)">来源系统</span>
+        <input class="input" placeholder="全部" value="retail_simulator" aria-label="来源系统" style="width:150px">
+
+        <div class="grow"></div>
+        <span class="tag tag--neutral">全部授权门店</span>
+      </div>
+
+      <div id="trust-host"></div>
+
+      <div class="bento">
+        <div class="t-metric-sm" id="kpi-0"></div>
+        <div class="t-metric-sm" id="kpi-1"></div>
+        <div class="t-metric-sm" id="kpi-2"></div>
+        <div class="t-metric-sm" id="kpi-3"></div>
+        <div class="t-metric-sm" id="kpi-4"></div>
+        <div class="t-metric-sm" id="kpi-5"></div>
+
+        <div class="t-two-thirds">
+          <section class="card">
+            <div class="card__head">
+              <h2 class="card__title">日趋势</h2>
+              <div class="segmented" role="group" aria-label="趋势指标" id="trend-metric">
+                <button data-metric="revenue" aria-pressed="true">营业额</button>
+                <button data-metric="contribution" aria-pressed="false">门店贡献</button>
+              </div>
+            </div>
+            <div id="trend-chart" style="height:210px"></div>
+            <p class="t-caption fg-muted" style="margin-top:var(--space-2)">
+              08-12、08-13 无回传：折线断开，区间以底纹标出。不做 connectNulls，也不用 0 顶替。
+            </p>
+          </section>
+        </div>
+
+        <div class="t-third">
+          <section class="card" style="height:100%">
+            <div class="card__head"><h2 class="card__title">辅助指标</h2></div>
+            <div id="aux"></div>
+            <div class="note note--info" style="margin-top:var(--space-3)">
+              这些是<b>经营口径</b>的成本。IFRS 16 的折旧与利息在「报表」页，两套口径并行维护，
+              互不替代，也不相加。
+            </div>
+          </section>
+        </div>
+
+        <div class="t-full">
+          <section class="card card--flush">
+            <div class="card__head card__body-pad" style="margin-bottom:0">
+              <h2 class="card__title">关注排名</h2>
+              <div class="row">
+                <span class="t-caption fg-muted">顺序与分数由服务端产生</span>
+                <button class="btn btn--sm" id="only-critical">只看严重级</button>
+              </div>
+            </div>
+            <div class="table-wrap" style="--table-max-h:340px">
+              <table class="data">
+                <thead><tr>
+                  <th style="width:44px">#</th>
+                  <th class="col-sticky" style="min-width:230px">门店</th>
+                  <th style="min-width:170px">信号</th>
+                  <th style="min-width:230px">变化 · 阈值</th>
+                  <th style="width:130px">严重度 · 分数</th>
+                  <th style="min-width:130px">来源</th>
+                  <th style="width:190px">操作</th>
+                </tr></thead>
+                <tbody id="attention-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <div class="t-third">
+          <section class="card" style="height:100%">
+            <div class="card__head">
+              <h2 class="card__title">信号构成</h2>
+              <span class="t-caption fg-muted">谁在主导</span>
+            </div>
+            <div id="signal-mix"></div>
+            <p class="t-caption fg-muted" style="margin-top:var(--space-2)">
+              按信号类型聚合分数贡献，不按门店堆叠——要回答的是"哪一类原因在主导"，
+              不是"哪家门店占了哪一块"。所以单色、无图例。
+            </p>
+          </section>
+        </div>
+
+        <div class="t-two-thirds">
+          <section class="card card--flush" style="height:100%">
+            <div class="card__head card__body-pad" style="margin-bottom:0">
+              <h2 class="card__title" id="suppressed-title">被抑制的关注</h2>
+              <span class="tag tag--warning">证据不足，不是表现正常</span>
+            </div>
+            <div class="card__body-pad" style="padding-top:0">
+              <p class="t-caption fg-muted" style="margin-bottom:var(--space-2)">
+                这些门店被排除在排名之外，是因为它们的证据支撑不了结论。抑制永远不是静默的——
+                每一条都带原因和覆盖率。
+              </p>
+            </div>
+            <div class="table-wrap">
+              <table class="data">
+                <thead><tr>
+                  <th class="col-sticky" style="min-width:200px">门店</th>
+                  <th style="width:80px">区域</th>
+                  <th style="width:110px">原因</th>
+                  <th style="min-width:180px">覆盖率</th>
+                </tr></thead>
+                <tbody id="suppressed-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<aside class="drawer" id="drawer" data-open="false" role="dialog" aria-label="AI 分析">
+  <div class="drawer__head">
+    <strong class="t-h3 grow">AI 分析 · 经营脉搏</strong>
+    <button class="btn btn--ghost btn--sm" data-drawer-close onclick="App.closeDrawer()">关闭</button>
+  </div>
+  <div class="drawer__body stack" style="gap:var(--space-4)" id="drawer-body"></div>
+</aside>
+
+<script src="assets/data.js"></script>
+<script src="assets/charts.js"></script>
+<script src="assets/app.js"></script>
+<script>
+App.mount({ page: "pulse", crumbs: ["经营分析", "经营脉搏"] });
+
+const F = DEMO.fmt;
+let trendMetric = "revenue";
+let onlyCritical = false;
+
+/* ── KPI ──────────────────────────────────────────────────────────── */
+
+function kpiCard(kpi) {
+  const tone = F.tone(kpi.change_pct, kpi.good_when);
+  const ready = DEMO.envelope.decision_ready;
+  return `
+    <section class="card" style="height:100%">
+      <div class="kpi" data-ready="${ready}">
+        <div class="kpi__label">
+          <span class="truncate">${kpi.label}</span>
+          <span class="row" style="gap:var(--space-1)">
+            ${!ready ? `<span class="not-ready-mark" title="不足以支撑决策">!</span>` : ""}
+            ${kpi.status === "partial" ? `<span class="tag tag--warning">部分</span>` : ""}
+          </span>
+        </div>
+        <div class="kpi__value" style="font-size:var(--text-h2);line-height:var(--leading-h2)">${F.kpiValue(kpi)}</div>
+        <div class="delta delta--${tone} t-caption">${F.delta(kpi.change_pct)}</div>
+        <div class="kpi__meta">对比 ${F.kpiComparison(kpi)}</div>
+        ${kpi.status_reason ? `<div class="kpi__meta" style="color:var(--warning-fg)">${kpi.status_reason}</div>` : ""}
+      </div>
+    </section>`;
+}
+
+/* ── 辅助指标行 ───────────────────────────────────────────────────── */
+
+function auxRow(row) {
+  const change = row.comparison ? ((row.current - row.comparison) / row.comparison) * 100 : null;
+  const goodWhen = row.code === "labour_cost" || row.code === "fixed_rent" || row.code === "variable_rent" ? "down" : "up";
+  const tone = F.tone(change, goodWhen);
+  const fmtValue = (v) =>
+    row.unit === "count" ? F.count(v) : row.unit === "currency" && v < 1000 ? v.toFixed(1) : F.money(v);
+  return `
+    <div class="row row--between" style="padding:var(--space-2) 0;box-shadow:inset 0 -1px 0 var(--border-hairline)">
+      <span class="t-small fg-secondary truncate">${row.label}</span>
+      <span class="row" style="gap:var(--space-3)">
+        <span class="num t-small fg-primary">${fmtValue(row.current)}</span>
+        <span class="delta delta--${tone} t-caption" style="min-width:64px;text-align:right">${F.delta(change)}</span>
+      </span>
+    </div>`;
+}
+
+/* ── 关注排名行 ───────────────────────────────────────────────────── */
+
+function attentionRow(row) {
+  return `
+    <tr data-severity="${row.severity}">
+      <td class="num-cell"><strong class="num">${row.rank}</strong></td>
+      <td class="col-sticky">
+        <div class="t-small fg-primary" style="font-weight:var(--weight-medium)">${row.store_code}</div>
+        <div class="t-caption fg-tertiary truncate">${row.store_name}</div>
+        <div class="t-micro fg-muted">${row.brand} · ${row.region}</div>
+      </td>
+      <td>${row.signals.map((s) => `
+        <div class="sev sev--${row.severity}"><span class="sev__dot"></span><span class="t-caption">${s.label}</span></div>`).join("")}</td>
+      <td>${row.signals.map((s) => `
+        <div class="t-caption num">
+          <span class="delta delta--bad">${F.delta(s.change)}</span>
+          <span class="fg-muted">· 阈值 ${F.delta(s.threshold)}</span>
+        </div>`).join("")}</td>
+      <td>
+        <div class="sev sev--${row.severity}">
+          <span class="sev__dot"></span>
+          <span class="t-caption">${{ critical: "严重", high: "高", medium: "中", low: "低" }[row.severity]}</span>
+          <span class="num t-caption fg-primary">${row.score.toFixed(2)}</span>
+        </div>
+      </td>
+      <td><span class="t-caption fg-muted truncate">${row.source_systems.join(", ")}</span></td>
+      <td>
+        <div class="row" style="gap:var(--space-1)">
+          <button class="btn btn--sm" data-scope="${row.store_id}">只看本店</button>
+          <a class="btn btn--sm" href="store360.html">门店 360</a>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function suppressedRow(row) {
+  const rate = Number(row.coverage.match(/([\d.]+)%/)?.[1] ?? 0);
+  return `
+    <tr>
+      <td class="col-sticky">
+        <div class="t-small fg-primary" style="font-weight:var(--weight-medium)">${row.store_code}</div>
+        <div class="t-caption fg-muted truncate">${row.store_name}</div>
+      </td>
+      <td><span class="t-caption fg-tertiary">${row.region}</span></td>
+      <td><span class="tag tag--warning">${row.reason}</span></td>
+      <td>
+        <div class="row" style="gap:var(--space-2)">
+          <span class="coverage-bar" data-tone="${rate >= 85 ? "warning" : "error"}" style="width:60px" aria-hidden="true">
+            <span class="coverage-bar__fill" style="width:${rate}%"></span>
+          </span>
+          <span class="t-caption num fg-tertiary">${row.coverage}</span>
+        </div>
+      </td>
+    </tr>`;
+}
+
+/* ── 渲染 ─────────────────────────────────────────────────────────── */
+
+function render() {
+  document.getElementById("trust-host").innerHTML = App.trustBar(DEMO.envelope);
+  App.bindTrustBar();
+
+  DEMO.kpis.forEach((kpi, i) => {
+    document.getElementById(`kpi-${i}`).innerHTML = kpiCard(kpi);
+  });
+
+  document.getElementById("aux").innerHTML = DEMO.aux.map(auxRow).join("");
+
+  Chart.line(document.getElementById("trend-chart"), DEMO.trend, { key: trendMetric });
+  Chart.barsH(document.getElementById("signal-mix"), DEMO.signalMix, { rowH: 24 });
+
+  const rows = onlyCritical ? DEMO.attention.filter((r) => r.severity === "critical") : DEMO.attention;
+  document.getElementById("attention-body").innerHTML = rows.map(attentionRow).join("");
+  document.getElementById("suppressed-body").innerHTML = DEMO.suppressed.map(suppressedRow).join("");
+
+  document.querySelectorAll("[data-scope]").forEach((btn) =>
+    btn.addEventListener("click", () => App.toast(`已聚焦到 ${btn.dataset.scope}（演示）`))
+  );
+}
+
+document.getElementById("suppressed-title").textContent =
+  `被抑制的关注（${DEMO.suppressed.length}）`;
+
+document.getElementById("trend-metric").addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-metric]");
+  if (!btn) return;
+  trendMetric = btn.dataset.metric;
+  document.querySelectorAll("#trend-metric [data-metric]").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.metric === trendMetric))
+  );
+  Chart.line(document.getElementById("trend-chart"), DEMO.trend, { key: trendMetric });
+});
+
+const criticalBtn = document.getElementById("only-critical");
+function toggleCritical(next) {
+  onlyCritical = next;
+  criticalBtn.textContent = onlyCritical ? "显示全部" : "只看严重级";
+  render();
+}
+criticalBtn.addEventListener("click", () => toggleCritical(!onlyCritical));
+
+[["classification", "数据分类"], ["window", "对比窗口"]].forEach(([id]) => {
+  document.getElementById(id).addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-value]");
+    if (!btn) return;
+    document.querySelectorAll(`#${id} [data-value]`).forEach((b) =>
+      b.setAttribute("aria-pressed", String(b === btn))
+    );
+    App.toast(id === "window" ? `对比窗口改为 ${btn.dataset.value} 天（演示）`
+      : btn.dataset.value === "production" ? "正式数据集为空——不会用模拟数据顶替" : "已切回模拟数据");
+  });
+});
+
+document.getElementById("refresh").addEventListener("click", () => {
+  App.toast("已重新拉取");
+  render();
+});
+
+/* ⌘K 里的筛选命令直接作用于本页，不跳转、不丢上下文 */
+App.filterHandlers = {
+  severity: () => { toggleCritical(true); App.toast("已筛选：仅严重级门店"); },
+  window: (value) => {
+    document.querySelectorAll("#window [data-value]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.value === value))
+    );
+    App.toast(`对比窗口已改为 ${value} 天`);
+  },
+  classification: () => {
+    document.querySelectorAll("#classification [data-value]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.value === "production"))
+    );
+    App.toast("正式数据集为空——不会用模拟数据顶替");
+  },
+};
+
+document.querySelector('[data-action="open-ai"]').addEventListener("click", () => {
+  document.getElementById("drawer-body").innerHTML = `
+    <div class="note note--neutral">
+      上下文：${DEMO.envelope.current} · 窗口 ${DEMO.envelope.window_days} 天 ·
+      ${DEMO.envelope.dataset_version} · ${DEMO.envelope.currency}
+    </div>
+
+    <div class="ai-block stack">
+      <div class="row row--between">
+        <span class="tag tag--info">AI 生成</span>
+        <span class="confidence" data-tone="mid">
+          <span class="t-micro fg-muted">置信度</span>
+          <span class="confidence__track"><span class="confidence__fill" style="width:62%"></span></span>
+          <span class="t-micro num">0.62</span>
+        </span>
+      </div>
+      <p class="t-small">
+        本窗口内门店贡献下滑 18.6%，降幅集中在 6 家门店。信号构成显示"营业额下滑"权重
+        5.31 最高，"租售比上升"次之——后者的分子未变，是分母恶化的派生结果。
+      </p>
+      <p class="t-caption fg-muted">
+        置信度降级：覆盖率 88.0% 低于阈值 95%，华南区 4 家门店已被排除在结论之外。
+      </p>
+    </div>
+
+    <div class="stack">
+      <div class="eyebrow">调用的工具</div>
+      <div class="row row--wrap" style="gap:var(--space-1)">
+        ${DEMO.brief.tools.map((t) => `<span class="tool-chip">${t.name} <span class="fg-muted">${t.ms}ms · ${t.rows}行</span></span>`).join("")}
+      </div>
+    </div>
+
+    <details>
+      <summary class="t-small fg-tertiary" style="cursor:pointer">推理轨迹</summary>
+      <ol class="stack t-caption fg-muted" style="gap:var(--space-2);margin-top:var(--space-2)">
+        <li>1 · 取 Highest Fact Version，排除被 v2/v3 取代的重述值</li>
+        <li>2 · 检出 DG-0388 存在 Source Conflict，拒绝猜测，该店整体排除</li>
+        <li>3 · 币种分区：本次仅 CNY，无跨币种加总</li>
+        <li>4 · 按 pulse-v1.2 计算 Attention Score，得到 6 家门店</li>
+      </ol>
+    </details>
+
+    <div class="stack">
+      <div class="eyebrow">引用来源</div>
+      <a class="t-small" href="store360.html">SH-0412 store_diagnostics · 14 store-days →</a>
+      <a class="t-small" href="#">retail_simulator · ${DEMO.envelope.dataset_version} →</a>
+    </div>`;
+  App.openDrawer("drawer");
+});
+
+render();
+</script>
+</body>
+</html>

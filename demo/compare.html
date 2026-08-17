@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A/B 并排对比 · 零售经营工作站</title>
+<script>
+  try {
+    var d = document.documentElement, p = new URLSearchParams(location.search);
+    d.dataset.theme = p.get("theme") || localStorage.getItem("demo.theme") ||
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    d.dataset.skin = "restrained"; // 外层框架自身固定用克制版，避免喧宾夺主
+  } catch (e) { document.documentElement.dataset.theme = "light"; document.documentElement.dataset.skin = "restrained"; }
+</script>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  body { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+  .cmp-bar {
+    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg-sunken);
+    box-shadow: inset 0 -1px 0 var(--border-hairline);
+    flex: none;
+  }
+
+  .cmp-stage { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  .cmp-stage[data-mode="single"] { grid-template-columns: 1fr; }
+
+  .cmp-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .cmp-pane + .cmp-pane { box-shadow: inset 1px 0 0 var(--border-default); }
+  .cmp-stage[data-mode="single"] .cmp-pane[data-hidden="true"] { display: none; }
+
+  .cmp-pane__head {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--bg-canvas);
+    box-shadow: inset 0 -1px 0 var(--border-hairline);
+    flex: none;
+  }
+  .cmp-pane__title { font-size: var(--text-small); font-weight: var(--weight-semibold); color: var(--fg-primary); }
+  .cmp-pane__sub { font-size: var(--text-caption); color: var(--fg-muted); }
+
+  .cmp-pane iframe { flex: 1; width: 100%; border: 0; background: var(--bg-canvas); }
+
+  @media (max-width: 1100px) {
+    .cmp-stage { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    .cmp-pane + .cmp-pane { box-shadow: inset 0 1px 0 var(--border-default); }
+  }
+</style>
+</head>
+<body>
+
+<div class="cmp-bar">
+  <a class="btn btn--ghost btn--sm" href="index.html">← 返回索引</a>
+
+  <span class="filter-bar__label">页面</span>
+  <div class="segmented" role="group" aria-label="对比页面" id="page-switch">
+    <button data-page="home.html" aria-pressed="true">工作台</button>
+    <button data-page="pulse.html" aria-pressed="false">经营脉搏</button>
+    <button data-page="store360.html" aria-pressed="false">门店 360</button>
+    <button data-page="contracts.html" aria-pressed="false">合同台账</button>
+    <button data-page="closing.html" aria-pressed="false">任务中心</button>
+    <button data-page="tokens.html" aria-pressed="false">设计令牌</button>
+  </div>
+
+  <div class="grow"></div>
+
+  <span class="filter-bar__label">明暗</span>
+  <div class="segmented" role="group" aria-label="明暗主题" id="theme-switch">
+    <button data-theme="light" aria-pressed="true">浅色</button>
+    <button data-theme="dark" aria-pressed="false">深色</button>
+  </div>
+
+  <span class="filter-bar__label">显示</span>
+  <div class="segmented" role="group" aria-label="显示模式" id="mode-switch">
+    <button data-mode="split" aria-pressed="true">并排</button>
+    <button data-mode="restrained" aria-pressed="false">只看克制版</button>
+    <button data-mode="expressive" aria-pressed="false">只看高质感版</button>
+  </div>
+</div>
+
+<div class="cmp-stage" id="stage" data-mode="split">
+  <div class="cmp-pane" data-skin="restrained">
+    <div class="cmp-pane__head">
+      <span class="cmp-pane__title">A · 克制版</span>
+      <span class="cmp-pane__sub">延续现有单色体系 · 无光晕 · 环形边界 · 圆角 6/8</span>
+    </div>
+    <iframe id="frame-a" title="克制版预览"></iframe>
+  </div>
+
+  <div class="cmp-pane" data-skin="expressive">
+    <div class="cmp-pane__head">
+      <span class="cmp-pane__title">B · 高质感版</span>
+      <span class="cmp-pane__sub">冷调基底 · 递进分层 · 靛青强调 · 圆角 8/12</span>
+    </div>
+    <iframe id="frame-b" title="高质感版预览"></iframe>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+let page = "home.html";
+let theme = document.documentElement.dataset.theme;
+let mode = "split";
+
+const stage = document.getElementById("stage");
+const panes = [...document.querySelectorAll(".cmp-pane")];
+
+function load() {
+  const q = (skin) => `${page}?skin=${skin}&theme=${theme}&embed=1`;
+  document.getElementById("frame-a").src = q("restrained");
+  document.getElementById("frame-b").src = q("expressive");
+}
+
+function applyMode() {
+  stage.dataset.mode = mode === "split" ? "split" : "single";
+  panes.forEach((pane) => {
+    pane.dataset.hidden = String(mode !== "split" && pane.dataset.skin !== mode);
+  });
+}
+
+function bind(id, key, onChange) {
+  document.getElementById(id).addEventListener("click", (event) => {
+    const btn = event.target.closest(`[data-${key}]`);
+    if (!btn) return;
+    document.querySelectorAll(`#${id} [data-${key}]`).forEach((b) =>
+      b.setAttribute("aria-pressed", String(b === btn))
+    );
+    onChange(btn.dataset[key]);
+  });
+}
+
+bind("page-switch", "page", (value) => { page = value; load(); });
+bind("theme-switch", "theme", (value) => {
+  theme = value;
+  document.documentElement.dataset.theme = value;
+  App.prefs.set("theme", value);
+  load();
+});
+bind("mode-switch", "mode", (value) => { mode = value; applyMode(); });
+
+// 外层的明暗切换器要反映进入时的实际状态
+document.querySelectorAll("#theme-switch [data-theme]").forEach((b) =>
+  b.setAttribute("aria-pressed", String(b.dataset.theme === theme))
+);
+
+applyMode();
+load();
+</script>
+</body>
+</html>

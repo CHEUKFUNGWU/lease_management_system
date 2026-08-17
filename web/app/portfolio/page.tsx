@@ -191,7 +191,7 @@ function PortfolioPage() {
                     ]}
                   />
                   <Button icon={<ReloadOutlined />} onClick={summaryQuery.retry} loading={loading}>
-                    刷新
+                    {t("common.refresh", language)}
                   </Button>
                 </Space>
               }
@@ -254,7 +254,7 @@ function PortfolioPage() {
               }
             >
               <div style={{ color: "var(--fg-tertiary)", marginBottom: 12, fontSize: 13 }}>
-                月租按全租期固定租金直线化计算，因此免租期与递增条款不影响可比性；单价仅统计已填写租赁面积的合同。
+                {t("pf.rent_per_sqm_note", language)}
               </div>
               {contractsWithoutArea > 0 && (
                 <Alert

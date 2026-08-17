@@ -127,8 +127,12 @@ func joinNonEmpty(values []string, separator string) string {
 	return result
 }
 
-// writeExportCSV streams a rendered export as a download.
+// writeExportCSV streams a rendered export as a download with UTF-8 BOM.
 func writeExportCSV(c *gin.Context, filename string, content []byte) {
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	bom := []byte{0xEF, 0xBB, 0xBF}
+	if len(content) < 3 || content[0] != bom[0] || content[1] != bom[1] || content[2] != bom[2] {
+		content = append(bom, content...)
+	}
 	c.Data(http.StatusOK, "text/csv; charset=utf-8", content)
 }

@@ -553,10 +553,35 @@ const dict: TranslationDict = {
     "zh-HK": "固定演示數據已生成",
     en: "Fixed demo dataset generated",
   },
+  "pulse.data_environment": {
+    "zh-CN": "数据环境",
+    "zh-HK": "數據環境",
+    en: "Data Environment",
+  },
+  "pulse.day_1": {
+    "zh-CN": "1天 (单日)",
+    "zh-HK": "1天 (單日)",
+    en: "1 Day (Daily)",
+  },
+  "pulse.days_count": {
+    "zh-CN": "{count}天",
+    "zh-HK": "{count}天",
+    en: "{count} Days",
+  },
   "pulse.anomaly_select": {
     "zh-CN": "模拟场景",
     "zh-HK": "模擬場景",
     en: "Simulation scenario",
+  },
+  "pulse.demo_scenario": {
+    "zh-CN": "演示场景",
+    "zh-HK": "演示場景",
+    en: "Demo Scenario",
+  },
+  "pulse.dimension": {
+    "zh-CN": "分析维度",
+    "zh-HK": "分析維度",
+    en: "Dimension",
   },
   "pulse.all_anomalies": {
     "zh-CN": "全部固定异常",

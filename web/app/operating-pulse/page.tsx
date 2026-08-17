@@ -33,9 +33,9 @@ import { retailExportApi } from "../lib/api";
 import { envelopeFromPulse, pulseRowsFromResponse } from "../lib/retail-export";
 import { PlanComparisonPanel } from "../components/PlanComparisonPanel";
 
-const WINDOW_OPTIONS = [7, 14, 28] as const;
+const WINDOW_OPTIONS = [1, 7, 14, 30, 90] as const;
 const DEFAULT_WINDOW_DAYS = 14;
-const validWindowDays = (value: number) => Number.isInteger(value) && value >= 7 && value <= 28;
+const validWindowDays = (value: number) => Number.isInteger(value) && value >= 1 && value <= 365;
 const TODAY = dayjs().format("YYYY-MM-DD");
 
 function updateQuery(router: ReturnType<typeof useRouter>, params: { classification: "production" | "simulated"; datasetVersion?: string; asOf: string; windowDays?: number; storeIDs: string[]; sourceSystem?: string; period?: string; groupBy?: string }) {
@@ -457,103 +457,175 @@ function OperatingPulseInner() {
               </Space>
             }
           />
-          <Card size="small" className="pulse-filter-card pulse-block-margin">
-            <Flex gap={12} wrap="wrap" align="center">
-              <Radio.Group
-                value={currentClassification}
-                onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")}
-                optionType="button"
-                buttonStyle="solid"
-                options={[
-                  { label: t("retail.classification.simulated", language), value: "simulated" },
-                  { label: t("retail.classification.production", language), value: "production" },
-                ]}
-              />
-              {currentClassification === "simulated" && anomalies.length > 0 && (
-                <Select
-                  aria-label={t("pulse.anomaly_select", language)}
-                  value={currentAnomaly?.id || "all"}
-                  className="pulse-select-min"
-                  options={[
-                    { label: t("pulse.all_anomalies", language), value: "all" },
-                    ...anomalies.map((item) => ({ label: `${item.store_code} · ${signalLabel(item.type, language)}`, value: item.id })),
-                  ]}
-                  onChange={(id) => {
-                    const selected = anomalies.find((item) => item.id === id);
-                    if (selected) applyQuery({ classification: "simulated", datasetVersion, asOf: selected.date_to, windowDays: DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem });
-                  }}
-                />
-              )}
-              <DatePicker
-                aria-label={t("pulse.as_of", language)}
-                value={asOf ? dayjs(asOf) : undefined}
-                onChange={(date) => date && applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: date.format("YYYY-MM-DD"), windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem })}
-                allowClear={false}
-              />
-              <Input
-                aria-label={t("common.source_system", language)}
-                allowClear
-                placeholder={t("common.source_system_optional", language)}
-                value={sourceInput}
-                onChange={(event) => setSourceInput(event.target.value)}
-                onPressEnter={applySourceFilter}
-                className="pulse-source-input"
-              />
-              <Button onClick={applySourceFilter}>{t("pulse.apply_source", language)}</Button>
-              <Select
-                aria-label={t("pulse.period_mode", language)}
-                value={periodMode}
-                className="pulse-select-min"
-                options={[
-                  { label: t("pulse.period_rolling", language), value: "rolling" },
-                  { label: t("pulse.period_last_month", language), value: "last-month" },
-                  { label: t("pulse.period_this_quarter", language), value: "this-quarter" },
-                  { label: t("pulse.period_month", language), value: "month" },
-                ]}
-                onChange={(value) => onPeriodModeChange(String(value))}
-              />
-              {periodMode === "month" && (
-                <DatePicker
-                  picker="month"
-                  aria-label={t("pulse.period_month", language)}
-                  value={derivedPeriodMode === "month" && period ? dayjs(`${period}-01`) : null}
-                  onChange={onPeriodMonthChange}
-                />
-              )}
-              {periodMode === "rolling" && (
-                <Segmented
-                  aria-label={t("pulse.window", language)}
-                  value={validWindow ? windowDays : DEFAULT_WINDOW_DAYS}
-                  onChange={onWindowChange}
-                  options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))}
-                />
-              )}
-              {periodMode === "rolling" && (
-                <InputNumber
-                  aria-label={t("pulse.custom_window", language)}
-                  min={7}
-                  max={28}
-                  value={customWindowInput}
-                  onChange={(value) => setCustomWindowInput(value ?? DEFAULT_WINDOW_DAYS)}
-                  onPressEnter={applyCustomWindow}
-                  className="pulse-custom-window"
-                />
-              )}
-              {periodMode === "rolling" && customWindowInput !== windowDays && (
-                <Button onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>
-              )}
-              <Segmented
-                aria-label={t("pulse.group_by", language)}
-                value={groupBy}
-                options={[
-                  { label: t("pulse.group_total", language), value: "total" },
-                  { label: t("pulse.group_region", language), value: "region" },
-                  { label: t("pulse.group_brand", language), value: "brand" },
-                ]}
-                onChange={(value) => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem, groupBy: String(value) })}
-              />
-              {isScoped ? <Button onClick={clearStore}>{t("pulse.back_all_stores", language)}</Button> : <Tag>{t("pulse.all_authorized_stores", language)}</Tag>}
-            </Flex>
+          {/* ─── Professional SaaS Filter Bar ─── */}
+          <Card size="small" className="pulse-filter-card pulse-block-margin" style={{ borderRadius: 10, padding: "4px 8px" }}>
+            {/* Primary Row: Essential Business Filters */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, paddingBottom: 10, borderBottom: "1px solid var(--border-subtle, #F0F0F0)" }}>
+              <Space size={16} wrap align="center">
+                {/* 1. Dimension */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-secondary)" }}>
+                    {t("pulse.dimension", language)}:
+                  </span>
+                  <Segmented
+                    aria-label={t("pulse.group_by", language)}
+                    value={groupBy}
+                    options={[
+                      { label: t("pulse.group_total", language), value: "total" },
+                      { label: t("pulse.group_region", language), value: "region" },
+                      { label: t("pulse.group_brand", language), value: "brand" },
+                    ]}
+                    onChange={(value) => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem, groupBy: String(value) })}
+                  />
+                </div>
+
+                {/* 2. As-of Date */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-secondary)" }}>
+                    {t("pulse.as_of", language)}:
+                  </span>
+                  <DatePicker
+                    aria-label={t("pulse.as_of", language)}
+                    value={asOf ? dayjs(asOf) : undefined}
+                    onChange={(date) => date && applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: date.format("YYYY-MM-DD"), windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem })}
+                    allowClear={false}
+                  />
+                </div>
+
+                {/* 3. Period & Window */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-secondary)" }}>
+                    {t("pulse.period_mode", language)}:
+                  </span>
+                  <Select
+                    aria-label={t("pulse.period_mode", language)}
+                    value={periodMode}
+                    style={{ width: 110 }}
+                    options={[
+                      { label: t("pulse.period_rolling", language), value: "rolling" },
+                      { label: t("pulse.period_last_month", language), value: "last-month" },
+                      { label: t("pulse.period_this_quarter", language), value: "this-quarter" },
+                      { label: t("pulse.period_month", language), value: "month" },
+                    ]}
+                    onChange={(value) => onPeriodModeChange(String(value))}
+                  />
+                </div>
+
+                {periodMode === "month" && (
+                  <DatePicker
+                    picker="month"
+                    aria-label={t("pulse.period_month", language)}
+                    value={derivedPeriodMode === "month" && period ? dayjs(`${period}-01`) : null}
+                    onChange={onPeriodMonthChange}
+                  />
+                )}
+
+                {periodMode === "rolling" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <Segmented
+                      aria-label={t("pulse.window", language)}
+                      value={WINDOW_OPTIONS.includes((validWindow ? windowDays : DEFAULT_WINDOW_DAYS) as any) ? (validWindow ? windowDays : DEFAULT_WINDOW_DAYS) : undefined}
+                      onChange={onWindowChange}
+                      options={[
+                        { label: t("pulse.day_1", language), value: 1 },
+                        { label: t("pulse.days_count", language, { count: "7" }), value: 7 },
+                        { label: t("pulse.days_count", language, { count: "14" }), value: 14 },
+                        { label: t("pulse.days_count", language, { count: "30" }), value: 30 },
+                        { label: t("pulse.days_count", language, { count: "90" }), value: 90 },
+                      ]}
+                    />
+                    <InputNumber
+                      aria-label={t("pulse.custom_window", language)}
+                      min={1}
+                      max={365}
+                      addonAfter={t("common.days_suffix", language)}
+                      value={customWindowInput}
+                      onChange={(value) => setCustomWindowInput(value ?? DEFAULT_WINDOW_DAYS)}
+                      onPressEnter={applyCustomWindow}
+                      style={{ width: 100 }}
+                    />
+                    {customWindowInput !== windowDays && (
+                      <Button size="small" onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>
+                    )}
+                  </div>
+                )}
+              </Space>
+
+              {/* Scoped Store Tag/Action */}
+              <div>
+                {isScoped ? (
+                  <Button size="small" onClick={clearStore}>{t("pulse.back_all_stores", language)}</Button>
+                ) : (
+                  <Tag color="default" style={{ margin: 0 }}>{t("pulse.all_authorized_stores", language)}</Tag>
+                )}
+              </div>
+            </div>
+
+            {/* Secondary Row: Data Environment & Advanced Controls */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, paddingTop: 10 }}>
+              <Space size={16} wrap align="center">
+                {/* Data Environment */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
+                    {t("pulse.data_environment", language)}:
+                  </span>
+                  <Radio.Group
+                    size="small"
+                    value={currentClassification}
+                    onChange={(event) => onClassificationChange(event.target.value as "production" | "simulated")}
+                    optionType="button"
+                    buttonStyle="solid"
+                    options={[
+                      { label: t("retail.classification.simulated", language), value: "simulated" },
+                      { label: t("retail.classification.production", language), value: "production" },
+                    ]}
+                  />
+                </div>
+
+                {/* Demo Scenario Replay */}
+                {currentClassification === "simulated" && anomalies.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
+                      {t("pulse.demo_scenario", language)}:
+                    </span>
+                    <Select
+                      size="small"
+                      aria-label={t("pulse.anomaly_select", language)}
+                      value={currentAnomaly?.id || "all"}
+                      style={{ minWidth: 220 }}
+                      options={[
+                        { label: t("pulse.all_anomalies", language), value: "all" },
+                        ...anomalies.map((item) => ({ label: `${item.store_code} · ${signalLabel(item.type, language)}`, value: item.id })),
+                      ]}
+                      onChange={(id) => {
+                        const selected = anomalies.find((item) => item.id === id);
+                        if (selected) applyQuery({ classification: "simulated", datasetVersion, asOf: selected.date_to, windowDays: DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem });
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Source System */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
+                    {t("common.source_system", language)}:
+                  </span>
+                  <Input
+                    size="small"
+                    aria-label={t("common.source_system", language)}
+                    allowClear
+                    placeholder={t("common.source_system_optional", language)}
+                    value={sourceInput}
+                    onChange={(event) => setSourceInput(event.target.value)}
+                    onPressEnter={applySourceFilter}
+                    style={{ width: 140 }}
+                  />
+                  {sourceInput !== (sourceSystem || "") && (
+                    <Button size="small" onClick={applySourceFilter}>{t("pulse.apply_source", language)}</Button>
+                  )}
+                </div>
+              </Space>
+            </div>
           </Card>
           {isEmptyInitial && (
             <Card>

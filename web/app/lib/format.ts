@@ -1,6 +1,9 @@
 export const fmtNum = (v: number | undefined | null) =>
   v != null ? v.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
 
+export const fmtPct = (v: number | undefined | null) =>
+  v != null ? `${(v * 100).toFixed(1)}%` : "—";
+
 // Lease dates are calendar days, not instants: the API sends them as
 // "2024-01-01T00:00:00Z" and rendering that verbatim leaks a timestamp the
 // business never asked about. Slicing beats parsing here — `new Date(...)`

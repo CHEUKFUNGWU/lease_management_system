@@ -17,6 +17,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { ScenarioPanel } from "./ScenarioPanel";
 import { reportApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
+import StackedCashflowChart from "../components/charts/StackedCashflowChart";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -184,6 +185,21 @@ function CashflowForecastPage() {
       variableRent: data.reduce((s, r) => s + (r.variable_rent || 0), 0),
       nonLease: data.reduce((s, r) => s + (r.non_lease_expense || 0), 0),
     };
+  }, [data]);
+
+  /* ---- chart data ---- */
+  const chartData = useMemo(() => {
+    if (!data.length) return [];
+    const map = new Map<string, { period: string; fixedRent: number; variableRent: number; nonLease: number }>();
+    for (const row of data) {
+      const key = String(row.period_key || row.period_start || "期间");
+      const existing = map.get(key) || { period: key, fixedRent: 0, variableRent: 0, nonLease: 0 };
+      existing.fixedRent += Number(row.fixed_rent || 0);
+      existing.variableRent += Number(row.variable_rent || 0);
+      existing.nonLease += Number(row.non_lease_expense || 0);
+      map.set(key, existing);
+    }
+    return Array.from(map.values());
   }, [data]);
 
   /* ---- table columns ---- */
@@ -419,6 +435,12 @@ function CashflowForecastPage() {
               </Card>
             </Col>
           </Row>
+        )}
+
+        {chartData.length > 0 && (
+          <Card size="small" title="现金流出结构堆叠图" style={{ marginBottom: 16 }}>
+            <StackedCashflowChart data={chartData} currency={data[0]?.currency || "CNY"} height={260} />
+          </Card>
         )}
 
         {/* ─── result table ─── */}

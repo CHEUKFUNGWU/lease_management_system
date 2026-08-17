@@ -868,7 +868,20 @@ func retailDiagnosticsMetricSummary(summary map[string]retailstore360.SummaryMet
 		if !ok {
 			continue
 		}
-		parts = append(parts, key+"="+formatRetailMetric(metric.Current, metric.Comparison, metric.ChangeValue, metric.ChangeType))
+		name := retailkpi.DisplayName(key)
+		part := fmt.Sprintf("%s：%s（基准 %s", name, formatRetailKPI(metric.Current), formatRetailKPI(metric.Comparison))
+		if metric.ChangeValue != nil {
+			direction := "持平"
+			if *metric.ChangeValue > 0 {
+				direction = "上升"
+			} else if *metric.ChangeValue < 0 {
+				direction = "下降"
+			}
+			magnitude := math.Abs(*metric.ChangeValue)
+			part += fmt.Sprintf("，环比%s %s", direction, formatRetailNumber(&magnitude, metric.Current.Unit))
+		}
+		part += "）"
+		parts = append(parts, part)
 	}
 	if len(parts) == 0 {
 		return "—"
@@ -882,7 +895,8 @@ func retailPeerSummary(peers []retailstore360.PeerBenchmark) string {
 	}
 	parts := make([]string, 0, len(peers))
 	for _, peer := range peers {
-		parts = append(parts, fmt.Sprintf("%s median=%s status=%s", peer.Code, formatRetailNumber(peer.Median, peer.Unit), displayRetailValue(peer.Status)))
+		name := retailkpi.DisplayName(peer.Code)
+		parts = append(parts, fmt.Sprintf("%s中位数 %s（%s）", name, formatRetailNumber(peer.Median, peer.Unit), displayRetailValue(peer.Status)))
 	}
 	return strings.Join(parts, "；")
 }
@@ -893,7 +907,8 @@ func retailBridgeSummary(bridges []retailstore360.Bridge) string {
 	}
 	parts := make([]string, 0, len(bridges))
 	for _, bridge := range bridges {
-		parts = append(parts, bridge.Code+"="+formatRetailNumber(bridge.TotalChange, "currency")+"/"+displayRetailValue(bridge.Status))
+		name := retailkpi.DisplayName(bridge.Code)
+		parts = append(parts, fmt.Sprintf("%s贡献 %s（%s）", name, formatRetailNumber(bridge.TotalChange, "currency"), displayRetailValue(bridge.Status)))
 	}
 	return strings.Join(parts, "；")
 }
@@ -903,7 +918,8 @@ func scenarioMetricResult(metrics map[string]retailscenario.Metric, code string)
 	if !ok {
 		return "—"
 	}
-	return formatRetailNumber(metric.Result, metric.Unit) + " (" + displayRetailValue(metric.Status) + ")"
+	name := retailkpi.DisplayName(code)
+	return name + " " + formatRetailNumber(metric.Result, metric.Unit) + " (" + displayRetailValue(metric.Status) + ")"
 }
 
 func scenarioPlanChange(response *retailscenario.Response, horizon bool) string {
@@ -924,7 +940,8 @@ func retailScenarioBridgeSummary(response *retailscenario.Response) string {
 	bridge := response.Scenarios[0].Bridge
 	parts := make([]string, 0, len(bridge.Items))
 	for _, item := range bridge.Items {
-		parts = append(parts, item.Code+"="+formatRetailNumber(item.Contribution, item.Unit))
+		name := retailkpi.DisplayName(item.Code)
+		parts = append(parts, fmt.Sprintf("%s贡献 %s", name, formatRetailNumber(item.Contribution, item.Unit)))
 	}
 	if len(parts) == 0 {
 		return displayRetailValue(bridge.Status)

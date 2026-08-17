@@ -12,6 +12,9 @@ import SourceCitation from "./SourceCitation";
 import ConfidenceBadge from "./ConfidenceBadge";
 import DataTrustBar from "./DataTrustBar";
 
+import { SparkleGlyph } from "./MonochromeGlyphs";
+import MarkdownText from "../ai-chat/MarkdownText";
+
 // AI-002: the same-page AI drawer for the retail pages. The /ai-chat page
 // stays; this drawer gives the current page an AI panel without dropping
 // the context. Chat goes through the existing aiChatApi with the page
@@ -125,7 +128,11 @@ export function RetailAIDrawerPanel({ pageContext }: { pageContext: RetailAIDraw
                 {typeof message.confidence === "number" && (
                   <div className="ai-confidence-row"><ConfidenceBadge confidence={message.confidence} /></div>
                 )}
-                <Typography.Paragraph>{message.content}</Typography.Paragraph>
+                {message.role === "assistant" ? (
+                  <MarkdownText content={message.content} />
+                ) : (
+                  <Typography.Paragraph>{message.content}</Typography.Paragraph>
+                )}
                 {message.envelope ? <DataTrustBar envelope={message.envelope as never} /> : null}
                 {message.sources && message.sources.length > 0 && (
                   <div className="ai-tool-row">
@@ -167,7 +174,12 @@ export default function RetailAIDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      title={t("ai.drawer.title", language)}
+      title={
+        <Space>
+          <SparkleGlyph size={14} />
+          <span>{t("ai.drawer.title", language)}</span>
+        </Space>
+      }
       placement="right"
       width={460}
       classNames={{ body: "app-drawer-body" }}

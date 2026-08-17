@@ -420,11 +420,11 @@ function MessageContent({
           <CodeBlock key={idx} code={part.content} language={part.language || "text"} i18nLang={i18nLang} />
         ) : role === "user" ? (
           // The user's own text is shown verbatim — they did not write markdown.
-          <Text key={idx} className="sty-6cefd92f">
+          <Text key={idx} style={{ color: "#FFFFFF", fontSize: 14, lineHeight: 1.6 }}>
             {part.content}
           </Text>
         ) : (
-          <div key={idx} className="sty-6cefd92f">
+          <div key={idx} style={{ width: "100%", fontSize: 14, lineHeight: 1.65 }}>
             <MarkdownText content={part.content} />
           </div>
         )
@@ -789,7 +789,8 @@ function SessionSidebar({
                   display: "flex",
                   minWidth: 0,
                   borderRadius: 8,
-                  background: activeSessionId === session.id ? "var(--fg-primary)" : "transparent",
+                  background: activeSessionId === session.id ? "var(--bg-inset, #F1F5F9)" : "transparent",
+                  boxShadow: activeSessionId === session.id ? "inset 0 0 0 1px var(--border-default, #E2E8F0)" : "none",
                 }}
               >
                 <button
@@ -805,7 +806,8 @@ function SessionSidebar({
                     borderRadius: 8,
                     cursor: "pointer",
                     background: "transparent",
-                    color: activeSessionId === session.id ? "var(--fg-inverse)" : "var(--fg-secondary)",
+                    color: activeSessionId === session.id ? "var(--fg-primary, #0F172A)" : "var(--fg-secondary)",
+                    fontWeight: activeSessionId === session.id ? 600 : 400,
                     transition: "all 0.15s",
                     display: "flex",
                     alignItems: "center",
@@ -2005,7 +2007,16 @@ function AIChatPageContent() {
                       />
 
                       <div
-                        className="sty-10c79dbd"
+                        style={{
+                          borderRadius: 12,
+                          padding: "12px 18px",
+                          background: msg.role === "user" ? "var(--mono-20, #1E293B)" : "var(--bg-elevated, #FFFFFF)",
+                          color: msg.role === "user" ? "#FFFFFF" : "var(--fg-primary, #0F172A)",
+                          border: msg.role === "user" ? "none" : "1px solid var(--border-default, #E2E8F0)",
+                          boxShadow: msg.role === "user" ? "0 1px 2px rgba(0,0,0,0.12)" : "0 1px 3px rgba(0,0,0,0.04)",
+                          maxWidth: "100%",
+                          wordBreak: "break-word",
+                        }}
                       >
                         {msg.role === "assistant" && typingMessageId === msg.id ? (
                           <TypewriterMessage
@@ -2277,23 +2288,26 @@ function AIChatPageContent() {
                         {msg.id !== "welcome" && activeSession?.serverSessionId && (
                           <div
                             style={{
-                              marginTop: 12,
-                              paddingTop: 10,
-                              borderTop: msg.role === "user" ? "1px solid rgba(255,255,255,0.15)" : "1px solid var(--border-default)",
+                              marginTop: 10,
+                              paddingTop: 8,
+                              borderTop: msg.role === "user" ? "1px solid rgba(255,255,255,0.12)" : "1px solid var(--border-subtle, #F1F5F9)",
                               display: "flex",
-                              gap: 8,
+                              gap: 6,
                               flexWrap: "wrap",
+                              alignItems: "center",
                             }}
                           >
                             <Button
                               type="text"
                               size="small"
-                              icon={<MessageOutlined />}
+                              icon={<MessageOutlined style={{ fontSize: 11 }} />}
                               disabled={loading}
                               onClick={() => triggerRuntimeContinuation({ type: "message", id: msg.id })}
                               style={{
-                                paddingInline: 8,
-                                color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
+                                fontSize: 11,
+                                paddingInline: 6,
+                                height: 22,
+                                color: msg.role === "user" ? "rgba(255,255,255,0.8)" : "var(--fg-muted, #94A3B8)",
                               }}
                             >
                               {t("ai.continue_from_message", language)}
@@ -2304,22 +2318,14 @@ function AIChatPageContent() {
                                 <Button
                                   type="text"
                                   size="small"
-                                  icon={<ToolOutlined />}
-                                  disabled={loading}
-                                  onClick={() => triggerRuntimeContinuation({ type: "run", id: msg.runId! })}
-                                  style={{
-                                    paddingInline: 8,
-                                    color: msg.role === "user" ? "rgba(255,255,255,0.88)" : "var(--fg-tertiary)",
-                                  }}
-                                >
-                                  {t("ai.continue_from_run", language)}
-                                </Button>
-                                <Button
-                                  type="text"
-                                  size="small"
-                                  icon={<ClockCircleOutlined />}
+                                  icon={<ClockCircleOutlined style={{ fontSize: 11 }} />}
                                   onClick={() => handleOpenTrace(msg.runId!)}
-                                  className="sty-ff4a32d8"
+                                  style={{
+                                    fontSize: 11,
+                                    paddingInline: 6,
+                                    height: 22,
+                                    color: msg.role === "user" ? "rgba(255,255,255,0.8)" : "var(--fg-muted, #94A3B8)",
+                                  }}
                                 >
                                   {t("ai.view_trace", language)}
                                 </Button>
@@ -2328,43 +2334,17 @@ function AIChatPageContent() {
                                     <Button
                                       type="text"
                                       size="small"
-                                      danger
-                                      icon={<CloseCircleOutlined />}
-                                      disabled={!loading}
-                                      onClick={() => handleRunControl(msg.runId!, "cancel")}
-                                      className="sty-ea458b5c"
-                                    >
-                                      {t("ai.run_cancel", language)}
-                                    </Button>
-                                    <Button
-                                      type="text"
-                                      size="small"
-                                      icon={<MessageOutlined />}
-                                      disabled={loading === false}
-                                      onClick={() => handleRunControl(msg.runId!, "steer")}
-                                      className="sty-ea458b5c"
-                                    >
-                                      {t("ai.run_steer", language)}
-                                    </Button>
-                                    <Button
-                                      type="text"
-                                      size="small"
-                                      icon={<MessageOutlined />}
+                                      icon={<MessageOutlined style={{ fontSize: 11 }} />}
                                       disabled={loading}
                                       onClick={() => handleRunControl(msg.runId!, "follow-up")}
-                                      className="sty-ea458b5c"
+                                      style={{
+                                        fontSize: 11,
+                                        paddingInline: 6,
+                                        height: 22,
+                                        color: "var(--fg-muted, #94A3B8)",
+                                      }}
                                     >
                                       {t("ai.run_follow_up", language)}
-                                    </Button>
-                                    <Button
-                                      type="text"
-                                      size="small"
-                                      icon={<ClockCircleOutlined />}
-                                      disabled={loading}
-                                      onClick={() => handleRunControl(msg.runId!, "branch")}
-                                      style={{ paddingInline: 8, color: "var(--fg-tertiary)" }}
-                                    >
-                                      {t("ai.run_branch", language)}
                                     </Button>
                                   </>
                                 )}
@@ -2426,26 +2406,54 @@ function AIChatPageContent() {
 
             {/* Input Area */}
             <div
-             className="ai-chat-input sty-879ad78b sty-6f1cfedd">
+              className="ai-chat-input"
+              style={{
+                padding: "16px 24px 20px",
+                background: "var(--bg-page)",
+                borderTop: "1px solid var(--border-default)",
+              }}
+            >
               {activePendingUpload && (
                 <div
-                  className="sty-4ccd7199"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "4px 10px",
+                    background: "var(--bg-inset)",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    marginBottom: 8,
+                    border: "1px solid var(--border-default)",
+                  }}
                 >
-                  <PaperClipOutlined className="sty-b032ab3e" />
-                  <span className="sty-05d4bcf4">
+                  <PaperClipOutlined style={{ color: "var(--fg-muted)" }} />
+                  <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {activePendingUpload.original_name}
                   </span>
                   <Button
                     type="text"
                     size="small"
-                    icon={<CloseCircleOutlined className="sty-cf3aaed5" />}
+                    icon={<CloseCircleOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
                     onClick={() => activeSessionId && setPendingUpload(activeSessionId, null)}
-                    className="sty-cf56331d"
+                    style={{ padding: 0, height: 16, width: 16 }}
                   />
                 </div>
               )}
               <div
-               className="sty-2b11dad0 chat-input-wrapper sty-cf56331d">
+                className="chat-input-wrapper"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 14px",
+                  background: "var(--bg-elevated)",
+                  borderRadius: 24,
+                  border: "1px solid var(--border-default)",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                  transition: "border-color 0.2s, box-shadow 0.2s",
+                }}
+              >
                 <Upload
                   customRequest={handleFileUpload}
                   showUploadList={false}
@@ -2474,9 +2482,10 @@ function AIChatPageContent() {
                   <Tooltip title={t("ai.upload_file_tooltip", language)}>
                     <Button
                       type="text"
-                      icon={<PaperClipOutlined className="sty-ac4110ca" />}
+                      shape="circle"
+                      icon={<PaperClipOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />}
                       disabled={loading}
-                      className="sty-41c51a74"
+                      style={{ width: 32, height: 32 }}
                     />
                   </Tooltip>
                 </Upload>
@@ -2495,33 +2504,43 @@ function AIChatPageContent() {
                     resize: "none",
                     fontSize: 14,
                     lineHeight: 1.6,
-                    padding: "6px 0",
+                    padding: "4px 0",
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.parentElement!.parentElement!.style.borderColor = "var(--fg-primary)";
+                    const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
+                    if (parent) {
+                      parent.style.borderColor = "var(--fg-primary)";
+                      parent.style.boxShadow = "0 2px 12px rgba(0, 0, 0, 0.08)";
+                    }
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.parentElement!.parentElement!.style.borderColor = "var(--border-default)";
+                    const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
+                    if (parent) {
+                      parent.style.borderColor = "var(--border-default)";
+                      parent.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.04)";
+                    }
                   }}
                 />
 
                 <Button
                   type="primary"
                   shape="circle"
-                  icon={<SendOutlined />}
+                  icon={<SendOutlined style={{ fontSize: 13 }} />}
                   onClick={() => handleSend()}
                   loading={loading}
                   disabled={loading || (!input.trim() && !activePendingUpload)}
-                  className="sty-d4712ed6"
+                  style={{ width: 32, height: 32 }}
                 />
               </div>
 
-              <Text
-                type="secondary"
-                className="sty-abba5ae3"
-              >
-                {t("ai.disclaimer", language)}
-              </Text>
+              <div style={{ textAlign: "center", marginTop: 8 }}>
+                <Text
+                  type="secondary"
+                  style={{ fontSize: 11, color: "var(--fg-muted)" }}
+                >
+                  {t("ai.disclaimer", language)}
+                </Text>
+              </div>
             </div>
           </div>
         </div>

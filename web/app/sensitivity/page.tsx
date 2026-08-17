@@ -5,12 +5,12 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Tag, message } from "antd";
 import { CalculatorOutlined } from "@ant-design/icons";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { contractApi, reportApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
+import TornadoChart from "../components/charts/TornadoChart";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "framer-motion";
@@ -58,6 +58,19 @@ function SensitivityPage() {
       { base, maxUp: 0, maxDown: 0 }
     );
   }, [rows]);
+
+  const tornadoFactors = useMemo(() => {
+    const shockMagnitudes = Array.from(new Set(rows.map((r) => Math.abs(r.rate_delta)).filter((d) => d > 0.0001)));
+    return shockMagnitudes.map((mag) => {
+      const upRow = rows.find((r) => Math.abs(r.rate_delta - mag) < 0.0001);
+      const downRow = rows.find((r) => Math.abs(r.rate_delta + mag) < 0.0001);
+      return {
+        name: `利率冲击 ±${(mag * 100).toFixed(1)}%`,
+        lowValue: downRow?.initial_liability ?? summary.base,
+        highValue: upRow?.initial_liability ?? summary.base,
+      };
+    });
+  }, [rows, summary.base]);
 
   // FETCH-003: the approved-contract dropdown runs through the shared
   // fetch seam (race gate / token injection / error exit).
@@ -169,18 +182,8 @@ function SensitivityPage() {
             </Row>
 
             {rows.length > 0 && (
-              <Card title="负债影响图">
-                <div style={{ width: "100%", height: 280 }}>
-                  <ResponsiveContainer>
-                    <BarChart data={rows}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="scenario_name" />
-                      <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
-                      <Tooltip formatter={(value) => fmtMoney(Number(value || 0), meta?.currency)} />
-                      <Bar isAnimationActive={false} dataKey="liability_delta" fill="var(--chart-blue)" name="负债变动" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+              <Card title="利率敏感性龙卷风图 (Tornado Sensitivity)">
+                <TornadoChart factors={tornadoFactors} baseValue={summary.base} currency={meta?.currency || "CNY"} height={280} />
               </Card>
             )}
 

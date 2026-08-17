@@ -16,6 +16,9 @@ import {
   Empty,
   Skeleton,
   Badge,
+  Flex,
+  Typography,
+  Tag,
 } from "antd";
 import {
   PlusOutlined,
@@ -257,17 +260,25 @@ function ContractsPage() {
       title: t("contracts.col_identity", language),
       key: "identity",
       sorter: true,
-      width: 260,
+      width: 240,
       render: (_: unknown, record: Contract) => (
-        <div className="sty-17e511d4">
-          {/* FIX-030: the only way into a contract used to be a 12px muted
-              arrow in the last column, with no label and no clickable row —
-              the entry point was there but unreadable as one. The number is
-              now the link, which is where anyone looks first. */}
-          <a className="contract-number-link" onClick={() => router.push(`/contracts/${record.id}`)}>{record.contract_number}</a>
-          <div className="sty-9ac25994" title={record.contract_name}>{record.contract_name}</div>
-          {record.discount_rate_missing && <StatusTag kind="error" className="sty-6ddf9e71">{t("contracts.discount_rate_missing", language)}</StatusTag>}
-        </div>
+        <Space direction="vertical" size={2} style={{ maxWidth: 220 }}>
+          <a
+            className="contract-number-link"
+            style={{ fontWeight: 600, color: "var(--chart-blue, #1677FF)", cursor: "pointer", fontSize: 13 }}
+            onClick={() => router.push(`/contracts/${record.id}`)}
+          >
+            {record.contract_number}
+          </a>
+          <Typography.Text type="secondary" ellipsis style={{ fontSize: 12, maxWidth: 220 }} title={record.contract_name}>
+            {record.contract_name}
+          </Typography.Text>
+          {record.discount_rate_missing && (
+            <StatusTag kind="error" style={{ fontSize: 10 }}>
+              {t("contracts.discount_rate_missing", language)}
+            </StatusTag>
+          )}
+        </Space>
       ),
     },
     {
@@ -276,41 +287,39 @@ function ContractsPage() {
       key: "currency",
       width: 80,
       render: (text: string) => (
-        <span className="sty-3afd6deb">
+        <Tag style={{ borderRadius: 4, margin: 0, fontSize: 11 }}>
           {text}
-        </span>
+        </Tag>
       ),
     },
     {
       title: t("contracts.col_liability", language),
       key: "latest_liability",
-      width: 150,
+      width: 140,
       align: "right" as const,
-      render: (_: unknown, record: Contract) => <span className="money-cell">{fmtMoney(record.latest_liability, record.currency)}</span>,
+      render: (_: unknown, record: Contract) => <span className="font-tabular" style={{ fontWeight: 500 }}>{fmtMoney(record.latest_liability, record.currency)}</span>,
     },
     {
       title: t("contracts.col_rou", language),
       key: "latest_rou_asset",
-      width: 150,
+      width: 140,
       align: "right" as const,
-      render: (_: unknown, record: Contract) => <span className="money-cell">{fmtMoney(record.latest_rou_asset, record.currency)}</span>,
+      render: (_: unknown, record: Contract) => <span className="font-tabular" style={{ fontWeight: 500 }}>{fmtMoney(record.latest_rou_asset, record.currency)}</span>,
     },
     {
       title: t("contracts.col_current_rent", language),
       key: "current_rent",
-      width: 190,
+      width: 170,
       align: "right" as const,
       render: (_: unknown, record: Contract) => (
-        <div>
-          <div className="money-cell">
+        <div style={{ textAlign: "right" }}>
+          <div className="font-tabular" style={{ fontWeight: 500 }}>
             {fmtMoney(record.current_rent, record.current_rent_currency ?? record.currency)}
           </div>
           {record.current_rent_coverage_start && record.current_rent_coverage_end && (
-            <div className="sty-0e5391a4">
-              {dayjs(record.current_rent_coverage_start).format("YYYY-MM-DD")}
-              {" ~ "}
-              {dayjs(record.current_rent_coverage_end).format("YYYY-MM-DD")}
-            </div>
+            <Typography.Text type="secondary" style={{ fontSize: 11 }} className="font-tabular">
+              {dayjs(record.current_rent_coverage_start).format("YYYY-MM-DD")} ~ {dayjs(record.current_rent_coverage_end).format("YYYY-MM-DD")}
+            </Typography.Text>
           )}
         </div>
       ),
@@ -320,9 +329,9 @@ function ContractsPage() {
       dataIndex: "commencement_date",
       key: "commencement_date",
       sorter: true,
-      width: 130,
+      width: 120,
       render: (text: string) => (
-        <span className="sty-0e5391a4">
+        <span className="font-tabular" style={{ fontSize: 12 }}>
           {fmtDate(text)}
         </span>
       ),
@@ -332,9 +341,9 @@ function ContractsPage() {
       dataIndex: "lease_end_date",
       key: "lease_end_date",
       sorter: true,
-      width: 130,
+      width: 120,
       render: (text: string) => (
-        <span className="sty-5e6ef0d9">
+        <span className="font-tabular" style={{ fontSize: 12 }}>
           {fmtDate(text)}
         </span>
       ),
@@ -350,22 +359,19 @@ function ContractsPage() {
           <Space size={4}>
             <StatusTag
               kind={STATUS_COLORS[status] || "neutral"}
-              className="sty-d7a8387d"
             >
               {STATUS_LABELS[status] || status}
             </StatusTag>
             {record.is_official_version && (
               <Badge
                 count={t("contracts.official", language)}
-                className="sty-ef82e49c"
+                style={{ backgroundColor: "var(--fg-primary)", color: "var(--fg-inverse)", fontSize: 10 }}
               />
             )}
             {!record.is_official_version && status !== "draft" && (
-              <span
-                className="sty-ab79ea2b"
-              >
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                 {t("contracts.working", language)}
-              </span>
+              </Typography.Text>
             )}
           </Space>
         );
@@ -375,9 +381,9 @@ function ContractsPage() {
     {
       title: t("contracts.col_lease_scope", language),
       key: "lease_scope",
-      width: 110,
+      width: 120,
       render: (_: any, record: Contract) => (
-        <StatusTag kind={LEASE_SCOPE_COLORS[record.lease_scope || "in_scope"]} className="sty-32c4a785">
+        <StatusTag kind={LEASE_SCOPE_COLORS[record.lease_scope || "in_scope"]}>
           {t(LEASE_SCOPE_KEYS[record.lease_scope || "in_scope"] || "contracts.scope_in_scope", language)}
         </StatusTag>
       ),
@@ -386,28 +392,23 @@ function ContractsPage() {
       title: t("contracts.col_asset", language),
       key: "asset_type",
       width: 100,
-      render: (_: any, record: Contract) => t(ASSET_TYPE_KEYS[record.asset_type || "real_estate"] || "contracts.asset_other", language),
+      render: (_: any, record: Contract) => (
+        <span style={{ fontSize: 12, color: "var(--fg-secondary)" }}>
+          {t(ASSET_TYPE_KEYS[record.asset_type || "real_estate"] || "contracts.asset_other", language)}
+        </span>
+      ),
     },
     {
       title: "",
       key: "action",
-      width: 80,
+      width: 60,
       align: "right" as const,
       render: (_: any, record: Contract) => (
         <Button
           type="text"
           size="small"
-          icon={<ArrowRightOutlined className="sty-e16cb0e3" />}
+          icon={<ArrowRightOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
           onClick={() => router.push(`/contracts/${record.id}`)}
-          className="sty-cd77f5b4"
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--fg-primary)";
-            e.currentTarget.style.background = "var(--bg-inset)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--fg-muted)";
-            e.currentTarget.style.background = "transparent";
-          }}
         />
       ),
     },
@@ -436,7 +437,6 @@ function ContractsPage() {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => router.push("/contracts/new")}
-                className="sty-5ab5e82b"
               >
                 {t("contracts.add_contract", language)}
               </Button>
@@ -451,64 +451,50 @@ function ContractsPage() {
           transition={{ duration: 0.25, delay: 0.05 }}
         >
           <Card
-            styles={{ body: { padding: "16px 20px" } }}
-            className="sty-91b8ec7c"
+            size="small"
+            style={{ marginBottom: 16 }}
           >
-            <div
-              className="sty-e63acfbd"
-            >
-              <div className="sty-bb510439">
-                <SearchOutlined
-                  className="sty-cceb8d9d"
-                />
-                <Input
-                  placeholder={t("contracts.search_placeholder", language)}
-                  value={search}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  allowClear
-                  className="sty-a1f31e15"
-                />
-              </div>
-
-              <div className="sty-05d4bcf4">
-                <FilterOutlined className="sty-cee1122c" />
-                <Select
-                  value={statusFilter}
-                  onChange={(value) => { setPageParam("1"); setStatusFilter(value); }}
-                  options={STATUS_OPTIONS}
-                  className="sty-477fa20b"
-                  size="middle"
-                  placeholder={t("contracts.filter_status", language)}
-                />
-              </div>
-
+            <Flex wrap="wrap" gap={10} align="center">
+              <Input
+                prefix={<SearchOutlined style={{ color: "var(--fg-muted)" }} />}
+                placeholder={t("contracts.search_placeholder", language)}
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                allowClear
+                style={{ width: 240 }}
+              />
+              <Select
+                value={statusFilter || undefined}
+                onChange={(value) => { setPageParam("1"); setStatusFilter(value || ""); }}
+                allowClear
+                placeholder={t("contracts.filter_status", language)}
+                options={STATUS_OPTIONS.filter((o) => o.value !== "")}
+                style={{ width: 140 }}
+              />
               <Select
                 value={riskFilter || undefined}
                 onChange={(value) => { setPageParam("1"); setRiskFilter(value || ""); }}
                 allowClear
                 placeholder={t("contracts.filter_risk", language)}
                 options={[{ value: "discount_rate_missing", label: t("contracts.risk_missing_discount_rate", language) }]}
-                className="sty-cee1122c"
+                style={{ width: 150 }}
               />
-
               <Select
                 value={scopeFilter || undefined}
                 onChange={(value) => { setPageParam("1"); setScopeFilter(value || ""); }}
                 allowClear
                 placeholder={t("contracts.filter_scope", language)}
                 options={Object.entries(LEASE_SCOPE_KEYS).map(([value, key]) => ({ value, label: t(key, language) }))}
-                className="sty-ced30fdd"
+                style={{ width: 140 }}
               />
-
               <Select
                 value={assetFilter || undefined}
                 onChange={(value) => { setPageParam("1"); setAssetFilter(value || ""); }}
                 allowClear
                 placeholder={t("contracts.filter_asset_type", language)}
                 options={Object.entries(ASSET_TYPE_KEYS).map(([value, key]) => ({ value, label: t(key, language) }))}
-                className="sty-cee1122c"
+                style={{ width: 130 }}
               />
-
               <Select
                 value={expiryFilter || undefined}
                 onChange={(value) => { setPageParam("1"); setExpiryFilter(value || ""); }}
@@ -518,26 +504,28 @@ function ContractsPage() {
                   { value: "90", label: t("contracts.expiry_90", language) },
                   { value: "180", label: t("contracts.expiry_180", language) },
                 ]}
-                className="sty-f5911ea9"
+                style={{ width: 130 }}
               />
-
-              <div className="sty-729b7a2c">
+              <Space size={4}>
                 <Button
                   type={sortOrder === "desc" ? "primary" : "default"}
                   size="small"
                   icon={<SortDescendingOutlined />}
                   onClick={() => setSortOrder("desc")}
-                  className="sty-729b7a2c"
                 />
                 <Button
                   type={sortOrder === "asc" ? "primary" : "default"}
                   size="small"
                   icon={<SortAscendingOutlined />}
                   onClick={() => setSortOrder("asc")}
-                  className="sty-4308db27"
                 />
-              </div>
-            </div>
+              </Space>
+              {hasFilters && (
+                <Button onClick={clearFilters} size="small" type="dashed">
+                  {t("contracts.clear_filters", language)}
+                </Button>
+              )}
+            </Flex>
           </Card>
         </motion.div>
 

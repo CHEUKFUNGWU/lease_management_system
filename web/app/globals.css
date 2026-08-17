@@ -1377,7 +1377,12 @@ html {
 }
 .app-content-shell {
   flex: 1;
-  overflow: hidden;
+  /* `overflow: hidden` here would make this the scrolling box for the sticky
+     sider — and since the shell itself never scrolls, the sider would sit
+     still relative to it and still scroll away with the page. `clip` on the
+     x-axis contains wide tables without creating a scroll container. */
+  overflow-x: clip;
+  min-width: 0;
 }
 .app-sider {
   background: var(--fg-inverse);
@@ -1389,6 +1394,13 @@ html {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* The page scrolls on the document (.app-root is min-height, not height),
+     so an unpositioned sider grows to content height and scrolls away with
+     it — and FIX-011's internal scrolling never engages because nothing
+     bounds the column. Pin it below the 60px sticky header instead. */
+  position: sticky;
+  top: 60px;
+  height: calc(100vh - 60px);
 }
 .app-sider-inner {
   padding: 12px 8px;

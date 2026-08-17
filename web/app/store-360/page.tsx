@@ -54,10 +54,12 @@ function writeQuery(router: ReturnType<typeof useRouter>, value: { storeID?: str
   router.replace(`/store-360?${query.toString()}`);
 }
 
+// A "complete" tag on every card is noise repeated six times — the state it
+// reports is the expected one. Only an incomplete metric earns a tag.
 function Status({ metric, language }: { metric?: RetailStoreDiagnosticsResponse["summary"][string]; language: Language }) {
-  const label = summaryStatus(metric, language).label;
-  const kind = summaryStatus(metric, language).status === "complete" ? "neutral" : "warning";
-  return <StatusTag kind={kind}>{label}</StatusTag>;
+  const summary = summaryStatus(metric, language);
+  if (summary.status === "complete") return null;
+  return <StatusTag kind="warning">{summary.label}</StatusTag>;
 }
 
 function MetricCard({ code, metric, currency, notReady, language }: { code: PulseMetricCode; metric?: RetailStoreDiagnosticsResponse["summary"][string]; currency: string; notReady?: boolean; language: Language }) {
@@ -214,13 +216,21 @@ function Store360Inner() {
   };
   // M2: calendar period switching (pulse contract) — rolling / last-month /
   // this-quarter / a picked month.
-  const periodMode = query.period === "" ? "rolling" : query.period === "last-month" ? "last-month" : query.period === "this-quarter" ? "this-quarter" : "month";
+  // "Pick a month" is a mode the user selects *before* a month exists, so it
+  // cannot be derived from query.period alone: the picker would never mount
+  // and the option would be dead. Local state carries the intent until a
+  // month is chosen, then the URL takes over again.
+  const [monthPicking, setMonthPicking] = useState(false);
+  const derivedPeriodMode = query.period === "" ? "rolling" : query.period === "last-month" ? "last-month" : query.period === "this-quarter" ? "this-quarter" : "month";
+  const periodMode = monthPicking ? "month" : derivedPeriodMode;
   const onPeriodModeChange = (mode: string) => {
-    if (mode === "month") return; // waits for the month picker below
+    setMonthPicking(mode === "month"); // the month picker below supplies the value
+    if (mode === "month") return;
     change({ period: mode === "rolling" ? "" : mode });
   };
   const onPeriodMonthChange = (date: dayjs.Dayjs | null) => {
     if (!date) return;
+    setMonthPicking(false);
     change({ period: date.format("YYYY-MM") });
   };
 
@@ -255,7 +265,7 @@ function Store360Inner() {
         <Select showSearch allowClear value={query.storeID || undefined} placeholder={t("store360.select_store", language)} className="store360-store-select" loading={discoveryLoading || optionsLoading} notFoundContent={optionsLoading ? t("store360.loading_stores", language) : t("store360.no_selectable_stores", language)} options={options.map((option) => { const item = optionFields(option); return { label: `${item.storeCode} · ${item.storeName}`, value: item.storeID, search: `${item.storeCode} ${item.storeName} ${item.brand} ${item.region}` }; })} optionFilterProp="search" onChange={(value) => change({ storeID: value || "" })} />
         <DatePicker allowClear={false} value={query.asOf ? dayjs(query.asOf) : undefined} onChange={(date) => date && change({ asOf: date.format("YYYY-MM-DD") })} />
         <Select aria-label={t("pulse.period_mode", language)} value={periodMode} className="store360-select-min" options={[{ label: t("pulse.period_rolling", language), value: "rolling" }, { label: t("pulse.period_last_month", language), value: "last-month" }, { label: t("pulse.period_this_quarter", language), value: "this-quarter" }, { label: t("pulse.period_month", language), value: "month" }]} onChange={(value) => onPeriodModeChange(String(value))} />
-        {periodMode === "month" && <DatePicker picker="month" aria-label={t("pulse.period_month", language)} onChange={onPeriodMonthChange} />}
+        {periodMode === "month" && <DatePicker picker="month" aria-label={t("pulse.period_month", language)} value={derivedPeriodMode === "month" && query.period ? dayjs(`${query.period}-01`) : null} onChange={onPeriodMonthChange} />}
         {periodMode === "rolling" && <Segmented value={validWindow(query.windowDays) ? query.windowDays : 14} onChange={(value) => change({ windowDays: Number(value), period: "" })} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />}
         {periodMode === "rolling" && <InputNumber aria-label={t("pulse.custom_window", language)} min={7} max={28} value={windowInput} onChange={(value) => setWindowInput(value ?? 14)} onPressEnter={applyCustomWindow} className="store360-custom-window" />}
         {periodMode === "rolling" && windowInput !== query.windowDays && <Button onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>}
@@ -289,12 +299,15 @@ function Store360Inner() {
     {response && !response.decision_ready && response.evidence.observed_store_days === 0 && <Alert className="store360-block-margin" type="warning" showIcon message={t("store360.no_facts_title", language)} description={t("store360.no_facts_desc", language)} />}
     {response && <>
       <Card className="store-360-identity-card" title={t("store360.identity", language)}><Flex wrap="wrap" gap={24}><div><Typography.Text type="secondary">{t("store360.field.store", language)}</Typography.Text><Typography.Title level={4} className="store360-identity-title">{response.store.store_code} · {response.store.store_name}</Typography.Title></div><div><Typography.Text type="secondary">{t("store360.field.brand_region", language)}</Typography.Text><div>{response.store.brand || "—"} · {response.store.region || "—"}</div></div><div><Typography.Text type="secondary">{t("store360.field.currency", language)}</Typography.Text><div>{response.currency || "—"} · {response.currency_status}</div></div><div><Typography.Text type="secondary">{t("store360.field.fact_version", language)}</Typography.Text><div>{response.fact_version_min}–{response.fact_version_max}</div></div></Flex></Card>
-      <Row gutter={[12, 12]} className="store360-block-gap">{STORE360_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><MetricCard language={language} code={code} metric={response.summary[code]} currency={response.currency} notReady={!response.decision_ready} /></Col>)}</Row>
+      {/* Six KPIs at xl={4} meant six across, which truncated currency figures
+          mid-number. Stopping at lg={8} gives a 3+3 grid whose cards are wide
+          enough for a millions-scale amount plus its currency code. */}
+      <Row gutter={[12, 12]} className="store360-block-gap">{STORE360_CODES.map((code) => <Col xs={24} sm={12} lg={8} key={code}><MetricCard language={language} code={code} metric={response.summary[code]} currency={response.currency} notReady={!response.decision_ready} /></Col>)}</Row>
       <Row gutter={[16, 16]} className="store360-block-gap"><Col xs={24} lg={16}><Space direction="vertical" size={16} className="chart-stack"><Trend response={response} language={language} /><BridgeWaterfall bridges={response.bridges} currency={response.currency} language={language} plFlow={plFlow} plFlowError={plFlowError} /></Space></Col><Col xs={24} lg={8}><Card title={t("store360.aux_metrics", language)}><Space direction="vertical" size={8} className="store360-full-width">{STORE360_AUX_CODES.map((code) => <Flex key={code} justify="space-between" align="center"><span>{kpiLabel(code, language)}</span><Flex gap={8} align="center"><Status metric={response.summary[code]} language={language} /><Typography.Text>{displayMetric(response.summary[code], response.currency, language)}</Typography.Text></Flex></Flex>)}</Space><Alert type="info" showIcon className="store360-block-gap" message={t("store360.cash_basis_title", language)} description={t("store360.cash_basis_desc", language)} /></Card></Col></Row>
       <Card title={t("store360.peer_benchmark", language)} className="store360-block-gap"><Typography.Text type="secondary">{response.peer_definition} · {t("store360.peer_definition", language).replace("{n}", String(response.minimum_peer_count))}</Typography.Text><Table className="store360-peer-table" size="small" pagination={false} rowKey="code" dataSource={response.peer_benchmark} columns={[{ title: t("store360.col.metric", language), render: (_: unknown, row: RetailStoreDiagnosticsResponse["peer_benchmark"][number]) => kpiLabel(row.code as PulseMetricCode, language) || row.code }, { title: t("store360.col.target", language), render: (_: unknown, row) => formatKPIValue({ value: row.target, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language) }, { title: t("store360.col.quartiles", language), render: (_: unknown, row) => `${formatKPIValue({ value: row.p25, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)} / ${formatKPIValue({ value: row.median, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)} / ${formatKPIValue({ value: row.p75, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)}` }, { title: t("store360.col.sample_percentile", language), render: (_: unknown, row) => `${row.peer_count} · ${row.percentile == null ? "—" : `${row.percentile.toFixed(1)}%`}` }, { title: t("store360.col.status", language), render: (_: unknown, row) => <Tag>{formatPeerBenchmarkStatus(row.status, row.reason, language)}</Tag> }]} /></Card>
 	      <div className="store360-block-gap"><BridgePanel language={language} bridges={response.bridges} currency={response.currency} /></div>
       <Card title={t("store360.observations", language)} className="store360-block-gap"><Space direction="vertical" className="store360-full-width">{response.observations.length ? response.observations.map((item) => <Alert key={`${item.code}-${item.reference}`} type={item.status === "complete" ? "info" : "warning"} showIcon message={item.label} description={item.statement} />) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("store360.no_observations", language)} />}</Space></Card>
-      <Collapse className="store360-block-gap" items={[{ key: "evidence", label: t("store360.evidence_title", language), children: <Space direction="vertical"><Typography.Text>{t("common.current", language)} {response.evidence.current.date_from}–{response.evidence.current.date_to} · {t("common.contrast", language)} {response.evidence.comparison.date_from}–{response.evidence.comparison.date_to}</Typography.Text><Typography.Text>{t("store360.evidence.coverage_source", language).replace("{observed}", String(response.evidence.observed_store_days)).replace("{expected}", String(response.evidence.expected_store_days)).replace("{sources}", response.evidence.source_systems.join(", ") || "—").replace("{datasets}", response.evidence.dataset_versions.join(", ") || "—")}</Typography.Text><Typography.Text>required fields: {response.evidence.required_fields.join(", ")}</Typography.Text><Typography.Text>{t("store360.evidence.fact_version", language).replace("{min}", String(response.evidence.fact_version_min)).replace("{max}", String(response.evidence.fact_version_max))} · <a href={response.evidence.kpi_drilldown_url}>{t("common.view_kpi_drilldown", language)}</a></Typography.Text></Space> }]} />
+      <Collapse className="store360-block-gap" items={[{ key: "evidence", label: t("store360.evidence_title", language), children: <Space direction="vertical"><Typography.Text>{t("common.current", language)} {response.evidence.current.date_from}–{response.evidence.current.date_to} · {t("common.contrast", language)} {response.evidence.comparison.date_from}–{response.evidence.comparison.date_to}</Typography.Text><Typography.Text>{t("store360.evidence.coverage_source", language).replace("{observed}", String(response.evidence.observed_store_days)).replace("{expected}", String(response.evidence.expected_store_days)).replace("{sources}", response.evidence.source_systems.join(", ") || "—").replace("{datasets}", response.evidence.dataset_versions.join(", ") || "—")}</Typography.Text><Typography.Text>{t("store360.evidence.required_fields", language)}: {response.evidence.required_fields.join(", ")}</Typography.Text><Typography.Text>{t("store360.evidence.fact_version", language).replace("{min}", String(response.evidence.fact_version_min)).replace("{max}", String(response.evidence.fact_version_max))} · <a href={response.evidence.kpi_drilldown_url}>{t("common.view_kpi_drilldown", language)}</a></Typography.Text></Space> }]} />
     </>}
     <RetailAIDrawer open={aiOpen} onClose={() => setAiOpen(false)} pageContext={{ page: "store-360", title: t("store360.title", language), filters: { as_of: query.asOf, window_days: String(query.windowDays), classification: query.classification || "", dataset_version: query.datasetVersion || "", source_system: query.sourceSystem || "", store_id: query.storeID || "" } }} />
   </div></AppLayout></ProtectedRoute>;

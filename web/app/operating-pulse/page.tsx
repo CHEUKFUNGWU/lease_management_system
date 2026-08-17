@@ -71,7 +71,9 @@ function KPIValueCard({ code, metric, currency, notReady, language }: { code: Pu
   // so a long figure can never stretch the fixed-height card.
   const display = formatKPIValue(metric.current, currency, language);
   return <Card size="small" className="pulse-kpi-card" data-testid={`pulse-kpi-${code}`}>
-    <Flex justify="space-between" align="start" gap={8}><Typography.Text type="secondary">{kpiLabel(code, language)}</Typography.Text><Flex align="center" gap={4}>{notReady && <KPIReadyBadge />}<Tooltip title={status.reason}><StatusTag kind={statusKind}>{status.label}</StatusTag></Tooltip></Flex></Flex>
+    {/* A "complete" tag on every card is noise repeated six times — the state
+        it reports is the expected one. Only an incomplete metric earns a tag. */}
+    <Flex justify="space-between" align="start" gap={8}><Typography.Text type="secondary">{kpiLabel(code, language)}</Typography.Text><Flex align="center" gap={4}>{notReady && <KPIReadyBadge />}{status.status !== "complete" && <Tooltip title={status.reason}><StatusTag kind={statusKind}>{status.label}</StatusTag></Tooltip>}</Flex></Flex>
     <Typography.Title level={3} className="pulse-kpi-value" ellipsis={{ tooltip: display }}>{display}</Typography.Title>
     <Typography.Text className={`pulse-change pulse-change-${tone}`}>{arrow} {formatChange(metric)} {status.reason ? `· ${status.reason}` : ""}</Typography.Text>
     <Typography.Text type="secondary" className="pulse-kpi-comparison">{t("common.contrast", language)} {formatKPIValue(metric.comparison, currency, language)}</Typography.Text>
@@ -185,7 +187,13 @@ function OperatingPulseInner() {
   const sourceSystem = searchParams.get("source_system") || "";
   const period = searchParams.get("period") || "";
   const groupBy = searchParams.get("group_by") || "total";
-  const periodMode = period === "" ? "rolling" : period === "last-month" ? "last-month" : period === "this-quarter" ? "this-quarter" : "month";
+  // "Pick a month" is a mode the user selects *before* a month exists, so it
+  // cannot be derived from the URL alone: the picker would never mount and the
+  // option would be dead. Local state carries the intent until a month is
+  // chosen, then the URL takes over again.
+  const [monthPicking, setMonthPicking] = useState(false);
+  const derivedPeriodMode = period === "" ? "rolling" : period === "last-month" ? "last-month" : period === "this-quarter" ? "this-quarter" : "month";
+  const periodMode = monthPicking ? "month" : derivedPeriodMode;
   const validWindow = validWindowDays(windowDays);
   const currentClassification = classification === "production" || classification === "simulated" ? classification : "simulated";
 
@@ -312,11 +320,13 @@ function OperatingPulseInner() {
     applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: next, storeIDs, sourceSystem, period: "" });
   };
   const onPeriodModeChange = (mode: string) => {
-    if (mode === "month") return; // waits for the month picker below
+    setMonthPicking(mode === "month"); // the month picker below supplies the value
+    if (mode === "month") return;
     applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem, period: mode === "rolling" ? "" : mode });
   };
   const onPeriodMonthChange = (date: dayjs.Dayjs | null) => {
     if (!date) return;
+    setMonthPicking(false);
     applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem, period: date.format("YYYY-MM") });
   };
   const onStoreSelect = (storeID: string) => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs: [storeID], sourceSystem });
@@ -324,7 +334,10 @@ function OperatingPulseInner() {
   const applySourceFilter = () => applyQuery({ classification: currentClassification, datasetVersion: currentClassification === "simulated" ? datasetVersion : undefined, asOf: asOf || TODAY, windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem: sourceInput.trim() });
   const refresh = () => { latestLoaded.current = false; setLatestRetryNonce((value) => value + 1); setRefreshNonce((value) => value + 1); };
 
-  const kpiCards = PULSE_KPI_CODES.map((code) => <Col xs={24} sm={12} lg={8} xl={4} key={code}><KPIValueCard code={code} metric={displaySummary[code]} currency={partition?.currency || response?.currency || ""} notReady={!response?.decision_ready} language={language} /></Col>);
+  // Six KPIs at xl={4} meant six across, which truncated currency figures
+  // mid-number. Stopping at lg={8} gives a 3+3 grid whose cards are wide
+  // enough for a millions-scale amount plus its currency code.
+  const kpiCards = PULSE_KPI_CODES.map((code) => <Col xs={24} sm={12} lg={8} key={code}><KPIValueCard code={code} metric={displaySummary[code]} currency={partition?.currency || response?.currency || ""} notReady={!response?.decision_ready} language={language} /></Col>);
   const aux = PULSE_AUXILIARY_CODES.map((code) => <AuxiliaryMetricRow key={code} code={code} metric={displaySummary[code]} language={language} currency={partition?.currency || response?.currency} />);
 
   const onClassificationChange = (next: "production" | "simulated") => {
@@ -354,7 +367,7 @@ function OperatingPulseInner() {
         <Input aria-label={t("common.source_system", language)} allowClear placeholder={t("common.source_system_optional", language)} value={sourceInput} onChange={(event) => setSourceInput(event.target.value)} onPressEnter={applySourceFilter} className="pulse-source-input" />
         <Button onClick={applySourceFilter}>{t("pulse.apply_source", language)}</Button>
         <Select aria-label={t("pulse.period_mode", language)} value={periodMode} className="pulse-select-min" options={[{ label: t("pulse.period_rolling", language), value: "rolling" }, { label: t("pulse.period_last_month", language), value: "last-month" }, { label: t("pulse.period_this_quarter", language), value: "this-quarter" }, { label: t("pulse.period_month", language), value: "month" }]} onChange={(value) => onPeriodModeChange(String(value))} />
-        {periodMode === "month" && <DatePicker picker="month" aria-label={t("pulse.period_month", language)} onChange={onPeriodMonthChange} />}
+        {periodMode === "month" && <DatePicker picker="month" aria-label={t("pulse.period_month", language)} value={derivedPeriodMode === "month" && period ? dayjs(`${period}-01`) : null} onChange={onPeriodMonthChange} />}
         {periodMode === "rolling" && <Segmented aria-label={t("pulse.window", language)} value={validWindow ? windowDays : DEFAULT_WINDOW_DAYS} onChange={onWindowChange} options={WINDOW_OPTIONS.map((item) => ({ label: `${item}${t("common.days_suffix", language)}`, value: item }))} />}
         {periodMode === "rolling" && <InputNumber aria-label={t("pulse.custom_window", language)} min={7} max={28} value={customWindowInput} onChange={(value) => setCustomWindowInput(value ?? DEFAULT_WINDOW_DAYS)} onPressEnter={applyCustomWindow} className="pulse-custom-window" />}
         {periodMode === "rolling" && customWindowInput !== windowDays && <Button onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>}

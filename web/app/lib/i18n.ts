@@ -916,6 +916,11 @@ const dict: TranslationDict = {
     "zh-HK": "覆蓋 {observed}/{expected} store-days · 來源 {sources} · dataset {datasets}",
     en: "Coverage {observed}/{expected} store-days · source {sources} · dataset {datasets}",
   },
+  "store360.evidence.required_fields": {
+    "zh-CN": "必需字段",
+    "zh-HK": "必需欄位",
+    en: "Required fields",
+  },
   "store360.evidence.fact_version": {
     "zh-CN": "fact version {min}–{max}",
     "zh-HK": "fact version {min}–{max}",
@@ -1499,9 +1504,11 @@ const dict: TranslationDict = {
     "zh-HK": "收起",
     en: "Collapse",
   },
+  // The bar is always visible, so this unit reaches every business user. The
+  // engineering term "store-days" stays in the collapsed audit detail.
   "trust.store_days": {
-    "zh-CN": "store-days",
-    "zh-HK": "store-days",
+    "zh-CN": "门店日",
+    "zh-HK": "門店日",
     en: "store-days",
   },
   "trust.comparison": {

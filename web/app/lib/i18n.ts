@@ -659,9 +659,14 @@ const dict: TranslationDict = {
     en: "Unknown currency",
   },
   "pulse.aux_metrics": {
-    "zh-CN": "辅助指标",
-    "zh-HK": "輔助指標",
-    en: "Auxiliary metrics",
+    "zh-CN": "经营效率与辅助指标",
+    "zh-HK": "經營效率與輔助指標",
+    en: "Operational & Efficiency Metrics",
+  },
+  "pulse.kpi_count_unit": {
+    "zh-CN": "项指标",
+    "zh-HK": "項指標",
+    en: "metrics",
   },
   "pulse.cash_basis_title": {
     "zh-CN": "经营现金口径",

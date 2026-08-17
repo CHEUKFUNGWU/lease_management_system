@@ -689,7 +689,7 @@ function OperatingPulseInner() {
 
                   <Row gutter={[12, 12]} className="pulse-block-gap">{kpiCards}</Row>
 
-                  {/* Tier 1: Visual Charts - Trend + Signal Mix Side-by-Side */}
+                  {/* Tier 1: Macro Trend & Operational Efficiency Metrics Side-by-Side */}
                   <Row gutter={[16, 16]} className="pulse-block-gap">
                     <Col xs={24} lg={15}>
                       <TrendChartSection
@@ -701,13 +701,31 @@ function OperatingPulseInner() {
                       />
                     </Col>
                     <Col xs={24} lg={9}>
-                      <SignalMix attention={partition.attention} language={language} />
+                      <Card
+                        title={
+                          <Flex justify="space-between" align="center">
+                            <span>{t("pulse.aux_metrics", language)}</span>
+                            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                              {PULSE_AUXILIARY_CODES.length} {t("pulse.kpi_count_unit", language)}
+                            </Typography.Text>
+                          </Flex>
+                        }
+                        styles={{ body: { padding: "8px 16px" } }}
+                        style={{ height: "100%", display: "flex", flexDirection: "column" }}
+                      >
+                        <Space direction="vertical" size={0} className="pulse-full-width" style={{ flex: 1, justifyContent: "space-around" }}>
+                          {aux}
+                        </Space>
+                      </Card>
                     </Col>
                   </Row>
 
-                  {/* Tier 2: Priority Attention Stores Table - Full Width Canvas */}
+                  {/* Tier 2: Anomaly Signals & Priority Attention Stores Table */}
                   <Row gutter={[16, 16]} className="pulse-block-gap">
-                    <Col xs={24}>
+                    <Col xs={24} lg={8}>
+                      <SignalMix attention={partition.attention} language={language} />
+                    </Col>
+                    <Col xs={24} lg={16}>
                       <Card
                         title={
                           <Flex justify="space-between" align="center">
@@ -718,6 +736,7 @@ function OperatingPulseInner() {
                             <Typography.Text type="secondary">{t("pulse.api_order", language)}</Typography.Text>
                           </Flex>
                         }
+                        style={{ height: "100%" }}
                       >
                         <AttentionTable
                           language={language}
@@ -736,23 +755,18 @@ function OperatingPulseInner() {
                     </Col>
                   </Row>
 
-                  {/* Tier 3: Auxiliary Metrics & Basis Explanations */}
+                  {/* Tier 3: Accounting Scope & Methodology Explanations */}
                   <Row gutter={[16, 16]} className="pulse-block-gap">
                     <Col xs={24} lg={12}>
-                      <Card title={t("pulse.aux_metrics", language)}>
-                        <Space direction="vertical" size={0} className="pulse-full-width">{aux}</Space>
-                      </Card>
+                      <Alert
+                        type="info"
+                        showIcon
+                        message={t("pulse.cash_basis_title", language)}
+                        description={t("pulse.cash_basis_desc", language)}
+                      />
                     </Col>
                     <Col xs={24} lg={12}>
-                      <Space direction="vertical" size={16} style={{ width: "100%" }}>
-                        <Alert
-                          type="info"
-                          showIcon
-                          message={t("pulse.cash_basis_title", language)}
-                          description={t("pulse.cash_basis_desc", language)}
-                        />
-                        <SuppressedPanel language={language} items={partition.suppressed_attention || []} />
-                      </Space>
+                      <SuppressedPanel language={language} items={partition.suppressed_attention || []} />
                     </Col>
                   </Row>
                 </>

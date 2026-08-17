@@ -155,6 +155,7 @@ function TrendChartSection({ trend, code, currency, onMetricChange, language }: 
           />
         </Flex>
       }
+      style={{ height: "100%" }}
     >
       <ConfidenceBandChart
         data={points}
@@ -170,14 +171,14 @@ function TrendChartSection({ trend, code, currency, onMetricChange, language }: 
 function SignalMix({ attention, language }: { attention: RetailAttention[]; language: Language }) {
   const rows = signalMix(attention, language);
   return (
-    <Card title={t("pulse.signal_mix_title", language)}>
-      <div className="chart-frame">
+    <Card title={t("pulse.signal_mix_title", language)} style={{ height: "100%" }}>
+      <div style={{ width: "100%", height: 270 }}>
         {rows.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} style={{ paddingTop: 60 }} />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 12, left: 12, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+            <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 16, left: 16, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle, #EAECF0)" opacity={0.6} />
               <XAxis type="number" tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={140} interval={0} />
               <ChartTooltip formatter={(value, _name, item) => [`${Number(value).toFixed(2)} · ${t("pulse.signal_mix_stores", language, { count: String(item?.payload?.stores ?? 0) })}`, t("pulse.signal_mix_weight", language)]} />
@@ -616,8 +617,25 @@ function OperatingPulseInner() {
 
                   <Row gutter={[12, 12]} className="pulse-block-gap">{kpiCards}</Row>
 
+                  {/* Tier 1: Visual Charts - Trend + Signal Mix Side-by-Side */}
                   <Row gutter={[16, 16]} className="pulse-block-gap">
-                    <Col xs={24} xl={14}>
+                    <Col xs={24} lg={15}>
+                      <TrendChartSection
+                        language={language}
+                        trend={partition.daily_trend}
+                        code={trendMetric}
+                        currency={partition.currency || response.currency || ""}
+                        onMetricChange={setTrendMetric}
+                      />
+                    </Col>
+                    <Col xs={24} lg={9}>
+                      <SignalMix attention={partition.attention} language={language} />
+                    </Col>
+                  </Row>
+
+                  {/* Tier 2: Priority Attention Stores Table - Full Width Canvas */}
+                  <Row gutter={[16, 16]} className="pulse-block-gap">
+                    <Col xs={24}>
                       <Card
                         title={
                           <Flex justify="space-between" align="center">
@@ -644,20 +662,9 @@ function OperatingPulseInner() {
                         />
                       </Card>
                     </Col>
-                    <Col xs={24} xl={10}>
-                      <Space direction="vertical" size={16} className="chart-stack">
-                        <TrendChartSection
-                          language={language}
-                          trend={partition.daily_trend}
-                          code={trendMetric}
-                          currency={partition.currency || response.currency || ""}
-                          onMetricChange={setTrendMetric}
-                        />
-                        <SignalMix attention={partition.attention} language={language} />
-                      </Space>
-                    </Col>
                   </Row>
 
+                  {/* Tier 3: Auxiliary Metrics & Basis Explanations */}
                   <Row gutter={[16, 16]} className="pulse-block-gap">
                     <Col xs={24} lg={12}>
                       <Card title={t("pulse.aux_metrics", language)}>
@@ -665,15 +672,15 @@ function OperatingPulseInner() {
                       </Card>
                     </Col>
                     <Col xs={24} lg={12}>
-                      <Alert
-                        type="info"
-                        showIcon
-                        message={t("pulse.cash_basis_title", language)}
-                        description={t("pulse.cash_basis_desc", language)}
-                      />
-                      <div className="pulse-block-gap">
+                      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                        <Alert
+                          type="info"
+                          showIcon
+                          message={t("pulse.cash_basis_title", language)}
+                          description={t("pulse.cash_basis_desc", language)}
+                        />
                         <SuppressedPanel language={language} items={partition.suppressed_attention || []} />
-                      </div>
+                      </Space>
                     </Col>
                   </Row>
                 </>

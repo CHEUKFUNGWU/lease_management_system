@@ -78,6 +78,7 @@ import {
 import { notifyError } from "../lib/notify";
 import { safeInternalAIURL } from "../lib/retailAI";
 import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioResponse } from "../lib/api";
+import MarkdownText from "./MarkdownText";
 import { AI_CHAT_SESSION_ITEM_CLASS, AI_CHAT_SESSION_MORE_CLASS, getAIChatResponsiveState, getAIChatSessionButtonProps, getAIChatSessionRowProps, transitionAIChatDrawer, type AIChatDrawerEvent } from "./responsive";
 
 const { TextArea } = Input;
@@ -417,13 +418,15 @@ function MessageContent({
       {parts.map((part, idx) =>
         part.type === "code" ? (
           <CodeBlock key={idx} code={part.content} language={part.language || "text"} i18nLang={i18nLang} />
-        ) : (
-          <Text
-            key={idx}
-            className="sty-6cefd92f"
-          >
+        ) : role === "user" ? (
+          // The user's own text is shown verbatim — they did not write markdown.
+          <Text key={idx} className="sty-6cefd92f">
             {part.content}
           </Text>
+        ) : (
+          <div key={idx} className="sty-6cefd92f">
+            <MarkdownText content={part.content} />
+          </div>
         )
       )}
 

@@ -2161,6 +2161,16 @@ const dict: TranslationDict = {
     "zh-HK": "新建會話",
     en: "New Session",
   },
+  "ai.history_sessions": {
+    "zh-CN": "历史会话",
+    "zh-HK": "歷史會話",
+    en: "History",
+  },
+  "ai.just_now": {
+    "zh-CN": "刚刚",
+    "zh-HK": "剛剛",
+    en: "Just now",
+  },
   "ai.no_sessions": {
     "zh-CN": "暂无会话",
     "zh-HK": "暫無會話",

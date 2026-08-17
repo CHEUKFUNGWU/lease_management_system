@@ -161,14 +161,13 @@ const agentSkillStarters = [
 
 // ─── Helpers ───────────────────────────────────────────────────
 
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  if (isToday) {
-    return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
-  }
-  return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+function formatTime(timestamp: number, language?: Language): string {
+  const diff = Date.now() - timestamp;
+  if (diff < 60 * 1000) return language ? t("ai.just_now", language) : "刚刚";
+  if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}m`;
+  if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}h`;
+  if (diff < 30 * 24 * 60 * 60 * 1000) return `${Math.floor(diff / (24 * 60 * 60 * 1000))}d`;
+  return `${Math.floor(diff / (30 * 24 * 60 * 60 * 1000))}mo`;
 }
 
 function getContractDraftView(message: Message) {
@@ -754,150 +753,185 @@ function SessionSidebar({
     <div
       className="ai-chat-session-sidebar"
       style={{
-        width: 260,
+        width: 256,
         height: "100%",
-        borderRight: "1px solid var(--border-default)",
-        background: "var(--bg-surface)",
+        borderRight: "1px solid var(--border-default, #EAECF0)",
+        background: "var(--bg-surface, #FAFAFA)",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
       }}
     >
-      {/* Header */}
+      {/* 1. Header (Flush 52px height) */}
       <div
         style={{
-          padding: "16px",
-          borderBottom: "1px solid var(--border-default)",
+          height: 52,
+          padding: "0 14px",
+          borderBottom: "1px solid var(--border-default, #EAECF0)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          boxSizing: "border-box",
         }}
       >
-        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--fg-primary)" }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-primary)", letterSpacing: "-0.01em" }}>
           {t("nav.ai_chat", language)}
         </span>
         <Tooltip title={t("ai.new_session_btn", language)}>
           <Button
             type="text"
             size="small"
-            icon={<PlusOutlined />}
+            icon={<PlusOutlined style={{ fontSize: 12 }} />}
             onClick={onNew}
+            style={{ borderRadius: 6, width: 26, height: 26, padding: 0 }}
           />
         </Tooltip>
       </div>
 
-      {/* Session List */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px 8px" }}>
+      {/* 2. New Conversation Action Button */}
+      <div style={{ padding: "10px 10px 4px 10px" }}>
+        <Button
+          type="default"
+          icon={<PlusOutlined style={{ fontSize: 12 }} />}
+          onClick={onNew}
+          style={{
+            width: "100%",
+            height: 34,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            borderRadius: 7,
+            fontWeight: 500,
+            fontSize: 12,
+            background: "var(--bg-card, #FFFFFF)",
+            borderColor: "var(--border-default, #D0D5DD)",
+            color: "var(--fg-primary)",
+            boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
+          }}
+        >
+          {t("ai.new_session_btn", language)}
+        </Button>
+      </div>
+
+      {/* 3. Section Header */}
+      <div style={{ padding: "10px 14px 4px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted, #98A2B3)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          {t("ai.history_sessions", language)}
+        </span>
+        <span style={{ fontSize: 11, color: "var(--fg-muted, #98A2B3)", fontVariantNumeric: "tabular-nums" }}>
+          {sessions.length}
+        </span>
+      </div>
+
+      {/* 4. Session List */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
         {sessions.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={t("ai.no_sessions", language)}
-            className="sty-51a6ccfa"
+            style={{ padding: "32px 0" }}
           />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {sessions.map((session) => (
-              <motion.div
-                key={session.id}
-                {...getAIChatSessionRowProps(activeSessionId === session.id)}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                style={{
-                  display: "flex",
-                  minWidth: 0,
-                  borderRadius: 8,
-                  background: activeSessionId === session.id ? "var(--bg-inset, #F1F5F9)" : "transparent",
-                  boxShadow: activeSessionId === session.id ? "inset 0 0 0 1px var(--border-default, #E2E8F0)" : "none",
-                }}
-              >
-                <button
-                  {...getAIChatSessionButtonProps(activeSessionId === session.id)}
-                  className={AI_CHAT_SESSION_ITEM_CLASS}
-                  aria-label={`选择会话 ${session.title}`}
-                  onClick={() => onSelect(session.id)}
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {sessions.map((session) => {
+              const isActive = activeSessionId === session.id;
+              return (
+                <div
+                  key={session.id}
+                  {...getAIChatSessionRowProps(isActive)}
                   style={{
-                    border: 0,
-                    font: "inherit",
-                    textAlign: "left",
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                    background: "transparent",
-                    color: activeSessionId === session.id ? "var(--fg-primary, #0F172A)" : "var(--fg-secondary)",
-                    fontWeight: activeSessionId === session.id ? 600 : 400,
-                    transition: "all 0.15s",
+                    position: "relative",
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
-                    position: "relative",
-                    flex: 1,
-                    minWidth: 0,
+                    justifyContent: "space-between",
+                    padding: "7px 10px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    background: isActive ? "var(--morandi-alabaster, #F2EDE9)" : "transparent",
+                    color: isActive ? "var(--morandi-charcoal, #2B2A29)" : "var(--fg-secondary, #475467)",
+                    fontWeight: isActive ? 600 : 400,
+                    transition: "all 0.15s ease",
+                    border: isActive ? "1px solid var(--border-subtle, #E4DFDA)" : "1px solid transparent",
                   }}
+                  onClick={() => onSelect(session.id)}
                   onMouseEnter={(e) => {
-                    if (activeSessionId !== session.id) {
-                      e.currentTarget.style.background = "var(--bg-inset)";
-                    }
+                    if (!isActive) e.currentTarget.style.background = "var(--bg-inset, #F8F9FA)";
                   }}
                   onMouseLeave={(e) => {
-                    if (activeSessionId !== session.id) {
-                      e.currentTarget.style.background = "transparent";
-                    }
+                    if (!isActive) e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <MessageOutlined
-                    className="sty-4a80e398"
-                  />
-                  <div className="sty-d246bf5e">
-                    <div
+                  <button
+                    {...getAIChatSessionButtonProps(isActive)}
+                    className={AI_CHAT_SESSION_ITEM_CLASS}
+                    aria-label={`选择会话 ${session.title}`}
+                    style={{
+                      border: 0,
+                      font: "inherit",
+                      textAlign: "left",
+                      padding: 0,
+                      cursor: "pointer",
+                      background: "transparent",
+                      color: "inherit",
+                      fontWeight: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flex: 1,
+                      minWidth: 0,
+                    }}
+                  >
+                    <span
                       style={{
                         fontSize: 13,
-                        fontWeight: 500,
+                        lineHeight: "20px",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
-                        lineHeight: 1.4,
+                        flex: 1,
                       }}
                     >
-                      {session.title}
-                    </div>
-                    <div
-                      className="sty-10d6972d"
-                    >
-                      <ClockCircleOutlined style={{ fontSize: 10 }} />
-                      {formatTime(session.updatedAt)}
-                    </div>
-                  </div>
+                      {session.title || t("ai.new_session", language)}
+                    </span>
+                  </button>
 
-                </button>
-                {/* Delete button is a sibling, so the session selector has one interactive target. */}
-                <Dropdown
-                  menu={{
-                    items: [
-                      {
-                        key: "delete",
-                        label: t("ai.delete_session", language),
-                        icon: <DeleteOutlined />,
-                        danger: true,
-                        onClick: (e) => {
-                          e.domEvent.stopPropagation();
-                          onDelete(session.id);
-                        },
-                      },
-                    ],
-                  }}
-                  trigger={["click"]}
-                  placement="bottomRight"
-                >
-                  <Button
-                    type="text"
-                    aria-label={`删除会话 ${session.title}`}
-                    icon={<MoreOutlined />}
-                    onClick={(e) => e.stopPropagation()}
-                    className={`${AI_CHAT_SESSION_MORE_CLASS} sty-f1151548`}
-                  />
-                </Dropdown>
-              </motion.div>
-            ))}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 6 }}>
+                    <span style={{ fontSize: 11, color: "var(--fg-muted, #98A2B3)", fontVariantNumeric: "tabular-nums" }}>
+                      {formatTime(session.updatedAt, language)}
+                    </span>
+                    <Dropdown
+                      menu={{
+                        items: [
+                          {
+                            key: "delete",
+                            label: t("ai.delete_session", language),
+                            icon: <DeleteOutlined />,
+                            danger: true,
+                            onClick: (e) => {
+                              e.domEvent.stopPropagation();
+                              onDelete(session.id);
+                            },
+                          },
+                        ],
+                      }}
+                      trigger={["click"]}
+                      placement="bottomRight"
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        aria-label={`删除会话 ${session.title}`}
+                        icon={<MoreOutlined style={{ fontSize: 12 }} />}
+                        onClick={(e) => e.stopPropagation()}
+                        className={AI_CHAT_SESSION_MORE_CLASS}
+                        style={{ width: 18, height: 18, padding: 0, color: "var(--fg-muted)" }}
+                      />
+                    </Dropdown>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1865,20 +1899,21 @@ function AIChatPageContent() {
               overflow: "hidden",
             }}
           >
-            {/* Top Bar */}
+            {/* Top Bar (matching height 52px flush with sidebar) */}
             <div
               style={{
-                height: 56,
-                borderBottom: "1px solid var(--border-default)",
+                height: 52,
+                borderBottom: "1px solid var(--border-default, #EAECF0)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "0 24px",
-                background: "var(--bg-elevated)",
+                padding: "0 20px",
+                background: "var(--bg-elevated, #FFFFFF)",
                 flexShrink: 0,
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
                 {responsiveState.showMobileSessionTrigger && (
                   <Button
                     ref={sessionDrawerTriggerRef}
@@ -1888,13 +1923,22 @@ function AIChatPageContent() {
                     onClick={() => transitionSessionDrawer("open")}
                   />
                 )}
-                <RobotOutlined style={{ fontSize: 16, color: "var(--fg-primary)" }} />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-primary)" }}>
+                <RobotOutlined style={{ fontSize: 15, color: "var(--morandi-charcoal, #5A5958)" }} />
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--fg-primary)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
                   {activeSession?.title || t("ai.assistant_name", language)}
                 </span>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                 {/* Model Selector */}
                 <Dropdown
                   menu={{
@@ -1908,22 +1952,13 @@ function AIChatPageContent() {
                   <Button
                     type="text"
                     size="small"
-                    style={{ fontSize: 12, borderRadius: 6 }}
+                    style={{ fontSize: 12, borderRadius: 6, color: "var(--fg-secondary)" }}
                     aria-label={`选择模型，当前 ${MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}`}
                   >
                     <span>{MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}</span>
-                    <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />
+                    <DownOutlined style={{ fontSize: 9, marginLeft: 4 }} />
                   </Button>
                 </Dropdown>
-
-                <Tooltip title={t("ai.new_session_btn", language)}>
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<PlusOutlined />}
-                    onClick={createNewSession}
-                  />
-                </Tooltip>
               </div>
             </div>
 

@@ -68,7 +68,7 @@ const retailDeterministicModel = "deterministic-fallback"
 func buildRetailOperationsRunbook(req Request) *AgentRunbook {
 	return &AgentRunbook{
 		SkillID: "retail_operations", SkillName: "零售经营分析 Agent",
-		AnswerPrefix: "零售经营分析使用已验收的确定性服务；AI 不重算经营数字，不写入业务台账。",
+		AnswerPrefix: "",
 		AgentPlan: []AgentPlanStep{
 			{ID: "load_retail_context", Title: "读取经营事实与来源", Status: "pending"},
 			{ID: "check_retail_quality", Title: "核对覆盖、币种和来源冲突", Status: "pending"},

@@ -503,41 +503,14 @@ function ReportsPageContent() {
                     )}
 
                     {/* contract ledger table */}
-                    <Card
-                      title={
-                        <div className="sty-5b498286">
-                          <span className="sty-6319d0fa">
-                            {t("reports.tab_ledger", language)}
-                          </span>
-                          <StatusTag className="sty-4678905e">
-                            {reportMode === "working"
-                              ? t("reports.mode_working", language)
-                              : t("reports.mode_official", language)}
-                          </StatusTag>
-                        </div>
-                      }
-                      extra={
-                        <Button
-                          icon={<DownloadOutlined />}
-                          onClick={async () => {
-                            if (!token) return;
-                            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-                            const res = await fetch(
-                              `${apiUrl}/api/v1/reports/liability-rolling/export?mode=${reportMode}&language=${language}`,
-                              { headers: { Authorization: `Bearer ${token}` } },
-                            );
-                            const blob = await res.blob();
-                            const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `Lease_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
-                            a.click();
-                            window.URL.revokeObjectURL(url);
-                          }}
-                        >
-                          {t("reports.export_csv", language)}
-                        </Button>
-                      }
+                    <div
+                      style={{
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border-default)",
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        marginTop: summary ? 16 : 0,
+                      }}
                     >
                       <Spin spinning={loading}>
                         <Table
@@ -583,7 +556,7 @@ function ReportsPageContent() {
                           locale={{ emptyText: reportEmptyState(t("reports.empty_hint", language)) }}
                         />
                       </Spin>
-                    </Card>
+                    </div>
                   </>
                 ),
               },
@@ -987,19 +960,14 @@ function ReportsPageContent() {
                     )}
 
                     {/* result table */}
-                    <Card
-                      title={
-                        <div className="sty-5b498286">
-                          <span className="sty-6319d0fa">
-                            {t("reports.amortization_table", language)}
-                          </span>
-                          <StatusTag className="sty-6319d0fa">
-                            {reportMode === "working"
-                              ? t("reports.mode_working", language)
-                              : t("reports.mode_official", language)}
-                          </StatusTag>
-                        </div>
-                      }
+                    <div
+                      style={{
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border-default)",
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        marginTop: 16,
+                      }}
                     >
                       <Spin spinning={amortLoading}>
                         <Table
@@ -1024,7 +992,7 @@ function ReportsPageContent() {
                           locale={{ emptyText: reportEmptyState(amortFetched ? t("reports.empty_hint", language) : t("reports.no_data_hint", language)) }}
                         />
                       </Spin>
-                    </Card>
+                    </div>
                   </>
                 ),
               },

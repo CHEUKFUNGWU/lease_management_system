@@ -462,9 +462,10 @@ function MessageContent({
       )}
 
       {model && (
-        <Text type="secondary" className="sty-14aa9694">
-          {t("ai.model_label", i18nLang)} {model}
-        </Text>
+        <div style={{ marginTop: 8, fontSize: 11, color: "var(--fg-muted, #94A3B8)", display: "flex", alignItems: "center", gap: 6 }}>
+          <span>{t("ai.model_label", i18nLang)}:</span>
+          <code style={{ background: "var(--bg-inset, #F1F5F9)", padding: "1px 6px", borderRadius: 4, fontSize: 10, color: "var(--fg-secondary, #64748B)" }}>{model}</code>
+        </div>
       )}
     </div>
   );
@@ -1836,7 +1837,7 @@ function AIChatPageContent() {
           style={{
             display: "flex",
             height: "calc(100vh - 64px)",
-            margin: "-24px",
+            width: "100%",
             background: "var(--bg-page)",
             overflow: "hidden",
           }}

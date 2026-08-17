@@ -2074,7 +2074,7 @@ function AIChatPageContent() {
                       >
                         {msg.role === "assistant" && typingMessageId === msg.id ? (
                           <TypewriterMessage
-                            content={msg.content}
+                            content={msg.id === "welcome" ? t("ai.welcome", language) : msg.content}
                             sources={msg.sources}
                             model={msg.model}
                             thinking={msg.thinking}
@@ -2085,7 +2085,7 @@ function AIChatPageContent() {
                           />
                         ) : (
                           <MessageContent
-                            content={msg.content}
+                            content={msg.id === "welcome" ? t("ai.welcome", language) : msg.content}
                             sources={msg.sources}
                             model={msg.model}
                             thinking={msg.thinking}

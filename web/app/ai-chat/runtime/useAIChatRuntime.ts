@@ -151,8 +151,16 @@ export function useAIChatRuntime({
     const storage = suppliedStorage || createBrowserRuntimeStorage(window.localStorage);
     const snapshot = storage.load();
     if (snapshot.sessions.length > 0) {
-      setSessions(snapshot.sessions);
-      setActiveSessionId(chooseActiveSessionId(snapshot.activeSessionId, snapshot.sessions));
+      const refreshed = snapshot.sessions.map((s) => ({
+        ...s,
+        messages: s.messages.map((m) =>
+          m.id === "welcome"
+            ? { ...m, content: t("ai.welcome", initialPreferences.current.language) }
+            : m
+        ),
+      }));
+      setSessions(refreshed);
+      setActiveSessionId(chooseActiveSessionId(snapshot.activeSessionId, refreshed));
     } else {
       const initial = createLocalSession(
         initialPreferences.current.language,

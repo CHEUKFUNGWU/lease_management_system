@@ -62,7 +62,6 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     "audit-logs": t("nav.audit_logs", language as any),
     "agent-metrics": t("nav.agent_metrics", language as any),
     settings: t("nav.settings", language as any),
-    landing: t("landing.brand_name", language as any),
     admin: t("nav.admin", language as any),
     users: t("nav.users", language as any),
     new: t("nav.new", language as any),

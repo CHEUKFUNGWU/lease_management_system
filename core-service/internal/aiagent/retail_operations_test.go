@@ -311,8 +311,15 @@ func TestRetailAgentLowEvidenceContractsAreInAssistantOutput(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
 	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader)
 	missing, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "请分析经营脉搏"}, nil, agent.toolRuntime)
-	if err != nil || !strings.Contains(missing.Answer, "reason=missing_context") || !strings.Contains(missing.Answer, "evidence=insufficient") || !strings.Contains(missing.Answer, "confidence=0.40") {
-		t.Fatalf("missing assistant evidence=%q", missing.Answer)
+	// The reason code, evidence status and confidence are asserted on the
+	// structured channel rather than scraped out of the prose; what the answer
+	// must still carry is the limitation stated in words, so a reader cannot
+	// mistake a low-evidence reply for a conclusion.
+	if err != nil || missing.RetailOperations == nil || missing.RetailOperations.Reason != "missing_context" || missing.RetailOperations.EvidenceStatus != "insufficient" || missing.Confidence != 0.40 {
+		t.Fatalf("missing assistant evidence=%#v confidence=%v", missing.RetailOperations, missing.Confidence)
+	}
+	if !strings.Contains(missing.Answer, "证据不足") || strings.Contains(missing.Answer, "reason=") || strings.Contains(missing.Answer, "confidence=") {
+		t.Fatalf("missing assistant answer must state the limitation in prose, not identifiers: %q", missing.Answer)
 	}
 
 	noFactsSet := cloneAgentRetailSet(agentRetailSet())
@@ -323,8 +330,12 @@ func TestRetailAgentLowEvidenceContractsAreInAssistantOutput(t *testing.T) {
 	noFactsAgent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, noFactsReader)
 	noFactsContext := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{Principal: agenttools.Principal{UserID: "user-1", Permissions: []string{"reports:read"}, Scope: access.Scope{LegalEntityID: "entity-a"}}, RunID: "run-no-facts", SkillID: "retail_operations", SkillVersion: "v1"})
 	noFacts, err := noFactsAgent.executeRetailOperations(noFactsContext, Request{Message: "查看经营脉搏", PageContext: &PageContext{Filters: map[string]string{"as_of": "2026-06-14", "window_days": "7", "classification": "simulated", "dataset_version": "planA-v1-empty"}}}, nil, noFactsAgent.toolRuntime)
-	if err != nil || noFacts.RetailOperations == nil || noFacts.RetailOperations.Pulse == nil || retailPulseInsufficientReason(noFacts.RetailOperations.Pulse) != "no_facts" || noFacts.RetailOperations.EvidenceStatus != "insufficient" || !strings.Contains(noFacts.Answer, "evidence=insufficient") || !strings.Contains(noFacts.Answer, "confidence=0.40") || noFacts.RetailOperations.SideEffects || noFacts.RetailActionProposal != nil || len(ProjectResult(noFacts).Artifacts) != 0 || noFacts.RetailOperations.Scenario != nil {
-		t.Fatalf("no-facts assistant evidence=%#v answer=%q", noFacts.RetailOperations, noFacts.Answer)
+	if err != nil || noFacts.RetailOperations == nil || noFacts.RetailOperations.Pulse == nil || retailPulseInsufficientReason(noFacts.RetailOperations.Pulse) != "no_facts" || noFacts.RetailOperations.EvidenceStatus != "insufficient" || noFacts.Confidence != 0.40 || noFacts.RetailOperations.SideEffects || noFacts.RetailActionProposal != nil || len(ProjectResult(noFacts).Artifacts) != 0 || noFacts.RetailOperations.Scenario != nil {
+		t.Fatalf("no-facts assistant evidence=%#v answer=%q confidence=%v", noFacts.RetailOperations, noFacts.Answer, noFacts.Confidence)
+	}
+	// Coverage gaps must remain visible to the reader, in words.
+	if !strings.Contains(noFacts.Answer, "数据覆盖尚未完整") {
+		t.Fatalf("no-facts answer must disclose the coverage gap: %q", noFacts.Answer)
 	}
 
 	invalidReader := &agentRetailReader{set: agentRetailSet()}
@@ -332,7 +343,7 @@ func TestRetailAgentLowEvidenceContractsAreInAssistantOutput(t *testing.T) {
 	filters := agentRetailScenarioFilters()
 	filters["gross_margin_rate_change_pp"] = "1"
 	invalid, err := invalidAgent.executeRetailOperations(agentRetailContext(), Request{Message: "人工下降10% 会怎样", PageContext: &PageContext{Filters: filters}}, nil, invalidAgent.toolRuntime)
-	if err != nil || invalid.RetailOperations == nil || invalid.RetailOperations.Reason != "resulting_rate_out_of_range" || !strings.Contains(invalid.Answer, "reason=resulting_rate_out_of_range") || !strings.Contains(invalid.Answer, "confidence=0.40") {
+	if err != nil || invalid.RetailOperations == nil || invalid.RetailOperations.Reason != "resulting_rate_out_of_range" || invalid.Confidence != 0.40 {
 		t.Fatalf("invalid-rate assistant evidence=%#v answer=%q", invalid.RetailOperations, invalid.Answer)
 	}
 }
@@ -347,7 +358,7 @@ func TestRetailAgentScopeDeniedIsNotReclassifiedByDatasetName(t *testing.T) {
 	response, err := agent.executeRetailOperations(deniedContext, Request{Message: "查看门店诊断", PageContext: &PageContext{Filters: map[string]string{
 		"as_of": "2026-06-14", "window_days": "7", "classification": "simulated", "dataset_version": "planA-v1-no-facts", "store_id": "11111111-1111-4111-8111-111111111111",
 	}}}, nil, agent.toolRuntime)
-	if err != nil || response.RetailOperations == nil || response.RetailOperations.Reason != "scope_denied" || !strings.Contains(response.Answer, "reason=scope_denied") || !strings.Contains(response.Answer, "evidence=insufficient") || !strings.Contains(response.Answer, "confidence=0.40") || response.RetailOperations.SideEffects || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 {
+	if err != nil || response.RetailOperations == nil || response.RetailOperations.Reason != "scope_denied" || response.RetailOperations.EvidenceStatus != "insufficient" || response.Confidence != 0.40 || response.RetailOperations.SideEffects || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 {
 		t.Fatalf("scope denial was reclassified or produced output: response=%#v err=%v", response, err)
 	}
 }

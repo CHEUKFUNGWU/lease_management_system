@@ -710,6 +710,38 @@ func retailInputReasonCode(reason string) string {
 	}
 }
 
+// retailReasonLabel turns an evidence reason code into the sentence a business
+// reader can act on. The code itself still reaches the client on
+// RetailOperationsData.Reason, so the audit trail loses nothing.
+func retailReasonLabel(reason string) string {
+	switch reason {
+	case "missing_context":
+		return "缺少必要的分析上下文（法人、期间或数据集）"
+	case "invalid_context":
+		return "提供的假设数值无效"
+	case "context_conflict":
+		return "页面筛选与问题描述冲突"
+	case "assist_mode_boundary":
+		return "该请求超出只读分析范围"
+	case "no_facts":
+		return "所选范围内没有经营事实"
+	case "scope_denied":
+		return "当前权限不覆盖所请求的门店或法人"
+	case "source_conflict":
+		return "同一期间存在多个来源系统，未指定采用哪一个"
+	case "resulting_rate_out_of_range":
+		return "假设导致的结果比率超出合理区间"
+	case "diagnostics_not_decision_ready":
+		return "门店诊断尚未达到可决策的数据完整度"
+	default:
+		return "所需数据当前不可用"
+	}
+}
+
+// The reason code, evidence status and confidence all travel on the structured
+// channel (RetailOperationsData.Reason / .EvidenceStatus and Response.
+// Confidence). What the answer owes the reader is the limitation in words —
+// printing the identifiers here made the chat read like a log line.
 func retailEvidenceMarker(reason, evidence string, confidence float64) string {
 	if strings.TrimSpace(reason) == "" {
 		reason = "data_unavailable"
@@ -717,37 +749,75 @@ func retailEvidenceMarker(reason, evidence string, confidence float64) string {
 	if strings.TrimSpace(evidence) == "" || evidence == "unavailable" {
 		evidence = "insufficient"
 	}
-	return fmt.Sprintf("\n\n证据状态：reason=%s；evidence=%s；confidence=%.2f。", reason, evidence, confidence)
+	return "\n\n证据不足：" + retailReasonLabel(reason) + "。以上内容仅供参考，请结合下方证据面板核对后再做判断。"
 }
 func retailPulseAnswer(response *retailpulse.Response) string {
 	if response == nil {
 		return "\n\n当前没有可用经营脉搏事实；请核对覆盖期和数据集。"
 	}
-	status := retailEvidence(response.DecisionReady, response.CurrentCoverage, response.ComparisonCoverage)
 	metrics := retailPulseMetricSummary(response.Summary)
-	attention := retailPulseAttentionSummary(response.Attention)
-	return fmt.Sprintf("\n\n数据上下文：%s · dataset=%s · source=%s · as_of=%s · window=%s · formula=%s · evidence=%s · confidence=%.2f。\n经营脉搏：%s 至 %s，关注项 %d；current 覆盖 %s，comparison 覆盖 %s，decision_ready=%t。摘要：%s。关注清单：%s。数字来自 retail-pulse-v1，缺失值保持为空，不补零。", response.DataClassification, displayRetailValue(response.DatasetVersion), retailSourceLabel(response.SourceSystems), response.Current.DateTo, formatWindow(response.Current.DateFrom, response.Current.DateTo), response.FormulaVersion, status, confidenceForRetail(status), response.Current.DateFrom, response.Current.DateTo, len(response.Attention), formatCoverage(response.CurrentCoverage), formatCoverage(response.ComparisonCoverage), response.DecisionReady, metrics, attention)
+	answer := fmt.Sprintf("\n\n**经营脉搏**（%s 至 %s）\n\n%s。", response.Current.DateFrom, response.Current.DateTo, metrics)
+	if len(response.Attention) > 0 {
+		answer += fmt.Sprintf("\n\n**需要关注的门店**：%s。", retailPulseAttentionSummary(response.Attention))
+	} else {
+		answer += "\n\n本期没有触发关注阈值的门店。"
+	}
+	if !response.DecisionReady {
+		answer += "\n\n数据覆盖尚未完整，以上为观察而非结论，请结合下方证据判断。"
+	}
+	return answer
 }
 func retailDiagnosticsAnswer(response *retailstore360.Response) string {
 	if response == nil {
 		return "\n\n该门店诊断暂无足够事实，未生成肯定性观察。"
 	}
-	status := map[bool]string{true: "complete", false: "insufficient"}[response.DecisionReady]
-	return fmt.Sprintf("\n\n数据上下文：%s · dataset=%s · source=%s · as_of=%s · window=%s · diagnostics=%s · formula=%s · evidence=%s · confidence=%.2f。\n门店 %s（%s · %s · %s）的诊断包含 %d 个同群样本、%d 个变化桥；target 覆盖 %s，comparison 覆盖 %s，decision_ready=%t。摘要：%s；同群：%s；变化桥：%s。这些是变化观察与待核实信号，不能单独确认原因。", response.DataClassification, displayRetailValue(response.DatasetVersion), retailSourceLabel(response.SourceSystems), response.Current.DateTo, formatWindow(response.Current.DateFrom, response.Current.DateTo), response.DiagnosticsVersion, response.FormulaVersion, status, retailDiagnosticsConfidence(response), response.Store.StoreCode, response.Store.StoreName, response.Store.Brand, response.Store.Region, len(response.PeerBenchmark), len(response.Bridges), formatCoverage(response.TargetCoverage), formatCoverage(response.ComparisonCoverage), response.DecisionReady, retailDiagnosticsMetricSummary(response.Summary), retailPeerSummary(response.PeerBenchmark), retailBridgeSummary(response.Bridges))
+	answer := fmt.Sprintf("\n\n**门店 %s · %s**（%s · %s）\n\n%s。", response.Store.StoreCode, response.Store.StoreName, response.Store.Brand, response.Store.Region, retailDiagnosticsMetricSummary(response.Summary))
+	if len(response.PeerBenchmark) > 0 {
+		answer += fmt.Sprintf("\n\n同群对标覆盖 %d 项指标：%s。", len(response.PeerBenchmark), retailPeerSummary(response.PeerBenchmark))
+	}
+	if len(response.Bridges) > 0 {
+		answer += fmt.Sprintf("\n\n变化归因：%s。", retailBridgeSummary(response.Bridges))
+	}
+	answer += "\n\n以上是变化观察与待核实信号，不能单独确认原因。"
+	if !response.DecisionReady {
+		answer += "数据覆盖尚未完整，请结合下方证据判断。"
+	}
+	return answer
 }
 func retailScenarioAnswer(response *retailscenario.Response, proposal bool) string {
 	if response == nil {
 		return "\n\n情景评估不可用；未保存任何业务行动。"
 	}
-	suffix := ""
+	answer := fmt.Sprintf("\n\n**%s 门店情景测算**（%d 个月 run-rate）\n\n基线门店经营利润 %s；方案带来的月度变化 %s，期内累计变化 %s。", response.Store.StoreCode, response.HorizonMonths, scenarioMetricResult(response.Baseline.Metrics, "store_contribution"), scenarioPlanChange(response, false), scenarioPlanChange(response, true))
+	if bridge := retailScenarioBridgeSummary(response); bridge != "" && bridge != "无" {
+		answer += fmt.Sprintf("\n\n贡献拆解：%s。", bridge)
+	}
+	answer += "\n\n经营占用现金成本是 Working 经营口径，不是 IFRS 16 会计费用；本次测算不触达 IFRS 16 或 Official。"
 	if proposal {
-		suffix = " 已生成待人工确认的行动提议；请前往情景工作台二次确认。"
+		answer += "已生成待人工确认的行动提议，请前往情景工作台二次确认。"
 	}
-	confidence := 0.40
-	if response.Evidence.CoverageRate != nil && *response.Evidence.CoverageRate >= 100 {
-		confidence = 0.90
+	return answer
+}
+
+// The metric sentences below read as prose because they are the user-visible
+// answer. Every identifier they used to echo — dataset version, source system,
+// as-of, formula version, evidence status, coverage, decision_ready — already
+// travels to the client on RetailOperationsData, so repeating it here as
+// key=value only made the chat look like a debug log.
+
+func retailMetricSentence(code string, metric retailpulse.SummaryMetric) string {
+	sentence := retailkpi.DisplayName(code) + " " + formatRetailKPI(metric.Current)
+	if metric.ChangeValue != nil {
+		direction := "持平"
+		if *metric.ChangeValue > 0 {
+			direction = "上升"
+		} else if *metric.ChangeValue < 0 {
+			direction = "下降"
+		}
+		magnitude := math.Abs(*metric.ChangeValue)
+		sentence += "，环比" + direction + " " + formatRetailNumber(&magnitude, metric.Current.Unit)
 	}
-	return fmt.Sprintf("\n\n数据上下文：%s · dataset=%s · source=%s · as_of=%s · window=%s · scenario=%s · formula=%s · evidence=%s · confidence=%.2f。\n%s 情景使用 %d 个月 run-rate 和服务端 Baseline/Plan 计算，覆盖 %s；Baseline 门店经营利润=%s，Plan 月度变化=%s，Plan 期内变化=%s，贡献桥=%s；经营占用现金成本是 Working 经营口径，不是 IFRS 16 会计费用；结果不触达 IFRS 16 或 Official。%s", response.DataClassification, displayRetailValue(response.DatasetVersion), displayRetailValue(response.SourceSystem), response.Current.DateTo, formatWindow(response.Current.DateFrom, response.Current.DateTo), response.ScenarioVersion, response.FormulaVersion, map[bool]string{true: "complete", false: "insufficient"}[response.Evidence.CoverageRate != nil && *response.Evidence.CoverageRate >= 100], confidence, response.Store.StoreCode, response.HorizonMonths, formatScenarioCoverage(response.Evidence.ObservedStoreDays, response.Evidence.ExpectedStoreDays, response.Evidence.CoverageRate), scenarioMetricResult(response.Baseline.Metrics, "store_contribution"), scenarioPlanChange(response, false), scenarioPlanChange(response, true), retailScenarioBridgeSummary(response), suffix)
+	return sentence
 }
 
 func retailPulseMetricSummary(summary map[string]retailpulse.SummaryMetric) string {
@@ -758,7 +828,7 @@ func retailPulseMetricSummary(summary map[string]retailpulse.SummaryMetric) stri
 		if !ok {
 			continue
 		}
-		parts = append(parts, key+"="+formatRetailMetric(metric.Current, metric.Comparison, metric.ChangeValue, metric.ChangeType))
+		parts = append(parts, retailMetricSentence(key, metric))
 	}
 	if len(parts) == 0 {
 		return "—"
@@ -772,9 +842,22 @@ func retailPulseAttentionSummary(attention []retailpulse.Attention) string {
 	}
 	parts := make([]string, 0, len(attention))
 	for _, item := range attention {
-		parts = append(parts, fmt.Sprintf("#%d %s score=%s severity=%s", item.Rank, item.StoreCode, formatRetailNumber(&item.Score, "count"), item.Severity))
+		parts = append(parts, fmt.Sprintf("%s（%s）", item.StoreCode, retailSeverityLabel(item.Severity)))
 	}
-	return strings.Join(parts, "；")
+	return strings.Join(parts, "、")
+}
+
+func retailSeverityLabel(severity string) string {
+	switch severity {
+	case "high":
+		return "高风险"
+	case "medium":
+		return "中风险"
+	case "low":
+		return "低风险"
+	default:
+		return severity
+	}
 }
 
 func retailDiagnosticsMetricSummary(summary map[string]retailstore360.SummaryMetric) string {

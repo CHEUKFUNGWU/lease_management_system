@@ -103,6 +103,17 @@ func Definitions() []Definition {
 	return result
 }
 
+// DisplayName returns the business name for a metric code, or the code itself
+// when there is none. Callers outside this package need it to write prose
+// instead of echoing identifiers at the reader; exposing an accessor keeps the
+// single copy here rather than letting a second map drift.
+func DisplayName(code string) string {
+	if name, ok := chineseNames[code]; ok {
+		return name
+	}
+	return code
+}
+
 var chineseNames = map[string]string{
 	"revenue": "销售额", "gross_profit": "毛利额", "footfall": "客流", "transactions": "交易数",
 	"labor_cost": "人工成本", "fixed_rent": "固定现金租金", "variable_rent": "变动租金", "non_lease_cost": "非租赁占用成本",

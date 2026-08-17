@@ -11,6 +11,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -32,6 +33,96 @@ type sharedString struct {
 }
 type sharedStrings struct {
 	Items []sharedString `xml:"si"`
+}
+
+// workbook.xml lists the sheets in tab order and points at each one by
+// relationship id; workbook.xml.rels maps that id to the part path. Tab order
+// is the only authority for "first worksheet" — file names need not match it,
+// a workbook whose first tab lives in sheet3.xml is perfectly legal.
+type workbookSheet struct {
+	Name    string `xml:"name,attr"`
+	SheetID string `xml:"sheetId,attr"`
+	RID     string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
+}
+type workbook struct {
+	Sheets []workbookSheet `xml:"sheets>sheet"`
+}
+type relationship struct {
+	ID     string `xml:"Id,attr"`
+	Target string `xml:"Target,attr"`
+}
+type relationships struct {
+	Items []relationship `xml:"Relationship"`
+}
+
+// firstWorksheetPath resolves the tab-order-first worksheet part. It falls back
+// to the lowest-numbered worksheet file when the workbook part or its
+// relationships are absent, which keeps hand-built fixtures readable while
+// never depending on map iteration order.
+func firstWorksheetPath(files map[string][]byte) string {
+	if rawBook, ok := files["xl/workbook.xml"]; ok {
+		book := workbook{}
+		if err := xml.Unmarshal(rawBook, &book); err == nil && len(book.Sheets) > 0 {
+			targets := map[string]string{}
+			if rawRels, relsOK := files["xl/_rels/workbook.xml.rels"]; relsOK {
+				rels := relationships{}
+				if relErr := xml.Unmarshal(rawRels, &rels); relErr == nil {
+					for _, item := range rels.Items {
+						targets[item.ID] = item.Target
+					}
+				}
+			}
+			if target, found := targets[book.Sheets[0].RID]; found {
+				candidate := normaliseSheetTarget(target)
+				if _, exists := files[candidate]; exists {
+					return candidate
+				}
+			}
+		}
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		if strings.HasPrefix(name, "xl/worksheets/") && strings.HasSuffix(name, ".xml") {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	sort.Slice(names, func(i, j int) bool {
+		left, leftOK := sheetOrdinal(names[i])
+		right, rightOK := sheetOrdinal(names[j])
+		if leftOK && rightOK && left != right {
+			return left < right
+		}
+		return names[i] < names[j]
+	})
+	return names[0]
+}
+
+// normaliseSheetTarget turns a relationship target into a package path.
+// Targets are relative to xl/ and may be written with a leading slash.
+func normaliseSheetTarget(target string) string {
+	target = strings.TrimPrefix(target, "/")
+	if strings.HasPrefix(target, "xl/") {
+		return target
+	}
+	return "xl/" + target
+}
+
+// sheetOrdinal reads the trailing number of "xl/worksheets/sheetN.xml" so
+// sheet2 sorts before sheet10, which a plain string sort gets wrong.
+func sheetOrdinal(name string) (int, bool) {
+	base := strings.TrimSuffix(strings.TrimPrefix(name, "xl/worksheets/"), ".xml")
+	digits := strings.TrimLeft(base, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	if digits == "" {
+		return 0, false
+	}
+	value, err := strconv.Atoi(digits)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
 }
 
 // Read returns the raw cell grid of the first worksheet, row by row, with
@@ -60,13 +151,11 @@ func Read(data []byte) ([][]string, error) {
 			return nil, fmt.Errorf("invalid shared strings: %w", err)
 		}
 	}
-	var sheetRaw []byte
-	for name, content := range files {
-		if strings.HasPrefix(name, "xl/worksheets/") && strings.HasSuffix(name, ".xml") {
-			sheetRaw = content
-			break
-		}
+	sheetPath := firstWorksheetPath(files)
+	if sheetPath == "" {
+		return nil, fmt.Errorf("XLSX worksheet is missing")
 	}
+	sheetRaw := files[sheetPath]
 	if len(sheetRaw) == 0 {
 		return nil, fmt.Errorf("XLSX worksheet is missing")
 	}

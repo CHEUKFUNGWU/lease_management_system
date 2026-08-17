@@ -1972,61 +1972,115 @@ function AIChatPageContent() {
                 </motion.div>
               )}
 
-              {/* Agent skill starters */}
+              {/* Hero Welcome & Skill Grid */}
               {currentMessages.length <= 1 && (
                 <motion.div
-                  initial={false}
-                  animate={{ opacity: 1 }}
-                  className="sty-c9f7b4b7"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{
+                    marginBottom: 24,
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: 16,
+                    padding: "24px 28px",
+                    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)",
+                  }}
                 >
-                  <Text type="secondary" className="sty-6e7d2f45">
-                    {t("ai.agent_skills", language)}
-                  </Text>
-                  {agentSkillStarters.map((skill) => (
-                    <Button
-                      key={skill.key}
-                      type="default"
-                      icon={getSkillIcon(skill.icon)}
-                      onClick={() => {
-                        setInput(t(skill.promptKey, language));
-                        setSelectedSkill(skill.skillId ? { id: skill.skillId, version: skill.skillVersion || "v1" } : undefined);
-                      }}
-                      disabled={loading}
-                      className="sty-93477e31"
-                    >
-                      {t(skill.labelKey, language)}
-                    </Button>
-                  ))}
-                </motion.div>
-              )}
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 6 }}>
+                      {t("ai.assistant_name", language)}
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--fg-secondary)", lineHeight: 1.6 }}>
+                      {t("ai.welcome_subtitle", language) || "连接门店销售、毛利、客流、占用成本与租赁合同，驱动「发现问题 — 解释原因 — 模拟方案 — 形成行动」闭环。"}
+                    </div>
+                  </div>
 
-              {/* Quick chips */}
-              {currentMessages.length <= 1 && (
-                <motion.div
-                  initial={false}
-                  animate={{ opacity: 1 }}
-                  className="sty-c9f7b4b7"
-                >
-                  <Text type="secondary" className="sty-f9cd36d3">
-                    {t("ai.quick_questions", language)}
-                  </Text>
-                  {chips.map((chipKey, idx) => (
-                    <Button
-                      key={idx}
-                      
-                      type="default"
-                      onClick={() => handleChipClick(t(chipKey, language))}
-                      disabled={loading}
-                      style={{
-                        fontSize: 12,
-                        borderRadius: 9999,
-                        borderColor: "var(--border-default)",
-                        color: "var(--fg-tertiary)",
-                      }}
-                    >
-                      {t(chipKey, language)}
-                    </Button>
-                  ))}
+                  {/* 2x2 Skill Grid */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                      gap: 12,
+                      marginBottom: 16,
+                    }}
+                  >
+                    {agentSkillStarters.map((skill) => (
+                      <div
+                        key={skill.key}
+                        onClick={() => {
+                          setInput(t(skill.promptKey, language));
+                          setSelectedSkill(skill.skillId ? { id: skill.skillId, version: skill.skillVersion || "v1" } : undefined);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 12,
+                          padding: "12px 14px",
+                          borderRadius: 10,
+                          border: "1px solid var(--border-subtle, #EAECF0)",
+                          background: "var(--bg-surface)",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "var(--morandi-sand, #D8BB8F)";
+                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "var(--border-subtle, #EAECF0)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            background: "var(--morandi-cream, #F2EDE9)",
+                            color: "var(--morandi-slate, #5A5958)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 15,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {getSkillIcon(skill.icon)}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 2 }}>
+                            {t(skill.labelKey, language)}
+                          </div>
+                          <div style={{ fontSize: 11, color: "var(--fg-muted)", lineHeight: 1.4 }}>
+                            {t(skill.promptKey, language).slice(0, 24)}...
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Quick Question Chips */}
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, paddingTop: 12, borderTop: "1px solid var(--border-subtle, #F1F5F9)" }}>
+                    <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("ai.quick_questions", language)}:</span>
+                    {chips.map((chipKey, idx) => (
+                      <Button
+                        key={idx}
+                        size="small"
+                        type="default"
+                        onClick={() => handleChipClick(t(chipKey, language))}
+                        disabled={loading}
+                        style={{
+                          fontSize: 12,
+                          borderRadius: 9999,
+                          borderColor: "var(--border-default)",
+                          color: "var(--fg-secondary)",
+                          background: "var(--bg-elevated)",
+                        }}
+                      >
+                        {t(chipKey, language)}
+                      </Button>
+                    ))}
+                  </div>
                 </motion.div>
               )}
 

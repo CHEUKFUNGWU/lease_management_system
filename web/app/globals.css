@@ -59,8 +59,19 @@
   --state-error-bg: #FDEDED;
   --state-error-text: #A8071A;
   --state-error-border: #F5C9C9;
-  --chart-blue: #1677FF;
-  --chart-purple: #722ED1;
+  /* Giorgio Morandi Palette Tokens */
+  --morandi-slate: #5A5958;
+  --morandi-cream: #F2EDE9;
+  --morandi-sand: #D8BB8F;
+  --morandi-greige: #C1B5A7;
+  --morandi-terracotta: #A57F6C;
+  --chart-blue: #5A5958;
+  --chart-purple: #A57F6C;
+  --chart-primary: #5A5958;
+  --chart-accent: #D8BB8F;
+  --chart-secondary: #C1B5A7;
+  --chart-negative: #A57F6C;
+  --chart-fill: #F2EDE9;
   --admin-surface: #001529;
   --code-surface: #1E1E1E;
 
@@ -1464,6 +1475,16 @@ html {
   overflow-y: auto;
   overflow-x: hidden;
   min-width: 0;
+}
+.app-content.app-content-full-bleed {
+  padding: 0 !important;
+  overflow: hidden !important;
+  height: calc(100vh - 64px) !important;
+}
+.app-content.app-content-full-bleed .app-content-inner {
+  max-width: 100% !important;
+  margin: 0 !important;
+  height: 100% !important;
 }
 .app-content-inner {
   max-width: 1440px;

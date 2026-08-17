@@ -1211,6 +1211,21 @@ const dict: TranslationDict = {
     "zh-HK": "情景不可用",
     en: "Scenario unavailable",
   },
+  "scenario.no_production_facts": {
+    "zh-CN": "正式环境暂无该门店经营事实",
+    "zh-HK": "正式環境暫無該門店經營事實",
+    en: "No production facts for this store",
+  },
+  "scenario.no_production_facts_desc": {
+    "zh-CN": "当前正式环境尚未录入该门店的历史营收与成本事实。您可以一键切换至「演示模拟数据」体验租金与经营情景测算。",
+    "zh-HK": "當前正式環境尚未錄入該門店的歷史營收與成本事實。您可以一鍵切換至「演示模擬數據」體驗租金與經營情景測算。",
+    en: "Production store facts are not yet available for this store. You can switch to simulated dataset to test scenario evaluations.",
+  },
+  "scenario.switch_to_simulated": {
+    "zh-CN": "切换至演示模拟数据",
+    "zh-HK": "切換至演示模擬數據",
+    en: "Switch to Simulated Dataset",
+  },
   "scenario.loading": {
     "zh-CN": "服务端读取事实并计算 30-day run-rate…",
     "zh-HK": "服務端讀取事實並計算 30-day run-rate…",
@@ -2025,6 +2040,11 @@ const dict: TranslationDict = {
     "zh-CN": "你好！我是零售经营分析助手。我可以读取经营数据并调用内置 skill 帮你完成任务：\n\n1. 读取经营脉搏，定位需要关注的门店与异常信号\n2. 对关注门店做门店 360 诊断，解释营收与贡献变化\n3. 评估确定性经营情景，生成待确认的行动建议\n4. 解析合同与台账文件并生成草稿（租赁与 IFRS 16 计量保留）\n\n上传文件或直接提问后，我会先生成草稿和工具执行轨迹，确认后才进入正式流程。",
     "zh-HK": "你好！我是零售經營分析助手。我可以讀取經營數據並調用內置 skill 幫你完成任務：\n\n1. 讀取經營脈搏，定位需要關注的門店與異常訊號\n2. 對關注門店做門店 360 診斷，解釋營收與貢獻變化\n3. 評估確定性經營情景，生成待確認的行動建議\n4. 解析合同與台賬文件並生成草稿（租賃與 IFRS 16 計量保留）\n\n上傳文件或直接提問後，我會先生成草稿和工具執行軌跡，確認後才進入正式流程。",
     en: "Hello! I am the Retail Performance Assistant. I read operating data and call built-in skills to help you:\n\n1. Read the operating pulse and surface stores that need attention\n2. Diagnose attention stores with Store 360, explaining revenue and contribution changes\n3. Evaluate deterministic operating scenarios and draft actions for confirmation\n4. Parse contracts and ledger files into drafts (lease and IFRS 16 measurement remain)\n\nAfter you upload a file or ask a question, I first produce drafts and a tool execution trace; only confirmed items enter the formal flow.",
+  },
+  "ai.welcome_subtitle": {
+    "zh-CN": "连接门店销售、毛利、客流、占用成本与租赁合同，驱动「发现问题 — 解释原因 — 模拟方案 — 形成行动」闭环。",
+    "zh-HK": "連接門店銷售、毛利、客流、佔用成本與租賃合同，驅動「發現問題 — 解釋原因 — 模擬方案 — 形成行動」閉環。",
+    en: "Connecting store sales, margin, traffic, occupancy cost, and lease contracts to close the discovery-to-action loop.",
   },
   "ai.context": {
     "zh-CN": "当前上下文：",

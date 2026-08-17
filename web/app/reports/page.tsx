@@ -377,48 +377,84 @@ function ReportsPageContent() {
 
           />
 
-          {/* ─── Report mode selector ─── */}
-          <Card className="sty-924d87a1">
-            <div
-              className="sty-bd560a9e"
-            >
-              <Space>
-                <span
-                  className="sty-f1dd2ad9"
-                >
-                  {t("reports.mode", language)}
-                </span>
-                <Radio.Group
-                  value={reportMode}
-                  onChange={(e) => setReportMode(e.target.value)}
-                  buttonStyle="solid"
-                >
-                  <Radio.Button value="working">
-                    <FileTextOutlined /> {t("reports.working", language)}
-                  </Radio.Button>
-                  <Radio.Button value="official">
-                    <SafetyOutlined /> {t("reports.official", language)}
-                  </Radio.Button>
-                </Radio.Group>
-              </Space>
+          {/* ─── Unified Professional Toolbar ─── */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 16,
+              padding: "12px 16px",
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-default)",
+              borderRadius: 10,
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-secondary)" }}>
+                {t("reports.mode", language)}:
+              </span>
+              <Radio.Group
+                value={reportMode}
+                onChange={(e) => setReportMode(e.target.value)}
+                buttonStyle="solid"
+                size="middle"
+              >
+                <Radio.Button value="working">
+                  <FileTextOutlined /> {t("reports.working", language)}
+                </Radio.Button>
+                <Radio.Button value="official">
+                  <SafetyOutlined /> {t("reports.official", language)}
+                </Radio.Button>
+              </Radio.Group>
 
               <span
-                className="sty-520d3a53"
+                style={{
+                  fontSize: 12,
+                  color: reportMode === "working" ? "var(--morandi-terracotta, #A57F6C)" : "var(--state-success-text, #216E39)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
               >
                 {reportMode === "working" ? (
                   <>
-                    <span className="sty-520d3a53">⚠</span>
-                    {t("reports.working_hint", language)}
+                    <span>⚠</span>
+                    <span>{t("reports.working_hint", language)}</span>
                   </>
                 ) : (
                   <>
-                    <span className="sty-e947dcf7">✓</span>
-                    {t("reports.official_hint", language)}
+                    <span>✓</span>
+                    <span>{t("reports.official_hint", language)}</span>
                   </>
                 )}
               </span>
             </div>
-          </Card>
+
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={async () => {
+                if (!token) return;
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+                const res = await fetch(
+                  `${apiUrl}/api/v1/reports/liability-rolling/export?mode=${reportMode}&language=${language}`,
+                  { headers: { Authorization: `Bearer ${token}` } },
+                );
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Lease_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+              }}
+              style={{ borderRadius: 6 }}
+            >
+              {t("reports.export_csv", language)}
+            </Button>
+          </div>
 
           {/* ─── tabs ─── */}
           <Tabs

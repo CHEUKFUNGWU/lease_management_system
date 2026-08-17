@@ -140,15 +140,15 @@ export default function WaterfallChart({
           <Bar dataKey="base" stackId="waterfall" fill="transparent" isAnimationActive={false} />
 
           {/* 真实瀑布阶梯柱 */}
-          <Bar dataKey="value" stackId="waterfall" isAnimationActive={false} radius={[2, 2, 0, 0]}>
+          <Bar dataKey="value" stackId="waterfall" isAnimationActive={false} radius={[3, 3, 0, 0]}>
             {chartData.map((entry, idx) => {
-              let fill = "var(--chart-blue, #1F4E9C)";
+              let fill = "var(--morandi-slate, #5A5958)";
               if (entry.isTotal) {
-                fill = "var(--mono-20, #262626)";
+                fill = "var(--morandi-slate, #5A5958)";
               } else if (entry.displayValue < 0) {
-                fill = "var(--fg-error, #A8071A)";
+                fill = "var(--morandi-terracotta, #A57F6C)";
               } else {
-                fill = "var(--fg-success, #216E39)";
+                fill = "var(--morandi-sand, #D8BB8F)";
               }
               return <Cell key={`cell-${idx}`} fill={fill} />;
             })}

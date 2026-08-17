@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Row, Select, Slider, Space, Spin, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Result, Row, Select, Slider, Space, Spin, Table, Tag, Typography, message } from "antd";
 import { ArrowLeftOutlined, PlayCircleOutlined, SaveOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
@@ -439,7 +439,50 @@ function ScenarioPageInner() {
 
             <Col xs={24} lg={14}>
               <Space direction="vertical" style={{ width: "100%" }} size={12}>
-                {error && <Alert type="error" showIcon message={t("scenario.unavailable", language)} description={error} />}
+                {error && (
+                  <Card
+                    style={{
+                      border: "1px solid var(--border-default, #E2E8F0)",
+                      background: "var(--bg-elevated)",
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Result
+                      status="warning"
+                      title={query.classification === "production" ? t("scenario.no_production_facts", language) : t("scenario.unavailable", language)}
+                      subTitle={
+                        query.classification === "production"
+                          ? t("scenario.no_production_facts_desc", language)
+                          : error
+                      }
+                      extra={
+                        query.classification === "production" ? (
+                          <Button
+                            type="primary"
+                            onClick={() => {
+                              if (latest) {
+                                setQuery({
+                                  classification: "simulated",
+                                  datasetVersion: latest.dataset_version,
+                                  asOf: latestAnomalyDate(latest),
+                                });
+                              } else {
+                                setQuery({ classification: "simulated" });
+                              }
+                            }}
+                            style={{
+                              background: "var(--morandi-slate, #5A5958)",
+                              borderColor: "var(--morandi-slate, #5A5958)",
+                              borderRadius: 6,
+                            }}
+                          >
+                            {t("scenario.switch_to_simulated", language)}
+                          </Button>
+                        ) : undefined
+                      }
+                    />
+                  </Card>
+                )}
                 {loading && (
                   <Card>
                     <Flex justify="center" align="center" style={{ minHeight: 200 }}>

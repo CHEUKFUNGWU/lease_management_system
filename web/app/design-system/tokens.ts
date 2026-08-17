@@ -68,11 +68,24 @@ export const colors = {
     neutral: { bg: "#F0F0F0", text: "#595959", border: "#E0E0E0" },
   },
 
-  // Chart series — grouped separately because dark mode does not invert
-  // chart colours the way it inverts surfaces and text (DARK-001).
+  // Giorgio Morandi Palette Tokens
+  morandi: {
+    slate: "#5A5958",      // Primary data line / dark warm charcoal
+    cream: "#F2EDE9",      // Soft alabaster background / area fill
+    sand: "#D8BB8F",       // Warm camel sand / positive growth / revenue
+    greige: "#C1B5A7",     // Muted greige / peer median / comparison
+    terracotta: "#A57F6C", // Dusty terracotta / occupancy cost / drag
+  },
+
+  // Chart series — Giorgio Morandi palette for editorial financial clarity
   chart: {
-    blue: "#1677FF",
-    purple: "#722ED1",
+    blue: "#5A5958",
+    purple: "#A57F6C",
+    primary: "#5A5958",
+    accent: "#D8BB8F",
+    secondary: "#C1B5A7",
+    negative: "#A57F6C",
+    fill: "#F2EDE9",
   },
 
   // Brand mark (BrandIcon) — graphic-specific values, not UI semantics.
@@ -324,9 +337,21 @@ export const darkColors = {
     error: { bg: "#3A1616", text: "#F0625C", border: "#5A2626" },
     neutral: { bg: "#262626", text: "#A6A6A6", border: "#3A3A3A" },
   },
+  morandi: {
+    slate: "#D1D5DB",
+    cream: "#262626",
+    sand: "#E5C896",
+    greige: "#9CA3AF",
+    terracotta: "#D98E73",
+  },
   chart: {
-    blue: "#4FC3F7",
-    purple: "#B39DDB",
+    blue: "#D1D5DB",
+    purple: "#D98E73",
+    primary: "#D1D5DB",
+    accent: "#E5C896",
+    secondary: "#9CA3AF",
+    negative: "#D98E73",
+    fill: "#262626",
   },
   // Brand mark stays the same in both themes; only the inverse variant
   // flips. Surface slots (admin sider / code) are the same dark values.

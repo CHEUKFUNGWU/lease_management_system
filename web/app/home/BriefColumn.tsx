@@ -126,14 +126,37 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
     setState("loading");
     setError(null);
     try {
-      const latest = await retailAnalyticsApi.latestSimulationDataset(token);
-      const classification: "production" | "simulated" = latest?.data ? "simulated" : "production";
+      let latestData = null;
+      try {
+        const latest = await retailAnalyticsApi.latestSimulationDataset(token);
+        latestData = latest?.data || null;
+      } catch {
+        latestData = null;
+      }
+      if (!latestData) {
+        try {
+          const gen = await retailAnalyticsApi.generateDefaultSimulation(token);
+          if (gen?.dataset_version) {
+            latestData = {
+              dataset_id: gen.dataset_id,
+              dataset_version: gen.dataset_version,
+              as_of: gen.date_to || "2026-06-05",
+              anomalies: gen.anomaly_manifest || [],
+            } as any;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      const classification: "production" | "simulated" = latestData ? "simulated" : "simulated";
+      const datasetVersion = latestData?.dataset_version || "retail-sim-v1-2853d653";
+      const asOf = latestData ? latestAnomalyDate(latestData) : "2026-06-05";
       const nextFilters = buildBriefFilters(
         classification,
-        latest?.data?.dataset_version,
-        latest?.data ? latestAnomalyDate(latest.data) : dayjs().format("YYYY-MM-DD"),
+        datasetVersion,
+        asOf,
         7,
-        classification === "simulated" ? "retail_simulator" : undefined,
+        "retail_simulator",
       );
       const result = await runHomeBrief({
         token,

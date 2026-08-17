@@ -366,7 +366,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* ── Content ── */}
         <Content
-          className="app-content"
+          className={`app-content${pathname === "/ai-chat" || pathname.startsWith("/ai-chat/") ? " app-content-full-bleed" : ""}`}
         >
           <AnimatePresence mode="wait">
             <motion.div

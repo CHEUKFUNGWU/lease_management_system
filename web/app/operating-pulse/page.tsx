@@ -181,7 +181,7 @@ function SignalMix({ attention, language }: { attention: RetailAttention[]; lang
               <XAxis type="number" tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={140} interval={0} />
               <ChartTooltip formatter={(value, _name, item) => [`${Number(value).toFixed(2)} · ${t("pulse.signal_mix_stores", language, { count: String(item?.payload?.stores ?? 0) })}`, t("pulse.signal_mix_weight", language)]} />
-              <Bar dataKey="weight" fill="var(--chart-blue)" radius={2} maxBarSize={28} />
+              <Bar dataKey="weight" fill="var(--morandi-sand, #D8BB8F)" radius={4} maxBarSize={28} />
             </BarChart>
           </ResponsiveContainer>
         )}

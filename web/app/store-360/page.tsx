@@ -135,7 +135,11 @@ function Trend({ response, language }: { response: RetailStoreDiagnosticsRespons
   );
 }
 
-const BRIDGE_TONE_FILL = { positive: "var(--state-success-text, #389E0D)", negative: "var(--state-error-text, #CF1322)", neutral: "var(--chart-blue, #1F4E9C)" } as const;
+const BRIDGE_TONE_FILL = {
+  positive: "var(--morandi-sand, #D8BB8F)",
+  negative: "var(--morandi-terracotta, #A57F6C)",
+  neutral: "var(--morandi-slate, #5A5958)",
+} as const;
 const PL_FLOW_OPTION = "__pl_flow";
 
 function BridgeWaterfall({ bridges, currency, language, plFlow, plFlowError }: { bridges: RetailStoreDiagnosticsResponse["bridges"]; currency: string; language: Language; plFlow: RetailPlFlowResponse | null; plFlowError: string | null }) {

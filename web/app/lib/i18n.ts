@@ -4126,6 +4126,41 @@ const dict: TranslationDict = {
     "zh-HK": "預算版本",
     en: "Budget Version",
   },
+  "budget.period": {
+    "zh-CN": "期间",
+    "zh-HK": "期間",
+    en: "Period",
+  },
+  "budget.freeze_section_title": {
+    "zh-CN": "固化 / 新建预算基线",
+    "zh-HK": "固化 / 新建預算基線",
+    en: "Freeze / Create Budget Baseline",
+  },
+  "budget.version_name": {
+    "zh-CN": "预算版本名称",
+    "zh-HK": "預算版本名稱",
+    en: "Version Name",
+  },
+  "budget.version_type": {
+    "zh-CN": "版本类型",
+    "zh-HK": "版本類型",
+    en: "Version Type",
+  },
+  "budget.source_label": {
+    "zh-CN": "来源系统 / 批次",
+    "zh-HK": "來源系統 / 批次",
+    en: "Source System / Batch",
+  },
+  "budget.period_range": {
+    "zh-CN": "有效期间范围",
+    "zh-HK": "有效期間範圍",
+    en: "Effective Period Range",
+  },
+  "budget.coverage_scope_label": {
+    "zh-CN": "覆盖范围描述",
+    "zh-HK": "覆蓋範圍描述",
+    en: "Coverage Scope Description",
+  },
   "budget.pick_version": {
     "zh-CN": "请选择预算版本",
     "zh-HK": "請選擇預算版本",

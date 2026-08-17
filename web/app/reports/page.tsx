@@ -5,7 +5,7 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { motion } from "framer-motion";
 import {
-  Card, Radio, Tag, Typography, Table, Spin, Statistic,
+  Card, Radio, Tag, Typography, Table, Spin, Statistic, Empty,
   Row, Col, Button, Tabs, DatePicker, Select, Input, Space, message,
 } from "antd";
 import {
@@ -29,6 +29,7 @@ import { useUrlState } from "../hooks/useUrlState";
 import { staggerContainer, staggerItem } from "../design-system/animations";
 import { notifyError } from "../lib/notify";
 import { useRetailQuery } from "../retail/useRetailQuery";
+import { tableScrollX } from "../lib/tableScroll";
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -513,48 +514,69 @@ function ReportsPageContent() {
                       }}
                     >
                       <Spin spinning={loading}>
-                        <Table
-                          columns={[
-                            { title: t("reports.contract_number", language), dataIndex: "contract_number", width: 150 },
-                            { title: t("reports.contract_name", language), dataIndex: "contract_name", ellipsis: true },
-                            {
-                              title: t("reports.approval_status", language),
-                              dataIndex: "approval_status",
-                              width: 100,
-                              render: (s: string) => (
-                                <StatusTag kind={statusKindFromAntColor(statusColor[s] || "default")}>
-                                  {getStatusText(language)[s] || s}
-                                </StatusTag>
-                              ),
-                            },
-                            {
-                              title: t("reports.is_official", language),
-                              dataIndex: "is_official_version",
-                              width: 90,
-                              render: (v: boolean) =>
-                                v ? <StatusTag>{t("reports.yes", language)}</StatusTag> : <StatusTag>{t("reports.no", language)}</StatusTag>,
-                            },
-                            {
-                              title: t("reports.discount_rate_missing", language),
-                              dataIndex: "discount_rate_missing",
-                              width: 100,
-                              render: (v: boolean) =>
-                                v ? (
-                                  <StatusTag kind="error">{t("reports.missing", language)}</StatusTag>
-                                ) : (
-                                  <StatusTag kind="success">{t("reports.filled", language)}</StatusTag>
+                        {ledgerData.length === 0 && !loading ? (
+                          <div style={{ padding: "48px 24px", textAlign: "center" }}>
+                            <Empty
+                              image={Empty.PRESENTED_IMAGE_SIMPLE}
+                              description={
+                                <span style={{ color: "var(--fg-secondary)", fontSize: 13 }}>
+                                  {t("reports.empty_hint", language)}
+                                </span>
+                              }
+                            >
+                              <Space size={12} style={{ marginTop: 8 }}>
+                                <Button type="primary" size="small" icon={<FileTextOutlined />} onClick={() => router.push("/contracts/new")}>
+                                  {t("contracts.add_contract", language)}
+                                </Button>
+                                <Button size="small" icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>
+                                  {t("dashboard.upload_file", language)}
+                                </Button>
+                              </Space>
+                            </Empty>
+                          </div>
+                        ) : (
+                          <Table
+                            columns={[
+                              { title: t("reports.contract_number", language), dataIndex: "contract_number", width: 140 },
+                              { title: t("reports.contract_name", language), dataIndex: "contract_name", width: 220, ellipsis: true },
+                              {
+                                title: t("reports.approval_status", language),
+                                dataIndex: "approval_status",
+                                width: 120,
+                                render: (s: string) => (
+                                  <StatusTag kind={statusKindFromAntColor(statusColor[s] || "default")}>
+                                    {getStatusText(language)[s] || s}
+                                  </StatusTag>
                                 ),
-                            },
-                            { title: t("reports.currency", language), dataIndex: "currency", width: 80 },
-                            { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110, render: (value: string) => fmtDate(value) },
-                            { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110, render: (value: string) => fmtDate(value) },
-                          ]}
-                          dataSource={ledgerData}
-                          rowKey="contract_id"
-                          pagination={{ pageSize: 10 }}
-                          scroll={ledgerData.length ? { x: "max-content" } : undefined}
-                          locale={{ emptyText: reportEmptyState(t("reports.empty_hint", language)) }}
-                        />
+                              },
+                              {
+                                title: t("reports.is_official", language),
+                                dataIndex: "is_official_version",
+                                width: 90,
+                                render: (v: boolean) =>
+                                  v ? <StatusTag>{t("reports.yes", language)}</StatusTag> : <StatusTag>{t("reports.no", language)}</StatusTag>,
+                              },
+                              {
+                                title: t("reports.discount_rate_missing", language),
+                                dataIndex: "discount_rate_missing",
+                                width: 110,
+                                render: (v: boolean) =>
+                                  v ? (
+                                    <StatusTag kind="error">{t("reports.missing", language)}</StatusTag>
+                                  ) : (
+                                    <StatusTag kind="success">{t("reports.filled", language)}</StatusTag>
+                                  ),
+                              },
+                              { title: t("reports.currency", language), dataIndex: "currency", width: 80 },
+                              { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110, render: (value: string) => fmtDate(value) },
+                              { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110, render: (value: string) => fmtDate(value) },
+                            ]}
+                            dataSource={ledgerData}
+                            rowKey="contract_id"
+                            pagination={{ pageSize: 10, showSizeChanger: true }}
+                            scroll={tableScrollX(ledgerData.length, 1000)}
+                          />
+                        )}
                       </Spin>
                     </div>
                   </>
@@ -736,23 +758,25 @@ function ReportsPageContent() {
                       </Row>
 
                       {/* advanced filters toggle */}
-                      <Button
-                        type="link"
-                        onClick={() => setShowFilters(!showFilters)}
-                        className="sty-2c2c74e0"
-                      >
-                        {showFilters
-                          ? t("reports.collapse_filters", language)
-                          : t("reports.expand_filters", language)}
-                      </Button>
+                      <div style={{ marginTop: 8 }}>
+                        <Button
+                          type="link"
+                          onClick={() => setShowFilters(!showFilters)}
+                          style={{ padding: 0, fontSize: 12 }}
+                        >
+                          {showFilters
+                            ? t("reports.collapse_filters", language)
+                            : t("reports.expand_filters", language)}
+                        </Button>
+                      </div>
 
                       {showFilters && (
-                        <>
-                          <Row gutter={[12, 10]} className="sty-51a6ccfa">
+                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border-default)" }}>
+                          <Row gutter={[16, 12]}>
                             {amortView !== "contract" && (
-                              <Col xs={24} sm={8}>
-                                <div className="sty-9b30e5cd">
-                                  <span className="sty-51a6ccfa">
+                              <Col xs={24} sm={12} md={8}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
                                     {t("reports.contract_id", language)}
                                   </span>
                                   <Input
@@ -760,15 +784,15 @@ function ReportsPageContent() {
                                     value={amortContractId}
                                     onChange={(e) => { setAmortContractId(e.target.value); setAmortFetched(false); }}
                                     placeholder={t("reports.filter_contract_id", language)}
-                                     allowClear
+                                    allowClear
                                   />
                                 </div>
                               </Col>
                             )}
                             {amortView !== "store" && (
-                              <Col xs={24} sm={8}>
-                                <div className="sty-9b30e5cd">
-                                  <span className="sty-51a6ccfa">
+                              <Col xs={24} sm={12} md={8}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
                                     {t("reports.store", language)}
                                   </span>
                                   <Input
@@ -776,14 +800,14 @@ function ReportsPageContent() {
                                     value={amortStore}
                                     onChange={(e) => { setAmortStore(e.target.value); setAmortFetched(false); }}
                                     placeholder={t("reports.filter_store", language)}
-                                     allowClear
+                                    allowClear
                                   />
                                 </div>
                               </Col>
                             )}
-                            <Col xs={24} sm={8}>
-                              <div className="sty-9b30e5cd">
-                                <span className="sty-70ea3314">
+                            <Col xs={24} sm={12} md={8}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
                                   {t("reports.tags", language)}
                                 </span>
                                 <Select
@@ -791,30 +815,16 @@ function ReportsPageContent() {
                                   size="small"
                                   value={selectedTags}
                                   onChange={(v) => { setSelectedTags(v); setAmortFetched(false); }}
-                                  className="sty-8465c002"
                                   placeholder={t("reports.filter_tags", language)}
                                   loading={tagLoading}
                                   options={availableTags.map((tg) => ({ value: tg, label: tg }))}
+                                  style={{ width: "100%" }}
                                 />
                               </div>
                             </Col>
-                          </Row>
-
-                          {/* discount rate & currency override */}
-                          <div
-                            className="sty-084409c0"
-                          >
-                            <span className="sty-12c0845e">
-                              {t("reports.override_title", language)}
-                            </span>
-                            <span className="sty-869f4e9b">
-                              {t("reports.override_desc", language)}
-                            </span>
-                          </div>
-                          <Row gutter={[12, 10]} className="sty-51a6ccfa">
-                            <Col xs={24} sm={8}>
-                              <div className="sty-9b30e5cd">
-                                <span className="sty-51a6ccfa">
+                            <Col xs={24} sm={12} md={8}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
                                   {t("reports.discount_rate_override", language)}
                                 </span>
                                 <Input
@@ -822,28 +832,27 @@ function ReportsPageContent() {
                                   value={discountRateOverride}
                                   onChange={(e) => { setDiscountRateOverride(e.target.value); setAmortFetched(false); }}
                                   placeholder={t("reports.override_placeholder", language)}
-                                   allowClear
-                                 />
-                               </div>
-                             </Col>
-                             <Col xs={24} sm={8}>
-                               <div className="sty-9b30e5cd">
-                                 <span className="sty-70ea3314">
-                                   {t("reports.report_currency", language)}
-                                 </span>
+                                  allowClear
+                                />
+                              </div>
+                            </Col>
+                            <Col xs={24} sm={12} md={8}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                                  {t("reports.report_currency", language)}
+                                </span>
                                 <Input
                                   size="small"
                                   value={reportCurrency}
                                   onChange={(e) => { setReportCurrency(e.target.value.toUpperCase()); setAmortFetched(false); }}
-                                  className="sty-51a6ccfa"
                                   placeholder="CNY"
                                   allowClear
                                 />
                               </div>
                             </Col>
-                            <Col xs={24} sm={8}>
-                              <div className="sty-9b30e5cd">
-                                <span className="sty-7f21e1ba">
+                            <Col xs={24} sm={12} md={8}>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
                                   {t("reports.exchange_rate", language)}
                                 </span>
                                 <Input
@@ -851,12 +860,12 @@ function ReportsPageContent() {
                                   value={exchangeRate}
                                   onChange={(e) => { setExchangeRate(e.target.value); setAmortFetched(false); }}
                                   placeholder={t("reports.exchange_rate_placeholder", language)}
-                                   allowClear
+                                  allowClear
                                 />
                               </div>
                             </Col>
                           </Row>
-                        </>
+                        </div>
                       )}
                     </Card>
 
@@ -970,27 +979,39 @@ function ReportsPageContent() {
                       }}
                     >
                       <Spin spinning={amortLoading}>
-                        <Table
-                          columns={amortCols}
-                          dataSource={amortData}
-                          rowKey={(record: any) =>
-                            [
-                              record.group_key,
-                              record.contract_id,
-                              record.store_id,
-                              record.asset_type,
-                              record.period_key,
-                              record.period_start,
-                              record.currency,
-                            ]
-                              .filter((value) => value !== undefined && value !== null && value !== "")
-                              .join("|") || JSON.stringify(record)
-                          }
-                          pagination={{ pageSize: 20, showSizeChanger: true }}
-                          scroll={amortData.length ? { x: "max-content" } : undefined}
-                          size="small"
-                          locale={{ emptyText: reportEmptyState(amortFetched ? t("reports.empty_hint", language) : t("reports.no_data_hint", language)) }}
-                        />
+                        {amortData.length === 0 && !amortLoading ? (
+                          <div style={{ padding: "48px 24px", textAlign: "center" }}>
+                            <Empty
+                              image={Empty.PRESENTED_IMAGE_SIMPLE}
+                              description={
+                                <span style={{ color: "var(--fg-secondary)", fontSize: 13 }}>
+                                  {amortFetched ? t("reports.empty_hint", language) : t("reports.no_data_hint", language)}
+                                </span>
+                              }
+                            />
+                          </div>
+                        ) : (
+                          <Table
+                            columns={amortCols}
+                            dataSource={amortData}
+                            rowKey={(record: any) =>
+                              [
+                                record.group_key,
+                                record.contract_id,
+                                record.store_id,
+                                record.asset_type,
+                                record.period_key,
+                                record.period_start,
+                                record.currency,
+                              ]
+                                .filter((value) => value !== undefined && value !== null && value !== "")
+                                .join("|") || JSON.stringify(record)
+                            }
+                            pagination={{ pageSize: 20, showSizeChanger: true }}
+                            scroll={tableScrollX(amortData.length, 1800)}
+                            size="small"
+                          />
+                        )}
                       </Spin>
                     </div>
                   </>

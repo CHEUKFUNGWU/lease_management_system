@@ -33,6 +33,7 @@ import {
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
+import { tableScrollX } from "../lib/tableScroll";
 import { contractApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -553,73 +554,72 @@ function ContractsPage() {
 
           <div className="contracts-desktop-table">
           <Card
-            styles={{ body: { padding: 0 } }}
+            styles={{ body: { padding: contracts.length === 0 && !loading ? "48px 24px" : 0 } }}
             className="sty-c6e381ce"
           >
-            <Table
-              columns={columns}
-              dataSource={contracts}
-              scroll={contracts.length ? { x: "max-content" } : undefined}
-              rowKey="id"
-              loading={{
-                spinning: loading,
-                indicator: <Skeleton active paragraph={{ rows: 5 }} />,
-              }}
-              rowSelection={{
-                selectedRowKeys,
-                onChange: (keys) => setSelectedRowKeys(keys),
-                // Only a draft contract can be submitted, so anything else is
-                // not selectable for the bulk action.
-                getCheckboxProps: (record: Contract) => ({
-                  disabled: record.approval_status !== "draft",
-                }),
-              }}
-              pagination={{
-                current: page,
-                pageSize,
-                total,
-                showSizeChanger: true,
-                onChange: (nextPage, nextSize) => {
-                  setSelectedRowKeys([]);
-                  setPageParam(String(nextPage));
-                  setPageSizeParam(String(nextSize));
-                },
-                showTotal: (total) => {
-                  const text = t("contracts.total_items", language, { total: "__TOTAL__" });
-                  const [before, after] = text.split("__TOTAL__");
-                  return (
-                    <span className="sty-73be230f">
-                      {before}
-                      <strong className="sty-96007dcc">{total}</strong>
-                      {after}
-                    </span>
-                  );
-                },
-              }}
-              onChange={handleTableChange}
-              locale={{
-                emptyText: (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description={
-                      <span className="sty-22a08c80">
-                        {hasFilters
-                          ? t("contracts.no_search_results", language)
-                          : t("contracts.no_data", language)}
+            {contracts.length === 0 && !loading ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={
+                  <span className="sty-22a08c80">
+                    {hasFilters
+                      ? t("contracts.no_search_results", language)
+                      : t("contracts.no_data", language)}
+                  </span>
+                }
+              >
+                {!hasFilters ? (
+                  <Space size={12} style={{ marginTop: 8 }}>
+                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => router.push("/contracts/new")}>{t("contracts.add_contract", language)}</Button>
+                    <Button size="small" icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>
+                  </Space>
+                ) : <Button size="small" onClick={clearFilters}>{t("contracts.clear_filters", language)}</Button>}
+              </Empty>
+            ) : (
+              <Table
+                columns={columns}
+                dataSource={contracts}
+                scroll={tableScrollX(contracts.length, 1200)}
+                rowKey="id"
+                loading={{
+                  spinning: loading,
+                  indicator: <Skeleton active paragraph={{ rows: 5 }} />,
+                }}
+                rowSelection={{
+                  selectedRowKeys,
+                  onChange: (keys) => setSelectedRowKeys(keys),
+                  // Only a draft contract can be submitted, so anything else is
+                  // not selectable for the bulk action.
+                  getCheckboxProps: (record: Contract) => ({
+                    disabled: record.approval_status !== "draft",
+                  }),
+                }}
+                pagination={{
+                  current: page,
+                  pageSize,
+                  total,
+                  showSizeChanger: true,
+                  onChange: (nextPage, nextSize) => {
+                    setSelectedRowKeys([]);
+                    setPageParam(String(nextPage));
+                    setPageSizeParam(String(nextSize));
+                  },
+                  showTotal: (total) => {
+                    const text = t("contracts.total_items", language, { total: "__TOTAL__" });
+                    const [before, after] = text.split("__TOTAL__");
+                    return (
+                      <span className="sty-73be230f">
+                        {before}
+                        <strong className="sty-96007dcc">{total}</strong>
+                        {after}
                       </span>
-                    }
-                  >
-                    {!hasFilters ? (
-                      <Space>
-                        <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => router.push("/contracts/new")}>{t("contracts.add_contract", language)}</Button>
-                        <Button size="small" icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>
-                      </Space>
-                    ) : <Button size="small" onClick={clearFilters}>{t("contracts.clear_filters", language)}</Button>}
-                  </Empty>
-                ),
-              }}
-              rowClassName={() => "contract-row"}
-            />
+                    );
+                  },
+                }}
+                onChange={handleTableChange}
+                rowClassName={() => "contract-row"}
+              />
+            )}
           </Card>
           </div>
 

@@ -247,69 +247,174 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
 
   return (
     <>
-      <Card className="sty-b8bb6f7b" styles={{ body: { padding: "16px 20px" } }}>
-        <Space wrap size={12}>
-          <span className="sty-7b32b26b">{t("budget.version", language)}</span>
-          <Select
-            className="sty-b8bb6f7b"
-            value={versionId}
-            onChange={setVersionId}
-            placeholder={t("budget.pick_version", language)}
-            options={versions.map((v) => ({
-              value: v.id,
-              label: `${v.name}（${v.version_type}, ${v.from_period}~${v.to_period}）`,
-            }))}
-          />
-          <span className="sty-7b32b26b">{t("budget.compare_to", language)}</span>
-          <Select
-            className="sty-cee1122c"
-            value={rightId}
-            onChange={setRightId}
-            options={[{ value: "actual", label: t("budget.actual_measurement_readonly", language) }, ...versions.filter((v) => v.id !== versionId).map((v) => ({ value: v.id, label: `${v.name}（${v.version_type}）` }))]}
-          />
-          <Input
-            className="sty-300e6a8d"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            placeholder={t("budget.period_placeholder", language)}
-          />
-          <Button type="primary" icon={<SearchOutlined />} loading={loading} onClick={runVariance}>
-            {t("budget.compare", language)}
-          </Button>
-        </Space>
+      {/* 1. Comparison Parameters Bar */}
+      <Card styles={{ body: { padding: "16px 20px" } }} style={{ marginBottom: 16 }}>
+        <Row gutter={[16, 12]} align="middle">
+          <Col xs={24} sm={12} md={7}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.version", language)}
+              </span>
+              <Select
+                value={versionId}
+                onChange={setVersionId}
+                placeholder={t("budget.pick_version", language)}
+                options={versions.map((v) => ({
+                  value: v.id,
+                  label: `${v.name}（${v.version_type}, ${v.from_period}~${v.to_period}）`,
+                }))}
+                style={{ width: "100%" }}
+                size="small"
+              />
+            </div>
+          </Col>
+          <Col xs={24} sm={12} md={7}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.compare_to", language)}
+              </span>
+              <Select
+                value={rightId}
+                onChange={setRightId}
+                options={[
+                  { value: "actual", label: t("budget.actual_measurement_readonly", language) },
+                  ...versions
+                    .filter((v) => v.id !== versionId)
+                    .map((v) => ({ value: v.id, label: `${v.name}（${v.version_type}）` })),
+                ]}
+                style={{ width: "100%" }}
+                size="small"
+              />
+            </div>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.period", language)}
+              </span>
+              <Input
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                placeholder={t("budget.period_placeholder", language)}
+                size="small"
+              />
+            </div>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, justifyContent: "flex-end", height: "100%" }}>
+              <span style={{ fontSize: 12, visibility: "hidden" }}>Action</span>
+              <Button type="primary" icon={<SearchOutlined />} loading={loading} onClick={runVariance} size="small" style={{ width: "100%" }}>
+                {t("budget.compare", language)}
+              </Button>
+            </div>
+          </Col>
+        </Row>
+      </Card>
 
-        <div className="sty-7b32b26b">
-          <Input
-            className="sty-ced30fdd"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder={t("budget.new_name_placeholder", language)}
-          />
-          <Select
-            className="sty-a4d93741"
-            value={newType}
-            onChange={setNewType}
-            options={[{ value: "budget", label: t("budget.type_budget", language) }, { value: "forecast", label: t("budget.type_forecast", language) }, { value: "scenario", label: t("budget.type_scenario", language) }]}
-          />
-          <Input
-            className="sty-72ff3588"
-            value={newSource}
-            onChange={(e) => setNewSource(e.target.value)}
-            placeholder={t("budget.source_placeholder", language)}
-          />
-          <Input className="sty-72ff3588" value={fromPeriod} onChange={(e) => setFromPeriod(e.target.value)} placeholder={t("budget.from_period", language)} />
-          <Input className="sty-a4d93741" value={toPeriod} onChange={(e) => setToPeriod(e.target.value)} placeholder={t("budget.to_period", language)} />
-          <Input className="sty-9b30e5cd" value={coverageScope} onChange={(e) => setCoverageScope(e.target.value)} placeholder={t("budget.coverage_scope", language)} />
-          <Button icon={<PlusOutlined />} loading={creating} onClick={createVersion}>
-            {t("budget.freeze", language)}
-          </Button>
-          <span className="sty-b20ac6af">{t("budget.freeze_hint", language)}</span>
+      {/* 2. Create & Freeze Budget Version Section */}
+      <Card
+        size="small"
+        title={
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)" }}>
+            {t("budget.freeze_section_title", language)}
+          </span>
+        }
+        styles={{ body: { padding: "14px 20px" } }}
+        style={{ marginBottom: 16 }}
+      >
+        <Row gutter={[16, 12]}>
+          <Col xs={24} sm={12} md={8}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.version_name", language)}
+              </span>
+              <Input
+                size="small"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder={t("budget.new_name_placeholder", language)}
+              />
+            </div>
+          </Col>
+          <Col xs={24} sm={12} md={4}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.version_type", language)}
+              </span>
+              <Select
+                size="small"
+                value={newType}
+                onChange={setNewType}
+                options={[
+                  { value: "budget", label: t("budget.type_budget", language) },
+                  { value: "forecast", label: t("budget.type_forecast", language) },
+                  { value: "scenario", label: t("budget.type_scenario", language) },
+                ]}
+                style={{ width: "100%" }}
+              />
+            </div>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.source_label", language)}
+              </span>
+              <Input
+                size="small"
+                value={newSource}
+                onChange={(e) => setNewSource(e.target.value)}
+                placeholder={t("budget.source_placeholder", language)}
+              />
+            </div>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.period_range", language)}
+              </span>
+              <Space.Compact style={{ width: "100%" }}>
+                <Input
+                  size="small"
+                  style={{ width: "50%" }}
+                  value={fromPeriod}
+                  onChange={(e) => setFromPeriod(e.target.value)}
+                  placeholder={t("budget.from_period", language)}
+                />
+                <Input
+                  size="small"
+                  style={{ width: "50%" }}
+                  value={toPeriod}
+                  onChange={(e) => setToPeriod(e.target.value)}
+                  placeholder={t("budget.to_period", language)}
+                />
+              </Space.Compact>
+            </div>
+          </Col>
+          <Col xs={24} sm={16} md={16}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                {t("budget.coverage_scope_label", language)}
+              </span>
+              <Input
+                size="small"
+                value={coverageScope}
+                onChange={(e) => setCoverageScope(e.target.value)}
+                placeholder={t("budget.coverage_scope", language)}
+              />
+            </div>
+          </Col>
+          <Col xs={24} sm={8} md={8}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, justifyContent: "flex-end", height: "100%" }}>
+              <span style={{ fontSize: 12, visibility: "hidden" }}>Action</span>
+              <Button icon={<PlusOutlined />} loading={creating} onClick={createVersion} size="small" type="dashed" style={{ width: "100%" }}>
+                {t("budget.freeze", language)}
+              </Button>
+            </div>
+          </Col>
+        </Row>
+        <div style={{ marginTop: 8, fontSize: 11, color: "var(--fg-muted)" }}>
+          {t("budget.freeze_hint", language)}
         </div>
-        {versionId && (
-          <div className="sty-7f21e1ba">
-            {t("budget.measurement_source_hint", language)}
-          </div>
-        )}
       </Card>
 
       {result && (

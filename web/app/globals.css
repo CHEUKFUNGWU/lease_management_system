@@ -502,7 +502,7 @@ body .ant-table-container {
 }
 
 .ant-table {
-  min-width: max-content;
+  width: 100%;
 }
 
 /* Tag: minimal.

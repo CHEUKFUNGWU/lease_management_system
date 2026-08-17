@@ -3,8 +3,8 @@
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Typography, Upload, message } from "antd";
-import { ReloadOutlined, RobotOutlined, CheckCircleOutlined, DownloadOutlined, UploadOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, Upload, message } from "antd";
+import { ReloadOutlined, RobotOutlined, CheckCircleOutlined, DownloadOutlined, InfoCircleOutlined, UploadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -99,6 +99,12 @@ export default function PerformancePage() {
   const stores: FourWall[] = cockpitState.kind === "ready" ? (cockpitState.data?.stores ?? []) : [];
   const equipment: EquipmentItem[] = cockpitState.kind === "ready" ? (cockpitState.data?.equipment ?? []) : [];
   const actions: Action[] = cockpitState.kind === "ready" ? (cockpitState.data?.actions ?? []) : [];
+  const governanceCounts = [
+    { label: "缺失字段", value: overview?.store_fact_missing_count ?? 0 },
+    { label: "未映射", value: overview?.store_fact_unmapped_count ?? 0 },
+    { label: "未对账", value: overview?.store_fact_unreconciled_count ?? 0 },
+    { label: "设备未对账", value: overview?.equipment_fact_unreconciled_count ?? 0 },
+  ];
   useEffect(() => {
     if (cockpitState.kind === "failed") notifyError(cockpitState.message || t("performance.load_failed", language));
   }, [cockpitState, language]);
@@ -183,7 +189,28 @@ export default function PerformancePage() {
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="待处理行动" value={overview.open_action_count} /></Card></Col>
       <Col xs={24} sm={12} lg={6}><Card><Statistic title="未兑现影响" value={overview.open_action_impact} precision={2} /></Card></Col>
     </Row>}
-    <Alert type="info" showIcon style={{ marginBottom: 16 }} message="数据治理边界" description={<Space wrap><span>缺失字段 {overview?.store_fact_missing_count ?? 0}</span><span>未映射 {overview?.store_fact_unmapped_count ?? 0}</span><span>未对账 {overview?.store_fact_unreconciled_count ?? 0}</span><span>设备未对账 {overview?.equipment_fact_unreconciled_count ?? 0}</span><span>缺失、未映射、未对账与零值会分别展示；AI 只能引用这些系统事实并生成建议，不能自动确认解释、修改 Forecast 或创建正式租赁事件。</span></Space>} />
+    {/* This used to be a permanent info banner that opened with four zero
+        counters and closed with a paragraph of governance rules — the densest
+        thing on an otherwise empty page. The counters now only appear when
+        one is non-zero (a clean dataset says nothing), and the rules moved
+        behind the ℹ️ they always belonged in. */}
+    {governanceCounts.some((item) => item.value > 0) ? (
+      <Alert
+        type="warning"
+        showIcon
+        className="perf-governance-alert"
+        message={
+          <Space wrap>
+            {governanceCounts.filter((item) => item.value > 0).map((item) => (
+              <span key={item.label}>{item.label} {item.value}</span>
+            ))}
+            <Tooltip title="缺失、未映射、未对账与零值会分别展示；AI 只能引用这些系统事实并生成建议，不能自动确认解释、修改 Forecast 或创建正式租赁事件。">
+              <InfoCircleOutlined className="perf-governance-hint" />
+            </Tooltip>
+          </Space>
+        }
+      />
+    ) : null}
     <Card><Tabs items={[
       { key: "actions", label: `行动中心 (${actions.length})`, children: actions.length ? <Space direction="vertical" style={{ width: "100%" }}><Space><Button size="small" icon={<CheckCircleOutlined />} disabled={!selectedActionIds.length} onClick={acknowledgeSelected}>批量确认</Button><Button size="small" icon={<DownloadOutlined />} onClick={exportActions}>导出 Working CSV</Button></Space><Table rowKey="id" size="small" rowSelection={{ selectedRowKeys: selectedActionIds, onChange: keys => setSelectedActionIds(keys as string[]) }} columns={actionColumns} dataSource={actions} pagination={{ pageSize: 8 }} /></Space> : <Empty description="当前期间没有待处理行动" /> },
       { key: "stores", label: `零售四墙 (${stores.length})`, children: stores.length ? <Table rowKey="store_id" size="small" columns={storeColumns} dataSource={stores} pagination={{ pageSize: 8 }} scroll={{ x: 900 }} /> : <Empty description="暂无门店经营事实；请先导入受控事实批次" /> },

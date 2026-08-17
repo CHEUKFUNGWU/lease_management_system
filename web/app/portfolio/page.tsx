@@ -3,6 +3,7 @@
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Alert, Button, Card, Col, Empty, Row, Segmented, Space, Statistic, Table, Tag } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
@@ -12,7 +13,7 @@ import { HelpTrigger } from "../components/HelpDrawer";
 import { portfolioHelpContent } from "../components/help-content";
 import { reportApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
-import { fmtMoney } from "../lib/format";
+import { fmtDate, fmtMoney } from "../lib/format";
 import { RentToSalesPanel } from "./RentToSalesPanel";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -87,6 +88,7 @@ const fmt = (value: number) => value.toLocaleString(undefined, { maximumFraction
 function PortfolioPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
+  const router = useRouter();
   const [modeParam, setModeParam] = useUrlState("mode", "working");
   const [groupingParam, setGroupingParam] = useUrlState("group_by", "store");
   const mode: "working" | "official" = modeParam === "official" ? "official" : "working";
@@ -120,6 +122,14 @@ function PortfolioPage() {
   useEffect(() => {
     if (unitPriceQuery.state.kind === "failed") notifyError(unitPriceQuery.state.message || t("portfolio.unit_price_failed", language));
   }, [unitPriceQuery.state, language]);
+
+  // A missing policy threshold is a configuration gap, not a transient fault:
+  // a toast that names the settings page and then disappears leaves the user
+  // to find it unaided. Surface it in-page with the route attached.
+  const configGapMessage = t("api.policy_thresholds_missing", language);
+  const failedMessages = [summaryQuery.state, unitPriceQuery.state]
+    .map((state) => (state.kind === "failed" ? state.message : null));
+  const hasConfigGap = failedMessages.some((message) => message === configGapMessage);
 
   const totals = useMemo(() => {
     return rows.reduce(
@@ -177,6 +187,15 @@ function PortfolioPage() {
                 </Space>
               }
             />
+
+            {hasConfigGap && (
+              <Alert
+                type="warning"
+                showIcon
+                message={configGapMessage}
+                action={<Button size="small" onClick={() => router.push("/settings")}>{t("portfolio.go_settings", language)}</Button>}
+              />
+            )}
 
             <Alert
               type={mode === "official" ? "success" : "info"}
@@ -349,8 +368,8 @@ function PortfolioPage() {
                     align: "right",
                     render: (value: number) => value ? <StatusTag kind="error">{value}</StatusTag> : <StatusTag kind="success">0</StatusTag>,
                   },
-                  { title: "最早开始日", dataIndex: "earliest_commencement_date", width: 120 },
-                  { title: "最晚结束日", dataIndex: "latest_lease_end_date", width: 120 },
+                  { title: "最早开始日", dataIndex: "earliest_commencement_date", width: 120, render: (value: string) => fmtDate(value) },
+                  { title: "最晚结束日", dataIndex: "latest_lease_end_date", width: 120, render: (value: string) => fmtDate(value) },
                 ]}
               />
             </Card>

@@ -21,7 +21,7 @@ import { reportApi } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
-import { fmtMoney, fmtNum } from "../lib/format";
+import { fmtDate, fmtMoney, fmtNum } from "../lib/format";
 import { exportCSV, exportExcel } from "../lib/export";
 import dayjs from "dayjs";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -80,13 +80,13 @@ const buildAmortColumns = (view: string, granularity: string, lang: string) => {
   const periodCols = granularity !== "day"
     ? [
         { title: t("reports.col_period", lang as any), dataIndex: "period_key", width: 100 },
-        { title: t("reports.col_period_start", lang as any), dataIndex: "period_start", width: 110 },
-        { title: t("reports.col_period_end", lang as any), dataIndex: "period_end", width: 110 },
+        { title: t("reports.col_period_start", lang as any), dataIndex: "period_start", width: 110, render: (value: string) => fmtDate(value) },
+        { title: t("reports.col_period_end", lang as any), dataIndex: "period_end", width: 110, render: (value: string) => fmtDate(value) },
       ]
     : [
         { title: t("reports.day", lang as any), dataIndex: "period_key", width: 110 },
-        { title: t("reports.col_period_start", lang as any), dataIndex: "period_start", width: 110 },
-        { title: t("reports.col_period_end", lang as any), dataIndex: "period_end", width: 110 },
+        { title: t("reports.col_period_start", lang as any), dataIndex: "period_start", width: 110, render: (value: string) => fmtDate(value) },
+        { title: t("reports.col_period_end", lang as any), dataIndex: "period_end", width: 110, render: (value: string) => fmtDate(value) },
       ];
 
   const financialCols = [
@@ -537,8 +537,8 @@ function ReportsPageContent() {
                                 ),
                             },
                             { title: t("reports.currency", language), dataIndex: "currency", width: 80 },
-                            { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110 },
-                            { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110 },
+                            { title: t("reports.commencement_date", language), dataIndex: "commencement_date", width: 110, render: (value: string) => fmtDate(value) },
+                            { title: t("reports.lease_end_date", language), dataIndex: "lease_end_date", width: 110, render: (value: string) => fmtDate(value) },
                           ]}
                           dataSource={ledgerData}
                           rowKey="contract_id"

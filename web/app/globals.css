@@ -1808,6 +1808,11 @@ html {
   display: block;
   margin-top: 8px;
 }
+.retail-import-field-hint {
+  margin-left: 4px;
+  color: var(--fg-muted);
+  cursor: help;
+}
 .retail-import-mapping-select {
   width: 100%;
   max-width: 320px;
@@ -3748,4 +3753,12 @@ html {
    stable hook. */
 .theme-toggle {
   color: var(--fg-secondary);
+}
+
+.perf-governance-alert {
+  margin-bottom: 16px;
+}
+.perf-governance-hint {
+  color: var(--fg-muted);
+  cursor: help;
 }

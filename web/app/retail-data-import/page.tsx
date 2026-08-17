@@ -2,21 +2,32 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Card, DatePicker, Descriptions, Flex, Input, Space, Spin, Table, Tag, Typography, Upload, message } from "antd";
-import { CloudUploadOutlined, CheckCircleOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, DatePicker, Descriptions, Flex, Input, Space, Spin, Table, Tag, Tooltip, Typography, Upload, message } from "antd";
+import { CloudUploadOutlined, CheckCircleOutlined, DownloadOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
-import { apiErrorMessage, fpnaPlanImportApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
+import { apiErrorMessage, fpnaPlanImportApi, operatingFactsApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
 import { tableScrollX } from "../lib/tableScroll";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
 
 const REQUIRED_FIELDS = ["store", "business_date", "currency", "revenue"];
+
+// No client-side template columns here on purpose: CONTRACT-001 forbids the
+// page from copying the backend field list as literals, so a generated
+// template would fork the schema. The store-facts importer downloads a real
+// template from the API; the plan and trial-balance importers need the same
+// backend endpoint before they can offer one.
+
+/** The field list, demoted from body copy to an info affordance. */
+function FieldHint({ text }: { text: string }) {
+  return <Tooltip title={text}><InfoCircleOutlined className="retail-import-field-hint" /></Tooltip>;
+}
 
 function fieldLabel(field: string, language: Language): string {
   const label = t(`retail_import.field_label.${field}`, language);
@@ -36,7 +47,26 @@ export default function RetailDataImportPage() {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [committing, setCommitting] = useState(false);
   const [commitResult, setCommitResult] = useState<RetailIngestCommitResponse | null>(null);
+  const [templateDownloading, setTemplateDownloading] = useState(false);
   const commitKeyRef = useRef<string>("");
+
+  const downloadStoreTemplate = async () => {
+    if (!token) return;
+    setTemplateDownloading(true);
+    try {
+      const blob = await operatingFactsApi.downloadStoreCSVTemplate(token);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "store_facts_template.csv";
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      message.error(apiErrorMessage(error));
+    } finally {
+      setTemplateDownloading(false);
+    }
+  };
 
   const runPreview = async (nextFile: File, nextMapping: Record<string, string> | null, nextSource?: string) => {
     if (!token) return;
@@ -175,6 +205,9 @@ export default function RetailDataImportPage() {
         <Upload accept=".csv,.xlsx" maxCount={1} showUploadList={false} beforeUpload={(selected) => { void onFileSelected(selected); return false; }}>
           <Button icon={<CloudUploadOutlined />}>{file ? file.name : t("retail_import.title", language)}</Button>
         </Upload>
+        {/* The backend has served this template since the importer shipped;
+            nothing in the UI ever offered it. */}
+        <Button icon={<DownloadOutlined />} loading={templateDownloading} onClick={() => { void downloadStoreTemplate(); }}>{t("import.download_template", language)}</Button>
       </Flex>
       <Typography.Text type="secondary" className="retail-import-hint">{t("retail_import.upload_hint", language)}</Typography.Text>
     </Card>
@@ -270,7 +303,7 @@ export default function RetailDataImportPage() {
         <span><input type="checkbox" checked={planOfficial} onChange={(event) => setPlanOfficial(event.target.checked)} /> {t("plan_import.official", language)}</span>
         <Button type="primary" loading={planImporting} disabled={!planFile || !planName.trim()} onClick={() => { void importPlanVersion(); }}>{t("plan_import.commit", language)}</Button>
       </Flex>
-      <Typography.Text type="secondary" className="retail-import-hint">{t("plan_import.hint", language)}</Typography.Text>
+      <Typography.Text type="secondary" className="retail-import-hint">{t("plan_import.hint_plain", language)} <FieldHint text={t("plan_import.hint", language)} /></Typography.Text>
       {planResult && <Alert className="retail-import-block-gap-sm" type="success" showIcon message={planResult} />}
     </Card>
     <Card size="small" className="retail-import-block-gap" title={t("tb_import.title", language)}>
@@ -286,7 +319,7 @@ export default function RetailDataImportPage() {
         </Upload>
         <Button type="primary" loading={tbImporting} disabled={!tbFile || !tbName.trim()} onClick={() => { void importTrialBalance(); }}>{t("tb_import.commit", language)}</Button>
       </Flex>
-      <Typography.Text type="secondary" className="retail-import-hint">{t("tb_import.hint", language)}</Typography.Text>
+      <Typography.Text type="secondary" className="retail-import-hint">{t("tb_import.hint_plain", language)} <FieldHint text={t("tb_import.hint", language)} /></Typography.Text>
       {tbResult && <Alert className="retail-import-block-gap-sm" type="success" showIcon message={tbResult} />}
     </Card>
   </div></AppLayout></ProtectedRoute>;

@@ -1658,6 +1658,12 @@ const dict: TranslationDict = {
   "plan.actual": { "zh-CN": "实际", "zh-HK": "實際", en: "Actual" },
   "plan.not_ready": { "zh-CN": "对比不可决策", "zh-HK": "對比不可決策", en: "Comparison not decision-ready" },
   "plan_import.title": { "zh-CN": "预算 / 计划版本导入", "zh-HK": "預算 / 計劃版本導入", en: "Budget / plan version import" },
+  "portfolio.go_settings": { "zh-CN": "前往参数配置", "zh-HK": "前往參數配置", en: "Open settings" },
+  "import.download_template": { "zh-CN": "下载模板", "zh-HK": "下載模板", en: "Download template" },
+  // Plain-language replacements for the snake_case column dumps that used to
+  // sit under each uploader; the raw lists moved behind an ℹ️ tooltip.
+  "plan_import.hint_plain": { "zh-CN": "请按模板填写门店与期间的经营计划数据；单行出错不影响其余行入库。", "zh-HK": "請按模板填寫門店與期間的經營計劃數據；單行出錯不影響其餘行入庫。", en: "Fill the template with store and period plan figures; a bad row never blocks the rest." },
+  "tb_import.hint_plain": { "zh-CN": "请按模板填写科目余额；同一来源与期间重复导入不会重复入账。", "zh-HK": "請按模板填寫科目餘額；同一來源與期間重複導入不會重複入賬。", en: "Fill the template with account balances; re-importing the same source and period will not double-post." },
   "plan_import.hint": { "zh-CN": "受控模板列：store_code, period(YYYY-MM), currency, revenue, gross_profit, labor_cost, fixed_rent, variable_rent, non_lease_cost, four_wall_ebitda；行级错误不影响其余行入库", "zh-HK": "受控模板列：store_code, period(YYYY-MM), currency, revenue, gross_profit, labor_cost, fixed_rent, variable_rent, non_lease_cost, four_wall_ebitda；行級錯誤不影響其餘行入庫", en: "Template columns: store_code, period (YYYY-MM), currency, revenue, gross_profit, labor_cost, fixed_rent, variable_rent, non_lease_cost, four_wall_ebitda; row errors never block the remaining rows" },
   "plan_import.name": { "zh-CN": "版本名称", "zh-HK": "版本名稱", en: "Version name" },
   "plan_import.version_type": { "zh-CN": "版本类型", "zh-HK": "版本類型", en: "Version type" },

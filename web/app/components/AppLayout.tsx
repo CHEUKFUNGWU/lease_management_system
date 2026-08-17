@@ -15,7 +15,6 @@ import {
   AuditOutlined,
   CalculatorOutlined,
   CheckSquareOutlined,
-  GlobalOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   DollarOutlined,
@@ -29,11 +28,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { hasRole, useAuth } from "../context/AuthContext";
-import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, useLanguage } from "../context/LanguageContext";
+import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { pageTransition } from "../design-system/animations";
 import GlobalSearch from "./GlobalSearch";
 import NotificationBell from "./NotificationBell";
+import ThemeToggle from "./ThemeToggle";
+import LanguageToggle from "./LanguageToggle";
 import BrandIcon from "./BrandIcon";
 
 const { Header, Sider, Content } = Layout;
@@ -154,7 +155,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { language, setLanguage } = useLanguage();
+  const { language } = useLanguage();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -286,32 +287,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Notifications */}
           <NotificationBell />
 
-          {/* Language switcher — shown only once more than one language is offered.
-              See SUPPORTED_LANGUAGES for why it is currently a single language. */}
-          {SUPPORTED_LANGUAGES.length > 1 && (
-            <Dropdown
-              menu={{
-                items: SUPPORTED_LANGUAGES.map((code) => ({
-                  key: code,
-                  label: LANGUAGE_LABELS[code],
-                  onClick: () => setLanguage(code),
-                })),
-              }}
-              placement="bottomRight"
-            >
-              <button
-                type="button"
-                aria-label={t("nav.language", language)}
-                aria-haspopup="menu"
-                className="app-language-button"
-              >
-                <GlobalOutlined className="app-language-icon" />
-                <span className="app-language-code">
-                  {language === "zh-CN" ? "CN" : language === "zh-HK" ? "HK" : "EN"}
-                </span>
-              </button>
-            </Dropdown>
-          )}
+          {/* DARK-001: theme toggle (follows OS by default, manual choice persists) */}
+          <ThemeToggle />
+
+          {/* I18N-003: shared with the login screen — see LanguageToggle. */}
+          <LanguageToggle />
 
           {/* Divider */}
           <div className="app-header-divider" />

@@ -420,6 +420,8 @@ const dict: TranslationDict = {
   "help.portfolio.title": { "zh-CN": "组合分析使用教程", "zh-HK": "組合分析使用教程", en: "Portfolio analysis guide" },
   "performance.load_failed": { "zh-CN": "经营数据加载失败", "zh-HK": "經營數據載入失敗", en: "Failed to load operating data" },
   "help.portfolio.flow.mode": { "zh-CN": "选 Working / Official", "zh-HK": "選 Working / Official", en: "Pick mode" },
+  "theme.switch_light": { "zh-CN": "切换到浅色", "zh-HK": "切換到淺色", en: "Switch to light" },
+  "theme.switch_dark": { "zh-CN": "切换到深色", "zh-HK": "切換到深色", en: "Switch to dark" },
   "help.portfolio.flow.group": { "zh-CN": "选分组维度", "zh-HK": "選分組維度", en: "Grouping" },
   "help.portfolio.flow.read": { "zh-CN": "读组合指标", "zh-HK": "讀組合指標", en: "Read metrics" },
   "help.portfolio.flow.export": { "zh-CN": "导出与下钻", "zh-HK": "導出與下鑽", en: "Export" },

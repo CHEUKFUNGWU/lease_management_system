@@ -10,6 +10,8 @@ import { t } from "../lib/i18n";
 import { ApiError, authApi } from "../lib/api";
 import { notifyError } from "../lib/notify";
 import BrandIcon from "../components/BrandIcon";
+import ThemeToggle from "../components/ThemeToggle";
+import LanguageToggle from "../components/LanguageToggle";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -65,6 +67,12 @@ export default function LoginPage() {
       </section>
 
       <section className="login-panel">
+        {/* DARK-003: the toggle lived only in the app header, so the one screen
+            every user meets first had no way to change theme. */}
+        <div className="login-panel-actions">
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
         <div className="login-panel-inner">
           <div className="login-lockup login-lockup-compact">
             <span className="login-badge" aria-hidden="true">

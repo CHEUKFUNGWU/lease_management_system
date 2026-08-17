@@ -34,7 +34,7 @@ func TestRetailPulseHandlerValidationAndEnvelope(t *testing.T) {
 		t.Fatalf("empty legal entity status=%d body=%s", emptyTenant.Code, emptyTenant.Body.String())
 	}
 	invalid := httptest.NewRecorder()
-	router.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/pulse?as_of=2026-01-31&window_days=6&data_classification=production", nil))
+	router.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/pulse?as_of=2026-01-31&window_days=0&data_classification=production", nil))
 	if invalid.Code != http.StatusBadRequest {
 		t.Fatalf("window validation status=%d", invalid.Code)
 	}

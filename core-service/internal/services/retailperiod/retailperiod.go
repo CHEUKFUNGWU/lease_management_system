@@ -33,12 +33,10 @@ const (
 const DefaultRollingDays = 14
 
 // MinRollingDays / MaxRollingDays bound the rolling range; the pulse handler
-// has always accepted any integer in between (window_days=8 is a legal URL),
-// and the 2026-08-16 decision keeps that range compatibility for custom
-// windows instead of tightening to the {7,14,28} UI options.
+// accepts custom windows (from single-day 1 to full-year 365).
 const (
-	MinRollingDays = 7
-	MaxRollingDays = 28
+	MinRollingDays = 1
+	MaxRollingDays = 365
 )
 
 // Period is the parsed, normalized request: either a rolling day count or a
@@ -64,7 +62,7 @@ type Window struct {
 var (
 	calendarMonthPattern   = regexp.MustCompile(`^(\d{4})-(0[1-9]|1[0-2])$`)
 	calendarQuarterPattern = regexp.MustCompile(`^(\d{4})-Q([1-4])$`)
-	rollingPattern         = regexp.MustCompile(`^(\d{1,2})$`)
+	rollingPattern         = regexp.MustCompile(`^(\d{1,3})$`)
 )
 
 // Parse resolves a period spec against the as-of anchor. Accepted forms:

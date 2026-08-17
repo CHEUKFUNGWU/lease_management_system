@@ -40,7 +40,7 @@ func TestErrorContractCarriesCodesWithoutChangingStatuses(t *testing.T) {
 	router := gin.New()
 	router.GET("/pulse", func(c *gin.Context) { c.Set("legal_entity_id", "entity-a"); handler.OperatingPulse(c) })
 	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/pulse?as_of=2026-01-31&data_classification=production&window_days=99", nil))
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/pulse?as_of=2026-01-31&data_classification=production&window_days=0", nil))
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("validation status=%d", recorder.Code)
 	}

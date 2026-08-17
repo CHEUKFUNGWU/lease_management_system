@@ -42,7 +42,7 @@ func TestParseRollingAcceptsCustomRangeDays(t *testing.T) {
 	if window.Period.Days != 8 || window.From.Format("2006-01-02") != "2026-08-09" {
 		t.Fatalf("window=%+v", window)
 	}
-	for _, invalid := range []string{"6", "29", "0", "99"} {
+	for _, invalid := range []string{"0", "366", "-1", "foo"} {
 		if _, err := Parse(invalid, date("2026-08-16")); err == nil {
 			t.Fatalf("rolling %q accepted", invalid)
 		}
@@ -149,7 +149,10 @@ func TestNormalizeAndDefault(t *testing.T) {
 	if _, err := ParseRollingDays(21); err != nil {
 		t.Fatalf("custom 21-day window rejected: %v", err)
 	}
-	if _, err := ParseRollingDays(30); err == nil {
-		t.Fatal("30-day rolling accepted")
+	if _, err := ParseRollingDays(30); err != nil {
+		t.Fatalf("custom 30-day window rejected: %v", err)
+	}
+	if _, err := ParseRollingDays(366); err == nil {
+		t.Fatal("366-day rolling accepted")
 	}
 }

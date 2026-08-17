@@ -484,8 +484,8 @@ func (s *Service) buildPartitions(set *repository.RetailKPIFactSet, query Query,
 		currentAgg, currentCoverage := totalAggregate(currentFacts, currentStart, currentEnd, expected)
 		comparisonAgg, comparisonCoverage := totalAggregate(comparisonFacts, comparisonStart, comparisonEnd, expected)
 		partition := Partition{Currency: currency, Current: Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")}, Comparison: Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")}, CurrentCoverage: currentCoverage, ComparisonCoverage: comparisonCoverage, DecisionReady: currentAgg != nil && comparisonAgg != nil && currentAgg.DecisionReady && comparisonAgg.DecisionReady}
-		if currentAgg != nil && comparisonAgg != nil {
-			partition.Summary = buildSummary(*currentAgg, *comparisonAgg)
+		if currentAgg != nil || comparisonAgg != nil {
+			partition.Summary = buildSummary(currentAgg, comparisonAgg)
 		}
 		partition.Attention, partition.SuppressedAttention = buildAttention(facts, currency, query, query.AttentionLimit, currentStart, currentEnd, comparisonStart, comparisonEnd, set)
 		partition.DailyTrend = buildTrend(facts, currency, currentStart, currentEnd, expected)
@@ -560,13 +560,23 @@ func totalAggregate(facts []retailkpi.DailyFact, from, to time.Time, expected in
 	return &rows[0], coverage
 }
 
-func buildSummary(current, comparison retailkpi.Aggregate) map[string]SummaryMetric {
+func buildSummary(current, comparison *retailkpi.Aggregate) map[string]SummaryMetric {
 	result := map[string]SummaryMetric{}
 	for _, code := range []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "transactions", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"} {
-		currentKPI, comparisonKPI := current.KPIs[code], comparison.KPIs[code]
+		var currentKPI, comparisonKPI retailkpi.KPIValue
+		if current != nil {
+			currentKPI = current.KPIs[code]
+		} else {
+			currentKPI = retailkpi.KPIValue{Status: retailkpi.StatusUnavailable, Reason: "missing_current_facts"}
+		}
+		if comparison != nil {
+			comparisonKPI = comparison.KPIs[code]
+		} else {
+			comparisonKPI = retailkpi.KPIValue{Status: retailkpi.StatusUnavailable, Reason: "missing_comparison_facts"}
+		}
 		metric := SummaryMetric{Current: currentKPI, Comparison: comparisonKPI, ChangeType: retailkpi.ChangeRateType(code), Status: summaryStatus(currentKPI, comparisonKPI)}
 		metric.ChangeValue, metric.Reason = retailkpi.ChangeRate(currentKPI.Value, comparisonKPI.Value, metric.ChangeType)
-		if code == "store_contribution" {
+		if code == "store_contribution" && current != nil && comparison != nil {
 			metric.ChangeMarginPP = changeRate(current.KPIs["store_contribution_margin"].Value, comparison.KPIs["store_contribution_margin"].Value)
 		}
 		result[code] = metric
@@ -575,8 +585,11 @@ func buildSummary(current, comparison retailkpi.Aggregate) map[string]SummaryMet
 }
 
 func summaryStatus(current, comparison retailkpi.KPIValue) string {
-	if current.Status == retailkpi.StatusUnavailable || comparison.Status == retailkpi.StatusUnavailable {
+	if current.Status == retailkpi.StatusUnavailable && comparison.Status == retailkpi.StatusUnavailable {
 		return string(retailkpi.StatusUnavailable)
+	}
+	if current.Status == retailkpi.StatusUnavailable || comparison.Status == retailkpi.StatusUnavailable {
+		return string(retailkpi.StatusPartial)
 	}
 	if current.Status != retailkpi.StatusComplete || comparison.Status != retailkpi.StatusComplete {
 		return string(retailkpi.StatusPartial)

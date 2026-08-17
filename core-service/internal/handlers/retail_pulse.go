@@ -63,7 +63,7 @@ func (h *RetailPulseHandler) OperatingPulse(c *gin.Context) {
 		}
 		parsed, parseErr := strconv.Atoi(raw)
 		if parseErr != nil {
-			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 1 and 365", nil)
 			return
 		}
 		windowDays = parsed
@@ -77,8 +77,8 @@ func (h *RetailPulseHandler) OperatingPulse(c *gin.Context) {
 		}
 		attentionLimit = parsed
 	}
-	if periodSpec == "" && (windowDays < 7 || windowDays > 28) {
-		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 7 and 28", nil)
+	if periodSpec == "" && (windowDays < 1 || windowDays > 365) {
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "window_days must be an integer between 1 and 365", nil)
 		return
 	}
 	if attentionLimit < 1 || attentionLimit > 50 {

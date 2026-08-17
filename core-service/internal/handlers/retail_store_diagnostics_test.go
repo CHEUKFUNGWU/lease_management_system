@@ -65,9 +65,7 @@ func TestRetailStoreDiagnosticsHandlerValidationAndOptions(t *testing.T) {
 		t.Fatalf("simulated dataset status=%d", simulatedDataset.Code)
 	}
 	badWindow := httptest.NewRecorder()
-	r.ServeHTTP(badWindow, httptest.NewRequest(http.MethodGet, "/diagnostics/00000000-0000-0000-0000-000000000001?data_classification=simulated&dataset_version=planA-v1&as_of=2026-06-14&window_days=5", nil))
-	// M2 range contract: 8 is a legal custom window now (pulse always
-	// accepted it); 5 is genuinely out of range.
+	r.ServeHTTP(badWindow, httptest.NewRequest(http.MethodGet, "/diagnostics/00000000-0000-0000-0000-000000000001?data_classification=simulated&dataset_version=planA-v1&as_of=2026-06-14&window_days=0", nil))
 	if badWindow.Code != http.StatusBadRequest {
 		t.Fatalf("bad window status=%d", badWindow.Code)
 	}

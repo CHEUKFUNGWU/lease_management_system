@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtMoney } from "./format";
+import { fmtDate, fmtMoney } from "./format";
 
 describe("fmtMoney", () => {
   // The point of the function: an amount measured in one currency must never be
@@ -38,5 +38,31 @@ describe("fmtMoney", () => {
   it("renders negative amounts with accounting parentheses", () => {
     expect(fmtMoney(-1234.5, "USD")).toContain("(US$");
     expect(fmtMoney(-1234.5, "USD")).toContain("1,234.50)");
+  });
+});
+
+describe("fmtDate", () => {
+  it("drops the timestamp the API appends to a calendar date", () => {
+    expect(fmtDate("2024-01-01T00:00:00Z")).toBe("2024-01-01");
+  });
+
+  it("keeps the calendar day regardless of the viewer's timezone", () => {
+    // The trap this guards: `new Date("2024-01-01T00:00:00Z")` rendered in a
+    // negative-offset zone yields 2023-12-31 — a lease that commences a day
+    // early. Slicing the string cannot drift.
+    const original = process.env.TZ;
+    process.env.TZ = "America/Los_Angeles";
+    expect(fmtDate("2024-01-01T00:00:00Z")).toBe("2024-01-01");
+    process.env.TZ = original;
+  });
+
+  it("passes through a bare date and dashes an empty one", () => {
+    expect(fmtDate("2024-06-30")).toBe("2024-06-30");
+    expect(fmtDate(null)).toBe("—");
+    expect(fmtDate("")).toBe("—");
+  });
+
+  it("returns an unrecognised value unchanged rather than inventing a date", () => {
+    expect(fmtDate("not a date")).toBe("not a date");
   });
 });

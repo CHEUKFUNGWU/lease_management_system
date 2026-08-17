@@ -258,7 +258,7 @@ export function ContractWorkspaceDialogs({
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item label={t("contract.currency", language)} name="currency">
-                  <Input placeholder="ISO 4217" />
+                  <Input placeholder="CNY" />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -717,7 +717,7 @@ export function ContractWorkspaceDialogs({
                   name="currency"
                   rules={[{ required: true, message: t("contract_detail.validation.currency", language) }]}
                 >
-                  <Input placeholder="ISO 4217" />
+                  <Input placeholder="CNY" />
                 </Form.Item>
               </Col>
               <Col span={12}>

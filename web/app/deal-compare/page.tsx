@@ -167,7 +167,7 @@ export default function DealComparePage() {
                 </Col>
                 <Col xs={24} md={8}>
                   <Form.Item label={t("deal_compare.label_currency", language)} name="currency" rules={[{ required: true, message: t("deal_compare.err_currency", language) }]}>
-                    <Input placeholder="ISO 4217" />
+                    <Input placeholder="CNY" />
                   </Form.Item>
                 </Col>
               </Row>

@@ -87,7 +87,7 @@ export default function RoiPage() {
                   <Input
                     value={currencyCode}
                     onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())}
-                    placeholder="ISO 4217"
+                    placeholder="CNY"
                     style={{ width: "100%", marginTop: 6 }}
                   />
                 </label>

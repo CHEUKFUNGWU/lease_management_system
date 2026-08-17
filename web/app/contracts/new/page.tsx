@@ -269,7 +269,7 @@ export default function NewContractPage() {
               name="currency"
               rules={[{ required: true }]}
             >
-              <Input placeholder="ISO 4217" />
+              <Input placeholder="CNY" />
             </Form.Item>
 
             <Form.Item label="资产类型" name="asset_type" rules={[{ required: true, message: "请选择资产类型" }]}>

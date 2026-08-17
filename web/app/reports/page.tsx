@@ -827,7 +827,7 @@ function ReportsPageContent() {
                                   value={reportCurrency}
                                   onChange={(e) => { setReportCurrency(e.target.value.toUpperCase()); setAmortFetched(false); }}
                                   className="sty-51a6ccfa"
-                                  placeholder="ISO 4217"
+                                  placeholder="CNY"
                                   allowClear
                                 />
                               </div>

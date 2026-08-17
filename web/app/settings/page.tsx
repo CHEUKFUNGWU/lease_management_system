@@ -617,14 +617,14 @@ export default function SettingsPage() {
               style={{ width: 90 }}
               value={rateForm.from_currency}
               onChange={(e) => setRateForm({ ...rateForm, from_currency: e.target.value.toUpperCase() })}
-              placeholder="ISO 4217"
+              placeholder="CNY"
             />
             <span>→</span>
             <Input
               style={{ width: 90 }}
               value={rateForm.to_currency}
               onChange={(e) => setRateForm({ ...rateForm, to_currency: e.target.value.toUpperCase() })}
-              placeholder="ISO 4217"
+              placeholder="CNY"
             />
             <Input
               style={{ width: 140 }}

@@ -35,7 +35,7 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { StatusTag, type StatusKind } from "../components/StatusTag";
-import { fmtMoney } from "../lib/format";
+import { fmtDate, fmtMoney } from "../lib/format";
 import { useUrlState } from "../hooks/useUrlState";
 import { useRetailQuery } from "../retail/useRetailQuery";
 
@@ -323,7 +323,7 @@ function ContractsPage() {
       width: 130,
       render: (text: string) => (
         <span className="sty-0e5391a4">
-          {text}
+          {fmtDate(text)}
         </span>
       ),
     },
@@ -335,7 +335,7 @@ function ContractsPage() {
       width: 130,
       render: (text: string) => (
         <span className="sty-5e6ef0d9">
-          {text}
+          {fmtDate(text)}
         </span>
       ),
     },

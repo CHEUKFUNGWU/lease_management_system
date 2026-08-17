@@ -39,19 +39,21 @@ interface PortfolioRow {
   latest_lease_end_date?: string;
 }
 
+// Module scope has no language, so these map codes to i18n keys and the
+// render sites do the lookup.
 const assetTypeLabels: Record<string, string> = {
-  real_estate: "不动产",
-  vehicle: "车辆",
-  it_equipment: "IT 设备",
-  machinery: "机器设备",
-  other: "其他",
+  real_estate: "pf.asset.real_estate",
+  vehicle: "pf.asset.vehicle",
+  it_equipment: "pf.asset.it",
+  machinery: "pf.asset.machinery",
+  other: "pf.asset.other",
 };
 
 const leaseScopeLabels: Record<string, string> = {
-  in_scope: "资本化租赁",
-  short_term_exempt: "短期豁免",
-  low_value_exempt: "低价值豁免",
-  not_a_lease: "非租赁",
+  in_scope: "pf.class.capitalised",
+  short_term_exempt: "pf.class.short_term",
+  low_value_exempt: "pf.class.low_value",
+  not_a_lease: "pf.class.non_lease",
 };
 
 const scopeColors: Record<string, string> = {
@@ -78,9 +80,16 @@ interface UnitPriceRow {
 type UnitPriceGrouping = "store" | "brand" | "region";
 
 const groupingLabels: Record<UnitPriceGrouping, string> = {
-  store: "按门店",
-  brand: "按品牌",
-  region: "按区域",
+  store: "pf.group_store",
+  brand: "pf.group_brand",
+  region: "pf.group_region",
+};
+
+/** The bare dimension noun, for the column header. */
+const groupingDimensions: Record<UnitPriceGrouping, string> = {
+  store: "pf.dim.store",
+  brand: "pf.dim.brand",
+  region: "pf.dim.region",
 };
 
 const fmt = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -168,7 +177,7 @@ function PortfolioPage() {
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           <Space direction="vertical" size={16} style={{ width: "100%" }}>
             <PageHeader
-              title="租赁组合分析"
+              title={t("pf.title", language)}
               help={<HelpTrigger content={portfolioHelpContent(language)} language={language} />}
 
               primaryAction={
@@ -200,24 +209,24 @@ function PortfolioPage() {
             <Alert
               type={mode === "official" ? "success" : "info"}
               showIcon
-              message={mode === "official" ? "Official 模式仅包含已审批合同" : "Working 模式包含草稿、复核中和已审批合同"}
+              message={mode === "official" ? t("pf.mode_official", language) : t("pf.mode_working", language)}
             />
 
             <Row gutter={16}>
               <Col xs={24} md={6}>
                 <Card>
-                  <Statistic title="合同数" value={totals.contracts} />
+                  <Statistic title={t("pf.kpi.contracts", language)} value={totals.contracts} />
                 </Card>
               </Col>
               <Col xs={24} md={6}>
                 <Card>
-                  <Statistic title="有效合同" value={totals.active} />
+                  <Statistic title={t("pf.kpi.active", language)} value={totals.active} />
                 </Card>
               </Col>
               <Col xs={24} md={6}>
                 <Card>
                   <Statistic
-                    title={totalsCurrency ? "固定租赁承诺" : "固定租赁承诺（多币种合计）"}
+                    title={totalsCurrency ? t("pf.kpi.fixed_commitment", language) : t("pf.kpi.fixed_commitment_multi", language)}
                     value={totals.fixed}
                     precision={2}
                     formatter={() => fmtMoney(totals.fixed, totalsCurrency)}
@@ -226,19 +235,19 @@ function PortfolioPage() {
               </Col>
               <Col xs={24} md={6}>
                 <Card>
-                  <Statistic title="缺失折现率" value={totals.missingRates} valueStyle={{ color: totals.missingRates ? "var(--state-error-text)" : undefined }} />
+                  <Statistic title={t("pf.kpi.missing_rate", language)} value={totals.missingRates} valueStyle={{ color: totals.missingRates ? "var(--state-error-text)" : undefined }} />
                 </Card>
               </Col>
             </Row>
 
             <Card
-              title="每平米月租对比"
+              title={t("pf.card.rent_per_sqm", language)}
               extra={
                 <Segmented
                   value={grouping}
                   onChange={(value) => setGroupingParam(value as string)}
                   options={(["store", "brand", "region"] as UnitPriceGrouping[]).map((value) => ({
-                    label: groupingLabels[value],
+                    label: t(groupingLabels[value], language),
                     value,
                   }))}
                 />
@@ -252,8 +261,8 @@ function PortfolioPage() {
                   type="warning"
                   showIcon
                   style={{ marginBottom: 12 }}
-                  message={`有 ${contractsWithoutArea} 份合同未填写租赁面积，未纳入单价计算`}
-                  description="补齐合同的租赁面积后，单价与对比结果才覆盖完整组合。"
+                  message={t("pf.missing_area_warning", language).replace("{count}", String(contractsWithoutArea))}
+                  description={t("pf.missing_area_desc", language)}
                 />
               )}
               <Table
@@ -263,12 +272,12 @@ function PortfolioPage() {
                 pagination={{ pageSize: 10 }}
                 size="small"
                 scroll={tableScrollX(unitPriceRows.length, 900)}
-                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可比数据：请先为合同填写租赁面积" /> }}
+                locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pf.no_area_data", language)} /> }}
                 columns={[
-                  { title: groupingLabels[grouping].replace("按", ""), dataIndex: "group_label" },
-                  { title: "币种", dataIndex: "currency", width: 80 },
+                  { title: t(groupingDimensions[grouping], language), dataIndex: "group_label" },
+                  { title: t("pf.col.currency", language), dataIndex: "currency", width: 80 },
                   {
-                    title: "每平米月租",
+                    title: t("pf.col.rent_per_sqm", language),
                     dataIndex: "monthly_rent_per_sqm",
                     width: 130,
                     align: "right" as const,
@@ -276,28 +285,28 @@ function PortfolioPage() {
                     render: (value: number) => <strong>{fmt(value)}</strong>,
                   },
                   {
-                    title: "租赁面积 (㎡)",
+                    title: t("pf.col.area", language),
                     dataIndex: "total_area_sqm",
                     width: 120,
                     align: "right" as const,
                     render: fmt,
                   },
                   {
-                    title: "月均固定租金",
+                    title: t("pf.col.monthly_fixed_rent", language),
                     dataIndex: "monthly_fixed_rent",
                     width: 130,
                     align: "right" as const,
                     render: fmt,
                   },
                   {
-                    title: "年化固定租金",
+                    title: t("pf.col.annual_fixed_rent", language),
                     dataIndex: "annual_fixed_rent",
                     width: 130,
                     align: "right" as const,
                     render: fmt,
                   },
                   {
-                    title: "面积覆盖",
+                    title: t("pf.col.area_coverage", language),
                     key: "coverage",
                     width: 110,
                     render: (_: unknown, row: UnitPriceRow) => (
@@ -312,7 +321,7 @@ function PortfolioPage() {
 
             <RentToSalesPanel token={token} />
 
-            <Card title="组合明细">
+            <Card title={t("pf.card.detail", language)}>
               <Table
                 loading={loading}
                 dataSource={rows}
@@ -322,54 +331,54 @@ function PortfolioPage() {
                 scroll={tableScrollX(rows.length, 1120)}
                 columns={[
                   {
-                    title: "资产类型",
+                    title: t("pf.col.asset_type", language),
                     dataIndex: "asset_type",
                     width: 130,
                     fixed: "left",
-                    render: (value: string) => assetTypeLabels[value] || value,
+                    render: (value: string) => (assetTypeLabels[value] ? t(assetTypeLabels[value], language) : value),
                   },
                   {
-                    title: "范围",
+                    title: t("pf.col.scope", language),
                     dataIndex: "lease_scope",
                     width: 130,
                     fixed: "left",
-                    render: (value: string) => <StatusTag kind={statusKindFromAntColor(scopeColors[value])}>{leaseScopeLabels[value] || value}</StatusTag>,
+                    render: (value: string) => <StatusTag kind={statusKindFromAntColor(scopeColors[value])}>{leaseScopeLabels[value] ? t(leaseScopeLabels[value], language) : value}</StatusTag>,
                   },
-                  { title: "币种", dataIndex: "currency", width: 80 },
-                  { title: "合同数", dataIndex: "contract_count", width: 90, align: "right" },
-                  { title: "已审批", dataIndex: "approved_count", width: 90, align: "right" },
-                  { title: "有效合同", dataIndex: "active_contract_count", width: 90, align: "right" },
+                  { title: t("pf.col.currency", language), dataIndex: "currency", width: 80 },
+                  { title: t("pf.kpi.contracts", language), dataIndex: "contract_count", width: 90, align: "right" },
+                  { title: t("pf.approved", language), dataIndex: "approved_count", width: 90, align: "right" },
+                  { title: t("pf.kpi.active", language), dataIndex: "active_contract_count", width: 90, align: "right" },
                   {
-                    title: "固定租赁承诺",
+                    title: t("pf.kpi.fixed_commitment", language),
                     dataIndex: "fixed_lease_commitment",
                     width: 150,
                     align: "right",
                     render: (value: number) => fmt(value),
                   },
                   {
-                    title: "变量租金暴露",
+                    title: t("pf.kpi.variable_exposure", language),
                     dataIndex: "variable_rent_exposure",
                     width: 140,
                     align: "right",
                     render: (value: number) => fmt(value),
                   },
                   {
-                    title: "非租赁成分",
+                    title: t("pf.kpi.non_lease", language),
                     dataIndex: "non_lease_component_amount",
                     width: 140,
                     align: "right",
                     render: (value: number) => fmt(value),
                   },
-                  { title: "付款行数", dataIndex: "payment_count", width: 90, align: "right" },
+                  { title: t("pf.col.payment_rows", language), dataIndex: "payment_count", width: 90, align: "right" },
                   {
-                    title: "折现率缺失",
+                    title: t("pf.col.missing_rate", language),
                     dataIndex: "missing_discount_rate_count",
                     width: 110,
                     align: "right",
                     render: (value: number) => value ? <StatusTag kind="error">{value}</StatusTag> : <StatusTag kind="success">0</StatusTag>,
                   },
-                  { title: "最早开始日", dataIndex: "earliest_commencement_date", width: 120, render: (value: string) => fmtDate(value) },
-                  { title: "最晚结束日", dataIndex: "latest_lease_end_date", width: 120, render: (value: string) => fmtDate(value) },
+                  { title: t("pf.col.earliest_start", language), dataIndex: "earliest_commencement_date", width: 120, render: (value: string) => fmtDate(value) },
+                  { title: t("pf.col.latest_end", language), dataIndex: "latest_lease_end_date", width: 120, render: (value: string) => fmtDate(value) },
                 ]}
               />
             </Card>

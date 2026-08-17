@@ -751,26 +751,42 @@ function SessionSidebar({
 
   return (
     <div
-     className="ai-chat-session-sidebar sty-8b7f5990 sty-70ad7596">
+      className="ai-chat-session-sidebar"
+      style={{
+        width: 260,
+        height: "100%",
+        borderRight: "1px solid var(--border-default)",
+        background: "var(--bg-surface)",
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+      }}
+    >
       {/* Header */}
       <div
-        className="sty-bd560a9e"
+        style={{
+          padding: "16px",
+          borderBottom: "1px solid var(--border-default)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
       >
-        <span className="sty-73be230f">
+        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--fg-primary)" }}>
           {t("nav.ai_chat", language)}
         </span>
-         <Tooltip title={t("ai.new_session_btn", language)}>
+        <Tooltip title={t("ai.new_session_btn", language)}>
           <Button
             type="text"
+            size="small"
             icon={<PlusOutlined />}
             onClick={onNew}
-            className="sty-1abe0e2d"
           />
         </Tooltip>
       </div>
 
       {/* Session List */}
-      <div className="sty-083a8ea2">
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 8px" }}>
         {sessions.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -1816,7 +1832,15 @@ function AIChatPageContent() {
     <ProtectedRoute>
       <AppLayout>
         <div
-         className="ai-chat-shell sty-f0618391 sty-ad852cb6">
+          className="ai-chat-shell"
+          style={{
+            display: "flex",
+            height: "calc(100vh - 64px)",
+            margin: "-24px",
+            background: "var(--bg-page)",
+            overflow: "hidden",
+          }}
+        >
           {/* Session Sidebar */}
           {responsiveState.showDesktopSidebar && (
             <SessionSidebar
@@ -1829,12 +1853,31 @@ function AIChatPageContent() {
           )}
 
           {/* Chat Area */}
-          <div className="sty-cf94ad70">
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minWidth: 0,
+              background: "var(--bg-page)",
+              overflow: "hidden",
+            }}
+          >
             {/* Top Bar */}
             <div
-              className="sty-99f2d520"
+              style={{
+                height: 56,
+                borderBottom: "1px solid var(--border-default)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "0 24px",
+                background: "var(--bg-elevated)",
+                flexShrink: 0,
+              }}
             >
-              <div className="ai-chat-header-left sty-99f2d520 sty-73be230f" >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {responsiveState.showMobileSessionTrigger && (
                   <Button
                     ref={sessionDrawerTriggerRef}
@@ -1842,16 +1885,15 @@ function AIChatPageContent() {
                     aria-label="打开会话"
                     icon={<MessageOutlined />}
                     onClick={() => transitionSessionDrawer("open")}
-                    className="sty-d35324fb"
                   />
                 )}
-                <RobotOutlined className="sty-94360367" />
-                <span className="ai-chat-header-title sty-94360367 sty-9b426ce2" >
+                <RobotOutlined style={{ fontSize: 16, color: "var(--fg-primary)" }} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg-primary)" }}>
                   {activeSession?.title || t("ai.assistant_name", language)}
                 </span>
               </div>
 
-              <div className="ai-chat-header-actions sty-9b426ce2 sty-b8bb6f7b" >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {/* Model Selector */}
                 <Dropdown
                   menu={{
@@ -1864,21 +1906,21 @@ function AIChatPageContent() {
                 >
                   <Button
                     type="text"
-                    className="ai-chat-model-button sty-b8bb6f7b sty-d2b9dfbe"
+                    size="small"
+                    style={{ fontSize: 12, borderRadius: 6 }}
                     aria-label={`选择模型，当前 ${MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}`}
                   >
-                    <span className="ai-chat-model-label">{MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}</span>
-                    <span className="ai-chat-model-short" aria-hidden="true">AI</span>
-                    <DownOutlined className="sty-73be230f" />
+                    <span>{MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}</span>
+                    <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />
                   </Button>
                 </Dropdown>
 
-        <Tooltip title={t("ai.new_session_btn", language)}>
+                <Tooltip title={t("ai.new_session_btn", language)}>
                   <Button
                     type="text"
+                    size="small"
                     icon={<PlusOutlined />}
                     onClick={createNewSession}
-                    className="sty-20b42614"
                   />
                 </Tooltip>
               </div>
@@ -1886,7 +1928,19 @@ function AIChatPageContent() {
 
             {/* Messages Area */}
             <div
-             className="ai-chat-messages sty-20b42614 sty-cdfdac9c">
+              className="ai-chat-messages"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "24px 32px",
+                maxWidth: 960,
+                width: "100%",
+                margin: "0 auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
               {/* Context strip */}
               {pageContext && (
                 <motion.div
@@ -2411,135 +2465,139 @@ function AIChatPageContent() {
                 padding: "16px 24px 20px",
                 background: "var(--bg-page)",
                 borderTop: "1px solid var(--border-default)",
+                width: "100%",
+                flexShrink: 0,
               }}
             >
-              {activePendingUpload && (
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "4px 10px",
-                    background: "var(--bg-inset)",
-                    borderRadius: 6,
-                    fontSize: 12,
-                    marginBottom: 8,
-                    border: "1px solid var(--border-default)",
-                  }}
-                >
-                  <PaperClipOutlined style={{ color: "var(--fg-muted)" }} />
-                  <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {activePendingUpload.original_name}
-                  </span>
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<CloseCircleOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
-                    onClick={() => activeSessionId && setPendingUpload(activeSessionId, null)}
-                    style={{ padding: 0, height: 16, width: 16 }}
-                  />
-                </div>
-              )}
-              <div
-                className="chat-input-wrapper"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 14px",
-                  background: "var(--bg-elevated)",
-                  borderRadius: 24,
-                  border: "1px solid var(--border-default)",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                  transition: "border-color 0.2s, box-shadow 0.2s",
-                }}
-              >
-                <Upload
-                  customRequest={handleFileUpload}
-                  showUploadList={false}
-                  disabled={loading}
-                  beforeUpload={(file) => {
-                    const allowedTypes = [
-                      "application/pdf",
-                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                      "application/vnd.ms-excel",
-                      "image/jpeg",
-                      "image/png",
-                      "image/tiff",
-                    ];
-                    if (!allowedTypes.includes(file.type)) {
-                      notifyError(t("ai.unsupported_file", language));
-                      return Upload.LIST_IGNORE;
-                    }
-                    const isLt50M = file.size / 1024 / 1024 < 50;
-                    if (!isLt50M) {
-                      notifyError(t("ai.file_too_large", language));
-                      return Upload.LIST_IGNORE;
-                    }
-                    return true;
-                  }}
-                >
-                  <Tooltip title={t("ai.upload_file_tooltip", language)}>
+              <div style={{ maxWidth: 960, width: "100%", margin: "0 auto" }}>
+                {activePendingUpload && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "4px 10px",
+                      background: "var(--bg-inset)",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      marginBottom: 8,
+                      border: "1px solid var(--border-default)",
+                    }}
+                  >
+                    <PaperClipOutlined style={{ color: "var(--fg-muted)" }} />
+                    <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {activePendingUpload.original_name}
+                    </span>
                     <Button
                       type="text"
-                      shape="circle"
-                      icon={<PaperClipOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />}
-                      disabled={loading}
-                      style={{ width: 32, height: 32 }}
+                      size="small"
+                      icon={<CloseCircleOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
+                      onClick={() => activeSessionId && setPendingUpload(activeSessionId, null)}
+                      style={{ padding: 0, height: 16, width: 16 }}
                     />
-                  </Tooltip>
-                </Upload>
-
-                <TextArea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t("ai.placeholder", language)}
-                  autoSize={{ minRows: 1, maxRows: 6 }}
+                  </div>
+                )}
+                <div
+                  className="chat-input-wrapper"
                   style={{
-                    flex: 1,
-                    background: "transparent",
-                    border: "none",
-                    boxShadow: "none",
-                    resize: "none",
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    padding: "4px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 14px",
+                    background: "var(--bg-elevated)",
+                    borderRadius: 24,
+                    border: "1px solid var(--border-default)",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                    transition: "border-color 0.2s, box-shadow 0.2s",
                   }}
-                  onFocus={(e) => {
-                    const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
-                    if (parent) {
-                      parent.style.borderColor = "var(--fg-primary)";
-                      parent.style.boxShadow = "0 2px 12px rgba(0, 0, 0, 0.08)";
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
-                    if (parent) {
-                      parent.style.borderColor = "var(--border-default)";
-                      parent.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.04)";
-                    }
-                  }}
-                />
-
-                <Button
-                  type="primary"
-                  shape="circle"
-                  icon={<SendOutlined style={{ fontSize: 13 }} />}
-                  onClick={() => handleSend()}
-                  loading={loading}
-                  disabled={loading || (!input.trim() && !activePendingUpload)}
-                  style={{ width: 32, height: 32 }}
-                />
-              </div>
-
-              <div style={{ textAlign: "center", marginTop: 8 }}>
-                <Text
-                  type="secondary"
-                  style={{ fontSize: 11, color: "var(--fg-muted)" }}
                 >
-                  {t("ai.disclaimer", language)}
-                </Text>
+                  <Upload
+                    customRequest={handleFileUpload}
+                    showUploadList={false}
+                    disabled={loading}
+                    beforeUpload={(file) => {
+                      const allowedTypes = [
+                        "application/pdf",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "application/vnd.ms-excel",
+                        "image/jpeg",
+                        "image/png",
+                        "image/tiff",
+                      ];
+                      if (!allowedTypes.includes(file.type)) {
+                        notifyError(t("ai.unsupported_file", language));
+                        return Upload.LIST_IGNORE;
+                      }
+                      const isLt50M = file.size / 1024 / 1024 < 50;
+                      if (!isLt50M) {
+                        notifyError(t("ai.file_too_large", language));
+                        return Upload.LIST_IGNORE;
+                      }
+                      return true;
+                    }}
+                  >
+                    <Tooltip title={t("ai.upload_file_tooltip", language)}>
+                      <Button
+                        type="text"
+                        shape="circle"
+                        icon={<PaperClipOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />}
+                        disabled={loading}
+                        style={{ width: 32, height: 32 }}
+                      />
+                    </Tooltip>
+                  </Upload>
+
+                  <TextArea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t("ai.placeholder", language)}
+                    autoSize={{ minRows: 1, maxRows: 6 }}
+                    style={{
+                      flex: 1,
+                      background: "transparent",
+                      border: "none",
+                      boxShadow: "none",
+                      resize: "none",
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      padding: "4px 0",
+                    }}
+                    onFocus={(e) => {
+                      const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
+                      if (parent) {
+                        parent.style.borderColor = "var(--fg-primary)";
+                        parent.style.boxShadow = "0 2px 12px rgba(0, 0, 0, 0.08)";
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
+                      if (parent) {
+                        parent.style.borderColor = "var(--border-default)";
+                        parent.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.04)";
+                      }
+                    }}
+                  />
+
+                  <Button
+                    type="primary"
+                    shape="circle"
+                    icon={<SendOutlined style={{ fontSize: 13 }} />}
+                    onClick={() => handleSend()}
+                    loading={loading}
+                    disabled={loading || (!input.trim() && !activePendingUpload)}
+                    style={{ width: 32, height: 32 }}
+                  />
+                </div>
+
+                <div style={{ textAlign: "center", marginTop: 8 }}>
+                  <Text
+                    type="secondary"
+                    style={{ fontSize: 11, color: "var(--fg-muted)" }}
+                  >
+                    {t("ai.disclaimer", language)}
+                  </Text>
+                </div>
               </div>
             </div>
           </div>

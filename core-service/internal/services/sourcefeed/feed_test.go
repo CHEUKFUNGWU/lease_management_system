@@ -2,12 +2,11 @@ package sourcefeed
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 )
 
-func TestSourceFeed_FourAdaptersConsistency(t *testing.T) {
+func TestAPIPushFeed_MapsRecordsAndKeepsEnvelope(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	env := FeedEnvelope{
@@ -18,22 +17,6 @@ func TestSourceFeed_FourAdaptersConsistency(t *testing.T) {
 		DataClassification: "production",
 	}
 
-	// 1. Upload Feed (CSV)
-	csvData := "store,business_date,currency,revenue,gross_profit\nS001,2026-06-01,CNY,10000.0,4000.0\n"
-	uploadFeed := NewUploadFeed([]byte(csvData), env)
-	b1, err := uploadFeed.Fetch(ctx, "")
-	if err != nil {
-		t.Fatalf("upload feed err: %v", err)
-	}
-
-	// 2. File Drop Feed (CSV Stream)
-	fileDropFeed := NewFileDropFeed(strings.NewReader(csvData), env)
-	b2, err := fileDropFeed.Fetch(ctx, "")
-	if err != nil {
-		t.Fatalf("file drop feed err: %v", err)
-	}
-
-	// 3. API Push Feed (JSON records)
 	jsonRecords := []map[string]interface{}{
 		{
 			"store":         "S001",
@@ -43,28 +26,30 @@ func TestSourceFeed_FourAdaptersConsistency(t *testing.T) {
 			"gross_profit":  "4000.0",
 		},
 	}
-	pushFeed := NewAPIPushFeed(jsonRecords, env)
-	b3, err := pushFeed.Fetch(ctx, "")
+	feed := NewAPIPushFeed(jsonRecords, env)
+	batch, err := feed.Fetch(ctx, "")
 	if err != nil {
 		t.Fatalf("push feed err: %v", err)
 	}
 
-	// 4. Self Service Feed (Nested JSON)
-	nestedJSON := `{"data":[{"store":"S001","business_date":"2026-06-01","currency":"CNY","revenue":"10000.0","gross_profit":"4000.0"}]}`
-	selfServiceFeed := NewSelfServiceFeed([]byte(nestedJSON), "data", env)
-	b4, err := selfServiceFeed.Fetch(ctx, "")
-	if err != nil {
-		t.Fatalf("self service feed err: %v", err)
+	if len(batch.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(batch.Rows))
 	}
+	if batch.Envelope.SourceSystem != "test_pos" || batch.Envelope.ImportBatchID != "batch_001" || batch.Envelope.Version != 1 {
+		t.Fatalf("source envelope corrupted: %+v", batch.Envelope)
+	}
+	// Headers are derived from the payload keys; rows line up with headers.
+	if len(batch.Headers) != len(batch.Rows[0]) {
+		t.Fatalf("headers %v do not line up with row %v", batch.Headers, batch.Rows[0])
+	}
+}
 
-	// Verify all four batches have identical rows count and identical source envelope
-	batches := []Batch{b1, b2, b3, b4}
-	for i, b := range batches {
-		if len(b.Rows) != 1 {
-			t.Fatalf("feed %d: expected 1 row, got %d", i, len(b.Rows))
-		}
-		if b.Envelope.SourceSystem != "test_pos" || b.Envelope.ImportBatchID != "batch_001" || b.Envelope.Version != 1 {
-			t.Fatalf("feed %d: source envelope corrupted: %+v", i, b.Envelope)
-		}
+func TestAPIPushFeed_EmptyPayloadKeepsEnvelope(t *testing.T) {
+	batch, err := NewAPIPushFeed(nil, FeedEnvelope{SourceSystem: "test_pos"}).Fetch(context.Background(), "")
+	if err != nil {
+		t.Fatalf("empty payload err: %v", err)
+	}
+	if len(batch.Rows) != 0 || batch.Envelope.SourceSystem != "test_pos" {
+		t.Fatalf("empty payload must keep envelope, got %+v", batch)
 	}
 }

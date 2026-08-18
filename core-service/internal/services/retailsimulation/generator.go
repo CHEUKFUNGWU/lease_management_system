@@ -239,7 +239,7 @@ func buildAnomalies(stores []StorePlan, from time.Time, days int) []Anomaly {
 		{"occupancy-burden", "occupancy_cost_burden", "up", "fixed rent burden is elevated versus baseline"},
 	}
 	result := make([]Anomaly, 0, len(types))
-	window := maxInt(3, days/24)
+	window := max(3, days/24)
 	for index, item := range types {
 		start := int(float64(days-window) * float64(index+1) / float64(len(types)+1))
 		if start < 1 {

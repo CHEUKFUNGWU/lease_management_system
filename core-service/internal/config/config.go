@@ -13,10 +13,6 @@ type Config struct {
 	DBPassword string
 	DBName     string
 
-	MinioEndpoint  string
-	MinioAccessKey string
-	MinioSecretKey string
-
 	JWTSecret                     string
 	AccessTokenTTLSeconds         int
 	RefreshTokenTTLSeconds        int
@@ -66,10 +62,6 @@ func Load() (*Config, error) {
 		DBUser:     getEnv("DB_USER", "lease"),
 		DBPassword: getEnv("DB_PASSWORD", "lease_secret"),
 		DBName:     getEnv("DB_NAME", "lease"),
-
-		MinioEndpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
-		MinioSecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
 
 		JWTSecret:                     getEnv("JWT_SECRET", "lease_jwt_secret_key"),
 		AccessTokenTTLSeconds:         accessTTL,

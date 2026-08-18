@@ -51,7 +51,6 @@ func newGatewayTestRouterWithRole(runtime agenttools.ToolRuntime, permissions []
 	handler := NewAgentGatewayHandler(runtime, auditRecorders...).WithSkillRegistry(agentskill.ProductionRegistry())
 	router.GET("/agent/tools", handler.Describe)
 	router.GET("/agent/skills", handler.Skills)
-	router.GET("/agent/metrics", handler.Metrics)
 	router.GET("/agent/metrics/prometheus", handler.MetricsPrometheus)
 	router.POST("/agent/tools/execute", handler.Execute)
 	return router
@@ -183,7 +182,7 @@ func TestAgentGatewayMetricsRequiresPermissionAndExposesPrometheus(t *testing.T)
 	}
 	deniedRouter := newGatewayTestRouter(newContractGatewayRuntime(reader), []string{"contracts:read"}, access.Scope{LegalEntityID: "le-001"})
 	deniedRecorder := httptest.NewRecorder()
-	deniedRouter.ServeHTTP(deniedRecorder, httptest.NewRequest(http.MethodGet, "/agent/metrics", nil))
+	deniedRouter.ServeHTTP(deniedRecorder, httptest.NewRequest(http.MethodGet, "/agent/metrics/prometheus", nil))
 	if deniedRecorder.Code != http.StatusForbidden {
 		t.Fatalf("metrics without permission status=%d body=%s", deniedRecorder.Code, deniedRecorder.Body.String())
 	}

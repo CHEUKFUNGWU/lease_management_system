@@ -125,7 +125,9 @@ func main() {
 	retailSimulationHandler := handlers.NewRetailSimulationHandler(retailSimulationRepo, auditLogger)
 	retailKPIHandler := handlers.NewRetailKPIHandler(retailKPIRepo)
 	planReader := handlers.NewRetailPlanReader(fpnaGovernanceRepo)
-	planMateriality := func(ctx context.Context) float64 { return systemSettingRepo.GetFloat64(ctx, "retail_plan_variance_materiality_pct", 5) }
+	planMateriality := func(ctx context.Context) float64 {
+		return systemSettingRepo.GetFloat64(ctx, "retail_plan_variance_materiality_pct", 5)
+	}
 	retailPulseHandler := handlers.NewRetailPulseHandler(retailKPIRepo).WithPlanReader(planReader).WithPlanMateriality(planMateriality)
 	retailStoreDiagnosticsHandler := handlers.NewRetailStoreDiagnosticsHandler(retailKPIRepo).WithPlanReader(planReader).WithPlanMateriality(planMateriality)
 	retailScenarioHandler := handlers.NewRetailScenarioHandler(retailKPIRepo, operatingFactsRepo)
@@ -453,7 +455,6 @@ func main() {
 		// contracts:read or calculations:read.
 		api.GET("/agent/tools", agentGatewayHandler.Describe)
 		api.GET("/agent/skills", agentGatewayHandler.Skills)
-		api.GET("/agent/metrics", agentGatewayHandler.Metrics)
 		api.GET("/agent/metrics/prometheus", agentGatewayHandler.MetricsPrometheus)
 		api.GET("/agent/usage", agentGatewayHandler.Usage)
 		api.POST("/agent/sessions", agentGatewayHandler.CreateSession)

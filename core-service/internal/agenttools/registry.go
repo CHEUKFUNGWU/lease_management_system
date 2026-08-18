@@ -1,6 +1,8 @@
 package agenttools
 
 import (
+	"slices"
+
 	"context"
 	"fmt"
 	"sort"
@@ -92,7 +94,7 @@ func (r *Registry) definitions(filter ToolFilter) []ToolDefinition {
 					continue
 				}
 			}
-			if filter.SkillID != "" && !contains(definition.SkillIDs, filter.SkillID) {
+			if filter.SkillID != "" && !slices.Contains(definition.SkillIDs, filter.SkillID) {
 				continue
 			}
 			definitions = append(definitions, definition)

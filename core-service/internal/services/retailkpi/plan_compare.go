@@ -8,6 +8,8 @@ package retailkpi
 import (
 	"context"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/services/retailperiod"
@@ -15,46 +17,46 @@ import (
 
 // PlanFact is one plan line at store grain for a calendar month.
 type PlanFact struct {
-	StoreID  string
-	Period   string
-	Currency string
-	Revenue  *float64
-	GrossProfit *float64
-	LaborCost   *float64
-	FixedRent   *float64
+	StoreID      string
+	Period       string
+	Currency     string
+	Revenue      *float64
+	GrossProfit  *float64
+	LaborCost    *float64
+	FixedRent    *float64
 	VariableRent *float64
 	NonLeaseCost *float64
 }
 
 // PlanVariance is one KPI's actual-vs-plan verdict.
 type PlanVariance struct {
-	KPI                string   `json:"kpi"`
-	Actual             *float64 `json:"actual"`
-	Plan               *float64 `json:"plan"`
-	Variance           *float64 `json:"variance"`
-	VariancePct        *float64 `json:"variance_pct"`
-	AttainmentPct      *float64 `json:"attainment_pct"`
-	MaterialityExceeded bool    `json:"materiality_exceeded"`
-	DecisionReady      bool     `json:"decision_ready"`
-	DowngradeReason    string   `json:"downgrade_reason,omitempty"`
+	KPI                 string   `json:"kpi"`
+	Actual              *float64 `json:"actual"`
+	Plan                *float64 `json:"plan"`
+	Variance            *float64 `json:"variance"`
+	VariancePct         *float64 `json:"variance_pct"`
+	AttainmentPct       *float64 `json:"attainment_pct"`
+	MaterialityExceeded bool     `json:"materiality_exceeded"`
+	DecisionReady       bool     `json:"decision_ready"`
+	DowngradeReason     string   `json:"downgrade_reason,omitempty"`
 }
 
 // PlanComparison is the full verdict plus its provenance basis.
 type PlanComparison struct {
-	Period              string         `json:"period"`
-	PlanVersionID       string         `json:"plan_version_id,omitempty"`
-	PlanVersionName     string         `json:"plan_version_name,omitempty"`
-	PlanVersionType     string         `json:"plan_version_type,omitempty"`
-	PlanAsOfPeriod      string         `json:"plan_as_of_period,omitempty"`
-	PlanSource          string         `json:"plan_source,omitempty"`
-	PlanIsOfficial      bool           `json:"plan_is_official"`
-	Currency            string         `json:"currency,omitempty"`
-	ExpectedStoreCount  int            `json:"expected_store_count"`
-	ActualStoreCount    int            `json:"actual_store_count"`
-	PlanStoreCount      int            `json:"plan_store_count"`
-	Variances           []PlanVariance `json:"variances"`
-	DecisionReady       bool           `json:"decision_ready"`
-	DowngradeReason     string         `json:"downgrade_reason,omitempty"`
+	Period             string         `json:"period"`
+	PlanVersionID      string         `json:"plan_version_id,omitempty"`
+	PlanVersionName    string         `json:"plan_version_name,omitempty"`
+	PlanVersionType    string         `json:"plan_version_type,omitempty"`
+	PlanAsOfPeriod     string         `json:"plan_as_of_period,omitempty"`
+	PlanSource         string         `json:"plan_source,omitempty"`
+	PlanIsOfficial     bool           `json:"plan_is_official"`
+	Currency           string         `json:"currency,omitempty"`
+	ExpectedStoreCount int            `json:"expected_store_count"`
+	ActualStoreCount   int            `json:"actual_store_count"`
+	PlanStoreCount     int            `json:"plan_store_count"`
+	Variances          []PlanVariance `json:"variances"`
+	DecisionReady      bool           `json:"decision_ready"`
+	DowngradeReason    string         `json:"downgrade_reason,omitempty"`
 }
 
 // PlanSet is the resolved plan basis for one calendar month.
@@ -77,13 +79,13 @@ type PlanReader interface {
 
 // ComparePlanRequest scopes one calendar-month comparison.
 type ComparePlanRequest struct {
-	Period                 string  // "YYYY-MM"
-	ExpectedStoreCount     int
+	Period             string // "YYYY-MM"
+	ExpectedStoreCount int
 	// ExpectedDaysInMonth is the calendar month's day count; when set, every
 	// store compared on both sides must have at least this many distinct
 	// observed days, otherwise the comparison downgrades — actual for half a
 	// month against a full-month plan is a mismatch, not a variance (c1).
-	ExpectedDaysInMonth    int
+	ExpectedDaysInMonth     int
 	MaterialityThresholdPct float64
 }
 
@@ -177,7 +179,7 @@ func ComparePlan(actual []DailyFact, plan []PlanFact, request ComparePlanRequest
 	}
 	if len(reasons) > 0 {
 		comparison.DecisionReady = false
-		comparison.DowngradeReason = joinReasons(reasons)
+		comparison.DowngradeReason = strings.Join(reasons, "; ")
 	}
 	return comparison, nil
 }
@@ -199,16 +201,16 @@ func compareKPI(kpi planKPI, actualByStore map[string][]DailyFact, planByStore m
 	actualTotal, planTotal := sumOverIntersection(kpi, actualByStore, planByStore)
 	if actualTotal == nil || planTotal == nil {
 		variance.DecisionReady = false
-		variance.DowngradeReason = joinReasons(reasons)
+		variance.DowngradeReason = strings.Join(reasons, "; ")
 		return variance
 	}
 	variance.Actual, variance.Plan = actualTotal, planTotal
 	diff := *actualTotal - *planTotal
 	variance.Variance = &diff
 	if *planTotal != 0 {
-		pct := diff / absFloat(*planTotal) * 100
+		pct := diff / math.Abs(*planTotal) * 100
 		variance.VariancePct = &pct
-		variance.MaterialityExceeded = absFloat(pct) >= request.MaterialityThresholdPct
+		variance.MaterialityExceeded = math.Abs(pct) >= request.MaterialityThresholdPct
 		attainment := *actualTotal / *planTotal * 100
 		variance.AttainmentPct = &attainment
 	} else {
@@ -217,7 +219,7 @@ func compareKPI(kpi planKPI, actualByStore map[string][]DailyFact, planByStore m
 	}
 	if len(reasons) > 0 {
 		variance.DecisionReady = false
-		variance.DowngradeReason = joinReasons(reasons)
+		variance.DowngradeReason = strings.Join(reasons, "; ")
 	}
 	return variance
 }
@@ -251,7 +253,7 @@ func compareContribution(actualByStore map[string][]DailyFact, planByStore map[s
 	}
 	if compared == 0 {
 		variance.DecisionReady = false
-		variance.DowngradeReason = joinReasons(append(reasons, "no_comparable_stores"))
+		variance.DowngradeReason = strings.Join(append(reasons, "no_comparable_stores"), "; ")
 		return variance
 	}
 	variance.Actual = &actualTotal
@@ -259,15 +261,15 @@ func compareContribution(actualByStore map[string][]DailyFact, planByStore map[s
 	diff := actualTotal - planTotal
 	variance.Variance = &diff
 	if planTotal != 0 {
-		pct := diff / absFloat(planTotal) * 100
+		pct := diff / math.Abs(planTotal) * 100
 		variance.VariancePct = &pct
-		variance.MaterialityExceeded = absFloat(pct) >= request.MaterialityThresholdPct
+		variance.MaterialityExceeded = math.Abs(pct) >= request.MaterialityThresholdPct
 		attainment := actualTotal / planTotal * 100
 		variance.AttainmentPct = &attainment
 	}
 	if len(reasons) > 0 {
 		variance.DecisionReady = false
-		variance.DowngradeReason = joinReasons(reasons)
+		variance.DowngradeReason = strings.Join(reasons, "; ")
 	}
 	return variance
 }
@@ -403,22 +405,4 @@ func singleKey(values map[string]bool) string {
 		return key
 	}
 	return ""
-}
-
-func absFloat(value float64) float64 {
-	if value < 0 {
-		return -value
-	}
-	return value
-}
-
-func joinReasons(reasons []string) string {
-	result := ""
-	for _, reason := range reasons {
-		if result != "" {
-			result += "; "
-		}
-		result += reason
-	}
-	return result
 }

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"slices"
+
 	"context"
 	"encoding/json"
 	"errors"
@@ -388,7 +390,7 @@ func eventDraftCommands(
 	selection reviewSelection,
 	actorID string,
 ) ([]draftapp.EventDraftCommand, error) {
-	if len(selection.Indexes) > 0 && !containsInt(selection.Indexes, 0) {
+	if len(selection.Indexes) > 0 && !slices.Contains(selection.Indexes, 0) {
 		return []draftapp.EventDraftCommand{}, nil
 	}
 	effectiveDate := parseDraftDate(data.Event.EffectiveDate)
@@ -410,15 +412,6 @@ func eventDraftCommands(
 		EvidenceRef:     map[string]interface{}{"artifact_id": artifact.ID, "run_id": artifact.RunID, "item_index": 0},
 		RequireEvidence: true,
 	}}, nil
-}
-
-func containsInt(values []int, wanted int) bool {
-	for _, value := range values {
-		if value == wanted {
-			return true
-		}
-	}
-	return false
 }
 
 func (h *AIChatHandler) validateRetryBatch(ctx context.Context, batchID, operation, actorID string) error {

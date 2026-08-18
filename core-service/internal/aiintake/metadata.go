@@ -1,6 +1,8 @@
 package aiintake
 
 import (
+	"slices"
+
 	"encoding/json"
 	"fmt"
 	"io"
@@ -78,7 +80,7 @@ func validateMetadata(metadata *IntakeMetadata, expectedDraftType string) error 
 	if !metadata.ReviewGate.Required {
 		return fmt.Errorf("Assist Mode AI intake must require human review")
 	}
-	if !contains(metadata.ReviewGate.Reasons, "assist_mode") {
+	if !slices.Contains(metadata.ReviewGate.Reasons, "assist_mode") {
 		return fmt.Errorf("Assist Mode AI intake review reasons must include assist_mode")
 	}
 	if metadata.ReviewGate.ConfidenceThreshold <= 0 || metadata.ReviewGate.ConfidenceThreshold > 1 {
@@ -93,13 +95,4 @@ func validateMetadata(metadata *IntakeMetadata, expectedDraftType string) error 
 		}
 	}
 	return nil
-}
-
-func contains(values []string, expected string) bool {
-	for _, value := range values {
-		if value == expected {
-			return true
-		}
-	}
-	return false
 }

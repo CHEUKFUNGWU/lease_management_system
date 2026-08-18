@@ -162,27 +162,6 @@ func (h *AgentGatewayHandler) Skills(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"skills": h.skills.List(roles)})
 }
 
-// Metrics exposes low-cardinality Tool Runtime counters to an operator with
-// the dedicated agent_runtime:metrics permission or audit-log read access.
-// It contains no run IDs, users or business values.
-func (h *AgentGatewayHandler) Metrics(c *gin.Context) {
-	ctx, status, err := h.gatewayContext(c, "agent-metrics", "")
-	if err != nil {
-		c.JSON(status, gin.H{"error": err.Error()})
-		return
-	}
-	runtime, status, ok := h.metricsRuntime(ctx)
-	if !ok {
-		message := "agent metrics permission is required"
-		if status == http.StatusServiceUnavailable {
-			message = "agent runtime metrics unavailable"
-		}
-		c.JSON(status, gin.H{"error": message})
-		return
-	}
-	c.JSON(http.StatusOK, runtime.Snapshot(time.Now().UTC()))
-}
-
 // MetricsPrometheus is the scrape-friendly form of Metrics. The same
 // permission check is intentionally applied before exposing the payload.
 func (h *AgentGatewayHandler) MetricsPrometheus(c *gin.Context) {

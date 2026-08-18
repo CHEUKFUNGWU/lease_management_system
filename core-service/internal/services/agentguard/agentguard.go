@@ -21,26 +21,25 @@ var (
 )
 
 // Config carries the enforcement knobs. Zero values collapse to defaults.
+// The daily cost ceiling is enforced by the BudgetStore (its constructor
+// receives the limit) and is deliberately absent here — a knob nobody reads
+// would only imply it did something.
 type Config struct {
-	PerMinuteMessages  int     // default 12
-	DailyCostLimitUSD  float64 // default 2.0
-	CostPerTokenUSD    float64 // default 2e-6 (~$2 per 1M tokens)
-	HistoryMessageLimit int    // default 20 — client history kept, oldest dropped
-	HistoryCharBudget   int    // default 40_000 chars across the kept history
+	PerMinuteMessages   int     // default 12 — used in the rate-limit message
+	CostPerTokenUSD     float64 // default 2e-6 (~$2 per 1M tokens)
+	HistoryMessageLimit int     // default 20 — client history kept, oldest dropped
+	HistoryCharBudget   int     // default 40_000 chars across the kept history
 }
 
 // DefaultConfig returns the product defaults.
 func DefaultConfig() Config {
-	return Config{PerMinuteMessages: 12, DailyCostLimitUSD: 2, CostPerTokenUSD: 2e-6, HistoryMessageLimit: 20, HistoryCharBudget: 40_000}
+	return Config{PerMinuteMessages: 12, CostPerTokenUSD: 2e-6, HistoryMessageLimit: 20, HistoryCharBudget: 40_000}
 }
 
 func (c Config) withDefaults() Config {
 	defaults := DefaultConfig()
 	if c.PerMinuteMessages <= 0 {
 		c.PerMinuteMessages = defaults.PerMinuteMessages
-	}
-	if c.DailyCostLimitUSD <= 0 {
-		c.DailyCostLimitUSD = defaults.DailyCostLimitUSD
 	}
 	if c.CostPerTokenUSD <= 0 {
 		c.CostPerTokenUSD = defaults.CostPerTokenUSD
@@ -94,8 +93,8 @@ func (g *Guard) Consume(ctx context.Context, userID, kind string, tokens int) er
 }
 
 // HistoryMessageLimit / HistoryCharBudget expose the assembly budget.
-func (g *Guard) HistoryMessageLimit() int  { return g.cfg.HistoryMessageLimit }
-func (g *Guard) HistoryCharBudget() int    { return g.cfg.HistoryCharBudget }
+func (g *Guard) HistoryMessageLimit() int { return g.cfg.HistoryMessageLimit }
+func (g *Guard) HistoryCharBudget() int   { return g.cfg.HistoryCharBudget }
 
 // BoundHistory truncates client-supplied history to the newest entries
 // within the message count, then drops the oldest until the total char
@@ -158,4 +157,3 @@ func (s *MemoryStore) Consume(_ context.Context, userID, kind string, _ int, cos
 	s.dailyCost[day] += costUSD
 	return true, "", nil
 }
-

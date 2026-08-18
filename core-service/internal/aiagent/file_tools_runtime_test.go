@@ -114,7 +114,7 @@ func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing
 	t.Cleanup(server.Close)
 	t.Setenv("AI_SERVICE_URL", server.URL)
 
-	agent := New(nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil)
 	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
 		Principal: agenttools.Principal{UserID: "user-1", Role: "editor", Permissions: []string{"ai_chat:use"}},
 		RunID:     "run-compat",

@@ -2,6 +2,7 @@ package aiintake
 
 import (
 	"os"
+	"slices"
 	"testing"
 )
 
@@ -25,7 +26,7 @@ func TestDecodeContractV1Contract(t *testing.T) {
 	if draft.Evidence.Complete || draft.Evidence.MissingReason == "" {
 		t.Fatalf("evidence = %#v", draft.Evidence)
 	}
-	if !draft.ReviewGate.Required || !contains(draft.ReviewGate.Reasons, "missing_fields") {
+	if !draft.ReviewGate.Required || !slices.Contains(draft.ReviewGate.Reasons, "missing_fields") {
 		t.Fatalf("review gate = %#v", draft.ReviewGate)
 	}
 }

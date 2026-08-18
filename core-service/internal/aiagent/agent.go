@@ -1,6 +1,8 @@
 package aiagent
 
 import (
+	"slices"
+
 	"bytes"
 	"context"
 	"encoding/json"
@@ -49,51 +51,14 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 	return h.skillRegistry
 }
 
-func New(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, nil, nil, nil, draftServices...)
-}
-
-// NewWithPerformance keeps the historical constructor source-compatible while
-// allowing the production gateway to expose the operating decision read seam.
-// The reader is an application adapter; it never gives the Agent a database
-// handle or a way to bypass the Tool Runtime policy.
-func NewWithPerformance(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, nil, nil, draftServices...)
-}
-
-func NewWithReaders(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, nil, draftServices...)
-}
-
-// NewWithOperationalReaders wires the existing budget, cash-flow and renewal
-// deterministic services into the same governed Agent Tool Runtime.
-func NewWithOperationalReaders(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, draftServices...)
-}
-
-// NewWithOperationalReadersAndGovernance additionally exposes the governed
-// decision-memo draft seam. It is separate to preserve source compatibility
-// for lightweight adapters that do not have the governance repository.
-func NewWithOperationalReadersAndGovernance(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, draftServices ...*draftapp.Service) *Agent {
-	return newAgentWithGovernance(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, draftServices...)
-}
-
-// NewWithOperationalReadersAndGovernanceAndRetail is the additive production
-// constructor for retail_operations@v1. The historical constructors remain
-// unchanged so legacy skills/tools keep their original registry contract.
+// NewWithOperationalReadersAndGovernanceAndRetail is the production
+// constructor: it wires the operating-facts / close-readiness / control /
+// governance / retail seams into the same governed Agent Tool Runtime.
 func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgentWithGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, draftServices...)
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, draftServices...)
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, draftServices ...*draftapp.Service) *Agent {
-	return newAgentWithGovernance(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, nil, draftServices...)
-}
-
-func newAgentWithGovernance(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, draftServices ...*draftapp.Service) *Agent {
-	return newAgentWithGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, nil, draftServices...)
-}
-
-func newAgentWithGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, draftServices ...*draftapp.Service) *Agent {
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
@@ -2408,7 +2373,7 @@ func buildReviewPrompts(contracts []ContractDraftItem, missingFields []string, w
 	lowConfidenceContracts := make([]string, 0)
 	scopeReviewContracts := make([]string, 0)
 	for _, contract := range contracts {
-		if contract.DiscountRate == 0 || containsString(contract.MissingFields, "discount_rate") {
+		if contract.DiscountRate == 0 || slices.Contains(contract.MissingFields, "discount_rate") {
 			discountRateContracts = append(discountRateContracts, contract.ContractNumber)
 		}
 		if contract.Confidence < 0.8 || contract.ScopeConfidence < 0.8 {
@@ -2544,15 +2509,6 @@ func statusFromReview(requiresHuman bool) string {
 		return "needs_review"
 	}
 	return "completed"
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
 
 func firstStrings(values []string, limit int) []string {

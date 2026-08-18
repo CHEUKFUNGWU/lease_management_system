@@ -3,6 +3,7 @@ package aiintake
 import (
 	"fmt"
 	"io"
+	"slices"
 	"time"
 )
 
@@ -42,10 +43,10 @@ func validateContractDraftData(contract *ContractDraftData) error {
 	if contract.PaymentTiming != "" && contract.PaymentTiming != "prepaid" && contract.PaymentTiming != "postpaid" {
 		return fmt.Errorf("contract draft has invalid payment timing %q", contract.PaymentTiming)
 	}
-	if contract.LeaseScope != "" && !contains([]string{"in_scope", "short_term_exempt", "low_value_exempt", "not_a_lease"}, contract.LeaseScope) {
+	if contract.LeaseScope != "" && !slices.Contains([]string{"in_scope", "short_term_exempt", "low_value_exempt", "not_a_lease"}, contract.LeaseScope) {
 		return fmt.Errorf("contract draft has invalid lease scope %q", contract.LeaseScope)
 	}
-	if contract.SuggestedScope != "" && !contains([]string{"in_scope", "short_term_exempt", "low_value_exempt", "not_a_lease"}, contract.SuggestedScope) {
+	if contract.SuggestedScope != "" && !slices.Contains([]string{"in_scope", "short_term_exempt", "low_value_exempt", "not_a_lease"}, contract.SuggestedScope) {
 		return fmt.Errorf("contract draft has invalid suggested scope %q", contract.SuggestedScope)
 	}
 	if contract.FixedRentAmount < 0 || contract.CAMAmount < 0 || contract.ServiceFee < 0 || contract.DiscountRate < 0 {

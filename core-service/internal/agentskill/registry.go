@@ -4,6 +4,8 @@
 package agentskill
 
 import (
+	"slices"
+
 	"fmt"
 	"sort"
 	"strings"
@@ -279,22 +281,9 @@ func (d Definition) Public() Definition {
 	return d
 }
 
-func containsFold(values []string, wanted string) bool {
-	wanted = strings.ToLower(strings.TrimSpace(wanted))
-	if wanted == "" {
-		return false
-	}
-	for _, value := range values {
-		if strings.ToLower(strings.TrimSpace(value)) == wanted {
-			return true
-		}
-	}
-	return false
-}
-
 func anyAlias(versions map[string]Definition, wanted string) bool {
 	for _, definition := range versions {
-		if containsFold(definition.Aliases, wanted) {
+		if slices.ContainsFunc(definition.Aliases, func(v string) bool { return strings.EqualFold(strings.TrimSpace(v), strings.TrimSpace(wanted)) }) {
 			return true
 		}
 	}
@@ -366,5 +355,5 @@ func roleAllowed(allowed []string, role string) bool {
 	if role == "user" {
 		role = "editor"
 	}
-	return containsFold(allowed, role)
+	return slices.ContainsFunc(allowed, func(v string) bool { return strings.EqualFold(strings.TrimSpace(v), strings.TrimSpace(role)) })
 }

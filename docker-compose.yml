@@ -48,9 +48,6 @@ services:
       DB_USER: ${DB_USER:-lease}
       DB_PASSWORD: ${DB_PASSWORD:-lease_secret}
       DB_NAME: ${DB_NAME:-lease}
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       JWT_SECRET: ${JWT_SECRET:-lease_jwt_secret_key}
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-86400}
       REFRESH_TOKEN_TTL_SECONDS: ${REFRESH_TOKEN_TTL_SECONDS:-2592000}

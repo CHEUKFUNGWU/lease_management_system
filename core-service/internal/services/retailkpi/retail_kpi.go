@@ -137,15 +137,15 @@ var chineseNames = map[string]string{
 }
 
 type Coverage struct {
-	RequestedDateFrom string   `json:"requested_date_from"`
-	RequestedDateTo   string   `json:"requested_date_to"`
-	ObservedDateFrom  string   `json:"observed_date_from,omitempty"`
-	ObservedDateTo    string   `json:"observed_date_to,omitempty"`
-	ObservedStoreDays int      `json:"observed_store_days"`
-	ExpectedStoreDays int      `json:"expected_store_days"`
-	DuplicateStoreDays int     `json:"duplicate_store_days,omitempty"`
-	CoverageRate      *float64 `json:"coverage_rate"`
-	MissingFields     []string `json:"missing_fields,omitempty"`
+	RequestedDateFrom  string   `json:"requested_date_from"`
+	RequestedDateTo    string   `json:"requested_date_to"`
+	ObservedDateFrom   string   `json:"observed_date_from,omitempty"`
+	ObservedDateTo     string   `json:"observed_date_to,omitempty"`
+	ObservedStoreDays  int      `json:"observed_store_days"`
+	ExpectedStoreDays  int      `json:"expected_store_days"`
+	DuplicateStoreDays int      `json:"duplicate_store_days,omitempty"`
+	CoverageRate       *float64 `json:"coverage_rate"`
+	MissingFields      []string `json:"missing_fields,omitempty"`
 }
 
 // MinimumPeerCount is the minimum size a Peer Cohort must have before a
@@ -374,7 +374,7 @@ func aggregateGroup(facts []DailyFact, groupBy, key, label, currency string) Agg
 		}
 	}
 	if len(facts) > 0 && areaAvailable == len(facts) {
-		v := areaSum / float64(maxInt(r.DistinctBusinessDays, 1))
+		v := areaSum / float64(max(r.DistinctBusinessDays, 1))
 		r.AverageDailyAreaSqm = &v
 	}
 	values := map[string]*float64{}
@@ -618,10 +618,4 @@ func inclusiveDays(from, to time.Time) int {
 		return 0
 	}
 	return int(to.Sub(from).Hours()/24) + 1
-}
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

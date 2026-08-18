@@ -13,11 +13,11 @@ import (
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aiagent"
-	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/aichat"
-	"github.com/lease-management-system/core-service/internal/services/agentguard"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/agentguard"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
 )
 
@@ -119,149 +119,12 @@ type AIChatHandler struct {
 	agentRuntime  *aichat.Runtime[aiagent.Response]
 	toolRuntime   *agenttools.Runtime
 	skillRegistry *agentskill.Registry
-	guard *agentguard.Guard
-}
-
-func NewAIChatHandler(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandler(contractRepo, mcRepo, eventRepo, runtimeRepo, nil, draftServices...)
-}
-
-// NewAIChatHandlerWithPerformance wires the optional operating-facts read seam
-// into the same server-owned Agent Tool Runtime as the lease tools.
-func NewAIChatHandlerWithPerformance(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandler(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, draftServices...)
-}
-
-func NewAIChatHandlerWithReaders(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandlerWithReaders(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, draftServices...)
-}
-
-func NewAIChatHandlerWithOperationalReaders(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	controls *agenttooldefs.ControlReaders,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandlerWithOperationalReaders(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, controls, draftServices...)
-}
-
-func NewAIChatHandlerWithOperationalReadersAndGovernance(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	controls *agenttooldefs.ControlReaders,
-	governance agenttooldefs.DecisionMemoDraftWriter,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandlerWithOperationalReadersAndGovernance(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, controls, governance, draftServices...)
+	guard         *agentguard.Guard
 }
 
 // NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail is the
-// additive constructor used by production wiring for retail_operations@v1.
-// Existing constructors deliberately keep their old registry contents.
+// production constructor used by cmd/api wiring.
 func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	controls *agenttooldefs.ControlReaders,
-	governance agenttooldefs.DecisionMemoDraftWriter,
-	retail agenttooldefs.RetailOperationsReader,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, controls, governance, retail, draftServices...)
-}
-
-func newAIChatHandler(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandlerWithReaders(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, nil, draftServices...)
-}
-
-func newAIChatHandlerWithReaders(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandlerWithOperationalReaders(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, nil, draftServices...)
-}
-
-func newAIChatHandlerWithOperationalReaders(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	controls *agenttooldefs.ControlReaders,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	agent := aiagent.NewWithOperationalReaders(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, draftServices...)
-	handler := &AIChatHandler{
-		runtimeRepo: runtimeRepo, contractRepo: contractRepo,
-		draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry(),
-	}
-	handler.agentRuntime = aichat.NewRuntime(
-		runtimeRepo, agent, agent, aiagent.ProjectResult,
-		aichat.Options{ReviewCommit: handler.commitReviewTransaction},
-	)
-	return handler
-}
-
-func newAIChatHandlerWithOperationalReadersAndGovernance(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	controls *agenttooldefs.ControlReaders,
-	governance agenttooldefs.DecisionMemoDraftWriter,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	return newAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, runtimeRepo, performance, closeReadiness, controls, governance, nil, draftServices...)
-}
-
-func newAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
 	contractRepo *repository.ContractRepository,
 	mcRepo *repository.MonthlyClosingRepository,
 	eventRepo *repository.EventRepository,
@@ -436,7 +299,7 @@ func runtimeInput(c *gin.Context, req AIChatRequest) aichat.Input {
 		Language: req.Language, PageContext: req.PageContext,
 		SkillID: req.SkillID, SkillVersion: req.SkillVersion,
 		Initiator: req.Initiator,
-		UserID: userIDString, LegalEntityID: middleware.GetTenantID(c),
+		UserID:    userIDString, LegalEntityID: middleware.GetTenantID(c),
 		Role: roleString, Permissions: append([]string(nil), permissionStrings...),
 		AuthHeader: c.GetHeader("Authorization"),
 	}

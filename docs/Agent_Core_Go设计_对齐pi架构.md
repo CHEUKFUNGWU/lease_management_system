@@ -4,7 +4,6 @@
 > 编制日期：2026-08-18
 > 关联文档：
 > - `docs/AI_底稿与Paperwork_Agent设计方案.md`（能力层：底稿产出、Tier A/B、不变量）
-> - `docs/AI_Chat_升级方案_pi_agent_参考.md`（早期 pi 借鉴，运行时层）
 > - `docs/AI_Agent_与_CLI_架构演进_PRD.md`（Tool Runtime 与 Gateway，已交付）
 > - [ADR-0022](adr/0022-first-party-go-agent-core-modelled-on-pi.md)（本文的决策留痕）、[ADR-0023](adr/0023-retire-the-first-party-python-ai-service.md)（退役 Python）、[ADR-0024](adr/0024-remove-the-agpl-pdf-dependency.md)（解析栈）
 > - 索引：[AI 文档索引与现行决策](AI_文档索引与现行决策.md)

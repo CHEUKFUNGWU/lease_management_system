@@ -138,6 +138,11 @@ func main() {
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo)
 	machineCredRepo := repository.NewMachineCredentialRepository(database.Pool)
 	sourceFeedHandler := handlers.NewSourceFeedHandler(machineCredRepo, retailKPIRepo)
+	inventoryRepo := repository.NewInventoryRepository(database.Pool)
+	inventoryMetricsHandler := handlers.NewInventoryMetricsHandler(inventoryRepo, retailKPIRepo)
+	masterDataResolutionHandler := handlers.NewMasterDataResolutionHandler(database.Pool)
+	competitorRepo := repository.NewCompetitorRepository(database.Pool)
+	competitorHandler := handlers.NewCompetitorObservationsHandler(competitorRepo)
 	exchangeRateVersionHandler := handlers.NewExchangeRateVersionHandler(exchangeRateRepo)
 	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
 	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
@@ -380,6 +385,12 @@ func main() {
 		protected.Handle(http.MethodGet, "/retail/promotions/:id/costs", permission("operating_facts", "read"), promotionHandler.ListPromotionCosts)
 		protected.Handle(http.MethodPost, "/retail/promotions/:id/costs", permission("operating_facts", "write"), promotionHandler.AddPromotionCost)
 		protected.Handle(http.MethodGet, "/retail/promotions/:id/roi", permission("operating_facts", "read"), promotionHandler.EvaluateROI)
+		protected.Handle(http.MethodGet, "/retail/inventory/summary", permission("operating_facts", "read"), inventoryMetricsHandler.GetInventorySummary)
+		protected.Handle(http.MethodPost, "/retail/inventory/facts", permission("operating_facts", "write"), inventoryMetricsHandler.UpsertInventoryFact)
+		protected.Handle(http.MethodPost, "/retail/master-data/resolve", permission("master_data", "read"), masterDataResolutionHandler.Resolve)
+		protected.Handle(http.MethodPost, "/retail/master-data/confirm-mapping", permission("master_data", "manage"), masterDataResolutionHandler.ConfirmMapping)
+		protected.Handle(http.MethodGet, "/retail/competitor-observations", permission("operating_facts", "read"), competitorHandler.ListObservations)
+		protected.Handle(http.MethodPost, "/retail/competitor-observations", permission("operating_facts", "write"), competitorHandler.AddObservation)
 
 		// Budget versions freeze the measured forward schedule so later actuals
 		// can be explained against a stable plan.

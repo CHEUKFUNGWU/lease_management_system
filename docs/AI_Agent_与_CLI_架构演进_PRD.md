@@ -293,7 +293,7 @@ The implementation should be delivered as vertical slices, in this order:
 - The repository test gates include Go packages, AI intake/planner tests, Web type-check/tests, skill evaluation and IFRS 16 regression.
 - Persisted `planner_usage` aggregation is exposed through the permissioned `GET /api/v1/agent/usage` endpoint and the Web `/agent-metrics` operator page; the summary derives user/legal-entity scope server-side and keeps unavailable cost explicit.
 - The repository includes Prometheus recording/alert rules, a bearer-token scrape template, startup validation for the LLM price book, and an operations runbook covering health checks, LLM usage/cost semantics, release smoke tests and application/database rollback boundaries.
-- The remaining environment/customer gates are enumerated in [`docs/AI_Agent_外部验收清单.md`](AI_Agent_外部验收清单.md) with owners, required inputs, evidence and pass criteria; they are intentionally not represented as completed by local tests.
+- The remaining environment/customer gates are enumerated in the external acceptance checklist (archived 2026-08-18) with owners, required inputs, evidence and pass criteria; they are intentionally not represented as completed by local tests.
 - Remaining acceptance work is operational or customer-specific: production metrics baseline calibration and approved rollback drill, real PaddleOCR sample coverage, ERP field mapping and third-party accounting sign-off.
 
 ### Decisions requiring explicit review before high-risk expansion

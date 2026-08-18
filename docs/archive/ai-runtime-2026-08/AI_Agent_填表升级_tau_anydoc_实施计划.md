@@ -1,5 +1,9 @@
 # AI Agent 填表升级（tau + anydoc）实施计划
 
+> ⚠️ **ARCHIVED 2026-08-18 — 不是现行依据**
+> 归档理由：tau 部分由 ADR-0022 作废；anydoc 与填表缝设计已迁入《Agent Core（Go）设计》§8.2 与附录 A
+> 现行入口：`docs/AI_文档索引与现行决策.md`
+
 > ⚠️ **文档状态：Partially Superseded（2026-08-18）**
 >
 > - **tau 部分作废**。D1/D2/D4 及 Wave T2「tau 大脑」被 [ADR-0022](adr/0022-first-party-go-agent-core-modelled-on-pi.md) 取代：Agent 内核改为自研 Go（`internal/agentcore`），架构对齐 pi，不引入 tau 容器。理由是 D2 要新增 Python 3.12 容器，与 [ADR-0023](adr/0023-retire-the-first-party-python-ai-service.md)「自研 Python 归零」直接冲突。

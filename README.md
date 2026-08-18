@@ -410,7 +410,6 @@ English:
 
 **转型 / Transformation**
 
-- [线下零售经营分析工作站：产品转型可行性报告与规划](docs/线下零售经营分析工作站_产品转型可行性报告与规划.md)
 - [转型执行看板](docs/execution/转型执行看板.md) — MAX-001 → MAX-009 任务、评审与验收记录
 - [转型实施任务清单与验收标准](docs/线下零售经营工作站_转型实施任务清单与验收标准.md)
 - [线下零售经营分析工作站 · 外部研究](docs/research/线下零售经营分析工作站_外部研究.md)
@@ -419,23 +418,21 @@ English:
 **UI / UX**
 
 - [DESIGN.md](DESIGN.md) — 设计系统与前端约束（写前端代码前先读这份）
-- [架构改善方案](docs/架构改善方案.md) — 外部架构评审的核实结论与合并排期
-- [UIUX 改善方案](docs/UIUX改善方案.md) — 当前设计系统诊断与分阶段改进计划
-- [UIUX 设计与交互提升评估报告](docs/UIUX_设计与交互提升评估报告.md)
+- [UIUX 改善方案](docs/UIUX改善方案.md) — 当前设计系统诊断、合并排期与分阶段改进计划
 
 **租赁与 IFRS 16 / Lease & IFRS 16**
 
 - [IFRS 16 计量回归对数报告](docs/IFRS16_计量回归对数报告.md)
 - [IFRS 16 计量方法与准则映射白皮书](docs/IFRS16_计量方法与准则映射白皮书.md)
-- [IFRS16 IT 需求文档](docs/IFRS16_IT_需求文档.md)
-- [IFRS16 MVP 技术架构方案](docs/IFRS16_MVP_技术架构方案.md)
 
 **Agent 与运维 / Agent & Operations**
 
 - [AGENTS.md](AGENTS.md)
+- [AI 文档索引与现行决策](docs/AI_文档索引与现行决策.md) — **AI 相关文档的入口**，标注每份文档是否仍然有效
 - [AI Agent 运行运维手册](docs/AI_Agent_运行运维手册.md)
-- [AI Agent 外部验收清单](docs/AI_Agent_外部验收清单.md)
 - [ops/prometheus/README.md](ops/prometheus/README.md)
+
+> 历史文档（已被取代或已完结）统一归档在 `docs/archive/`，均带 ARCHIVED 横幅，**不作为现行依据**。
 
 ---
 

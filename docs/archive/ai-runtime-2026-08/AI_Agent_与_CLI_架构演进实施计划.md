@@ -1,5 +1,9 @@
 # AI Agent 与 CLI 架构演进实施计划
 
+> ⚠️ **ARCHIVED 2026-08-18 — 不是现行依据**
+> 归档理由：AG-001~035 已交付（b1532b4）；对外契约见保留的《AI Agent 与 CLI 架构演进 PRD》，内核现行设计见《Agent Core（Go）设计》
+> 现行入口：`docs/AI_文档索引与现行决策.md`
+
 > 文档状态：Implemented / Runtime Validation Complete
 >
 > 版本：v1.1

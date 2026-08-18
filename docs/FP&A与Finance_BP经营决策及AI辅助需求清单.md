@@ -4,7 +4,7 @@
 > 编制日期：2026-08-10  
 > 适用产品：租赁管理系统（Lease Management System）  
 > 目标用户：集团 FP&A、零售 Finance BP、制造 Finance BP、Finance Analyst、财务审批人  
-> 关联文档：`docs/财务业务伙伴与FP&A产品战略分析.md`
+> 关联文档：FP&A 产品战略分析（已归档，结论已并入《PRD_财务BP与FPA岗位支撑补齐方案》）
 
 ## 1. 文档目的
 

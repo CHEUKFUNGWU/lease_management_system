@@ -2460,3 +2460,112 @@ export const machineCredentialApi = {
       token,
     }),
 };
+
+// Batch F7: Inventory Metrics API
+export interface InventorySummary {
+  currency: string;
+  days: number;
+  ending_stock_cost: number;
+  ending_stock_qty: number;
+  in_transit_cost: number;
+  in_transit_qty: number;
+  cogs: number;
+  doi?: number;
+  turnover_rate?: number;
+  stock_carrying_cost: number;
+  transit_carrying_cost: number;
+  total_carrying_cost: number;
+  carrying_cost_rate: number;
+}
+
+export const inventoryApi = {
+  getSummary: (
+    params: { store_id?: string; from_date?: string; to_date?: string; annual_rate?: number; currency?: string },
+    token: string
+  ): Promise<InventorySummary> => {
+    const query = new URLSearchParams();
+    if (params.store_id) query.set("store_id", params.store_id);
+    if (params.from_date) query.set("from_date", params.from_date);
+    if (params.to_date) query.set("to_date", params.to_date);
+    if (params.annual_rate != null) query.set("annual_rate", String(params.annual_rate));
+    if (params.currency) query.set("currency", params.currency);
+    return apiRequest(`/api/v1/retail/inventory/summary?${query.toString()}`, { token });
+  },
+  upsertFact: (data: any, token: string): Promise<any> =>
+    apiRequest("/api/v1/retail/inventory/facts", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
+// Batch F8: Master Data Resolution API
+export interface MasterDataCandidate {
+  raw_identifier: string;
+  canonical_id: string;
+  canonical_name: string;
+  confidence: number;
+  source: "cached" | "rule" | "ai";
+}
+
+export interface MasterDataResolutionResponse {
+  resolved: Record<string, MasterDataCandidate>;
+  unknown: string[];
+  ambiguous: MasterDataCandidate[];
+}
+
+export const masterDataResolutionApi = {
+  resolve: (
+    data: { kind: "store" | "sku" | "category"; external_system?: string; raw_identifiers: string[]; confidence_threshold?: number },
+    token: string
+  ): Promise<MasterDataResolutionResponse> =>
+    apiRequest("/api/v1/retail/master-data/resolve", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  confirmMapping: (
+    data: { kind: string; external_system: string; raw_identifier: string; canonical_id: string; canonical_name?: string; confidence_score?: number; resolved_by?: string },
+    token: string
+  ): Promise<{ status: string }> =>
+    apiRequest("/api/v1/retail/master-data/confirm-mapping", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
+// Batch F9: Competitor Observations API
+export interface CompetitorObservation {
+  id?: string;
+  store_id: string;
+  competitor_name: string;
+  competitor_brand?: string;
+  distance_meters?: number;
+  observation_date: string;
+  price_index?: number;
+  promo_intensity: "low" | "medium" | "high" | "aggressive";
+  footfall_estimate?: number;
+  observer?: string;
+  notes?: string;
+}
+
+export interface CompetitorBenchmarkSummary {
+  store_id: string;
+  competitor_count: number;
+  avg_price_index?: number;
+  highest_promo_threat: string;
+  recent_observations: CompetitorObservation[];
+  benchmark_disclaimer: string;
+}
+
+export const competitorApi = {
+  list: (storeID: string, token: string): Promise<{ benchmark: CompetitorBenchmarkSummary; observations: CompetitorObservation[] }> =>
+    apiRequest(`/api/v1/retail/competitor-observations?store_id=${encodeURIComponent(storeID)}`, { token }),
+  addObservation: (data: CompetitorObservation, token: string): Promise<CompetitorObservation> =>
+    apiRequest("/api/v1/retail/competitor-observations", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};

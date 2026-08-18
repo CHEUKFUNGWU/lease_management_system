@@ -33,6 +33,8 @@ import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, 
 import { bridgeConservation, bridgeTone, bridgeWaterfall, bridgeWaterfallDomain, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, summaryStatus, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
 import ProfitFlowPanel from "./ProfitFlowPanel";
 import { CategoryCompositionPanel } from "./CategoryCompositionPanel";
+import { InventoryTurnoverPanel } from "./InventoryTurnoverPanel";
+import { CompetitorBenchmarkPanel } from "./CompetitorBenchmarkPanel";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
 
@@ -753,6 +755,21 @@ function Store360Inner() {
                   dataClassification={query.classification || "production"}
                   fromDate={response.evidence?.current?.date_from}
                   toDate={response.evidence?.current?.date_to}
+                />
+              </div>
+
+              <div className="store360-block-gap">
+                <InventoryTurnoverPanel
+                  storeId={query.storeID}
+                  currency={response.currency}
+                  fromDate={response.evidence?.current?.date_from}
+                  toDate={response.evidence?.current?.date_to}
+                />
+              </div>
+
+              <div className="store360-block-gap">
+                <CompetitorBenchmarkPanel
+                  storeId={query.storeID}
                 />
               </div>
 

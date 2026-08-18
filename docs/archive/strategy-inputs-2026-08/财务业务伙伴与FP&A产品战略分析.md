@@ -1,5 +1,9 @@
 # 租赁管理平台：Finance Business Partner、FP&A 与 Finance Analyst 产品战略分析
 
+> ⚠️ **ARCHIVED 2026-08-18 — 不是现行依据**
+> 归档理由：FP&A 战略输入，结论已被《PRD_财务BP与FPA岗位支撑补齐方案》与其模块深化吸收
+> 现行入口：`docs/AI_文档索引与现行决策.md`
+
 > 分析日期：2026-08-08
 > 分析范围：基于当前产品功能、需求文档、技术架构、路线图及产品评审材料
 > 目的：评估现有产品如何从“租赁子账与 IFRS 16 工具”进一步赋能 Finance Business Partner、FP&A 和 Finance Analyst

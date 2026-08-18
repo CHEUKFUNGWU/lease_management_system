@@ -1,7 +1,7 @@
 # Close Readiness Preflight
 
 > 规格状态：Ready for implementation
-> 来源：`docs/财务业务伙伴与FP&A产品战略分析.md`  以及现有 Month-End Close、Work Queue 和领域 ADR
+> 来源：FP&A 产品战略分析（已归档）  以及现有 Month-End Close、Work Queue 和领域 ADR
 > 本规格对应的第一条业务垂直切片：让 Finance Analyst 在月结前看到“哪些问题会阻塞本期间工作、为什么阻塞、下一步如何处理”。
 
 ## Problem Statement

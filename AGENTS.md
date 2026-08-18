@@ -15,7 +15,7 @@
 | 产品有什么功能、怎么跑起来、目录结构、测试账号 | [README.md](README.md) |
 | **改前端代码必须遵守的设计与样式约束** | **[DESIGN.md](DESIGN.md)** |
 | **一个业务词到底是什么意思、该叫什么** | **[CONTEXT.md](CONTEXT.md)** — 领域语言，命名与措辞以它为准 |
-| 为什么做这次转型、边界在哪、ICP 与产品蓝图 | [docs/线下零售经营分析工作站_产品转型可行性报告与规划.md](docs/线下零售经营分析工作站_产品转型可行性报告与规划.md) |
+| 为什么做这次转型、边界在哪、ICP 与产品蓝图 | [docs/线下零售经营工作站_转型实施任务清单与验收标准.md](docs/线下零售经营工作站_转型实施任务清单与验收标准.md)、[docs/PRD_零售经营分析工作站_BP日常支撑完善.md](docs/PRD_零售经营分析工作站_BP日常支撑完善.md) |
 | 进入哪个市场、怎么找到第一批客户 | [docs/GTM_零售经营工作站_中国大陆与香港市场进入策略.md](docs/GTM_零售经营工作站_中国大陆与香港市场进入策略.md) |
 | 零售 MVP 每一票的任务、评审与验收记录 | [docs/execution/转型执行看板.md](docs/execution/转型执行看板.md) |
 | 端到端验收证据（截图、trace、residual） | [docs/execution/evidence/MAX-009/index.md](docs/execution/evidence/MAX-009/index.md) |
@@ -23,7 +23,8 @@
 | 架构决策记录 | [docs/adr/](docs/adr/) |
 | 现行功能规格 | [docs/specs/](docs/specs/) |
 | IFRS 16 计量口径与回归 | [docs/IFRS16_计量方法与准则映射白皮书.md](docs/IFRS16_计量方法与准则映射白皮书.md)、[docs/IFRS16_计量回归对数报告.md](docs/IFRS16_计量回归对数报告.md) |
-| Agent 运行时的运维与验收 | [docs/AI_Agent_运行运维手册.md](docs/AI_Agent_运行运维手册.md)、[docs/AI_Agent_外部验收清单.md](docs/AI_Agent_外部验收清单.md) |
+| Agent 运行时的运维 | [docs/AI_Agent_运行运维手册.md](docs/AI_Agent_运行运维手册.md) |
+| **AI / Agent 的现行设计与决策** | [docs/AI_文档索引与现行决策.md](docs/AI_文档索引与现行决策.md) — **动 AI 相关的东西之前先读这份**，它标着每份文档还算不算数 |
 
 变更历史不在本文维护，用 `git log`。
 

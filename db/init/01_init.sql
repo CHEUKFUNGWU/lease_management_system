@@ -2001,4 +2001,62 @@ CREATE TABLE IF NOT EXISTS source_feed_configs (
 CREATE INDEX IF NOT EXISTS idx_source_feed_configs_lookup 
 ON source_feed_configs(legal_entity_id, status);
 
+-- Migration 051: Inventory Facts, Master Data Mappings, Competitor Observations (Batches F7, F8, F9)
+CREATE TABLE IF NOT EXISTS retail_store_day_inventory_facts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_entity_id VARCHAR(64) NOT NULL,
+    store_id VARCHAR(64) NOT NULL,
+    business_date DATE NOT NULL,
+    currency VARCHAR(16) NOT NULL DEFAULT 'CNY',
+    category_code VARCHAR(64),
+    sku_code VARCHAR(64),
+    stock_qty DECIMAL(18,2) NOT NULL DEFAULT 0,
+    stock_cost DECIMAL(18,2) NOT NULL DEFAULT 0,
+    in_transit_qty DECIMAL(18,2) NOT NULL DEFAULT 0,
+    in_transit_cost DECIMAL(18,2) NOT NULL DEFAULT 0,
+    days_of_inventory DECIMAL(10,2),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_retail_store_day_inventory UNIQUE (legal_entity_id, store_id, business_date, currency, category_code, sku_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_retail_inventory_facts_lookup 
+ON retail_store_day_inventory_facts(legal_entity_id, store_id, business_date);
+
+CREATE TABLE IF NOT EXISTS master_data_entity_mappings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_entity_id VARCHAR(64) NOT NULL,
+    entity_kind VARCHAR(32) NOT NULL,
+    external_system VARCHAR(64) NOT NULL,
+    raw_identifier VARCHAR(256) NOT NULL,
+    canonical_id VARCHAR(64) NOT NULL,
+    canonical_name VARCHAR(256),
+    confidence_score DECIMAL(5,4) NOT NULL DEFAULT 1.0000,
+    resolved_by VARCHAR(32) NOT NULL DEFAULT 'manual',
+    is_confirmed BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_entity_mapping UNIQUE (legal_entity_id, entity_kind, external_system, raw_identifier)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_mappings_lookup 
+ON master_data_entity_mappings(legal_entity_id, entity_kind, external_system);
+
+CREATE TABLE IF NOT EXISTS retail_competitor_observations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_entity_id VARCHAR(64) NOT NULL,
+    store_id VARCHAR(64) NOT NULL,
+    competitor_name VARCHAR(128) NOT NULL,
+    competitor_brand VARCHAR(128),
+    distance_meters INT,
+    observation_date DATE NOT NULL,
+    price_index DECIMAL(5,2),
+    promo_intensity VARCHAR(32) NOT NULL DEFAULT 'medium',
+    footfall_estimate INT,
+    observer VARCHAR(64),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_competitor_obs_lookup 
+ON retail_competitor_observations(legal_entity_id, store_id, observation_date);
+
 -- End of init script

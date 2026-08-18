@@ -1,5 +1,9 @@
 # AI Chat 升级方案（参考 Pi Coding Agent）
 
+> ⚠️ **ARCHIVED 2026-08-18 — 不是现行依据**
+> 归档理由：早期 pi 借鉴分析，P0 建议已交付；对 pi 的精确映射见《Agent Core（Go）设计》，其 API 描述基于 pi 源码，精度高于本文
+> 现行入口：`docs/AI_文档索引与现行决策.md`
+
 > ⚠️ **文档状态：Superseded（2026-08-18）**
 >
 > 本文是最早一轮对 pi 的借鉴分析，其 P0 建议（流式事件、服务端会话、中途纠偏、技能注册、artifact 协议）已由 `codex/ai-agent-cli-runtime-delivery`（`b1532b4`，已并入 main）交付。

@@ -1,5 +1,9 @@
 # CodebaseDesign：Agent 填表升级（tau + anydoc）模块深化
 
+> ⚠️ **ARCHIVED 2026-08-18 — 不是现行依据**
+> 归档理由：同配套实施计划：tau 模块边界作废，M1 与 M4 已迁入《Agent Core（Go）设计》§8.2 与附录 A
+> 现行入口：`docs/AI_文档索引与现行决策.md`
+
 > ⚠️ **文档状态：Partially Superseded（2026-08-18）**
 >
 > 与配套实施计划同步作废/保留：**tau 相关的模块边界作废**（见 [ADR-0022](adr/0022-first-party-go-agent-core-modelled-on-pi.md)），**anydoc 解析适配器与页面 fill 缝的模块设计保留**（见 [ADR-0024](adr/0024-remove-the-agpl-pdf-dependency.md)）。

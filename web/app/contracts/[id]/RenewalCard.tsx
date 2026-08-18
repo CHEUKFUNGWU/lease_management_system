@@ -92,6 +92,7 @@ const HEALTH_META: Record<string, { label: string; color: string }> = {
   no_revenue: { label: "renewal.health_no_revenue", color: "default" },
   zero_revenue: { label: "renewal.health_zero_revenue", color: "volcano" },
   currency_mismatch: { label: "renewal.health_currency_mismatch", color: "purple" },
+  no_rent: { label: "renewal.health_no_rent", color: "default" },
 };
 
 export function RenewalCard({ contractId }: { contractId: string }) {

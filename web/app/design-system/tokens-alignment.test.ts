@@ -10,7 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { colors, depth, typography } from "./tokens";
+import { colors, darkColors, depth, typography } from "./tokens";
 
 const css = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
 
@@ -26,6 +26,19 @@ function cssVarResolved(name: string): string {
   const ref = /^var\(--([^)]+)\)$/.exec(raw);
   if (ref) return cssVarResolved(ref[1]);
   return raw;
+}
+
+// 取出 [data-theme="dark"] 块（无嵌套花括号，匹配到第一个 } 即收口）。
+function darkBlock(): string {
+  const match = /\[data-theme="dark"\][^{]*\{([^}]*)\}/.exec(css);
+  if (!match) throw new Error("globals.css 缺少 [data-theme=\"dark\"] 块");
+  return match[1];
+}
+
+function darkCssVar(name: string): string {
+  const match = new RegExp(`--${name}\\s*:\\s*([^;]+);`).exec(darkBlock());
+  if (!match) throw new Error(`[data-theme="dark"] 缺少 --${name}`);
+  return match[1].trim();
 }
 
 function pageHeaderTitle(): { size: string; weight: string } {
@@ -78,5 +91,30 @@ describe("tokens.ts 与 globals.css :root 对齐（DESIGN.md §1）", () => {
     for (const size of Object.values(typography.sizes)) {
       expect(size.weight).toBeLessThanOrEqual(600);
     }
+  });
+
+  it("图表色板七个槽位与 tokens 一致（DESIGN.md §3.4）", () => {
+    expect(cssVarResolved("chart-blue")).toBe(colors.chart.blue);
+    expect(cssVarResolved("chart-purple")).toBe(colors.chart.purple);
+    expect(cssVarResolved("chart-primary")).toBe(colors.chart.primary);
+    expect(cssVarResolved("chart-accent")).toBe(colors.chart.accent);
+    expect(cssVarResolved("chart-secondary")).toBe(colors.chart.secondary);
+    expect(cssVarResolved("chart-negative")).toBe(colors.chart.negative);
+    expect(cssVarResolved("chart-fill")).toBe(colors.chart.fill);
+  });
+
+  it("暗色块七个图表槽位齐全，且逐项镜像 darkColors.chart（DARK-004）", () => {
+    // 只定义一两个槽位是历史漂移的成因——缺槽位会静默回落到 :root 的浅色值。
+    const slots = ["chart-blue", "chart-purple", "chart-primary", "chart-accent", "chart-secondary", "chart-negative", "chart-fill"];
+    for (const slot of slots) {
+      expect(darkBlock()).toContain(`--${slot}:`);
+    }
+    expect(darkCssVar("chart-blue")).toBe(darkColors.chart.blue);
+    expect(darkCssVar("chart-purple")).toBe(darkColors.chart.purple);
+    expect(darkCssVar("chart-primary")).toBe(darkColors.chart.primary);
+    expect(darkCssVar("chart-accent")).toBe(darkColors.chart.accent);
+    expect(darkCssVar("chart-secondary")).toBe(darkColors.chart.secondary);
+    expect(darkCssVar("chart-negative")).toBe(darkColors.chart.negative);
+    expect(darkCssVar("chart-fill")).toBe(darkColors.chart.fill);
   });
 });

@@ -40,6 +40,38 @@ interface Props {
   dataClassification?: string;
   fromDate?: string;
   toDate?: string;
+  /** 对标期（比较基线）窗口。缺省时不做毛利分解，只展示当期品类事实。 */
+  baseFromDate?: string;
+  baseToDate?: string;
+}
+
+interface CategoryRow {
+  category_code: string;
+  category_name: string;
+  revenue: number;
+  gross_profit: number;
+}
+
+/** 把 store-day 品类事实按品类汇总。值来自后端事实表，前端不做任何推算。 */
+function aggregateByCategory(facts: RetailStoreDayCategoryFact[]): CategoryRow[] {
+  const catMap = new Map<string, CategoryRow>();
+  for (const f of facts) {
+    const existing = catMap.get(f.category_code) || {
+      category_code: f.category_code,
+      category_name: f.category_code,
+      revenue: 0,
+      gross_profit: 0,
+    };
+    existing.revenue += f.revenue || 0;
+    existing.gross_profit += f.gross_profit || 0;
+    catMap.set(f.category_code, existing);
+  }
+  return Array.from(catMap.values()).map((c) => ({
+    category_code: c.category_code,
+    category_name: c.category_name,
+    revenue: c.revenue,
+    gross_profit: c.gross_profit,
+  }));
 }
 
 export function CategoryCompositionPanel({
@@ -48,6 +80,8 @@ export function CategoryCompositionPanel({
   dataClassification = "production",
   fromDate = "",
   toDate = "",
+  baseFromDate = "",
+  baseToDate = "",
 }: Props) {
   const { language } = useLanguage();
   const { token } = useAuth();
@@ -62,7 +96,7 @@ export function CategoryCompositionPanel({
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch category facts
+      // 1. Fetch category facts for the current window
       const factsRes = await categoryApi.listCategoryFacts(
         {
           store_id: storeId,
@@ -86,42 +120,31 @@ export function CategoryCompositionPanel({
       );
       setReconciliation(recRes);
 
-      // 3. Compute Margin Decomposition if facts exist
-      if (factsRes.facts && factsRes.facts.length > 0) {
-        // Aggregate by category
-        const catMap = new Map<string, { code: string; name: string; rev: number; gp: number }>();
-        for (const f of factsRes.facts) {
-          const existing = catMap.get(f.category_code) || {
-            code: f.category_code,
-            name: f.category_code,
-            rev: 0,
-            gp: 0,
-          };
-          existing.rev += f.revenue || 0;
-          existing.gp += f.gross_profit || 0;
-          catMap.set(f.category_code, existing);
-        }
+      // 3. Baseline = real facts from the comparison window, when one is
+      //    provided. A baseline is never synthesised on the client — the
+      //    decomposition endpoint is only called with facts from the store.
+      let baseline: CategoryRow[] = [];
+      if (baseFromDate && baseToDate) {
+        const baseRes = await categoryApi.listCategoryFacts(
+          {
+            store_id: storeId,
+            from_date: baseFromDate,
+            to_date: baseToDate,
+            data_classification: dataClassification,
+          },
+          token
+        );
+        baseline = aggregateByCategory(baseRes.facts || []);
+      }
+      const hasRealBaseline = baseline.length > 0 && baseline.some((c) => c.revenue > 0);
 
-        const currentList = Array.from(catMap.values()).map((c) => ({
-          category_code: c.code,
-          category_name: c.name,
-          revenue: c.rev,
-          gross_profit: c.gp,
-        }));
-
-        // Baseline: simulated standard 50% baseline if no historic baseline provided
-        const baseList = currentList.map((c) => ({
-          category_code: c.category_code,
-          category_name: c.category_name,
-          revenue: c.revenue * 0.9, // 90% revenue baseline
-          gross_profit: c.revenue * 0.9 * 0.45, // 45% benchmark margin
-        }));
-
+      // 4. Margin decomposition only runs against real base + current facts.
+      if (factsRes.facts && factsRes.facts.length > 0 && hasRealBaseline) {
         const decompRes = await categoryApi.marginDecomposition(
           {
             currency,
-            base: baseList,
-            current: currentList,
+            base: baseline,
+            current: aggregateByCategory(factsRes.facts),
           },
           token
         );
@@ -138,17 +161,26 @@ export function CategoryCompositionPanel({
 
   useEffect(() => {
     loadData();
-  }, [token, storeId, fromDate, toDate, dataClassification, currency]);
+  }, [token, storeId, fromDate, toDate, baseFromDate, baseToDate, dataClassification, currency]);
 
   // Aggregate category rows for display
   const categoryTableData = useMemo(() => {
-    if (!decomposition || !decomposition.categories) return [];
-    return decomposition.categories;
-  }, [decomposition]);
+    if (decomposition) return decomposition.categories;
+    return aggregateByCategory(facts).map((c) => ({
+      category_code: c.category_code,
+      category_name: c.category_code,
+      current_revenue: c.revenue,
+      current_gross_profit: c.gross_profit,
+      current_margin_rate: c.revenue > 0 ? c.gross_profit / c.revenue : null,
+      volume_effect: null,
+      mix_effect: null,
+      rate_effect: null,
+    }));
+  }, [decomposition, facts]);
 
   const columns = [
     {
-      title: "品类编码 (Category)",
+      title: t("category.col_code", language),
       dataIndex: "category_code",
       key: "category_code",
       width: 140,
@@ -162,62 +194,74 @@ export function CategoryCompositionPanel({
       ),
     },
     {
-      title: "销售额 (Revenue)",
+      title: t("category.col_revenue", language),
       dataIndex: "current_revenue",
       key: "current_revenue",
       align: "right" as const,
-      render: (v: number) => fmtMoney(v, currency),
+      render: (v: number | null) => fmtMoney(v ?? 0, currency),
     },
     {
-      title: "毛利额 (Gross Profit)",
+      title: t("category.col_gross_profit", language),
       dataIndex: "current_gross_profit",
       key: "current_gross_profit",
       align: "right" as const,
-      render: (v: number) => (
-        <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-error, #ff4d4f)" }}>
-          {fmtMoney(v, currency)}
-        </span>
-      ),
+      render: (v: number | null) =>
+        v == null ? (
+          "—"
+        ) : (
+          <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-error, #ff4d4f)" }}>
+            {fmtMoney(v, currency)}
+          </span>
+        ),
     },
     {
-      title: "毛利率 (Margin Rate)",
+      title: t("category.col_margin_rate", language),
       dataIndex: "current_margin_rate",
       key: "current_margin_rate",
       align: "right" as const,
-      render: (v: number) => <strong>{fmtPct(v)}</strong>,
+      render: (v: number | null) => (v == null ? "—" : <strong>{fmtPct(v)}</strong>),
     },
     {
       title: t("category.volume_effect", language),
       dataIndex: "volume_effect",
       key: "volume_effect",
       align: "right" as const,
-      render: (v: number) => (
-        <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-error, #ff4d4f)" }}>
-          {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
-        </span>
-      ),
+      render: (v: number | null) =>
+        v == null ? (
+          "—"
+        ) : (
+          <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-error, #ff4d4f)" }}>
+            {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
+          </span>
+        ),
     },
     {
       title: t("category.mix_effect", language),
       dataIndex: "mix_effect",
       key: "mix_effect",
       align: "right" as const,
-      render: (v: number) => (
-        <span style={{ color: v >= 0 ? "var(--color-primary, #1890ff)" : "var(--color-error, #ff4d4f)" }}>
-          {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
-        </span>
-      ),
+      render: (v: number | null) =>
+        v == null ? (
+          "—"
+        ) : (
+          <span style={{ color: v >= 0 ? "var(--color-primary, #1890ff)" : "var(--color-error, #ff4d4f)" }}>
+            {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
+          </span>
+        ),
     },
     {
       title: t("category.rate_effect", language),
       dataIndex: "rate_effect",
       key: "rate_effect",
       align: "right" as const,
-      render: (v: number) => (
-        <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-warning, #faad14)" }}>
-          {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
-        </span>
-      ),
+      render: (v: number | null) =>
+        v == null ? (
+          "—"
+        ) : (
+          <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-warning, #faad14)" }}>
+            {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
+          </span>
+        ),
     },
   ];
 
@@ -230,7 +274,16 @@ export function CategoryCompositionPanel({
           showIcon
           icon={<WarningOutlined />}
           message={t("category.reconcile_mismatch", language)}
-          description={`发现 ${reconciliation.mismatch_count} 个门店日的品类明细与主事实表存在不平残差。系统未自动调平，请核实数据源。`}
+          description={t("category.reconcile_mismatch_desc", language, { count: String(reconciliation.mismatch_count) })}
+        />
+      )}
+      {reconciliation && reconciliation.overall_status === "incomplete" && (
+        <Alert
+          type="warning"
+          showIcon
+          icon={<WarningOutlined />}
+          message={t("category.reconcile_incomplete", language)}
+          description={t("category.reconcile_incomplete_desc", language, { count: String(reconciliation.incomplete_count) })}
         />
       )}
 
@@ -295,64 +348,77 @@ export function CategoryCompositionPanel({
               </Card>
             </Col>
           </Row>
-
-          {/* Category Table Card */}
-          <Card
-            size="small"
-            title={
-              <Space>
-                <PieChartOutlined />
-                <span>{t("category.tab_composition", language)}</span>
-                {reconciliation && (
-                  reconciliation.overall_status === "tie" ? (
-                    <Tag color="success" icon={<CheckCircleOutlined />}>
-                      {t("category.reconcile_tie", language)}
-                    </Tag>
-                  ) : reconciliation.overall_status === "within_tolerance" ? (
-                    <Tag color="cyan">
-                      {t("category.reconcile_within_tol", language)}
-                    </Tag>
-                  ) : reconciliation.overall_status === "mismatch" ? (
-                    <Tag color="error" icon={<WarningOutlined />}>
-                      {t("category.reconcile_mismatch", language)}
-                    </Tag>
-                  ) : (
-                    <Tag color="default">
-                      {t("category.reconcile_no_detail", language)}
-                    </Tag>
-                  )
-                )}
-                {decomposition.is_conserved && (
-                  <Tag color="blue">
-                    守恒残差: {decomposition.rounding_residual}
-                  </Tag>
-                )}
-              </Space>
-            }
-            extra={
-              <Button size="small" icon={<SyncOutlined />} onClick={loadData}>
-                刷新
-              </Button>
-            }
-          >
-            <Table
-              dataSource={categoryTableData}
-              columns={columns}
-              rowKey="category_code"
-              pagination={false}
-              size="small"
-              scroll={tableScrollX(categoryTableData.length, 800)}
-            />
-          </Card>
         </>
       ) : (
-        <Card size="small">
+        facts.length > 0 && (
+          <Alert
+            type="warning"
+            showIcon
+            icon={<WarningOutlined />}
+            message={t("category.no_baseline", language)}
+          />
+        )
+      )}
+
+      {/* Category Table Card */}
+      <Card
+        size="small"
+        title={
+          <Space>
+            <PieChartOutlined />
+            <span>{t("category.tab_composition", language)}</span>
+            {reconciliation && (
+              reconciliation.overall_status === "tie" ? (
+                <Tag color="success" icon={<CheckCircleOutlined />}>
+                  {t("category.reconcile_tie", language)}
+                </Tag>
+              ) : reconciliation.overall_status === "within_tolerance" ? (
+                <Tag color="cyan">
+                  {t("category.reconcile_within_tol", language)}
+                </Tag>
+              ) : reconciliation.overall_status === "mismatch" ? (
+                <Tag color="error" icon={<WarningOutlined />}>
+                  {t("category.reconcile_mismatch", language)}
+                </Tag>
+              ) : reconciliation.overall_status === "incomplete" ? (
+                <Tag color="warning" icon={<WarningOutlined />}>
+                  {t("category.reconcile_incomplete", language)}
+                </Tag>
+              ) : (
+                <Tag color="default">
+                  {t("category.reconcile_no_detail", language)}
+                </Tag>
+              )
+            )}
+            {decomposition?.is_conserved && (
+              <Tag color="blue">
+                {t("category.conserved_residual", language, { value: String(decomposition.rounding_residual) })}
+              </Tag>
+            )}
+          </Space>
+        }
+        extra={
+          <Button size="small" icon={<SyncOutlined />} onClick={loadData}>
+            {t("category.refresh", language)}
+          </Button>
+        }
+      >
+        {categoryTableData.length > 0 ? (
+          <Table
+            dataSource={categoryTableData}
+            columns={columns}
+            rowKey="category_code"
+            pagination={false}
+            size="small"
+            scroll={tableScrollX(categoryTableData.length, 800)}
+          />
+        ) : (
           <div style={{ textAlign: "center", padding: "30px 0", color: "var(--fg-muted)" }}>
             <PieChartOutlined style={{ fontSize: 32, marginBottom: 8 }} />
             <div>{t("category.reconcile_no_detail", language)}</div>
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
     </Space>
   );
 }

@@ -755,6 +755,8 @@ function Store360Inner() {
                   dataClassification={query.classification || "production"}
                   fromDate={response.evidence?.current?.date_from}
                   toDate={response.evidence?.current?.date_to}
+                  baseFromDate={response.evidence?.comparison?.date_from}
+                  baseToDate={response.evidence?.comparison?.date_to}
                 />
               </div>
 

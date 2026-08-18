@@ -119,6 +119,7 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
             item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
             item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
             item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
+            item("/upload", "/upload", <CloudUploadOutlined />, t("nav.upload", language as any)),
           ],
       });
       if (canViewAccounting) {

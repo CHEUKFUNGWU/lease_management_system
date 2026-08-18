@@ -2228,9 +2228,10 @@ export interface CategoryReconciliationResponse {
   within_tolerance_count: number;
   mismatch_count: number;
   no_detail_count: number;
+  incomplete_count: number;
   store_day_results: DayStoreReconciliationResult[];
   mismatches: DayStoreReconciliationResult[];
-  overall_status: "tie" | "within_tolerance" | "mismatch" | "no_detail";
+  overall_status: "tie" | "within_tolerance" | "mismatch" | "no_detail" | "incomplete";
 }
 
 export interface CategoryAttribution {

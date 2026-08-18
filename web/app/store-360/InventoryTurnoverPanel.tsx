@@ -20,6 +20,7 @@ import {
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { fmtMoney } from "../lib/format";
+import { t } from "../lib/i18n";
 import { inventoryApi, type InventorySummary } from "../lib/api";
 import { StateBlock } from "../components/StateBlock";
 
@@ -70,7 +71,7 @@ export function InventoryTurnoverPanel({
 
   if (loading) {
     return (
-      <Card size="small" title={<Space><InboxOutlined /><span>库存周转与在途资金占用 (Inventory & Working Capital)</span></Space>}>
+      <Card size="small" title={<Space><InboxOutlined /><span>{t("inventory.panel_title", language)}</span></Space>}>
         <div style={{ textAlign: "center", padding: "20px 0" }}>
           <Spin />
         </div>
@@ -85,12 +86,12 @@ export function InventoryTurnoverPanel({
         title={
           <Space>
             <InboxOutlined />
-            <span>库存周转与在途资金占用 (Inventory & Working Capital)</span>
-            <Tag color="blue">存量指标 MeasureKind: stock</Tag>
+            <span>{t("inventory.panel_title", language)}</span>
+            <Tag color="blue">{t("inventory.measure_kind_tag", language)}</Tag>
           </Space>
         }
       >
-        <StateBlock state={{ kind: "empty", reason: "当前门店在选定期间暂无库存与在途记录" }} language={language} />
+        <StateBlock state={{ kind: "empty", reason: t("inventory.empty_reason", language) }} language={language} />
       </Card>
     );
   }
@@ -101,8 +102,8 @@ export function InventoryTurnoverPanel({
       title={
         <Space>
           <InboxOutlined />
-          <span>库存周转与在途资金占用 (Inventory & Working Capital)</span>
-          <Tag color="blue">存量指标 MeasureKind: stock</Tag>
+          <span>{t("inventory.panel_title", language)}</span>
+          <Tag color="blue">{t("inventory.measure_kind_tag", language)}</Tag>
         </Space>
       }
     >
@@ -110,13 +111,13 @@ export function InventoryTurnoverPanel({
         <Col xs={12} sm={8} md={4}>
           <Card size="small">
             <Statistic
-              title="在库库存成本"
+              title={t("inventory.stat_stock_cost", language)}
               value={summary.ending_stock_cost}
               formatter={(v) => fmtMoney(Number(v), currency)}
               valueStyle={{ fontSize: 18 }}
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              在库数量: {summary.ending_stock_qty.toLocaleString()} 件
+              {t("inventory.stat_stock_qty", language, { qty: summary.ending_stock_qty.toLocaleString() })}
             </Text>
           </Card>
         </Col>
@@ -124,13 +125,13 @@ export function InventoryTurnoverPanel({
         <Col xs={12} sm={8} md={5}>
           <Card size="small">
             <Statistic
-              title="在途存货成本 (In-Transit)"
+              title={t("inventory.stat_transit_cost", language)}
               value={summary.in_transit_cost}
               formatter={(v) => fmtMoney(Number(v), currency)}
               valueStyle={{ fontSize: 18 }}
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              在途数量: {summary.in_transit_qty.toLocaleString()} 件
+              {t("inventory.stat_transit_qty", language, { qty: summary.in_transit_qty.toLocaleString() })}
             </Text>
           </Card>
         </Col>
@@ -138,16 +139,16 @@ export function InventoryTurnoverPanel({
         <Col xs={12} sm={8} md={5}>
           <Card size="small">
             <Statistic
-              title="库存周转天数 (DOI)"
+              title={t("inventory.stat_doi", language)}
               value={summary.doi != null ? summary.doi : "—"}
-              suffix={summary.doi != null ? "天" : ""}
+              suffix={summary.doi != null ? t("inventory.days_suffix", language) : ""}
               valueStyle={{
                 fontSize: 20,
-                color: (summary.doi ?? 0) <= 30 ? "#52c41a" : (summary.doi ?? 0) <= 60 ? "#1890ff" : "#faad14",
+                color: summary.doi == null ? "var(--fg-muted)" : summary.doi <= 30 ? "#52c41a" : summary.doi <= 60 ? "#1890ff" : "#faad14",
               }}
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              (期末存货 / 营业成本) × {summary.days}天
+              {t("inventory.doi_formula", language, { days: String(summary.days) })}
             </Text>
           </Card>
         </Col>
@@ -155,13 +156,13 @@ export function InventoryTurnoverPanel({
         <Col xs={12} sm={8} md={5}>
           <Card size="small">
             <Statistic
-              title="存货周转率 (Turnover)"
+              title={t("inventory.stat_turnover", language)}
               value={summary.turnover_rate != null ? summary.turnover_rate : "—"}
-              suffix={summary.turnover_rate != null ? "次" : ""}
+              suffix={summary.turnover_rate != null ? t("inventory.times_suffix", language) : ""}
               valueStyle={{ fontSize: 20 }}
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              营业成本 / 存货成本
+              {t("inventory.turnover_formula", language)}
             </Text>
           </Card>
         </Col>
@@ -169,13 +170,13 @@ export function InventoryTurnoverPanel({
         <Col xs={12} sm={8} md={5}>
           <Card size="small">
             <Statistic
-              title="资金占用成本 (年化)"
+              title={t("inventory.stat_carrying_cost", language)}
               value={summary.total_carrying_cost}
               formatter={(v) => fmtMoney(Number(v), currency)}
               valueStyle={{ fontSize: 18, color: "#ff4d4f" }}
             />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              按 {(summary.carrying_cost_rate * 100).toFixed(0)}% 资金利息测算
+              {t("inventory.carrying_formula", language, { rate: (summary.carrying_cost_rate * 100).toFixed(0) })}
             </Text>
           </Card>
         </Col>

@@ -20,6 +20,7 @@ import {
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 import { competitorApi, type CompetitorBenchmarkSummary, type CompetitorObservation } from "../lib/api";
 import { tableScrollX } from "../lib/tableScroll";
 import { StateBlock } from "../components/StateBlock";
@@ -55,9 +56,26 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
     loadData();
   }, [token, storeId]);
 
+  const intensityLabel = (st: string): string => {
+    switch (st) {
+      case "low":
+        return t("competitor.intensity_low", language);
+      case "medium":
+        return t("competitor.intensity_medium", language);
+      case "high":
+        return t("competitor.intensity_high", language);
+      case "aggressive":
+        return t("competitor.intensity_aggressive", language);
+      case "none":
+        return t("competitor.intensity_none", language);
+      default:
+        return st;
+    }
+  };
+
   if (loading) {
     return (
-      <Card size="small" title={<Space><ShopOutlined /><span>周边商圈竞品观测 (Competitor Benchmark)</span></Space>}>
+      <Card size="small" title={<Space><ShopOutlined /><span>{t("competitor.panel_title", language)}</span></Space>}>
         <div style={{ textAlign: "center", padding: "20px 0" }}>
           <Spin />
         </div>
@@ -72,12 +90,12 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
         title={
           <Space>
             <ShopOutlined />
-            <span>周边商圈竞品观测 (Competitor Benchmark)</span>
-            <Tag color="purple">参考域隔离数据 (Non-KPI)</Tag>
+            <span>{t("competitor.panel_title", language)}</span>
+            <Tag color="purple">{t("competitor.non_kpi_tag", language)}</Tag>
           </Space>
         }
       >
-        <StateBlock state={{ kind: "empty", reason: "当前门店周边商圈暂未录入竞品观测记录" }} language={language} />
+        <StateBlock state={{ kind: "empty", reason: t("competitor.empty_reason", language) }} language={language} />
       </Card>
     );
   }
@@ -92,7 +110,7 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
 
   const columns = [
     {
-      title: "竞品名称",
+      title: t("competitor.col_name", language),
       dataIndex: "competitor_name",
       key: "competitor_name",
       width: 160,
@@ -104,7 +122,7 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
       ),
     },
     {
-      title: "距离 (米)",
+      title: t("competitor.col_distance", language),
       dataIndex: "distance_meters",
       key: "distance_meters",
       width: 100,
@@ -112,7 +130,7 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
       render: (v?: number) => (v != null ? `${v}m` : "—"),
     },
     {
-      title: "相对价格指数",
+      title: t("competitor.col_price_index", language),
       dataIndex: "price_index",
       key: "price_index",
       width: 120,
@@ -126,14 +144,14 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
       ),
     },
     {
-      title: "促销力度",
+      title: t("competitor.col_promo_intensity", language),
       dataIndex: "promo_intensity",
       key: "promo_intensity",
       width: 110,
-      render: (st: string) => <Tag color={threatColors[st] || "default"}>{st}</Tag>,
+      render: (st: string) => <Tag color={threatColors[st] || "default"}>{intensityLabel(st)}</Tag>,
     },
     {
-      title: "预估客流",
+      title: t("competitor.col_footfall", language),
       dataIndex: "footfall_estimate",
       key: "footfall_estimate",
       width: 110,
@@ -141,13 +159,13 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
       render: (v?: number) => (v != null ? v.toLocaleString() : "—"),
     },
     {
-      title: "观测日期",
+      title: t("competitor.col_date", language),
       dataIndex: "observation_date",
       key: "observation_date",
       width: 120,
     },
     {
-      title: "备注与线索",
+      title: t("competitor.col_notes", language),
       dataIndex: "notes",
       key: "notes",
       render: (notes?: string) => notes || "—",
@@ -160,8 +178,8 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
       title={
         <Space>
           <ShopOutlined />
-          <span>周边商圈竞品观测 (Competitor Benchmark)</span>
-          <Tag color="purple">参考域隔离数据 (Non-KPI)</Tag>
+          <span>{t("competitor.panel_title", language)}</span>
+          <Tag color="purple">{t("competitor.non_kpi_tag", language)}</Tag>
         </Space>
       }
     >
@@ -170,9 +188,9 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
           <Col span={8}>
             <Card size="small">
               <Statistic
-                title="监测竞品总数"
+                title={t("competitor.stat_count", language)}
                 value={summary.competitor_count}
-                suffix="家"
+                suffix={t("competitor.count_suffix", language)}
                 valueStyle={{ fontSize: 18 }}
               />
             </Card>
@@ -180,7 +198,7 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
           <Col span={8}>
             <Card size="small">
               <Statistic
-                title="商圈平均相对价格指数"
+                title={t("competitor.stat_avg_price", language)}
                 value={summary.avg_price_index != null ? (summary.avg_price_index * 100).toFixed(0) : "—"}
                 suffix={summary.avg_price_index != null ? "%" : ""}
                 valueStyle={{ fontSize: 18 }}
@@ -190,8 +208,8 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
           <Col span={8}>
             <Card size="small">
               <Statistic
-                title="最高促销竞争威胁"
-                value={summary.highest_promo_threat}
+                title={t("competitor.stat_highest_threat", language)}
+                value={intensityLabel(summary.highest_promo_threat)}
                 valueStyle={{
                   fontSize: 18,
                   color: summary.highest_promo_threat === "aggressive" ? "#ff4d4f" : undefined,

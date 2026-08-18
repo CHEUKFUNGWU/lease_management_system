@@ -16,7 +16,7 @@ interface StoreRatio {
   store_name: string;
   brand: string;
   region: string;
-  cash_rent: number;
+  cash_rent: number | null;
   revenue: number | null;
   currency: string;
   sales_per_sqm: number | null;
@@ -48,6 +48,7 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   no_revenue: { label: "缺营收", color: "default" },
   zero_revenue: { label: "营收为零", color: "volcano" },
   currency_mismatch: { label: "币种不一致", color: "purple" },
+  no_rent: { label: "缺租金", color: "default" },
 };
 
 export function RentToSalesPanel({ token }: { token: string | null }) {

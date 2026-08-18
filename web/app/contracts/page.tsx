@@ -268,7 +268,6 @@ function ContractsPage() {
         <Space direction="vertical" size={2} style={{ maxWidth: 220 }}>
           <a
             className="contract-number-link"
-            style={{ fontWeight: 600, color: "var(--chart-blue, #1677FF)", cursor: "pointer", fontSize: 13 }}
             onClick={() => router.push(`/contracts/${record.id}`)}
           >
             {record.contract_number}

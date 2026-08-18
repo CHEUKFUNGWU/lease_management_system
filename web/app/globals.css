@@ -143,8 +143,18 @@
   --state-error-bg: #3A1616;
   --state-error-text: #F0625C;
   --state-error-border: #5A2626;
-  --chart-blue: #4FC3F7;
-  --chart-purple: #B39DDB;
+  /* DARK-004: the dark chart slots mirror darkColors.chart in tokens.ts.
+     §3.4 semantics hold in both themes — dark mode must not render the
+     blue/purple sequences the palette explicitly rules out. All seven slots
+     are mirrored; defining only two was how light values leaked into the
+     other five in dark mode. */
+  --chart-blue: #D1D5DB;
+  --chart-purple: #D98E73;
+  --chart-primary: #D1D5DB;
+  --chart-accent: #E5C896;
+  --chart-secondary: #9CA3AF;
+  --chart-negative: #D98E73;
+  --chart-fill: #262626;
   --admin-surface: #001529;
   --code-surface: #1E1E1E;
 

@@ -1140,6 +1140,226 @@ const dict: TranslationDict = {
     "zh-HK": "暫無品類明細數據",
     en: "No Category Details",
   },
+  "category.reconcile_incomplete": {
+    "zh-CN": "部分门店日品类明细缺失，差异未按 0 估算",
+    "zh-HK": "部分門店日品類明細缺失，差異未按 0 估算",
+    en: "Some store-days have missing category detail — differences are not estimated as zero",
+  },
+  "category.no_baseline": {
+    "zh-CN": "缺少可对比的历史基线，量/结构/毛利变动效应不可计算。当前展示品类实际销售与毛利。",
+    "zh-HK": "缺少可對比的歷史基線，量/結構/毛利變動效應不可計算。當前展示品類實際銷售與毛利。",
+    en: "No comparable historical baseline — volume / mix / rate effects cannot be computed. Showing actual category sales and margin.",
+  },
+  "category.col_code": {
+    "zh-CN": "品类编码 (Category)",
+    "zh-HK": "品類編碼 (Category)",
+    en: "Category Code",
+  },
+  "category.col_revenue": {
+    "zh-CN": "销售额 (Revenue)",
+    "zh-HK": "銷售額 (Revenue)",
+    en: "Revenue",
+  },
+  "category.col_gross_profit": {
+    "zh-CN": "毛利额 (Gross Profit)",
+    "zh-HK": "毛利額 (Gross Profit)",
+    en: "Gross Profit",
+  },
+  "category.col_margin_rate": {
+    "zh-CN": "毛利率 (Margin Rate)",
+    "zh-HK": "毛利率 (Margin Rate)",
+    en: "Margin Rate",
+  },
+  "category.refresh": {
+    "zh-CN": "刷新",
+    "zh-HK": "刷新",
+    en: "Refresh",
+  },
+  "category.conserved_residual": {
+    "zh-CN": "守恒残差: {value}",
+    "zh-HK": "守恆殘差: {value}",
+    en: "Conserved residual: {value}",
+  },
+  "category.reconcile_mismatch_desc": {
+    "zh-CN": "发现 {count} 个门店日的品类明细与主事实表存在不平残差。系统未自动调平，请核实数据源。",
+    "zh-HK": "發現 {count} 個門店日的品類明細與主事實表存在不平殘差。系統未自動調平，請核實數據源。",
+    en: "Found {count} store-days where category details do not tie to the summary facts. The system does not auto-balance; please verify the data source.",
+  },
+  "category.reconcile_incomplete_desc": {
+    "zh-CN": "{count} 个门店日存在缺失的品类明细；缺失值未按 0 参与对账。",
+    "zh-HK": "{count} 個門店日存在缺失的品類明細；缺失值未按 0 參與對賬。",
+    en: "{count} store-days have missing category details; missing values were not treated as zero in the reconciliation.",
+  },
+  "inventory.panel_title": {
+    "zh-CN": "库存周转与在途资金占用 (Inventory & Working Capital)",
+    "zh-HK": "庫存週轉與在途資金佔用 (Inventory & Working Capital)",
+    en: "Inventory Turnover & Working Capital",
+  },
+  "inventory.measure_kind_tag": {
+    "zh-CN": "存量指标 MeasureKind: stock",
+    "zh-HK": "存量指標 MeasureKind: stock",
+    en: "Stock measure — MeasureKind: stock",
+  },
+  "inventory.empty_reason": {
+    "zh-CN": "当前门店在选定期间暂无库存与在途记录",
+    "zh-HK": "當前門店在選定期間暫無庫存與在途記錄",
+    en: "No inventory or in-transit records for this store in the selected period",
+  },
+  "inventory.stat_stock_cost": {
+    "zh-CN": "在库库存成本",
+    "zh-HK": "在庫庫存成本",
+    en: "On-hand stock cost",
+  },
+  "inventory.stat_stock_qty": {
+    "zh-CN": "在库数量: {qty} 件",
+    "zh-HK": "在庫數量: {qty} 件",
+    en: "On-hand qty: {qty} units",
+  },
+  "inventory.stat_transit_cost": {
+    "zh-CN": "在途存货成本 (In-Transit)",
+    "zh-HK": "在途存貨成本 (In-Transit)",
+    en: "In-transit stock cost",
+  },
+  "inventory.stat_transit_qty": {
+    "zh-CN": "在途数量: {qty} 件",
+    "zh-HK": "在途數量: {qty} 件",
+    en: "In-transit qty: {qty} units",
+  },
+  "inventory.stat_doi": {
+    "zh-CN": "库存周转天数 (DOI)",
+    "zh-HK": "庫存週轉天數 (DOI)",
+    en: "Days of Inventory (DOI)",
+  },
+  "inventory.days_suffix": {
+    "zh-CN": "天",
+    "zh-HK": "天",
+    en: "days",
+  },
+  "inventory.doi_formula": {
+    "zh-CN": "(期末存货 / 营业成本) × {days}天",
+    "zh-HK": "(期末存貨 / 營業成本) × {days}天",
+    en: "(ending inventory / COGS) × {days} days",
+  },
+  "inventory.stat_turnover": {
+    "zh-CN": "存货周转率 (Turnover)",
+    "zh-HK": "存貨週轉率 (Turnover)",
+    en: "Inventory Turnover",
+  },
+  "inventory.times_suffix": {
+    "zh-CN": "次",
+    "zh-HK": "次",
+    en: "x",
+  },
+  "inventory.turnover_formula": {
+    "zh-CN": "营业成本 / 存货成本",
+    "zh-HK": "營業成本 / 存貨成本",
+    en: "COGS / inventory cost",
+  },
+  "inventory.stat_carrying_cost": {
+    "zh-CN": "资金占用成本 (年化)",
+    "zh-HK": "資金佔用成本 (年化)",
+    en: "Carrying cost (annualized)",
+  },
+  "inventory.carrying_formula": {
+    "zh-CN": "按 {rate}% 资金利息测算",
+    "zh-HK": "按 {rate}% 資金利息測算",
+    en: "At {rate}% cost of capital",
+  },
+  "competitor.panel_title": {
+    "zh-CN": "周边商圈竞品观测 (Competitor Benchmark)",
+    "zh-HK": "周邊商圈競品觀測 (Competitor Benchmark)",
+    en: "Competitor Benchmark",
+  },
+  "competitor.non_kpi_tag": {
+    "zh-CN": "参考域隔离数据 (Non-KPI)",
+    "zh-HK": "參考域隔離數據 (Non-KPI)",
+    en: "Reference-only data (Non-KPI)",
+  },
+  "competitor.empty_reason": {
+    "zh-CN": "当前门店周边商圈暂未录入竞品观测记录",
+    "zh-HK": "當前門店周邊商圈暫未錄入競品觀測記錄",
+    en: "No competitor observations recorded for this store's area yet",
+  },
+  "competitor.col_name": {
+    "zh-CN": "竞品名称",
+    "zh-HK": "競品名稱",
+    en: "Competitor",
+  },
+  "competitor.col_distance": {
+    "zh-CN": "距离 (米)",
+    "zh-HK": "距離 (米)",
+    en: "Distance (m)",
+  },
+  "competitor.col_price_index": {
+    "zh-CN": "相对价格指数",
+    "zh-HK": "相對價格指數",
+    en: "Relative Price Index",
+  },
+  "competitor.col_promo_intensity": {
+    "zh-CN": "促销力度",
+    "zh-HK": "促銷力度",
+    en: "Promo Intensity",
+  },
+  "competitor.col_footfall": {
+    "zh-CN": "预估客流",
+    "zh-HK": "預估客流",
+    en: "Est. Footfall",
+  },
+  "competitor.col_date": {
+    "zh-CN": "观测日期",
+    "zh-HK": "觀測日期",
+    en: "Observed On",
+  },
+  "competitor.col_notes": {
+    "zh-CN": "备注与线索",
+    "zh-HK": "備註與線索",
+    en: "Notes & Leads",
+  },
+  "competitor.stat_count": {
+    "zh-CN": "监测竞品总数",
+    "zh-HK": "監測競品總數",
+    en: "Competitors Tracked",
+  },
+  "competitor.count_suffix": {
+    "zh-CN": "家",
+    "zh-HK": "家",
+    en: "",
+  },
+  "competitor.stat_avg_price": {
+    "zh-CN": "商圈平均相对价格指数",
+    "zh-HK": "商圈平均相對價格指數",
+    en: "Avg. Price Index",
+  },
+  "competitor.stat_highest_threat": {
+    "zh-CN": "最高促销竞争威胁",
+    "zh-HK": "最高促銷競爭威脅",
+    en: "Highest Promo Threat",
+  },
+  "competitor.intensity_low": {
+    "zh-CN": "低",
+    "zh-HK": "低",
+    en: "Low",
+  },
+  "competitor.intensity_medium": {
+    "zh-CN": "中",
+    "zh-HK": "中",
+    en: "Medium",
+  },
+  "competitor.intensity_high": {
+    "zh-CN": "高",
+    "zh-HK": "高",
+    en: "High",
+  },
+  "competitor.intensity_aggressive": {
+    "zh-CN": "激进",
+    "zh-HK": "激進",
+    en: "Aggressive",
+  },
+  "competitor.intensity_none": {
+    "zh-CN": "无",
+    "zh-HK": "無",
+    en: "None",
+  },
   "promotion.title": {
     "zh-CN": "促销活动与 ROI 闭环",
     "zh-HK": "促銷活動與 ROI 閉環",
@@ -5304,6 +5524,11 @@ const dict: TranslationDict = {
     "zh-CN": "币种不一致",
     "zh-HK": "幣種不一致",
     en: "Currency mismatch",
+  },
+  "renewal.health_no_rent": {
+    "zh-CN": "无租金数据",
+    "zh-HK": "無租金數據",
+    en: "No rent data",
   },
   "renewal.health_description": {
     "zh-CN": "暂无可用的门店经营指标",

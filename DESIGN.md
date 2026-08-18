@@ -320,7 +320,7 @@ xs sm md  lg  xl  2xl 3xl 4xl
 
 - ❌ **禁止硬编码 CJK 字面量。** 所有面向用户的文案走 `t("key", language)`。
 - `web/app/lib/i18n.ts` 里每个 key 必须同时提供 `zh-CN` / `zh-HK` / `en` 三种译文。
-- ⚠️ 现状：`/operating-pulse`、`/store-360`、`/scenario-workbench` 三页**完全没有引入 `t()`**，是已知违规项（改善方案阶段四）。**新页面不得重复这个错误。**
+- ✅ 现状（2026-08-18 复测）：三页均已接入 `t()`（调用数 104 / 118 / 71）；store-360 的三个新面板（`InventoryTurnoverPanel` / `CompetitorBenchmarkPanel` / `CategoryCompositionPanel`）此前残留的硬编码 CJK 已全部迁移到 `inventory.*` / `competitor.*` / `category.*` 键组（含 `{count}` / `{qty}` / `{days}` / `{rate}` 插值）。**新页面、新面板不得再引入 CJK 字面量。**
 
 ---
 
@@ -390,8 +390,8 @@ xs sm md  lg  xl  2xl 3xl 4xl
 | 类名覆盖 / app shell CSS | ✅ 测试守护 | `app/lib/class-coverage.test.ts`、`app/lib/app-shell-css.test.ts` |
 | i18n 硬编码文案 | ✅ 审计脚本 | `web/scripts/audit-i18n.mjs` |
 | 组件测试 | ✅ 13 个 `.test.tsx` | 用 `renderToStaticMarkup` SSR 断言，不依赖 `@testing-library` |
-| ESLint 配置文件 | ❌ **仍不存在** | `next lint` 无配置文件可读，实际拦截全靠 `enforce-design.mjs` |
+| ESLint 配置文件 | ⚠️ **存在但只产 warning** | `web/.eslintrc.json` 已存在（`extends: next/core-web-vitals`），`next lint` 确实读取它；缺的是把规则提到 error——当前 21 条 `react-hooks/exhaustive-deps` 等只 warning 不 fail，`next lint` 因此永远绿 |
 
 **`enforce-design.mjs` 是 diff 级拦截器**：基线 CI 用 `origin/main`、本地用 `main`，只检查**新增行**。存量违规（§14 那批）一律放行——全树扫描会立刻全红，变成没人能合的噪音。
 
-这个设计的代价写在 §14：**它只在你跑了 `npm run lint` 时生效。** 内联样式从 906 涨到 946 说明这条路径被绕过过，或者匹配规则漏了某些写法。ESLint 配置文件仍然缺失，是这套机制里唯一还没补上的一环。
+这个设计的代价写在 §14：**它只在你跑了 `npm run lint` 时生效。** 内联样式从 906 涨到 946 说明这条路径被绕过过，或者匹配规则漏了某些写法。ESLint 配置不是缺失而是太松——`next/core-web-vitals` 的规则只 warning 不 fail，要补的一环是把关键规则提到 error（或给 `next lint` 加 `--max-warnings=0`）。

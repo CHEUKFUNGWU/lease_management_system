@@ -1923,12 +1923,13 @@ CREATE TABLE IF NOT EXISTS retail_store_day_category_facts (
     data_classification VARCHAR(32) NOT NULL DEFAULT 'production',
     simulation_dataset_version VARCHAR(64),
     data_quality_status VARCHAR(32) NOT NULL DEFAULT 'valid',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
-    CONSTRAINT uq_retail_store_day_category_fact UNIQUE (
-        legal_entity_id, store_id, business_date, currency, category_code,
-        data_classification, simulation_dataset_version, version
-    )
+CREATE UNIQUE INDEX IF NOT EXISTS uq_retail_store_day_category_fact_dedup
+ON retail_store_day_category_facts (
+    legal_entity_id, store_id, business_date, currency, category_code,
+    data_classification, COALESCE(simulation_dataset_version, ''), version
 );
 
 CREATE INDEX IF NOT EXISTS idx_retail_store_day_category_facts_lookup 
@@ -1965,11 +1966,16 @@ CREATE TABLE IF NOT EXISTS promotion_costs (
     amount DECIMAL(18,2) NOT NULL DEFAULT 0,
     currency VARCHAR(16) NOT NULL DEFAULT 'CNY',
     notes TEXT,
+    source_system VARCHAR(100) NOT NULL DEFAULT 'manual_import',
+    import_batch_id VARCHAR(64),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_promotion_costs_promo 
 ON promotion_costs(promotion_id, period);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_promotion_costs_dedup
+ON promotion_costs (promotion_id, period, cost_category, amount, currency);
 
 -- Migration 050: Machine Credentials & Source Feeds (Batch F6)
 CREATE TABLE IF NOT EXISTS machine_credentials (
@@ -2015,8 +2021,18 @@ CREATE TABLE IF NOT EXISTS retail_store_day_inventory_facts (
     in_transit_qty DECIMAL(18,2) NOT NULL DEFAULT 0,
     in_transit_cost DECIMAL(18,2) NOT NULL DEFAULT 0,
     days_of_inventory DECIMAL(10,2),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uq_retail_store_day_inventory UNIQUE (legal_entity_id, store_id, business_date, currency, category_code, sku_code)
+    data_classification VARCHAR(32) NOT NULL DEFAULT 'production',
+    source_system VARCHAR(100) NOT NULL DEFAULT 'unknown',
+    import_batch_id VARCHAR(64),
+    as_of_at TIMESTAMP WITH TIME ZONE,
+    version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_retail_store_day_inventory_dedup
+ON retail_store_day_inventory_facts (
+    legal_entity_id, store_id, business_date, currency,
+    COALESCE(category_code, ''), COALESCE(sku_code, '')
 );
 
 CREATE INDEX IF NOT EXISTS idx_retail_inventory_facts_lookup 
@@ -2053,10 +2069,49 @@ CREATE TABLE IF NOT EXISTS retail_competitor_observations (
     footfall_estimate INT,
     observer VARCHAR(64),
     notes TEXT,
+    data_classification VARCHAR(32) NOT NULL DEFAULT 'production',
+    source_system VARCHAR(100) NOT NULL DEFAULT 'manual_import',
+    import_batch_id VARCHAR(64),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_competitor_obs_lookup 
 ON retail_competitor_observations(legal_entity_id, store_id, observation_date);
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_retail_competitor_observation
+ON retail_competitor_observations (legal_entity_id, store_id, observation_date, competitor_name);
+
 -- End of init script
+
+-- schema_migrations records which migrations have been applied. A fresh volume
+-- starts fully migrated (001..052) so `scripts/migrate.sh` sees nothing pending;
+-- an existing volume tracks its own progress in this same table. Keep this list
+-- in sync whenever a new migration is added to db/migrations/.
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version     TEXT PRIMARY KEY,
+    applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO schema_migrations (version) VALUES
+('001_initial_schema'), ('002_seed_data'), ('003_update_schema'), ('004_monthly_closing'),
+('005_lease_scope_gate'), ('006_lease_admin_platform'), ('007_obligations_portfolio'),
+('008_ai_chat_runtime'), ('009_access_policy'), ('010_monthly_closing_integrity'),
+('011_workflow_controls'), ('012_journal_entry_reversal'), ('013_contract_area'),
+('014_contract_updated_by'), ('015_exchange_rates'), ('016_budget_versions'),
+('017_event_parameters'), ('018_store_metrics'), ('019_close_exception_governance'),
+('020_fpna_decision_governance'), ('021_remove_unapproved_defaults'),
+('022_agent_draft_idempotency'), ('023_agent_artifact_protocol'), ('024_agent_draft_batches'),
+('025_agent_capability_revocations'), ('026_event_draft_evidence'),
+('027_agent_run_checkpoints'), ('028_agent_run_event_types'), ('029_agent_run_worker_leases'),
+('030_auth_refresh_sessions'), ('031_agent_run_audit_summaries'),
+('032_agent_run_checkpoint_audit_and_terminal_alerts'), ('033_agent_run_audit_links'),
+('034_operating_decision_platform'), ('035_fpna_governed_decision_artifacts'),
+('036_close_exception_governance_repair'), ('037_budget_versions_source_backfill'),
+('038_retail_store_day_facts'), ('039_retail_simulation_datasets'),
+('040_agent_artifact_retail_proposal'), ('041_ai_chat_message_confidence'),
+('042_ai_chat_session_initiator'), ('043_retag_home_brief_sessions'),
+('044_gl_trial_balance'), ('045_agent_usage_events'), ('046_store_lifecycle_and_labor'),
+('047_capex_and_exchange_rates'), ('048_category_facts_and_reconciliation'),
+('049_promotions_and_roi'), ('050_machine_credentials_and_source_feeds'),
+('051_inventory_masterdata_and_competitors'), ('052_env_envelope_and_dedup_keys')
+ON CONFLICT (version) DO NOTHING;

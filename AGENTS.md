@@ -29,9 +29,9 @@
 
 ## 当前工程事实
 
-- `db/init/01_init.sql`：73 张表；增量迁移到 `045_agent_usage_events.sql`
-- `core-service/internal/services/`：22 个业务包，其中 `retailkpi` / `retailpulse` / `retailstore360` / `retailscenario` / `retailsimulation` 为零售经营分析
-- `web/app/`：26 个页面，零售主线为 `/operating-pulse`、`/store-360`、`/scenario-workbench`
+- `db/init/01_init.sql`：83 张业务表 + `schema_migrations`（空库基线自动标记全部迁移已应用）；增量迁移到 `052_env_envelope_and_dedup_keys.sql`
+- `core-service/internal/services/`：41 个业务包，其中 `retailkpi` / `retailpulse` / `retailstore360` / `retailscenario` / `retailsimulation` 为零售经营分析
+- `web/app/`：29 个页面，零售主线为 `/operating-pulse`、`/store-360`、`/scenario-workbench`
 - Agent Tool：`lease.*` 29 个；零售只读 Tool 3 个（`retail.operating_pulse.read`、`retail.store_diagnostics.read`、`retail.store.scenario.evaluate`）
 - Docker Compose 默认 5 个服务（PostgreSQL、MinIO、Core、AI、Web），`worker` profile 可另起 `agent-runner`
 - IFRS 16 回归：22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，未经第三方会计师复核，**不得对外表述为审计背书**
@@ -71,7 +71,7 @@
 
 ## 架构分层
 
-- **Web** (Next.js + TypeScript + Ant Design + Recharts)：经营脉搏、门店 360、租金谈判测算、合同台账、AI 录入、月结、报表、组合分析等 26 个页面
+- **Web** (Next.js + TypeScript + Ant Design + Recharts)：经营脉搏、门店 360、租金谈判测算、合同台账、AI 录入、月结、报表、组合分析等 29 个页面
 - **Core Service** (Go + Gin)：权限、合同主数据、付款计划、事件、IFRS 16 计量、月结、ERP 导出/回写、审计日志、零售 KPI 语义层与经营分析服务、Agent Gateway
 - **AI Service** (Python + FastAPI)：文件解析、PaddleOCR、LLM 字段抽取、草稿生成、置信度与原文定位
 - **PostgreSQL**：正式业务数据、经营事实、AI 草稿、任务状态、审核记录
@@ -187,7 +187,7 @@
 
 **计量结果**：合同编号、会计期间、期初/期末租赁负债、本期新增/利息/付款/重估调整、期初/期末使用权资产、本期新增/折旧/减值/终止处置
 
-**Store-day 经营事实**：法人、门店、日期、币种、营收、毛利、交易数、客流、人工成本、固定租金、变量租金、非租赁成本、其他成本、面积；来源信封（`data_classification` = production/simulated/mixed、`source_system`、`batch_id`、`dataset_version`、`fact_version`、`as_of`）
+**Store-day 经营事实**：法人、门店、日期、币种、营收、毛利、交易数、客流、人工成本、固定租金、变量租金、非租赁成本、其他成本、面积；来源信封按 038/048/052 实际列名写：`data_classification`（production/simulated/mixed）、`source_system`、`import_batch_id`、`as_of_at`、`version`（= fact version）、`simulation_dataset_version`
 
 **审计追溯**：数据版本号、合同版本号、利率版本号、计算规则版本号、导入批次号、创建/更新人及时间、审批人、附件索引
 

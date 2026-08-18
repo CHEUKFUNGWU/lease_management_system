@@ -34,6 +34,8 @@ type PromotionCost struct {
 	Amount       float64   `json:"amount"`
 	Currency     string    `json:"currency"`
 	Notes        *string   `json:"notes,omitempty"`
+	SourceSystem string    `json:"source_system"`
+	ImportBatchID *string  `json:"import_batch_id,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -169,15 +171,23 @@ func (r *PromotionRepository) ListPromotionCosts(ctx context.Context, promoID st
 }
 
 func (r *PromotionRepository) AddPromotionCost(ctx context.Context, c *PromotionCost) error {
+	if c.SourceSystem == "" {
+		c.SourceSystem = "manual_import"
+	}
 	query := `
 		INSERT INTO promotion_costs (
-			promotion_id, period, cost_category, amount, currency, notes
-		) VALUES ($1, $2, $3, $4, $5, $6)
+			promotion_id, period, cost_category, amount, currency, notes, source_system, import_batch_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (promotion_id, period, cost_category, amount, currency)
+		DO UPDATE SET
+			notes = EXCLUDED.notes,
+			source_system = EXCLUDED.source_system,
+			import_batch_id = EXCLUDED.import_batch_id
 		RETURNING id, created_at
 	`
 	return r.db.QueryRow(
 		ctx, query,
-		c.PromotionID, c.Period, c.CostCategory, c.Amount, c.Currency, c.Notes,
+		c.PromotionID, c.Period, c.CostCategory, c.Amount, c.Currency, c.Notes, c.SourceSystem, c.ImportBatchID,
 	).Scan(&c.ID, &c.CreatedAt)
 }
 
@@ -219,7 +229,7 @@ func (r *PromotionRepository) GetPromotionActualFacts(ctx context.Context, legal
 	// through the store, and the join is INNER so a fact whose store is missing
 	// cannot slip past the tenant filter.
 	query := `
-		SELECT f.store_id, f.business_date, f.currency, COALESCE(f.revenue, 0), COALESCE(f.gross_profit, 0), COALESCE(f.transactions, 0)
+		SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit, f.transactions
 		FROM retail_store_day_facts f
 		JOIN stores s ON s.id = f.store_id
 		WHERE s.legal_entity_id = $1
@@ -241,6 +251,7 @@ func (r *PromotionRepository) GetPromotionActualFacts(ctx context.Context, legal
 	for rows.Next() {
 		var f promotionattribution.DailyFact
 		var bDate time.Time
+		// revenue/gross_profit/transactions 保留 NULL（扫描进指针），缺失绝不当作 0。
 		if err := rows.Scan(&f.StoreID, &bDate, &f.Currency, &f.Revenue, &f.GrossProfit, &f.Transactions); err != nil {
 			return nil, fmt.Errorf("scan promo fact: %w", err)
 		}

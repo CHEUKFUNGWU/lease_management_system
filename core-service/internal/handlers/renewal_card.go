@@ -323,12 +323,12 @@ func (h *RenewalCardHandler) storeHealth(ctx context.Context, storeID string, co
 		Period:         latest.Period,
 		HealthyCeiling: h.rentToSalesThreshold(ctx, "rent_to_sales_healthy_ceiling"),
 		WarningCeiling: h.rentToSalesThreshold(ctx, "rent_to_sales_warning_ceiling"),
-		Stores: []renttosales.StoreInput{{
-			StoreID: storeID, StoreCode: latest.StoreCode, StoreName: latest.StoreName,
-			CashRent: monthlyRent, RentCurrency: contract.Currency,
-			Revenue: &latest.Revenue, RevenueCurrency: latest.Currency,
-			RevenueSource: latest.Source, AreaSqm: contract.AreaSqm,
-		}},
+Stores: []renttosales.StoreInput{{
+				StoreID: storeID, StoreCode: latest.StoreCode, StoreName: latest.StoreName,
+				CashRent: &monthlyRent, RentCurrency: contract.Currency,
+				Revenue: &latest.Revenue, RevenueCurrency: latest.Currency,
+				RevenueSource: latest.Source, AreaSqm: contract.AreaSqm,
+			}},
 	})
 	if err != nil || len(result.Stores) == 0 {
 		return nil

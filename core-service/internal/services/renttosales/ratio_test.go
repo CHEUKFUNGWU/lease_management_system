@@ -10,7 +10,16 @@ func revenue(value float64) *float64 { return &value }
 func store(code string, rent float64, sales *float64) StoreInput {
 	return StoreInput{
 		StoreID: code, StoreCode: code, StoreName: code + " 店",
-		CashRent: rent, RentCurrency: "CNY",
+		CashRent: &rent, RentCurrency: "CNY",
+		Revenue: sales, RevenueCurrency: "CNY", RevenueSource: "manual",
+	}
+}
+
+// storeNoRent is a store with reported sales but no approved rent schedule.
+func storeNoRent(code string, sales *float64) StoreInput {
+	return StoreInput{
+		StoreID: code, StoreCode: code, StoreName: code + " 店",
+		CashRent: nil, RentCurrency: "",
 		Revenue: sales, RevenueCurrency: "CNY", RevenueSource: "manual",
 	}
 }
@@ -89,6 +98,31 @@ func TestCalculate_KeepsUnknownApartFromZeroAndFromMismatch(t *testing.T) {
 	}
 	if result.StoresNoRevenue != 1 {
 		t.Errorf("only the unreported store counts as missing revenue, got %d", result.StoresNoRevenue)
+	}
+}
+
+// A store with sales but no approved rent schedule is not a store paying zero
+// rent. Stating 0% would claim the rent schedule says something it does not.
+func TestCalculate_UnknownRentIsNotZeroRent(t *testing.T) {
+	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+		storeNoRent("NORENT", revenue(1000000)),
+	}}))
+	if err != nil {
+		t.Fatalf("Calculate: %v", err)
+	}
+
+	row := find(t, result, "NORENT")
+	if row.Status != StatusNoRent {
+		t.Errorf("no approved schedule must read as unknown rent, not 0: %+v", row)
+	}
+	if row.RentToSales != nil {
+		t.Errorf("an unknown-rent store has no ratio: %+v", row)
+	}
+	if row.CashRent != 0 {
+		t.Errorf("an unknown-rent store must not carry a stated rent figure: %+v", row)
+	}
+	if result.PortfolioRatio != nil {
+		t.Errorf("portfolio ratio must not include an unknown-rent store: %v", *result.PortfolioRatio)
 	}
 }
 

@@ -12,6 +12,7 @@ const (
 	StatusWithinTolerance ReconciliationStatus = "within_tolerance"
 	StatusMismatch        ReconciliationStatus = "mismatch"
 	StatusNoDetail        ReconciliationStatus = "no_detail"
+	StatusIncomplete      ReconciliationStatus = "incomplete"
 )
 
 type CategoryFact struct {
@@ -19,8 +20,8 @@ type CategoryFact struct {
 	BusinessDate string // YYYY-MM-DD
 	Currency     string
 	CategoryCode string
-	Revenue      float64
-	GrossProfit  float64
+	Revenue      *float64 // nil == 缺失；不得当作 0 参与对账
+	GrossProfit  *float64
 	Transactions int
 	Units        float64
 }
@@ -29,8 +30,8 @@ type DailySummaryFact struct {
 	StoreID      string
 	BusinessDate string // YYYY-MM-DD
 	Currency     string
-	Revenue      float64
-	GrossProfit  float64
+	Revenue      *float64
+	GrossProfit  *float64
 }
 
 type Tolerance struct {
@@ -67,6 +68,7 @@ type ReconciliationResult struct {
 	WithinToleranceCount   int              `json:"within_tolerance_count"`
 	MismatchCount          int              `json:"mismatch_count"`
 	NoDetailCount          int              `json:"no_detail_count"`
+	IncompleteCount        int              `json:"incomplete_count"`
 	StoreDayResults        []DayStoreResult `json:"store_day_results"`
 	Mismatches             []DayStoreResult `json:"mismatches"`
 	OverallStatus          ReconciliationStatus `json:"overall_status"`
@@ -87,9 +89,11 @@ func Reconcile(details []CategoryFact, summaries []DailySummaryFact, tol Toleran
 
 	// 1. Group category details by (store, date, currency)
 	detailSums := make(map[key]*struct {
-		rev   float64
-		gp    float64
-		count int
+		rev        float64
+		gp         float64
+		count      int
+		missingRev int
+		missingGP  int
 	})
 
 	for _, d := range details {
@@ -97,14 +101,24 @@ func Reconcile(details []CategoryFact, summaries []DailySummaryFact, tol Toleran
 		entry := detailSums[k]
 		if entry == nil {
 			entry = &struct {
-				rev   float64
-				gp    float64
-				count int
+				rev        float64
+				gp         float64
+				count      int
+				missingRev int
+				missingGP  int
 			}{}
 			detailSums[k] = entry
 		}
-		entry.rev += d.Revenue
-		entry.gp += d.GrossProfit
+		if d.Revenue == nil {
+			entry.missingRev++
+		} else {
+			entry.rev += *d.Revenue
+		}
+		if d.GrossProfit == nil {
+			entry.missingGP++
+		} else {
+			entry.gp += *d.GrossProfit
+		}
 		entry.count++
 	}
 
@@ -115,32 +129,62 @@ func Reconcile(details []CategoryFact, summaries []DailySummaryFact, tol Toleran
 	withinTolCount := 0
 	mismatchCount := 0
 	noDetailCount := 0
+	incompleteCount := 0
 
 	for _, s := range summaries {
 		k := key{storeID: s.StoreID, date: s.BusinessDate, curr: s.Currency}
 		dEntry := detailSums[k]
 
 		r := DayStoreResult{
-			StoreID:        s.StoreID,
-			BusinessDate:   s.BusinessDate,
-			Currency:       s.Currency,
-			SummaryRevenue: round2(s.Revenue),
-			SummaryGP:      round2(s.GrossProfit),
+			StoreID:      s.StoreID,
+			BusinessDate: s.BusinessDate,
+			Currency:     s.Currency,
+		}
+		if s.Revenue != nil {
+			r.SummaryRevenue = round2(*s.Revenue)
+		}
+		if s.GrossProfit != nil {
+			r.SummaryGP = round2(*s.GrossProfit)
 		}
 
-		if dEntry == nil || dEntry.count == 0 {
+		// 汇总侧本身缺数：无法对账，不得把 NULL 当作 0 去比。
+		if s.Revenue == nil || s.GrossProfit == nil {
+			r.RevenueDiff = 0
+			r.GPDiff = 0
+			r.Status = StatusIncomplete
+			r.Reason = "summary fact missing revenue or gross_profit; NULL is not treated as zero"
+			incompleteCount++
+		} else if dEntry == nil || dEntry.count == 0 {
 			r.DetailRevenue = 0
 			r.DetailGP = 0
-			r.RevenueDiff = round2(-s.Revenue)
-			r.GPDiff = round2(-s.GrossProfit)
+			r.RevenueDiff = round2(-*s.Revenue)
+			r.GPDiff = round2(-*s.GrossProfit)
 			r.Status = StatusNoDetail
 			r.Reason = "no category detail facts found for this store-day"
 			noDetailCount++
+		} else if dEntry.missingRev > 0 || dEntry.missingGP > 0 {
+			// 明细行缺数：只对已知值求和，缺失不按 0 参与差异计算，
+			// 该门店日标记为 incomplete 而非伪造一个真实的差异。
+			if dEntry.missingRev > 0 {
+				r.Reason = fmt.Sprintf("%d category rows missing revenue; missing values not treated as zero", dEntry.missingRev)
+			}
+			if dEntry.missingGP > 0 {
+				if r.Reason != "" {
+					r.Reason += "; "
+				}
+				r.Reason += fmt.Sprintf("%d category rows missing gross_profit; missing values not treated as zero", dEntry.missingGP)
+			}
+			r.DetailRevenue = round2(dEntry.rev)
+			r.DetailGP = round2(dEntry.gp)
+			r.RevenueDiff = round2(dEntry.rev - *s.Revenue)
+			r.GPDiff = round2(dEntry.gp - *s.GrossProfit)
+			r.Status = StatusIncomplete
+			incompleteCount++
 		} else {
 			r.DetailRevenue = round2(dEntry.rev)
 			r.DetailGP = round2(dEntry.gp)
-			r.RevenueDiff = round2(dEntry.rev - s.Revenue)
-			r.GPDiff = round2(dEntry.gp - s.GrossProfit)
+			r.RevenueDiff = round2(dEntry.rev - *s.Revenue)
+			r.GPDiff = round2(dEntry.gp - *s.GrossProfit)
 
 			revDiffAbs := math.Abs(r.RevenueDiff)
 			gpDiffAbs := math.Abs(r.GPDiff)
@@ -151,12 +195,12 @@ func Reconcile(details []CategoryFact, summaries []DailySummaryFact, tol Toleran
 			} else {
 				// Check tolerance
 				revRatio := 0.0
-				if math.Abs(s.Revenue) > 0.005 {
-					revRatio = revDiffAbs / math.Abs(s.Revenue)
+				if math.Abs(*s.Revenue) > 0.005 {
+					revRatio = revDiffAbs / math.Abs(*s.Revenue)
 				}
 				gpRatio := 0.0
-				if math.Abs(s.GrossProfit) > 0.005 {
-					gpRatio = gpDiffAbs / math.Abs(s.GrossProfit)
+				if math.Abs(*s.GrossProfit) > 0.005 {
+					gpRatio = gpDiffAbs / math.Abs(*s.GrossProfit)
 				}
 
 				revOk := revDiffAbs <= tol.AbsoluteRevenue || revRatio <= tol.Ratio
@@ -183,8 +227,10 @@ func Reconcile(details []CategoryFact, summaries []DailySummaryFact, tol Toleran
 		overall = StatusMismatch
 	} else if withinTolCount > 0 {
 		overall = StatusWithinTolerance
-	} else if noDetailCount > 0 && tieCount == 0 {
+	} else if noDetailCount > 0 && tieCount == 0 && incompleteCount == 0 {
 		overall = StatusNoDetail
+	} else if incompleteCount > 0 && tieCount == 0 && withinTolCount == 0 {
+		overall = StatusIncomplete
 	}
 
 	return ReconciliationResult{
@@ -193,6 +239,7 @@ func Reconcile(details []CategoryFact, summaries []DailySummaryFact, tol Toleran
 		WithinToleranceCount: withinTolCount,
 		MismatchCount:        mismatchCount,
 		NoDetailCount:        noDetailCount,
+		IncompleteCount:      incompleteCount,
 		StoreDayResults:      results,
 		Mismatches:           mismatches,
 		OverallStatus:        overall,

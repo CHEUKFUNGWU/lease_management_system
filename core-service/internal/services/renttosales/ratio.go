@@ -27,6 +27,7 @@ const (
 	StatusNoRevenue     = "no_revenue"
 	StatusZeroRevenue   = "zero_revenue"
 	StatusCurrencyClash = "currency_mismatch"
+	StatusNoRent        = "no_rent"
 )
 
 // StoreInput is one store's rent and, if it was reported, its sales.
@@ -37,7 +38,10 @@ type StoreInput struct {
 	Brand     string
 	Region    string
 
-	CashRent     float64
+	// CashRent is nil when no approved rent schedule covers the period. That
+	// is different from a store paying no rent, and the report keeps the two
+	// apart (the same rule Revenue already follows).
+	CashRent     *float64
 	RentCurrency string
 
 	Revenue         *float64
@@ -122,9 +126,12 @@ func Calculate(input Input) (Result, error) {
 		ratio := StoreRatio{
 			StoreID: store.StoreID, StoreCode: store.StoreCode, StoreName: store.StoreName,
 			Brand: store.Brand, Region: store.Region,
-			CashRent: round2(store.CashRent), Revenue: store.Revenue,
+			Revenue: store.Revenue,
 			Currency: store.RentCurrency, RevenueVersion: store.RevenueVersion,
 			RevenueSource: store.RevenueSource,
+		}
+		if store.CashRent != nil {
+			ratio.CashRent = round2(*store.CashRent)
 		}
 
 		switch {
@@ -132,6 +139,12 @@ func Calculate(input Input) (Result, error) {
 			ratio.Status = StatusNoRevenue
 			ratio.StatusReason = "尚未上传该期间营收"
 			result.StoresNoRevenue++
+			portfolioUsable = false
+
+		case store.CashRent == nil:
+			// 门店在期间内没有已审批的租金付款计划：租金未知，不是零租金。
+			ratio.Status = StatusNoRent
+			ratio.StatusReason = "该期间未匹配到已审批的租金付款计划，租金未知（并非零租金）"
 			portfolioUsable = false
 
 		case store.RentCurrency != "" && store.RevenueCurrency != "" &&
@@ -149,7 +162,7 @@ func Calculate(input Input) (Result, error) {
 			portfolioUsable = false
 
 		default:
-			percent := round2(store.CashRent / *store.Revenue * 100)
+			percent := round2(*store.CashRent / *store.Revenue * 100)
 			ratio.RentToSales = &percent
 			switch {
 			case percent > warning:
@@ -163,7 +176,7 @@ func Calculate(input Input) (Result, error) {
 				ratio.Status = StatusHealthy
 			}
 
-			ratedRent += store.CashRent
+			ratedRent += *store.CashRent
 			ratedRevenue += *store.Revenue
 			if ratedCurrency == "" {
 				ratedCurrency = store.RentCurrency

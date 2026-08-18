@@ -137,7 +137,7 @@ func main() {
 	promotionRepo := repository.NewPromotionRepository(database.Pool)
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo)
 	machineCredRepo := repository.NewMachineCredentialRepository(database.Pool)
-	sourceFeedHandler := handlers.NewSourceFeedHandler(machineCredRepo, retailKPIRepo)
+	sourceFeedHandler := handlers.NewSourceFeedHandler(machineCredRepo, retailKPIRepo, operatingFactsRepo, auditLogger)
 	inventoryRepo := repository.NewInventoryRepository(database.Pool)
 	inventoryMetricsHandler := handlers.NewInventoryMetricsHandler(inventoryRepo, retailKPIRepo)
 	masterDataResolutionHandler := handlers.NewMasterDataResolutionHandler(database.Pool)

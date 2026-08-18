@@ -96,6 +96,9 @@ type upsertInventoryFactReq struct {
 	InTransitQty    float64  `json:"in_transit_qty"`
 	InTransitCost   float64  `json:"in_transit_cost"`
 	DaysOfInventory *float64 `json:"days_of_inventory"`
+	SourceSystem    string   `json:"source_system"`
+	ImportBatchID   *string  `json:"import_batch_id"`
+	AsOfAt          string   `json:"as_of_at"`
 }
 
 func (h *InventoryMetricsHandler) UpsertInventoryFact(c *gin.Context) {
@@ -121,6 +124,14 @@ func (h *InventoryMetricsHandler) UpsertInventoryFact(c *gin.Context) {
 		InTransitQty:    req.InTransitQty,
 		InTransitCost:   req.InTransitCost,
 		DaysOfInventory: req.DaysOfInventory,
+		SourceSystem:    req.SourceSystem,
+		ImportBatchID:   req.ImportBatchID,
+	}
+	if req.AsOfAt != "" {
+		if parsed, err := time.Parse(time.RFC3339, req.AsOfAt); err == nil {
+			utc := parsed.UTC()
+			fact.AsOfAt = &utc
+		}
 	}
 
 	if err := h.repo.UpsertInventoryFact(c.Request.Context(), fact); err != nil {

@@ -397,13 +397,6 @@ func (h *Agent) executeRetailOperations(ctx context.Context, req Request, emit f
 		} else if data.Reason == "" {
 			data.Reason = retailToolReason(err, diagnosticResult)
 		}
-		// A no-facts pulse can still reach diagnostics with a scope_denied
-		// response because the requested store is absent from the authorized
-		// population. Preserve the business data-quality reason in the Agent
-		// output while retaining the raw tool rejection in the trace.
-		if data.Reason == "scope_denied" && data.Pulse != nil && retailPulseInsufficientReason(data.Pulse) == "no_facts" {
-			data.Reason = "no_facts"
-		}
 		if err != nil || data.Diagnostics == nil {
 			data.EvidenceStatus = "insufficient"
 			data.NeedsInput = retailReasonNeedsInput(data.Reason)

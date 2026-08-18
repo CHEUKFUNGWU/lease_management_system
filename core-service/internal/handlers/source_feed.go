@@ -2,11 +2,17 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/machineauth"
@@ -14,17 +20,31 @@ import (
 )
 
 type SourceFeedHandler struct {
-	credRepo *repository.MachineCredentialRepository
-	kpiRepo  *repository.RetailKPIRepository
+	credRepo     *repository.MachineCredentialRepository
+	kpiRepo      *repository.RetailKPIRepository
+	storeDayRepo retailStoreDayFactStore
+	audit        retailStoreDayFactAuditor
 }
 
 func NewSourceFeedHandler(
 	credRepo *repository.MachineCredentialRepository,
 	kpiRepo *repository.RetailKPIRepository,
+	storeDayRepo retailStoreDayFactStore,
+	auditLogger any,
 ) *SourceFeedHandler {
+	var auditor retailStoreDayFactAuditor
+	switch value := auditLogger.(type) {
+	case nil:
+	case retailStoreDayFactAuditor:
+		auditor = value
+	default:
+		auditor = nil
+	}
 	return &SourceFeedHandler{
-		credRepo: credRepo,
-		kpiRepo:  kpiRepo,
+		credRepo:     credRepo,
+		kpiRepo:      kpiRepo,
+		storeDayRepo: storeDayRepo,
+		audit:        auditor,
 	}
 }
 
@@ -190,7 +210,9 @@ func (h *SourceFeedHandler) PushFacts(c *gin.Context) {
 		DataClassification: "production",
 	}
 
-	// 3. Convert via APIPushFeed Adapter
+	// 3. Convert via APIPushFeed Adapter (shape validation + headers for the
+	//    response). Persistence below re-uses the typed payload, not these
+	//    stringified rows, so numeric precision is preserved.
 	feed := sourcefeed.NewAPIPushFeed(req.Facts, env)
 	batch, err := feed.Fetch(c.Request.Context(), "")
 	if err != nil {
@@ -198,12 +220,75 @@ func (h *SourceFeedHandler) PushFacts(c *gin.Context) {
 		return
 	}
 
+	// 4. Validate and persist through the same idempotent path as the main
+	//    store-day write API. The machine credential's legal entity is the
+	//    scope; the batch id is the idempotency key.
+	entity, err := access.EntityFilterFor(cred.LegalEntityID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "machine credential lacks a legal entity scope"})
+		return
+	}
+	raw, err := json.Marshal(req.Facts)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "facts payload cannot be encoded"})
+		return
+	}
+	var inputs []retailStoreDayFactInput
+	if err := json.Unmarshal(raw, &inputs); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "facts items must be objects with store_id / business_date / revenue"})
+		return
+	}
+	if len(inputs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "facts must contain at least one record"})
+		return
+	}
+	prepared := make([]*repository.RetailStoreDayFact, 0, len(inputs))
+	for index, input := range inputs {
+		input.SourceSystem = req.SourceSystem
+		input.ImportBatchID = nil
+		input.AsOfAt = asOfTime.UTC().Format(time.RFC3339)
+		if input.Version == 0 {
+			input.Version = 1
+		}
+		if input.DataClassification == "" {
+			input.DataClassification = "production"
+		}
+		fact, validationError := validateRetailStoreDayInput(input)
+		if validationError != "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("facts[%d] invalid: %s", index, validationError),
+			})
+			return
+		}
+		prepared = append(prepared, fact)
+	}
+
+	digest := sha256.Sum256(raw)
+	payloadSHA256 := hex.EncodeToString(digest[:])
+	var auditFn repository.RetailStoreDayFactAuditFunc
+	if h.audit != nil {
+		auditFn = func(ctx context.Context, tx repository.DBTX, oldFact, newFact *repository.RetailStoreDayFact) error {
+			return h.audit.LogInTx(ctx, tx, "retail_store_day_facts", newFact.ID, "upsert", oldFact, newFact, "machine_api", c)
+		}
+	}
+	result, err := h.storeDayRepo.UpsertRetailStoreDayFactsAtomic(c.Request.Context(), entity, prepared, req.BatchID, payloadSHA256, nil, auditFn)
+	if err != nil {
+		if errors.Is(err, repository.ErrRetailStoreDayFactIdempotencyConflict) {
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), nil)
+			return
+		}
+		writeCodedFailure(c, http.StatusUnprocessableEntity, err, nil)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status":          "accepted",
-		"batch_id":        batch.Envelope.ImportBatchID,
-		"source_system":   batch.Envelope.SourceSystem,
-		"records_count":   len(batch.Rows),
-		"headers":         batch.Headers,
-		"message":         "Facts batch received and mapped via SourceFeed adapter",
+		"status":         "accepted",
+		"batch_id":       batch.Envelope.ImportBatchID,
+		"source_system":  batch.Envelope.SourceSystem,
+		"records_count":  len(batch.Rows),
+		"headers":        batch.Headers,
+		"saved_count":    len(result.Facts),
+		"idempotent_replay": result.Replayed,
+		"message":        "Facts batch received, mapped and persisted via the store-day fact pipeline",
 	})
 }

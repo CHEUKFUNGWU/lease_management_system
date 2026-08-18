@@ -44,9 +44,9 @@ type DailyFact struct {
 	StoreID      string
 	BusinessDate string // YYYY-MM-DD
 	Currency     string
-	Revenue      float64
-	GrossProfit  float64
-	Transactions int
+	Revenue      *float64 // nil == 缺失；不得当作 0 销售（retail-kpi-v1 口径）
+	GrossProfit  *float64
+	Transactions *int
 }
 
 type RunRate struct {
@@ -74,16 +74,25 @@ type AttributionResult struct {
 	IsSeparable            bool              `json:"is_separable"`
 	OverlapWarnings        []string          `json:"overlap_warnings"`
 	Disclaimers            []string          `json:"disclaimers"`
+	// BaselineUnavailable 标记无法从真实经营事实得出基线（活动前无数据或基线查询失败）。
+	// 设置时 ROI 必须为 nil，增量数字不得作为决策依据。
+	BaselineUnavailable bool `json:"baseline_unavailable,omitempty"`
 }
 
 // Attribute executes pure promotion ROI attribution with overlap non-separable degradation.
 func Attribute(promo Promotion, costs []PromotionCost, actual []DailyFact, baseline RunRate, overlaps []Promotion) AttributionResult {
-	// 1. Calculate actual totals during promotion
+	// 1. Calculate actual totals during promotion. NULL 字段不参与加总——
+	//    缺失的门店日不得当作零销售拖低实际值，也不得当作零拉高增量。
 	var actualRev, actualGP float64
+	var missingDays int
 	daySet := make(map[string]struct{})
 	for _, f := range actual {
-		actualRev += f.Revenue
-		actualGP += f.GrossProfit
+		if f.Revenue == nil || f.GrossProfit == nil {
+			missingDays++
+		} else {
+			actualRev += *f.Revenue
+			actualGP += *f.GrossProfit
+		}
 		daySet[f.BusinessDate] = struct{}{}
 	}
 
@@ -145,6 +154,12 @@ func Attribute(promo Promotion, costs []PromotionCost, actual []DailyFact, basel
 	}
 	if !isSeparable {
 		disclaimers = append(disclaimers, "存在重叠活动或多因素并发，增量销售与毛利数据已降级为不可分离状态。")
+	}
+	if missingDays > 0 {
+		disclaimers = append(disclaimers, fmt.Sprintf(
+			"促销窗口内有 %d 个门店日缺少营收或毛利数据；实际汇总仅覆盖有数据的门店日，缺失部分未以 0 估算。",
+			missingDays,
+		))
 	}
 
 	return AttributionResult{

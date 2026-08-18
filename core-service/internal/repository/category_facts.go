@@ -173,7 +173,7 @@ func (r *CategoryRepository) GetCategoryReconciliationData(
 ) ([]categoryreconciliation.CategoryFact, []categoryreconciliation.DailySummaryFact, error) {
 	// 1. Fetch category facts
 	catQuery := `
-		SELECT store_id, business_date, currency, category_code, COALESCE(revenue, 0), COALESCE(gross_profit, 0), COALESCE(transactions, 0), COALESCE(units, 0)
+		SELECT store_id, business_date, currency, category_code, revenue, gross_profit, COALESCE(transactions, 0), COALESCE(units, 0)
 		FROM retail_store_day_category_facts
 		WHERE legal_entity_id = $1
 	`
@@ -222,7 +222,7 @@ func (r *CategoryRepository) GetCategoryReconciliationData(
 	// legal_entity_id: tenancy is reached through the store. The join is INNER so
 	// a fact whose store is missing cannot slip past the tenant filter.
 	sumQuery := `
-		SELECT f.store_id, f.business_date, f.currency, COALESCE(f.revenue, 0), COALESCE(f.gross_profit, 0)
+		SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit
 		FROM retail_store_day_facts f
 		JOIN stores s ON s.id = f.store_id
 		WHERE s.legal_entity_id = $1

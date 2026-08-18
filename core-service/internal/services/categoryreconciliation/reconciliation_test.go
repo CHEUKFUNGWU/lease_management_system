@@ -4,17 +4,19 @@ import (
 	"testing"
 )
 
+func fp(v float64) *float64 { return &v }
+
 func TestReconcile_AllTie(t *testing.T) {
 	summaries := []DailySummaryFact{
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: 1000.0, GrossProfit: 400.0},
-		{StoreID: "S01", BusinessDate: "2026-01-02", Currency: "CNY", Revenue: 2000.0, GrossProfit: 800.0},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: fp(1000.0), GrossProfit: fp(400.0)},
+		{StoreID: "S01", BusinessDate: "2026-01-02", Currency: "CNY", Revenue: fp(2000.0), GrossProfit: fp(800.0)},
 	}
 
 	details := []CategoryFact{
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_A", Revenue: 600.0, GrossProfit: 240.0},
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_B", Revenue: 400.0, GrossProfit: 160.0},
-		{StoreID: "S01", BusinessDate: "2026-01-02", Currency: "CNY", CategoryCode: "CAT_A", Revenue: 1500.0, GrossProfit: 600.0},
-		{StoreID: "S01", BusinessDate: "2026-01-02", Currency: "CNY", CategoryCode: "CAT_B", Revenue: 500.0, GrossProfit: 200.0},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_A", Revenue: fp(600.0), GrossProfit: fp(240.0)},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_B", Revenue: fp(400.0), GrossProfit: fp(160.0)},
+		{StoreID: "S01", BusinessDate: "2026-01-02", Currency: "CNY", CategoryCode: "CAT_A", Revenue: fp(1500.0), GrossProfit: fp(600.0)},
+		{StoreID: "S01", BusinessDate: "2026-01-02", Currency: "CNY", CategoryCode: "CAT_B", Revenue: fp(500.0), GrossProfit: fp(200.0)},
 	}
 
 	res := Reconcile(details, summaries, DefaultTolerance())
@@ -32,13 +34,13 @@ func TestReconcile_AllTie(t *testing.T) {
 
 func TestReconcile_WithinTolerance(t *testing.T) {
 	summaries := []DailySummaryFact{
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: 1000.0, GrossProfit: 400.0},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: fp(1000.0), GrossProfit: fp(400.0)},
 	}
 
 	// 0.5 difference is within 1.0 absolute tolerance
 	details := []CategoryFact{
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_A", Revenue: 600.5, GrossProfit: 400.3},
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_B", Revenue: 400.0, GrossProfit: 0.0},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_A", Revenue: fp(600.5), GrossProfit: fp(400.3)},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_B", Revenue: fp(400.0), GrossProfit: fp(0.0)},
 	}
 
 	res := Reconcile(details, summaries, DefaultTolerance())
@@ -53,13 +55,13 @@ func TestReconcile_WithinTolerance(t *testing.T) {
 
 func TestReconcile_MismatchNeverAutoBalanced(t *testing.T) {
 	summaries := []DailySummaryFact{
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: 1000.0, GrossProfit: 400.0},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: fp(1000.0), GrossProfit: fp(400.0)},
 	}
 
 	// 200.0 mismatch
 	details := []CategoryFact{
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_A", Revenue: 500.0, GrossProfit: 200.0},
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_B", Revenue: 300.0, GrossProfit: 100.0},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_A", Revenue: fp(500.0), GrossProfit: fp(200.0)},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_B", Revenue: fp(300.0), GrossProfit: fp(100.0)},
 	}
 
 	res := Reconcile(details, summaries, DefaultTolerance())
@@ -85,7 +87,7 @@ func TestReconcile_MismatchNeverAutoBalanced(t *testing.T) {
 
 func TestReconcile_NoDetail(t *testing.T) {
 	summaries := []DailySummaryFact{
-		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: 1000.0, GrossProfit: 400.0},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: fp(1000.0), GrossProfit: fp(400.0)},
 	}
 	details := []CategoryFact{}
 
@@ -96,5 +98,28 @@ func TestReconcile_NoDetail(t *testing.T) {
 	}
 	if res.NoDetailCount != 1 {
 		t.Fatalf("expected 1 no_detail count, got %d", res.NoDetailCount)
+	}
+}
+
+func TestReconcile_MissingCategoryRevenueIsNotZero(t *testing.T) {
+	// 明细某行营收缺失：不得当作 0 参与求和并伪造差异，应标记 incomplete。
+	summaries := []DailySummaryFact{
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", Revenue: fp(1000.0), GrossProfit: fp(400.0)},
+	}
+	details := []CategoryFact{
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_A", Revenue: nil, GrossProfit: fp(240.0)},
+		{StoreID: "S01", BusinessDate: "2026-01-01", Currency: "CNY", CategoryCode: "CAT_B", Revenue: fp(400.0), GrossProfit: fp(160.0)},
+	}
+
+	res := Reconcile(details, summaries, DefaultTolerance())
+
+	if res.OverallStatus != StatusIncomplete {
+		t.Fatalf("expected incomplete, got %s", res.OverallStatus)
+	}
+	if res.IncompleteCount != 1 {
+		t.Fatalf("expected 1 incomplete count, got %d", res.IncompleteCount)
+	}
+	if res.StoreDayResults[0].DetailRevenue != 400.0 {
+		t.Fatalf("expected detail revenue to sum known rows only (400), got %.2f", res.StoreDayResults[0].DetailRevenue)
 	}
 }

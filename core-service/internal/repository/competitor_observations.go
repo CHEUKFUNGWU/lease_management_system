@@ -71,6 +71,15 @@ func (r *CompetitorRepository) AddObservation(ctx context.Context, o *competitor
 			distance_meters, observation_date, price_index, promo_intensity,
 			footfall_estimate, observer, notes
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		ON CONFLICT (legal_entity_id, store_id, observation_date, competitor_name)
+		DO UPDATE SET
+			competitor_brand = EXCLUDED.competitor_brand,
+			distance_meters = EXCLUDED.distance_meters,
+			price_index = EXCLUDED.price_index,
+			promo_intensity = EXCLUDED.promo_intensity,
+			footfall_estimate = EXCLUDED.footfall_estimate,
+			observer = EXCLUDED.observer,
+			notes = EXCLUDED.notes
 		RETURNING id, created_at
 	`
 	return r.db.QueryRow(

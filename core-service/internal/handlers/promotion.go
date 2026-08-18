@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -223,38 +224,39 @@ func (h *PromotionHandler) EvaluateROI(c *gin.Context) {
 	baseStart := st.AddDate(0, 0, -14).Format("2006-01-02")
 	baseEnd := st.AddDate(0, 0, -1).Format("2006-01-02")
 
-	baseFacts, _ := h.repo.GetPromotionActualFacts(c.Request.Context(), tenantID, baseStart, baseEnd, p.ScopeValues)
+	baseFacts, err := h.repo.GetPromotionActualFacts(c.Request.Context(), tenantID, baseStart, baseEnd, p.ScopeValues)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("query baseline facts: %v", err)})
+		return
+	}
 
 	var baseDailyRev, baseDailyGP, baseDailyTx float64
-	if len(baseFacts) > 0 {
+	baselineUnavailable := len(baseFacts) == 0
+	if !baselineUnavailable {
 		var bRev, bGP float64
 		var bTx int
 		bDays := make(map[string]struct{})
 		for _, bf := range baseFacts {
-			bRev += bf.Revenue
-			bGP += bf.GrossProfit
-			bTx += bf.Transactions
+			// NULL 字段不参与基线加总（缺失不等同于零销售）；完整字段数不足以
+			// 支撑日均值时按基线缺失处理，不编造数字。
+			if bf.Revenue != nil {
+				bRev += *bf.Revenue
+			}
+			if bf.GrossProfit != nil {
+				bGP += *bf.GrossProfit
+			}
+			if bf.Transactions != nil {
+				bTx += *bf.Transactions
+			}
 			bDays[bf.BusinessDate] = struct{}{}
 		}
 		dayCount := float64(len(bDays))
-		if dayCount > 0 {
+		if dayCount == 0 {
+			baselineUnavailable = true
+		} else {
 			baseDailyRev = bRev / dayCount
 			baseDailyGP = bGP / dayCount
 			baseDailyTx = float64(bTx) / dayCount
-		}
-	} else if len(actuals) > 0 {
-		// Fallback: estimate run-rate as 85% of actual promo performance
-		var aRev, aGP float64
-		aDays := make(map[string]struct{})
-		for _, af := range actuals {
-			aRev += af.Revenue
-			aGP += af.GrossProfit
-			aDays[af.BusinessDate] = struct{}{}
-		}
-		dayCount := float64(len(aDays))
-		if dayCount > 0 {
-			baseDailyRev = (aRev / dayCount) * 0.85
-			baseDailyGP = (aGP / dayCount) * 0.85
 		}
 	}
 
@@ -308,6 +310,13 @@ func (h *PromotionHandler) EvaluateROI(c *gin.Context) {
 		baseline,
 		overlapPromos,
 	)
+
+	if baselineUnavailable {
+		// 基线缺失：不得用 0 或估算值充当基线，ROI 与增量数字不可作为决策依据。
+		res.BaselineUnavailable = true
+		res.ROI = nil
+		res.Disclaimers = append(res.Disclaimers, "活动前 14 天无可用经营事实，未估算基线；增量销售、增量毛利与 ROI 不可作为决策依据。")
+	}
 
 	c.JSON(http.StatusOK, res)
 }

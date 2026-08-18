@@ -35,11 +35,11 @@ type RentToSalesRow struct {
 	Region    string `json:"region"`
 	Period    string `json:"period"`
 
-	// CashRent is the rent actually payable in the period, not the IFRS 16
-	// interest and depreciation. Rent-to-sales is a trading measure and the
-	// number a business partner means by "rent" is the one that leaves the bank.
-	CashRent     float64 `json:"cash_rent"`
-	RentCurrency string  `json:"rent_currency"`
+	// CashRent is nil when no approved rent schedule covers the period. That
+	// is different from a store paying no rent — the report keeps the two
+	// apart, exactly as Revenue does below.
+	CashRent     *float64 `json:"cash_rent"`
+	RentCurrency string   `json:"rent_currency"`
 
 	// Revenue is nil when the store has reported nothing for the period. That
 	// is different from zero sales, and the report keeps the two apart.
@@ -195,7 +195,7 @@ func (r *StoreMetricsRepository) RentToSales(ctx context.Context, legalEntityID,
 			GROUP BY store_id
 		)
 		SELECT s.id, s.code, s.name, COALESCE(s.brand, ''), COALESCE(s.region, ''),
-			COALESCE(pr.cash_rent, 0), COALESCE(pr.rent_currency, ''),
+			pr.cash_rent, COALESCE(pr.rent_currency, ''),
 			lm.revenue, COALESCE(lm.currency, ''), lm.version, COALESCE(lm.source, ''),
 			sa.area_sqm
 		FROM stores s

@@ -4,6 +4,8 @@ import (
 	"testing"
 )
 
+func fp(v float64) *float64 { return &v }
+
 func TestAttribute_CleanSeparableROI(t *testing.T) {
 	promo := Promotion{
 		PromoCode:    "PROMO_2026_SUMMER",
@@ -22,9 +24,9 @@ func TestAttribute_CleanSeparableROI(t *testing.T) {
 
 	// 3 event days
 	actual := []DailyFact{
-		{BusinessDate: "2026-06-01", Revenue: 20000.0, GrossProfit: 8000.0},
-		{BusinessDate: "2026-06-02", Revenue: 25000.0, GrossProfit: 10000.0},
-		{BusinessDate: "2026-06-03", Revenue: 25000.0, GrossProfit: 10000.0},
+		{BusinessDate: "2026-06-01", Revenue: fp(20000.0), GrossProfit: fp(8000.0)},
+		{BusinessDate: "2026-06-02", Revenue: fp(25000.0), GrossProfit: fp(10000.0)},
+		{BusinessDate: "2026-06-03", Revenue: fp(25000.0), GrossProfit: fp(10000.0)},
 	} // Actual Rev = 70,000, GP = 28,000
 
 	baseline := RunRate{
@@ -91,5 +93,36 @@ func TestAttribute_OverlappingDegradation(t *testing.T) {
 
 	if len(res.OverlapWarnings) != 1 {
 		t.Fatalf("expected 1 overlap warning, got %d", len(res.OverlapWarnings))
+	}
+}
+
+func TestAttribute_MissingRevenueDaysAreNotZero(t *testing.T) {
+	// 缺失的营收/毛利不得当作 0 拉低实际值，也不得用 0 编造增量。
+	promo := Promotion{PromoCode: "P", StartDate: "2026-06-01", EndDate: "2026-06-02", Currency: "CNY"}
+	actual := []DailyFact{
+		{BusinessDate: "2026-06-01", Revenue: fp(1000.0), GrossProfit: fp(400.0)},
+		{BusinessDate: "2026-06-02", Revenue: nil, GrossProfit: fp(300.0)}, // 营收缺失
+	}
+	baseline := RunRate{DailyRevenue: 500, DailyGrossProfit: 200}
+
+	res := Attribute(promo, nil, actual, baseline, nil)
+
+	if res.ActualRevenue != 1000.0 {
+		t.Fatalf("expected actual revenue 1000 (missing day excluded, not 0), got %.2f", res.ActualRevenue)
+	}
+	if res.EventDays != 2 {
+		t.Fatalf("expected 2 event days (missing day still counts as an event day), got %d", res.EventDays)
+	}
+	if res.ROI != nil {
+		t.Fatalf("expected nil ROI (no costs -> no ROI), got %v", *res.ROI)
+	}
+	hasMissingDisclaimer := false
+	for _, d := range res.Disclaimers {
+		if len(d) > 0 && d != "本测算基于活动前同期基线运行率 (Run-Rate) 进行关联分析，不构成完全排他的因果性证明。" {
+			hasMissingDisclaimer = true
+		}
+	}
+	if !hasMissingDisclaimer {
+		t.Fatalf("expected a disclaimer about missing fact days, got %v", res.Disclaimers)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/lease-management-system/core-service/internal/services/periodutil"
 )
 
 type AttributionStatus string
@@ -128,7 +130,7 @@ func Attribute(promo Promotion, costs []PromotionCost, actual []DailyFact, basel
 			continue
 		}
 		// Check date overlap
-		if datesOverlap(promo.StartDate, promo.EndDate, ov.StartDate, ov.EndDate) {
+		if periodutil.DatesOverlap(promo.StartDate, promo.EndDate, ov.StartDate, ov.EndDate) {
 			isSeparable = false
 			status = StatusNonSeparable
 			overlapWarnings = append(overlapWarnings, fmt.Sprintf(
@@ -165,10 +167,6 @@ func Attribute(promo Promotion, costs []PromotionCost, actual []DailyFact, basel
 		OverlapWarnings:        overlapWarnings,
 		Disclaimers:            disclaimers,
 	}
-}
-
-func datesOverlap(s1, e1, s2, e2 string) bool {
-	return !(e1 < s2 || e2 < s1)
 }
 
 func round2(v float64) float64 {

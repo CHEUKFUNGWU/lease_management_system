@@ -21,6 +21,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import { fmtMoney } from "../lib/format";
 import { inventoryApi, type InventorySummary } from "../lib/api";
+import { StateBlock } from "../components/StateBlock";
 
 const { Text } = Typography;
 
@@ -37,6 +38,7 @@ export function InventoryTurnoverPanel({
   fromDate = "",
   toDate = "",
 }: Props) {
+  const { language } = useLanguage();
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<InventorySummary | null>(null);
@@ -76,7 +78,22 @@ export function InventoryTurnoverPanel({
     );
   }
 
-  if (!summary) return null;
+  if (!summary) {
+    return (
+      <Card
+        size="small"
+        title={
+          <Space>
+            <InboxOutlined />
+            <span>库存周转与在途资金占用 (Inventory & Working Capital)</span>
+            <Tag color="blue">存量指标 MeasureKind: stock</Tag>
+          </Space>
+        }
+      >
+        <StateBlock state={{ kind: "empty", reason: "当前门店在选定期间暂无库存与在途记录" }} language={language} />
+      </Card>
+    );
+  }
 
   return (
     <Card

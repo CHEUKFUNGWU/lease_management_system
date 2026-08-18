@@ -19,8 +19,10 @@ import {
   InfoCircleOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 import { competitorApi, type CompetitorBenchmarkSummary, type CompetitorObservation } from "../lib/api";
 import { tableScrollX } from "../lib/tableScroll";
+import { StateBlock } from "../components/StateBlock";
 
 const { Text } = Typography;
 
@@ -29,6 +31,7 @@ interface Props {
 }
 
 export function CompetitorBenchmarkPanel({ storeId }: Props) {
+  const { language } = useLanguage();
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<CompetitorBenchmarkSummary | null>(null);
@@ -62,7 +65,22 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
     );
   }
 
-  if (!summary || observations.length === 0) return null;
+  if (!summary || observations.length === 0) {
+    return (
+      <Card
+        size="small"
+        title={
+          <Space>
+            <ShopOutlined />
+            <span>周边商圈竞品观测 (Competitor Benchmark)</span>
+            <Tag color="purple">参考域隔离数据 (Non-KPI)</Tag>
+          </Space>
+        }
+      >
+        <StateBlock state={{ kind: "empty", reason: "当前门店周边商圈暂未录入竞品观测记录" }} language={language} />
+      </Card>
+    );
+  }
 
   const threatColors: Record<string, string> = {
     low: "success",

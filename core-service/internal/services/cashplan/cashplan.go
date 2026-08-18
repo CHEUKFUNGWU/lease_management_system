@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/services/periodutil"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
@@ -211,7 +212,7 @@ func Compose(ctx context.Context, req Request, sources Sources) (*Plan, error) {
 	}
 	sort.Strings(currencies)
 
-	periods := generatePeriods(req.FromPeriod, req.ToPeriod)
+	periods, _ := periodutil.GenerateMonthlyPeriods(req.FromPeriod, req.ToPeriod)
 
 	partitions := make([]Partition, 0, len(currencies))
 	for _, curr := range currencies {
@@ -352,27 +353,6 @@ func buildBridge(opCash, rentOffset, leaseOut, capexOut, netCash float64) Conser
 		RoundingResidual: residual,
 		IsConserved:      math.Abs(residual) < 0.01,
 	}
-}
-
-func generatePeriods(from, to string) []string {
-	var periods []string
-	var y1, m1, y2, m2 int
-	fmt.Sscanf(from, "%d-%d", &y1, &m1)
-	fmt.Sscanf(to, "%d-%d", &y2, &m2)
-
-	currY, currM := y1, m1
-	for {
-		if currY > y2 || (currY == y2 && currM > m2) {
-			break
-		}
-		periods = append(periods, fmt.Sprintf("%04d-%02d", currY, currM))
-		currM++
-		if currM > 12 {
-			currY++
-			currM = 1
-		}
-	}
-	return periods
 }
 
 func round(v float64) float64 {

@@ -717,7 +717,7 @@ function OperatingPulseInner() {
                           <Typography.Text strong style={{ fontSize: 13, color: "var(--fg-primary)" }}>
                             {t("retail.sssg.title", language)}
                           </Typography.Text>
-                          <span style={{ fontSize: 18, fontWeight: 700, color: partition.sssg.sssg != null && partition.sssg.sssg >= 0 ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)" }}>
+                          <span className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: partition.sssg.sssg != null && partition.sssg.sssg >= 0 ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)" }}>
                             {partition.sssg.sssg != null ? `${partition.sssg.sssg > 0 ? "+" : ""}${partition.sssg.sssg.toFixed(2)}%` : "—"}
                           </span>
                         </Space>

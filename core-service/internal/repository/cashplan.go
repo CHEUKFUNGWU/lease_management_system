@@ -40,7 +40,7 @@ func (r *CashPlanRepository) ReadOperating(ctx context.Context, legalEntityID, f
 			f.store_id::text,
 			COALESCE(s.code, '') as store_code,
 			COALESCE(s.name, '') as store_name,
-			TO_CHAR(f.fact_date, 'YYYY-MM') as period,
+			TO_CHAR(f.business_date, 'YYYY-MM') as period,
 			COALESCE(f.currency, 'CNY') as currency,
 			COALESCE(SUM(f.revenue), 0) as revenue,
 			COALESCE(SUM(f.gross_profit), 0) as gross_profit,
@@ -48,14 +48,17 @@ func (r *CashPlanRepository) ReadOperating(ctx context.Context, legalEntityID, f
 			COALESCE(SUM(f.fixed_rent), 0) as fixed_rent,
 			COALESCE(SUM(f.variable_rent), 0) as variable_rent,
 			COALESCE(SUM(f.non_lease_cost), 0) as non_lease_cost,
-			COALESCE(SUM(f.other_cost), 0) as other_cost,
+			COALESCE(SUM(f.other_controllable_cost), 0) as other_cost,
 			COUNT(f.id) as days_count
 		FROM retail_store_day_facts f
-		LEFT JOIN stores s ON f.store_id = s.id
-		WHERE f.legal_entity_id = $1
-		  AND f.fact_date >= $2 AND f.fact_date <= $3
+		-- The fact table carries no legal_entity_id; tenancy is reached through
+		-- the store, which is why this join is INNER rather than LEFT. A LEFT join
+		-- would let a fact whose store is missing escape the tenant filter.
+		JOIN stores s ON f.store_id = s.id
+		WHERE s.legal_entity_id = $1
+		  AND f.business_date >= $2 AND f.business_date <= $3
 		  AND f.data_classification = $4
-		  AND ($5 = '' OR f.dataset_version = $5)
+		  AND ($5 = '' OR f.simulation_dataset_version = $5)
 	`
 	args := []interface{}{legalEntityID, startDate, endDate, classification, datasetVersion}
 	if len(storeIDs) > 0 {
@@ -67,7 +70,7 @@ func (r *CashPlanRepository) ReadOperating(ctx context.Context, legalEntityID, f
 		query += fmt.Sprintf(" AND f.store_id IN (%s)", strings.Join(placeholders, ","))
 	}
 	query += `
-		GROUP BY f.store_id, s.code, s.name, TO_CHAR(f.fact_date, 'YYYY-MM'), f.currency
+		GROUP BY f.store_id, s.code, s.name, TO_CHAR(f.business_date, 'YYYY-MM'), f.currency
 		ORDER BY period ASC, store_code ASC
 	`
 
@@ -119,15 +122,25 @@ func (r *CashPlanRepository) ReadLeasePayments(ctx context.Context, legalEntityI
 			COALESCE(c.store_id::text, '') as store_id,
 			TO_CHAR(ps.due_date, 'YYYY-MM') as period,
 			COALESCE(c.currency, 'CNY') as currency,
-			COALESCE(SUM(CASE WHEN ps.payment_type = 'fixed' THEN ps.amount ELSE 0 END), 0) as fixed_rent,
-			COALESCE(SUM(CASE WHEN ps.payment_type = 'variable' THEN ps.amount ELSE 0 END), 0) as variable_rent,
-			COALESCE(SUM(CASE WHEN ps.payment_type = 'non_lease' THEN ps.amount ELSE 0 END), 0) as non_lease,
-			COALESCE(SUM(CASE WHEN ps.payment_type = 'tax' THEN ps.amount ELSE 0 END), 0) as tax,
-			COALESCE(SUM(ps.amount), 0) as total_outflow
-		FROM payment_schedules ps
-		JOIN contracts c ON ps.contract_id = c.id
+			-- The schedule has no payment_type column; the classification lives in
+			-- boolean flags. These three predicates partition ps.amount exactly, and
+			-- match the split already used by RentToSales in store_metrics.go —
+			-- "fixed rent" means the lease component that is not turnover-driven.
+			COALESCE(SUM(CASE WHEN ps.is_variable = false AND ps.is_non_lease_component = false THEN ps.amount ELSE 0 END), 0) as fixed_rent,
+			COALESCE(SUM(CASE WHEN ps.is_variable = true AND ps.is_non_lease_component = false THEN ps.amount ELSE 0 END), 0) as variable_rent,
+			COALESCE(SUM(CASE WHEN ps.is_non_lease_component = true THEN ps.amount ELSE 0 END), 0) as non_lease,
+			-- Tax is its own column rather than a category of amount, so it adds to
+			-- the outflow instead of being carved out of it.
+			COALESCE(SUM(ps.tax_amount), 0) as tax,
+			COALESCE(SUM(ps.amount), 0) + COALESCE(SUM(ps.tax_amount), 0) as total_outflow
+		FROM lease_payment_schedules ps
+		JOIN lease_contracts c ON ps.contract_id = c.id
 		WHERE c.legal_entity_id = $1
 		  AND ps.due_date >= $2 AND ps.due_date <= $3
+		  -- approval_status is what marks a schedule line as counting; the
+		  -- is_official_version flag sits at false for every payment schedule row,
+		  -- so filtering on it would report zero cash outflow for every store.
+		  AND ps.approval_status = 'approved'
 	`
 	args := []interface{}{legalEntityID, startDate, endDate}
 	if len(storeIDs) > 0 {

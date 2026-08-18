@@ -1,7 +1,7 @@
-.PHONY: help setup up down restart logs migrate web core ai db reset-db ifrs16-regression
+.PHONY: help setup up down restart logs migrate migrate-status migrate-baseline web core ai db reset-db ifrs16-regression
 
 help: ## 显示帮助信息
-	@echo "Lease Management System — 常用命令"
+	@echo "零售经营分析工作站 — 常用命令"
 	@echo ""
 	@echo "  make setup      复制 .env.example 到 .env 并初始化项目"
 	@echo "  make up         启动所有 Docker 服务"
@@ -9,7 +9,9 @@ help: ## 显示帮助信息
 	@echo "  make restart    重启所有服务"
 	@echo "  make logs       查看所有服务日志"
 	@echo "  make db         进入 PostgreSQL 命令行"
-	@echo "  make migrate    在 Docker 中执行数据库迁移"
+	@echo "  make migrate           应用 db/migrations/ 下尚未执行的增量迁移"
+	@echo "  make migrate-status    查看已应用 / 待应用的迁移（只读）"
+	@echo "  make migrate-baseline  把全部迁移标记为已应用但不执行"
 	@echo "  make reset-db   删除数据库卷并重建（清空所有数据）"
 	@echo "  make ifrs16-regression  运行 IFRS 16 计量回归测试并生成对数报告"
 	@echo "  make web        进入前端开发容器"
@@ -35,13 +37,14 @@ logs: ## 查看服务日志
 db: ## 进入 PostgreSQL 命令行
 	docker-compose exec postgres psql -U lease -d lease
 
-migrate: ## 在 Docker 中执行数据库迁移
-	@echo "在 PostgreSQL 容器中执行迁移..."
-	@for f in db/init/*.sql; do \
-		echo "  运行: $$f"; \
-		docker-compose exec -T postgres psql -U lease -d lease -f /docker-entrypoint-initdb.d/$$(basename $$f); \
-	done
-	@echo "迁移完成"
+migrate: ## 应用 db/migrations/ 下尚未执行的增量迁移
+	@scripts/migrate.sh
+
+migrate-status: ## 查看已应用 / 待应用的迁移，不做任何修改
+	@scripts/migrate.sh --status
+
+migrate-baseline: ## 把全部迁移标记为已应用但不执行（用于 schema 已就位的库）
+	@scripts/migrate.sh --baseline
 
 reset-db: ## 删除数据库卷并重建
 	@echo "⚠️  这将删除所有数据库数据！"

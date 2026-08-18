@@ -385,4 +385,4 @@ CAS 21《租赁》与 IFRS 16 趋同，境内执行企业会计准则的企业�
 | BP 日常工作支撑的产品缺口 | [PRD_零售经营分析工作站_BP日常支撑完善.md](PRD_零售经营分析工作站_BP日常支撑完善.md) |
 | FP&A 与 Finance BP 需求 | [FP&A与Finance_BP经营决策及AI辅助需求清单.md](FP&A与Finance_BP经营决策及AI辅助需求清单.md) |
 | 可作为内容资产的准则材料 | [IFRS16_计量方法与准则映射白皮书.md](IFRS16_计量方法与准则映射白皮书.md)、[IFRS16_计量回归对数报告.md](IFRS16_计量回归对数报告.md) |
-| 转型执行看板 | [execution/转型执行看板.md](execution/转型执行看板.md) |
+| 延后治理项与重新进入条件 | [execution/精简MVP路线与延后治理清单.md](execution/精简MVP路线与延后治理清单.md) |

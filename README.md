@@ -293,7 +293,7 @@ To test legal-entity isolation, create a user with a `legal_entity_id` through `
 
 Sign in as an admin and open `/operating-pulse`. If the legal entity has no simulated dataset yet, the page offers **生成固定演示数据**, which creates a reproducible 60-store / 181-day dataset containing six fixed anomalies. Then walk the full chain: **Operating Pulse → Store 360 → Scenario Workbench → action draft**.
 
-演示脚本 / Demo script: [`docs/execution/MAX-009_演示脚本.md`](docs/execution/MAX-009_演示脚本.md)
+演示脚本与 MAX-009 端到端验收证据已随零售 MVP 交付完成而归档，见 `docs/archive/retail-mvp-execution-2026-08/`。
 
 ### 6. 数据库迁移 / Database migrations
 
@@ -410,10 +410,9 @@ English:
 
 **转型 / Transformation**
 
-- [转型执行看板](docs/execution/转型执行看板.md) — MAX-001 → MAX-009 任务、评审与验收记录
 - [转型实施任务清单与验收标准](docs/线下零售经营工作站_转型实施任务清单与验收标准.md)
+- [精简 MVP 路线与延后治理清单](docs/execution/精简MVP路线与延后治理清单.md) — **HARD-001~012 延后治理项与其重新进入条件**
 - [线下零售经营分析工作站 · 外部研究](docs/research/线下零售经营分析工作站_外部研究.md)
-- [MAX-009 端到端验收证据索引](docs/execution/evidence/MAX-009/index.md)
 
 **UI / UX**
 

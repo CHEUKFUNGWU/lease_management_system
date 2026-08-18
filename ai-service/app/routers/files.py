@@ -81,12 +81,3 @@ async def upload_file(
     }
 
 
-@router.get("/files/{file_id}/status")
-async def get_file_status(file_id: str):
-    """获取文件处理状态"""
-    # TODO: 查询数据库获取任务状态
-    return {
-        "file_id": file_id,
-        "status": "pending",
-        "progress": 0
-    }

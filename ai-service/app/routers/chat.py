@@ -21,13 +21,6 @@ class ChatRequest(BaseModel):
     tool_choice: Optional[str] = None
 
 
-class Source(BaseModel):
-    type: str
-    id: str
-    title: str
-    snippet: str
-
-
 class ToolCall(BaseModel):
     id: str
     type: str = "function"
@@ -36,11 +29,8 @@ class ToolCall(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
-    sources: List[Source]
-    confidence: float
     model: str
     tool_calls: Optional[List[ToolCall]] = None
-    usage: Optional[Dict[str, Any]] = None
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -102,14 +92,12 @@ async def chat(request: ChatRequest):
                 for tc in message["tool_calls"]
             ]
         
-        # Sources are extracted by Core Service from the context it built
+        # Sources and confidence are produced by Core Service from the context
+        # it built; the AI service only returns the answer and tool calls.
         return ChatResponse(
             answer=answer,
-            sources=[],
-            confidence=0.9,
             model=llm_client.get_model_name(),
             tool_calls=tool_calls,
-            usage=llm_client.usage_metadata(result),
         )
     except ValueError as e:
         raise HTTPException(status_code=503, detail=f"LLM 配置错误: {str(e)}")

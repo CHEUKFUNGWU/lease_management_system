@@ -30,21 +30,6 @@ router = APIRouter()
 intake_producer = AIIntakeProducer()
 
 
-class ParseRequest(BaseModel):
-    file_id: str
-    file_type: str
-    task_type: Optional[str] = "contract_extraction"
-
-
-class ParseResponse(BaseModel):
-    task_id: str
-    file_id: str
-    status: str
-    extracted_data: Optional[dict] = None
-    confidence_scores: Optional[dict] = None
-    warnings: Optional[List[str]] = None
-
-
 class ContractDraftRequest(BaseModel):
     file_id: str
     object_name: str
@@ -74,18 +59,6 @@ class ContractBatchDraftRequest(BaseModel):
     content_type: str = "application/pdf"
     file_content: Optional[str] = None
     mode: str = "assist"
-
-
-@router.post("/parse", response_model=ParseResponse)
-async def parse_document(request: ParseRequest):
-    return {
-        "task_id": "task_" + request.file_id,
-        "file_id": request.file_id,
-        "status": "pending",
-        "extracted_data": None,
-        "confidence_scores": None,
-        "warnings": ["AI Assist Mode: 识别结果需人工确认后入库"],
-    }
 
 
 @router.post("/parse/contract", response_model=ContractIntakeResponse)

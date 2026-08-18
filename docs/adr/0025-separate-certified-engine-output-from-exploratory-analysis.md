@@ -48,8 +48,15 @@ remeasurement_adjustment
 ```
 
 The set is defined by **measure semantics, not by tool identity**, so that
-registering a new tool cannot silently widen it. The list is a governance
-artefact: changes require the finance owner's sign-off, not an engineer's.
+registering a new tool cannot silently widen it.
+
+The list is a governance artefact, not an implementation detail. This project
+has a single human participant, so "sign-off" cannot mean a second person's
+approval; it means a **dated decision-log entry recording the change and its
+rationale**, committed alongside the change. The function of sign-off is
+traceability of who decided what and why, and a solo operator satisfies that
+completely. What is not acceptable is widening the set as a side effect of
+implementing something else.
 
 ### 3. The fence is enforced twice, in code
 
@@ -80,6 +87,13 @@ the system raises a hardening candidate. Hardening means a documented measure
 definition, a deterministic Go service, unit tests, at least three regression
 assertions against real customer data, descriptor registration, and allowlist
 update — after which the measure is served from Tier A.
+
+**The trigger must be mechanical, not a calendar commitment.** On the third
+recurrence the system files an issue by itself, carrying the sandbox code, the
+input fingerprints and the run references. A one-person team will not reliably
+run a quarterly review; it will reliably work through an issue queue. Any
+control here that depends on someone remembering is a control that does not
+exist.
 
 This is what stops Tier B accumulating as debt: the tail that customers actually
 use is converted into moat on a schedule, and the tail that no one repeats stays
@@ -116,9 +130,13 @@ intended behaviour and the intended cost.
 probe will need periodic extension as models phrase labels in new ways; §12 of
 the working-paper document records this as accepted residual risk.
 
-**Governance acquires a recurring obligation.** Without a standing commitment of
-engineering time to hardening (§4), Tier B becomes permanent technical debt
-rather than a pipeline.
+**Governance acquires a recurring obligation, and it must be automated.** Tier B
+becomes permanent technical debt unless hardening candidates actually get
+worked. With a single human participant, the enforcement mechanism is the
+auto-filed issue in §4 plus a visible count of open candidates — not a
+scheduled review. The same reasoning applies to every control in this ADR: the
+two fences in §3 are valuable precisely because they are code that fails closed,
+rather than something a reviewer is expected to notice.
 
 ## Non-goals
 

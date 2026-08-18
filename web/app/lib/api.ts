@@ -2179,6 +2179,147 @@ export const exchangeRateApi = {
     }),
 };
 
+export interface RetailCategory {
+  id: string;
+  legal_entity_id: string;
+  category_code: string;
+  name: string;
+  parent_code?: string;
+  effective_from: string;
+  effective_to?: string;
+}
+
+export interface RetailStoreDayCategoryFact {
+  id: string;
+  legal_entity_id: string;
+  store_id: string;
+  business_date: string;
+  currency: string;
+  category_code: string;
+  revenue?: number;
+  gross_profit?: number;
+  transactions?: number;
+  units?: number;
+  source_system: string;
+  import_batch_id: string;
+  as_of_at: string;
+  version: number;
+  data_classification: string;
+  data_quality_status: string;
+}
+
+export interface DayStoreReconciliationResult {
+  store_id: string;
+  business_date: string;
+  currency: string;
+  summary_revenue: number;
+  detail_revenue: number;
+  revenue_diff: number;
+  summary_gross_profit: number;
+  detail_gross_profit: number;
+  gross_profit_diff: number;
+  status: "tie" | "within_tolerance" | "mismatch" | "no_detail";
+  reason?: string;
+}
+
+export interface CategoryReconciliationResponse {
+  total_store_days: number;
+  tie_count: number;
+  within_tolerance_count: number;
+  mismatch_count: number;
+  no_detail_count: number;
+  store_day_results: DayStoreReconciliationResult[];
+  mismatches: DayStoreReconciliationResult[];
+  overall_status: "tie" | "within_tolerance" | "mismatch" | "no_detail";
+}
+
+export interface CategoryAttribution {
+  category_code: string;
+  category_name: string;
+  base_revenue: number;
+  current_revenue: number;
+  base_margin_rate: number;
+  current_margin_rate: number;
+  base_gross_profit: number;
+  current_gross_profit: number;
+  gross_profit_variance: number;
+  volume_effect: number;
+  mix_effect: number;
+  rate_effect: number;
+}
+
+export interface MarginDecompositionResponse {
+  currency: string;
+  base_total_revenue: number;
+  current_total_revenue: number;
+  base_total_gross_profit: number;
+  current_total_gross_profit: number;
+  base_margin_rate: number;
+  current_margin_rate: number;
+  total_gross_profit_variance: number;
+  volume_effect: number;
+  mix_effect: number;
+  rate_effect: number;
+  rounding_residual: number;
+  is_conserved: boolean;
+  categories: CategoryAttribution[];
+}
+
+export const categoryApi = {
+  listCategories: (token: string): Promise<{ categories: RetailCategory[] }> =>
+    apiRequest("/api/v1/retail/categories", { token }),
+  createCategory: (data: Partial<RetailCategory>, token: string) =>
+    apiRequest("/api/v1/retail/categories", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  listCategoryFacts: (
+    params: {
+      store_id?: string;
+      from_date?: string;
+      to_date?: string;
+      data_classification?: string;
+    },
+    token: string
+  ): Promise<{ facts: RetailStoreDayCategoryFact[] }> => {
+    const qs = new URLSearchParams();
+    if (params.store_id) qs.append("store_id", params.store_id);
+    if (params.from_date) qs.append("from_date", params.from_date);
+    if (params.to_date) qs.append("to_date", params.to_date);
+    if (params.data_classification) qs.append("data_classification", params.data_classification);
+    const query = qs.toString();
+    return apiRequest(`/api/v1/retail/store-day-category-facts${query ? `?${query}` : ""}`, { token });
+  },
+  reconcile: (
+    req: {
+      store_ids?: string[];
+      from_date?: string;
+      to_date?: string;
+      data_classification?: string;
+    },
+    token: string
+  ): Promise<CategoryReconciliationResponse> =>
+    apiRequest("/api/v1/retail/category-facts/reconcile", {
+      method: "POST",
+      body: JSON.stringify(req),
+      token,
+    }),
+  marginDecomposition: (
+    req: {
+      currency?: string;
+      base: Array<{ category_code: string; category_name: string; revenue: number; gross_profit: number }>;
+      current: Array<{ category_code: string; category_name: string; revenue: number; gross_profit: number }>;
+    },
+    token: string
+  ): Promise<MarginDecompositionResponse> =>
+    apiRequest("/api/v1/retail/margin-decomposition", {
+      method: "POST",
+      body: JSON.stringify(req),
+      token,
+    }),
+};
+
 export const cashPlanApi = {
   compose: (
     req: {

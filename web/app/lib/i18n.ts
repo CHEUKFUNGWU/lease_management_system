@@ -1080,6 +1080,66 @@ const dict: TranslationDict = {
     "zh-HK": "當前期間沒有可用觀察信號",
     en: "No usable observations in the current period",
   },
+  "category.tab_composition": {
+    "zh-CN": "品类构成与毛利归因",
+    "zh-HK": "品類構成與毛利歸因",
+    en: "Category Mix & Margin Attribution",
+  },
+  "category.stat_total_revenue": {
+    "zh-CN": "品类汇总销售额",
+    "zh-HK": "品類彙總銷售額",
+    en: "Category Total Revenue",
+  },
+  "category.stat_total_gp": {
+    "zh-CN": "品类汇总毛利额",
+    "zh-HK": "品類彙總毛利額",
+    en: "Category Total Margin",
+  },
+  "category.volume_effect": {
+    "zh-CN": "销售规模效应 (Volume)",
+    "zh-HK": "銷售規模效應 (Volume)",
+    en: "Volume Effect",
+  },
+  "category.mix_effect": {
+    "zh-CN": "品类结构效应 (Mix)",
+    "zh-HK": "品類結構效應 (Mix)",
+    en: "Category Mix Effect",
+  },
+  "category.rate_effect": {
+    "zh-CN": "品类毛利率变动 (Rate)",
+    "zh-HK": "品類毛利率變動 (Rate)",
+    en: "Margin Rate Effect",
+  },
+  "category.residual": {
+    "zh-CN": "分解残差",
+    "zh-HK": "分解殘差",
+    en: "Decomposition Residual",
+  },
+  "category.reconcile_status": {
+    "zh-CN": "明细对账状态",
+    "zh-HK": "明細對賬狀態",
+    en: "Reconciliation Status",
+  },
+  "category.reconcile_tie": {
+    "zh-CN": "明细严格平账",
+    "zh-HK": "明細嚴格平賬",
+    en: "Strictly Reconciled",
+  },
+  "category.reconcile_within_tol": {
+    "zh-CN": "容差范围内吻合",
+    "zh-HK": "容差範圍內吻合",
+    en: "Within Tolerance",
+  },
+  "category.reconcile_mismatch": {
+    "zh-CN": "明细与门店总数存在不平",
+    "zh-HK": "明細與門店總數存在不平",
+    en: "Reconciliation Mismatch",
+  },
+  "category.reconcile_no_detail": {
+    "zh-CN": "暂无品类明细数据",
+    "zh-HK": "暫無品類明細數據",
+    en: "No Category Details",
+  },
   "store360.evidence_title": {
     "zh-CN": "证据与可追溯性",
     "zh-HK": "證據與可追溯性",

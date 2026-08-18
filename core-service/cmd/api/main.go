@@ -132,6 +132,8 @@ func main() {
 	fpnaGovernanceHandler := handlers.NewFPnAGovernanceHandler(fpnaGovernanceRepo, operatingFactsRepo, auditLogger).WithExchangeRateRepo(exchangeRateRepo)
 	cashPlanRepo := repository.NewCashPlanRepository(database.Pool)
 	cashPlanHandler := handlers.NewCashPlanHandler(cashPlanRepo)
+	categoryRepo := repository.NewCategoryRepository(database.Pool)
+	categoryHandler := handlers.NewCategoryHandler(categoryRepo)
 	exchangeRateVersionHandler := handlers.NewExchangeRateVersionHandler(exchangeRateRepo)
 	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
 	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
@@ -361,6 +363,11 @@ func main() {
 		protected.Handle(http.MethodGet, "/exchange-rates/versions", permission("settings", "read"), exchangeRateVersionHandler.ListVersions)
 		protected.Handle(http.MethodPost, "/exchange-rates/versions", permission("settings", "update"), exchangeRateVersionHandler.CreateVersion)
 		protected.Handle(http.MethodPost, "/cashflow/plan/compose", permission("reports", "read"), cashPlanHandler.Compose)
+		protected.Handle(http.MethodGet, "/retail/categories", permission("master_data", "read"), categoryHandler.ListCategories)
+		protected.Handle(http.MethodPost, "/retail/categories", permission("master_data", "manage"), categoryHandler.CreateCategory)
+		protected.Handle(http.MethodGet, "/retail/store-day-category-facts", permission("operating_facts", "read"), categoryHandler.ListCategoryFacts)
+		protected.Handle(http.MethodPost, "/retail/category-facts/reconcile", permission("operating_facts", "read"), categoryHandler.ReconcileCategoryFacts)
+		protected.Handle(http.MethodPost, "/retail/margin-decomposition", permission("operating_facts", "read"), categoryHandler.GetMarginDecomposition)
 
 		// Budget versions freeze the measured forward schedule so later actuals
 		// can be explained against a stable plan.

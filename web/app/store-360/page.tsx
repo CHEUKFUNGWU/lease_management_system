@@ -32,6 +32,7 @@ import { PlanComparisonPanel } from "../components/PlanComparisonPanel";
 import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, lifecycleStatusLabel, storeFormatLabel, translateReason, type PulseMetricCode } from "../operating-pulse/logic";
 import { bridgeConservation, bridgeTone, bridgeWaterfall, bridgeWaterfallDomain, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, summaryStatus, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
 import ProfitFlowPanel from "./ProfitFlowPanel";
+import { CategoryCompositionPanel } from "./CategoryCompositionPanel";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
 
@@ -743,6 +744,16 @@ function Store360Inner() {
 
               <div className="store360-block-gap">
                 <BridgePanel language={language} bridges={response.bridges} currency={response.currency} />
+              </div>
+
+              <div className="store360-block-gap">
+                <CategoryCompositionPanel
+                  storeId={query.storeID}
+                  currency={response.currency}
+                  dataClassification={query.classification || "production"}
+                  fromDate={response.evidence?.current?.date_from}
+                  toDate={response.evidence?.current?.date_to}
+                />
               </div>
 
               <Card title={t("store360.observations", language)} className="store360-block-gap">

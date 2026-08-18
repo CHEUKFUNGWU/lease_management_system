@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/promotionattribution"
@@ -214,6 +216,10 @@ func (h *PromotionHandler) EvaluateROI(c *gin.Context) {
 	// 3. Fetch actual facts for promo window
 	actuals, err := h.repo.GetPromotionActualFacts(c.Request.Context(), tenantID, p.StartDate, p.EndDate, p.ScopeValues)
 	if err != nil {
+		if errors.Is(err, repository.ErrRetailKPISourceConflict) {
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -226,6 +232,10 @@ func (h *PromotionHandler) EvaluateROI(c *gin.Context) {
 
 	baseFacts, err := h.repo.GetPromotionActualFacts(c.Request.Context(), tenantID, baseStart, baseEnd, p.ScopeValues)
 	if err != nil {
+		if errors.Is(err, repository.ErrRetailKPISourceConflict) {
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("query baseline facts: %v", err)})
 		return
 	}

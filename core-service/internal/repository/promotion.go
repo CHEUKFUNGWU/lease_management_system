@@ -228,26 +228,48 @@ func (r *PromotionRepository) GetPromotionActualFacts(ctx context.Context, legal
 	// retail_store_day_facts carries no legal_entity_id; tenancy is reached
 	// through the store, and the join is INNER so a fact whose store is missing
 	// cannot slip past the tenant filter.
-	query := `
-		WITH ranked AS (
-			SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit, f.transactions,
-			       ROW_NUMBER() OVER (PARTITION BY f.store_id, f.business_date ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
-			FROM retail_store_day_facts f
-			JOIN stores s ON s.id = f.store_id
-			WHERE s.legal_entity_id = $1
-			  AND f.business_date >= $2 AND f.business_date <= $3
-	`
+	where := "s.legal_entity_id = $1 AND f.business_date >= $2 AND f.business_date <= $3"
 	args := []interface{}{legalEntityID, startDate, endDate}
 	if len(storeIDs) > 0 {
-		query += " AND f.store_id = ANY($4)"
+		where += " AND f.store_id = ANY($4)"
 		args = append(args, storeIDs)
 	}
-	query += `
+
+	// Same source-conflict gate as retail_kpi.go / cashplan.go: promotion
+	// attribution must not silently pick one source per store-day, nor sum two
+	// sources into a double-counted baseline.
+	conflictQuery := fmt.Sprintf(`
+		WITH ranked AS (
+			SELECT f.store_id, f.business_date, f.source_system,
+			       ROW_NUMBER() OVER (PARTITION BY f.store_id,f.business_date,f.source_system ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
+			FROM retail_store_day_facts f
+			JOIN stores s ON s.id = f.store_id
+			WHERE %s
+		)
+		SELECT COUNT(*) FROM (
+			SELECT store_id, business_date FROM ranked WHERE rn = 1
+			GROUP BY store_id, business_date HAVING COUNT(DISTINCT source_system) > 1
+		) q`, where)
+	var conflicts int
+	if err := r.db.QueryRow(ctx, conflictQuery, args...).Scan(&conflicts); err != nil {
+		return nil, fmt.Errorf("check promo actuals source conflict: %w", err)
+	}
+	if conflicts > 0 {
+		return nil, ErrRetailKPISourceConflict
+	}
+
+	query := fmt.Sprintf(`
+		WITH ranked AS (
+			SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit, f.transactions,
+			       ROW_NUMBER() OVER (PARTITION BY f.store_id,f.business_date,f.source_system ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
+			FROM retail_store_day_facts f
+			JOIN stores s ON s.id = f.store_id
+			WHERE %s
 		)
 		SELECT store_id, business_date, currency, revenue, gross_profit, transactions
 		FROM ranked
 		WHERE rn = 1
-	`
+	`, where)
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

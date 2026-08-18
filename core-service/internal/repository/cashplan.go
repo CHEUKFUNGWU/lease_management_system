@@ -51,6 +51,37 @@ func (r *CashPlanRepository) ReadOperating(ctx context.Context, legalEntityID, f
 		whereClause += fmt.Sprintf(" AND f.store_id IN (%s)", strings.Join(placeholders, ","))
 	}
 
+	// Source conflict gate, mirroring retail_kpi.go QueryFacts: dedup runs per
+	// (store, day, source), and a store-day reported by more than one source
+	// system is an error the caller must resolve, not a tie to break silently.
+	// Without this, two sources for the same store-day would either drop one
+	// row (pre-fix) or double-count revenue (post-fix), and the cash plan
+	// would diverge from the operating pulse on the same facts.
+	conflictSQL := fmt.Sprintf(`
+		WITH ranked AS (
+			SELECT f.store_id, f.business_date, f.source_system,
+				ROW_NUMBER() OVER (
+					PARTITION BY f.store_id,f.business_date,f.source_system
+					ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC
+				) AS rn
+			FROM retail_store_day_facts f
+			JOIN stores s ON s.id = f.store_id
+			%s
+		)
+		SELECT COUNT(*) FROM (
+			SELECT store_id, business_date FROM ranked WHERE rn = 1
+			GROUP BY store_id, business_date
+			HAVING COUNT(DISTINCT source_system) > 1
+		) q
+	`, whereClause)
+	var conflicts int
+	if err := r.db.QueryRow(ctx, conflictSQL, args...).Scan(&conflicts); err != nil {
+		return nil, fmt.Errorf("check cash plan source conflict: %w", err)
+	}
+	if conflicts > 0 {
+		return nil, ErrRetailKPISourceConflict
+	}
+
 	query := fmt.Sprintf(`
 		WITH ranked AS (
 			SELECT
@@ -68,7 +99,7 @@ func (r *CashPlanRepository) ReadOperating(ctx context.Context, legalEntityID, f
 				f.non_lease_cost,
 				f.other_controllable_cost,
 				ROW_NUMBER() OVER (
-					PARTITION BY f.store_id, f.business_date
+					PARTITION BY f.store_id,f.business_date,f.source_system
 					ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC
 				) AS rn
 			FROM retail_store_day_facts f

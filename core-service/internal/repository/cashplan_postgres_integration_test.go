@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/lease-management-system/core-service/internal/services/retailsimulation"
@@ -179,5 +180,49 @@ func TestCashPlanPostgresSimulationDatasetHighestVersion(t *testing.T) {
 	expectedTotal := initialTotalRevenue + diffRevenue
 	if newTotalRevenue != expectedTotal {
 		t.Fatalf("expected total revenue %f (initial %f + diff %f), got %f", expectedTotal, initialTotalRevenue, diffRevenue, newTotalRevenue)
+	}
+}
+
+// TestCashPlanPostgresReadOperatingSourceConflictMatchesKPILayer pins the KPI-layer
+// semantics for multi-source store-days: both sources survive the per-source dedup,
+// and the conflict check raises ErrRetailKPISourceConflict instead of silently
+// dropping one source (or double-counting both). The conflict error itself is the
+// proof that both rows were retained — if either source had been dropped, there
+// would be no conflict.
+func TestCashPlanPostgresReadOperatingSourceConflictMatchesKPILayer(t *testing.T) {
+	pool := retailStoreDayFactsPool(t)
+	ctx := context.Background()
+	entityA, storeA := seedRetailStoreDayFactsTenant(t, ctx, pool, "cashplan-conflict")
+	t.Cleanup(func() {
+		cleanup := func(statement string, args ...interface{}) {
+			if _, err := pool.Exec(context.Background(), statement, args...); err != nil {
+				t.Errorf("Cashplan conflict cleanup failed: %v", err)
+			}
+		}
+		cleanup(`DELETE FROM retail_store_day_facts f USING stores s WHERE f.store_id=s.id AND s.legal_entity_id = $1`, entityA)
+		cleanup(`DELETE FROM stores WHERE legal_entity_id = $1`, entityA)
+		cleanup(`DELETE FROM legal_entities WHERE id = $1`, entityA)
+	})
+
+	const insertFact = `
+		INSERT INTO retail_store_day_facts (
+			store_id, business_date, currency, revenue, gross_profit, transactions, footfall, area_sqm,
+			labor_cost, fixed_rent, variable_rent, non_lease_cost, other_controllable_cost,
+			source_system, version, reconciliation_status, mapping_status, data_quality_status, data_classification
+		) VALUES
+		($1, '2026-02-10', 'CNY', $2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 $3, 1, 'unreconciled', 'mapped', 'valid', 'production')
+	`
+	if _, err := pool.Exec(ctx, insertFact, storeA, 1000.0, "pos"); err != nil {
+		t.Fatalf("insert pos fact: %v", err)
+	}
+	if _, err := pool.Exec(ctx, insertFact, storeA, 1200.0, "erp"); err != nil {
+		t.Fatalf("insert erp fact: %v", err)
+	}
+
+	cashRepo := NewCashPlanRepository(pool)
+	_, err := cashRepo.ReadOperating(ctx, entityA, "2026-02", "2026-02", "production", "", []string{storeA})
+	if !errors.Is(err, ErrRetailKPISourceConflict) {
+		t.Fatalf("expected source conflict for two-source store-day, got %v", err)
 	}
 }

@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/categoryreconciliation"
@@ -117,6 +119,10 @@ func (h *CategoryHandler) ReconcileCategoryFacts(c *gin.Context) {
 		c.Request.Context(), tenantID, req.StoreIDs, req.FromDate, req.ToDate, req.DataClassification,
 	)
 	if err != nil {
+		if errors.Is(err, repository.ErrRetailKPISourceConflict) {
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

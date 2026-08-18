@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/cashplan"
@@ -62,6 +64,10 @@ func (h *CashPlanHandler) Compose(c *gin.Context) {
 
 	result, err := cashplan.Compose(c.Request.Context(), planReq, sources)
 	if err != nil {
+		if errors.Is(err, repository.ErrRetailKPISourceConflict) {
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

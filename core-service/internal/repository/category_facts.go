@@ -221,42 +221,65 @@ func (r *CategoryRepository) GetCategoryReconciliationData(
 	// Unlike retail_store_day_category_facts above, retail_store_day_facts has no
 	// legal_entity_id: tenancy is reached through the store. The join is INNER so
 	// a fact whose store is missing cannot slip past the tenant filter.
-	sumQuery := `
-		WITH ranked AS (
-			SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit,
-			       ROW_NUMBER() OVER (PARTITION BY f.store_id, f.business_date ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
-			FROM retail_store_day_facts f
-			JOIN stores s ON s.id = f.store_id
-			WHERE s.legal_entity_id = $1
-	`
+	where := "s.legal_entity_id = $1"
 	sumArgs := []interface{}{legalEntityID}
 	sIdx := 2
 	if len(storeIDs) > 0 {
-		sumQuery += fmt.Sprintf(" AND f.store_id = ANY($%d)", sIdx)
+		where += fmt.Sprintf(" AND f.store_id = ANY($%d)", sIdx)
 		sumArgs = append(sumArgs, storeIDs)
 		sIdx++
 	}
 	if fromDate != "" {
-		sumQuery += fmt.Sprintf(" AND f.business_date >= $%d", sIdx)
+		where += fmt.Sprintf(" AND f.business_date >= $%d", sIdx)
 		sumArgs = append(sumArgs, fromDate)
 		sIdx++
 	}
 	if toDate != "" {
-		sumQuery += fmt.Sprintf(" AND f.business_date <= $%d", sIdx)
+		where += fmt.Sprintf(" AND f.business_date <= $%d", sIdx)
 		sumArgs = append(sumArgs, toDate)
 		sIdx++
 	}
 	if dataClassification != "" {
-		sumQuery += fmt.Sprintf(" AND f.data_classification = $%d", sIdx)
+		where += fmt.Sprintf(" AND f.data_classification = $%d", sIdx)
 		sumArgs = append(sumArgs, dataClassification)
 		sIdx++
 	}
-	sumQuery += `
+
+	// Same source-conflict gate as retail_kpi.go / cashplan.go: a store-day
+	// reported by two source systems must surface as an error, not silently
+	// double-count in the reconciliation summary.
+	conflictQuery := fmt.Sprintf(`
+		WITH ranked AS (
+			SELECT f.store_id, f.business_date, f.source_system,
+			       ROW_NUMBER() OVER (PARTITION BY f.store_id,f.business_date,f.source_system ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
+			FROM retail_store_day_facts f
+			JOIN stores s ON s.id = f.store_id
+			WHERE %s
+		)
+		SELECT COUNT(*) FROM (
+			SELECT store_id, business_date FROM ranked WHERE rn = 1
+			GROUP BY store_id, business_date HAVING COUNT(DISTINCT source_system) > 1
+		) q`, where)
+	var conflicts int
+	if err := r.db.QueryRow(ctx, conflictQuery, sumArgs...).Scan(&conflicts); err != nil {
+		return nil, nil, fmt.Errorf("check category reconciliation source conflict: %w", err)
+	}
+	if conflicts > 0 {
+		return nil, nil, ErrRetailKPISourceConflict
+	}
+
+	sumQuery := fmt.Sprintf(`
+		WITH ranked AS (
+			SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit,
+			       ROW_NUMBER() OVER (PARTITION BY f.store_id,f.business_date,f.source_system ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
+			FROM retail_store_day_facts f
+			JOIN stores s ON s.id = f.store_id
+			WHERE %s
 		)
 		SELECT store_id, business_date, currency, revenue, gross_profit
 		FROM ranked
 		WHERE rn = 1
-	`
+	`, where)
 
 	sumRows, err := r.db.Query(ctx, sumQuery, sumArgs...)
 	if err != nil {

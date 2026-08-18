@@ -1,5 +1,9 @@
 # IFRS 16 系统 UI 升级计划：Threads 极简风格
 
+> ⚠️ **ARCHIVED 2026-08-18 — 不是现行依据**
+> 归档理由：2026-05 的 UI 升级计划，已被后续 UIUX 改善方案与零售工作站设计取代
+> 现行入口：`docs/AI_文档索引与现行决策.md`
+
 ## 1. 当前 UI 设计审查 (Current UI Review)
 
 通过分析你目前在 `@[web]` (Next.js) 中的代码（特别是 `AppLayout.tsx` 和默认的 Ant Design 配置），以及你在桌面的 `lease_management_ui` 概念设计，我总结了以下几点：

@@ -1,5 +1,9 @@
 # Findings & Decisions — IFRS 16 UI/UX 升级
 
+> ⚠️ **ARCHIVED 2026-08-18 — 不是现行依据**
+> 归档理由：2026-05 UI 升级的调研结论，已落进代码
+> 现行入口：`docs/AI_文档索引与现行决策.md`
+
 ## Requirements
 - 将现有 MVP 级 UI 升级至专业企业 SaaS 水准
 - 提升视觉一致性、信息层级、交互反馈和响应式体验

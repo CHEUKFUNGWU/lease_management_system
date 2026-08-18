@@ -59,6 +59,12 @@ jobs:
         working-directory: core-service
         run: node scripts/enforce-money.mjs
 
+      # 归档守卫：过期文档会被 AI 协作者读到并照着执行，所以横幅与单向引用
+      # 必须是机器强制的，不能靠人记得。规则见 AGENTS.md「文档归档规则」。
+      - name: 文档归档守卫
+        working-directory: ${{ github.workspace }}
+        run: scripts/check_docs_archive.sh
+
       # TEST_DATABASE_URL is what turns the schema smoke tests on; without it
       # they skip, which is why they must be given a database here.
       - name: 测试(单元 + schema 冒烟)

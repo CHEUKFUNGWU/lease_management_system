@@ -158,6 +158,13 @@
 10. **AI 问答越权或引用错误**：必须基于权限范围检索、展示引用来源、区分正式数据与 AI 推断
 11. **用模拟数据冒充经营结论**：模拟验证不能替代商业验证，不得表述为客户采用、真实 ROI 或 PMF
 
+## 文档归档规则
+
+- **`docs/archive/**` 是历史记录，永不作为现行依据。** 里面的方案、计划、评审结论均已被取代或已完结，照着它做事会产出错误的工作。
+- **要找现行结论，读 `docs/AI_文档索引与现行决策.md`。** 那份维护着每份文档的状态（Current / Historical / Partially Superseded / Superseded）与现行决策登记。
+- **归档是单向的。** 现行文档不得链接进 `docs/archive/`；需要引用归档结论时，把结论重述在现行文档里。豁免：文档索引、`docs/adr/**`（"supersedes X" 正是 ADR 的功能）、archive 内部互引。
+- 以上两条由 `scripts/check_docs_archive.sh` 在 CI 强制，不靠人记。
+
 ## 文件与数据规范
 
 **合同头**：合同编号、名称、法人主体、门店编号/名称、出租方、资产/物业类别、`asset_type`、币种、签约日期、commencement date、lease start/end date、原始不可撤销期、续租/终止选择权描述及判断结果、折现率类型/版本、`lease_scope`、豁免/排除原因、scope 来源与置信度、合同状态

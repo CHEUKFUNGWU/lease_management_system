@@ -307,40 +307,27 @@
 
 ## 12. Agent 工具需求
 
-### 12.1 Read Tools（优先实施）
+> ⚠️ **本节原有的勾选清单已于 2026-08-18 移除。**
+>
+> 那张表把大量**已经实现**的工具标成未实现（`lease.portfolio.summary`、`lease.cashflow.scenario`、`lease.predeal.simulate`、`lease.store.scenario.simulate`、各类 Draft 工具等在 `internal/agenttools/tools/` 中均已注册），是本仓库最典型的误导源之一——AI 协作者读到它会去重复实现已有能力。
+>
+> **工具的实现状态以代码为准**：`core-service/internal/agenttools/tools/` 是唯一事实来源，注册点见 `internal/aiagent/agent.go`。缺口的现行判断见 [AI 文档索引与现行决策](AI_文档索引与现行决策.md) §3。
+>
+> 本节保留下面的**分类与约束**，那部分仍然有效。
 
-- [x] `lease.contract.search`
-- [x] `lease.contract.get`
-- [x] `lease.measurement.list`
-- [x] `lease.event.list`
-- [x] `lease.journal.list`
-- [ ] `lease.portfolio.summary`
-- [ ] `lease.rent_to_sales.analyze`
-- [ ] `lease.budget_variance.explain`
-- [ ] `lease.cashflow.forecast`
-- [ ] `lease.close_readiness.get`
-- [ ] `lease.renewal_decision.get`
-- [ ] `retail.store_performance.get`
-- [ ] `manufacturing.equipment_performance.get`
+### 12.1 工具分级
 
-### 12.2 Simulation Tools
+| 级别 | 用途 | 约束 |
+|---|---|---|
+| **Read** | 读取权限范围内的事实：合同、计量、事件、分录、经营组合、门店表现、租售比、设备表现、关账准备度、预算差异 | 只读，不产生副作用 |
+| **Simulation** | 签约报价比较、签约前经济性、续租方案、现金流情景、门店/设备经营方案 | **必须是无副作用的确定性计算**；结果为 Scenario，不改写 Forecast、合同或会计记录 |
+| **Draft / Action** | 合同、付款计划、事件、差异解释、经营行动、Scenario、决策备忘录 | **必须经过 Review Gate**，带幂等键与审计留痕 |
 
-- [ ] `lease.deal.compare`
-- [ ] `lease.predeal.simulate`
-- [ ] `lease.renewal.simulate`
-- [ ] `lease.cashflow.scenario`
-- [ ] `retail.store_scenario.simulate`
-- [ ] `manufacturing.asset_scenario.simulate`
+### 12.2 不变的硬约束
 
-### 12.3 Draft / Action Tools
-
-- [x] 合同、付款计划和事件草稿创建工具。
-- [ ] 差异解释草稿工具。
-- [ ] 经营行动草稿工具。
-- [ ] Scenario 草稿保存工具。
-- [ ] 决策备忘录草稿工具。
-
-所有 Simulation Tools 必须是无副作用的确定性计算；所有 Draft / Action Tools 必须经过 Review Gate。
+- Simulation 类工具永远不写库；Draft 类工具永远只产草稿。
+- 工具的权限、租户范围、幂等、复核、配额判定统一走中间件链，不散落在各工具实现里——见 [ADR-0019 Addendum A](adr/0019-agent-tool-runtime-policy-and-threat-model.md)。
+- IFRS 16 计量类度量不得由沙箱等非确定性路径产生——见 [ADR-0025](adr/0025-separate-certified-engine-output-from-exploratory-analysis.md)。
 
 ## 13. 数据集成与语义层
 

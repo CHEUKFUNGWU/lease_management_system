@@ -129,7 +129,7 @@ func TestRetailPulsePostgresGoldenAffectsAndIsolation(t *testing.T) {
 	}
 	for _, scenario := range scenarios {
 		asOf, _ := time.Parse("2006-01-02", scenario.asOf)
-		response, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: asOf, Classification: "simulated", DatasetVersion: planA.DatasetVersion, AttentionLimit: 50})
+		response, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: asOf, WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, AttentionLimit: 50})
 		if err != nil {
 			t.Fatalf("scenario %s: %v", scenario.asOf, err)
 		}
@@ -154,12 +154,12 @@ func TestRetailPulsePostgresGoldenAffectsAndIsolation(t *testing.T) {
 	countingDB := &pulseCountingDB{DBTX: pool}
 	countedService := retailpulse.NewService(repository.NewRetailKPIRepository(countingDB))
 	started := time.Now()
-	countedResponse, err := countedService.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "simulated", DatasetVersion: planA.DatasetVersion, AttentionLimit: 50})
+	countedResponse, err := countedService.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, AttentionLimit: 50})
 	if err != nil {
 		t.Fatalf("counted 60-store pulse: %v", err)
 	}
-	if countingDB.queryCount != 2 || countingDB.queryRowCount != 1 {
-		t.Fatalf("pulse query count=%d query_row_count=%d, want fixed 2+1 (population/facts + conflict)", countingDB.queryCount, countingDB.queryRowCount)
+	if countingDB.queryCount != 3 || countingDB.queryRowCount != 1 {
+		t.Fatalf("pulse query count=%d query_row_count=%d, want fixed 3+1 (population/facts/lifecycles + conflict)", countingDB.queryCount, countingDB.queryRowCount)
 	}
 	assertPostgresPulseGolden(t, countedResponse, golden["2026-06-05"], planA, planA.Stores[6].Code)
 	t.Logf("60-store pulse duration=%s SQL queries=%d query_rows=%d facts=%d", time.Since(started), countingDB.queryCount, countingDB.queryRowCount, len(countedResponse.Attention))
@@ -169,7 +169,7 @@ func TestRetailPulsePostgresGoldenAffectsAndIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	region := planA.Stores[1].Region
-	regionResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA, Regions: []string{region}}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50})
+	regionResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA, Regions: []string{region}}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50})
 	if err != nil {
 		t.Fatalf("region scoped pulse: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestRetailPulsePostgresGoldenAffectsAndIsolation(t *testing.T) {
 		}
 	}
 	brand := planA.Stores[1].Brand
-	brandResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA, Brands: []string{brand}}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50})
+	brandResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA, Brands: []string{brand}}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50})
 	if err != nil {
 		t.Fatalf("brand scoped pulse: %v", err)
 	}
@@ -204,7 +204,7 @@ func TestRetailPulsePostgresGoldenAffectsAndIsolation(t *testing.T) {
 			t.Fatalf("brand scope suppression leaked brand=%s want=%s store=%s", suppressed.Brand, brand, suppressed.StoreCode)
 		}
 	}
-	storeResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", StoreIDs: []string{scopedStoreID}, AttentionLimit: 50})
+	storeResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", StoreIDs: []string{scopedStoreID}, AttentionLimit: 50})
 	if err != nil {
 		t.Fatalf("store scoped pulse: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestRetailPulsePostgresGoldenAffectsAndIsolation(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO retail_store_day_facts (store_id,business_date,currency,revenue,gross_profit,transactions,footfall,area_sqm,labor_cost,fixed_rent,variable_rent,non_lease_cost,other_controllable_cost,source_system,version,reconciliation_status,mapping_status,data_quality_status,data_classification,simulation_dataset_version) SELECT f.store_id,f.business_date,f.currency,f.revenue,f.gross_profit,f.transactions,f.footfall,f.area_sqm,f.labor_cost,f.fixed_rent,f.variable_rent,f.non_lease_cost,f.other_controllable_cost,f.source_system,2,f.reconciliation_status,f.mapping_status,f.data_quality_status,f.data_classification,f.simulation_dataset_version FROM retail_store_day_facts f WHERE f.store_id=$1 AND f.business_date='2026-06-01' AND f.source_system='retail_simulator' AND f.data_classification='simulated' AND f.simulation_dataset_version=$2`, scopedStoreID, planA.DatasetVersion); err != nil {
 		t.Fatal(err)
 	}
-	highestResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50})
+	highestResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50})
 	if err != nil || highestResponse.FactVersionMax != 2 || highestResponse.CurrentCoverage.ObservedStoreDays != 420 || highestResponse.CurrentCoverage.ExpectedStoreDays != 420 || highestResponse.ComparisonCoverage.ObservedStoreDays != 420 || highestResponse.ComparisonCoverage.ExpectedStoreDays != 420 {
 		t.Fatalf("highest fact version response=%+v err=%v", highestResponse, err)
 	}
@@ -231,13 +231,13 @@ func TestRetailPulsePostgresGoldenAffectsAndIsolation(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO retail_store_day_facts (store_id,business_date,currency,revenue,gross_profit,transactions,footfall,area_sqm,labor_cost,fixed_rent,variable_rent,non_lease_cost,other_controllable_cost,source_system,version,reconciliation_status,mapping_status,data_quality_status,data_classification,simulation_dataset_version) VALUES ($1,'2026-06-01','CNY',100,30,10,20,10,10,1,1,1,1,'other_source',1,'unreconciled','mapped','valid','simulated',$2)`, scopedStoreID, planA.DatasetVersion); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "simulated", DatasetVersion: planA.DatasetVersion, AttentionLimit: 50}); !errors.Is(err, repository.ErrRetailKPISourceConflict) {
+	if _, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, AttentionLimit: 50}); !errors.Is(err, repository.ErrRetailKPISourceConflict) {
 		t.Fatalf("pulse source conflict=%v", err)
 	}
-	if _, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50}); err != nil {
+	if _, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "simulated", DatasetVersion: planA.DatasetVersion, SourceSystem: "retail_simulator", AttentionLimit: 50}); err != nil {
 		t.Fatalf("pulse explicit source=%v", err)
 	}
-	productionResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), Classification: "production", AttentionLimit: 50})
+	productionResponse, err := service.Build(access.WithScope(ctx, access.Scope{LegalEntityID: entityA}), retailpulse.Query{LegalEntityID: entityA, AsOf: mustDate("2026-06-05"), WindowDays: 7, Classification: "production", AttentionLimit: 50})
 	if err != nil || productionResponse.DataClassification != "production" || productionResponse.DatasetVersion != "" || !productionResponse.DecisionReady || productionResponse.Currency != "CNY" || productionResponse.CurrentCoverage.ObservedStoreDays != 7 || productionResponse.CurrentCoverage.ExpectedStoreDays != 7 || productionResponse.ComparisonCoverage.ObservedStoreDays != 7 || productionResponse.ComparisonCoverage.ExpectedStoreDays != 7 || len(productionResponse.DailyTrend) != 7 {
 		t.Fatalf("production-only pulse=%+v err=%v", productionResponse, err)
 	}

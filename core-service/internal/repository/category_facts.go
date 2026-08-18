@@ -222,10 +222,12 @@ func (r *CategoryRepository) GetCategoryReconciliationData(
 	// legal_entity_id: tenancy is reached through the store. The join is INNER so
 	// a fact whose store is missing cannot slip past the tenant filter.
 	sumQuery := `
-		SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit
-		FROM retail_store_day_facts f
-		JOIN stores s ON s.id = f.store_id
-		WHERE s.legal_entity_id = $1
+		WITH ranked AS (
+			SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit,
+			       ROW_NUMBER() OVER (PARTITION BY f.store_id, f.business_date ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
+			FROM retail_store_day_facts f
+			JOIN stores s ON s.id = f.store_id
+			WHERE s.legal_entity_id = $1
 	`
 	sumArgs := []interface{}{legalEntityID}
 	sIdx := 2
@@ -249,6 +251,12 @@ func (r *CategoryRepository) GetCategoryReconciliationData(
 		sumArgs = append(sumArgs, dataClassification)
 		sIdx++
 	}
+	sumQuery += `
+		)
+		SELECT store_id, business_date, currency, revenue, gross_profit
+		FROM ranked
+		WHERE rn = 1
+	`
 
 	sumRows, err := r.db.Query(ctx, sumQuery, sumArgs...)
 	if err != nil {

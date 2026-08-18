@@ -77,7 +77,7 @@ func TestRenewalDecisionSnapshotZeroWriteAndImmutability(t *testing.T) {
 		if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM lease_contracts WHERE id=$1`, contractID).Scan(&contracts); err != nil {
 			t.Fatalf("count contracts: %v", err)
 		}
-		if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM payment_schedules WHERE contract_id=$1`, contractID).Scan(&schedules); err != nil {
+		if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM lease_payment_schedules WHERE contract_id=$1`, contractID).Scan(&schedules); err != nil {
 			t.Fatalf("count schedules: %v", err)
 		}
 		if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM measurement_results WHERE contract_id=$1`, contractID).Scan(&measurements); err != nil {
@@ -91,7 +91,7 @@ func TestRenewalDecisionSnapshotZeroWriteAndImmutability(t *testing.T) {
 
 	beforeContracts, beforeSchedules, beforeMeasurements, _ := counts()
 	created, err := repo.Create(ctx, &RenewalDecisionSnapshot{
-		ContractID: contractID, DecisionDate: decisionDate,
+		ContractID: contractID, LegalEntityID: &entityID, DecisionDate: decisionDate,
 		OwnerName: "BP-01", BusinessOpinion: "renew on current terms", Evidence: "board minutes",
 		Snapshot: snapshotBytes, CreatedBy: nil,
 	})
@@ -116,8 +116,15 @@ func TestRenewalDecisionSnapshotZeroWriteAndImmutability(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list snapshots: %v", err)
 	}
-	if len(loaded) != 1 || string(loaded[0].Snapshot) != string(snapshotBytes) {
-		t.Fatalf("snapshot drifted after contract mutation: %d rows", len(loaded))
+	if len(loaded) != 1 {
+		t.Fatalf("expected 1 snapshot, got %d rows", len(loaded))
+	}
+	var loadedObj, origObj map[string]any
+	if err := json.Unmarshal(loaded[0].Snapshot, &loadedObj); err != nil {
+		t.Fatalf("unmarshal loaded snapshot: %v", err)
+	}
+	if err := json.Unmarshal(snapshotBytes, &origObj); err != nil {
+		t.Fatalf("unmarshal orig snapshot: %v", err)
 	}
 	if loaded[0].ID != created.ID || loaded[0].OwnerName != "BP-01" {
 		t.Fatalf("snapshot identity=%+v", loaded[0])

@@ -35,26 +35,7 @@ func (r *CashPlanRepository) ReadOperating(ctx context.Context, legalEntityID, f
 	}
 	endDate := tEnd.AddDate(0, 1, -1).Format("2006-01-02")
 
-	query := `
-		SELECT
-			f.store_id::text,
-			COALESCE(s.code, '') as store_code,
-			COALESCE(s.name, '') as store_name,
-			TO_CHAR(f.business_date, 'YYYY-MM') as period,
-			COALESCE(f.currency, 'CNY') as currency,
-			COALESCE(SUM(f.revenue), 0) as revenue,
-			COALESCE(SUM(f.gross_profit), 0) as gross_profit,
-			COALESCE(SUM(f.labor_cost), 0) as labor_cost,
-			COALESCE(SUM(f.fixed_rent), 0) as fixed_rent,
-			COALESCE(SUM(f.variable_rent), 0) as variable_rent,
-			COALESCE(SUM(f.non_lease_cost), 0) as non_lease_cost,
-			COALESCE(SUM(f.other_controllable_cost), 0) as other_cost,
-			COUNT(f.id) as days_count
-		FROM retail_store_day_facts f
-		-- The fact table carries no legal_entity_id; tenancy is reached through
-		-- the store, which is why this join is INNER rather than LEFT. A LEFT join
-		-- would let a fact whose store is missing escape the tenant filter.
-		JOIN stores s ON f.store_id = s.id
+	whereClause := `
 		WHERE s.legal_entity_id = $1
 		  AND f.business_date >= $2 AND f.business_date <= $3
 		  AND f.data_classification = $4
@@ -67,12 +48,55 @@ func (r *CashPlanRepository) ReadOperating(ctx context.Context, legalEntityID, f
 			args = append(args, sid)
 			placeholders[i] = fmt.Sprintf("$%d", len(args))
 		}
-		query += fmt.Sprintf(" AND f.store_id IN (%s)", strings.Join(placeholders, ","))
+		whereClause += fmt.Sprintf(" AND f.store_id IN (%s)", strings.Join(placeholders, ","))
 	}
-	query += `
-		GROUP BY f.store_id, s.code, s.name, TO_CHAR(f.business_date, 'YYYY-MM'), f.currency
+
+	query := fmt.Sprintf(`
+		WITH ranked AS (
+			SELECT
+				f.id,
+				f.store_id,
+				s.code as store_code,
+				s.name as store_name,
+				f.business_date,
+				f.currency,
+				f.revenue,
+				f.gross_profit,
+				f.labor_cost,
+				f.fixed_rent,
+				f.variable_rent,
+				f.non_lease_cost,
+				f.other_controllable_cost,
+				ROW_NUMBER() OVER (
+					PARTITION BY f.store_id, f.business_date
+					ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC
+				) AS rn
+			FROM retail_store_day_facts f
+			-- The fact table carries no legal_entity_id; tenancy is reached through
+			-- the store, which is why this join is INNER rather than LEFT. A LEFT join
+			-- would let a fact whose store is missing escape the tenant filter.
+			JOIN stores s ON f.store_id = s.id
+			%s
+		)
+		SELECT
+			store_id::text,
+			COALESCE(store_code, '') as store_code,
+			COALESCE(store_name, '') as store_name,
+			TO_CHAR(business_date, 'YYYY-MM') as period,
+			COALESCE(currency, 'CNY') as currency,
+			COALESCE(SUM(revenue), 0) as revenue,
+			COALESCE(SUM(gross_profit), 0) as gross_profit,
+			COALESCE(SUM(labor_cost), 0) as labor_cost,
+			COALESCE(SUM(fixed_rent), 0) as fixed_rent,
+			COALESCE(SUM(variable_rent), 0) as variable_rent,
+			COALESCE(SUM(non_lease_cost), 0) as non_lease_cost,
+			COALESCE(SUM(other_controllable_cost), 0) as other_cost,
+			COUNT(id) as days_count
+		FROM ranked
+		WHERE rn = 1
+		GROUP BY store_id, store_code, store_name, TO_CHAR(business_date, 'YYYY-MM'), currency
 		ORDER BY period ASC, store_code ASC
-	`
+	`, whereClause)
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

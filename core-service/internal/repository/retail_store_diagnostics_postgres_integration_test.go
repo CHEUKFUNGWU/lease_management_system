@@ -86,8 +86,8 @@ func TestRetailStoreDiagnosticsPostgresGoldenAndIsolation(t *testing.T) {
 	if response.Store.StoreCode != plan.Stores[1].Code || response.TargetCoverage.ExpectedStoreDays != 14 || response.ComparisonCoverage.ExpectedStoreDays != 14 || response.Evidence.FactVersionMax != 1 || len(response.DailyTrend) != 14 {
 		t.Fatalf("store 360 envelope=%+v", response)
 	}
-	if counting.queryCount != 2 || counting.queryRowCount != 1 {
-		t.Fatalf("store 360 query count=%d row=%d, want 2+1", counting.queryCount, counting.queryRowCount)
+	if counting.queryCount != 3 || counting.queryRowCount != 1 {
+		t.Fatalf("store 360 query count=%d row=%d, want 3+1", counting.queryCount, counting.queryRowCount)
 	}
 	if len(response.Bridges) != 3 {
 		t.Fatalf("bridges=%d", len(response.Bridges))

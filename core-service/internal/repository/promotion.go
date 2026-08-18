@@ -229,17 +229,25 @@ func (r *PromotionRepository) GetPromotionActualFacts(ctx context.Context, legal
 	// through the store, and the join is INNER so a fact whose store is missing
 	// cannot slip past the tenant filter.
 	query := `
-		SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit, f.transactions
-		FROM retail_store_day_facts f
-		JOIN stores s ON s.id = f.store_id
-		WHERE s.legal_entity_id = $1
-		  AND f.business_date >= $2 AND f.business_date <= $3
+		WITH ranked AS (
+			SELECT f.store_id, f.business_date, f.currency, f.revenue, f.gross_profit, f.transactions,
+			       ROW_NUMBER() OVER (PARTITION BY f.store_id, f.business_date ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
+			FROM retail_store_day_facts f
+			JOIN stores s ON s.id = f.store_id
+			WHERE s.legal_entity_id = $1
+			  AND f.business_date >= $2 AND f.business_date <= $3
 	`
 	args := []interface{}{legalEntityID, startDate, endDate}
 	if len(storeIDs) > 0 {
 		query += " AND f.store_id = ANY($4)"
 		args = append(args, storeIDs)
 	}
+	query += `
+		)
+		SELECT store_id, business_date, currency, revenue, gross_profit, transactions
+		FROM ranked
+		WHERE rn = 1
+	`
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

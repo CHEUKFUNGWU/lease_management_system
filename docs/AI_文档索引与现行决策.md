@@ -55,6 +55,24 @@
 | [**0024**](adr/0024-remove-the-agpl-pdf-dependency.md) | **移除 AGPL 的 PyMuPDF，解析按证据需求分流** | **Accepted（新）** |
 | [**0025**](adr/0025-separate-certified-engine-output-from-exploratory-analysis.md) | **双轨执行与受保护度量红线** | **Accepted（新）** |
 
+### 1.5 归档区
+
+全部历史文档在 `docs/archive/`，**均带 ARCHIVED 横幅，永不作为现行依据**（规则见 AGENTS.md「文档归档规则」，由 `scripts/check_docs_archive.sh` 在 CI 强制）。
+
+| 目录 | 份数 | 内容 |
+|---|---|---|
+| `ai-runtime-2026-08/` | 5 | AI/CLI 实施计划、外部验收清单、pi 参考方案、tau 计划与其模块深化 |
+| `strategy-inputs-2026-08/` | 2 | 零售转型可行性报告、FP&A 产品战略分析 |
+| `uiux-reviews-2026-08/` | 3 | UIUX 评估报告、零售 UIUX 评审、架构改善方案 |
+| `ifrs16-mvp-2026-05/` | 2 | IFRS16 IT 需求文档、MVP 技术架构方案 |
+| `pre-retail-roadmap/` | 3 | 零售转型前的路线图与任务清单 |
+| `uiux-overhaul-2026-08/` | 3 | 已完结的 UIUX 交付流程工单 |
+| `superseded-lists/` | 3 | 被取代的清单与 AGENTS 历史章节 |
+| `ui-upgrade-2026-05/` | 4 | 2026-05 的 UI 升级 |
+| `project-history/` | 1 | 2026-05 缺陷清单 |
+
+**2026-08-18 的约定变更**：此前 `docs/archive-local/` 被 gitignore、只存本机，目的是不让过期文档污染协作者上下文。现已全部迁回跟踪式归档——本地归档有三个代价（机器丢失即消失、其他 clone 与 worktree 看不到、git 历史里的删除文件没人会想到去找），而它防的那件事由**横幅 + AGENTS.md 规则 + CI 守卫**替代，效果更好且不丢副本。
+
 ---
 
 ## 2. 现行决策登记

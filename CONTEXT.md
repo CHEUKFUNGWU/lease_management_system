@@ -127,8 +127,8 @@ The conclusion that Fact Coverage, provenance, and currency basis are sufficient
 _Avoid_: Valid, complete, healthy
 
 **Currency Partition**:
-The separation of a multi-currency result into one set of metrics per currency. Amounts in different currencies are never summed; there is no implicit conversion.
-_Avoid_: Base currency total, consolidated amount
+The separation of a multi-currency result into one set of metrics per currency. Amounts in different currencies are never summed; there is no implicit conversion. Currency translation (via `TranslationBasis`) is an explicit, version-controlled secondary view that always displays its exchange rate version and type; currency partitioning remains the default.
+_Avoid_: Base currency total, consolidated amount without rate version
 
 **Attention Signal**:
 One deterministic observation that a store's metric moved beyond a defined threshold, carrying the observed change, threshold, direction, unit, and its contribution to the store's score.

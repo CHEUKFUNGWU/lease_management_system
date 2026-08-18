@@ -129,7 +129,10 @@ func main() {
 	retailPulseHandler := handlers.NewRetailPulseHandler(retailKPIRepo).WithPlanReader(planReader).WithPlanMateriality(planMateriality)
 	retailStoreDiagnosticsHandler := handlers.NewRetailStoreDiagnosticsHandler(retailKPIRepo).WithPlanReader(planReader).WithPlanMateriality(planMateriality)
 	retailScenarioHandler := handlers.NewRetailScenarioHandler(retailKPIRepo, operatingFactsRepo)
-	fpnaGovernanceHandler := handlers.NewFPnAGovernanceHandler(fpnaGovernanceRepo, operatingFactsRepo, auditLogger)
+	fpnaGovernanceHandler := handlers.NewFPnAGovernanceHandler(fpnaGovernanceRepo, operatingFactsRepo, auditLogger).WithExchangeRateRepo(exchangeRateRepo)
+	cashPlanRepo := repository.NewCashPlanRepository(database.Pool)
+	cashPlanHandler := handlers.NewCashPlanHandler(cashPlanRepo)
+	exchangeRateVersionHandler := handlers.NewExchangeRateVersionHandler(exchangeRateRepo)
 	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
 	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
 	decisionScenarioHandler := handlers.NewDecisionScenarioHandler(draftService)
@@ -355,6 +358,9 @@ func main() {
 		// foreign-currency leases into the entity's functional currency.
 		protected.Handle(http.MethodGet, "/exchange-rates", permission("settings", "read"), exchangeRateHandler.List)
 		protected.Handle(http.MethodPost, "/exchange-rates", permission("settings", "update"), exchangeRateHandler.Upsert)
+		protected.Handle(http.MethodGet, "/exchange-rates/versions", permission("settings", "read"), exchangeRateVersionHandler.ListVersions)
+		protected.Handle(http.MethodPost, "/exchange-rates/versions", permission("settings", "update"), exchangeRateVersionHandler.CreateVersion)
+		protected.Handle(http.MethodPost, "/cashflow/plan/compose", permission("reports", "read"), cashPlanHandler.Compose)
 
 		// Budget versions freeze the measured forward schedule so later actuals
 		// can be explained against a stable plan.

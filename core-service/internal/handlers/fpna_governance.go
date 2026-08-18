@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -18,18 +19,25 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/services/currencytranslation"
 	"github.com/lease-management-system/core-service/internal/services/fpna"
 	"github.com/lease-management-system/core-service/internal/services/operating"
 )
 
 type FPnAGovernanceHandler struct {
-	repo          *repository.FPnAGovernanceRepository
-	operatingRepo *repository.OperatingFactsRepository
-	auditLogger   *audit.Logger
+	repo             *repository.FPnAGovernanceRepository
+	operatingRepo    *repository.OperatingFactsRepository
+	exchangeRateRepo *repository.ExchangeRateRepository
+	auditLogger      *audit.Logger
 }
 
 func NewFPnAGovernanceHandler(repo *repository.FPnAGovernanceRepository, operatingRepo *repository.OperatingFactsRepository, auditLogger *audit.Logger) *FPnAGovernanceHandler {
 	return &FPnAGovernanceHandler{repo: repo, operatingRepo: operatingRepo, auditLogger: auditLogger}
+}
+
+func (h *FPnAGovernanceHandler) WithExchangeRateRepo(r *repository.ExchangeRateRepository) *FPnAGovernanceHandler {
+	h.exchangeRateRepo = r
+	return h
 }
 
 type planVersionInput struct {
@@ -236,13 +244,139 @@ func (h *FPnAGovernanceHandler) ComparePlanVersions(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "mixed currencies require exchange_rate_version", "review_required": true})
 		return
 	}
+
+	targetCurrency := firstNonEmpty(c.Query("reporting_currency"), c.Query("currency"), leftVersion.Currency, rightVersion.Currency, "CNY")
+	if exchangeRateVersion != "" && h.exchangeRateRepo != nil {
+		basis, err := currencytranslation.NewBasis(c.Request.Context(), exchangeRateVersion, &repoRateReader{repo: h.exchangeRateRepo})
+		if err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": fmt.Sprintf("failed to load exchange rate version %q: %v", exchangeRateVersion, err), "review_required": true})
+			return
+		}
+		leftSet := currencytranslation.MultiCurrencyPlanSet{VersionID: leftID, VersionName: leftVersion.Name, Lines: toPlanLineItems(left)}
+		transLeft, err := basis.Translate(leftSet, targetCurrency)
+		if err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "review_required": true})
+			return
+		}
+		rightSet := currencytranslation.MultiCurrencyPlanSet{VersionID: rightID, VersionName: rightVersion.Name, Lines: toPlanLineItems(right)}
+		transRight, err := basis.Translate(rightSet, targetCurrency)
+		if err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "review_required": true})
+			return
+		}
+		left = fromTranslatedLines(transLeft.Lines, left)
+		right = fromTranslatedLines(transRight.Lines, right)
+	}
+
 	leftBasis := firstNonEmpty(c.Query("left_basis"), strings.Title(leftVersion.VersionType))
 	rightBasis := firstNonEmpty(c.Query("right_basis"), strings.Title(rightVersion.VersionType))
 	dataVersion := firstNonEmpty(c.Query("data_version"), fmt.Sprintf("plan:%s@%s|plan:%s@%s", leftID, leftVersion.AsOfPeriod, rightID, rightVersion.AsOfPeriod))
-	currency := firstNonEmpty(c.Query("currency"), leftVersion.Currency, rightVersion.Currency)
+	currency := targetCurrency
 	result := fpna.ComparePlanLines(period, leftBasis, rightBasis, currency, dataVersion, left, right, 0.01)
 	result.Source = fmt.Sprintf("fpna_plan_lines:%s,%s", leftID, rightID)
-	c.JSON(http.StatusOK, gin.H{"basis": "Working", "exchange_rate_version": exchangeRateVersion, "coverage": result.Coverage, "source": gin.H{"left_version": leftID, "right_version": rightID, "left_as_of": leftVersion.AsOfPeriod, "right_as_of": rightVersion.AsOfPeriod, "data_version": dataVersion, "exchange_rate_version": exchangeRateVersion}, "result": result})
+	c.JSON(http.StatusOK, gin.H{"basis": "Working", "exchange_rate_version": exchangeRateVersion, "reporting_currency": targetCurrency, "coverage": result.Coverage, "source": gin.H{"left_version": leftID, "right_version": rightID, "left_as_of": leftVersion.AsOfPeriod, "right_as_of": rightVersion.AsOfPeriod, "data_version": dataVersion, "exchange_rate_version": exchangeRateVersion}, "result": result})
+}
+
+type repoRateReader struct {
+	repo *repository.ExchangeRateRepository
+}
+
+func (r *repoRateReader) GetRateVersion(ctx context.Context, versionRef string) (*currencytranslation.RateVersion, error) {
+	v, err := r.repo.GetVersion(ctx, versionRef)
+	if err != nil {
+		return nil, err
+	}
+	if v == nil {
+		return nil, nil
+	}
+	return &currencytranslation.RateVersion{
+		ID:            v.ID,
+		Name:          v.Name,
+		VersionType:   v.VersionType,
+		EffectiveFrom: v.EffectiveFrom,
+		EffectiveTo:   v.EffectiveTo,
+		Source:        v.Source,
+		Status:        v.Status,
+	}, nil
+}
+
+func (r *repoRateReader) GetRates(ctx context.Context, versionID string, rateType string) ([]currencytranslation.ExchangeRate, error) {
+	dbRates, err := r.repo.GetRatesForVersion(ctx, versionID, rateType)
+	if err != nil {
+		return nil, err
+	}
+	res := make([]currencytranslation.ExchangeRate, len(dbRates))
+	for i, d := range dbRates {
+		res[i] = currencytranslation.ExchangeRate{
+			FromCurrency: d.FromCurrency,
+			ToCurrency:   d.ToCurrency,
+			RateType:     d.RateType,
+			Rate:         d.Rate,
+		}
+	}
+	return res, nil
+}
+
+func toPlanLineItems(lines []*repository.FPnAPlanLine) []currencytranslation.PlanLineItem {
+	items := make([]currencytranslation.PlanLineItem, len(lines))
+	for i, l := range lines {
+		items[i] = currencytranslation.PlanLineItem{
+			Period:         l.Period,
+			Grain:          l.Grain,
+			OriginalCurr:   l.Currency,
+			Revenue:        derefFloat(l.Revenue),
+			GrossProfit:    derefFloat(l.GrossProfit),
+			LaborCost:      derefFloat(l.LaborCost),
+			FixedRent:      derefFloat(l.FixedRent),
+			VariableRent:   derefFloat(l.VariableRent),
+			NonLeaseCost:   derefFloat(l.NonLeaseCost),
+			FourWallEBITDA: derefFloat(l.FourWallEBITDA),
+			CashFlow:       derefFloat(l.CashFlow),
+			Capex:          derefFloat(l.Capex),
+		}
+	}
+	return items
+}
+
+func fromTranslatedLines(tLines []currencytranslation.TranslatedLine, orig []*repository.FPnAPlanLine) []*repository.FPnAPlanLine {
+	res := make([]*repository.FPnAPlanLine, len(tLines))
+	for i, t := range tLines {
+		var o *repository.FPnAPlanLine
+		if i < len(orig) {
+			clone := *orig[i]
+			o = &clone
+		} else {
+			o = &repository.FPnAPlanLine{}
+		}
+		o.Currency = t.TargetCurrency
+		rev := t.TransRevenue
+		gp := t.TransGrossProfit
+		labor := t.TransLaborCost
+		fixed := t.TransFixedRent
+		vRent := t.TransVarRent
+		nonLease := t.TransNonLease
+		ebitda := t.TransEBITDA
+		cf := t.TransCashFlow
+		capex := t.TransCapex
+		o.Revenue = &rev
+		o.GrossProfit = &gp
+		o.LaborCost = &labor
+		o.FixedRent = &fixed
+		o.VariableRent = &vRent
+		o.NonLeaseCost = &nonLease
+		o.FourWallEBITDA = &ebitda
+		o.CashFlow = &cf
+		o.Capex = &capex
+		res[i] = o
+	}
+	return res
+}
+
+func derefFloat(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
 }
 
 func (h *FPnAGovernanceHandler) ForecastAccuracy(c *gin.Context) {

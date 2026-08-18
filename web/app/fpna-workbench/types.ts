@@ -57,6 +57,7 @@ export interface VarianceLine {
 export interface CompareResult {
   basis: string;
   exchange_rate_version?: string;
+  reporting_currency?: string;
   error?: string;
   coverage?: {
     status?: string;
@@ -238,6 +239,7 @@ export interface CompareParams {
   grain?: string;
   currency?: string;
   exchange_rate_version?: string;
+  reporting_currency?: string;
   business_segment?: string;
   brand?: string;
   region?: string;

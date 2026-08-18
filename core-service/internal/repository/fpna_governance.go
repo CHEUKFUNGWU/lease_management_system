@@ -65,6 +65,8 @@ type FPnAPlanLine struct {
 	NonLeaseCost       *float64        `json:"non_lease_cost,omitempty"`
 	FourWallEBITDA     *float64        `json:"four_wall_ebitda,omitempty"`
 	CashFlow           *float64        `json:"cash_flow,omitempty"`
+	Capex              *float64        `json:"capex,omitempty"`
+	CapexCategory      string          `json:"capex_category,omitempty"`
 	NetDebt            *float64        `json:"net_debt,omitempty"`
 	OperationalKPIs    json.RawMessage `json:"operational_kpis"`
 	SourceSystem       string          `json:"source_system"`
@@ -303,7 +305,7 @@ func (r *FPnAGovernanceRepository) CreatePlanVersionWithLines(ctx context.Contex
 		if asOfAt.IsZero() {
 			asOfAt = time.Now().UTC()
 		}
-		_, err = r.db.Exec(ctx, `INSERT INTO fpna_plan_lines (id,plan_version_id,period,grain,legal_entity_id,business_segment,brand,region,store_id,plant_code,production_line_code,equipment_id,asset_type,currency,revenue,gross_profit,labor_cost,fixed_rent,variable_rent,non_lease_cost,four_wall_ebitda,cash_flow,net_debt,operational_kpis,source_system,source_record_id,as_of_at,actual_flag,forecast_flag,scenario_inputs) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`, lineID, version.ID, item.Period, item.Grain, item.LegalEntityID, item.BusinessSegment, item.Brand, item.Region, item.StoreID, item.PlantCode, item.ProductionLineCode, item.EquipmentID, item.AssetType, item.Currency, item.Revenue, item.GrossProfit, item.LaborCost, item.FixedRent, item.VariableRent, item.NonLeaseCost, item.FourWallEBITDA, item.CashFlow, item.NetDebt, opKPIs, item.SourceSystem, item.SourceRecordID, asOfAt, item.ActualFlag, item.ForecastFlag, scInputs)
+		_, err = r.db.Exec(ctx, `INSERT INTO fpna_plan_lines (id,plan_version_id,period,grain,legal_entity_id,business_segment,brand,region,store_id,plant_code,production_line_code,equipment_id,asset_type,currency,revenue,gross_profit,labor_cost,fixed_rent,variable_rent,non_lease_cost,four_wall_ebitda,cash_flow,capex,capex_category,net_debt,operational_kpis,source_system,source_record_id,as_of_at,actual_flag,forecast_flag,scenario_inputs) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`, lineID, version.ID, item.Period, item.Grain, item.LegalEntityID, item.BusinessSegment, item.Brand, item.Region, item.StoreID, item.PlantCode, item.ProductionLineCode, item.EquipmentID, item.AssetType, item.Currency, item.Revenue, item.GrossProfit, item.LaborCost, item.FixedRent, item.VariableRent, item.NonLeaseCost, item.FourWallEBITDA, item.CashFlow, item.Capex, item.CapexCategory, item.NetDebt, opKPIs, item.SourceSystem, item.SourceRecordID, asOfAt, item.ActualFlag, item.ForecastFlag, scInputs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create plan line: %w", err)
 		}
@@ -399,7 +401,7 @@ func (r *FPnAGovernanceRepository) CreatePlanLine(ctx context.Context, item *FPn
 	if item.AsOfAt.IsZero() {
 		item.AsOfAt = time.Now().UTC()
 	}
-	err := r.db.QueryRow(ctx, `INSERT INTO fpna_plan_lines (id,plan_version_id,period,grain,legal_entity_id,business_segment,brand,region,store_id,plant_code,production_line_code,equipment_id,asset_type,currency,revenue,gross_profit,labor_cost,fixed_rent,variable_rent,non_lease_cost,four_wall_ebitda,cash_flow,net_debt,operational_kpis,source_system,source_record_id,as_of_at,actual_flag,forecast_flag,scenario_inputs) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30) RETURNING created_at`, item.ID, item.PlanVersionID, item.Period, item.Grain, item.LegalEntityID, item.BusinessSegment, item.Brand, item.Region, item.StoreID, item.PlantCode, item.ProductionLineCode, item.EquipmentID, item.AssetType, item.Currency, item.Revenue, item.GrossProfit, item.LaborCost, item.FixedRent, item.VariableRent, item.NonLeaseCost, item.FourWallEBITDA, item.CashFlow, item.NetDebt, item.OperationalKPIs, item.SourceSystem, item.SourceRecordID, item.AsOfAt, item.ActualFlag, item.ForecastFlag, item.ScenarioInputs).Scan(new(time.Time))
+	err := r.db.QueryRow(ctx, `INSERT INTO fpna_plan_lines (id,plan_version_id,period,grain,legal_entity_id,business_segment,brand,region,store_id,plant_code,production_line_code,equipment_id,asset_type,currency,revenue,gross_profit,labor_cost,fixed_rent,variable_rent,non_lease_cost,four_wall_ebitda,cash_flow,capex,capex_category,net_debt,operational_kpis,source_system,source_record_id,as_of_at,actual_flag,forecast_flag,scenario_inputs) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32) RETURNING created_at`, item.ID, item.PlanVersionID, item.Period, item.Grain, item.LegalEntityID, item.BusinessSegment, item.Brand, item.Region, item.StoreID, item.PlantCode, item.ProductionLineCode, item.EquipmentID, item.AssetType, item.Currency, item.Revenue, item.GrossProfit, item.LaborCost, item.FixedRent, item.VariableRent, item.NonLeaseCost, item.FourWallEBITDA, item.CashFlow, item.Capex, item.CapexCategory, item.NetDebt, item.OperationalKPIs, item.SourceSystem, item.SourceRecordID, item.AsOfAt, item.ActualFlag, item.ForecastFlag, item.ScenarioInputs).Scan(new(time.Time))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create FP&A plan line: %w", err)
 	}
@@ -412,7 +414,7 @@ func (r *FPnAGovernanceRepository) ListPlanLines(ctx context.Context, planID str
 
 func (r *FPnAGovernanceRepository) ListPlanLinesFiltered(ctx context.Context, planID string, entity access.EntityFilter, period, grain string, filters map[string]string) ([]*FPnAPlanLine, error) {
 	args := []any{planID, period, grain}
-	query := `SELECT l.id,l.plan_version_id,l.period,l.grain,l.legal_entity_id,COALESCE(l.business_segment,''),COALESCE(l.brand,''),COALESCE(l.region,''),l.store_id,COALESCE(l.plant_code,''),COALESCE(l.production_line_code,''),l.equipment_id,COALESCE(l.asset_type,''),l.currency,l.revenue,l.gross_profit,l.labor_cost,l.fixed_rent,l.variable_rent,l.non_lease_cost,l.four_wall_ebitda,l.cash_flow,l.net_debt,l.operational_kpis,l.source_system,COALESCE(l.source_record_id,''),l.as_of_at,l.actual_flag,l.forecast_flag,l.scenario_inputs FROM fpna_plan_lines l JOIN fpna_plan_versions v ON v.id=l.plan_version_id WHERE l.plan_version_id=$1 AND ($2='' OR l.period=$2) AND ($3='' OR l.grain=$3)`
+	query := `SELECT l.id,l.plan_version_id,l.period,l.grain,l.legal_entity_id,COALESCE(l.business_segment,''),COALESCE(l.brand,''),COALESCE(l.region,''),l.store_id,COALESCE(l.plant_code,''),COALESCE(l.production_line_code,''),l.equipment_id,COALESCE(l.asset_type,''),l.currency,l.revenue,l.gross_profit,l.labor_cost,l.fixed_rent,l.variable_rent,l.non_lease_cost,l.four_wall_ebitda,l.cash_flow,l.capex,COALESCE(l.capex_category,''),l.net_debt,l.operational_kpis,l.source_system,COALESCE(l.source_record_id,''),l.as_of_at,l.actual_flag,l.forecast_flag,l.scenario_inputs FROM fpna_plan_lines l JOIN fpna_plan_versions v ON v.id=l.plan_version_id WHERE l.plan_version_id=$1 AND ($2='' OR l.period=$2) AND ($3='' OR l.grain=$3)`
 	if clause, arg, err := entity.SQLClause("v.legal_entity_id", len(args)+1); err != nil {
 		return nil, err
 	} else if clause != "" {
@@ -435,7 +437,7 @@ func (r *FPnAGovernanceRepository) ListPlanLinesFiltered(ctx context.Context, pl
 	result := make([]*FPnAPlanLine, 0)
 	for rows.Next() {
 		item := &FPnAPlanLine{}
-		if err := rows.Scan(&item.ID, &item.PlanVersionID, &item.Period, &item.Grain, &item.LegalEntityID, &item.BusinessSegment, &item.Brand, &item.Region, &item.StoreID, &item.PlantCode, &item.ProductionLineCode, &item.EquipmentID, &item.AssetType, &item.Currency, &item.Revenue, &item.GrossProfit, &item.LaborCost, &item.FixedRent, &item.VariableRent, &item.NonLeaseCost, &item.FourWallEBITDA, &item.CashFlow, &item.NetDebt, &item.OperationalKPIs, &item.SourceSystem, &item.SourceRecordID, &item.AsOfAt, &item.ActualFlag, &item.ForecastFlag, &item.ScenarioInputs); err != nil {
+		if err := rows.Scan(&item.ID, &item.PlanVersionID, &item.Period, &item.Grain, &item.LegalEntityID, &item.BusinessSegment, &item.Brand, &item.Region, &item.StoreID, &item.PlantCode, &item.ProductionLineCode, &item.EquipmentID, &item.AssetType, &item.Currency, &item.Revenue, &item.GrossProfit, &item.LaborCost, &item.FixedRent, &item.VariableRent, &item.NonLeaseCost, &item.FourWallEBITDA, &item.CashFlow, &item.Capex, &item.CapexCategory, &item.NetDebt, &item.OperationalKPIs, &item.SourceSystem, &item.SourceRecordID, &item.AsOfAt, &item.ActualFlag, &item.ForecastFlag, &item.ScenarioInputs); err != nil {
 			return nil, err
 		}
 		result = append(result, item)

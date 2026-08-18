@@ -992,10 +992,31 @@ CREATE TABLE IF NOT EXISTS budget_lines (
 CREATE INDEX IF NOT EXISTS idx_budget_lines_period
     ON budget_lines(budget_version_id, accounting_period);
 
+-- 汇率版本表:受控的多币种折算版本
+CREATE TABLE IF NOT EXISTS exchange_rate_versions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    version_type VARCHAR(30) NOT NULL, -- closing, average, budget
+    effective_from DATE NOT NULL,
+    effective_to DATE,
+    source VARCHAR(100) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'draft',
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (version_type IN ('closing', 'average', 'budget')),
+    CHECK (status IN ('draft', 'review', 'approved', 'official', 'retired')),
+    UNIQUE (name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_rate_versions_effective
+    ON exchange_rate_versions(version_type, effective_from DESC, status);
+
 -- 汇率表:外币租赁折算为法人主体职能货币
 -- closing 用于期末重估货币性项目(租赁负债);average 用于当期流量(利息与付款)
 CREATE TABLE IF NOT EXISTS exchange_rates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    version_id UUID REFERENCES exchange_rate_versions(id),
     from_currency VARCHAR(10) NOT NULL,
     to_currency VARCHAR(10) NOT NULL,
     rate_date DATE NOT NULL,
@@ -1013,6 +1034,8 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
 
 CREATE INDEX IF NOT EXISTS idx_exchange_rates_lookup
     ON exchange_rates(from_currency, to_currency, rate_type, rate_date DESC);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_version
+    ON exchange_rates(version_id);
 
 -- Do not seed a discount rate. A missing rate must stay missing until an
 -- approved policy or human confirmation supplies one.
@@ -1642,7 +1665,7 @@ CREATE TABLE IF NOT EXISTS fpna_plan_versions (
 );
 CREATE INDEX IF NOT EXISTS idx_fpna_plan_versions_lookup ON fpna_plan_versions(legal_entity_id,version_type,as_of_period DESC,created_at DESC);
 CREATE TABLE IF NOT EXISTS fpna_plan_lines (
- id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), plan_version_id UUID NOT NULL REFERENCES fpna_plan_versions(id) ON DELETE CASCADE, period VARCHAR(7) NOT NULL, grain VARCHAR(30) NOT NULL DEFAULT 'group', legal_entity_id UUID REFERENCES legal_entities(id), business_segment VARCHAR(100), brand VARCHAR(100), region VARCHAR(100), store_id UUID REFERENCES stores(id), plant_code VARCHAR(100), production_line_code VARCHAR(100), equipment_id UUID REFERENCES equipment_assets(id), asset_type VARCHAR(100), currency VARCHAR(10) NOT NULL, revenue DECIMAL(18,2), gross_profit DECIMAL(18,2), labor_cost DECIMAL(18,2), fixed_rent DECIMAL(18,2), variable_rent DECIMAL(18,2), non_lease_cost DECIMAL(18,2), four_wall_ebitda DECIMAL(18,2), cash_flow DECIMAL(18,2), net_debt DECIMAL(18,2), operational_kpis JSONB NOT NULL DEFAULT '{}'::jsonb, source_system VARCHAR(100) NOT NULL, source_record_id VARCHAR(150), as_of_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), actual_flag BOOLEAN NOT NULL DEFAULT false, forecast_flag BOOLEAN NOT NULL DEFAULT false, scenario_inputs JSONB NOT NULL DEFAULT '{}'::jsonb, CHECK (period ~ '^[0-9]{4}-[0-9]{2}$'), UNIQUE (plan_version_id,period,grain,legal_entity_id,business_segment,brand,region,store_id,plant_code,production_line_code,equipment_id,asset_type,currency)
+ id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), plan_version_id UUID NOT NULL REFERENCES fpna_plan_versions(id) ON DELETE CASCADE, period VARCHAR(7) NOT NULL, grain VARCHAR(30) NOT NULL DEFAULT 'group', legal_entity_id UUID REFERENCES legal_entities(id), business_segment VARCHAR(100), brand VARCHAR(100), region VARCHAR(100), store_id UUID REFERENCES stores(id), plant_code VARCHAR(100), production_line_code VARCHAR(100), equipment_id UUID REFERENCES equipment_assets(id), asset_type VARCHAR(100), currency VARCHAR(10) NOT NULL, revenue DECIMAL(18,2), gross_profit DECIMAL(18,2), labor_cost DECIMAL(18,2), fixed_rent DECIMAL(18,2), variable_rent DECIMAL(18,2), non_lease_cost DECIMAL(18,2), four_wall_ebitda DECIMAL(18,2), cash_flow DECIMAL(18,2), capex DECIMAL(18,2), capex_category VARCHAR(50), net_debt DECIMAL(18,2), operational_kpis JSONB NOT NULL DEFAULT '{}'::jsonb, source_system VARCHAR(100) NOT NULL, source_record_id VARCHAR(150), as_of_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), actual_flag BOOLEAN NOT NULL DEFAULT false, forecast_flag BOOLEAN NOT NULL DEFAULT false, scenario_inputs JSONB NOT NULL DEFAULT '{}'::jsonb, CHECK (period ~ '^[0-9]{4}-[0-9]{2}$'), UNIQUE (plan_version_id,period,grain,legal_entity_id,business_segment,brand,region,store_id,plant_code,production_line_code,equipment_id,asset_type,currency)
 );
 CREATE INDEX IF NOT EXISTS idx_fpna_plan_lines_period ON fpna_plan_lines(plan_version_id,period,grain);
 CREATE TABLE IF NOT EXISTS fpna_metric_definitions (

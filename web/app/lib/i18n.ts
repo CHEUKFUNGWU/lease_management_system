@@ -5680,15 +5680,80 @@ const dict: TranslationDict = {
     "zh-HK": "未來現金流與財務預測",
     en: "Cashflow & Financial Forecast",
   },
+  "cashflow.tab_cash_plan": {
+    "zh-CN": "资金计划合成 (Cash Plan)",
+    "zh-HK": "資金計劃合成 (Cash Plan)",
+    en: "Cash Plan Composition",
+  },
   "cashflow.tab_store_operating": {
-    "zh-CN": "门店营利与综合现金流",
-    "zh-HK": "門店營利與綜合現金流",
+    "zh-CN": "门店营利与经营现金流",
+    "zh-HK": "門店營利與經營現金流",
     en: "Store Operating Cash Flow",
   },
   "cashflow.tab_ifrs16_lease": {
-    "zh-CN": "IFRS 16 会计负债与租金流出",
-    "zh-HK": "IFRS 16 會計負債與租金流出",
-    en: "IFRS 16 Lease Outflow",
+    "zh-CN": "租赁付款计划流出",
+    "zh-HK": "租賃付款計劃流出",
+    en: "Lease Payment Outflow",
+  },
+  "cashflow.plan.operating_cash": {
+    "zh-CN": "经营现金流",
+    "zh-HK": "經營現金流",
+    en: "Operating Cash Flow",
+  },
+  "cashflow.plan.rent_offset": {
+    "zh-CN": "租金去重抵消项",
+    "zh-HK": "租金去重抵消項",
+    en: "Rent De-duplication Offset",
+  },
+  "cashflow.plan.lease_outflow": {
+    "zh-CN": "租赁支出流出",
+    "zh-HK": "租賃支出流出",
+    en: "Lease Outflows",
+  },
+  "cashflow.plan.capex_outflow": {
+    "zh-CN": "CAPEX 资本支出",
+    "zh-HK": "CAPEX 資本支出",
+    en: "CAPEX Outflows",
+  },
+  "cashflow.plan.net_cash": {
+    "zh-CN": "净资金计划",
+    "zh-HK": "淨資金計劃",
+    en: "Net Cash Plan",
+  },
+  "cashflow.plan.bridge_title": {
+    "zh-CN": "资金计划合成守恒桥",
+    "zh-HK": "資金計劃合成守恒橋",
+    en: "Cash Plan Conservation Bridge",
+  },
+  "cashflow.plan.residual": {
+    "zh-CN": "舍入残差",
+    "zh-HK": "捨入殘差",
+    en: "Rounding Residual",
+  },
+  "cashflow.plan.conserved": {
+    "zh-CN": "严格守恒",
+    "zh-HK": "嚴格守恒",
+    en: "Conserved",
+  },
+  "cashflow.plan.unconserved": {
+    "zh-CN": "存在残差",
+    "zh-HK": "存在殘差",
+    en: "Unconserved",
+  },
+  "fpna.translation.version_label": {
+    "zh-CN": "折算汇率版本",
+    "zh-HK": "折算匯率版本",
+    en: "Exchange Rate Version",
+  },
+  "fpna.translation.reporting_currency": {
+    "zh-CN": "报告币种",
+    "zh-HK": "報告幣種",
+    en: "Reporting Currency",
+  },
+  "fpna.translation.banner": {
+    "zh-CN": "已启用跨币种折算视图（汇率版本：{version}，类型：{type}，报告币种：{currency}）",
+    "zh-HK": "已啟用跨幣種折算視圖（匯率版本：{version}，類型：{type}，報告幣種：{currency}）",
+    en: "Cross-currency translation view enabled (Rate Version: {version}, Type: {type}, Target Currency: {currency})",
   },
   "cashflow.stat_store_revenue": {
     "zh-CN": "预计营业收入",

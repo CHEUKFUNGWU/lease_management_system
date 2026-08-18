@@ -1480,7 +1480,7 @@ export const performanceApi = {
     apiRequest(`/api/v1/performance/plan-versions`, { method: "POST", body: JSON.stringify(data), token }),
   freezePlanVersion: (id: string, official: boolean, token: string) =>
     apiRequest(`/api/v1/performance/plan-versions/${encodeURIComponent(id)}/freeze?official=${official ? "true" : "false"}`, { method: "POST", token }),
-  comparePlanVersions: (params: { left_id: string; right_id: string; period: string; left_basis?: string; right_basis?: string; grain?: string; business_segment?: string; brand?: string; region?: string; store_id?: string; plant?: string; line?: string; equipment_id?: string; asset_type?: string; currency?: string; exchange_rate_version?: string }, token: string) => {
+  comparePlanVersions: (params: { left_id: string; right_id: string; period: string; left_basis?: string; right_basis?: string; grain?: string; business_segment?: string; brand?: string; region?: string; store_id?: string; plant?: string; line?: string; equipment_id?: string; asset_type?: string; currency?: string; exchange_rate_version?: string; reporting_currency?: string }, token: string) => {
     const qs = new URLSearchParams(params as Record<string, string>);
     return apiRequest(`/api/v1/performance/plan-versions/compare?${qs}`, { token });
   },
@@ -2073,6 +2073,77 @@ export const operatingFactsApi = {
     apiRequest(`/api/v1/operating-facts/equipment-facts`, { method: "POST", body: JSON.stringify(data), token }),
 };
 
+export interface ExchangeRateVersion {
+  id: string;
+  name: string;
+  version_type: "closing" | "average" | "budget";
+  effective_from: string;
+  effective_to?: string;
+  source: string;
+  status: "draft" | "review" | "approved" | "official" | "retired";
+  created_at: string;
+}
+
+export interface CashPlanStep {
+  label: string;
+  code: string;
+  amount: number;
+  is_deduction: boolean;
+  running_total: number;
+}
+
+export interface CashPlanBridge {
+  steps: CashPlanStep[];
+  operating_cash: number;
+  rent_offset: number;
+  lease_outflow: number;
+  capex_outflow: number;
+  net_cash_plan: number;
+  rounding_residual: number;
+  is_conserved: boolean;
+}
+
+export interface CashPlanMonthly {
+  period: string;
+  currency: string;
+  revenue: number;
+  operating_cash: number;
+  operating_rent_expense: number;
+  rent_offset: number;
+  lease_outflow: number;
+  capex_outflow: number;
+  net_cash_plan: number;
+  bridge: CashPlanBridge;
+}
+
+export interface CashPlanPartition {
+  currency: string;
+  from_period: string;
+  to_period: string;
+  decision_ready: boolean;
+  total_revenue: number;
+  total_operating_cash: number;
+  total_rent_offset: number;
+  total_lease_outflow: number;
+  total_capex_outflow: number;
+  total_net_cash_plan: number;
+  monthly: CashPlanMonthly[];
+  bridge: CashPlanBridge;
+  weakest_coverage_ratio?: number;
+}
+
+export interface CashPlanResponse {
+  version: string;
+  legal_entity_id: string;
+  from_period: string;
+  to_period: string;
+  data_classification: string;
+  dataset_version?: string;
+  multi_currency: boolean;
+  partitions: CashPlanPartition[];
+  generated_at: string;
+}
+
 export const exchangeRateApi = {
   list: (token: string, params?: { from_currency?: string; to_currency?: string }) => {
     const qs = new URLSearchParams();
@@ -2081,6 +2152,15 @@ export const exchangeRateApi = {
     const query = qs.toString();
     return apiRequest(`/api/v1/exchange-rates${query ? `?${query}` : ""}`, { token });
   },
+  listVersions: (token: string): Promise<{ versions: ExchangeRateVersion[] }> => {
+    return apiRequest(`/api/v1/exchange-rates/versions`, { token });
+  },
+  createVersion: (data: Partial<ExchangeRateVersion>, token: string) =>
+    apiRequest("/api/v1/exchange-rates/versions", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
   upsert: (
     data: {
       from_currency: string;
@@ -2095,6 +2175,24 @@ export const exchangeRateApi = {
     apiRequest("/api/v1/exchange-rates", {
       method: "POST",
       body: JSON.stringify(data),
+      token,
+    }),
+};
+
+export const cashPlanApi = {
+  compose: (
+    req: {
+      from_period: string;
+      to_period: string;
+      data_classification?: string;
+      dataset_version?: string;
+      store_ids?: string[];
+    },
+    token: string
+  ): Promise<CashPlanResponse> =>
+    apiRequest("/api/v1/cashflow/plan/compose", {
+      method: "POST",
+      body: JSON.stringify(req),
       token,
     }),
 };

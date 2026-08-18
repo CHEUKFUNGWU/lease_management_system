@@ -42,6 +42,7 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
   const [grain, setGrain] = useState<GrainType>("group");
   const [currency] = useState<string>("CNY");
   const [exchangeRateVersion, setExchangeRateVersion] = useState<string>("");
+  const [reportingCurrency, setReportingCurrency] = useState<string>("CNY");
 
   const handleCompare = async () => {
     if (!leftId || !rightId || !period) return;
@@ -52,6 +53,7 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
       grain,
       currency: currency || undefined,
       exchange_rate_version: exchangeRateVersion || undefined,
+      reporting_currency: reportingCurrency || undefined,
     };
     await commands.compareVersions(params);
   };
@@ -157,7 +159,7 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
             </div>
           </Col>
 
-          <Col xs={24} sm={8} md={4}>
+          <Col xs={24} sm={8} md={3}>
             <div className="fpna-param-block">
               <label className="fpna-param-label">
                 {t("fpna.label_period", language)}
@@ -170,7 +172,7 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
             </div>
           </Col>
 
-          <Col xs={24} sm={8} md={4}>
+          <Col xs={24} sm={8} md={3}>
             <div className="fpna-param-block">
               <label className="fpna-param-label">
                 {t("fpna.label_grain", language)}
@@ -185,7 +187,39 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
             </div>
           </Col>
 
-          <Col xs={24} sm={8} md={4}>
+          <Col xs={24} sm={8} md={3}>
+            <div className="fpna-param-block">
+              <label className="fpna-param-label">
+                {t("fpna.translation.reporting_currency", language)}
+              </label>
+              <Select
+                className="fpna-full-width"
+                value={reportingCurrency}
+                onChange={setReportingCurrency}
+                options={[
+                  { label: "CNY", value: "CNY" },
+                  { label: "HKD", value: "HKD" },
+                  { label: "USD", value: "USD" },
+                  { label: "EUR", value: "EUR" },
+                ]}
+              />
+            </div>
+          </Col>
+
+          <Col xs={24} sm={8} md={3}>
+            <div className="fpna-param-block">
+              <label className="fpna-param-label">
+                {t("fpna.translation.version_label", language)}
+              </label>
+              <Input
+                value={exchangeRateVersion}
+                onChange={(e) => setExchangeRateVersion(e.target.value)}
+                placeholder="FY2026-Budget"
+              />
+            </div>
+          </Col>
+
+          <Col xs={24} sm={8} md={3}>
             <div className="fpna-param-block">
               <label className="fpna-param-label">&nbsp;</label>
               <Button
@@ -202,6 +236,16 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
           </Col>
         </Row>
       </Card>
+
+      {/* Persistent Currency Translation Banner (PRD F3-c / CodebaseDesign §8) */}
+      {compareData?.exchange_rate_version && (
+        <Alert
+          type="info"
+          showIcon
+          className="fpna-margin-bottom-16"
+          message={`跨币种折算视图已启用 · 汇率版本: ${compareData.exchange_rate_version} · 报告币种: ${compareData.reporting_currency || reportingCurrency}`}
+        />
+      )}
 
       {/* Mixed Currency Actionable Guidance */}
       {compareData?.mixed_currency_guidance?.required && (
@@ -250,6 +294,9 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
               <span>{t("fpna.compare_result_title", language)}</span>
               <Tag color="blue">{compareData.result.period}</Tag>
               <Tag color="cyan">Basis: {compareData.basis}</Tag>
+              {compareData.exchange_rate_version && (
+                <Tag color="purple">FX: {compareData.exchange_rate_version}</Tag>
+              )}
               {compareData.coverage && (
                 <Tag color="green">
                   Coverage: {typeof compareData.coverage.ratio === "number" ? `${(compareData.coverage.ratio * 100).toFixed(0)}%` : compareData.coverage.status || "Complete"}

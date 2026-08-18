@@ -19,6 +19,7 @@ import { reportApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import StackedCashflowChart from "../components/charts/StackedCashflowChart";
 import { StoreCashflowPanel } from "./StoreCashflowPanel";
+import { CashPlanPanel } from "./CashPlanPanel";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -93,7 +94,7 @@ function CashflowForecastPage() {
   const { language } = useLanguage();
 
   /* ---- module perspective tab ---- */
-  const [activeTab, setActiveTab] = useState<"store_operating" | "ifrs16_lease">("store_operating");
+  const [activeTab, setActiveTab] = useState<"cash_plan" | "store_operating" | "ifrs16_lease">("cash_plan");
 
   /* ---- controls ---- */
   const [reportModeParam, setReportModeParam] = useUrlState("mode", "working");
@@ -226,13 +227,16 @@ function CashflowForecastPage() {
               buttonStyle="solid"
               optionType="button"
             >
+              <Radio.Button value="cash_plan">{t("cashflow.tab_cash_plan", language)}</Radio.Button>
               <Radio.Button value="store_operating">{t("cashflow.tab_store_operating", language)}</Radio.Button>
               <Radio.Button value="ifrs16_lease">{t("cashflow.tab_ifrs16_lease", language)}</Radio.Button>
             </Radio.Group>
           }
         />
 
-        {activeTab === "store_operating" ? (
+        {activeTab === "cash_plan" ? (
+          <CashPlanPanel token={token || ""} />
+        ) : activeTab === "store_operating" ? (
           <StoreCashflowPanel currency="CNY" />
         ) : (
           <>

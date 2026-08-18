@@ -83,11 +83,11 @@ export default function TornadoChart({
           data={chartData}
           margin={{ top: 12, right: 24, bottom: 8, left: 24 }}
         >
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-default, #D9D9D9)" opacity={0.6} />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-default)" opacity={0.6} />
           <XAxis
             type="number"
             tickLine={false}
-            stroke="var(--fg-tertiary, #595959)"
+            stroke="var(--fg-tertiary)"
             fontSize={11}
             tickFormatter={(v) => (Math.abs(Number(v)) >= 1000 ? `${(Number(v) / 1000).toFixed(0)}k` : String(v))}
           />
@@ -95,11 +95,11 @@ export default function TornadoChart({
             dataKey="name"
             type="category"
             tickLine={false}
-            stroke="var(--fg-tertiary, #595959)"
+            stroke="var(--fg-tertiary)"
             fontSize={12}
             width={110}
           />
-          <ReferenceLine x={0} stroke="var(--mono-20, #262626)" strokeWidth={1.5} />
+          <ReferenceLine x={0} stroke="var(--mono-20)" strokeWidth={1.5} />
           <Tooltip
             content={({ active, payload }) => {
               if (!active || !payload || !payload.length) return null;
@@ -108,15 +108,15 @@ export default function TornadoChart({
               return (
                 <div
                   style={{
-                    background: "var(--bg-surface, #FFFFFF)",
+                    background: "var(--bg-surface)",
                     boxShadow: "var(--shadow-dropdown, 0 4px 12px rgba(0,0,0,0.08))",
                     borderRadius: 6,
                     padding: "8px 12px",
                     fontSize: 12,
-                    border: "1px solid var(--border-default, #D9D9D9)",
+                    border: "1px solid var(--border-default)",
                   }}
                 >
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary, #000000)", marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
                     {point.name}
                   </div>
                   <div style={{ color: "var(--fg-error, #A8071A)", marginBottom: 2 }}>
@@ -139,7 +139,7 @@ export default function TornadoChart({
             iconType="circle"
             wrapperStyle={{ fontSize: 11, paddingBottom: 6 }}
             formatter={(value) => (
-              <span style={{ color: "var(--fg-secondary, #262626)", marginRight: 8 }}>
+              <span style={{ color: "var(--fg-secondary)", marginRight: 8 }}>
                 {value === "lowDelta" ? "悲观/下调冲击" : "乐观/上调收益"}
               </span>
             )}

@@ -5,7 +5,7 @@ import { StatusTag } from "../components/StatusTag";
 import { Suspense, useState, useEffect, useMemo } from "react";
 import {
   Card, Radio, Alert, Tag, Typography, Table, Spin, Statistic,
-  Row, Col, Button, Select, Input, Space, message, DatePicker,
+  Row, Col, Button, Select, Segmented, Input, Space, message, DatePicker,
 } from "antd";
 import {
   FileTextOutlined, SafetyOutlined, DownloadOutlined,
@@ -195,10 +195,10 @@ function CashflowForecastPage() {
   /* ---- chart data ---- */
   const chartData = useMemo(() => {
     if (!data.length) return [];
-    const map = new Map<string, { period: string; fixedRent: number; variableRent: number; nonLease: number }>();
+    const map = new Map<string, { month: string; fixedRent: number; variableRent: number; nonLease: number }>();
     for (const row of data) {
       const key = String(row.period_key || row.period_start || "期间");
-      const existing = map.get(key) || { period: key, fixedRent: 0, variableRent: 0, nonLease: 0 };
+      const existing = map.get(key) || { month: key, fixedRent: 0, variableRent: 0, nonLease: 0 };
       existing.fixedRent += Number(row.fixed_rent || 0);
       existing.variableRent += Number(row.variable_rent || 0);
       existing.nonLease += Number(row.non_lease_expense || 0);
@@ -221,16 +221,16 @@ function CashflowForecastPage() {
         <PageHeader
           title={<><LineChartOutlined style={{ marginRight: 8 }} />{t("cashflow.title", language)}</>}
           primaryAction={
-            <Radio.Group
+            <Segmented
+              className="precision-segmented"
               value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value)}
-              buttonStyle="solid"
-              optionType="button"
-            >
-              <Radio.Button value="cash_plan">{t("cashflow.tab_cash_plan", language)}</Radio.Button>
-              <Radio.Button value="store_operating">{t("cashflow.tab_store_operating", language)}</Radio.Button>
-              <Radio.Button value="ifrs16_lease">{t("cashflow.tab_ifrs16_lease", language)}</Radio.Button>
-            </Radio.Group>
+              onChange={(val) => setActiveTab(val as "cash_plan" | "store_operating" | "ifrs16_lease")}
+              options={[
+                { label: t("cashflow.tab_cash_plan", language), value: "cash_plan" },
+                { label: t("cashflow.tab_store_operating", language), value: "store_operating" },
+                { label: t("cashflow.tab_ifrs16_lease", language), value: "ifrs16_lease" },
+              ]}
+            />
           }
         />
 
@@ -243,20 +243,33 @@ function CashflowForecastPage() {
             {/* ─── report mode card ─── */}
             <Card style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Space>
+                <Space size={12}>
                   <span style={{ fontWeight: 600 }}>{t("cashflow.report_mode", language)}</span>
-                  <Radio.Group
+                  <Segmented
+                    className="precision-segmented"
                     value={reportMode}
-                    onChange={(e) => { setReportModeParam(e.target.value); setFetched(false); }}
-                    buttonStyle="solid"
-                  >
-                    <Radio.Button value="working">
-                      <FileTextOutlined /> {t("cashflow.working_mode", language)}
-                    </Radio.Button>
-                    <Radio.Button value="official">
-                      <SafetyOutlined /> {t("cashflow.official_mode", language)}
-                    </Radio.Button>
-                  </Radio.Group>
+                    onChange={(v) => { setReportModeParam(String(v)); setFetched(false); }}
+                    options={[
+                      {
+                        label: (
+                          <Space size={4}>
+                            <FileTextOutlined />
+                            <span>{t("cashflow.working_mode", language)}</span>
+                          </Space>
+                        ),
+                        value: "working",
+                      },
+                      {
+                        label: (
+                          <Space size={4}>
+                            <SafetyOutlined />
+                            <span>{t("cashflow.official_mode", language)}</span>
+                          </Space>
+                        ),
+                        value: "official",
+                      },
+                    ]}
+                  />
                 </Space>
               </div>
 

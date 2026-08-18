@@ -153,9 +153,9 @@ function Trend({ response, language }: { response: RetailStoreDiagnosticsRespons
 }
 
 const BRIDGE_TONE_FILL = {
-  positive: "#2D4B46",  // Muted pine green
-  negative: "#7F473E",  // Muted terracotta rust
-  neutral: "#0F172A",   // Midnight obsidian
+  positive: "var(--chart-accent)",
+  negative: "var(--chart-negative)",
+  neutral: "var(--chart-primary)",
 } as const;
 const PL_FLOW_OPTION = "__pl_flow";
 
@@ -197,7 +197,7 @@ function BridgeWaterfall({ bridges, currency, language, plFlow, plFlowError }: {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={steps} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle, #D9D9D9)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
                 <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
                 <YAxis tick={{ fontSize: 11 }} domain={bridgeWaterfallDomain(steps) ?? ["auto", "auto"]} allowDataOverflow tickFormatter={(value) => value == null ? "—" : Number(value).toLocaleString()} />
                 <ChartTooltip formatter={(_value, _name, item) => [formatBridgeItem(item?.payload?.contribution ?? null, "currency", currency, language), item?.payload?.name || ""]} />

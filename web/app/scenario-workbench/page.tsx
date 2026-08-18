@@ -87,7 +87,7 @@ function MetricTable({ response, selectedKey, notReady, language }: { response: 
             const isNeg = delta != null && delta < 0;
             const colorClass = isPos ? "color-pos" : isNeg ? "color-neg" : "";
             return (
-              <span className={`font-tabular ${colorClass}`} style={{ color: isPos ? "var(--state-success-text, #389E0D)" : isNeg ? "var(--state-error-text, #CF1322)" : undefined }}>
+              <span className={`font-tabular ${colorClass}`} style={{ color: isPos ? "var(--state-success-text)" : isNeg ? "var(--state-error-text)" : undefined }}>
                 {formatScenarioValue(delta, row.result?.unit || "", response.currency, language)}
               </span>
             );
@@ -272,10 +272,12 @@ function ScenarioPageInner() {
     const selected = response.scenarios.find((item) => item.key === selectedKey);
     if (!selected || !selected.bridge || !selected.bridge.items) return [];
     const baseVal = response.baseline?.metrics?.store_contribution?.result ?? 0;
-    const items = selected.bridge.items.map((item) => ({
+    const allItems = selected.bridge.items.map((item) => ({
       label: item.label,
       value: item.contribution ?? 0,
     }));
+    const activeItems = allItems.filter((item) => Math.abs(item.value) >= 0.01);
+    const items = activeItems.length > 0 ? activeItems : allItems;
     const planVal = selected.metrics?.store_contribution?.result ?? (baseVal + (selected.monthly_contribution_change || 0));
     return [
       { label: `${t("scenario.option_baseline", language)} (${t("retail.kpi.store_contribution", language)})`, value: baseVal, isTotal: true },
@@ -403,7 +405,7 @@ function ScenarioPageInner() {
                 >
                   <Space direction="vertical" style={{ width: "100%" }} size={12}>
                     {DELTA_FIELDS.map((field) => (
-                      <div key={field.key} style={{ padding: "4px 0", borderBottom: "1px dashed var(--border-subtle, #f0f0f0)" }}>
+                      <div key={field.key} style={{ padding: "4px 0", borderBottom: "1px dashed var(--border-subtle)" }}>
                         <Flex justify="space-between" align="center">
                           <Typography.Text style={{ fontSize: 13, fontWeight: 500 }}>
                             {t(field.labelKey, language)}
@@ -450,7 +452,7 @@ function ScenarioPageInner() {
                 {error && (
                   <Card
                     style={{
-                      border: "1px solid var(--border-default, #E2E8F0)",
+                      border: "1px solid var(--border-default)",
                       background: "var(--bg-elevated)",
                       borderRadius: 12,
                     }}
@@ -479,8 +481,8 @@ function ScenarioPageInner() {
                               }
                             }}
                             style={{
-                              background: "var(--morandi-slate, #5A5958)",
-                              borderColor: "var(--morandi-slate, #5A5958)",
+                              background: "var(--fg-primary)",
+                              borderColor: "var(--fg-primary)",
                               borderRadius: 6,
                             }}
                           >
@@ -505,7 +507,7 @@ function ScenarioPageInner() {
                       <Col xs={24} sm={12}>
                         <Card size="small">
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>{t("scenario.table.monthly_diff", language)}</Typography.Text>
-                          <Typography.Title level={3} className="font-tabular" style={{ margin: "4px 0 0", color: (response.scenarios.find((s) => s.key === selectedKey)?.monthly_contribution_change || 0) >= 0 ? "var(--state-success-text, #389E0D)" : "var(--state-error-text, #CF1322)" }}>
+                          <Typography.Title level={3} className="font-tabular" style={{ margin: "4px 0 0", color: (response.scenarios.find((s) => s.key === selectedKey)?.monthly_contribution_change || 0) >= 0 ? "var(--state-success-text)" : "var(--state-error-text)" }}>
                             {formatScenarioValue(response.scenarios.find((s) => s.key === selectedKey)?.monthly_contribution_change, "currency", response.currency, language)}
                           </Typography.Title>
                         </Card>
@@ -513,7 +515,7 @@ function ScenarioPageInner() {
                       <Col xs={24} sm={12}>
                         <Card size="small">
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>{responseHorizonLabel(response, language)} {t("scenario.table.horizon_diff", language)}</Typography.Text>
-                          <Typography.Title level={3} className="font-tabular" style={{ margin: "4px 0 0", color: (response.scenarios.find((s) => s.key === selectedKey)?.horizon_contribution_change || 0) >= 0 ? "var(--state-success-text, #389E0D)" : "var(--state-error-text, #CF1322)" }}>
+                          <Typography.Title level={3} className="font-tabular" style={{ margin: "4px 0 0", color: (response.scenarios.find((s) => s.key === selectedKey)?.horizon_contribution_change || 0) >= 0 ? "var(--state-success-text)" : "var(--state-error-text)" }}>
                             {formatScenarioValue(response.scenarios.find((s) => s.key === selectedKey)?.horizon_contribution_change, "currency", response.currency, language)}
                           </Typography.Title>
                         </Card>

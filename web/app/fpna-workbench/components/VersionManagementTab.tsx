@@ -11,6 +11,7 @@ import {
   Form,
   Input,
   Select,
+  Segmented,
   Radio,
   Typography,
   Descriptions,
@@ -41,6 +42,21 @@ import type {
 import { VERSION_TYPES, SCENARIO_TYPES } from "../types";
 
 const { Text, Paragraph } = Typography;
+
+const VERSION_TYPE_KEYS: Record<string, string> = {
+  budget: "fpna.version_type_budget",
+  forecast: "fpna.version_type_forecast",
+  actual: "fpna.version_type_actual",
+  prior_year: "fpna.version_type_prior_year",
+  scenario: "fpna.version_type_scenario",
+};
+
+const SCENARIO_TYPE_KEYS: Record<string, string> = {
+  baseline: "fpna.scenario_baseline",
+  upside: "fpna.scenario_upside",
+  downside: "fpna.scenario_downside",
+  custom: "fpna.scenario_custom",
+};
 
 interface Props {
   snapshot: WorkbenchSnapshot;
@@ -293,17 +309,17 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
 
   return (
     <div className="help-flow-vertical">
-      <div className="fpna-tree-card-inner">
-        <Space>
-          <Radio.Group
+      <div className="fpna-tree-card-inner precision-filter-bar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <Space size={8}>
+          <Segmented
+            className="precision-segmented"
             value={viewMode}
-            onChange={(e) => setViewMode(e.target.value)}
-            optionType="button"
-            buttonStyle="solid"
-          >
-            <Radio.Button value="list">{t("fpna.view_list", language)}</Radio.Button>
-            <Radio.Button value="tree">{t("fpna.view_lineage_tree", language)}</Radio.Button>
-          </Radio.Group>
+            onChange={(val) => setViewMode(val as "list" | "tree")}
+            options={[
+              { label: t("fpna.view_list", language), value: "list" },
+              { label: t("fpna.view_lineage_tree", language), value: "tree" },
+            ]}
+          />
           <Button icon={<ReloadOutlined />} onClick={() => commands.refreshVersions()} loading={snapshot.versionsLoading}>
             {t("common.refresh", language)}
           </Button>
@@ -354,6 +370,8 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
         open={createModalVisible}
         onOk={handleCreate}
         onCancel={() => setCreateModalVisible(false)}
+        okText={t("common.confirm", language)}
+        cancelText={t("common.cancel", language)}
         confirmLoading={actionLoading}
         width={680}
       >
@@ -372,7 +390,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               <Select>
                 {VERSION_TYPES.map((vt) => (
                   <Select.Option key={vt} value={vt}>
-                    {vt.toUpperCase()}
+                    {VERSION_TYPE_KEYS[vt] ? t(VERSION_TYPE_KEYS[vt], language) : vt}
                   </Select.Option>
                 ))}
               </Select>
@@ -386,7 +404,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               <Select>
                 {SCENARIO_TYPES.map((st) => (
                   <Select.Option key={st} value={st}>
-                    {st}
+                    {SCENARIO_TYPE_KEYS[st] ? t(SCENARIO_TYPE_KEYS[st], language) : st}
                   </Select.Option>
                 ))}
               </Select>
@@ -396,7 +414,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
           <Space className="fpna-full-width" size="middle">
             <Form.Item
               name="as_of_period"
-              label="As of Period (YYYY-MM)"
+              label={t("fpna.form_as_of_period", language)}
               rules={[{ required: true, pattern: /^\d{4}-\d{2}$/, message: t("fpna.err_period_format", language) }]}
               className="fpna-form-flex-1"
             >
@@ -405,7 +423,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
 
             <Form.Item
               name="from_period"
-              label="From Period (YYYY-MM)"
+              label={t("fpna.form_from_period", language)}
               rules={[{ required: true, pattern: /^\d{4}-\d{2}$/, message: t("fpna.err_period_format", language) }]}
               className="fpna-form-flex-1"
             >
@@ -414,7 +432,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
 
             <Form.Item
               name="to_period"
-              label="To Period (YYYY-MM)"
+              label={t("fpna.form_to_period", language)}
               rules={[{ required: true, pattern: /^\d{4}-\d{2}$/, message: t("fpna.err_period_format", language) }]}
               className="fpna-form-flex-1"
             >
@@ -433,13 +451,13 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
           </Form.Item>
 
           <Card size="small" title={t("fpna.card_governance_versions", language)}>
-            <Form.Item name="assumption_version" label="Assumption Version">
+            <Form.Item name="assumption_version" label={t("fpna.form_assumption_version", language)}>
               <Input placeholder={t("fpna.placeholder_assumption_version", language)} />
             </Form.Item>
-            <Form.Item name="exchange_rate_version" label="Exchange Rate Version">
+            <Form.Item name="exchange_rate_version" label={t("fpna.form_fx_version", language)}>
               <Input placeholder={t("fpna.placeholder_fx_version_example", language)} />
             </Form.Item>
-            <Form.Item name="metric_definition_version" label="Metric Definition Version">
+            <Form.Item name="metric_definition_version" label={t("fpna.form_metric_version", language)}>
               <Input placeholder={t("fpna.placeholder_metric_version_example", language)} />
             </Form.Item>
           </Card>
@@ -464,7 +482,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               <code>{selectedVersion.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_type", language)}>
-              {selectedVersion.version_type.toUpperCase()}
+              {VERSION_TYPE_KEYS[selectedVersion.version_type] ? t(VERSION_TYPE_KEYS[selectedVersion.version_type], language) : selectedVersion.version_type.toUpperCase()}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_scenario", language)}>
               {selectedVersion.scenario_type}
@@ -474,34 +492,34 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
                 {selectedVersion.status.toUpperCase()}
               </StatusTag>
             </Descriptions.Item>
-            <Descriptions.Item label="Official">
+            <Descriptions.Item label={t("fpna.desc_official_status", language)}>
               {selectedVersion.is_official ? <Tag color="gold">YES (Official)</Tag> : "NO (Working)"}
             </Descriptions.Item>
-            <Descriptions.Item label="As Of Period">{selectedVersion.as_of_period}</Descriptions.Item>
+            <Descriptions.Item label={t("fpna.form_as_of_period", language)}>{selectedVersion.as_of_period}</Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_period_range", language)}>
               {selectedVersion.from_period} ~ {selectedVersion.to_period}
             </Descriptions.Item>
-            <Descriptions.Item label="Prior Version ID" span={2}>
+            <Descriptions.Item label={t("fpna.desc_prior_version_id", language)} span={2}>
               {selectedVersion.prior_version_id ? (
                 <code>{selectedVersion.prior_version_id}</code>
               ) : (
-                <Text type="secondary">None (Root)</Text>
+                <Text type="secondary">{t("fpna.desc_none_root", language)}</Text>
               )}
             </Descriptions.Item>
-            <Descriptions.Item label="Assumption Version">
+            <Descriptions.Item label={t("fpna.form_assumption_version", language)}>
               {selectedVersion.assumption_version || <Text type="secondary">N/A</Text>}
             </Descriptions.Item>
-            <Descriptions.Item label="Exchange Rate Version">
+            <Descriptions.Item label={t("fpna.form_fx_version", language)}>
               {selectedVersion.exchange_rate_version || <Text type="secondary">N/A</Text>}
             </Descriptions.Item>
-            <Descriptions.Item label="Metric Definition Version" span={2}>
+            <Descriptions.Item label={t("fpna.form_metric_version", language)} span={2}>
               {selectedVersion.metric_definition_version || <Text type="secondary">N/A</Text>}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_created_at", language)}>
               {new Date(selectedVersion.created_at).toLocaleString()}
             </Descriptions.Item>
-            <Descriptions.Item label="Frozen At">
-              {selectedVersion.frozen_at ? new Date(selectedVersion.frozen_at).toLocaleString() : <Text type="secondary">Unfrozen</Text>}
+            <Descriptions.Item label={t("fpna.desc_frozen_at", language)}>
+              {selectedVersion.frozen_at ? new Date(selectedVersion.frozen_at).toLocaleString() : <Text type="secondary">{t("fpna.desc_unfrozen", language)}</Text>}
             </Descriptions.Item>
           </Descriptions>
         )}

@@ -18,18 +18,18 @@ function FlowNode({ x, y, width, height, index, payload, unit }: any) {
   const isSource = payload?.sourceNodes?.length === 0 || payload?.depth === 0;
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} fill="var(--chart-blue, #1F4E9C)" rx={2} />
+      <rect x={x} y={y} width={width} height={height} fill="var(--chart-blue)" rx={2} />
       <text
         x={isSource ? x - 8 : x + width + 8}
         y={y + height / 2}
         textAnchor={isSource ? "end" : "start"}
         dominantBaseline="middle"
         fontSize={11}
-        fill="var(--fg-secondary, #262626)"
+        fill="var(--fg-secondary)"
         key={`label-${index}`}
       >
         <tspan fontWeight={500}>{payload?.name}</tspan>
-        <tspan fill="var(--fg-tertiary, #595959)"> {fmtMoney(payload?.value, unit)}</tspan>
+        <tspan fill="var(--fg-tertiary)"> {fmtMoney(payload?.value, unit)}</tspan>
       </text>
     </g>
   );
@@ -98,7 +98,7 @@ export default function ProfitFlowPanel({
             data={data}
             nodePadding={24}
             margin={{ top: 16, right: 140, bottom: 16, left: 130 }}
-            link={{ stroke: "var(--chart-blue, #1F4E9C)", strokeOpacity: 0.25 }}
+            link={{ stroke: "var(--chart-blue)", strokeOpacity: 0.25 }}
             node={<FlowNode unit={unit} />}
           >
             <ChartTooltip formatter={(value) => fmtMoney(Number(value), unit)} />

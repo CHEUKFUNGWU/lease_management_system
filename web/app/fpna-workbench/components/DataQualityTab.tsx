@@ -263,19 +263,19 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
             <Descriptions.Item label="ID">
               <code>{selectedItem.id}</code>
             </Descriptions.Item>
-            <Descriptions.Item label="Source Table">
+            <Descriptions.Item label={t("fpna.desc_source_table", language)}>
               <code>{selectedItem.source_table}</code>
             </Descriptions.Item>
-            <Descriptions.Item label="Source Record ID">
+            <Descriptions.Item label={t("fpna.desc_source_record_id", language)}>
               <code>{selectedItem.source_record_id}</code>
             </Descriptions.Item>
-            <Descriptions.Item label="Data Version">
+            <Descriptions.Item label={t("fpna.desc_data_version", language)}>
               {selectedItem.data_version || <Text type="secondary">N/A</Text>}
             </Descriptions.Item>
-            <Descriptions.Item label="Description">
+            <Descriptions.Item label={t("fpna.desc_validation_desc", language)}>
               {selectedItem.description}
             </Descriptions.Item>
-            <Descriptions.Item label="Evidence Payload">
+            <Descriptions.Item label={t("fpna.desc_evidence_payload", language)}>
               <pre className="ai-md-code fpna-desc-pre">
                 {JSON.stringify(selectedItem.evidence, null, 2)}
               </pre>

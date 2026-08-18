@@ -410,7 +410,7 @@ function ReportsPageContent() {
               <span
                 style={{
                   fontSize: 12,
-                  color: reportMode === "working" ? "var(--morandi-terracotta, #A57F6C)" : "var(--state-success-text, #216E39)",
+                  color: reportMode === "working" ? "var(--state-warning-text)" : "var(--state-success-text)",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 4,

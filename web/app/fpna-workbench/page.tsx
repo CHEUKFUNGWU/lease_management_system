@@ -59,15 +59,22 @@ export default function FPnAWorkbenchPage() {
             icon={<InfoCircleOutlined />}
             className="fpna-margin-bottom-16"
             message={
-              <Space>
-                <strong>{t("fpna.operating_scope_badge", language)}</strong>
-                <span>
-                  {t("fpna.operating_scope_desc", language)}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>
+                  {t("fpna.operating_scope_badge", language)}
                 </span>
-                <Link href="/reports?tab=budget" className="fpna-bold-link">
-                  {t("fpna.lease_budget_name", language)}
+                <Link
+                  href="/reports?tab=budget"
+                  style={{ fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
+                  {t("fpna.link_lease_budget", language)} <ArrowRightOutlined style={{ fontSize: 10 }} />
                 </Link>
-              </Space>
+              </div>
+            }
+            description={
+              <div style={{ marginTop: 4, color: "var(--fg-secondary)", fontSize: 12, lineHeight: 1.6 }}>
+                {t("fpna.operating_scope_desc", language)}
+              </div>
             }
           />
 

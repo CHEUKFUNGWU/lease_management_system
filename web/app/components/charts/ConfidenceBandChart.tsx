@@ -85,21 +85,21 @@ export default function ConfidenceBandChart({
         >
           <defs>
             <linearGradient id="trendLineGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--morandi-sand, #D8BB8F)" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="var(--morandi-cream, #F2EDE9)" stopOpacity={0.0} />
+              <stop offset="5%" stopColor="var(--chart-accent)" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="var(--chart-fill)" stopOpacity={0.0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle, #EAECF0)" opacity={0.6} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.6} />
           <XAxis
             dataKey="date"
             tickLine={false}
-            stroke="var(--fg-tertiary, #595959)"
+            stroke="var(--fg-tertiary)"
             fontSize={11}
             tickMargin={6}
           />
           <YAxis
             tickLine={false}
-            stroke="var(--fg-tertiary, #595959)"
+            stroke="var(--fg-tertiary)"
             fontSize={11}
             tickFormatter={(v) => (unit === "percent" ? `${(v * 100).toFixed(0)}%` : Number(v) >= 1000 ? `${(Number(v) / 1000).toFixed(0)}k` : String(v))}
             width={48}
@@ -112,27 +112,27 @@ export default function ConfidenceBandChart({
               return (
                 <div
                   style={{
-                    background: "var(--bg-surface, #FFFFFF)",
+                    background: "var(--bg-surface)",
                     boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
                     borderRadius: 8,
                     padding: "10px 14px",
                     fontSize: 12,
-                    border: "1px solid var(--border-default, #E2E8F0)",
+                    border: "1px solid var(--border-default)",
                   }}
                 >
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary, #0F172A)", marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
                     {label}
                   </div>
-                  <div style={{ color: "var(--morandi-slate, #5A5958)", fontWeight: 500, marginBottom: 2 }}>
+                  <div style={{ color: "var(--fg-primary)", fontWeight: 500, marginBottom: 2 }}>
                     {metricLabel}: <strong>{formatValue(point.value)}</strong>
                   </div>
                   {point.median != null && (
-                    <div style={{ color: "var(--morandi-greige, #C1B5A7)", marginBottom: 2 }}>
+                    <div style={{ color: "var(--fg-secondary)", marginBottom: 2 }}>
                       同群中位数: {formatValue(point.median)}
                     </div>
                   )}
                   {point.p25 != null && point.p75 != null && (
-                    <div style={{ color: "var(--fg-muted, #94A3B8)", fontSize: 11 }}>
+                    <div style={{ color: "var(--fg-muted)", fontSize: 11 }}>
                       正常波动带 (P25~P75): {formatValue(point.p25)} ~ {formatValue(point.p75)}
                     </div>
                   )}
@@ -146,7 +146,7 @@ export default function ConfidenceBandChart({
             iconType="circle"
             wrapperStyle={{ fontSize: 11, paddingBottom: 8 }}
             formatter={(value) => (
-              <span style={{ color: "#334155", fontWeight: 500, marginRight: 8 }}>
+              <span style={{ color: "var(--fg-secondary)", fontWeight: 500, marginRight: 8 }}>
                 {value === "bandRange"
                   ? "同群置信安全带 (P25~P75)"
                   : value === "median"
@@ -171,17 +171,17 @@ export default function ConfidenceBandChart({
             dataKey="bandRange"
             stackId="band"
             stroke="none"
-            fill="#CBD5E1"
-            fillOpacity={0.7}
+            fill="var(--chart-fill)"
+            fillOpacity={0.65}
             name="bandRange"
             isAnimationActive={false}
           />
 
-          {/* 基准中位数虚线：清晰高对比度深冷灰 */}
+          {/* 基准中位数虚线：清晰高对比度对比基准 */}
           <Line
             type="monotone"
             dataKey="median"
-            stroke="#475569"
+            stroke="var(--chart-secondary)"
             strokeDasharray="4 4"
             strokeWidth={1.75}
             dot={false}
@@ -189,14 +189,14 @@ export default function ConfidenceBandChart({
             isAnimationActive={false}
           />
 
-          {/* 本店实际走势：沉稳禁欲系深蓝黑/墨岩主线 */}
+          {/* 本店实际走势：主线 */}
           <Line
             type="monotone"
             dataKey="value"
-            stroke="#0F172A"
+            stroke="var(--chart-primary)"
             strokeWidth={2.5}
-            dot={{ r: 3.5, fill: "#0F172A", stroke: "#FFFFFF", strokeWidth: 1.5 }}
-            activeDot={{ r: 5.5, stroke: "#FFFFFF", strokeWidth: 2, fill: "#0F172A" }}
+            dot={{ r: 3.5, fill: "var(--chart-primary)", stroke: "var(--bg-surface)", strokeWidth: 1.5 }}
+            activeDot={{ r: 5.5, stroke: "var(--bg-surface)", strokeWidth: 2, fill: "var(--chart-primary)" }}
             name="value"
             connectNulls={false}
           />

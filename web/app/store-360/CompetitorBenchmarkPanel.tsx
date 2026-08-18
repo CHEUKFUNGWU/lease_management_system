@@ -184,40 +184,39 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
       }
     >
       <Space direction="vertical" size={12} style={{ width: "100%" }}>
-        <Row gutter={[16, 16]}>
-          <Col span={8}>
-            <Card size="small">
-              <Statistic
-                title={t("competitor.stat_count", language)}
-                value={summary.competitor_count}
-                suffix={t("competitor.count_suffix", language)}
-                valueStyle={{ fontSize: 18 }}
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small">
-              <Statistic
-                title={t("competitor.stat_avg_price", language)}
-                value={summary.avg_price_index != null ? (summary.avg_price_index * 100).toFixed(0) : "—"}
-                suffix={summary.avg_price_index != null ? "%" : ""}
-                valueStyle={{ fontSize: 18 }}
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small">
-              <Statistic
-                title={t("competitor.stat_highest_threat", language)}
-                value={intensityLabel(summary.highest_promo_threat)}
-                valueStyle={{
+        <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+          <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 74, padding: "12px 16px" }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("competitor.stat_count", language)}</span>
+            <div style={{ margin: "4px 0 0" }}>
+              <Typography.Text className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-primary)" }}>
+                {summary.competitor_count} {t("competitor.count_suffix", language)}
+              </Typography.Text>
+            </div>
+          </div>
+          <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 74, padding: "12px 16px" }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("competitor.stat_avg_price", language)}</span>
+            <div style={{ margin: "4px 0 0" }}>
+              <Typography.Text className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-primary)" }}>
+                {summary.avg_price_index != null ? `${(summary.avg_price_index * 100).toFixed(0)}%` : "—"}
+              </Typography.Text>
+            </div>
+          </div>
+          <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 74, padding: "12px 16px" }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("competitor.stat_highest_threat", language)}</span>
+            <div style={{ margin: "4px 0 0" }}>
+              <Typography.Text
+                className="font-tabular"
+                style={{
                   fontSize: 18,
-                  color: summary.highest_promo_threat === "aggressive" ? "#ff4d4f" : undefined,
+                  fontWeight: 600,
+                  color: summary.highest_promo_threat === "aggressive" ? "var(--state-error-text)" : "var(--fg-primary)",
                 }}
-              />
-            </Card>
-          </Col>
-        </Row>
+              >
+                {intensityLabel(summary.highest_promo_threat)}
+              </Typography.Text>
+            </div>
+          </div>
+        </div>
 
         <Table
           dataSource={observations}

@@ -107,80 +107,74 @@ export function InventoryTurnoverPanel({
         </Space>
       }
     >
-      <Row gutter={[16, 16]}>
-        <Col xs={12} sm={8} md={4}>
-          <Card size="small">
-            <Statistic
-              title={t("inventory.stat_stock_cost", language)}
-              value={summary.ending_stock_cost}
-              formatter={(v) => fmtMoney(Number(v), currency)}
-              valueStyle={{ fontSize: 18 }}
-            />
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {t("inventory.stat_stock_qty", language, { qty: summary.ending_stock_qty.toLocaleString() })}
-            </Text>
-          </Card>
-        </Col>
+      <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "12px 14px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("inventory.stat_stock_cost", language)}</span>
+          <div style={{ margin: "4px 0 2px" }}>
+            <Typography.Text className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-primary)" }}>
+              {fmtMoney(summary.ending_stock_cost, currency)}
+            </Typography.Text>
+          </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("inventory.stat_stock_qty", language, { qty: summary.ending_stock_qty.toLocaleString() })}
+          </Text>
+        </div>
 
-        <Col xs={12} sm={8} md={5}>
-          <Card size="small">
-            <Statistic
-              title={t("inventory.stat_transit_cost", language)}
-              value={summary.in_transit_cost}
-              formatter={(v) => fmtMoney(Number(v), currency)}
-              valueStyle={{ fontSize: 18 }}
-            />
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {t("inventory.stat_transit_qty", language, { qty: summary.in_transit_qty.toLocaleString() })}
-            </Text>
-          </Card>
-        </Col>
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "12px 14px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("inventory.stat_transit_cost", language)}</span>
+          <div style={{ margin: "4px 0 2px" }}>
+            <Typography.Text className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-primary)" }}>
+              {fmtMoney(summary.in_transit_cost, currency)}
+            </Typography.Text>
+          </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("inventory.stat_transit_qty", language, { qty: summary.in_transit_qty.toLocaleString() })}
+          </Text>
+        </div>
 
-        <Col xs={12} sm={8} md={5}>
-          <Card size="small">
-            <Statistic
-              title={t("inventory.stat_doi", language)}
-              value={summary.doi != null ? summary.doi : "—"}
-              suffix={summary.doi != null ? t("inventory.days_suffix", language) : ""}
-              valueStyle={{
-                fontSize: 20,
-                color: summary.doi == null ? "var(--fg-muted)" : summary.doi <= 30 ? "#52c41a" : summary.doi <= 60 ? "#1890ff" : "#faad14",
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "12px 14px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("inventory.stat_doi", language)}</span>
+          <div style={{ margin: "4px 0 2px" }}>
+            <Typography.Text
+              className="font-tabular"
+              style={{
+                fontSize: 18,
+                fontWeight: 600,
+                color: summary.doi == null ? "var(--fg-muted)" : summary.doi <= 30 ? "var(--state-success-text)" : summary.doi <= 60 ? "var(--state-info-text)" : "var(--state-warning-text)",
               }}
-            />
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {t("inventory.doi_formula", language, { days: String(summary.days) })}
-            </Text>
-          </Card>
-        </Col>
+            >
+              {summary.doi != null ? `${summary.doi}${t("inventory.days_suffix", language)}` : "—"}
+            </Typography.Text>
+          </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("inventory.doi_formula", language, { days: String(summary.days) })}
+          </Text>
+        </div>
 
-        <Col xs={12} sm={8} md={5}>
-          <Card size="small">
-            <Statistic
-              title={t("inventory.stat_turnover", language)}
-              value={summary.turnover_rate != null ? summary.turnover_rate : "—"}
-              suffix={summary.turnover_rate != null ? t("inventory.times_suffix", language) : ""}
-              valueStyle={{ fontSize: 20 }}
-            />
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {t("inventory.turnover_formula", language)}
-            </Text>
-          </Card>
-        </Col>
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "12px 14px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("inventory.stat_turnover", language)}</span>
+          <div style={{ margin: "4px 0 2px" }}>
+            <Typography.Text className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-primary)" }}>
+              {summary.turnover_rate != null ? `${summary.turnover_rate}${t("inventory.times_suffix", language)}` : "—"}
+            </Typography.Text>
+          </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("inventory.turnover_formula", language)}
+          </Text>
+        </div>
 
-        <Col xs={12} sm={8} md={5}>
-          <Card size="small">
-            <Statistic
-              title={t("inventory.stat_carrying_cost", language)}
-              value={summary.total_carrying_cost}
-              formatter={(v) => fmtMoney(Number(v), currency)}
-              valueStyle={{ fontSize: 18, color: "#ff4d4f" }}
-            />
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {t("inventory.carrying_formula", language, { rate: (summary.carrying_cost_rate * 100).toFixed(0) })}
-            </Text>
-          </Card>
-        </Col>
-      </Row>
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "12px 14px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("inventory.stat_carrying_cost", language)}</span>
+          <div style={{ margin: "4px 0 2px" }}>
+            <Typography.Text className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: "var(--state-error-text)" }}>
+              {fmtMoney(summary.total_carrying_cost, currency)}
+            </Typography.Text>
+          </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("inventory.carrying_formula", language, { rate: (summary.carrying_cost_rate * 100).toFixed(0) })}
+          </Text>
+        </div>
+      </div>
     </Card>
   );
 }

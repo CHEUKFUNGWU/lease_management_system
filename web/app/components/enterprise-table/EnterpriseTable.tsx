@@ -98,9 +98,9 @@ export function EnterpriseTable<T extends object = any>({
                   padding: "0 10px",
                   borderRadius: 6,
                   border: "none",
-                  background: isActive ? "var(--bg-surface, #FFFFFF)" : "transparent",
-                  boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08), inset 0 0 0 1px var(--border-default, #D9D9D9)" : "none",
-                  color: isActive ? "var(--fg-primary, #000000)" : "var(--fg-tertiary, #595959)",
+                  background: isActive ? "var(--bg-surface)" : "transparent",
+                  boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08), inset 0 0 0 1px var(--border-default)" : "none",
+                  color: isActive ? "var(--fg-primary)" : "var(--fg-tertiary)",
                   fontWeight: isActive ? 600 : 400,
                   fontSize: 13,
                   cursor: "pointer",
@@ -115,7 +115,7 @@ export function EnterpriseTable<T extends object = any>({
                   style={{
                     fontSize: 11,
                     color: isActive ? "var(--fg-primary)" : "var(--fg-muted)",
-                    background: isActive ? "var(--bg-inset, #F0F0F0)" : "transparent",
+                    background: isActive ? "var(--bg-inset)" : "transparent",
                     padding: "0 5px",
                     borderRadius: 9999,
                     fontVariantNumeric: "tabular-nums",
@@ -157,8 +157,8 @@ export function EnterpriseTable<T extends object = any>({
             alignItems: "center",
             gap: 12,
             padding: "8px 16px",
-            background: "var(--bg-inset, #F5F5F5)",
-            border: "1px solid var(--border-default, #D9D9D9)",
+            background: "var(--bg-inset)",
+            border: "1px solid var(--border-default)",
             borderRadius: 8,
             fontSize: 13,
           }}
@@ -192,9 +192,9 @@ export function EnterpriseTable<T extends object = any>({
       {/* ─── Enterprise Data Table Body ─── */}
       <div
         style={{
-          border: "1px solid var(--border-default, #D9D9D9)",
+          border: "1px solid var(--border-default)",
           borderRadius: 8,
-          background: "var(--bg-surface, #FFFFFF)",
+          background: "var(--bg-surface)",
           overflow: "auto",
           maxHeight: scrollMaxHeight,
           width: "100%",
@@ -211,16 +211,16 @@ export function EnterpriseTable<T extends object = any>({
             }}
           >
             <thead>
-              <tr style={{ background: "var(--bg-inset, #F5F5F5)", position: "sticky", top: 0, zIndex: 10 }}>
+              <tr style={{ background: "var(--bg-inset)", position: "sticky", top: 0, zIndex: 10 }}>
                 {/* Select All Checkbox Column */}
                 <th
                   style={{
                     width: 44,
                     padding: "10px 12px",
-                    borderBottom: "1px solid var(--border-default, #D9D9D9)",
+                    borderBottom: "1px solid var(--border-default)",
                     position: "sticky",
                     left: 0,
-                    background: "var(--bg-inset, #F5F5F5)",
+                    background: "var(--bg-inset)",
                     zIndex: 11,
                   }}
                 >
@@ -239,14 +239,14 @@ export function EnterpriseTable<T extends object = any>({
                       style={{
                         padding: "10px 14px",
                         fontWeight: 600,
-                        color: "var(--fg-secondary, #262626)",
-                        borderBottom: "1px solid var(--border-default, #D9D9D9)",
+                        color: "var(--fg-secondary)",
+                        borderBottom: "1px solid var(--border-default)",
                         textAlign: col.align || "left",
                         width: col.width,
                         minWidth: col.minWidth,
                         position: isFirstCol ? "sticky" : undefined,
                         left: isFirstCol ? 44 : undefined,
-                        background: isFirstCol ? "var(--bg-inset, #F5F5F5)" : undefined,
+                        background: isFirstCol ? "var(--bg-inset)" : undefined,
                         zIndex: isFirstCol ? 11 : undefined,
                         boxShadow: isFirstCol ? "2px 0 4px rgba(0,0,0,0.03)" : undefined,
                       }}
@@ -273,7 +273,7 @@ export function EnterpriseTable<T extends object = any>({
                     <tr
                       key={id}
                       style={{
-                        background: isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface, #FFFFFF)",
+                        background: isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface)",
                         transition: "background 0.15s ease",
                       }}
                     >
@@ -282,10 +282,10 @@ export function EnterpriseTable<T extends object = any>({
                         style={{
                           width: 44,
                           padding: "8px 12px",
-                          borderBottom: "1px solid var(--border-subtle, #F0F0F0)",
+                          borderBottom: "1px solid var(--border-subtle)",
                           position: "sticky",
                           left: 0,
-                          background: isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface, #FFFFFF)",
+                          background: isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface)",
                           zIndex: 5,
                         }}
                       >
@@ -306,11 +306,11 @@ export function EnterpriseTable<T extends object = any>({
                             key={col.key}
                             style={{
                               padding: "8px 14px",
-                              borderBottom: "1px solid var(--border-subtle, #F0F0F0)",
+                              borderBottom: "1px solid var(--border-subtle)",
                               textAlign: col.align || "left",
                               position: isFirstCol ? "sticky" : undefined,
                               left: isFirstCol ? 44 : undefined,
-                              background: isFirstCol ? (isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface, #FFFFFF)") : undefined,
+                              background: isFirstCol ? (isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface)") : undefined,
                               zIndex: isFirstCol ? 5 : undefined,
                               boxShadow: isFirstCol ? "2px 0 4px rgba(0,0,0,0.03)" : undefined,
                             }}
@@ -432,7 +432,7 @@ export function EnterpriseTable<T extends object = any>({
             </Button>
           </div>
 
-          <hr style={{ border: "none", borderTop: "1px solid var(--border-subtle, #F0F0F0)", margin: "8px 0" }} />
+          <hr style={{ border: "none", borderTop: "1px solid var(--border-subtle)", margin: "8px 0" }} />
 
           {/* Save as Custom View */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -518,11 +518,11 @@ function EditableCell({
 
   const syncBorderColor =
     syncState?.status === "syncing"
-      ? "var(--state-info-text, #1890FF)"
+      ? "var(--state-info-text)"
       : syncState?.status === "synced"
-      ? "var(--state-success-text, #52C41A)"
+      ? "var(--state-success-text)"
       : syncState?.status === "error"
-      ? "var(--state-error-text, #FF4D4F)"
+      ? "var(--state-error-text)"
       : "transparent";
 
   return (
@@ -578,7 +578,7 @@ function EditableCell({
               justifyContent: "space-between",
               background: "transparent",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset, #F5F5F5)")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             <span>{value !== undefined && value !== null ? String(value) : "—"}</span>

@@ -171,8 +171,8 @@ export function CommandPalette() {
           padding: 0,
           borderRadius: 12,
           overflow: "hidden",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px var(--border-default, #D9D9D9)",
-          background: "var(--bg-surface, #FFFFFF)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px var(--border-default)",
+          background: "var(--bg-surface)",
         },
       }}
     >
@@ -183,7 +183,7 @@ export function CommandPalette() {
           alignItems: "center",
           gap: 10,
           padding: "12px 16px",
-          borderBottom: "1px solid var(--border-default, #E5E5E5)",
+          borderBottom: "1px solid var(--border-default)",
         }}
       >
         <SearchOutlined style={{ fontSize: 16, color: "var(--fg-muted)" }} />
@@ -223,7 +223,7 @@ export function CommandPalette() {
                   padding: "9px 16px",
                   cursor: "pointer",
                   background: isSelected ? "var(--bg-hover, #F5F5F5)" : "transparent",
-                  borderLeft: isSelected ? "3px solid var(--morandi-slate, #5A5958)" : "3px solid transparent",
+                  borderLeft: isSelected ? "3px solid var(--fg-secondary)" : "3px solid transparent",
                   transition: "all 0.1s ease",
                 }}
               >
@@ -240,7 +240,7 @@ export function CommandPalette() {
                     bordered={false}
                     style={{
                       fontSize: 10,
-                      background: "var(--bg-inset, #ECEAE8)",
+                      background: "var(--bg-inset)",
                       color: "var(--fg-secondary)",
                       borderRadius: 4,
                     }}
@@ -262,8 +262,8 @@ export function CommandPalette() {
           justifyContent: "space-between",
           alignItems: "center",
           padding: "8px 16px",
-          background: "var(--bg-inset, #FAFAFA)",
-          borderTop: "1px solid var(--border-subtle, #F0F0F0)",
+          background: "var(--bg-inset)",
+          borderTop: "1px solid var(--border-subtle)",
           fontSize: 11,
           color: "var(--fg-muted)",
         }}

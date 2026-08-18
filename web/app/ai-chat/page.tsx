@@ -441,7 +441,7 @@ function MessageContent({
           <CodeBlock key={idx} code={part.content} language={part.language || "text"} i18nLang={i18nLang} />
         ) : role === "user" ? (
           // The user's own text is shown verbatim — they did not write markdown.
-          <Text key={idx} style={{ color: "var(--fg-primary, #262626)", fontSize: 14, lineHeight: 1.6 }}>
+          <Text key={idx} style={{ color: "var(--fg-primary)", fontSize: 14, lineHeight: 1.6 }}>
             {part.content}
           </Text>
         ) : (
@@ -461,27 +461,27 @@ function MessageContent({
       })()}
 
       {(typeof confidence === "number" || (sources && sources.length > 0) || model) && (
-        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle, #F1F5F9)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             {typeof confidence === "number" && (
               <ConfidenceBadge confidence={confidence} reason={confidenceReason} />
             )}
             {sources && sources.length > 0 ? (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>{t("ai.sources", i18nLang)}:</span>
+                <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>{t("ai.sources", i18nLang)}:</span>
                 {sources.map((source, idx) => {
                   const value = typeof source === "string" ? source : { ...source, url: safeInternalAIURL(source.url) };
                   return <SourceCitation key={idx} source={value} />;
                 })}
               </div>
             ) : !thinking && content ? (
-              <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>{t("ai.no_sources", i18nLang)}</span>
+              <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>{t("ai.no_sources", i18nLang)}</span>
             ) : null}
           </div>
           {model && (
-            <div style={{ fontSize: 11, color: "var(--fg-muted, #64748B)", display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ fontSize: 11, color: "var(--fg-muted)", display: "flex", alignItems: "center", gap: 4 }}>
               <span>{t("ai.model_label", i18nLang)}</span>
-              <code style={{ background: "var(--bg-inset, #F1F5F9)", padding: "1px 5px", borderRadius: 4, fontSize: 10, color: "var(--fg-secondary, #334155)" }}>{model}</code>
+              <code style={{ background: "var(--bg-inset)", padding: "1px 5px", borderRadius: 4, fontSize: 10, color: "var(--fg-secondary)" }}>{model}</code>
             </div>
           )}
         </div>
@@ -563,8 +563,8 @@ function AgentTracePanel({
     <div
       style={{
         marginTop: 12,
-        background: "var(--bg-inset, #F8FAFC)",
-        border: "1px solid var(--border-default, #E2E8F0)",
+        background: "var(--bg-inset)",
+        border: "1px solid var(--border-default)",
         borderRadius: 8,
         padding: "8px 12px",
         fontSize: 12,
@@ -581,18 +581,18 @@ function AgentTracePanel({
         onClick={() => setExpanded(!expanded)}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <ToolOutlined style={{ color: "var(--fg-muted, #64748B)", fontSize: 12 }} />
-          <Text strong style={{ fontSize: 12, color: "var(--fg-secondary, #334155)" }}>
+          <ToolOutlined style={{ color: "var(--fg-muted)", fontSize: 12 }} />
+          <Text strong style={{ fontSize: 12, color: "var(--fg-secondary)" }}>
             {t("ai.agent_trace_title", language)} · {totalSteps} 项执行步骤
           </Text>
         </div>
-        <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>
+        <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>
           {expanded ? "收起 ▲" : "展开详情 ▼"}
         </span>
       </div>
 
       {expanded && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle, #E2E8F0)", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle)", display: "flex", flexDirection: "column", gap: 6 }}>
           {plan.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {plan.map((step) => {
@@ -615,19 +615,19 @@ function AgentTracePanel({
                     key={`${call.tool}-${index}`}
                     style={{
                       padding: "6px 10px",
-                      background: "var(--bg-surface, #FFFFFF)",
-                      border: "1px solid var(--border-subtle, #E2E8F0)",
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border-subtle)",
                       borderRadius: 6,
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Text strong style={{ fontSize: 11, color: "var(--fg-primary, #0F172A)" }}>{call.skill || call.tool}</Text>
+                      <Text strong style={{ fontSize: 11, color: "var(--fg-primary)" }}>{call.skill || call.tool}</Text>
                       <StatusTag kind={statusKindFromAntColor(meta.color as any)} style={{ fontSize: 10, padding: "0 4px" }}>
                         {meta.label}
                       </StatusTag>
                     </div>
                     {(call.output_summary || call.input_summary) && (
-                      <div style={{ fontSize: 11, color: "var(--fg-secondary, #334155)", marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: "var(--fg-secondary)", marginTop: 2 }}>
                         {call.output_summary || call.input_summary}
                       </div>
                     )}
@@ -669,15 +669,15 @@ function AgentReviewPanel({
     <div
       style={{
         marginTop: 12,
-        background: "var(--bg-inset, #F8FAFC)",
-        border: "1px solid var(--border-default, #E2E8F0)",
+        background: "var(--bg-inset)",
+        border: "1px solid var(--border-default)",
         borderRadius: 8,
         padding: "12px 16px",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-        <ExclamationCircleOutlined style={{ color: "var(--state-warning-text, #D97706)", fontSize: 13 }} />
-        <Text strong style={{ fontSize: 12, color: "var(--fg-primary, #0F172A)" }}>
+        <ExclamationCircleOutlined style={{ color: "var(--state-warning-text)", fontSize: 13 }} />
+        <Text strong style={{ fontSize: 12, color: "var(--fg-primary)" }}>
           {t("ai.agent_review_title", language)}
         </Text>
       </div>
@@ -693,22 +693,22 @@ function AgentReviewPanel({
               key={prompt.id || index}
               style={{
                 padding: "8px 12px",
-                background: "var(--bg-surface, #FFFFFF)",
-                border: "1px solid var(--border-subtle, #E2E8F0)",
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border-subtle)",
                 borderRadius: 6,
               }}
             >
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-primary, #0F172A)", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
                 {cleanedTitle || prompt.title}
               </div>
               {cleanedDesc && (
-                <div style={{ fontSize: 12, color: "var(--fg-secondary, #334155)", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: "var(--fg-secondary)", lineHeight: 1.5 }}>
                   {cleanedDesc}
                 </div>
               )}
               {isContextNeed && (
                 <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>快捷填入:</span>
+                  <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>快捷填入:</span>
                   <Button
                     size="small"
                     style={{ fontSize: 11, height: 24, borderRadius: 4 }}
@@ -833,8 +833,8 @@ function SessionSidebar({
       style={{
         width: 256,
         height: "100%",
-        borderRight: "1px solid var(--border-default, #EAECF0)",
-        background: "var(--bg-surface, #FAFAFA)",
+        borderRight: "1px solid var(--border-default)",
+        background: "var(--bg-surface)",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
@@ -845,7 +845,7 @@ function SessionSidebar({
         style={{
           height: 52,
           padding: "0 14px",
-          borderBottom: "1px solid var(--border-default, #EAECF0)",
+          borderBottom: "1px solid var(--border-default)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -883,7 +883,7 @@ function SessionSidebar({
             fontWeight: 500,
             fontSize: 12,
             background: "var(--bg-card, #FFFFFF)",
-            borderColor: "var(--border-default, #D0D5DD)",
+            borderColor: "var(--border-default)",
             color: "var(--fg-primary)",
             boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
           }}
@@ -894,10 +894,10 @@ function SessionSidebar({
 
       {/* 3. Section Header */}
       <div style={{ padding: "10px 14px 4px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted, #98A2B3)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
           {t("ai.history_sessions", language)}
         </span>
-        <span style={{ fontSize: 11, color: "var(--fg-muted, #98A2B3)", fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ fontSize: 11, color: "var(--fg-muted)", fontVariantNumeric: "tabular-nums" }}>
           {sessions.length}
         </span>
       </div>
@@ -926,15 +926,15 @@ function SessionSidebar({
                     padding: "7px 10px",
                     borderRadius: 6,
                     cursor: "pointer",
-                    background: isActive ? "var(--morandi-alabaster, #F2EDE9)" : "transparent",
-                    color: isActive ? "var(--morandi-charcoal, #2B2A29)" : "var(--fg-secondary, #475467)",
+                    background: isActive ? "var(--bg-inset)" : "transparent",
+                    color: isActive ? "var(--fg-primary)" : "var(--fg-secondary)",
                     fontWeight: isActive ? 600 : 400,
                     transition: "all 0.15s ease",
-                    border: isActive ? "1px solid var(--border-subtle, #E4DFDA)" : "1px solid transparent",
+                    border: isActive ? "1px solid var(--border-default)" : "1px solid transparent",
                   }}
                   onClick={() => onSelect(session.id)}
                   onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "var(--bg-inset, #F8F9FA)";
+                    if (!isActive) e.currentTarget.style.background = "var(--bg-inset)";
                   }}
                   onMouseLeave={(e) => {
                     if (!isActive) e.currentTarget.style.background = "transparent";
@@ -975,7 +975,7 @@ function SessionSidebar({
                   </button>
 
                   <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 6 }}>
-                    <span style={{ fontSize: 11, color: "var(--fg-muted, #98A2B3)", fontVariantNumeric: "tabular-nums" }}>
+                    <span style={{ fontSize: 11, color: "var(--fg-muted)", fontVariantNumeric: "tabular-nums" }}>
                       {formatTime(session.updatedAt, language)}
                     </span>
                     <Dropdown
@@ -1982,12 +1982,12 @@ function AIChatPageContent() {
             <div
               style={{
                 height: 52,
-                borderBottom: "1px solid var(--border-default, #EAECF0)",
+                borderBottom: "1px solid var(--border-default)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "0 20px",
-                background: "var(--bg-elevated, #FFFFFF)",
+                background: "var(--bg-elevated)",
                 flexShrink: 0,
                 boxSizing: "border-box",
               }}
@@ -2002,7 +2002,7 @@ function AIChatPageContent() {
                     onClick={() => transitionSessionDrawer("open")}
                   />
                 )}
-                <RobotOutlined style={{ fontSize: 15, color: "var(--morandi-charcoal, #5A5958)" }} />
+                <RobotOutlined style={{ fontSize: 15, color: "var(--fg-secondary)" }} />
                 <span
                   style={{
                     fontSize: 13,
@@ -2132,17 +2132,17 @@ function AIChatPageContent() {
                           gap: 12,
                           padding: "12px 14px",
                           borderRadius: 10,
-                          border: "1px solid var(--border-subtle, #EAECF0)",
+                          border: "1px solid var(--border-subtle)",
                           background: "var(--bg-surface)",
                           cursor: "pointer",
                           transition: "all 0.2s ease",
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = "var(--morandi-sand, #D8BB8F)";
+                          e.currentTarget.style.borderColor = "var(--border-strong)";
                           e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = "var(--border-subtle, #EAECF0)";
+                          e.currentTarget.style.borderColor = "var(--border-subtle)";
                           e.currentTarget.style.boxShadow = "none";
                         }}
                       >
@@ -2151,8 +2151,8 @@ function AIChatPageContent() {
                             width: 32,
                             height: 32,
                             borderRadius: 8,
-                            background: "var(--morandi-cream, #F2EDE9)",
-                            color: "var(--morandi-slate, #5A5958)",
+                            background: "var(--bg-inset)",
+                            color: "var(--fg-primary)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -2175,7 +2175,7 @@ function AIChatPageContent() {
                   </div>
 
                   {/* Quick Question Chips */}
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, paddingTop: 12, borderTop: "1px solid var(--border-subtle, #F1F5F9)" }}>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
                     <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("ai.quick_questions", language)}:</span>
                     {chips.map((chipKey, idx) => (
                       <Button
@@ -2241,9 +2241,9 @@ function AIChatPageContent() {
                         style={{
                           borderRadius: 12,
                           padding: "12px 18px",
-                          background: msg.role === "user" ? "var(--bg-inset, #F1F5F9)" : "var(--bg-elevated, #FFFFFF)",
-                          color: "var(--fg-primary, #0F172A)",
-                          border: "1px solid var(--border-default, #E2E8F0)",
+                          background: msg.role === "user" ? "var(--bg-inset)" : "var(--bg-elevated)",
+                          color: "var(--fg-primary)",
+                          border: "1px solid var(--border-default)",
                           boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                           maxWidth: "100%",
                           wordBreak: "break-word",
@@ -2319,9 +2319,9 @@ function AIChatPageContent() {
                                
                                 style={{
                                   borderRadius: 4,
-                                  background: "var(--bg-surface, #FFFFFF)",
-                                  border: "1px solid var(--border-default, #E2E8F0)",
-                                  color: "var(--fg-secondary, #334155)",
+                                  background: "var(--bg-surface)",
+                                  border: "1px solid var(--border-default)",
+                                  color: "var(--fg-secondary)",
                                 }}
                               >
                                 {att.original_name}
@@ -2522,7 +2522,7 @@ function AIChatPageContent() {
                             style={{
                               marginTop: 10,
                               paddingTop: 8,
-                              borderTop: "1px solid var(--border-subtle, #E2E8F0)",
+                              borderTop: "1px solid var(--border-subtle)",
                               display: "flex",
                               gap: 6,
                               flexWrap: "wrap",
@@ -2539,7 +2539,7 @@ function AIChatPageContent() {
                                 fontSize: 11,
                                 paddingInline: 6,
                                 height: 22,
-                                color: "var(--fg-secondary, #334155)",
+                                color: "var(--fg-secondary)",
                               }}
                             >
                               {t("ai.continue_from_message", language)}
@@ -2556,7 +2556,7 @@ function AIChatPageContent() {
                                     fontSize: 11,
                                     paddingInline: 6,
                                     height: 22,
-                                    color: "var(--fg-secondary, #334155)",
+                                    color: "var(--fg-secondary)",
                                   }}
                                 >
                                   {t("ai.view_trace", language)}
@@ -2573,7 +2573,7 @@ function AIChatPageContent() {
                                         fontSize: 11,
                                         paddingInline: 6,
                                         height: 22,
-                                        color: "var(--fg-muted, #94A3B8)",
+                                        color: "var(--fg-muted)",
                                       }}
                                     >
                                       {t("ai.run_follow_up", language)}
@@ -2622,7 +2622,7 @@ function AIChatPageContent() {
                     <Avatar
                       icon={<RobotOutlined />}
                       style={{
-                        backgroundColor: "var(--fg-primary, #000000)",
+                        backgroundColor: "var(--fg-primary)",
                         flexShrink: 0,
                       }}
                       size={32}
@@ -2631,8 +2631,8 @@ function AIChatPageContent() {
                       style={{
                         borderRadius: 12,
                         padding: "12px 18px",
-                        background: "var(--bg-elevated, #FFFFFF)",
-                        border: "1px solid var(--border-default, #D9D9D9)",
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border-default)",
                         boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                         display: "flex",
                         flexDirection: "column",
@@ -2641,11 +2641,11 @@ function AIChatPageContent() {
                     >
                       <Space size={8} align="center">
                         <Spin size="small" />
-                        <span style={{ fontSize: 13, color: "var(--fg-secondary, #262626)", fontWeight: 500 }}>
+                        <span style={{ fontSize: 13, color: "var(--fg-secondary)", fontWeight: 500 }}>
                           {t("ai.thinking", language)}
                         </span>
                       </Space>
-                      <Typography.Text type="secondary" style={{ fontSize: 11, color: "var(--fg-muted, #737373)" }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 11, color: "var(--fg-muted)" }}>
                         {t("ai.thinking_progress", language)}
                       </Typography.Text>
                     </div>

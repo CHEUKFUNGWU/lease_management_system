@@ -74,8 +74,8 @@ export function BentoTile({
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        background: isAccent ? "var(--accent-bg, #FAF8F5)" : "var(--bg-surface, #FFFFFF)",
-        border: "1px solid var(--border-default, #E5E5E5)",
+        background: isAccent ? "var(--accent-bg, #FAF8F5)" : "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
         borderRadius: isHero ? 12 : 10,
         boxShadow: isHero ? "0 4px 12px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)" : "0 1px 3px rgba(0,0,0,0.02)",
         overflow: "hidden",
@@ -91,7 +91,7 @@ export function BentoTile({
             right: 0,
             width: 140,
             height: 140,
-            background: "radial-gradient(circle at top right, var(--morandi-sand, #D8BB8F) 0%, transparent 70%)",
+            background: "radial-gradient(circle at top right, var(--chart-accent) 0%, transparent 70%)",
             opacity: 0.12,
             pointerEvents: "none",
             zIndex: 0,
@@ -107,7 +107,7 @@ export function BentoTile({
             alignItems: "center",
             justifyContent: "space-between",
             padding: "14px 18px",
-            borderBottom: "1px solid var(--border-subtle, #F0F0F0)",
+            borderBottom: "1px solid var(--border-subtle)",
             position: "relative",
             zIndex: 1,
           }}
@@ -118,14 +118,14 @@ export function BentoTile({
                 style={{
                   fontSize: isHero ? 16 : 14,
                   fontWeight: 600,
-                  color: "var(--fg-primary, #1A1A1A)",
+                  color: "var(--fg-primary)",
                 }}
               >
                 {title}
               </div>
             )}
             {subtitle && (
-              <div style={{ fontSize: 12, color: "var(--fg-muted, #8C8C8C)", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 2 }}>
                 {subtitle}
               </div>
             )}

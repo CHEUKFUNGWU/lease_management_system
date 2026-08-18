@@ -107,7 +107,7 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
             item("/deal-compare", "/deal-compare", <SwapOutlined />, t("nav.deal_compare", language as any)),
             item("/sensitivity", "/sensitivity", <LineChartOutlined />, t("nav.sensitivity", language as any)),
             item("/cashflow-forecast", "/cashflow-forecast", <DollarOutlined />, t("nav.cashflow", language as any)),
-            item("/promotions", "/promotions", <AuditOutlined />, t("promotion.title", language as any)),
+            item("/promotions", "/promotions", <AuditOutlined />, t("nav.promotions", language as any)),
           ],
         });
       }
@@ -119,7 +119,6 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
             item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
             item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
             item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
-            item("/upload", "/upload", <CloudUploadOutlined />, t("nav.upload", language as any)),
           ],
       });
       if (canViewAccounting) {

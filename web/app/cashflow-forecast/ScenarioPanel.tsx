@@ -10,6 +10,8 @@ import { reportApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 
 interface Ladder {
   labels: string[];
@@ -37,6 +39,7 @@ interface ScenarioResult {
 }
 
 export function ScenarioPanel({ token }: { token: string | null }) {
+  const { language } = useLanguage();
   const [form] = Form.useForm();
   const [results, setResults] = useState<ScenarioResult[]>([]);
   const [warning, setWarning] = useState<string | null>(null);
@@ -93,17 +96,16 @@ export function ScenarioPanel({ token }: { token: string | null }) {
 
   return (
     <Card
-      title="到期阶梯与组合情景"
+      title={t("cashflow.scenario.title", language)}
       style={{ borderRadius: 10, marginTop: 16 }}
       extra={
         <Button type="primary" icon={<ExperimentOutlined />} loading={loading} onClick={() => form.submit()}>
-          测算
+          {t("cashflow.scenario.btn_run", language)}
         </Button>
       }
     >
       <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 16 }}>
-        按到期日排的租金流水是一张日程表，它假设每份租约都在到期日干净地停掉——而这是没人会去规划的结果。
-        下面按比例假设「续掉多少、关掉多少」，并始终与不做假设的基准并排显示。
+        {t("cashflow.scenario.intro", language)}
       </div>
 
       <Form
@@ -113,32 +115,32 @@ export function ScenarioPanel({ token }: { token: string | null }) {
       >
         <Row gutter={12}>
           <Col xs={12} md={4}>
-            <Form.Item label="测算期（月）" name="horizon_months" rules={[{ required: true, message: "请填写测算期" }]}>
+            <Form.Item label={t("cashflow.scenario.horizon_months", language)} name="horizon_months" rules={[{ required: true, message: t("cashflow.scenario.req_horizon", language) }]}>
               <InputNumber style={{ width: "100%" }} min={12} max={120} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
-            <Form.Item label="续租比例" name="renewal_rate" extra="0–1">
+            <Form.Item label={t("cashflow.scenario.renewal_rate", language)} name="renewal_rate" extra="0–1">
               <InputNumber style={{ width: "100%" }} min={0} max={1} step={0.05} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
-            <Form.Item label="续租租期（月）" name="renewal_term_months" rules={[{ required: true, message: "请填写续租租期" }]}>
+            <Form.Item label={t("cashflow.scenario.renewal_term_months", language)} name="renewal_term_months" rules={[{ required: true, message: t("cashflow.scenario.req_term", language) }]}>
               <InputNumber style={{ width: "100%" }} min={1} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
-            <Form.Item label="续租涨幅（%）" name="renewal_uplift_percent">
+            <Form.Item label={t("cashflow.scenario.renewal_uplift", language)} name="renewal_uplift_percent">
               <InputNumber style={{ width: "100%" }} precision={1} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
-            <Form.Item label="关店比例" name="closure_rate" extra="与续租比例合计不超过 1">
+            <Form.Item label={t("cashflow.scenario.closure_rate", language)} name="closure_rate" extra={t("cashflow.scenario.rate_helper", language)}>
               <InputNumber style={{ width: "100%" }} min={0} max={1} step={0.05} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
-            <Form.Item label="退出成本（月租金）" name="closure_cost_months">
+            <Form.Item label={t("cashflow.scenario.closure_cost", language)} name="closure_cost_months">
               <InputNumber style={{ width: "100%" }} min={0} precision={1} />
             </Form.Item>
           </Col>
@@ -153,7 +155,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
-            message={`测算期内有 ${results[0].expiring_leases} 份租约到期`}
+            message={t("cashflow.scenario.expiring_msg", language).replace("{count}", String(results[0].expiring_leases))}
             description={results[results.length - 1].caveat}
           />
 
@@ -166,35 +168,35 @@ export function ScenarioPanel({ token }: { token: string | null }) {
             scroll={tableScrollX((results || []).length, 700)}
             columns={[
               {
-                title: "情景",
+                title: t("common.scenario", language),
                 dataIndex: ["scenario", "name"],
                 render: (name: string, row: ScenarioResult) => (
                   <Space>
                     <strong>{name}</strong>
-                    {row.renewal_total === 0 && row.closure_total === 0 && <StatusTag>基准</StatusTag>}
+                    {row.renewal_total === 0 && row.closure_total === 0 && <StatusTag>{t("scenario.baseline", language) || "基准"}</StatusTag>}
                   </Space>
                 ),
               },
               {
-                title: "已签约承诺",
+                title: t("cashflow.scenario.committed_total", language),
                 dataIndex: "committed_total",
                 align: "right" as const,
                 render: (value: number) => fmtMoney(value, currency),
               },
               {
-                title: "假设续租",
+                title: t("cashflow.scenario.renewal_total", language),
                 dataIndex: "renewal_total",
                 align: "right" as const,
                 render: (value: number) => (value ? fmtMoney(value, currency) : "—"),
               },
               {
-                title: "假设关店成本",
+                title: t("cashflow.scenario.closure_total", language),
                 dataIndex: "closure_total",
                 align: "right" as const,
                 render: (value: number) => (value ? fmtMoney(value, currency) : "—"),
               },
               {
-                title: "合计",
+                title: t("common.total", language),
                 dataIndex: "total",
                 align: "right" as const,
                 render: (value: number) => <strong>{fmtMoney(value, currency)}</strong>,

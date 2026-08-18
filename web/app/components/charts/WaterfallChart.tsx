@@ -90,18 +90,19 @@ export default function WaterfallChart({
         <BarChart
           data={chartData}
           margin={{ top: 16, right: 16, bottom: 8, left: 16 }}
+          barCategoryGap="18%"
         >
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-default, #D9D9D9)" opacity={0.6} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.6} />
           <XAxis
             dataKey="label"
             tickLine={false}
-            stroke="var(--fg-tertiary, #595959)"
+            stroke="var(--fg-tertiary)"
             fontSize={11}
             tickMargin={6}
           />
           <YAxis
             tickLine={false}
-            stroke="var(--fg-tertiary, #595959)"
+            stroke="var(--fg-tertiary)"
             fontSize={11}
             tickFormatter={(v) => (Math.abs(Number(v)) >= 1000 ? `${(Number(v) / 1000).toFixed(0)}k` : String(v))}
             width={48}
@@ -114,21 +115,21 @@ export default function WaterfallChart({
               return (
                 <div
                   style={{
-                    background: "var(--bg-surface, #FFFFFF)",
+                    background: "var(--bg-surface)",
                     boxShadow: "var(--shadow-dropdown, 0 4px 12px rgba(0,0,0,0.08))",
                     borderRadius: 6,
                     padding: "8px 12px",
                     fontSize: 12,
-                    border: "1px solid var(--border-default, #D9D9D9)",
+                    border: "1px solid var(--border-default)",
                   }}
                 >
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary, #000000)", marginBottom: 4 }}>
+                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
                     {point.label}
                   </div>
-                  <div style={{ color: point.displayValue >= 0 ? "var(--fg-success, #216E39)" : "var(--fg-error, #A8071A)" }}>
+                  <div style={{ color: point.displayValue >= 0 ? "var(--state-success-text)" : "var(--state-error-text)" }}>
                     {point.isTotal ? "结算总额" : "变动金额"}: <strong>{fmtMoney(point.displayValue, currency)}</strong>
                   </div>
-                  <div style={{ color: "var(--fg-tertiary, #595959)", marginTop: 2 }}>
+                  <div style={{ color: "var(--fg-tertiary)", marginTop: 2 }}>
                     累计净额: {fmtMoney(point.runningTotal, currency)}
                   </div>
                 </div>
@@ -137,18 +138,18 @@ export default function WaterfallChart({
           />
 
           {/* 隐形占位底座 */}
-          <Bar dataKey="base" stackId="waterfall" fill="transparent" isAnimationActive={false} />
+          <Bar dataKey="base" stackId="waterfall" fill="transparent" isAnimationActive={false} maxBarSize={36} />
 
           {/* 真实瀑布阶梯柱 */}
-          <Bar dataKey="value" stackId="waterfall" isAnimationActive={false} radius={[3, 3, 0, 0]}>
+          <Bar dataKey="value" stackId="waterfall" isAnimationActive={false} radius={[3, 3, 0, 0]} maxBarSize={36}>
             {chartData.map((entry, idx) => {
-              let fill = "var(--morandi-slate, #5A5958)";
+              let fill = "var(--chart-primary)";
               if (entry.isTotal) {
-                fill = "var(--morandi-slate, #5A5958)";
+                fill = "var(--chart-primary)";
               } else if (entry.displayValue < 0) {
-                fill = "var(--morandi-terracotta, #A57F6C)";
+                fill = "var(--chart-negative)";
               } else {
-                fill = "var(--morandi-sand, #D8BB8F)";
+                fill = "var(--chart-accent)";
               }
               return <Cell key={`cell-${idx}`} fill={fill} />;
             })}

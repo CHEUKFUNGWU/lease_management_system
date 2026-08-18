@@ -6,7 +6,7 @@
 >
 > 编制视角：AI Engineer / Platform Engineer
 >
-> 目标系统：租赁管理系统（IFRS 16）
+> 目标系统：线下零售经营分析工作站 / Retail Performance Workstation（IFRS 16 计量是其中一个合规模块）
 >
 > 日期：2026-08-08
 >

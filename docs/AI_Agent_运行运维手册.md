@@ -1,6 +1,6 @@
 # AI Agent 运行与发布运维手册
 
-> 适用系统：租赁管理系统（IFRS 16）
+> 适用系统：线下零售经营分析工作站 / Retail Performance Workstation（IFRS 16 计量是其中一个合规模块）
 >
 > 适用组件：Core Agent Tool Runtime、AI Planner、`lease-agent` CLI、`agent-runner` Worker
 >

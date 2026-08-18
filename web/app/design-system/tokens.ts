@@ -154,23 +154,6 @@ export const typography = {
   },
 } as const;
 
-// ─── Spacing Tokens ────────────────────────────────────────────
-
-export const spacing = {
-  // Base unit: 4px
-  unit: 4,
-
-  // Semantic spacing
-  xs: 4,      // Micro gaps (icon + text)
-  sm: 8,      // Tight gaps (inline elements)
-  md: 12,     // Standard gaps (form fields, list items)
-  lg: 16,     // Section padding (card internal)
-  xl: 24,     // Component gaps (between cards)
-  "2xl": 32,  // Section gaps (page sections)
-  "3xl": 48,  // Major sections
-  "4xl": 64,  // Page-level padding
-} as const;
-
 // ─── Depth / Elevation Tokens ──────────────────────────────────
 
 export const depth = {
@@ -217,35 +200,6 @@ export const depth = {
   },
 } as const;
 
-// ─── Motion Tokens ─────────────────────────────────────────────
-
-export const motion = {
-  // Durations
-  instant: 0,
-  fast: 100,      // Hover states, color changes
-  normal: 150,    // Standard transitions
-  slow: 250,      // Layout changes, page transitions
-  slower: 350,    // Modal open/close
-  slowest: 500,   // Major state changes
-
-  // Easing curves
-  easing: {
-    micro: "cubic-bezier(0.4, 0, 0.2, 1)",      // Standard UI transitions
-    enter: "cubic-bezier(0, 0, 0.2, 1)",        // Elements appearing
-    exit: "cubic-bezier(0.4, 0, 1, 1)",          // Elements disappearing
-    bounce: "cubic-bezier(0.34, 1.56, 0.64, 1)", // Playful micro-interactions
-    linear: "linear",                             // Progress, skeletons
-  },
-
-  // Preset animations (for framer-motion or CSS)
-  presets: {
-    fadeIn: { opacity: [0, 1], transition: { duration: 0.2, ease: "easeOut" } },
-    fadeInUp: { opacity: [0, 1], y: [4, 0], transition: { duration: 0.25, ease: "easeOut" } },
-    scaleIn: { opacity: [0, 1], scale: [0.98, 1], transition: { duration: 0.2, ease: "easeOut" } },
-    slideInRight: { opacity: [0, 1], x: [8, 0], transition: { duration: 0.2, ease: "easeOut" } },
-  },
-} as const;
-
 // ─── Border Radius Tokens ──────────────────────────────────────
 
 export const radius = {
@@ -257,42 +211,6 @@ export const radius = {
   "2xl": 12,  // Feature cards
   "3xl": 16,  // Hero elements
   full: 9999, // Pills, avatars
-} as const;
-
-// ─── Z-Index Scale ─────────────────────────────────────────────
-
-export const zIndex = {
-  base: 0,
-  dropdown: 100,
-  sticky: 200,
-  overlay: 300,
-  modal: 400,
-  toast: 500,
-  tooltip: 600,
-} as const;
-
-// ─── Layout Tokens ─────────────────────────────────────────────
-
-export const layout = {
-  sidebar: {
-    width: 240,
-    collapsedWidth: 64,
-  },
-  header: {
-    height: 60,
-  },
-  content: {
-    maxWidth: 1440,
-    padding: 32,
-  },
-  breakpoints: {
-    sm: 640,
-    md: 768,
-    lg: 1024,
-    xl: 1280,
-    "2xl": 1440,
-    "3xl": 1920,
-  },
 } as const;
 
 // ─── Dark Theme Colors (DARK-001) ───────────────────────────────

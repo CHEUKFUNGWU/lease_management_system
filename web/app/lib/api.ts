@@ -1,7 +1,6 @@
 import { t, type Language } from "./i18n";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-const AI_BASE_URL = process.env.NEXT_PUBLIC_AI_URL || "http://localhost:8081";
 
 interface RequestOptions extends RequestInit {
   token?: string;
@@ -487,42 +486,6 @@ export async function apiRequest(
       window.dispatchEvent(new Event("auth-session-expired"));
     }
     throw new ApiError(code, response.status, error, endpoint);
-  }
-
-  return response.json();
-}
-
-export async function aiRequest(
-  endpoint: string,
-  options: RequestOptions = {}
-) {
-  const url = `${AI_BASE_URL}${endpoint}`;
-  
-  const headers: Record<string, string> = {
-    ...((options.headers as Record<string, string>) || {}),
-  };
-
-  if (options.token) {
-    headers["Authorization"] = `Bearer ${options.token}`;
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      ...options,
-      headers,
-    });
-  } catch {
-    throw new ApiError("network_error", 0);
-  }
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    const code = typeof error?.code === "string" ? error.code : typeof error?.error === "string" ? error.error : `http_${response.status}`;
-    if (response.status === 401 && typeof window !== "undefined") {
-      window.dispatchEvent(new Event("auth-session-expired"));
-    }
-    throw new ApiError(code, response.status, error);
   }
 
   return response.json();
@@ -1317,42 +1280,6 @@ export const reportApi = {
     });
     return apiRequest(`/api/v1/reports/cashflow-forecast?${qs.toString()}`, { token });
   },
-};
-
-// AI APIs
-export const aiApi = {
-  upload: (formData: FormData) =>
-    aiRequest("/api/v1/files/upload", {
-      method: "POST",
-      body: formData,
-    }),
-
-  parse: (data: any) =>
-    aiRequest("/api/v1/parse", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  parseContract: (data: {
-    file_id: string;
-    object_name: string;
-    content_type: string;
-  }) =>
-    aiRequest("/api/v1/parse/contract", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" } as Record<string, string>,
-      body: JSON.stringify(data),
-    }),
-
-  parsePaymentSchedule: (data: {
-    file_id: string;
-    object_name: string;
-    content_type: string;
-  }) =>
-    aiRequest("/api/v1/parse/payment-schedule", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
 };
 
 // Audit APIs
@@ -2494,42 +2421,6 @@ export const inventoryApi = {
   },
   upsertFact: (data: any, token: string): Promise<any> =>
     apiRequest("/api/v1/retail/inventory/facts", {
-      method: "POST",
-      body: JSON.stringify(data),
-      token,
-    }),
-};
-
-// Batch F8: Master Data Resolution API
-export interface MasterDataCandidate {
-  raw_identifier: string;
-  canonical_id: string;
-  canonical_name: string;
-  confidence: number;
-  source: "cached" | "rule" | "ai";
-}
-
-export interface MasterDataResolutionResponse {
-  resolved: Record<string, MasterDataCandidate>;
-  unknown: string[];
-  ambiguous: MasterDataCandidate[];
-}
-
-export const masterDataResolutionApi = {
-  resolve: (
-    data: { kind: "store" | "sku" | "category"; external_system?: string; raw_identifiers: string[]; confidence_threshold?: number },
-    token: string
-  ): Promise<MasterDataResolutionResponse> =>
-    apiRequest("/api/v1/retail/master-data/resolve", {
-      method: "POST",
-      body: JSON.stringify(data),
-      token,
-    }),
-  confirmMapping: (
-    data: { kind: string; external_system: string; raw_identifier: string; canonical_id: string; canonical_name?: string; confidence_score?: number; resolved_by?: string },
-    token: string
-  ): Promise<{ status: string }> =>
-    apiRequest("/api/v1/retail/master-data/confirm-mapping", {
       method: "POST",
       body: JSON.stringify(data),
       token,

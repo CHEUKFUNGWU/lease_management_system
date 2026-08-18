@@ -1,23 +1,3 @@
-import type { ReactNode } from "react";
-
-export interface DashboardStats {
-  total: number;
-  approved: number;
-  pending: number;
-  draft: number;
-}
-
-export interface DashboardStatusDatum {
-  key: string;
-  name: string;
-  value: number;
-}
-
-export interface DashboardTooltipDatum {
-  name: string;
-  value?: number;
-}
-
 export interface MoneySlice {
   currency: string;
   value: number;
@@ -47,12 +27,6 @@ export interface DashboardUpcomingDate {
   title: string;
   description?: string;
   reminder_days?: number;
-}
-
-export interface LiabilityTrendPoint {
-  period: string;
-  liability: number;
-  rou: number;
 }
 
 export interface DashboardMoneyKPIs {

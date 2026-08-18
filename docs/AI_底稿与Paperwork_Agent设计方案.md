@@ -1,13 +1,21 @@
 # AI 底稿与 Paperwork Agent 设计方案
 
-> 文档状态：Draft for Review（v2）
-> 编制日期：2026-08-11
+> 文档状态：Draft for Review（v3）
+> 编制日期：2026-08-11，末次修订 2026-08-18
 > 目标用户：集团 FP&A、零售/制造 Finance BP、经营分析、财务核算、审计复核人
+>
+> **决策留痕**（本文的核心结构选择均已升格为 ADR）：
+> - [ADR-0025 双轨执行与受保护度量](adr/0025-separate-certified-engine-output-from-exploratory-analysis.md) — §3、§4、§9
+> - [ADR-0024 移除 AGPL PDF 依赖](adr/0024-remove-the-agpl-pdf-dependency.md) — §6、§8
+> - [ADR-0022 Go Agent Core](adr/0022-first-party-go-agent-core-modelled-on-pi.md)、[ADR-0023 退役 Python](adr/0023-retire-the-first-party-python-ai-service.md) — §10
+> - [ADR-0019 Addendum A 治理中间件链](adr/0019-agent-tool-runtime-policy-and-threat-model.md) — §4.2 的落点
+>
 > 关联文档：
-> - `docs/AI_Chat_升级方案_pi_agent_参考.md`（运行时层设计参考）
+> - [Agent Core（Go）设计 —— 对齐 pi 架构](Agent_Core_Go设计_对齐pi架构.md)（内核层，本文的执行底座）
 > - `docs/AI_Agent_与_CLI_架构演进_PRD.md`（工具运行时与网关，已交付）
 > - `docs/FP&A与Finance_BP经营决策及AI辅助需求清单.md`（业务需求清单）
 > - `docs/agent-automation-risk-register.v1.md`（自动化风险登记册）
+> - 索引：[AI 文档索引与现行决策](AI_文档索引与现行决策.md)
 
 ---
 
@@ -56,7 +64,11 @@ Agent 运行时（工具注册表、能力令牌、网关、Run 队列、外部 
 | 外部 Runner + LLM planner 循环 | `internal/agentrunner/`、`cmd/agent-runner/`、`ai-service/app/routers/agent_plan.py` |
 | AI Chat 服务端会话、Run、事件流、trace、artifact、复核动作 | `/api/v1/ai/chat/*`、`internal/aichat/`、`internal/agentartifact/` |
 | 确定性计算引擎 | `internal/services/`：`predeal`、`dealcompare`、`renewaldecision`、`cashflow`、`operating`、`closereadiness` |
-| 文档抽取与证据定位 | `ai-service/app/services/document_extractor.py`（PaddleOCR-VL + PyMuPDF + openpyxl，带页码/坐标/引文） |
+| 文档抽取与证据定位 | `ai-service/app/services/`（PaddleOCR-VL 块级坐标 + openpyxl）。**PyMuPDF 待移除，见 ADR-0024** |
+| **AI 列语义映射（新）** | `handlers/retail_mapping_ai.go` + `services/retailingest`：AI 建议 → 规则降级链，人工确认后落库 |
+| **受控导入统一（新）** | `services/controlledintake`、`internal/controlledxlsx`：三个导入器合并到同一深模块 |
+| **FP&A 工作台（新）** | 版本血缘、差异对比、数据质量队列（`handlers/fpna_governance.go`、`web/app/fpna-workbench`） |
+| **零售日事实底座（新）** | store-day 事实、经营脉搏、门店 360（MAX-001~009 轨道） |
 | 用量与指标 | `/api/v1/agent/usage`、`/agent/metrics`、`web/app/agent-metrics` |
 
 ### 1.2 缺口
@@ -82,9 +94,17 @@ Agent 运行时（工具注册表、能力令牌、网关、Run 队列、外部 
 - 意图只有 4 类，前端按关键词猜（`web/app/ai-chat/page.tsx:1520`），后端 LLM 二选一（`agent.go:664`）。
 - **兜底分支是 `return "contract"`**。门店 P&L 扔进来不会报错，会被当成合同解析。无拒识路径。
 
-**G3 · 经营数据入库靠受控模板，无语义映射**
+**G3 · 经营数据的语义映射** — ✅ **已解决（2026-08）**
 
-`ImportStoresXLSX` 按精确小写表头匹配（`handlers/operating_facts_xlsx.go:45`）。客户原始底稿必须先人工改成模板格式——这正是 Finance BP 最花时间的一步。
+`handlers/retail_mapping_ai.go` + `services/retailingest.SuggestMappingAssisted` 已落地：AI 建议映射 → 失败降级到规则映射 → 人工确认后落库。受控模板路径（`ImportStoresXLSX`）保留为确定性通道。
+
+其实现有一处比本文 §6.3 原设计更好，**应反向吸收为规范**：
+
+> `RetailMappingAI.SuggestMapping` 只把**表头 + 掩码后的列画像**（`NonEmpty` / `NumericLike` / `DateLike` 计数 + `MaskedSample`）发给模型，**原始单元格值不出 Go 进程**。
+
+这是数据最小化，本文原设计没有这一条。后续所有"把表格交给模型判断"的场景，一律遵循此模式：**送画像，不送值**。
+
+剩余缺口收窄为：Mapping Profile 的指纹复用与漂移检测（§6.4）尚未实现——现在每次导入仍要重新确认一遍映射。
 
 **G4 · 无代码执行能力**
 
@@ -338,9 +358,31 @@ Python 3.11-slim（固定 digest）
 
 行为改变：`unknown` 或置信度低于阈值 → **明确告知"我不确定这是什么类型"并列候选让用户选**，不再静默当成合同。取代 `inferUploadTaskType` 的关键词猜测。
 
-### 6.2 扩展受理格式
+### 6.2 受理格式与解析栈（见 ADR-0024）
 
-`files.py` 白名单增加 `text/csv`、`text/tab-separated-values`、`.docx`、`.doc`。CSV 缺失是当前最不该有的缺口。
+白名单增加 `text/csv`、`text/tab-separated-values`、`.docx`、`.doc`。CSV 缺失是当前最不该有的缺口——ERP 导出的默认格式就是它。
+
+解析按**是否需要证据坐标**分流，而不是按格式：
+
+| 输入 | 解析器 | 证据 |
+|---|---|---|
+| office 家族（docx/pptx/xlsx/odf/rtf/epub/csv） | **anydoc**（Rust CLI，子进程） | 不声称 |
+| 纯文本 PDF，首轮 | **anydoc** | 不声称 |
+| 扫描件、图片 | **PaddleOCR API** | 块级 `{page, coordinates, quote}` |
+| 用户请求查看证据的 PDF | **PaddleOCR API** | 块级 |
+| Excel 读 + 写 | **excelize** | — |
+
+**PyMuPDF 移除**（AGPL 与 ADR-0021 的许可证姿态冲突）。注意：现有 PyMuPDF 证据路径的 bbox 是整页 word 的 min/max，粒度实为"页级"；PaddleOCR 的 `_structured_locators` 给的是块级，**移除后证据质量是上升的**。
+
+**惰性证据（lazy evidence）**：
+
+```
+1. 上传 → anydoc 出文本 → 抽字段 → 生成草稿      （快、免费、本地）
+2. 用户点某字段「查看证据」→ 才对该文件跑一次 OCR
+   → 缓存 locators，后续复用
+```
+
+把 OCR 成本从"每份文件"降到"用户真正要看证据的文件"，首次响应也快得多。代价是首次点证据有延迟，UI 给加载态。
 
 ### 6.3 表格语义映射 `table.map_columns`
 
@@ -446,7 +488,7 @@ WorkingPaper {
 | LLM planner 不可用 | Run 置 `failed`，保留已完成工具结果 | "规划服务暂不可用，已完成的 N 步结果已保留" | ✅ | ❌ 不得回退到关键词猜意图 |
 | 沙箱不可用 / 超配额 | Tier B 子任务失败，Tier A 部分照常产出，底稿标注缺失章节 | "自定义分析部分未能完成，原因：…" | ✅ | ❌ 不得在宿主进程内执行代码 |
 | 沙箱代码执行报错 | 返回 stderr 给 Agent，最多重试 2 次后放弃 | 展示错误摘要 + 代码 | ✅（有限） | ❌ 不得把报错当成"结果为 0" |
-| OCR 不可用 | 降级到 PyMuPDF 文本层；扫描件则明确失败 | "该文件为扫描件且 OCR 不可用" | ✅ | ❌ 不得用文件名/元数据猜内容 |
+| OCR 不可用 | **降级 anydoc：产出文本，证据状态标记 `unavailable`** | "已提取文本，但本次无法提供证据定位" | ✅ | ❌ **不得声称任何坐标**；❌ 不得用文件名/元数据猜内容 |
 | Triage 置信度低 | 停下来问用户 | 列出候选类型 | — | ❌ 不得兜底为 `contract` |
 | 工具返回 `needs_review` | 正常路径，进 Review Gate | 展示复核项 | — | ❌ 不得自动确认 |
 | Certified 工具执行失败 | 该单元格标为数据缺口 | 列入封面页缺口清单 | ✅ | ❌ 不得改用沙箱补算（违反 I3） |
@@ -745,31 +787,30 @@ L2 涉及 LLM 调用，成本与耗时不适合每次提交，走 nightly + 阶�
 
 标注说明：**〔0〕**= 阶段 0 产物底座，**〔1〕**= 阶段 1 S1，**〔3〕**= 阶段 3 映射层，**〔4〕**= 阶段 4 沙箱。带〔4〕的条目在取得首个真实客户前不动工。
 
-**ai-service**
-- 〔0〕`app/routers/files.py:27` — 白名单加 CSV / TSV / DOCX
-- 〔0〕`app/routers/parse.py` — 新增 `/triage` 端点
-- 〔0〕`app/services/document_extractor.py` — 增加 CSV / DOCX 提取分支
-- 〔0〕`requirements.txt` — 加 pandas / xlsxwriter / python-docx（渲染服务用，非沙箱镜像）
-- 〔3〕新增 `app/routers/mapping.py` — 列语义映射
+**内核层的改造不在此表**——见 [Agent Core（Go）设计](Agent_Core_Go设计_对齐pi架构.md) §10 的 W1–W6。本表只列能力层。两者的衔接点：本文 §4.2 的请求期路由 = ADR-0019 Addendum A 中间件链的 `ProtectedMeasure`；§7.1 的 provenance = 该链的 `ArtifactCollector`。
 
 **core-service**
 - 〔0〕新增 `internal/workingpaper/` — artifact 组装 + lint + xlsx/docx 渲染 + 封面页
-- 〔0〕新增 `internal/agenttools/protected_measures.go` — 受保护度量 + 词法探针 + artifact lint（Router 请求期判定留到〔4〕）
-- 〔0〕新增 `internal/agenttools/tools/analysis.go` — 先只放 `doc.triage`
+- 〔0〕新增 `internal/agenttools/protected_measures.go` — 受保护度量 + 中英词法探针 + artifact lint（请求期判定随 W2 的中间件链落地）
+- 〔0〕新增 `internal/docparse/` — `DocumentParser` 接口；anydoc 子进程 + PaddleOCR Go client + excelize（**xlsx writer 在此，G5 由它解决**）
+- 〔0〕新增 `doc.triage` 工具
 - 〔0〕`internal/aiagent/agent.go:664` — 文件路由改走 `doc.triage`，**移除 `return "contract"` 兜底**
-- 〔0〕`internal/aiagent/agent.go` `buildAgentRunbook` — 增加"是否需要多步编排"判定，转 Gateway Run
-- 〔0〕`internal/aiagent/agent.go:287-295` — runbook 静态卡片改为 planner 实际执行结果
+- 〔0〕`internal/aiagent/agent.go:287-295`（23 处 `Status: "pending"`）— 静态卡片改为实际执行结果
 - 〔1〕新增 sensitivity 确定性服务 + 工具注册（补 `/sensitivity` 与 Agent 的断链）
-- 〔3〕新增 `table.map_columns` 工具
-- 〔3〕`internal/handlers/operating_facts_xlsx.go` — 受控模板路径保留，旁边增加 Mapping Profile 路径
+- 〔3〕新增 `table.map_columns` 工具 + Mapping Profile 指纹与漂移检测
+- 〔3〕`services/retailingest` — 在既有 AI 建议链上增加 Profile 命中与预填
 - 〔4〕新增 `internal/sandbox/` — `Provider` 接口 + Docker L1 实现
-- 〔4〕`analysis.sandbox.execute` 工具 + Router 请求期判定
+- 〔4〕`analysis.sandbox.execute` 工具
+
+**ai-service（随 ADR-0023 退役，不再新增功能）**
+- 〔0〕上传白名单加 CSV / TSV / DOCX —— **若 W5 已完成则直接在 Go 侧实现，不回改 Python**
+- 〔0〕**删除 `pymupdf` 依赖**（ADR-0024）
 
 **web**
 - 〔0〕`app/ai-chat/page.tsx:1520` — 移除 `inferUploadTaskType` 关键词猜测，改由后端 triage 决定
-- 〔0〕新增 WorkingPaper artifact 渲染组件 + 证据下钻面板
+- 〔0〕新增 WorkingPaper artifact 渲染组件 + 证据下钻面板（含 `unavailable` 证据态的显式呈现）
 - 〔0〕两平面事件流合并渲染
-- 〔3〕新增列映射确认 UI（含漂移差异高亮）
+- 〔3〕列映射确认 UI 增加漂移差异高亮
 
 **db**
 - 〔3〕Mapping Profile 表（含指纹、版本、漂移状态）
@@ -793,9 +834,10 @@ L2 涉及 LLM 调用，成本与耗时不适合每次提交，走 nightly + 阶�
 1. **沙箱选型与部署形态**（私有化 / SaaS / 两者，L1 / gVisor / microVM）——**已明确挂到首个标杆客户**：其合规要求决定隔离档位。阶段 4 的进入条件即"已有 ≥1 真实客户且合规要求明确"，在此之前不做选型，Provider 抽象承担后移成本。
 2. **国内客户的沙箱落地方案**——自建 vs 阿里云 / 腾讯云 / 火山，同样待首个标杆客户的云环境确定。
 3. ~~BIZ 基线测量的用户来源~~ → 已转化为阶段 1 的交付目标：DEMO-2 要求从演示中换回 ≥2 份真实文件，这既是验收项，也是基线用户的获取渠道。**招募基线用户与寻找标杆客户合并为同一件事。**
-4. **protected_measures 清单的最终范围**——目前 10 项由本文提出，需财务负责人确认是否遗漏（例如是否纳入减值、售后租回相关度量）。
+4. **protected_measures 清单的最终范围**——10 项已随 [ADR-0025](adr/0025-separate-certified-engine-output-from-exploratory-analysis.md) §2 定案，但该 ADR 明确"清单是治理物，变更需财务负责人签字"。**仍需财务负责人首次确认是否遗漏**（减值、售后租回相关度量）。清单一旦上线再改是破坏性变更。
 5. **Tier B 产物的对外可见性**——是否允许客户导出含 Exploratory 数字的底稿给外部（审计师/业主）。建议默认禁止，需显式开关。
-6. **固化通道的资源承诺**——每季度投入多少人力做口径固化。没有这个承诺，Tier B 会永久沉淀为技术债。
+6. **固化通道的资源承诺**——每季度投入多少人力做口径固化。ADR-0025 已把这条列为"没有承诺则 Tier B 变成永久技术债"的结论，但资源本身仍需拍板。
+7. **anydoc 二进制的供应链管理**——版本与 checksum 钉死的具体机制（镜像内置 vs 构建期下载），随 ADR-0024 落地时确定。
 
 ---
 

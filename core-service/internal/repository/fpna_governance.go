@@ -248,6 +248,70 @@ func (r *FPnAGovernanceRepository) CreatePlanVersion(ctx context.Context, item *
 	return item, nil
 }
 
+func (r *FPnAGovernanceRepository) FindDraftForecastByPeriod(ctx context.Context, legalEntityID *string, asOfPeriod string) (*FPnAPlanVersion, error) {
+	item := &FPnAPlanVersion{}
+	args := []any{asOfPeriod}
+	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE version_type='forecast' AND status='draft' AND as_of_period=$1`
+	if legalEntityID != nil && *legalEntityID != "" {
+		query += " AND legal_entity_id=$2"
+		args = append(args, *legalEntityID)
+	} else {
+		query += " AND legal_entity_id IS NULL"
+	}
+	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find draft forecast: %w", err)
+	}
+	return item, nil
+}
+
+func (r *FPnAGovernanceRepository) CreatePlanVersionWithLines(ctx context.Context, version *FPnAPlanVersion, lines []*FPnAPlanLine) (*FPnAPlanVersion, error) {
+	if version.ID == "" {
+		version.ID = uuid.New().String()
+	}
+	if len(version.CoverageScope) == 0 {
+		version.CoverageScope = json.RawMessage(`{}`)
+	}
+	if version.ScenarioType == "" {
+		version.ScenarioType = "baseline"
+	}
+	if version.Status == "" {
+		version.Status = "draft"
+	}
+	err := r.db.QueryRow(ctx, `INSERT INTO fpna_plan_versions (id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,currency,as_of_period,from_period,to_period,actual_cutoff_period,prior_version_id,assumption_version,exchange_rate_version,metric_definition_version,status,is_official,created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING created_at`, version.ID, version.LegalEntityID, version.Name, version.VersionType, version.ScenarioType, version.Source, version.CoverageScope, version.Currency, version.AsOfPeriod, version.FromPeriod, version.ToPeriod, optionalValue(version.ActualCutoffPeriod), version.PriorVersionID, version.AssumptionVersion, version.ExchangeRateVersion, version.MetricDefinitionVersion, version.Status, version.IsOfficial, version.CreatedBy).Scan(&version.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create plan version: %w", err)
+	}
+
+	for _, item := range lines {
+		lineID := item.ID
+		if lineID == "" {
+			lineID = uuid.New().String()
+		}
+		opKPIs := item.OperationalKPIs
+		if len(opKPIs) == 0 {
+			opKPIs = json.RawMessage(`{}`)
+		}
+		scInputs := item.ScenarioInputs
+		if len(scInputs) == 0 {
+			scInputs = json.RawMessage(`{}`)
+		}
+		asOfAt := item.AsOfAt
+		if asOfAt.IsZero() {
+			asOfAt = time.Now().UTC()
+		}
+		_, err = r.db.Exec(ctx, `INSERT INTO fpna_plan_lines (id,plan_version_id,period,grain,legal_entity_id,business_segment,brand,region,store_id,plant_code,production_line_code,equipment_id,asset_type,currency,revenue,gross_profit,labor_cost,fixed_rent,variable_rent,non_lease_cost,four_wall_ebitda,cash_flow,net_debt,operational_kpis,source_system,source_record_id,as_of_at,actual_flag,forecast_flag,scenario_inputs) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)`, lineID, version.ID, item.Period, item.Grain, item.LegalEntityID, item.BusinessSegment, item.Brand, item.Region, item.StoreID, item.PlantCode, item.ProductionLineCode, item.EquipmentID, item.AssetType, item.Currency, item.Revenue, item.GrossProfit, item.LaborCost, item.FixedRent, item.VariableRent, item.NonLeaseCost, item.FourWallEBITDA, item.CashFlow, item.NetDebt, opKPIs, item.SourceSystem, item.SourceRecordID, asOfAt, item.ActualFlag, item.ForecastFlag, scInputs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create plan line: %w", err)
+		}
+	}
+
+	return version, nil
+}
+
 func (r *FPnAGovernanceRepository) ListPlanVersions(ctx context.Context, entity access.EntityFilter, versionType, status, asOfPeriod string) ([]*FPnAPlanVersion, error) {
 	args := []any{versionType, status, asOfPeriod}
 	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE ($1='' OR version_type=$1) AND ($2='' OR status=$2) AND ($3='' OR as_of_period=$3)`

@@ -78,3 +78,76 @@ Trade-offs:
 - This ADR does not expose PostgreSQL, MinIO-admin, arbitrary HTTP or Shell.
 - This ADR does not replace the IFRS 16 calculation engine with an LLM.
 
+
+---
+
+## Addendum A — Centralise policy into an ordered middleware chain (2026-08-18)
+
+Status: Accepted. Extends the Decision above; does not revise it.
+
+### Why
+
+The Decision lists what `agenttools` owns, but the implementation scattered
+those responsibilities: permissions and review live on `ToolDescriptor`,
+idempotency partly on the descriptor and partly inside handlers, tenant scope in
+`agenttools/scope.go` and again in each handler, audit in `agenttools/audit.go`,
+budget in the runner's `Limits`, and the skill allowlist in
+`agentskill/registry.go`. Each is individually correct. Together they make it
+impossible to read one place and know which gates a tool call passes, and easy
+to omit one when registering a new tool.
+
+ADR-0022 introduces `BeforeToolCall` / `AfterToolCall` as the only policy
+attachment points. This addendum fixes what attaches, and in what order.
+
+### Decision
+
+```
+before := ChainBefore(
+    TenantScope,        // 1
+    CapabilityCheck,    // 2
+    ProtectedMeasure,   // 3
+    BudgetGuard,        // 4
+    IdempotencyGuard,   // 5
+    ReviewGate,         // 6
+)
+
+after := ChainAfter(
+    AuditRecorder,      // not skippable
+    ArtifactCollector,
+    MetricsRecorder,
+)
+```
+
+The order is load-bearing:
+
+| # | Placement rationale |
+|---|---|
+| 1 | Cheapest and most severe. An out-of-scope request must not consume any further resource. |
+| 2 | Identity precedes policy; every later decision is meaningless under an invalid token. |
+| 3 | **Before** the budget guard, so a request refused on principle (ADR-0025) does not consume the user's quota. |
+| 4 | Before any real cost is incurred. |
+| 5 | **Before** the Review Gate, so replaying an already-confirmed call returns the stored result rather than demanding a second confirmation. |
+| 6 | Last. Short-circuits to `needs_review` and returns control to a human. |
+
+`ChainBefore` short-circuits on the first block; `ChainAfter` runs every hook and
+aggregates errors. The asymmetry is intentional — blocking should be as early as
+possible, while audit-side hooks must always run even if an earlier one fails.
+
+`ProtectedMeasure` is the request-time half of the ADR-0025 fence.
+`ArtifactCollector` records the `tool_call_id` / `engine_version` / `input_hash`
+that per-cell Certified provenance requires, at the moment of the call rather
+than by later reconstruction.
+
+### Enforcement
+
+Coverage is verified by mutation, not by inspection: removing any single
+middleware from the chain must turn at least one test red. A middleware whose
+removal leaves the suite green is not protecting anything and either needs a
+test or should not exist. This is acceptance item ACORE-2 in
+`docs/Agent_Core_Go设计_对齐pi架构.md` §11.
+
+### Unchanged
+
+The threat model, the `ToolRuntime` interface, the level model, and every
+Non-goal above remain in force. This addendum relocates enforcement; it does not
+relax it.

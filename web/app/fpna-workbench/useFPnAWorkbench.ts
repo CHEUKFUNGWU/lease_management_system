@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { performanceApi, apiErrorMessage } from "../lib/api";
 import { buildVersionTree, canFreeze, canPromoteToOfficial } from "./logic";
 import type {
+  AccuracyTrendResult,
   CompareParams,
   CompareResult,
   CreatePlanVersionInput,
@@ -12,6 +13,8 @@ import type {
   FPnAMasterDataMapping,
   FPnAMetricDefinition,
   FPnAPlanVersion,
+  HybridForecastInput,
+  ProposedForecast,
   WorkbenchCommands,
   WorkbenchSnapshot,
 } from "./types";
@@ -40,6 +43,12 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
   const [mappings, setMappings] = useState<FPnAMasterDataMapping[]>([]);
   const [assumptions, setAssumptions] = useState<FPnAAssumption[]>([]);
   const [governanceLoading, setGovernanceLoading] = useState(false);
+
+  const [proposedForecast, setProposedForecast] = useState<ProposedForecast | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+
+  const [accuracyTrend, setAccuracyTrend] = useState<AccuracyTrendResult | null>(null);
+  const [accuracyLoading, setAccuracyLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -178,6 +187,82 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     }
   }, [token]);
 
+  const previewHybridForecast = useCallback(async (input: HybridForecastInput): Promise<ProposedForecast | null> => {
+    if (!token) throw new Error("No authentication token");
+    setForecastLoading(true);
+    setError(null);
+    try {
+      const res = await performanceApi.hybridForecast({
+        ...input,
+        persist: false,
+      }, token);
+      const proposed: ProposedForecast = res?.proposed || {
+        name: input.name || "",
+        baseline_id: input.forecast_id,
+        actual_id: input.actual_id,
+        actual_cutoff_period: input.actual_cutoff_period,
+        scenario_type: input.scenario_type || "baseline",
+        currency: "CNY",
+        as_of_period: input.actual_cutoff_period,
+        from_period: res?.data?.[0]?.period || "",
+        to_period: res?.data?.[res?.data?.length - 1]?.period || "",
+        lines: res?.data || [],
+        period_blends: res?.period_blends || [],
+        coverage: res?.coverage || { expected: 0, observed: 0, percent: 100, complete: true },
+        assumption_version: input.assumption_version,
+        exchange_rate_version: input.exchange_rate_version,
+        metric_definition_version: input.metric_definition_version,
+      };
+      setProposedForecast(proposed);
+      return proposed;
+    } catch (err: unknown) {
+      const msg = apiErrorMessage(err);
+      setError(msg);
+      throw err;
+    } finally {
+      setForecastLoading(false);
+    }
+  }, [token]);
+
+  const commitHybridForecast = useCallback(async (input: HybridForecastInput): Promise<FPnAPlanVersion | null> => {
+    if (!token) throw new Error("No authentication token");
+    setForecastLoading(true);
+    setError(null);
+    try {
+      const res = await performanceApi.hybridForecast({
+        ...input,
+        persist: true,
+      }, token);
+      const ver: FPnAPlanVersion = res?.version;
+      await refreshVersions();
+      return ver;
+    } catch (err: unknown) {
+      const msg = apiErrorMessage(err);
+      setError(msg);
+      throw err;
+    } finally {
+      setForecastLoading(false);
+    }
+  }, [token, refreshVersions]);
+
+  const fetchAccuracyTrend = useCallback(async (forecastId: string, actualId: string): Promise<void> => {
+    if (!token) return;
+    setAccuracyLoading(true);
+    try {
+      const res = await performanceApi.forecastAccuracyTrend({
+        forecast_id: forecastId,
+        actual_id: actualId,
+      }, token);
+      if (res?.trend) {
+        setAccuracyTrend(res.trend);
+      }
+    } catch (err: unknown) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setAccuracyLoading(false);
+    }
+  }, [token]);
+
   const updateDataQualityStatus = useCallback(async (id: string, status: DataQualityStatus): Promise<void> => {
     if (!token) throw new Error("No authentication token");
     await performanceApi.updateDataQualityStatus(id, status, token);
@@ -206,6 +291,10 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     assumptions,
     governanceLoading,
     versionsLoading,
+    proposedForecast,
+    forecastLoading,
+    accuracyTrend,
+    accuracyLoading,
     error,
   };
 
@@ -214,6 +303,9 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     createVersion,
     freezeVersion,
     compareVersions,
+    previewHybridForecast,
+    commitHybridForecast,
+    fetchAccuracyTrend,
     updateDataQualityStatus,
     refreshDataQuality,
     refreshGovernance,

@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"math"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -267,11 +269,99 @@ func (h *FPnAGovernanceHandler) ForecastAccuracy(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"basis": "Working", "forecast_accuracy": fpna.ForecastAccuracy(forecast, actual), "source": gin.H{"forecast_version": forecastID, "actual_version": actualID}})
 }
 
+func (h *FPnAGovernanceHandler) ForecastAccuracyTrend(c *gin.Context) {
+	forecastID := c.Query("forecast_id")
+	actualID := c.Query("actual_id")
+	if forecastID == "" || actualID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "forecast_id and actual_id are required"})
+		return
+	}
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	forecast, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), forecastID, entity, "", "", planLineFilters(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	actual, err := h.repo.ListPlanLinesFiltered(c.Request.Context(), actualID, entity, "", "", planLineFilters(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	fByPeriod := make(map[string][]*repository.FPnAPlanLine)
+	for _, l := range forecast {
+		fByPeriod[l.Period] = append(fByPeriod[l.Period], l)
+	}
+	aByPeriod := make(map[string][]*repository.FPnAPlanLine)
+	for _, l := range actual {
+		aByPeriod[l.Period] = append(aByPeriod[l.Period], l)
+	}
+
+	periodsMap := make(map[string]struct{})
+	for p := range fByPeriod {
+		periodsMap[p] = struct{}{}
+	}
+	for p := range aByPeriod {
+		periodsMap[p] = struct{}{}
+	}
+	periods := make([]string, 0, len(periodsMap))
+	for p := range periodsMap {
+		periods = append(periods, p)
+	}
+	sort.Strings(periods)
+
+	points := make([]fpna.AccuracyTrendPoint, 0, len(periods))
+	for _, p := range periods {
+		fLines := fByPeriod[p]
+		aLines := aByPeriod[p]
+		acc := fpna.ForecastAccuracy(fLines, aLines)
+		var fSum, aSum float64
+		for _, row := range acc.Rows {
+			fSum += row.Forecast
+			aSum += row.Actual
+		}
+		var accuracy *float64
+		if math.Abs(aSum) > 1e-9 {
+			val := fpna.Round2(100 - math.Abs(aSum-fSum)/math.Abs(aSum)*100)
+			accuracy = &val
+		}
+		variance := fpna.Round2(aSum - fSum)
+		points = append(points, fpna.AccuracyTrendPoint{
+			Period:   p,
+			Forecast: fpna.Round2(fSum),
+			Actual:   fpna.Round2(aSum),
+			Variance: variance,
+			Accuracy: accuracy,
+			Bias:     acc.Bias,
+		})
+	}
+
+	trendResult := fpna.EvaluateAccuracyTrend(points)
+	c.JSON(http.StatusOK, gin.H{
+		"basis": "Working",
+		"trend": trendResult,
+		"source": gin.H{
+			"forecast_version": forecastID,
+			"actual_version":   actualID,
+		},
+	})
+}
+
 func (h *FPnAGovernanceHandler) HybridForecast(c *gin.Context) {
 	var req struct {
-		ForecastID         string `json:"forecast_id" binding:"required"`
-		ActualID           string `json:"actual_id" binding:"required"`
-		ActualCutoffPeriod string `json:"actual_cutoff_period" binding:"required"`
+		ForecastID              string `json:"forecast_id" binding:"required"`
+		ActualID                string `json:"actual_id" binding:"required"`
+		ActualCutoffPeriod      string `json:"actual_cutoff_period" binding:"required"`
+		Persist                 bool   `json:"persist"`
+		Name                    string `json:"name"`
+		ScenarioType            string `json:"scenario_type"`
+		AssumptionVersion       string `json:"assumption_version"`
+		ExchangeRateVersion     string `json:"exchange_rate_version"`
+		MetricDefinitionVersion string `json:"metric_definition_version"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -292,12 +382,61 @@ func (h *FPnAGovernanceHandler) HybridForecast(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	result, err := fpna.HybridForecast(forecast, actual, req.ActualCutoffPeriod)
+
+	composeReq := fpna.ComposeRequest{
+		Name:                    req.Name,
+		BaselineID:              req.ForecastID,
+		ActualID:                req.ActualID,
+		ActualCutoffPeriod:      req.ActualCutoffPeriod,
+		ScenarioType:            req.ScenarioType,
+		AssumptionVersion:       req.AssumptionVersion,
+		ExchangeRateVersion:     req.ExchangeRateVersion,
+		MetricDefinitionVersion: req.MetricDefinitionVersion,
+	}
+
+	proposed, err := fpna.Compose(forecast, actual, composeReq)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"basis": "Working", "actual_cutoff_period": req.ActualCutoffPeriod, "data": result, "immutable": true})
+
+	if !req.Persist {
+		c.JSON(http.StatusOK, gin.H{
+			"basis":                "Working",
+			"actual_cutoff_period": req.ActualCutoffPeriod,
+			"data":                 proposed.Lines,
+			"period_blends":        proposed.PeriodBlends,
+			"coverage":             proposed.Coverage,
+			"proposed":             proposed,
+			"immutable":            true,
+		})
+		return
+	}
+
+	var legal *string
+	if tid := middleware.GetTenantID(c); tid != "" {
+		legal = &tid
+	}
+	userID := userIDFromContext(c)
+	if userID == "" {
+		userID = "system"
+	}
+	idempotencyKey := c.GetHeader("Idempotency-Key")
+
+	writer := fpna.NewPostgresPlanVersionWriter(h.repo)
+	version, err := writer.Commit(c.Request.Context(), proposed, legal, userID, idempotencyKey)
+	if err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"version":              version,
+		"period_blends":        proposed.PeriodBlends,
+		"coverage":             proposed.Coverage,
+		"actual_cutoff_period": req.ActualCutoffPeriod,
+		"message":              "forecast plan version created successfully",
+	})
 }
 
 type mappingInput struct {

@@ -1,5 +1,13 @@
 # AI Chat 升级方案（参考 Pi Coding Agent）
 
+> ⚠️ **文档状态：Superseded（2026-08-18）**
+>
+> 本文是最早一轮对 pi 的借鉴分析，其 P0 建议（流式事件、服务端会话、中途纠偏、技能注册、artifact 协议）已由 `codex/ai-agent-cli-runtime-delivery`（`b1532b4`，已并入 main）交付。
+>
+> 后续对 pi 的架构对齐以 [Agent Core（Go）设计 —— 对齐 pi 架构](Agent_Core_Go设计_对齐pi架构.md) 与 [ADR-0022](adr/0022-first-party-go-agent-core-modelled-on-pi.md) 为准——那两份基于 pi 源码（`packages/agent/src/types.ts`、`agent.ts`）做了逐项映射，本文的 API 描述则来自早期文档阅读，精度较低。
+>
+> 本文保留为背景资料。
+
 ## 1. 结论
 
 Pi 的价值不在于“长得像一个聊天框”，而在于它把 Agent 运行时拆成了几层可以组合的能力：

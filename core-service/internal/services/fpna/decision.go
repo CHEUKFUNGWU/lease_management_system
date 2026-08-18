@@ -397,4 +397,5 @@ func safePtr(value *string) string {
 	}
 	return *value
 }
-func round2(value float64) float64 { return math.Round(value*100) / 100 }
+func Round2(value float64) float64 { return math.Round(value*100) / 100 }
+func round2(value float64) float64 { return Round2(value) }

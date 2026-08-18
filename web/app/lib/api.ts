@@ -1453,6 +1453,11 @@ export const performanceApi = {
     Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
     return apiRequest(`/api/v1/performance/forecast-accuracy?${qs}`, { token });
   },
+  forecastAccuracyTrend: (params: { forecast_id: string; actual_id: string }, token: string) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
+    return apiRequest(`/api/v1/performance/forecast-accuracy/trend?${qs}`, { token });
+  },
   hybridForecast: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/forecast/hybrid`, { method: "POST", body: JSON.stringify(data), token }),
   mappings: (params: { mapping_type?: string; effective_date?: string }, token: string) => {

@@ -1,6 +1,15 @@
 # AI Agent 填表升级（tau + anydoc）实施计划
 
-> 文档状态：Draft（待评审）
+> ⚠️ **文档状态：Partially Superseded（2026-08-18）**
+>
+> - **tau 部分作废**。D1/D2/D4 及 Wave T2「tau 大脑」被 [ADR-0022](adr/0022-first-party-go-agent-core-modelled-on-pi.md) 取代：Agent 内核改为自研 Go（`internal/agentcore`），架构对齐 pi，不引入 tau 容器。理由是 D2 要新增 Python 3.12 容器，与 [ADR-0023](adr/0023-retire-the-first-party-python-ai-service.md)「自研 Python 归零」直接冲突。
+> - **anydoc 部分保留并强化**。Wave T1 的解析适配器决议有效，且升级为 [ADR-0024](adr/0024-remove-the-agpl-pdf-dependency.md) 的一部分——anydoc 同时承担移除 AGPL 的 PyMuPDF 的职责。
+> - **Wave T3/T4 的填表缝设计保留**（每页 fill API + CLI 命令 + `page_fill` 预填工件、意图与数据识别闭环）。其 `page_fill` 工件须与 `WorkingPaper` 共用同一 provenance 模型，见 [AI 底稿与 Paperwork Agent 设计方案](AI_底稿与Paperwork_Agent设计方案.md) §7.1。
+> - **Wave T5 中「`agent-runner` 退役」改为「收敛为 agentcore 的 driver」**，checkpoint 与租约恢复逻辑保留。
+>
+> 本文正文保留为决策过程记录，不再作为执行依据。现行执行依据见 [Agent Core（Go）设计 —— 对齐 pi 架构](Agent_Core_Go设计_对齐pi架构.md)。
+>
+> 原文档状态：Draft（待评审）
 >
 > 版本：v0.9
 >

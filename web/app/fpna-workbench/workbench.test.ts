@@ -33,6 +33,9 @@ describe("FP&A Workbench Module (N1 / F0)", () => {
       expect(hookSource).toContain("createVersion");
       expect(hookSource).toContain("freezeVersion");
       expect(hookSource).toContain("compareVersions");
+      expect(hookSource).toContain("previewHybridForecast");
+      expect(hookSource).toContain("commitHybridForecast");
+      expect(hookSource).toContain("fetchAccuracyTrend");
       expect(hookSource).toContain("updateDataQualityStatus");
       expect(hookSource).toContain("refreshDataQuality");
       expect(hookSource).toContain("refreshGovernance");
@@ -41,6 +44,13 @@ describe("FP&A Workbench Module (N1 / F0)", () => {
     it("useFPnAWorkbench intercepts mixed currency errors and provides actionable guidance", () => {
       expect(hookSource).toContain("mixed currencies require exchange_rate_version");
       expect(hookSource).toContain("mixed_currency_guidance");
+    });
+
+    it("FPnA Workbench Page registers RollingForecastTab and HelpTrigger tutorial", () => {
+      expect(pageSource).toContain("RollingForecastTab");
+      expect(pageSource).toContain('"fpna.tab_rolling_forecast"');
+      expect(pageSource).toContain("HelpTrigger");
+      expect(pageSource).toContain("fpnaWorkbenchHelpContent");
     });
   });
 
@@ -111,6 +121,13 @@ describe("FP&A Workbench Module (N1 / F0)", () => {
       expect(url.searchParams.get("period")).toBe("2026-01");
       expect(url.searchParams.get("status")).toBe("open");
       expect(url.searchParams.get("severity")).toBe("high");
+    });
+
+    it("performanceApi.forecastAccuracyTrend passes forecast and actual IDs", async () => {
+      await performanceApi.forecastAccuracyTrend({ forecast_id: "fc-1", actual_id: "act-1" }, "tok");
+      const url = new URL(String(vi.mocked(fetch).mock.calls[0][0]));
+      expect(url.searchParams.get("forecast_id")).toBe("fc-1");
+      expect(url.searchParams.get("actual_id")).toBe("act-1");
     });
   });
 });

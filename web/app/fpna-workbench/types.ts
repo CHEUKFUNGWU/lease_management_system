@@ -151,6 +151,67 @@ export interface FPnAAssumption {
   created_at: string;
 }
 
+export interface PeriodBlendSummary {
+  period: string;
+  source_type: "actual" | "forecast";
+  replaced: boolean;
+  record_count: number;
+}
+
+export interface ProposedForecast {
+  name: string;
+  baseline_id: string;
+  actual_id: string;
+  actual_cutoff_period: string;
+  scenario_type: ScenarioType;
+  currency: string;
+  as_of_period: string;
+  from_period: string;
+  to_period: string;
+  lines: Array<Record<string, unknown>>;
+  period_blends: PeriodBlendSummary[];
+  coverage: {
+    expected: number;
+    observed: number;
+    percent: number;
+    complete: boolean;
+  };
+  assumption_version?: string;
+  exchange_rate_version?: string;
+  metric_definition_version?: string;
+}
+
+export interface AccuracyTrendPoint {
+  period: string;
+  forecast: number;
+  actual: number;
+  variance: number;
+  accuracy?: number;
+  bias: number;
+  driver?: string;
+}
+
+export interface AccuracyTrendResult {
+  points: AccuracyTrendPoint[];
+  overall_mean_abs_pct?: number;
+  total_bias: number;
+  consecutive_bias_count: number;
+  has_systemic_bias: boolean;
+  systemic_direction?: "overestimation" | "underestimation";
+}
+
+export interface HybridForecastInput {
+  forecast_id: string;
+  actual_id: string;
+  actual_cutoff_period: string;
+  persist?: boolean;
+  name?: string;
+  scenario_type?: ScenarioType;
+  assumption_version?: string;
+  exchange_rate_version?: string;
+  metric_definition_version?: string;
+}
+
 export interface CreatePlanVersionInput {
   name: string;
   version_type: VersionType;
@@ -195,6 +256,10 @@ export interface WorkbenchSnapshot {
   assumptions: FPnAAssumption[];
   governanceLoading: boolean;
   versionsLoading: boolean;
+  proposedForecast: ProposedForecast | null;
+  forecastLoading: boolean;
+  accuracyTrend: AccuracyTrendResult | null;
+  accuracyLoading: boolean;
   error: string | null;
 }
 
@@ -203,6 +268,9 @@ export interface WorkbenchCommands {
   createVersion: (input: CreatePlanVersionInput) => Promise<FPnAPlanVersion>;
   freezeVersion: (id: string, official: boolean) => Promise<void>;
   compareVersions: (params: CompareParams) => Promise<void>;
+  previewHybridForecast: (input: HybridForecastInput) => Promise<ProposedForecast | null>;
+  commitHybridForecast: (input: HybridForecastInput) => Promise<FPnAPlanVersion | null>;
+  fetchAccuracyTrend: (forecastId: string, actualId: string) => Promise<void>;
   updateDataQualityStatus: (id: string, status: DataQualityStatus) => Promise<void>;
   refreshDataQuality: (filter?: { period?: string; status?: string; severity?: string }) => Promise<void>;
   refreshGovernance: () => Promise<void>;

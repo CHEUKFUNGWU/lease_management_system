@@ -4139,4 +4139,23 @@ html {
 .fpna-select-search {
   width: 280px;
 }
+.fpna-trend-btn {
+  margin-top: 22px;
+  width: 100%;
+}
+.fpna-success-icon {
+  font-size: 48px;
+  color: var(--state-success-text, #52c41a);
+  margin-bottom: 16px;
+}
+.fpna-text-center {
+  text-align: center;
+  padding: 32px 0;
+}
+.fpna-tab-content {
+  padding: 8px 0;
+}
+.fpna-width-full {
+  width: 100%;
+}
 

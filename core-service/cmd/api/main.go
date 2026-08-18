@@ -317,6 +317,7 @@ func main() {
 		protected.Handle(http.MethodPost, "/performance/plan-versions/:id/freeze", permission("fpna_actions", "write"), fpnaGovernanceHandler.FreezePlanVersion)
 		protected.Handle(http.MethodGet, "/performance/plan-versions/compare", permission("reports", "read"), fpnaGovernanceHandler.ComparePlanVersions)
 		protected.Handle(http.MethodGet, "/performance/forecast-accuracy", permission("reports", "read"), fpnaGovernanceHandler.ForecastAccuracy)
+		protected.Handle(http.MethodGet, "/performance/forecast-accuracy/trend", permission("reports", "read"), fpnaGovernanceHandler.ForecastAccuracyTrend)
 		protected.Handle(http.MethodPost, "/performance/forecast/hybrid", permission("fpna_actions", "write"), fpnaGovernanceHandler.HybridForecast)
 		protected.Handle(http.MethodGet, "/performance/mappings", permission("reports", "read"), fpnaGovernanceHandler.ListMappings)
 		protected.Handle(http.MethodPost, "/performance/mappings", permission("fpna_mappings", "write"), fpnaGovernanceHandler.CreateMapping)

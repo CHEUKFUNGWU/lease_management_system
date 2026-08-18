@@ -160,3 +160,47 @@ export function portfolioHelpContent(language: Language): HelpContent {
     ],
   };
 }
+
+/**
+ * HELP-003: tutorial content for the FP&A performance workbench page.
+ */
+export function fpnaWorkbenchHelpContent(language: Language): HelpContent {
+  return {
+    title: t("help.fpna.title", language),
+    flow: [
+      { key: "lineage", label: t("help.fpna.flow.lineage", language) },
+      { key: "compare", label: t("help.fpna.flow.compare", language) },
+      { key: "forecast", label: t("help.fpna.flow.forecast", language) },
+      { key: "quality", label: t("help.fpna.flow.quality", language) },
+      { key: "governance", label: t("help.fpna.flow.governance", language) },
+    ],
+    sections: [
+      {
+        key: "lineage",
+        heading: t("help.fpna.s1.heading", language),
+        body: t("help.fpna.s1.body", language),
+      },
+      {
+        key: "compare",
+        heading: t("help.fpna.s2.heading", language),
+        body: t("help.fpna.s2.body", language),
+      },
+      {
+        key: "forecast",
+        heading: t("help.fpna.s3.heading", language),
+        body: t("help.fpna.s3.body", language),
+      },
+      {
+        key: "quality",
+        heading: t("help.fpna.s4.heading", language),
+        body: t("help.fpna.s4.body", language),
+      },
+      {
+        key: "dual_basis",
+        heading: t("help.fpna.s5.heading", language),
+        body: t("help.fpna.s5.body", language),
+      },
+    ],
+  };
+}
+

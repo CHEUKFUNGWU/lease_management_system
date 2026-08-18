@@ -12,8 +12,11 @@ import { pageTransition } from "../design-system/animations";
 import { useFPnAWorkbench } from "./useFPnAWorkbench";
 import { VersionManagementTab } from "./components/VersionManagementTab";
 import { VersionCompareTab } from "./components/VersionCompareTab";
+import { RollingForecastTab } from "./components/RollingForecastTab";
 import { DataQualityTab } from "./components/DataQualityTab";
 import { GovernanceRegistryTab } from "./components/GovernanceRegistryTab";
+import { HelpTrigger } from "../components/HelpDrawer";
+import { fpnaWorkbenchHelpContent } from "../components/help-content";
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -30,10 +33,13 @@ export default function FPnAWorkbenchPage() {
           {/* Header Area */}
           <div className="fpna-header-row">
             <div>
-              <Title level={3} className="fpna-header-title">
-                <CalculatorOutlined className="fpna-tree-icon" />
-                {t("fpna.workbench_title", language)}
-              </Title>
+              <Space align="center">
+                <Title level={3} className="fpna-header-title">
+                  <CalculatorOutlined className="fpna-tree-icon" />
+                  {t("fpna.workbench_title", language)}
+                </Title>
+                <HelpTrigger content={fpnaWorkbenchHelpContent(language)} language={language} />
+              </Space>
               <Paragraph type="secondary" className="fpna-header-subtitle">
                 {t("fpna.workbench_subtitle", language)}
               </Paragraph>
@@ -87,6 +93,17 @@ export default function FPnAWorkbenchPage() {
                   label: t("fpna.tab_compare", language),
                   children: (
                     <VersionCompareTab
+                      snapshot={snapshot}
+                      commands={commands}
+                      language={language}
+                    />
+                  ),
+                },
+                {
+                  key: "forecast",
+                  label: t("fpna.tab_rolling_forecast", language) || "滚动预测编制",
+                  children: (
+                    <RollingForecastTab
                       snapshot={snapshot}
                       commands={commands}
                       language={language}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailcohort"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
@@ -30,6 +31,10 @@ var (
 
 type FactReader interface {
 	QueryFacts(context.Context, string, string, string, string, string, string, []string) (*repository.RetailKPIFactSet, error)
+}
+
+type StoreLifecycleReader interface {
+	ListStoreLifecycles(context.Context, string, string, string, []string) ([]retailcohort.StoreLifecycle, error)
 }
 
 type Query struct {
@@ -59,11 +64,15 @@ type Period struct {
 }
 
 type StoreIdentity struct {
-	StoreID   string `json:"store_id"`
-	StoreCode string `json:"store_code"`
-	StoreName string `json:"store_name"`
-	Brand     string `json:"brand"`
-	Region    string `json:"region"`
+	StoreID         string  `json:"store_id"`
+	StoreCode       string  `json:"store_code"`
+	StoreName       string  `json:"store_name"`
+	Brand           string  `json:"brand"`
+	Region          string  `json:"region"`
+	StoreFormat     string  `json:"store_format,omitempty"`
+	OpeningDate     *string `json:"opening_date,omitempty"`
+	ClosingDate     *string `json:"closing_date,omitempty"`
+	LifecycleStatus string  `json:"lifecycle_status,omitempty"`
 }
 
 type SummaryMetric struct {
@@ -292,11 +301,27 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 		}
 	}
 	observations := buildObservations(summary, benchmarks, bridges, quality, decisionReady)
+	identity := StoreIdentity{StoreID: population.StoreID, StoreCode: population.StoreCode, StoreName: population.StoreName, Brand: population.Brand, Region: population.Region}
+	if lr, ok := s.reader.(StoreLifecycleReader); ok {
+		if lifecycles, err := lr.ListStoreLifecycles(ctx, q.LegalEntityID, q.Classification, q.DatasetVersion, []string{q.StoreID}); err == nil && len(lifecycles) > 0 {
+			lc := lifecycles[0]
+			identity.StoreFormat = lc.StoreFormat
+			if lc.OpeningDate != nil {
+				d := lc.OpeningDate.Format("2006-01-02")
+				identity.OpeningDate = &d
+			}
+			if lc.ClosingDate != nil {
+				d := lc.ClosingDate.Format("2006-01-02")
+				identity.ClosingDate = &d
+			}
+			identity.LifecycleStatus = string(retailcohort.CalculateLifecycleStatus(lc.OpeningDate, lc.ClosingDate, currentEnd, 12))
+		}
+	}
 	linkQuery := q
 	if linkQuery.SourceSystem == "" && len(set.SourceSystems) == 1 {
 		linkQuery.SourceSystem = set.SourceSystems[0]
 	}
-	response := &Response{Basis: "Working", DiagnosticsVersion: DiagnosticsVersion, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: retailpulse.PulseVersion, DataClassification: q.Classification, DatasetVersion: q.DatasetVersion, GeneratedAt: s.now(), Store: StoreIdentity{StoreID: population.StoreID, StoreCode: population.StoreCode, StoreName: population.StoreName, Brand: population.Brand, Region: population.Region}, Current: Period{currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02")}, Comparison: Period{comparisonStart.Format("2006-01-02"), comparisonEnd.Format("2006-01-02")}, TargetCoverage: currentCoverage, ComparisonCoverage: comparisonCoverage, DecisionReady: decisionReady, Currency: targetCurrency, CurrencyStatus: currencyStatus, Summary: summary, DailyTrend: trend, PeerDefinition: "same brand + region + currency, current decision-ready, excluding target", MinimumPeerCount: MinimumPeerCount, PeerBenchmark: benchmarks, Bridges: bridges, Observations: observations, KPIDrilldownURL: diagnosticKPIDrilldown(linkQuery, q.StoreID, currentStart, currentEnd)}
+	response := &Response{Basis: "Working", DiagnosticsVersion: DiagnosticsVersion, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: retailpulse.PulseVersion, DataClassification: q.Classification, DatasetVersion: q.DatasetVersion, GeneratedAt: s.now(), Store: identity, Current: Period{currentStart.Format("2006-01-02"), currentEnd.Format("2006-01-02")}, Comparison: Period{comparisonStart.Format("2006-01-02"), comparisonEnd.Format("2006-01-02")}, TargetCoverage: currentCoverage, ComparisonCoverage: comparisonCoverage, DecisionReady: decisionReady, Currency: targetCurrency, CurrencyStatus: currencyStatus, Summary: summary, DailyTrend: trend, PeerDefinition: "same brand + region + currency, current decision-ready, excluding target", MinimumPeerCount: MinimumPeerCount, PeerBenchmark: benchmarks, Bridges: bridges, Observations: observations, KPIDrilldownURL: diagnosticKPIDrilldown(linkQuery, q.StoreID, currentStart, currentEnd)}
 	response.DataQualityIssues = quality
 	response.DecisionReadyReason = storeDecisionReadyReason(decisionReady, quality)
 	// The envelope is the single provenance shape: sources, dataset

@@ -29,7 +29,7 @@ import { RetailExportMenu } from "../components/RetailExportMenu";
 import { retailExportApi } from "../lib/api";
 import { diagnosticsRowsFromResponse, envelopeFromDiagnostics } from "../lib/retail-export";
 import { PlanComparisonPanel } from "../components/PlanComparisonPanel";
-import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, translateReason, type PulseMetricCode } from "../operating-pulse/logic";
+import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, lifecycleStatusLabel, storeFormatLabel, translateReason, type PulseMetricCode } from "../operating-pulse/logic";
 import { bridgeConservation, bridgeTone, bridgeWaterfall, bridgeWaterfallDomain, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, summaryStatus, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
 import ProfitFlowPanel from "./ProfitFlowPanel";
 
@@ -603,13 +603,28 @@ function Store360Inner() {
                   <BentoTile span={12} rows={1} variant="feature" noPadding>
                     <div style={{ padding: "14px 18px" }}>
                       <Flex justify="space-between" align="center" wrap="wrap" gap={16} style={{ marginBottom: 12 }}>
-                        <Space size={8} align="center">
+                        <Space size={8} align="center" wrap>
                           <Typography.Title level={4} className="store360-identity-title" style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "var(--fg-primary)" }}>
                             {response.store.store_code} · {response.store.store_name}
                           </Typography.Title>
+                          {response.store.lifecycle_status && (
+                            <Tag bordered={false} color={response.store.lifecycle_status === "mature" ? "blue" : response.store.lifecycle_status === "ramp_up" ? "cyan" : "default"} style={{ margin: 0, fontSize: 11 }}>
+                              {lifecycleStatusLabel(response.store.lifecycle_status, language)}
+                            </Tag>
+                          )}
+                          {response.store.store_format && (
+                            <Tag bordered={false} color="purple" style={{ margin: 0, fontSize: 11 }}>
+                              {storeFormatLabel(response.store.store_format, language)}
+                            </Tag>
+                          )}
                           {(response.store.brand || response.store.region) && (
                             <span style={{ fontSize: 12, color: "var(--fg-secondary)", fontWeight: 500, marginLeft: 4 }}>
                               · {[response.store.brand, response.store.region].filter(Boolean).join(" · ")}
+                            </span>
+                          )}
+                          {response.store.opening_date && (
+                            <span style={{ fontSize: 11, color: "var(--fg-muted)", marginLeft: 4 }}>
+                              ({t("retail.store.opening_date", language)}: {response.store.opening_date})
                             </span>
                           )}
                         </Space>

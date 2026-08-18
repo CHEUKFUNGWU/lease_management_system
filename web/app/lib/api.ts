@@ -272,6 +272,8 @@ export interface RetailAttention {
   store_name: string;
   brand: string;
   region: string;
+  store_format?: string;
+  lifecycle_status?: string;
   currency: string;
   currency_status?: string;
   score: number;
@@ -329,6 +331,39 @@ export interface RetailPlanComparison {
   downgrade_reason?: string;
 }
 
+export interface RetailSSSGExcludedStore {
+  store_id: string;
+  store_code: string;
+  store_name: string;
+  reason: "too_new" | "closed" | "missing_lifecycle_data" | string;
+  opening_date?: string;
+  closing_date?: string;
+}
+
+export interface RetailSSSGCohort {
+  baseline_start: string;
+  baseline_end: string;
+  current_start: string;
+  current_end: string;
+  ramp_up_months: number;
+  total_stores: number;
+  included_count: number;
+  excluded_count: number;
+  undecided_count: number;
+  included_store_ids: string[];
+  excluded_stores?: RetailSSSGExcludedStore[];
+  undecided_stores?: RetailSSSGExcludedStore[];
+}
+
+export interface RetailSSSGResult {
+  cohort: RetailSSSGCohort;
+  current_revenue?: number | null;
+  baseline_revenue?: number | null;
+  sssg?: number | null;
+  decision_ready: boolean;
+  downgrade_reason?: string;
+}
+
 export interface RetailPulsePartition {
   currency?: string;
   currency_status?: string;
@@ -338,6 +373,7 @@ export interface RetailPulsePartition {
   comparison_coverage: RetailCoverage;
   decision_ready: boolean;
   summary?: Record<string, RetailSummaryMetric>;
+  sssg?: RetailSSSGResult;
   daily_trend: RetailDailyTrend[];
   attention: RetailAttention[];
   suppressed_attention?: RetailSuppressedAttention[];
@@ -1616,7 +1652,7 @@ export interface RetailStoreDiagnosticsResponse {
   data_classification: RetailDataClassification;
   dataset_version?: string;
   generated_at: string;
-  store: { store_id: string; store_code: string; store_name: string; brand: string; region: string };
+  store: { store_id: string; store_code: string; store_name: string; brand: string; region: string; store_format?: string; opening_date?: string; closing_date?: string; lifecycle_status?: string };
   current: { date_from: string; date_to: string };
   comparison: { date_from: string; date_to: string };
   target_coverage: RetailCoverage;

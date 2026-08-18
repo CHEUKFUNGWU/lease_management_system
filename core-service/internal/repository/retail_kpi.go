@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/services/retailcohort"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
@@ -87,12 +88,13 @@ func (r *RetailKPIRepository) QueryFacts(ctx context.Context, legalEntityID, dat
 		SELECT f.id,f.store_id,s.code,s.name,COALESCE(s.brand,'') AS brand,COALESCE(s.region,'') AS region,
 			f.business_date::text,f.currency,f.revenue,f.gross_profit,f.transactions,f.footfall,f.area_sqm,
 			f.labor_cost,f.fixed_rent,f.variable_rent,f.non_lease_cost,f.other_controllable_cost,
+			f.labor_hours,f.headcount,
 			f.source_system,f.version,f.as_of_at,f.data_quality_status,f.mapping_status,f.data_classification,f.simulation_dataset_version,
 			ROW_NUMBER() OVER (PARTITION BY f.store_id,f.business_date,f.source_system ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
 		FROM retail_store_day_facts f JOIN stores s ON s.id=f.store_id
 		WHERE ` + mainWhere + `)
 		SELECT id,store_id,code,name,brand,region,business_date,currency,revenue,gross_profit,transactions,footfall,area_sqm,
-			labor_cost,fixed_rent,variable_rent,non_lease_cost,other_controllable_cost,source_system,version,
+			labor_cost,fixed_rent,variable_rent,non_lease_cost,other_controllable_cost,labor_hours,headcount,source_system,version,
 			as_of_at,data_quality_status,mapping_status,data_classification,simulation_dataset_version
 		FROM ranked WHERE rn=1 ORDER BY business_date,store_id,source_system`
 	rows, err := r.db.Query(ctx, query, mainArgs...)
@@ -104,18 +106,18 @@ func (r *RetailKPIRepository) QueryFacts(ctx context.Context, legalEntityID, dat
 	sourceSet, datasetSet := map[string]bool{}, map[string]bool{}
 	for rows.Next() {
 		var id, storeID, code, name, brand, region, businessDate, currency, source, quality, mapping, factClass string
-		var revenue, grossProfit, transactions, footfall, area, labor, fixedRent, variableRent, nonLease, other *float64
+		var revenue, grossProfit, transactions, footfall, area, labor, fixedRent, variableRent, nonLease, other, laborHours, headcount *float64
 		var version int
 		var asOf time.Time
 		var dataset *string
-		if err := rows.Scan(&id, &storeID, &code, &name, &brand, &region, &businessDate, &currency, &revenue, &grossProfit, &transactions, &footfall, &area, &labor, &fixedRent, &variableRent, &nonLease, &other, &source, &version, &asOf, &quality, &mapping, &factClass, &dataset); err != nil {
+		if err := rows.Scan(&id, &storeID, &code, &name, &brand, &region, &businessDate, &currency, &revenue, &grossProfit, &transactions, &footfall, &area, &labor, &fixedRent, &variableRent, &nonLease, &other, &laborHours, &headcount, &source, &version, &asOf, &quality, &mapping, &factClass, &dataset); err != nil {
 			return nil, fmt.Errorf("scan KPI fact: %w", err)
 		}
 		parsed, err := time.Parse("2006-01-02", businessDate)
 		if err != nil {
 			return nil, fmt.Errorf("parse KPI business date: %w", err)
 		}
-		result.Facts = append(result.Facts, retailkpi.DailyFact{StoreID: storeID, StoreCode: code, StoreName: name, Brand: brand, Region: region, BusinessDate: parsed, AsOfAt: asOf, Currency: currency, SourceSystem: source, Version: version, Revenue: revenue, GrossProfit: grossProfit, Transactions: transactions, Footfall: footfall, AreaSqm: area, LaborCost: labor, FixedRent: fixedRent, VariableRent: variableRent, NonLeaseCost: nonLease, OtherControllableCost: other, DataQualityStatus: quality, MappingStatus: mapping, DataClassification: factClass, SimulationDatasetVersion: dataset})
+		result.Facts = append(result.Facts, retailkpi.DailyFact{StoreID: storeID, StoreCode: code, StoreName: name, Brand: brand, Region: region, BusinessDate: parsed, AsOfAt: asOf, Currency: currency, SourceSystem: source, Version: version, Revenue: revenue, GrossProfit: grossProfit, Transactions: transactions, Footfall: footfall, AreaSqm: area, LaborCost: labor, FixedRent: fixedRent, VariableRent: variableRent, NonLeaseCost: nonLease, OtherControllableCost: other, LaborHours: laborHours, Headcount: headcount, DataQualityStatus: quality, MappingStatus: mapping, DataClassification: factClass, SimulationDatasetVersion: dataset})
 		if result.MinFactVersion == 0 || version < result.MinFactVersion {
 			result.MinFactVersion = version
 		}
@@ -176,6 +178,42 @@ func (r *RetailKPIRepository) ListStorePopulation(ctx context.Context, legalEnti
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate KPI store population: %w", err)
+	}
+	return result, nil
+}
+
+// ListStoreLifecycles loads store master records with lifecycle timestamps
+// for comparable cohort filtering and lifecycle badge computation.
+func (r *RetailKPIRepository) ListStoreLifecycles(ctx context.Context, legalEntityID, classification, datasetVersion string, storeIDs []string) ([]retailcohort.StoreLifecycle, error) {
+	if strings.TrimSpace(legalEntityID) == "" {
+		return nil, fmt.Errorf("legal entity scope is required")
+	}
+	if classification != "production" && classification != "simulated" {
+		return nil, fmt.Errorf("data_classification must be production or simulated")
+	}
+	if classification == "simulated" && strings.TrimSpace(datasetVersion) == "" {
+		return nil, fmt.Errorf("dataset version is required for simulated data")
+	}
+	if classification == "production" && strings.TrimSpace(datasetVersion) != "" {
+		return nil, fmt.Errorf("dataset version is not allowed for production data")
+	}
+	args := []interface{}{legalEntityID, classification}
+	where, args, _ := retailKPIStorePopulationFilter(ctx, "s", args, 3, classification, datasetVersion, storeIDs)
+	rows, err := r.db.Query(ctx, "SELECT s.id::text, s.code, s.name, COALESCE(s.brand,''), COALESCE(s.region,''), COALESCE(s.store_format,''), s.opening_date, s.closing_date, s.is_active FROM stores s WHERE "+where+" ORDER BY s.code, s.id", args...)
+	if err != nil {
+		return nil, fmt.Errorf("query store lifecycles: %w", err)
+	}
+	defer rows.Close()
+	result := make([]retailcohort.StoreLifecycle, 0)
+	for rows.Next() {
+		var store retailcohort.StoreLifecycle
+		if err := rows.Scan(&store.StoreID, &store.StoreCode, &store.StoreName, &store.Brand, &store.Region, &store.StoreFormat, &store.OpeningDate, &store.ClosingDate, &store.IsActive); err != nil {
+			return nil, fmt.Errorf("scan store lifecycle: %w", err)
+		}
+		result = append(result, store)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate store lifecycles: %w", err)
 	}
 	return result, nil
 }

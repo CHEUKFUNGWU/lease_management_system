@@ -23,6 +23,8 @@ export const PULSE_AUXILIARY_CODES = [
   "occupancy_cash_cost_rate",
   "store_contribution_margin",
   "sales_per_sqm",
+  "sales_per_labor_hour",
+  "labor_hours_per_transaction",
 ] as const;
 
 export type PulseMetricCode = (typeof PULSE_KPI_CODES)[number] | (typeof PULSE_AUXILIARY_CODES)[number];
@@ -39,6 +41,8 @@ const KPI_LABEL_KEYS: Record<PulseMetricCode, string> = {
   occupancy_cash_cost_rate: "retail.kpi.occupancy_cash_cost_rate",
   store_contribution_margin: "retail.kpi.store_contribution_margin",
   sales_per_sqm: "retail.kpi.sales_per_sqm",
+  sales_per_labor_hour: "retail.kpi.sales_per_labor_hour",
+  labor_hours_per_transaction: "retail.kpi.labor_hours_per_transaction",
 };
 
 export function kpiLabel(code: string, language: Language): string {
@@ -202,6 +206,51 @@ export function trendValue(row: RetailPulsePartition["daily_trend"][number], cod
   if (row.gap) return null;
   const value = row.kpis?.[code]?.value;
   return value === undefined ? null : value;
+}
+
+export function sssgReasonLabel(reason: string, language: Language): string {
+  switch (reason) {
+    case "too_new":
+      return t("retail.sssg.reason.too_new", language);
+    case "closed":
+      return t("retail.sssg.reason.closed", language);
+    case "missing_lifecycle_data":
+      return t("retail.sssg.reason.missing_lifecycle_data", language);
+    default:
+      return reason;
+  }
+}
+
+export function lifecycleStatusLabel(status: string, language: Language): string {
+  switch (status) {
+    case "mature":
+      return t("retail.lifecycle.mature", language);
+    case "ramp_up":
+      return t("retail.lifecycle.ramp_up", language);
+    case "pre_opening":
+      return t("retail.lifecycle.pre_opening", language);
+    case "closed":
+      return t("retail.lifecycle.closed", language);
+    case "undecided":
+      return t("retail.lifecycle.undecided", language);
+    default:
+      return status;
+  }
+}
+
+export function storeFormatLabel(format: string, language: Language): string {
+  switch (format) {
+    case "flagship":
+      return t("retail.format.flagship", language);
+    case "standard":
+      return t("retail.format.standard", language);
+    case "compact":
+      return t("retail.format.compact", language);
+    case "outlet":
+      return t("retail.format.outlet", language);
+    default:
+      return format;
+  }
 }
 
 export function attentionSignalSummary(attention: RetailAttention, language: Language): string {

@@ -27,7 +27,7 @@ import { StateBlock } from "../components/StateBlock";
 import { BentoGrid, BentoTile } from "../components/bento/BentoGrid";
 import type { DataState } from "../lib/dataState";
 import { apiErrorMessage, retailAnalyticsApi, type RetailAttention, type RetailCoverage, type RetailDailyTrend, type RetailPulsePartition, type RetailPulseResponse, type RetailSimulationDatasetData, type RetailStoreScope, type RetailSuppressedAttention, type RetailSummaryMetric } from "../lib/api";
-import { changeTone, formatChange, formatKPIValue, formatSeverity, formatSignalValue, formatSourceSystem, kpiLabel, latestAnomalyDate, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, signalMix, switchClassification, translateReason, trendValue, type PulseMetricCode } from "./logic";
+import { changeTone, formatChange, formatKPIValue, formatSeverity, formatSignalValue, formatSourceSystem, kpiLabel, latestAnomalyDate, lifecycleStatusLabel, metricStatusLabel, metricUnitLabel, PULSE_AUXILIARY_CODES, PULSE_KPI_CODES, responsePartitions, signalLabel, signalMix, sssgReasonLabel, storeFormatLabel, switchClassification, translateReason, trendValue, type PulseMetricCode } from "./logic";
 import { tableScrollX } from "../lib/tableScroll";
 import { RetailExportMenu } from "../components/RetailExportMenu";
 import { retailExportApi } from "../lib/api";
@@ -207,7 +207,23 @@ function AttentionTable({ attention, onSelect, onStore360, language }: { attenti
     { title: t("pulse.col.priority", language), dataIndex: "rank", width: 56, render: (value: number) => <strong style={{ color: "var(--fg-primary)" }}>#{value}</strong> },
     { title: t("pulse.col.store", language), key: "store", width: 260, render: (_: unknown, row: RetailAttention) => row.group_by === "region" || row.group_by === "brand"
       ? <Space direction="vertical" size={0}><strong>{row.group_label}</strong><Typography.Text type="secondary">{row.group_by === "region" ? t("pulse.group_region", language) : t("pulse.group_brand", language)}</Typography.Text></Space>
-      : <Space direction="vertical" size={0}><strong>{row.store_code}</strong><Typography.Text>{row.store_name}</Typography.Text><Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text></Space> },
+      : <Space direction="vertical" size={2}>
+          <Flex align="center" gap={6} wrap="wrap">
+            <strong>{row.store_code}</strong>
+            {row.lifecycle_status && (
+              <Tag bordered={false} color={row.lifecycle_status === "mature" ? "blue" : row.lifecycle_status === "ramp_up" ? "cyan" : "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                {lifecycleStatusLabel(row.lifecycle_status, language)}
+              </Tag>
+            )}
+            {row.store_format && (
+              <Tag bordered={false} color="purple" style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+                {storeFormatLabel(row.store_format, language)}
+              </Tag>
+            )}
+          </Flex>
+          <Typography.Text>{row.store_name}</Typography.Text>
+          <Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text>
+        </Space> },
     { title: t("pulse.col.signal", language), key: "signals", width: 160, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signal.signal_code} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><span className="severity-label"><SeverityDot severity={toSeverity(row.severity)} />{signalLabel(signal.signal_code, language)}</span></Tooltip>)}</Space> },
     { title: t("pulse.col.change", language), key: "change", width: 340, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${t("common.current", language)} ${formatSignalValue(signal.current, signal.unit, row.currency, language)} · ${t("common.contrast", language)} ${formatSignalValue(signal.comparison, signal.unit, row.currency, language)} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><Typography.Text className="pulse-change-bad">{signalLabel(signal.signal_code, language)} {formatSignalValue(signal.observed_change, signal.unit, row.currency, language)} · {t("common.threshold", language)} {formatSignalValue(signal.threshold, signal.unit, row.currency, language)}</Typography.Text></Tooltip>)}</Space> },
     { title: t("pulse.col.score", language), key: "score", width: 112, render: (_: unknown, row: RetailAttention) => <Flex align="center" gap={6} wrap={false}><SeverityDot severity={toSeverity(row.severity)} /><span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-primary)" }}>{row.score.toFixed(2)}</span></Flex> },
@@ -689,6 +705,44 @@ function OperatingPulseInner() {
                           onChange={(value) => setSelectedCurrency(String(value))}
                           options={partitions.map((item) => ({ label: item.currency || t("pulse.unknown_currency", language), value: item.currency }))}
                         />
+                      </Flex>
+                    </Card>
+                  )}
+
+                  {/* SSSG Same-Store Sales Growth Card */}
+                  {partition.sssg && (
+                    <Card size="small" className="pulse-block-gap" style={{ marginTop: 12, background: "var(--bg-elevated)", borderColor: "var(--border-subtle)" }}>
+                      <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+                        <Space size={12} align="center">
+                          <Typography.Text strong style={{ fontSize: 13, color: "var(--fg-primary)" }}>
+                            {t("retail.sssg.title", language)}
+                          </Typography.Text>
+                          <span style={{ fontSize: 18, fontWeight: 700, color: partition.sssg.sssg != null && partition.sssg.sssg >= 0 ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)" }}>
+                            {partition.sssg.sssg != null ? `${partition.sssg.sssg > 0 ? "+" : ""}${partition.sssg.sssg.toFixed(2)}%` : "—"}
+                          </span>
+                        </Space>
+                        <Space size={16} wrap align="center">
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            {t("retail.sssg.comparable_stores", language)}: <strong style={{ color: "var(--fg-primary)" }}>{partition.sssg.cohort.included_count}</strong> / {partition.sssg.cohort.total_stores}
+                          </Typography.Text>
+                          {partition.sssg.cohort.excluded_count > 0 && (
+                            <Tooltip
+                              title={
+                                <Space direction="vertical" size={2}>
+                                  {partition.sssg.cohort.excluded_stores?.map((s) => (
+                                    <div key={s.store_id} style={{ fontSize: 11 }}>
+                                      {s.store_code} {s.store_name} ({sssgReasonLabel(s.reason, language)})
+                                    </div>
+                                  ))}
+                                </Space>
+                              }
+                            >
+                              <Tag bordered={false} color="default" style={{ cursor: "pointer", fontSize: 11, margin: 0 }}>
+                                {t("retail.sssg.excluded_stores", language)}: {partition.sssg.cohort.excluded_count}
+                              </Tag>
+                            </Tooltip>
+                          )}
+                        </Space>
                       </Flex>
                     </Card>
                   )}

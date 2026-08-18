@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailcohort"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailsimulation"
 )
@@ -646,3 +647,90 @@ func TestPulsePlanComparisonBlock(t *testing.T) {
 }
 
 func floatPtr(value float64) *float64 { return &value }
+
+type fakeLifecycleReader struct {
+	set        *repository.RetailKPIFactSet
+	lifecycles []retailcohort.StoreLifecycle
+}
+
+func (f *fakeLifecycleReader) QueryFacts(context.Context, string, string, string, string, string, string, []string) (*repository.RetailKPIFactSet, error) {
+	return f.set, nil
+}
+
+func (f *fakeLifecycleReader) ListStoreLifecycles(context.Context, string, string, string, []string) ([]retailcohort.StoreLifecycle, error) {
+	return f.lifecycles, nil
+}
+
+func TestPulseSSSGAndLifecycleBadges(t *testing.T) {
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	matureDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	rampDate := time.Date(2025, 8, 1, 0, 0, 0, 0, time.UTC)
+
+	facts := make([]retailkpi.DailyFact, 0, 28)
+	// Current: 7 days, S1 = 200/day, S2 = 100/day
+	for day := 7; day < 14; day++ {
+		facts = append(facts, dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, day), 200))
+		facts = append(facts, dailyFact("s2", "S2", "CNY", from.AddDate(0, 0, day), 100))
+	}
+	// Comparison: 7 days, S1 = 100/day, S2 = 100/day
+	for day := 0; day < 7; day++ {
+		facts = append(facts, dailyFact("s1", "S1", "CNY", from.AddDate(0, 0, day), 100))
+		facts = append(facts, dailyFact("s2", "S2", "CNY", from.AddDate(0, 0, day), 100))
+	}
+
+	reader := &fakeLifecycleReader{
+		set: &repository.RetailKPIFactSet{
+			Facts:              facts,
+			ExpectedStoreCount: 2,
+			ExpectedStores: []retailkpi.StorePopulation{
+				{StoreID: "s1", StoreCode: "S1", StoreName: "Store Mature", Brand: "BrandA", Region: "North"},
+				{StoreID: "s2", StoreCode: "S2", StoreName: "Store RampUp", Brand: "BrandA", Region: "North"},
+			},
+		},
+		lifecycles: []retailcohort.StoreLifecycle{
+			{StoreID: "s1", StoreCode: "S1", StoreName: "Store Mature", StoreFormat: "flagship", OpeningDate: &matureDate, IsActive: true},
+			{StoreID: "s2", StoreCode: "S2", StoreName: "Store RampUp", StoreFormat: "standard", OpeningDate: &rampDate, IsActive: true},
+		},
+	}
+
+	service := NewService(reader)
+	response, err := service.Build(context.Background(), Query{
+		LegalEntityID:  "entity-a",
+		AsOf:           from.AddDate(0, 0, 13),
+		WindowDays:     7,
+		Classification: "production",
+		AttentionLimit: 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if response.SSSG == nil {
+		t.Fatal("expected SSSG result in response, got nil")
+	}
+	// Only s1 is mature before baseline start 2026-01-01 (opened 2024-01-01)
+	// s2 opened 2025-08-01 (ramp finishes 2026-08-01, after baseline start 2026-01-01) -> excluded from cohort
+	if response.SSSG.Cohort.IncludedCount != 1 {
+		t.Fatalf("expected 1 comparable store (s1), got %d", response.SSSG.Cohort.IncludedCount)
+	}
+	// s1 rev current = 7 * 200 = 1400; baseline = 7 * 100 = 700; SSSG = +100%
+	if response.SSSG.SSSG == nil || *response.SSSG.SSSG != 100.0 {
+		t.Fatalf("expected SSSG +100.0%%, got %+v", response.SSSG.SSSG)
+	}
+
+	// Verify Attention items receive lifecycle badges
+	if len(response.Attention) > 0 {
+		for _, att := range response.Attention {
+			if att.StoreID == "s1" {
+				if att.LifecycleStatus != "mature" || att.StoreFormat != "flagship" {
+					t.Fatalf("s1 lifecycle badge mismatch: status=%q format=%q", att.LifecycleStatus, att.StoreFormat)
+				}
+			} else if att.StoreID == "s2" {
+				if att.LifecycleStatus != "ramp_up" || att.StoreFormat != "standard" {
+					t.Fatalf("s2 lifecycle badge mismatch: status=%q format=%q", att.LifecycleStatus, att.StoreFormat)
+				}
+			}
+		}
+	}
+}
+

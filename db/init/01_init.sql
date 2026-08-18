@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS stores (
     brand VARCHAR(100),
     region VARCHAR(100),
     address TEXT,
+    opening_date DATE,
+    closing_date DATE,
+    store_format VARCHAR(50),
     is_active BOOLEAN NOT NULL DEFAULT true,
     data_classification VARCHAR(20) NOT NULL DEFAULT 'production',
     simulation_dataset_version VARCHAR(100),
@@ -1691,6 +1694,8 @@ CREATE TABLE IF NOT EXISTS retail_store_day_facts (
     variable_rent DECIMAL(18,2),
     non_lease_cost DECIMAL(18,2),
     other_controllable_cost DECIMAL(18,2),
+    labor_hours DECIMAL(18,2),
+    headcount DECIMAL(18,2),
     source_system VARCHAR(100) NOT NULL,
     source_record_id VARCHAR(150),
     import_batch_id UUID REFERENCES operating_fact_batches(id),
@@ -1725,6 +1730,8 @@ CREATE TABLE IF NOT EXISTS retail_store_day_facts (
     CHECK (variable_rent IS NULL OR variable_rent >= 0),
     CHECK (non_lease_cost IS NULL OR non_lease_cost >= 0),
     CHECK (other_controllable_cost IS NULL OR other_controllable_cost >= 0),
+    CHECK (labor_hours IS NULL OR labor_hours >= 0),
+    CHECK (headcount IS NULL OR headcount >= 0),
     UNIQUE (store_id, business_date, version, source_system)
 );
 CREATE INDEX IF NOT EXISTS idx_retail_store_day_facts_lookup

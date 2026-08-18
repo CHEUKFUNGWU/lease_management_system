@@ -20,6 +20,13 @@ const (
 	StatusUnavailable KPIStatus = "unavailable"
 )
 
+type MeasureKind string
+
+const (
+	MeasureKindFlow  MeasureKind = "flow"
+	MeasureKindStock MeasureKind = "stock"
+)
+
 // DailyFact is the nullable source-grain input to the semantic layer. The
 // repository performs tenant, source and highest-version selection before
 // handing facts to this package.
@@ -33,6 +40,7 @@ type DailyFact struct {
 	Revenue, GrossProfit, Transactions, Footfall *float64
 	AreaSqm, LaborCost, FixedRent, VariableRent  *float64
 	NonLeaseCost, OtherControllableCost          *float64
+	LaborHours, Headcount                        *float64
 	DataQualityStatus, MappingStatus             string
 }
 
@@ -58,39 +66,43 @@ type KPIValue struct {
 }
 
 type Definition struct {
-	Code            string   `json:"code"`
-	Name            string   `json:"name"`
-	NameZH          string   `json:"name_zh"`
-	Unit            string   `json:"unit"`
-	Formula         string   `json:"formula"`
-	RequiredFields  []string `json:"required_fields"`
-	NullRule        string   `json:"null_rule"`
-	DenominatorRule string   `json:"denominator_rule"`
-	Description     string   `json:"description"`
+	Code            string      `json:"code"`
+	Name            string      `json:"name"`
+	NameZH          string      `json:"name_zh"`
+	Unit            string      `json:"unit"`
+	Formula         string      `json:"formula"`
+	MeasureKind     MeasureKind `json:"measure_kind"`
+	IsCore          bool        `json:"is_core"`
+	RequiredFields  []string    `json:"required_fields"`
+	NullRule        string      `json:"null_rule"`
+	DenominatorRule string      `json:"denominator_rule"`
+	Description     string      `json:"description"`
 }
 
 var definitions = []Definition{
-	{Code: "revenue", Name: "Revenue", Unit: "currency", Formula: "SUM(revenue)", RequiredFields: []string{"revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily net sales in the fact currency."},
-	{Code: "gross_profit", Name: "Gross profit", Unit: "currency", Formula: "SUM(gross_profit)", RequiredFields: []string{"gross_profit"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily gross profit."},
-	{Code: "footfall", Name: "Footfall", Unit: "count", Formula: "SUM(footfall)", RequiredFields: []string{"footfall"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily observed visitors."},
-	{Code: "transactions", Name: "Transactions", Unit: "count", Formula: "SUM(transactions)", RequiredFields: []string{"transactions"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily transactions."},
-	{Code: "labor_cost", Name: "Labor cost", Unit: "currency", Formula: "SUM(labor_cost)", RequiredFields: []string{"labor_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily labor cost."},
-	{Code: "fixed_rent", Name: "Fixed rent", Unit: "currency", Formula: "SUM(fixed_rent)", RequiredFields: []string{"fixed_rent"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily fixed rent."},
-	{Code: "variable_rent", Name: "Variable rent", Unit: "currency", Formula: "SUM(variable_rent)", RequiredFields: []string{"variable_rent"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily sales-linked rent."},
-	{Code: "non_lease_cost", Name: "Non-lease cost", Unit: "currency", Formula: "SUM(non_lease_cost)", RequiredFields: []string{"non_lease_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily operating non-lease occupancy cost."},
-	{Code: "other_controllable_cost", Name: "Other controllable cost", Unit: "currency", Formula: "SUM(other_controllable_cost)", RequiredFields: []string{"other_controllable_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily controllable operating cost outside labor and occupancy."},
-	{Code: "occupancy_cash_cost", Name: "Occupancy cash cost", Unit: "currency", Formula: "fixed_rent + variable_rent + non_lease_cost", RequiredFields: []string{"fixed_rent", "variable_rent", "non_lease_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Operating cash occupancy cost; excludes IFRS16 depreciation, interest, ROU and lease liability movements."},
-	{Code: "store_contribution", Name: "Store contribution", Unit: "currency", Formula: "gross_profit - labor_cost - occupancy_cash_cost - other_controllable_cost", RequiredFields: []string{"gross_profit", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Operating contribution before IFRS16 accounting measures."},
-	{Code: "gross_margin_rate", Name: "Gross margin rate", Unit: "percent", Formula: "gross_profit / revenue * 100", RequiredFields: []string{"gross_profit", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Gross profit as a percentage of revenue."},
-	{Code: "conversion_rate", Name: "Conversion rate", Unit: "percent", Formula: "transactions / footfall * 100", RequiredFields: []string{"transactions", "footfall"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero footfall => null, reason zero_denominator", Description: "Transactions as a percentage of visitors."},
-	{Code: "average_transaction_value", Name: "Average transaction value", Unit: "currency", Formula: "revenue / transactions", RequiredFields: []string{"revenue", "transactions"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero transactions => null, reason zero_denominator", Description: "Revenue per transaction."},
-	{Code: "labor_cost_rate", Name: "Labor cost rate", Unit: "percent", Formula: "labor_cost / revenue * 100", RequiredFields: []string{"labor_cost", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Labor cost as a percentage of revenue."},
-	{Code: "rent_to_sales_rate", Name: "Rent to sales rate", Unit: "percent", Formula: "(fixed_rent + variable_rent) / revenue * 100", RequiredFields: []string{"fixed_rent", "variable_rent", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Cash rent as a percentage of revenue."},
-	{Code: "occupancy_cash_cost_rate", Name: "Occupancy cash cost rate", Unit: "percent", Formula: "occupancy_cash_cost / revenue * 100", RequiredFields: []string{"fixed_rent", "variable_rent", "non_lease_cost", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Operating cash occupancy cost as a percentage of revenue."},
-	{Code: "store_contribution_margin", Name: "Store contribution margin", Unit: "percent", Formula: "store_contribution / revenue * 100", RequiredFields: []string{"gross_profit", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Operating contribution as a percentage of revenue."},
-	{Code: "average_daily_area_sqm", Name: "Average daily area", Unit: "sqm", Formula: "SUM(area_sqm by store-day) / distinct_business_days", RequiredFields: []string{"area_sqm"}, NullRule: "missing area facts yield partial/null", DenominatorRule: "zero distinct business days => null, reason zero_denominator", Description: "Daily store area averaged over distinct business days; area is never summed across days."},
-	{Code: "sales_per_sqm", Name: "Sales per square metre", Unit: "currency_per_sqm", Formula: "revenue / average_daily_area_sqm", RequiredFields: []string{"revenue", "area_sqm"}, NullRule: "missing area facts yield partial/null", DenominatorRule: "zero average_daily_area_sqm => null, reason zero_denominator", Description: "Revenue divided by average daily area; area is averaged by distinct business day, never summed across days."},
-	{Code: "revenue_per_store_day", Name: "Revenue per store-day", Unit: "currency", Formula: "revenue / observed_store_days", RequiredFields: []string{"revenue"}, NullRule: "no observed store-days => unavailable/null", DenominatorRule: "zero observed store-days => null, reason zero_denominator", Description: "Revenue divided by observed store-day rows."},
+	{Code: "revenue", Name: "Revenue", Unit: "currency", Formula: "SUM(revenue)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily net sales in the fact currency."},
+	{Code: "gross_profit", Name: "Gross profit", Unit: "currency", Formula: "SUM(gross_profit)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"gross_profit"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily gross profit."},
+	{Code: "footfall", Name: "Footfall", Unit: "count", Formula: "SUM(footfall)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"footfall"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily observed visitors."},
+	{Code: "transactions", Name: "Transactions", Unit: "count", Formula: "SUM(transactions)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"transactions"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily transactions."},
+	{Code: "labor_cost", Name: "Labor cost", Unit: "currency", Formula: "SUM(labor_cost)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"labor_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily labor cost."},
+	{Code: "fixed_rent", Name: "Fixed rent", Unit: "currency", Formula: "SUM(fixed_rent)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"fixed_rent"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily fixed rent."},
+	{Code: "variable_rent", Name: "Variable rent", Unit: "currency", Formula: "SUM(variable_rent)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"variable_rent"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily sales-linked rent."},
+	{Code: "non_lease_cost", Name: "Non-lease cost", Unit: "currency", Formula: "SUM(non_lease_cost)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"non_lease_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily operating non-lease occupancy cost."},
+	{Code: "other_controllable_cost", Name: "Other controllable cost", Unit: "currency", Formula: "SUM(other_controllable_cost)", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"other_controllable_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Daily controllable operating cost outside labor and occupancy."},
+	{Code: "occupancy_cash_cost", Name: "Occupancy cash cost", Unit: "currency", Formula: "fixed_rent + variable_rent + non_lease_cost", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"fixed_rent", "variable_rent", "non_lease_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Operating cash occupancy cost; excludes IFRS16 depreciation, interest, ROU and lease liability movements."},
+	{Code: "store_contribution", Name: "Store contribution", Unit: "currency", Formula: "gross_profit - labor_cost - occupancy_cash_cost - other_controllable_cost", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"gross_profit", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "not applicable", Description: "Operating contribution before IFRS16 accounting measures."},
+	{Code: "gross_margin_rate", Name: "Gross margin rate", Unit: "percent", Formula: "gross_profit / revenue * 100", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"gross_profit", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Gross profit as a percentage of revenue."},
+	{Code: "conversion_rate", Name: "Conversion rate", Unit: "percent", Formula: "transactions / footfall * 100", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"transactions", "footfall"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero footfall => null, reason zero_denominator", Description: "Transactions as a percentage of visitors."},
+	{Code: "average_transaction_value", Name: "Average transaction value", Unit: "currency", Formula: "revenue / transactions", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"revenue", "transactions"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero transactions => null, reason zero_denominator", Description: "Revenue per transaction."},
+	{Code: "labor_cost_rate", Name: "Labor cost rate", Unit: "percent", Formula: "labor_cost / revenue * 100", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"labor_cost", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Labor cost as a percentage of revenue."},
+	{Code: "rent_to_sales_rate", Name: "Rent to sales rate", Unit: "percent", Formula: "(fixed_rent + variable_rent) / revenue * 100", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"fixed_rent", "variable_rent", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Cash rent as a percentage of revenue."},
+	{Code: "occupancy_cash_cost_rate", Name: "Occupancy cash cost rate", Unit: "percent", Formula: "occupancy_cash_cost / revenue * 100", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"fixed_rent", "variable_rent", "non_lease_cost", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Operating cash occupancy cost as a percentage of revenue."},
+	{Code: "store_contribution_margin", Name: "Store contribution margin", Unit: "percent", Formula: "store_contribution / revenue * 100", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"gross_profit", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost", "revenue"}, NullRule: "missing required facts yield partial/null", DenominatorRule: "zero revenue => null, reason zero_denominator", Description: "Operating contribution as a percentage of revenue."},
+	{Code: "average_daily_area_sqm", Name: "Average daily area", Unit: "sqm", Formula: "SUM(area_sqm by store-day) / distinct_business_days", MeasureKind: MeasureKindStock, IsCore: true, RequiredFields: []string{"area_sqm"}, NullRule: "missing area facts yield partial/null", DenominatorRule: "zero distinct business days => null, reason zero_denominator", Description: "Daily store area averaged over distinct business days; area is never summed across days."},
+	{Code: "sales_per_sqm", Name: "Sales per square metre", Unit: "currency_per_sqm", Formula: "revenue / average_daily_area_sqm", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"revenue", "area_sqm"}, NullRule: "missing area facts yield partial/null", DenominatorRule: "zero average_daily_area_sqm => null, reason zero_denominator", Description: "Revenue divided by average daily area; area is averaged by distinct business day, never summed across days."},
+	{Code: "revenue_per_store_day", Name: "Revenue per store-day", Unit: "currency", Formula: "revenue / observed_store_days", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"revenue"}, NullRule: "no observed store-days => unavailable/null", DenominatorRule: "zero observed store-days => null, reason zero_denominator", Description: "Revenue divided by observed store-day rows."},
+	{Code: "sales_per_labor_hour", Name: "Sales per labor hour", Unit: "currency_per_hour", Formula: "revenue / labor_hours", MeasureKind: MeasureKindFlow, IsCore: false, RequiredFields: []string{"revenue", "labor_hours"}, NullRule: "missing labor facts yield partial/null", DenominatorRule: "zero labor hours => null, reason zero_denominator", Description: "Revenue generated per labor hour worked."},
+	{Code: "labor_hours_per_transaction", Name: "Labor hours per transaction", Unit: "hours_per_transaction", Formula: "labor_hours / transactions", MeasureKind: MeasureKindFlow, IsCore: false, RequiredFields: []string{"labor_hours", "transactions"}, NullRule: "missing labor facts yield partial/null", DenominatorRule: "zero transactions => null, reason zero_denominator", Description: "Average labor hours spent per transaction."},
 }
 
 func Definitions() []Definition {
@@ -121,6 +133,7 @@ var chineseNames = map[string]string{
 	"gross_margin_rate": "毛利率", "conversion_rate": "转化率", "average_transaction_value": "客单价", "labor_cost_rate": "人工成本率",
 	"rent_to_sales_rate": "租金销售比", "occupancy_cash_cost_rate": "经营占用成本率", "store_contribution_margin": "门店经营利润率",
 	"average_daily_area_sqm": "平均日经营面积", "sales_per_sqm": "期间坪效", "revenue_per_store_day": "单店日均销售",
+	"sales_per_labor_hour": "销售人效", "labor_hours_per_transaction": "单均工时",
 }
 
 type Coverage struct {
@@ -304,6 +317,9 @@ func buildCoverage(facts []DailyFact, req Request) Coverage {
 			seenStoreDays[storeDay] = true
 		}
 		for _, d := range definitions {
+			if !d.IsCore {
+				continue
+			}
 			for _, field := range d.RequiredFields {
 				if fieldValue(f, field) == nil {
 					missing[field] = true
@@ -362,7 +378,7 @@ func aggregateGroup(facts []DailyFact, groupBy, key, label, currency string) Agg
 		r.AverageDailyAreaSqm = &v
 	}
 	values := map[string]*float64{}
-	for _, code := range []string{"revenue", "gross_profit", "footfall", "transactions", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost"} {
+	for _, code := range []string{"revenue", "gross_profit", "footfall", "transactions", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "other_controllable_cost", "labor_hours", "headcount"} {
 		values[code] = sumField(facts, code)
 	}
 	values["occupancy_cash_cost"] = combine(values["fixed_rent"], values["variable_rent"], values["non_lease_cost"], false)
@@ -380,6 +396,8 @@ func aggregateGroup(facts []DailyFact, groupBy, key, label, currency string) Agg
 	values["rent_to_sales_rate"] = ratio(combine(values["fixed_rent"], values["variable_rent"], nil, false), values["revenue"], 100)
 	values["occupancy_cash_cost_rate"] = ratio(values["occupancy_cash_cost"], values["revenue"], 100)
 	values["store_contribution_margin"] = ratio(values["store_contribution"], values["revenue"], 100)
+	values["sales_per_labor_hour"] = ratio(values["revenue"], values["labor_hours"], 1)
+	values["labor_hours_per_transaction"] = ratio(values["labor_hours"], values["transactions"], 1)
 	if r.AverageDailyAreaSqm != nil {
 		values["average_daily_area_sqm"] = r.AverageDailyAreaSqm
 		values["sales_per_sqm"] = ratio(values["revenue"], r.AverageDailyAreaSqm, 1)
@@ -438,7 +456,7 @@ func aggregateGroup(facts []DailyFact, groupBy, key, label, currency string) Agg
 
 func isZeroDenominatorMetric(code string) bool {
 	switch code {
-	case "gross_margin_rate", "conversion_rate", "average_transaction_value", "labor_cost_rate", "rent_to_sales_rate", "occupancy_cash_cost_rate", "store_contribution_margin", "sales_per_sqm":
+	case "gross_margin_rate", "conversion_rate", "average_transaction_value", "labor_cost_rate", "rent_to_sales_rate", "occupancy_cash_cost_rate", "store_contribution_margin", "sales_per_sqm", "sales_per_labor_hour", "labor_hours_per_transaction":
 		return true
 	default:
 		return false
@@ -447,7 +465,7 @@ func isZeroDenominatorMetric(code string) bool {
 
 func allCoreComplete(values map[string]KPIValue) bool {
 	for _, definition := range definitions {
-		if values[definition.Code].Status != StatusComplete {
+		if definition.IsCore && values[definition.Code].Status != StatusComplete {
 			return false
 		}
 	}
@@ -490,17 +508,22 @@ func sumField(facts []DailyFact, field string) *float64 {
 	}
 	return &total
 }
+
 func availableFor(code string, facts []DailyFact) int {
+	def := findDefinition(code)
+	if def == nil {
+		return 0
+	}
 	count := 0
 	for _, f := range facts {
-		if code == "sales_per_sqm" || code == "average_daily_area_sqm" {
+		if def.MeasureKind == MeasureKindStock {
 			if f.AreaSqm != nil && f.Revenue != nil {
 				count++
 			}
 			continue
 		}
 		ok := true
-		for _, field := range required(code) {
+		for _, field := range def.RequiredFields {
 			if fieldValue(f, field) == nil {
 				ok = false
 				break
@@ -512,14 +535,24 @@ func availableFor(code string, facts []DailyFact) int {
 	}
 	return count
 }
-func required(code string) []string {
-	for _, d := range definitions {
-		if d.Code == code {
-			return d.RequiredFields
+
+func findDefinition(code string) *Definition {
+	for i := range definitions {
+		if definitions[i].Code == code {
+			return &definitions[i]
 		}
 	}
 	return nil
 }
+
+func required(code string) []string {
+	def := findDefinition(code)
+	if def != nil {
+		return def.RequiredFields
+	}
+	return nil
+}
+
 func fieldValue(f DailyFact, field string) *float64 {
 	switch field {
 	case "revenue":
@@ -542,6 +575,10 @@ func fieldValue(f DailyFact, field string) *float64 {
 		return f.NonLeaseCost
 	case "other_controllable_cost":
 		return f.OtherControllableCost
+	case "labor_hours":
+		return f.LaborHours
+	case "headcount":
+		return f.Headcount
 	}
 	return nil
 }

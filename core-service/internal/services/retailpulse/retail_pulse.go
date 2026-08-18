@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailcohort"
 	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
@@ -24,6 +25,10 @@ const (
 
 type FactReader interface {
 	QueryFacts(context.Context, string, string, string, string, string, string, []string) (*repository.RetailKPIFactSet, error)
+}
+
+type StoreLifecycleReader interface {
+	ListStoreLifecycles(context.Context, string, string, string, []string) ([]retailcohort.StoreLifecycle, error)
 }
 
 type Query struct {
@@ -111,6 +116,8 @@ type Attention struct {
 	StoreName       string                        `json:"store_name"`
 	Brand           string                        `json:"brand"`
 	Region          string                        `json:"region"`
+	StoreFormat     string                        `json:"store_format,omitempty"`
+	LifecycleStatus string                        `json:"lifecycle_status,omitempty"`
 	Currency        string                        `json:"currency"`
 	CurrencyStatus  string                        `json:"currency_status,omitempty"`
 	Score           float64                       `json:"score"`
@@ -148,6 +155,7 @@ type Partition struct {
 	ComparisonCoverage  retailkpi.Coverage       `json:"comparison_coverage"`
 	DecisionReady       bool                     `json:"decision_ready"`
 	Summary             map[string]SummaryMetric `json:"summary"`
+	SSSG                *retailcohort.SSSGResult `json:"sssg,omitempty"`
 	DailyTrend          []DailyTrend             `json:"daily_trend"`
 	Attention           []Attention              `json:"attention"`
 	SuppressedAttention []SuppressedAttention    `json:"suppressed_attention,omitempty"`
@@ -182,6 +190,7 @@ type Response struct {
 	DecisionReadyReason       string                      `json:"decision_ready_reason,omitempty"`
 	Envelope                  sourceenvelope.Envelope     `json:"envelope"`
 	Summary                   map[string]SummaryMetric    `json:"summary,omitempty"`
+	SSSG                      *retailcohort.SSSGResult    `json:"sssg,omitempty"`
 	DailyTrend                []DailyTrend                `json:"daily_trend,omitempty"`
 	Attention                 []Attention                 `json:"attention,omitempty"`
 	SuppressedAttention       []SuppressedAttention       `json:"suppressed_attention,omitempty"`
@@ -276,7 +285,11 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 	if linkQuery.SourceSystem == "" && len(set.SourceSystems) == 1 {
 		linkQuery.SourceSystem = set.SourceSystems[0]
 	}
-	partitions := s.buildPartitions(set, linkQuery, currentStart, currentEnd, comparisonStart, comparisonEnd)
+	var lifecycles []retailcohort.StoreLifecycle
+	if lr, ok := s.reader.(StoreLifecycleReader); ok {
+		lifecycles, _ = lr.ListStoreLifecycles(ctx, query.LegalEntityID, query.Classification, query.DatasetVersion, query.StoreIDs)
+	}
+	partitions := s.buildPartitions(set, linkQuery, currentStart, currentEnd, comparisonStart, comparisonEnd, lifecycles)
 	response := &Response{
 		Basis: "Working", PulseVersion: PulseVersion, FormulaVersion: retailkpi.FormulaVersion,
 		DataClassification: query.Classification, DatasetVersion: query.DatasetVersion,
@@ -298,7 +311,7 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 	if len(partitions) == 1 {
 		p := partitions[0]
 		response.Currency, response.CurrencyStatus = p.Currency, p.CurrencyStatus
-		response.CurrentCoverage, response.ComparisonCoverage, response.DecisionReady, response.Summary, response.DailyTrend, response.Attention, response.SuppressedAttention, response.AttentionCount = p.CurrentCoverage, p.ComparisonCoverage, p.DecisionReady, p.Summary, p.DailyTrend, p.Attention, p.SuppressedAttention, p.AttentionCount
+		response.CurrentCoverage, response.ComparisonCoverage, response.DecisionReady, response.Summary, response.SSSG, response.DailyTrend, response.Attention, response.SuppressedAttention, response.AttentionCount = p.CurrentCoverage, p.ComparisonCoverage, p.DecisionReady, p.Summary, p.SSSG, p.DailyTrend, p.Attention, p.SuppressedAttention, p.AttentionCount
 		response.Current, response.Comparison = p.Current, p.Comparison
 	} else {
 		response.Partitions = partitions
@@ -430,7 +443,7 @@ func templateValue(value string) string {
 	return url.QueryEscape(value)
 }
 
-func (s *Service) buildPartitions(set *repository.RetailKPIFactSet, query Query, currentStart, currentEnd, comparisonStart, comparisonEnd time.Time) []Partition {
+func (s *Service) buildPartitions(set *repository.RetailKPIFactSet, query Query, currentStart, currentEnd, comparisonStart, comparisonEnd time.Time, lifecycles []retailcohort.StoreLifecycle) []Partition {
 	// P0-7: population attribution derives from each store's full currency
 	// set, never from fact iteration order. A store whose facts span
 	// currencies stays in every currency partition where it has facts and
@@ -487,7 +500,15 @@ func (s *Service) buildPartitions(set *repository.RetailKPIFactSet, query Query,
 		if currentAgg != nil || comparisonAgg != nil {
 			partition.Summary = buildSummary(currentAgg, comparisonAgg)
 		}
-		partition.Attention, partition.SuppressedAttention = buildAttention(facts, currency, query, query.AttentionLimit, currentStart, currentEnd, comparisonStart, comparisonEnd, set)
+		if len(lifecycles) > 0 {
+			cohort := retailcohort.EvaluateComparableCohort(lifecycles, retailcohort.PeriodPair{
+				CurrentStart: currentStart, CurrentEnd: currentEnd,
+				BaselineStart: comparisonStart, BaselineEnd: comparisonEnd,
+			}, retailcohort.DefaultPolicy())
+			sssgRes := retailcohort.CalculateSSSG(currentFacts, comparisonFacts, cohort, retailkpi.Request{DateFrom: currentStart, DateTo: currentEnd, RequestedDateFrom: currentStart.Format("2006-01-02"), RequestedDateTo: currentEnd.Format("2006-01-02")}, retailkpi.Request{DateFrom: comparisonStart, DateTo: comparisonEnd, RequestedDateFrom: comparisonStart.Format("2006-01-02"), RequestedDateTo: comparisonEnd.Format("2006-01-02")})
+			partition.SSSG = &sssgRes
+		}
+		partition.Attention, partition.SuppressedAttention = buildAttention(facts, currency, query, query.AttentionLimit, currentStart, currentEnd, comparisonStart, comparisonEnd, set, lifecycles)
 		partition.DailyTrend = buildTrend(facts, currency, currentStart, currentEnd, expected)
 		partition.AttentionCount = len(partition.Attention)
 		result = append(result, partition)
@@ -562,7 +583,7 @@ func totalAggregate(facts []retailkpi.DailyFact, from, to time.Time, expected in
 
 func buildSummary(current, comparison *retailkpi.Aggregate) map[string]SummaryMetric {
 	result := map[string]SummaryMetric{}
-	for _, code := range []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "transactions", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"} {
+	for _, code := range []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "transactions", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm", "sales_per_labor_hour", "labor_hours_per_transaction"} {
 		var currentKPI, comparisonKPI retailkpi.KPIValue
 		if current != nil {
 			currentKPI = current.KPIs[code]
@@ -622,7 +643,11 @@ type attentionTarget struct {
 	facts          []retailkpi.DailyFact
 }
 
-func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, limit int, currentStart, currentEnd, comparisonStart, comparisonEnd time.Time, set *repository.RetailKPIFactSet) ([]Attention, []SuppressedAttention) {
+func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, limit int, currentStart, currentEnd, comparisonStart, comparisonEnd time.Time, set *repository.RetailKPIFactSet, lifecycles []retailcohort.StoreLifecycle) ([]Attention, []SuppressedAttention) {
+	lifecycleMap := make(map[string]retailcohort.StoreLifecycle, len(lifecycles))
+	for _, lc := range lifecycles {
+		lifecycleMap[lc.StoreID] = lc
+	}
 	targets := attentionTargets(facts, query, set)
 	type candidate struct{ attention Attention }
 	candidates := []candidate{}
@@ -664,7 +689,12 @@ func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, l
 			drilldownGroupBy = target.groupBy
 			drilldownStoreID = ""
 		}
-		candidates = append(candidates, candidate{attention: Attention{GroupBy: target.groupBy, GroupKey: target.groupKey, GroupLabel: target.groupLabel, StoreID: target.storeID, StoreCode: target.storeCode, StoreName: target.storeName, Brand: target.brand, Region: target.region, Currency: currency, CurrencyStatus: currencyStatus(currency), Score: round(score), Severity: severity(score), ObservedSignals: signals, CurrentKPIs: currentAgg.KPIs, ComparisonKPIs: comparisonAgg.KPIs, Evidence: Evidence{Current: Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")}, Comparison: Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")}, CurrentFactCount: len(currentFacts), ComparisonFactCount: len(comparisonFacts), SourceSystems: unitSources, DatasetVersions: unitDatasets, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: PulseVersion}, Drilldown: map[string]string{"group_by": drilldownGroupBy, "store_id": drilldownStoreID, "store_code": target.storeCode, "currency": currency, "data_classification": query.Classification, "simulation_dataset_version": query.DatasetVersion, "source_system": query.SourceSystem, "current_date_from": currentStart.Format("2006-01-02"), "current_date_to": currentEnd.Format("2006-01-02"), "comparison_date_from": comparisonStart.Format("2006-01-02"), "comparison_date_to": comparisonEnd.Format("2006-01-02"), "current_url": drilldownURL(query, drilldownGroupBy, drilldownStoreID, currentStart, currentEnd), "comparison_url": drilldownURL(query, drilldownGroupBy, drilldownStoreID, comparisonStart, comparisonEnd)}}})
+		var lcStatus, storeFmt string
+		if lc, ok := lifecycleMap[target.storeID]; ok {
+			storeFmt = lc.StoreFormat
+			lcStatus = string(retailcohort.CalculateLifecycleStatus(lc.OpeningDate, lc.ClosingDate, currentEnd, 12))
+		}
+		candidates = append(candidates, candidate{attention: Attention{GroupBy: target.groupBy, GroupKey: target.groupKey, GroupLabel: target.groupLabel, StoreID: target.storeID, StoreCode: target.storeCode, StoreName: target.storeName, Brand: target.brand, Region: target.region, StoreFormat: storeFmt, LifecycleStatus: lcStatus, Currency: currency, CurrencyStatus: currencyStatus(currency), Score: round(score), Severity: severity(score), ObservedSignals: signals, CurrentKPIs: currentAgg.KPIs, ComparisonKPIs: comparisonAgg.KPIs, Evidence: Evidence{Current: Period{DateFrom: currentStart.Format("2006-01-02"), DateTo: currentEnd.Format("2006-01-02")}, Comparison: Period{DateFrom: comparisonStart.Format("2006-01-02"), DateTo: comparisonEnd.Format("2006-01-02")}, CurrentFactCount: len(currentFacts), ComparisonFactCount: len(comparisonFacts), SourceSystems: unitSources, DatasetVersions: unitDatasets, FormulaVersion: retailkpi.FormulaVersion, PulseVersion: PulseVersion}, Drilldown: map[string]string{"group_by": drilldownGroupBy, "store_id": drilldownStoreID, "store_code": target.storeCode, "currency": currency, "data_classification": query.Classification, "simulation_dataset_version": query.DatasetVersion, "source_system": query.SourceSystem, "current_date_from": currentStart.Format("2006-01-02"), "current_date_to": currentEnd.Format("2006-01-02"), "comparison_date_from": comparisonStart.Format("2006-01-02"), "comparison_date_to": comparisonEnd.Format("2006-01-02"), "current_url": drilldownURL(query, drilldownGroupBy, drilldownStoreID, currentStart, currentEnd), "comparison_url": drilldownURL(query, drilldownGroupBy, drilldownStoreID, comparisonStart, comparisonEnd)}}})
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		if candidates[i].attention.Score != candidates[j].attention.Score {
@@ -839,7 +869,11 @@ func suppressionReasons(currentAgg, comparisonAgg *retailkpi.Aggregate, currentC
 				add(issue)
 			}
 		}
-		for _, value := range aggregate.KPIs {
+		for _, d := range retailkpi.Definitions() {
+			if !d.IsCore {
+				continue
+			}
+			value := aggregate.KPIs[d.Code]
 			if value.Status == retailkpi.StatusPartial || value.Status == retailkpi.StatusUnavailable {
 				add("partial_or_unavailable_kpi")
 				break

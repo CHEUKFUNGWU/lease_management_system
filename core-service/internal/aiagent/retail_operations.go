@@ -655,9 +655,14 @@ func retailPulseConfidence(response *retailpulse.Response) float64 {
 		return 0.40
 	}
 	base := 0.90
-	for _, metric := range response.Summary {
-		if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
-			base = 0.70
+	for _, d := range retailkpi.Definitions() {
+		if !d.IsCore {
+			continue
+		}
+		if metric, ok := response.Summary[d.Code]; ok {
+			if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
+				base = 0.70
+			}
 		}
 	}
 	base -= retailCoveragePenalty(response.CurrentCoverage)
@@ -1045,9 +1050,14 @@ func retailPulseInsufficient(response *retailpulse.Response) bool {
 	if len(response.Summary) == 0 {
 		return true
 	}
-	for _, metric := range response.Summary {
-		if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
-			return true
+	for _, d := range retailkpi.Definitions() {
+		if !d.IsCore {
+			continue
+		}
+		if metric, ok := response.Summary[d.Code]; ok {
+			if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
+				return true
+			}
 		}
 	}
 	return false
@@ -1063,9 +1073,14 @@ func retailPulseInsufficientReason(response *retailpulse.Response) string {
 	if retailkpi.CoverageIncomplete(response.CurrentCoverage) || retailkpi.CoverageIncomplete(response.ComparisonCoverage) {
 		return "partial_coverage"
 	}
-	for _, metric := range response.Summary {
-		if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
-			return "partial_metrics"
+	for _, d := range retailkpi.Definitions() {
+		if !d.IsCore {
+			continue
+		}
+		if metric, ok := response.Summary[d.Code]; ok {
+			if metric.Status != "complete" || metric.Current.Status != "complete" || metric.Comparison.Status != "complete" {
+				return "partial_metrics"
+			}
 		}
 	}
 	return "data_unavailable"

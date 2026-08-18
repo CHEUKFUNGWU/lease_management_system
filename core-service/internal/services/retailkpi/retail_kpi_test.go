@@ -395,3 +395,99 @@ func TestAggregateDuplicateStoreDayRowsAlarm(t *testing.T) {
 		t.Fatalf("duplicate alarm missing from issues: %+v", rows[0].DataQualityIssues)
 	}
 }
+
+func TestMeasureKindStockVersusFlow(t *testing.T) {
+	// Guard N4 / GUARD-001: stock measures (average_daily_area_sqm) average across
+	// distinct business days and are never summed, while flow measures (revenue) sum.
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	facts := []DailyFact{
+		{StoreID: "s1", StoreCode: "S1", StoreName: "Store 1", Currency: "CNY", BusinessDate: base, Revenue: ptr(500), GrossProfit: ptr(200), Transactions: ptr(50), Footfall: ptr(100), AreaSqm: ptr(120), LaborCost: ptr(50), FixedRent: ptr(30), VariableRent: ptr(10), NonLeaseCost: ptr(5), OtherControllableCost: ptr(10), MappingStatus: "mapped"},
+		{StoreID: "s1", StoreCode: "S1", StoreName: "Store 1", Currency: "CNY", BusinessDate: base.AddDate(0, 0, 1), Revenue: ptr(700), GrossProfit: ptr(280), Transactions: ptr(70), Footfall: ptr(140), AreaSqm: ptr(120), LaborCost: ptr(50), FixedRent: ptr(30), VariableRent: ptr(14), NonLeaseCost: ptr(5), OtherControllableCost: ptr(10), MappingStatus: "mapped"},
+	}
+
+	rows, _, err := AggregateFacts(facts, Request{DateFrom: base, DateTo: base.AddDate(0, 0, 1), RequestedDateFrom: "2026-01-01", RequestedDateTo: "2026-01-02", GroupBy: "total", ExpectedStoreCount: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kpis := rows[0].KPIs
+	// Stock: average_daily_area_sqm is 120 (not 240)
+	if kpis["average_daily_area_sqm"].Value == nil || *kpis["average_daily_area_sqm"].Value != 120 {
+		t.Fatalf("expected stock average 120 sqm, got %v", kpis["average_daily_area_sqm"].Value)
+	}
+	// Flow: revenue is 500 + 700 = 1200
+	if kpis["revenue"].Value == nil || *kpis["revenue"].Value != 1200 {
+		t.Fatalf("expected flow sum 1200, got %v", kpis["revenue"].Value)
+	}
+	// Sales per sqm: 1200 / 120 = 10
+	if kpis["sales_per_sqm"].Value == nil || *kpis["sales_per_sqm"].Value != 10 {
+		t.Fatalf("expected sales_per_sqm 10, got %v", kpis["sales_per_sqm"].Value)
+	}
+
+	// Verify Definition MeasureKind properties
+	areaDef := findDefinition("average_daily_area_sqm")
+	if areaDef == nil || areaDef.MeasureKind != MeasureKindStock {
+		t.Fatalf("average_daily_area_sqm must be MeasureKindStock, got %+v", areaDef)
+	}
+	revDef := findDefinition("revenue")
+	if revDef == nil || revDef.MeasureKind != MeasureKindFlow {
+		t.Fatalf("revenue must be MeasureKindFlow, got %+v", revDef)
+	}
+}
+
+func TestLaborProductivityMetrics(t *testing.T) {
+	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Case 1: Complete labor hours facts
+	factsWithLabor := []DailyFact{
+		{StoreID: "s1", StoreCode: "S1", StoreName: "Store 1", Currency: "CNY", BusinessDate: base, Revenue: ptr(1000), GrossProfit: ptr(400), Transactions: ptr(50), Footfall: ptr(100), AreaSqm: ptr(100), LaborCost: ptr(200), FixedRent: ptr(50), VariableRent: ptr(20), NonLeaseCost: ptr(10), OtherControllableCost: ptr(20), LaborHours: ptr(25), Headcount: ptr(4), MappingStatus: "mapped"},
+	}
+
+	rows, _, err := AggregateFacts(factsWithLabor, Request{DateFrom: base, DateTo: base, RequestedDateFrom: "2026-01-01", RequestedDateTo: "2026-01-01", GroupBy: "total", ExpectedStoreCount: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kpis := rows[0].KPIs
+	// Sales per labor hour: 1000 / 25 = 40
+	if kpis["sales_per_labor_hour"].Value == nil || *kpis["sales_per_labor_hour"].Value != 40 || kpis["sales_per_labor_hour"].Status != StatusComplete {
+		t.Fatalf("expected sales_per_labor_hour 40 (complete), got %+v", kpis["sales_per_labor_hour"])
+	}
+	// Labor hours per transaction: 25 / 50 = 0.5
+	if kpis["labor_hours_per_transaction"].Value == nil || *kpis["labor_hours_per_transaction"].Value != 0.5 || kpis["labor_hours_per_transaction"].Status != StatusComplete {
+		t.Fatalf("expected labor_hours_per_transaction 0.5 (complete), got %+v", kpis["labor_hours_per_transaction"])
+	}
+
+	// Case 2: Missing labor hours should return StatusPartial with missing_required_field without failing core DecisionReady
+	factsWithoutLabor := []DailyFact{
+		{StoreID: "s1", StoreCode: "S1", StoreName: "Store 1", Currency: "CNY", BusinessDate: base, Revenue: ptr(1000), GrossProfit: ptr(400), Transactions: ptr(50), Footfall: ptr(100), AreaSqm: ptr(100), LaborCost: ptr(200), FixedRent: ptr(50), VariableRent: ptr(20), NonLeaseCost: ptr(10), OtherControllableCost: ptr(20), LaborHours: nil, Headcount: nil, MappingStatus: "mapped"},
+	}
+
+	rowsMissing, _, err := AggregateFacts(factsWithoutLabor, Request{DateFrom: base, DateTo: base, RequestedDateFrom: "2026-01-01", RequestedDateTo: "2026-01-01", GroupBy: "total", ExpectedStoreCount: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kpisMissing := rowsMissing[0].KPIs
+	if kpisMissing["sales_per_labor_hour"].Status != StatusPartial || kpisMissing["sales_per_labor_hour"].Reason != "missing_required_field" || kpisMissing["sales_per_labor_hour"].Value != nil {
+		t.Fatalf("missing labor_hours should yield partial with missing_required_field, got %+v", kpisMissing["sales_per_labor_hour"])
+	}
+	// Core decision readiness should remain true even when optional labor hours are missing
+	if !rowsMissing[0].DecisionReady {
+		t.Fatalf("missing optional labor_hours must not break core DecisionReady status")
+	}
+
+	// Case 3: Zero labor hours / Zero transactions denominator check
+	factsZero := []DailyFact{
+		{StoreID: "s1", StoreCode: "S1", StoreName: "Store 1", Currency: "CNY", BusinessDate: base, Revenue: ptr(1000), GrossProfit: ptr(400), Transactions: ptr(0), Footfall: ptr(100), AreaSqm: ptr(100), LaborCost: ptr(200), FixedRent: ptr(50), VariableRent: ptr(20), NonLeaseCost: ptr(10), OtherControllableCost: ptr(20), LaborHours: ptr(0), Headcount: ptr(0), MappingStatus: "mapped"},
+	}
+
+	rowsZero, _, _ := AggregateFacts(factsZero, Request{DateFrom: base, DateTo: base, RequestedDateFrom: "2026-01-01", RequestedDateTo: "2026-01-01", GroupBy: "total", ExpectedStoreCount: 1})
+	kpisZero := rowsZero[0].KPIs
+	if kpisZero["sales_per_labor_hour"].Status != StatusUnavailable || kpisZero["sales_per_labor_hour"].Reason != "zero_denominator" {
+		t.Fatalf("zero labor hours should yield zero_denominator, got %+v", kpisZero["sales_per_labor_hour"])
+	}
+	if kpisZero["labor_hours_per_transaction"].Status != StatusUnavailable || kpisZero["labor_hours_per_transaction"].Reason != "zero_denominator" {
+		t.Fatalf("zero transactions should yield zero_denominator, got %+v", kpisZero["labor_hours_per_transaction"])
+	}
+}
+

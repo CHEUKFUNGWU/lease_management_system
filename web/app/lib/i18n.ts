@@ -151,6 +151,106 @@ const dict: TranslationDict = {
     "zh-HK": "期間坪效",
     en: "Sales per sqm",
   },
+  "retail.kpi.sales_per_labor_hour": {
+    "zh-CN": "人时产出",
+    "zh-HK": "人時產出",
+    en: "Sales per labor hour",
+  },
+  "retail.kpi.labor_hours_per_transaction": {
+    "zh-CN": "单均人时",
+    "zh-HK": "單均人時",
+    en: "Labor hours per txn",
+  },
+  "retail.lifecycle.mature": {
+    "zh-CN": "成熟期",
+    "zh-HK": "成熟期",
+    en: "Mature",
+  },
+  "retail.lifecycle.ramp_up": {
+    "zh-CN": "爬坡期",
+    "zh-HK": "爬坡期",
+    en: "Ramp-up",
+  },
+  "retail.lifecycle.pre_opening": {
+    "zh-CN": "筹备期",
+    "zh-HK": "籌備期",
+    en: "Pre-opening",
+  },
+  "retail.lifecycle.closed": {
+    "zh-CN": "已闭店",
+    "zh-HK": "已閉店",
+    en: "Closed",
+  },
+  "retail.lifecycle.undecided": {
+    "zh-CN": "待定",
+    "zh-HK": "待定",
+    en: "Undecided",
+  },
+  "retail.format.flagship": {
+    "zh-CN": "旗舰店",
+    "zh-HK": "旗艦店",
+    en: "Flagship",
+  },
+  "retail.format.standard": {
+    "zh-CN": "标准店",
+    "zh-HK": "標準店",
+    en: "Standard",
+  },
+  "retail.format.compact": {
+    "zh-CN": "紧凑店",
+    "zh-HK": "緊湊店",
+    en: "Compact",
+  },
+  "retail.format.outlet": {
+    "zh-CN": "奥莱店",
+    "zh-HK": "奧萊店",
+    en: "Outlet",
+  },
+  "retail.sssg.title": {
+    "zh-CN": "SSSG 同店销售增长",
+    "zh-HK": "SSSG 同店銷售增長",
+    en: "SSSG (Same-Store Sales Growth)",
+  },
+  "retail.sssg.comparable_stores": {
+    "zh-CN": "可比门店",
+    "zh-HK": "可比門店",
+    en: "Comparable stores",
+  },
+  "retail.sssg.excluded_stores": {
+    "zh-CN": "排除门店",
+    "zh-HK": "排除門店",
+    en: "Excluded stores",
+  },
+  "retail.sssg.reason.too_new": {
+    "zh-CN": "处于爬坡期",
+    "zh-HK": "處於爬坡期",
+    en: "In ramp-up period",
+  },
+  "retail.sssg.reason.closed": {
+    "zh-CN": "已闭店",
+    "zh-HK": "已閉店",
+    en: "Store closed",
+  },
+  "retail.sssg.reason.missing_lifecycle_data": {
+    "zh-CN": "缺失开业日期",
+    "zh-HK": "缺失開業日期",
+    en: "Missing opening date",
+  },
+  "retail.store.lifecycle": {
+    "zh-CN": "生命周期",
+    "zh-HK": "生命週期",
+    en: "Lifecycle",
+  },
+  "retail.store.format": {
+    "zh-CN": "门店店型",
+    "zh-HK": "門店店型",
+    en: "Store format",
+  },
+  "retail.store.opening_date": {
+    "zh-CN": "开业日期",
+    "zh-HK": "開業日期",
+    en: "Opening date",
+  },
   "retail.kpi.fixed_rent": {
     "zh-CN": "固定现金租金",
     "zh-HK": "固定現金租金",

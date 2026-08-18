@@ -348,7 +348,39 @@ agent.Subscribe(agentsession.UsageRecorder(store))      // 用量与成本
 
 把 OCR 成本从"每份文件"降到"用户真正要看证据的文件"，首次响应也快得多。
 
-### 8.2 必须同步修正的失败语义
+### 8.2 anydoc 适配器契约
+
+> 承接自 `AI_Agent_填表升级_tau_anydoc_实施计划.md` Wave T1 与其模块深化 M1。**两处均已作废，此处为迁移后的现行版本。** 原设计把适配器放在 `ai-service/app/services/anydoc_adapter.py`（Python），与 ADR-0023 冲突，故翻译到 Go；原设计的 PDF 路径写作「PaddleOCR 优先 + PyMuPDF fallback」，PyMuPDF 已由 ADR-0024 删除。
+
+```go
+type ParsedDocument struct {
+    Markdown     string       // GFM，供模型与证据锚点使用
+    Format       string       // docx / xls / pptx / odt / rtf / epub / csv / pdf
+    EvidenceMode EvidenceMode // Quote（office，无坐标体系）| Coordinate（PDF 经 OCR）| Unavailable
+    Warnings     []string     // 降级说明，进入复核上下文
+}
+
+type DocumentParser interface {
+    Parse(ctx context.Context, src Source) (ParsedDocument, error) // Source{Data, Filename, SizeLimit}
+}
+```
+
+**藏在接口后面**：格式探测（扩展名 + 内容）、大小上限、加密/损坏文件的错误分类（`parse_unsupported` / `file_encrypted` / `file_too_large`，**绝不静默成功**）、CSV 走标准库确定性路径不交给模型、以及证据模式的判定。
+
+**证据模式的取值是本契约的核心**，它把 §8.1 的惰性证据与 ADR-0024 §4 的诚实降级编码进了类型：
+
+| 输入与路径 | EvidenceMode | 含义 |
+|---|---|---|
+| office 家族经 anydoc | `Quote` | 有引文锚点，无坐标。`evidence_complete=false`（沿用 `ai-intake.v1` 既有语义） |
+| PDF 经 PaddleOCR | `Coordinate` | 块级 `{page, coordinates, quote}` |
+| PDF 经 anydoc（首轮，未请求证据） | `Unavailable` | 有文本，**不得声称任何定位** |
+| OCR 不可用而降级 | `Unavailable` | 同上 |
+
+**anydoc 以子进程调用**，不走 cgo。二进制按版本与 checksum 钉死（索引 §5 未决项 6）。
+
+**删除测试**：删掉这一层，格式探测与四种错误分类会扩散回每个调用点，且「有文本就当有证据」的静默降级会重新出现。
+
+### 8.3 必须同步修正的失败语义
 
 底稿方案 §8 里"OCR 不可用 → 降级到 PyMuPDF 文本层"这一行**已失效**。新规则：
 

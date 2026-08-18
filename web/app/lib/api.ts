@@ -2428,3 +2428,35 @@ export const settingsApi = {
       token,
     }),
 };
+
+export interface MachineCredential {
+  id: string;
+  legal_entity_id: string;
+  name: string;
+  client_id: string;
+  client_secret?: string;
+  scopes: string[];
+  expires_at?: string;
+  revoked_at?: string;
+  last_used_at?: string;
+  created_at: string;
+}
+
+export const machineCredentialApi = {
+  list: (token: string): Promise<{ credentials: MachineCredential[] }> =>
+    apiRequest("/api/v1/admin/machine-credentials", { token }),
+  issue: (
+    data: { name: string; scopes?: string[]; expires_in_days?: number },
+    token: string
+  ): Promise<MachineCredential> =>
+    apiRequest("/api/v1/admin/machine-credentials", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  revoke: (id: string, token: string): Promise<{ status: string; client_id: string }> =>
+    apiRequest(`/api/v1/admin/machine-credentials/${encodeURIComponent(id)}/revoke`, {
+      method: "POST",
+      token,
+    }),
+};

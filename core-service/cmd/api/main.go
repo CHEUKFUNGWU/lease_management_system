@@ -136,6 +136,8 @@ func main() {
 	categoryHandler := handlers.NewCategoryHandler(categoryRepo)
 	promotionRepo := repository.NewPromotionRepository(database.Pool)
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo)
+	machineCredRepo := repository.NewMachineCredentialRepository(database.Pool)
+	sourceFeedHandler := handlers.NewSourceFeedHandler(machineCredRepo, retailKPIRepo)
 	exchangeRateVersionHandler := handlers.NewExchangeRateVersionHandler(exchangeRateRepo)
 	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
 	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
@@ -175,6 +177,7 @@ func main() {
 	r.POST("/api/v1/auth/login", authHandler.Login)
 	r.POST("/api/v1/auth/refresh", authHandler.Refresh)
 	r.POST("/api/v1/auth/logout", authHandler.Logout)
+	r.POST("/api/v1/retail/push/facts", sourceFeedHandler.PushFacts)
 
 	// Protected routes
 	api := r.Group("/api/v1")
@@ -484,6 +487,9 @@ func main() {
 		// Global Settings
 		protected.Handle(http.MethodGet, "/settings/global", permission("settings", "read"), settingsHandler.GetGlobal)
 		protected.Handle(http.MethodPut, "/settings/global", permission("settings", "update"), settingsHandler.UpdateGlobal)
+		protected.Handle(http.MethodGet, "/admin/machine-credentials", permission("settings", "read"), sourceFeedHandler.ListMachineCredentials)
+		protected.Handle(http.MethodPost, "/admin/machine-credentials", permission("settings", "update"), sourceFeedHandler.IssueMachineCredential)
+		protected.Handle(http.MethodPost, "/admin/machine-credentials/:id/revoke", permission("settings", "update"), sourceFeedHandler.RevokeMachineCredential)
 	}
 
 	port := cfg.Port

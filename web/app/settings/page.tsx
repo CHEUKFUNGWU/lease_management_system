@@ -22,6 +22,7 @@ import { t } from "../lib/i18n";
 import { useRouter } from "next/navigation";
 import { classifyDataState } from "../lib/dataState";
 import { notifyError } from "../lib/notify";
+import { MachineCredentialsPanel } from "./MachineCredentialsPanel";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -687,6 +688,9 @@ export default function SettingsPage() {
             ]}
           />
         </Card>
+
+        {/* Machine API Credentials */}
+        <MachineCredentialsPanel />
 
         {/* filters */}
         <Card style={{ marginBottom: 16 }}>

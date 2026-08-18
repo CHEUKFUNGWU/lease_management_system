@@ -6,7 +6,10 @@
 > - `docs/AI_底稿与Paperwork_Agent设计方案.md`（能力层：底稿产出、Tier A/B、不变量）
 > - `docs/AI_Chat_升级方案_pi_agent_参考.md`（早期 pi 借鉴，运行时层）
 > - `docs/AI_Agent_与_CLI_架构演进_PRD.md`（Tool Runtime 与 Gateway，已交付）
-> - ~~`docs/AI_Agent_填表升级_tau_anydoc_实施计划.md`~~（**tau 部分作废**，见 §9；anydoc 部分保留）
+> - [ADR-0022](adr/0022-first-party-go-agent-core-modelled-on-pi.md)（本文的决策留痕）、[ADR-0023](adr/0023-retire-the-first-party-python-ai-service.md)（退役 Python）、[ADR-0024](adr/0024-remove-the-agpl-pdf-dependency.md)（解析栈）
+> - 索引：[AI 文档索引与现行决策](AI_文档索引与现行决策.md)
+>
+> **已吸收的前序设计**：`AI_Agent_填表升级_tau_anydoc_实施计划` 与其模块深化中，tau 部分由 ADR-0022 作废；anydoc 适配器已迁入 §8.2，填表缝（Wave T3/T4、M4）已迁入**附录 A**。两份原文档随后归档，本文为现行依据。
 
 ---
 
@@ -452,3 +455,86 @@ type DocumentParser interface {
 ## 13. 一句话总结
 
 > 照抄 pi 的**运行时抽象**（纯循环 + 注入依赖 + 两个闸点 + 订阅者结算），不照抄它的**信任模型**（无权限、无持久化、开放生态）。收益不是"更像 pi"，而是**把六项散落的治理收拢成一条顺序固定、可被变异测试锁死的中间件链**，顺带让自研 Python 归零。
+
+---
+
+## 附录 A — 功能页填表缝（page_fill）
+
+> 迁移自 `AI_Agent_填表升级_tau_anydoc_实施计划.md` Wave T3/T4 与其模块深化 M4。**两处均已作废**，tau 相关部分被 ADR-0022 取代，此处是保留下来的填表设计的现行版本。
+>
+> 编为附录而非正章，是为了不改动本文既有章号——ADR-0022、ADR-0004 Addendum A、底稿方案 §14 与文档索引 §5 都按现有编号引用了本文。
+
+### A.1 为什么需要这条缝
+
+「客户扔一份非标准 Excel 进来，Agent 识别意图、把数据填进对应功能页、人确认后入库」这条链路里，最后一段没有着落：Agent 算得出结果，却没有把结果交给页面表单的协议。
+
+原则一句话：**填表 = 预填 + 人确认。** Agent 的写权限停在 preview 与 artifact，commit 永远是人或人驱动的 CLI。
+
+### A.2 `page_fill` artifact 协议
+
+在 `internal/agentartifact` 新增 artifact 类型：
+
+```json
+{
+  "artifact_type": "page_fill",
+  "schema_version": "v1",
+  "target_page": "retail-data-import",
+  "target_api": "POST /retail/operating-facts/store-days/import/preview",
+  "payload": { },
+  "field_provenance": { },
+  "confidence": 0.0,
+  "review_required": true,
+  "review_reasons": [],
+  "deep_link": "/retail-data-import?fill=artifact-…"
+}
+```
+
+**深度**：页面只认「填表载荷」，不认 Agent 内部结构。`payload` 的 schema 与页面表单一一对应，同一份字段定义同时驱动表单与校验（沿用 retailingest「后端白名单、前端消费」的既有纪律）。换内核不影响页面消费端。
+
+**确认点纪律**：每个 `page_fill` 只有一个 confirm 落点，对应既有业务写入 API；confirm 必须人工触发并带幂等键。**页面预填只是把人要点的按钮准备好，不替代人。**
+
+### A.3 与 WorkingPaper 共用同一套 provenance（本次合并新增）
+
+原 M4 协议里是 `sources / model_version / rule_version / confidence` 一套字段，而底稿方案 §7.1 的 `WorkingPaper` 用的是 `basis / tool_call_id / engine_version / …` 另一套。**两套并存会在同一个数字上造成追溯断链**——一个数字可能先经 `page_fill` 入库，之后又出现在底稿里，两段链路对不上就等于没有溯源。
+
+因此 `page_fill.field_provenance` 采用与 `WorkingPaper` 单元格**完全相同**的结构，`basis` 取同一套四分类：
+
+| 字段来源 | basis | 说明 |
+|---|---|---|
+| 从库中读出预填 | `SystemFact` | |
+| 确定性引擎算出 | `Certified` | 带 `tool_call_id` + `engine_version` |
+| 模型从文件抽取，**尚未确认** | `Exploratory` | 必带 `confidence` 与证据锚点 |
+| 人在页面上确认或改写后 | `HumanInput` | 带 `confirmed_by` / `confirmed_at` |
+
+**由此得到一条硬规则**：`basis=Exploratory` 的字段**不得**随 commit 直接入库——它要么被人确认转为 `HumanInput`，要么被丢弃。这是底稿方案不变量 I5 在填表路径上的同一条规则，两条路径共用一个断言即可。
+
+### A.4 每页填表契约
+
+| 功能页 | 现有写入口 | Agent 工具（白名单，LevelDraft） | CLI 命令（人，含 commit） | 预填 payload | 确认点 |
+|---|---|---|---|---|---|
+| 合同台账 | `lease.*.draft.create` | 已有，不动 | 已有 | 草稿字段 | 审批流 |
+| 零售数据导入 | preview / commit | `retail.store_days.import.preview` | `retail import preview\|commit` | mapping、source_system、as_of | 导入页 commit |
+| 租金谈判测算 | evaluate + action-draft save | `retail.store.scenario.evaluate`（已有）+ `retail.scenario.action.save` | `scenario evaluate\|save` | assumptions、store_id、window_days | 保存/采纳 |
+| FP&A 计划 | `/fpna/plan-versions/import` | `fpna.plan.import.preview` | `plan import preview\|commit` | 映射 + 校验行 | commit |
+| Trial Balance | `/gl/trial-balances/import` | `gl.trial_balance.import.preview` | `tb import preview\|commit` | 映射 + 校验行 | commit |
+| 月结 | generate（已有） | 无（只读解释） | 无 | — | 审批/锁账不变 |
+
+**preview 工具对 Agent 开放，commit 工具只对 CLI（人）开放、不进 Agent 白名单。** 经营脉搏与门店 360 保持只读——它们的「填表」就是导入页，不另开写口。
+
+### A.5 意图识别闭环
+
+`agentskill/registry.go` 扩展三个技能：`retail_ingest_fill`（匹配「导入/填/上传经营数据」+ HasFile）、`plan_import_fill`、`tb_import_fill`。各自白名单 = 文件解析工具 + 对应 preview 工具。
+
+链路：附件 → `doc.triage` 分诊 → anydoc/OCR 解析 → 技能选择 → preview 工具 → `page_fill` artifact → 页面预填 → 人确认 commit。
+
+**端到端验收**：一份真实 POS 风格 Excel 走通全链路，经营脉搏出现 production 数据与诚实覆盖率；`scope_denied` 不得被软化成「无数据」（既有测试保持）。
+
+### A.6 相关验收
+
+补进 §11：
+
+| ID | 验收项 | 通过判据 |
+|---|---|---|
+| **ACORE-10** | 填表不越权 | commit 类工具不在任何 Agent 技能白名单内；Agent 尝试调用 commit 被拒并记录 |
+| **ACORE-11** | provenance 跨路径一致 | 同一字段经 `page_fill` 入库后再进 WorkingPaper，`basis` 与来源引用可端到端追溯 |
+| **ACORE-12** | 未确认字段不入库 | `basis=Exploratory` 的字段随 commit 提交时被拒（与不变量 I5 共用断言） |

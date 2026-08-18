@@ -8,30 +8,73 @@
  *
  * 变更集合 = `git diff <base>`（工作树 vs 基线）+ 未跟踪文件，因此对
  * 未提交的新改动同样生效。
+ *
+ * 存量债务显式记账（T6b）：DESIGN.md §14 登记的违规由
+ * `design-debt-baseline.json` 按「文件 × 规则」记录允许数量（带日期），
+ * 守卫对超出基线数量的部分仍然失败——把基线挪走或只记总量都会彻底放行，
+ * 记到每个文件的精确数量才能继续拦住新增（某文件从 40 涨到 41 就红）。
  */
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = execSync("git rev-parse --show-toplevel").toString().trim();
-const base = process.env.CI ? "origin/main" : "main";
+const defaultBase = process.env.CI ? "origin/main" : "main";
+const BASELINE_PATH = path.join(root, "web/scripts/design-debt-baseline.json");
 
-const changedFiles = [
-  ...execSync(`git diff --name-only ${base}`, { cwd: root }).toString().split("\n"),
-  // 未跟踪的新文件 git diff 看不到，但同样受止血条款约束。
-  ...execSync(`git ls-files --others --exclude-standard`, { cwd: root }).toString().split("\n"),
-]
-  .map((p) => p.trim())
-  .filter(Boolean);
+// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+// ┃ 规则模式与豁免                                                    ┃
+// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+const INLINE_STYLE_RE = /style=\{\{([^{}]*)\}\}/;
+const FONT_WEIGHT_RE = /fontWeight\s*:\s*(['"]?)(700|800|900)\1/;
+const IMPORTANT_RE = /!important/;
+const CJK_RE = /[\u4e00-\u9fff]/;
+const HARDCODED_COLOR_RE = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
+const BORDER_1PX_SOLID_RE = /border(?:-[a-z]+)?\s*:\s*["']?1px\s+solid/;
+const HARDCODED_TIMESTAMP_RE = /TIMESTAMPTZ\s*'\s*20\d\d-\d\d-\d\d|TIMESTAMP\s*'\s*20\d\d-\d\d-\d\d/;
+
+// t() 词典文件、测试文件里的中文是内容本身；守卫脚本自身也不扫描。
+// I18N-001：三个零售页的硬编码中文已全部走 t()，CJK_EXEMPT_PAGES 与
+// INLINE_STYLE_EXEMPT_PAGES 两个豁免名单已删除——计数守卫现在对这三页
+// 的硬编码中文与静态内联样式同样生效（收紧，见 I18N-001 守卫 commit）。
+// §13-4/§13-8 同样豁免测试文件：断言里写出的期望颜色是测试内容，不是
+// UI 硬编码，与 CJK 豁免同一条理由。
+const CJK_EXEMPT_SUFFIXES = [/\/lib\/i18n(\.\w+)*\.tsx?$/, /\.test\.(ts|tsx)$/, /\.spec\.(ts|tsx)$/];
+// DESIGN.md §13-4 豁免：令牌定义本身与品牌图形常量（tokens.ts 是
+// 颜色的单一真相源；BrandIcon 的图形值属于 brand.* 图形语义）。
+const COLOR_EXEMPT_FILES = new Set(["web/app/design-system/tokens.ts", "web/app/components/BrandIcon.tsx"]);
+const SELF_EXEMPT = ["web/scripts/enforce-design.mjs", "web/scripts/design-debt-baseline.json"];
+
+// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+// ┃ 徽标与元数据豁免 — 品牌图形不是文案，浏览器标题不是 UI 文案      ┃
+// ┃ 「营」徽标是品牌 mark（继承旧 L16 的位置），没有可翻译的文案；    ┃
+// ┃   它的内联样式是 UI-002 之前的存量，本票只允许改字重与字形。      ┃
+// ┃ layout.tsx 的 metadata 是 Next 静态元数据；走 generateMetadata    ┃
+// ┃   做 i18n 是独立改进，归 UIUX 阶段四。                            ┃
+// ┃ 这里只允许「行模式/整文件元数据」级别的窄豁免；                   ┃
+// ┃ 任何人拿它当整页文件的挡箭牌 = 绕过止血。                         ┃
+// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+const BRAND_BADGE_LINE = /aria-hidden="true"[^>]*>\u8425<\/span>/;
+const METADATA_EXEMPT_FILES = new Set(["web/app/layout.tsx"]);
 
 // 行级变更提取：只检查「新增行」，已存在于基线里的违规行不触发。
 // 改过的文件里若有存量违规（906 处内联样式那一类），本守卫放行——
 // 存量是阶段一的事，本守卫只防新增。
-const untracked = new Set(
-  execSync(`git ls-files --others --exclude-standard`, { cwd: root }).toString().split("\n").map((p) => p.trim()).filter(Boolean),
-);
+function changedFiles(base) {
+  return [
+    ...execSync(`git diff --name-only ${base}`, { cwd: root }).toString().split("\n"),
+    // 未跟踪的新文件 git diff 看不到，但同样受止血条款约束。
+    ...execSync(`git ls-files --others --exclude-standard`, { cwd: root }).toString().split("\n"),
+  ]
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
 
-function changedLines(file) {
+function changedLines(base, file) {
+  const untracked = new Set(
+    execSync(`git ls-files --others --exclude-standard`, { cwd: root }).toString().split("\n").map((p) => p.trim()).filter(Boolean),
+  );
   if (untracked.has(file)) {
     // 未跟踪文件整文件都是新增，无旧行可比
     try {
@@ -88,36 +131,6 @@ function isNewViolation(pattern, line, oldText) {
   return violationCount(pattern, line) > violationCount(pattern, oldText);
 }
 
-const violations = [];
-function fail(file, line, message) {
-  violations.push(`${file}:${line}: ${message}`);
-}
-
-// t() 词典文件、测试文件里的中文是内容本身；守卫脚本自身也不扫描。
-// I18N-001：三个零售页的硬编码中文已全部走 t()，CJK_EXEMPT_PAGES 与
-// INLINE_STYLE_EXEMPT_PAGES 两个豁免名单已删除——计数守卫现在对这三页
-// 的硬编码中文与静态内联样式同样生效（收紧，见 I18N-001 守卫 commit）。
-const CJK_EXEMPT_SUFFIXES = [/\/lib\/i18n(\.\w+)*\.tsx?$/, /\.test\.(ts|tsx)$/, /\.spec\.(ts|tsx)$/];
-const SELF_EXEMPT = ["web/scripts/enforce-design.mjs"];
-
-// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-// ┃ 徽标与元数据豁免 — 品牌图形不是文案，浏览器标题不是 UI 文案      ┃
-// ┃ 「营」徽标是品牌 mark（继承旧 L16 的位置），没有可翻译的文案；    ┃
-// ┃   它的内联样式是 UI-002 之前的存量，本票只允许改字重与字形。      ┃
-// ┃ layout.tsx 的 metadata 是 Next 静态元数据；走 generateMetadata    ┃
-// ┃   做 i18n 是独立改进，归 UIUX 阶段四。                            ┃
-// ┃ 这里只允许「行模式/整文件元数据」级别的窄豁免；                   ┃
-// ┃ 任何人拿它当整页文件的挡箭牌 = 绕过止血。                         ┃
-// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-const BRAND_BADGE_LINE = /aria-hidden="true"[^>]*>\u8425<\/span>/;
-const METADATA_EXEMPT_FILES = new Set(["web/app/layout.tsx"]);
-
-const INLINE_STYLE_RE = /style=\{\{([^{}]*)\}\}/;
-const FONT_WEIGHT_RE = /fontWeight\s*:\s*(['"]?)(700|800|900)\1/;
-const IMPORTANT_RE = /!important/;
-const CJK_RE = /[\u4e00-\u9fff]/;
-const HARDCODED_TIMESTAMP_RE = /TIMESTAMPTZ\s*'\s*20\d\d-\d\d-\d\d|TIMESTAMP\s*'\s*20\d\d-\d\d-\d\d/;
-
 // 静态内联样式按**属性个数**比，不是按 style={{ 出现次数（ENF-003）：
 // 每个 `key: value` 里 value 以标识符/表达式开头的（引号、数字、#、%、
 // ( 开头的都是字面量）视为动态值，DESIGN.md §13-2 允许，不计数；无
@@ -147,69 +160,143 @@ function isNewStaticStyle(line, oldText) {
   return staticStylePropCount(line) > staticStylePropCount(oldText);
 }
 
-for (const file of changedFiles) {
-  if (SELF_EXEMPT.includes(file)) {
-    continue;
-  }
-  const absolute = path.join(root, file);
-  let content;
-  try {
-    content = readFileSync(absolute, "utf8");
-  } catch {
-    continue; // 文件被删除，无需检查
-  }
-  const lines = changedLines(file);
+// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+// ┃ 扫描：收集每条违规为 { file, line, rule, message }                ┃
+// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+export function collectViolations(base = defaultBase) {
+  const violations = [];
+  const fail = (file, line, rule, message) => {
+    violations.push({ file, line, rule, message: `${file}:${line}: ${message}` });
+  };
 
-  if (file.startsWith("web/")) {
-    for (const { number, text: line, oldText } of lines) {
-      if (isNewViolation(IMPORTANT_RE, line, oldText)) {
-        fail(file, number, "新增 !important（DESIGN.md §13-1）：提高特异性或改 token");
-      }
-      // 「营」徽标只豁免内联样式一条（品牌 mark 的存量写法）；
-      // !important 与 fontWeight 检查照常生效（上一批 Review §4）。
-      const styleExempt = BRAND_BADGE_LINE.test(line);
-      if (!styleExempt && isNewStaticStyle(line, oldText)) {
-        fail(file, number, "新增静态内联 style={{}}（DESIGN.md §13-2）：用类名 + CSS 变量");
-      }
-      if (isNewViolation(FONT_WEIGHT_RE, line, oldText)) {
-        fail(file, number, "新增 fontWeight > 600（DESIGN.md §13-6）：用尺寸和字距做层级");
+  for (const file of changedFiles(base)) {
+    if (SELF_EXEMPT.includes(file)) {
+      continue;
+    }
+    const absolute = path.join(root, file);
+    let content;
+    try {
+      content = readFileSync(absolute, "utf8");
+    } catch {
+      continue; // 文件被删除，无需检查
+    }
+    const lines = changedLines(base, file);
+
+    if (file.startsWith("web/")) {
+      for (const { number, text: line, oldText } of lines) {
+        if (isNewViolation(IMPORTANT_RE, line, oldText)) {
+          fail(file, number, "13-1", "新增 !important（DESIGN.md §13-1）：提高特异性或改 token");
+        }
+        // 「营」徽标只豁免内联样式一条（品牌 mark 的存量写法）；
+        // !important 与 fontWeight 检查照常生效（上一批 Review §4）。
+        const styleExempt = BRAND_BADGE_LINE.test(line);
+        if (!styleExempt && isNewStaticStyle(line, oldText)) {
+          fail(file, number, "13-2", "新增静态内联 style={{}}（DESIGN.md §13-2）：用类名 + CSS 变量");
+        }
+        if (isNewViolation(FONT_WEIGHT_RE, line, oldText)) {
+          fail(file, number, "13-6", "新增 fontWeight > 600（DESIGN.md §13-6）：用尺寸和字距做层级");
+        }
       }
     }
 
     if (file.startsWith("web/app/")) {
       const exempt = METADATA_EXEMPT_FILES.has(file) || CJK_EXEMPT_SUFFIXES.some((re) => re.test(file));
-      if (!exempt) {
-        for (const { number, text: line, oldText } of lines) {
-          const trimmed = line.trim();
-          if (BRAND_BADGE_LINE.test(line)) {
-            continue; // 「营」徽标：品牌 mark，见豁免名单
-          }
-          if (isNewViolation(CJK_RE, line, oldText) && !/t\(\s*['"]/.test(line) && !/^(\/\/|\/\*|\*)/.test(trimmed)) {
-            fail(file, number, "新增硬编码中文（DESIGN.md §13-7）：文案走 t()，三种语言齐全");
-          }
+      for (const { number, text: line, oldText } of lines) {
+        const trimmed = line.trim();
+        if (BRAND_BADGE_LINE.test(line)) {
+          continue; // 「营」徽标：品牌 mark，见豁免名单
+        }
+        if (!exempt && isNewViolation(CJK_RE, line, oldText) && !/t\(\s*['"]/.test(line) && !/^(\/\/|\/\*|\*)/.test(trimmed)) {
+          fail(file, number, "13-7", "新增硬编码中文（DESIGN.md §13-7）：文案走 t()，三种语言齐全");
+        }
+        // §13-4 硬编码颜色（T5）：只在 .ts/.tsx 生效——tokens.ts 的
+        // 十六进制是令牌本身，BrandIcon 是图形常量，两者豁免；
+        // globals.css 的 :root 是 CSS 文件，本规则不扫。
+        if (!COLOR_EXEMPT_FILES.has(file) && /\.(ts|tsx)$/.test(file) && !exempt && isNewViolation(HARDCODED_COLOR_RE, line, oldText)) {
+          fail(file, number, "13-4", "新增硬编码颜色值（DESIGN.md §13-4）：用 token，不要写 #hex / rgb() / rgba()");
+        }
+        // §13-8 字面量边框（T5）：DESIGN.md §6 要求走 --shadow-* 环形阴影。
+        if (/\.(ts|tsx)$/.test(file) && !exempt && isNewViolation(BORDER_1PX_SOLID_RE, line, oldText)) {
+          fail(file, number, "13-8", "新增 border: 1px solid（DESIGN.md §13-8）：用 --shadow-* 环形阴影");
+        }
+      }
+    }
+
+    if (file.endsWith("_test.go")) {
+      for (const { number, text: line, oldText } of lines) {
+        if (isNewViolation(HARDCODED_TIMESTAMP_RE, line, oldText)) {
+          fail(
+            file,
+            number,
+            "go-timestamp",
+            "测试里硬编码绝对时间戳（挂钟越过即永久变红）：改用相对 NOW() + INTERVAL 的偏移",
+          );
         }
       }
     }
   }
+  return violations;
+}
 
-  if (file.endsWith("_test.go")) {
-    for (const { number, text: line, oldText } of lines) {
-      if (isNewViolation(HARDCODED_TIMESTAMP_RE, line, oldText)) {
-        fail(
-          file,
-          number,
-          "测试里硬编码绝对时间戳（挂钟越过即永久变红）：改用相对 NOW() + INTERVAL 的偏移",
-        );
-      }
+// ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+// ┃ 存量债务基线（T6b）：按「文件 × 规则」记录允许数量，超出即失败    ┃
+// ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+export function loadBaseline(filePath = BASELINE_PATH) {
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    // 基线文件缺失 = 不允许任何存量债务，等价于全量收紧。守卫自己的
+    // 报错信息会说明这一点，而不是静默跳过。
+    return { as_of: "missing", files: {} };
+  }
+}
+
+// violations: collectViolations 的输出。返回 { excess, allowed, summary }：
+// 每个「文件 × 规则」组先吸收基线允许的数量，超出部分进入 excess
+// （每条都失败）；allowed 是被吸收的条数（只出现在汇总信息里）。
+export function applyBaseline(violations, baseline) {
+  const files = baseline?.files || {};
+  const grouped = new Map(); // "file\0rule" -> violations[]
+  for (const v of violations) {
+    const key = `${v.file}\u0000${v.rule}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    grouped.get(key).push(v);
+  }
+  const excess = [];
+  let allowed = 0;
+  const summary = {};
+  for (const [key, group] of grouped) {
+    const [file, rule] = key.split("\u0000");
+    const allowance = files[file]?.[rule] ?? 0;
+    const absorbed = Math.min(allowance, group.length);
+    allowed += absorbed;
+    excess.push(...group.slice(absorbed));
+    if (group.length > allowance) {
+      summary[`${file} ${rule}`] = { count: group.length, allowance };
     }
   }
+  return { excess, allowed, summary };
 }
 
-if (violations.length > 0) {
-  console.error("DESIGN.md §13 止血拦截失败：");
-  for (const v of violations) {
-    console.error("  " + v);
+// 直接执行时才跑主流程；被测试 import 时只导出函数。
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const violations = collectViolations();
+  const baseline = loadBaseline();
+  const { excess, allowed, summary } = applyBaseline(violations, baseline);
+
+  const over = Object.entries(summary);
+  if (over.length > 0) {
+    console.error("DESIGN.md §13 止血拦截失败：");
+    for (const [scope, { count, allowance }] of over) {
+      console.error(`  ${scope}: 新增 ${count} 处，基线允许 ${allowance} 处`);
+    }
+    console.error("  超出基线的具体行：");
+    for (const v of excess) {
+      console.error(`  ${v.message}`);
+    }
+    process.exit(1);
   }
-  process.exit(1);
+  console.log(`enforce-design: ${changedFiles(defaultBase).length} 个变更文件，无违规${allowed > 0 ? `（${allowed} 处存量债务按基线放行，见 design-debt-baseline.json）` : ""}`);
 }
-console.log(`enforce-design: ${changedFiles.length} 个变更文件，无新增违规`);

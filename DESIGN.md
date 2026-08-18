@@ -430,7 +430,8 @@ DataTrustBar      分类 · 口径 · 覆盖率 · decision-ready · 展开全�
 
 | 执行机制 | 状态 | 位置 |
 |---|---|---|
-| §13 止血条款自动拦截 | ✅ **CI 强制** | `web/scripts/enforce-design.mjs`（ENF-001），经 `npm run lint` 在 CI 跑 |
+| §13 止血条款自动拦截 | ✅ **CI 强制** | `web/scripts/enforce-design.mjs`（ENF-001），经 `npm run lint` 在 CI 跑。**已实现 9 条中的 6 条**：§13-1 `!important`、§13-2 内联样式、§13-4 硬编码颜色（T5）、§13-6 字重、§13-7 硬编码 CJK、§13-8 `border: 1px solid`（T5）。**未覆盖**：§13-3 JS hover（依赖事件处理器的语义分析，纯正则误报率太高，暂缓）、§13-5 `<Tag color="red">`（AntD 预设色名，与 §13-4 的 token 规则重叠，可在下一轮并入）、§13-9 用 0 填补缺失数据（需要数据流语义，不在文本扫描范畴） |
+| §13 存量债务基线 | ✅ **测试守护** | `web/scripts/design-debt-baseline.json`（按「文件 × 规则」记允许数量，带日期）+ `web/scripts/design-debt-baseline.test.ts`；超出基线即 CI 失败（T6b） |
 | §1 `tokens.ts` ↔ `:root` 对齐 | ✅ 测试守护 | `app/design-system/tokens-alignment.test.ts` |
 | 暗色令牌完整性 | ✅ 测试守护 | `app/design-system/theme-dark.test.ts` |
 | §8.1 容器原语 | ✅ 测试守护 | `web/scripts/container-primitives.test.ts` |
@@ -439,6 +440,6 @@ DataTrustBar      分类 · 口径 · 覆盖率 · decision-ready · 展开全�
 | 组件测试 | ✅ 13 个 `.test.tsx` | 用 `renderToStaticMarkup` SSR 断言，不依赖 `@testing-library` |
 | ESLint 配置文件 | ⚠️ **存在但只产 warning** | `web/.eslintrc.json` 已存在（`extends: next/core-web-vitals`），`next lint` 确实读取它；缺的是把规则提到 error——当前 21 条 `react-hooks/exhaustive-deps` 等只 warning 不 fail，`next lint` 因此永远绿 |
 
-**`enforce-design.mjs` 是 diff 级拦截器**：基线 CI 用 `origin/main`、本地用 `main`，只检查**新增行**。存量违规（§14 那批）一律放行——全树扫描会立刻全红，变成没人能合的噪音。
+**`enforce-design.mjs` 是 diff 级拦截器**：基线 CI 用 `origin/main`、本地用 `main`，只检查**新增行**。存量违规（§14 那批）一律放行——全树扫描会立刻全红，变成没人能合的噪音。分支级存量按 §14 的基线文件显式记账，超出允许数量仍然失败。
 
 这个设计的代价写在 §14：**它只在你跑了 `npm run lint` 时生效。** 内联样式从 906 涨到 946 说明这条路径被绕过过，或者匹配规则漏了某些写法。ESLint 配置不是缺失而是太松——`next/core-web-vitals` 的规则只 warning 不 fail，要补的一环是把关键规则提到 error（或给 `next lint` 加 `--max-warnings=0`）。

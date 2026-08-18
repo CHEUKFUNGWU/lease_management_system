@@ -72,7 +72,7 @@ export function MachineCredentialsPanel() {
         },
         token
       );
-      message.success("机器凭据颁发成功！");
+      message.success(t("machine_cred.issue_success", language));
       setNewlyIssued({
         client_id: res.client_id,
         client_secret: (res as any).client_secret || "",
@@ -81,7 +81,7 @@ export function MachineCredentialsPanel() {
       form.resetFields();
       loadCredentials();
     } catch (err: any) {
-      message.error(err?.message || "颁发失败");
+      message.error(err?.message || t("machine_cred.issue_failed", language));
     }
   };
 
@@ -89,37 +89,37 @@ export function MachineCredentialsPanel() {
     if (!token) return;
     try {
       await machineCredentialApi.revoke(clientID, token);
-      message.success("凭据已成功吊销");
+      message.success(t("machine_cred.revoke_success", language));
       loadCredentials();
     } catch (err: any) {
-      message.error(err?.message || "吊销失败");
+      message.error(err?.message || t("machine_cred.revoke_failed", language));
     }
   };
 
   const copyText = (text: string) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
-      message.success("已复制到剪贴板");
+      message.success(t("machine_cred.copied", language));
     }
   };
 
   const columns = [
     {
-      title: "凭据名称",
+      title: t("machine_cred.col_name", language),
       dataIndex: "name",
       key: "name",
       width: 160,
       render: (name: string) => <Text strong>{name}</Text>,
     },
     {
-      title: "Client ID",
+      title: t("machine_cred.col_client_id", language),
       dataIndex: "client_id",
       key: "client_id",
       width: 220,
       render: (id: string) => <Text code>{id}</Text>,
     },
     {
-      title: "权限 Scope",
+      title: t("machine_cred.col_scopes", language),
       dataIndex: "scopes",
       key: "scopes",
       width: 200,
@@ -134,40 +134,40 @@ export function MachineCredentialsPanel() {
       ),
     },
     {
-      title: "状态",
+      title: t("machine_cred.col_status", language),
       key: "status",
       width: 100,
       render: (_: any, r: MachineCredential) =>
         r.revoked_at ? (
           <Tag color="error" icon={<StopOutlined />}>
-            已吊销
+            {t("machine_cred.status_revoked", language)}
           </Tag>
         ) : (
           <Tag color="success" icon={<CheckCircleOutlined />}>
-            有效
+            {t("machine_cred.status_active", language)}
           </Tag>
         ),
     },
     {
-      title: "最近调用",
+      title: t("machine_cred.col_last_used", language),
       dataIndex: "last_used_at",
       key: "last_used_at",
       width: 160,
-      render: (t?: string) => (t ? t.replace("T", " ").substring(0, 19) : "从未调用"),
+      render: (used?: string) => (used ? used.replace("T", " ").substring(0, 19) : t("machine_cred.never_used", language)),
     },
     {
-      title: "操作",
+      title: t("machine_cred.col_actions", language),
       key: "actions",
       width: 100,
       render: (_: any, r: MachineCredential) =>
         !r.revoked_at && (
           <Popconfirm
-            title="确定吊销该机器凭据？"
-            description="吊销后使用该凭据的 POS/外部系统推送将立即被拒绝。"
+            title={t("machine_cred.revoke_confirm_title", language)}
+            description={t("machine_cred.revoke_confirm_desc", language)}
             onConfirm={() => handleRevoke(r.client_id)}
           >
             <Button size="small" danger type="link">
-              吊销
+              {t("machine_cred.revoke_btn", language)}
             </Button>
           </Popconfirm>
         ),
@@ -179,12 +179,12 @@ export function MachineCredentialsPanel() {
       title={
         <Space>
           <KeyOutlined />
-          <span>机器凭据与外部数据接入 (Machine API & Feeds)</span>
+          <span>{t("machine_cred.title", language)}</span>
         </Space>
       }
       extra={
         <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => setModalOpen(true)}>
-          颁发机器凭据
+          {t("machine_cred.issue_btn", language)}
         </Button>
       }
       style={{ marginBottom: 16 }}
@@ -196,7 +196,7 @@ export function MachineCredentialsPanel() {
             showIcon
             closable
             onClose={() => setNewlyIssued(null)}
-            message="请立即保存 Client Secret（密钥仅展示一次，关闭后不可再次查看）"
+            message={t("machine_cred.secret_alert_msg", language)}
             description={
               <Space direction="vertical" style={{ width: "100%", marginTop: 8 }}>
                 <div>
@@ -229,9 +229,9 @@ export function MachineCredentialsPanel() {
         />
 
         {/* Push API curl example */}
-        <Card size="small" title={<Space><CodeOutlined /><span>POS / ERP 外部推送接口调用示例</span></Space>}>
+        <Card size="small" title={<Space><CodeOutlined /><span>{t("machine_cred.curl_example_title", language)}</span></Space>}>
           <Paragraph style={{ fontSize: 12, marginBottom: 8 }}>
-            外部系统可通过标准 HTTP POST 调用推送 store-day 事实数据（支持 <code>Idempotency-Key</code> 幂等重放）：
+            {t("machine_cred.curl_example_desc", language)}
           </Paragraph>
           <pre style={{ background: "var(--bg-subtle, #f5f5f5)", padding: 12, borderRadius: 4, fontSize: 11, overflowX: "auto" }}>
 {`curl -X POST https://<domain>/api/v1/retail/push/facts \\
@@ -256,7 +256,7 @@ export function MachineCredentialsPanel() {
       </Space>
 
       <Modal
-        title="颁发机器凭据 (Client Credentials)"
+        title={t("machine_cred.modal_title", language)}
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={() => form.submit()}
@@ -264,24 +264,24 @@ export function MachineCredentialsPanel() {
         <Form form={form} layout="vertical" onFinish={handleIssue}>
           <Form.Item
             name="name"
-            label="凭据用途名称"
-            rules={[{ required: true, message: "请输入凭据名称" }]}
+            label={t("machine_cred.label_name", language)}
+            rules={[{ required: true, message: t("machine_cred.rule_name_required", language) }]}
           >
-            <Input placeholder="例: 上海区 POS 每日自动同步" />
+            <Input placeholder={t("machine_cred.placeholder_name", language)} />
           </Form.Item>
           <Form.Item
             name="scopes"
-            label="授权范围 (Scopes)"
+            label={t("machine_cred.label_scopes", language)}
             initialValue={["operating_facts:write"]}
           >
             <Select mode="multiple">
-              <Select.Option value="operating_facts:write">经营事实写入 (operating_facts:write)</Select.Option>
-              <Select.Option value="store:read">门店主数据只读 (store:read)</Select.Option>
+              <Select.Option value="operating_facts:write">{t("machine_cred.scope_facts_write", language)}</Select.Option>
+              <Select.Option value="store:read">{t("machine_cred.scope_store_read", language)}</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item
             name="expires_in_days"
-            label="有效期 (天)"
+            label={t("machine_cred.label_expires", language)}
             initialValue={365}
           >
             <InputNumber style={{ width: "100%" }} min={1} />

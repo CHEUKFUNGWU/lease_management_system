@@ -12,6 +12,7 @@ import {
   Input,
   InputNumber,
   Select,
+  Segmented,
   DatePicker,
   Row,
   Col,
@@ -130,12 +131,12 @@ export default function PromotionsPage() {
         },
         token
       );
-      message.success("促销活动创建成功");
+      message.success(t("promotion.msg_create_success", language));
       setCreateModalOpen(false);
       form.resetFields();
       loadPromotions();
     } catch (err: any) {
-      message.error(err?.message || "创建失败");
+      message.error(err?.message || t("promotion.msg_create_failed", language));
     }
   };
 
@@ -153,28 +154,28 @@ export default function PromotionsPage() {
         },
         token
       );
-      message.success("活动费用记录成功");
+      message.success(t("promotion.msg_cost_success", language));
       setCostModalOpen(false);
       costForm.resetFields();
       loadPromoDetails(selectedPromo);
     } catch (err: any) {
-      message.error(err?.message || "添加费用失败");
+      message.error(err?.message || t("promotion.msg_cost_failed", language));
     }
   };
 
   const handleCreateActionItem = () => {
     if (!selectedPromo || !roiResult) return;
-    const summary = `[活动复盘行动项] ${selectedPromo.name} (ROI: ${roiResult.roi != null ? (roiResult.roi * 100).toFixed(1) + "%" : "N/A"})\n` +
-      `活动编码: ${selectedPromo.promo_code}\n` +
-      `增量毛利: ${fmtMoney(roiResult.incremental_gross_profit, roiResult.currency)}\n` +
-      `实际总成本: ${fmtMoney(roiResult.total_cost, roiResult.currency)}\n` +
-      `归因结论: ${roiResult.is_separable ? "归因独立。" : "存在重叠活动，请结合商圈与门店排期复核。"}`;
+    const summary = `${t("promotion.action_item_prefix", language)} ${selectedPromo.name} (ROI: ${roiResult.roi != null ? (roiResult.roi * 100).toFixed(1) + "%" : "N/A"})\n` +
+      `${t("promotion.code_label", language)}: ${selectedPromo.promo_code}\n` +
+      `${t("promotion.inc_gross_profit_label", language)}: ${fmtMoney(roiResult.incremental_gross_profit, roiResult.currency)}\n` +
+      `${t("promotion.total_cost_label", language)}: ${fmtMoney(roiResult.total_cost, roiResult.currency)}\n` +
+      `${t("promotion.attribution_conclusion", language)}: ${roiResult.is_separable ? t("promotion.attribution_separable", language) : t("promotion.attribution_overlap", language)}`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(summary);
-      message.success("已复制活动复盘结论，可直接粘贴生成经营行动项！");
+      message.success(t("promotion.msg_copied_action", language));
     } else {
-      message.info("活动复盘结论已就绪");
+      message.info(t("promotion.msg_action_ready", language));
     }
   };
 
@@ -228,22 +229,22 @@ export default function PromotionsPage() {
       width: 110,
       render: (st: string) => {
         const map: Record<string, { color: string; label: string }> = {
-          draft: { color: "default", label: "草稿" },
-          approved: { color: "processing", label: "已审批" },
-          completed: { color: "success", label: "已结案" },
-          cancelled: { color: "error", label: "已作废" },
+          draft: { color: "default", label: t("promotion.status_draft", language) },
+          approved: { color: "processing", label: t("promotion.status_approved", language) },
+          completed: { color: "success", label: t("promotion.status_completed", language) },
+          cancelled: { color: "error", label: t("promotion.status_cancelled", language) },
         };
         const conf = map[st] || { color: "default", label: st };
         return <Tag color={conf.color}>{conf.label}</Tag>;
       },
     },
     {
-      title: "操作",
+      title: t("promotion.col_actions", language),
       key: "actions",
       width: 120,
       render: (_: any, r: Promotion) => (
         <Button size="small" type="link" onClick={() => loadPromoDetails(r)}>
-          复盘详情
+          {t("promotion.btn_review_details", language)}
         </Button>
       ),
     },
@@ -254,7 +255,7 @@ export default function PromotionsPage() {
       <AppLayout>
         <PageHeader
           title={t("promotion.title", language)}
-          meta="事前活动预算审查 · 事后增量毛利与 ROI 归因 · 行动项闭环"
+          meta={t("promotion.page_meta", language)}
           primaryAction={
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
               {t("promotion.create", language)}
@@ -262,7 +263,7 @@ export default function PromotionsPage() {
           }
           secondaryAction={
             <Button icon={<ReloadOutlined />} onClick={loadPromotions}>
-              刷新
+              {t("promotion.btn_refresh", language)}
             </Button>
           }
         />
@@ -276,18 +277,18 @@ export default function PromotionsPage() {
               </Space>
             }
             extra={
-              <Select
+              <Segmented
+                className="precision-segmented"
                 value={statusFilter}
-                onChange={setStatusFilter}
-                style={{ width: 130 }}
-                placeholder="全部状态"
-              >
-                <Option value="">全部状态</Option>
-                <Option value="draft">草稿</Option>
-                <Option value="approved">已审批</Option>
-                <Option value="completed">已结案</Option>
-                <Option value="cancelled">已作废</Option>
-              </Select>
+                onChange={(val) => setStatusFilter(String(val))}
+                options={[
+                  { label: t("promotion.all_status", language), value: "" },
+                  { label: t("promotion.status_draft", language), value: "draft" },
+                  { label: t("promotion.status_approved", language), value: "approved" },
+                  { label: t("promotion.status_completed", language), value: "completed" },
+                  { label: t("promotion.status_cancelled", language), value: "cancelled" },
+                ]}
+              />
             }
           >
             <Table
@@ -302,14 +303,14 @@ export default function PromotionsPage() {
 
           {/* Promotion Detail & ROI Drawer */}
           <Drawer
-            title={selectedPromo ? `活动复盘: ${selectedPromo.name} (${selectedPromo.promo_code})` : "活动详情"}
+            title={selectedPromo ? `${t("promotion.drawer_title", language)}: ${selectedPromo.name} (${selectedPromo.promo_code})` : t("promotion.drawer_default_title", language)}
             width={720}
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
             extra={
               <Space>
                 <Button onClick={() => setCostModalOpen(true)}>
-                  添加费用发生额
+                  {t("promotion.btn_add_cost", language)}
                 </Button>
                 <Button type="primary" icon={<SendOutlined />} onClick={handleCreateActionItem}>
                   {t("promotion.create_action", language)}
@@ -347,71 +348,84 @@ export default function PromotionsPage() {
                           showIcon
                           icon={<CheckCircleOutlined />}
                           message={t("promotion.status_separable", language)}
-                          description="活动期内无并发重叠活动，基线差值分析具备良好独立性。"
+                          description={t("promotion.status_separable_desc", language)}
                         />
                       )}
 
-                      {/* Top Metric Cards */}
-                      <Row gutter={[16, 16]}>
-                        <Col span={12}>
-                          <Card size="small">
-                            <Statistic
-                              title={t("promotion.roi", language)}
-                              value={roiResult.roi != null ? (roiResult.roi * 100).toFixed(1) : "—"}
-                              suffix={roiResult.roi != null ? "%" : ""}
-                              valueStyle={{
-                                fontSize: 24,
-                                color: (roiResult.roi ?? 0) >= 1.0 ? "#52c41a" : "#faad14",
+                      {/* Top Metric Grid */}
+                      <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.roi", language)}</span>
+                          <div style={{ margin: "6px 0 2px" }}>
+                            <Typography.Text
+                              className="font-tabular"
+                              style={{
+                                fontSize: 22,
+                                fontWeight: 600,
+                                color: (roiResult.roi ?? 0) >= 1.0 ? "var(--state-success-text, #216E39)" : "var(--state-warning-text, #9A6700)",
                               }}
-                            />
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                              增量毛利 / 实际总成本
-                            </Text>
-                          </Card>
-                        </Col>
-                        <Col span={12}>
-                          <Card size="small">
-                            <Statistic
-                              title={t("promotion.field_actual_cost", language)}
-                              value={roiResult.total_cost}
-                              formatter={(v) => fmtMoney(Number(v), roiResult.currency)}
-                              valueStyle={{ fontSize: 20 }}
-                            />
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                              预算: {fmtMoney(roiResult.budget_amount, roiResult.currency)}
-                            </Text>
-                          </Card>
-                        </Col>
-                        <Col span={12}>
-                          <Card size="small">
-                            <Statistic
-                              title={t("promotion.inc_revenue", language)}
-                              value={roiResult.incremental_revenue}
-                              formatter={(v) => `${Number(v) >= 0 ? "+" : ""}${fmtMoney(Number(v), roiResult.currency)}`}
-                              valueStyle={{ fontSize: 18, color: roiResult.incremental_revenue >= 0 ? "#52c41a" : "#ff4d4f" }}
-                            />
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                              活动期 {roiResult.event_days} 天总实际: {fmtMoney(roiResult.actual_revenue, roiResult.currency)}
-                            </Text>
-                          </Card>
-                        </Col>
-                        <Col span={12}>
-                          <Card size="small">
-                            <Statistic
-                              title={t("promotion.inc_gross_profit", language)}
-                              value={roiResult.incremental_gross_profit}
-                              formatter={(v) => `${Number(v) >= 0 ? "+" : ""}${fmtMoney(Number(v), roiResult.currency)}`}
-                              valueStyle={{ fontSize: 18, color: roiResult.incremental_gross_profit >= 0 ? "#52c41a" : "#ff4d4f" }}
-                            />
-                            <Text type="secondary" style={{ fontSize: 11 }}>
-                              基线毛利: {fmtMoney(roiResult.baseline_gross_profit, roiResult.currency)}
-                            </Text>
-                          </Card>
-                        </Col>
-                      </Row>
+                            >
+                              {roiResult.roi != null ? `${(roiResult.roi * 100).toFixed(1)}%` : "—"}
+                            </Typography.Text>
+                          </div>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {t("promotion.metric_roi_formula", language)}
+                          </Text>
+                        </div>
+
+                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.field_actual_cost", language)}</span>
+                          <div style={{ margin: "6px 0 2px" }}>
+                            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
+                              {fmtMoney(roiResult.total_cost, roiResult.currency)}
+                            </Typography.Text>
+                          </div>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {t("promotion.metric_budget_label", language, { amount: fmtMoney(roiResult.budget_amount, roiResult.currency) })}
+                          </Text>
+                        </div>
+
+                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.inc_revenue", language)}</span>
+                          <div style={{ margin: "6px 0 2px" }}>
+                            <Typography.Text
+                              className="font-tabular"
+                              style={{
+                                fontSize: 20,
+                                fontWeight: 600,
+                                color: roiResult.incremental_revenue >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
+                              }}
+                            >
+                              {`${Number(roiResult.incremental_revenue) >= 0 ? "+" : ""}${fmtMoney(Number(roiResult.incremental_revenue), roiResult.currency)}`}
+                            </Typography.Text>
+                          </div>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {t("promotion.metric_actual_days_label", language, { days: String(roiResult.event_days), amount: fmtMoney(roiResult.actual_revenue, roiResult.currency) })}
+                          </Text>
+                        </div>
+
+                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.inc_gross_profit", language)}</span>
+                          <div style={{ margin: "6px 0 2px" }}>
+                            <Typography.Text
+                              className="font-tabular"
+                              style={{
+                                fontSize: 20,
+                                fontWeight: 600,
+                                color: roiResult.incremental_gross_profit >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
+                              }}
+                            >
+                              {`${Number(roiResult.incremental_gross_profit) >= 0 ? "+" : ""}${fmtMoney(Number(roiResult.incremental_gross_profit), roiResult.currency)}`}
+                            </Typography.Text>
+                          </div>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {t("promotion.metric_baseline_gp_label", language, { amount: fmtMoney(roiResult.baseline_gross_profit, roiResult.currency) })}
+                          </Text>
+                        </div>
+                      </div>
 
                       {/* Cost breakdown */}
-                      <Card size="small" title="费用发生明细 (Cost Breakdown)">
+                      <Card size="small" title={t("promotion.cost_breakdown_title", language)}>
                         {costs.length > 0 ? (
                           <Table
                             dataSource={costs}
@@ -419,21 +433,21 @@ export default function PromotionsPage() {
                             size="small"
                             pagination={false}
                             columns={[
-                              { title: "类别", dataIndex: "cost_category", key: "cost_category" },
-                              { title: "期间", dataIndex: "period", key: "period" },
+                              { title: t("promotion.col_cost_category", language), dataIndex: "cost_category", key: "cost_category" },
+                              { title: t("promotion.col_cost_period", language), dataIndex: "period", key: "period" },
                               {
-                                title: "金额",
+                                title: t("promotion.col_cost_amount", language),
                                 dataIndex: "amount",
                                 key: "amount",
                                 align: "right" as const,
                                 render: (v: number) => fmtMoney(v, selectedPromo.currency),
                               },
-                              { title: "备注", dataIndex: "notes", key: "notes" },
+                              { title: t("promotion.col_cost_notes", language), dataIndex: "notes", key: "notes" },
                             ]}
                           />
                         ) : (
                           <div style={{ textAlign: "center", padding: "16px 0", color: "var(--fg-muted)" }}>
-                            暂无实际费用录入，请点击上方「添加费用发生额」录入补贴/物料/推广等成本
+                            {t("promotion.cost_empty", language)}
                           </div>
                         )}
                       </Card>
@@ -457,39 +471,39 @@ export default function PromotionsPage() {
                   <Card size="small" bordered={false}>
                     <Space direction="vertical" size={12} style={{ width: "100%" }}>
                       <div>
-                        <Text type="secondary">活动名称: </Text>
+                        <Text type="secondary">{t("promotion.info_name", language)}: </Text>
                         <Text strong>{selectedPromo.name}</Text>
                       </div>
                       <div>
-                        <Text type="secondary">活动编码: </Text>
+                        <Text type="secondary">{t("promotion.info_code", language)}: </Text>
                         <Text code>{selectedPromo.promo_code}</Text>
                       </div>
                       <div>
-                        <Text type="secondary">活动类型: </Text>
+                        <Text type="secondary">{t("promotion.info_type", language)}: </Text>
                         <Tag color="blue">{selectedPromo.promo_type}</Tag>
                       </div>
                       <div>
-                        <Text type="secondary">活动时间: </Text>
+                        <Text type="secondary">{t("promotion.info_period", language)}: </Text>
                         <Text>{selectedPromo.start_date} ~ {selectedPromo.end_date}</Text>
                       </div>
                       <div>
-                        <Text type="secondary">适用范围: </Text>
+                        <Text type="secondary">{t("promotion.info_scope", language)}: </Text>
                         <Text>{selectedPromo.target_scope}</Text>
                       </div>
                       <div>
-                        <Text type="secondary">预算上限: </Text>
+                        <Text type="secondary">{t("promotion.info_budget", language)}: </Text>
                         <Text strong style={{ fontSize: 16, color: "var(--color-primary, #1890ff)" }}>
                           {fmtMoney(selectedPromo.budget_amount, selectedPromo.currency)}
                         </Text>
                       </div>
                       <div>
-                        <Text type="secondary">负责人: </Text>
-                        <Text>{selectedPromo.owner || "未指定"}</Text>
+                        <Text type="secondary">{t("promotion.info_owner", language)}: </Text>
+                        <Text>{selectedPromo.owner || t("promotion.info_owner_unassigned", language)}</Text>
                       </div>
                       <div>
-                        <Text type="secondary">活动方案说明: </Text>
+                        <Text type="secondary">{t("promotion.info_desc", language)}: </Text>
                         <Paragraph style={{ marginTop: 4 }}>
-                          {selectedPromo.description || "无详细方案描述"}
+                          {selectedPromo.description || t("promotion.info_no_desc", language)}
                         </Paragraph>
                       </div>
                     </Space>
@@ -510,14 +524,14 @@ export default function PromotionsPage() {
               <Form.Item
                 name="promo_code"
                 label={t("promotion.field_code", language)}
-                rules={[{ required: true, message: "请输入活动编码" }]}
+                rules={[{ required: true, message: t("promotion.rule_code_required", language) }]}
               >
                 <Input placeholder="例: PROMO_2026_MEMBER_06" />
               </Form.Item>
               <Form.Item
                 name="name"
                 label={t("promotion.field_name", language)}
-                rules={[{ required: true, message: "请输入活动名称" }]}
+                rules={[{ required: true, message: t("promotion.rule_name_required", language) }]}
               >
                 <Input placeholder="例: 6月夏日狂欢会员日" />
               </Form.Item>
@@ -526,15 +540,15 @@ export default function PromotionsPage() {
                   <Form.Item
                     name="promo_type"
                     label={t("promotion.field_type", language)}
-                    rules={[{ required: true, message: "请选择类型" }]}
+                    rules={[{ required: true, message: t("promotion.rule_type_required", language) }]}
                     initialValue="discount"
                   >
                     <Select>
-                      <Option value="discount">商品直折 (Discount)</Option>
-                      <Option value="coupon">满减满折 (Coupon)</Option>
-                      <Option value="gift">买赠/随单礼 (Gift)</Option>
-                      <Option value="member_day">会员日专享 (Member Day)</Option>
-                      <Option value="other">其他营销 (Other)</Option>
+                      <Option value="discount">{t("promotion.type_discount", language)}</Option>
+                      <Option value="coupon">{t("promotion.type_coupon", language)}</Option>
+                      <Option value="gift">{t("promotion.type_gift", language)}</Option>
+                      <Option value="member_day">{t("promotion.type_member_day", language)}</Option>
+                      <Option value="other">{t("promotion.type_other", language)}</Option>
                     </Select>
                   </Form.Item>
                 </Col>
@@ -542,7 +556,7 @@ export default function PromotionsPage() {
                   <Form.Item
                     name="budget_amount"
                     label={t("promotion.field_budget", language)}
-                    rules={[{ required: true, message: "请输入预算金额" }]}
+                    rules={[{ required: true, message: t("promotion.rule_budget_required", language) }]}
                     initialValue={10000}
                   >
                     <InputNumber style={{ width: "100%" }} min={0} />
@@ -552,19 +566,19 @@ export default function PromotionsPage() {
               <Form.Item
                 name="dates"
                 label={t("promotion.field_period", language)}
-                rules={[{ required: true, message: "请选择起止日期" }]}
+                rules={[{ required: true, message: t("promotion.rule_dates_required", language) }]}
               >
                 <RangePicker style={{ width: "100%" }} />
               </Form.Item>
-              <Form.Item name="description" label="活动说明与测算假设">
-                <Input.TextArea rows={3} placeholder="输入活动目的、折扣深度及预期拉动指标..." />
+              <Form.Item name="description" label={t("promotion.label_desc_assumptions", language)}>
+                <Input.TextArea rows={3} placeholder={t("promotion.placeholder_desc", language)} />
               </Form.Item>
             </Form>
           </Modal>
 
           {/* Add Cost Modal */}
           <Modal
-            title="录入实际活动费用"
+            title={t("promotion.modal_add_cost_title", language)}
             open={costModalOpen}
             onCancel={() => setCostModalOpen(false)}
             onOk={() => costForm.submit()}
@@ -572,27 +586,27 @@ export default function PromotionsPage() {
             <Form form={costForm} layout="vertical" onFinish={handleAddCost}>
               <Form.Item
                 name="cost_category"
-                label="费用类别"
-                rules={[{ required: true, message: "请选择费用类别" }]}
+                label={t("promotion.col_cost_category", language)}
+                rules={[{ required: true, message: t("promotion.rule_cost_category_required", language) }]}
                 initialValue="subsidy"
               >
                 <Select>
-                  <Option value="subsidy">商品毛利让利补贴 (Subsidy)</Option>
-                  <Option value="materials">物料制作与布置 (Materials)</Option>
-                  <Option value="labor">活动专岗与兼职人力 (Labor)</Option>
-                  <Option value="marketing">商圈与线上推广费 (Marketing)</Option>
-                  <Option value="other">其他杂费 (Other)</Option>
+                  <Option value="subsidy">{t("promotion.cost_type_subsidy", language)}</Option>
+                  <Option value="materials">{t("promotion.cost_type_materials", language)}</Option>
+                  <Option value="labor">{t("promotion.cost_type_labor", language)}</Option>
+                  <Option value="marketing">{t("promotion.cost_type_marketing", language)}</Option>
+                  <Option value="other">{t("promotion.cost_type_other", language)}</Option>
                 </Select>
               </Form.Item>
               <Form.Item
                 name="amount"
-                label="费用金额"
-                rules={[{ required: true, message: "请输入金额" }]}
+                label={t("promotion.col_cost_amount", language)}
+                rules={[{ required: true, message: t("promotion.rule_cost_amount_required", language) }]}
               >
                 <InputNumber style={{ width: "100%" }} min={0} />
               </Form.Item>
-              <Form.Item name="notes" label="费用说明/凭据号">
-                <Input placeholder="输入报销单号或供应商合同..." />
+              <Form.Item name="notes" label={t("promotion.label_cost_notes", language)}>
+                <Input placeholder={t("promotion.placeholder_cost_notes", language)} />
               </Form.Item>
             </Form>
           </Modal>

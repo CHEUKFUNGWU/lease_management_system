@@ -170,7 +170,7 @@ export function StoreCashflowPanel({
         <span
           style={{
             fontWeight: 600,
-            color: v >= 0 ? "var(--morandi-slate, #5A5958)" : "var(--morandi-terracotta, #A57F6C)",
+            color: v >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
           }}
         >
           {fmtMoney(Math.round(v), currency)}
@@ -182,43 +182,73 @@ export function StoreCashflowPanel({
   return (
     <div style={{ display: "grid", gap: 16 }}>
       {/* Summary KPI Cards — Stripe-style Seamless Unified Strip */}
-      <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("cashflow.stat_store_revenue", language)}</span>
-          <div style={{ margin: "8px 0 0" }}>
-            <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+      <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", marginBottom: 16 }}>
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            {t("cashflow.stat_store_revenue", language)}
+          </span>
+          <div style={{ margin: "6px 0 2px" }}>
+            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
               {fmtMoney(summary.totalSales, currency)}
             </Typography.Text>
           </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("cashflow.store.sub_revenue", language)}
+          </Text>
         </div>
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("cashflow.stat_store_margin", language)}</span>
-          <div style={{ margin: "8px 0 0" }}>
-            <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            {t("cashflow.stat_store_margin", language)}
+          </span>
+          <div style={{ margin: "6px 0 2px" }}>
+            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--state-success-text, #216E39)" }}>
               {fmtMoney(summary.totalGrossProfit, currency)}
             </Typography.Text>
           </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("cashflow.store.sub_margin", language)}
+          </Text>
         </div>
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("cashflow.stat_store_occupancy", language)}</span>
-          <div style={{ margin: "8px 0 0" }}>
-            <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-              {fmtMoney(summary.totalRent, currency)}
+
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            {t("cashflow.stat_store_occupancy", language)}
+          </span>
+          <div style={{ margin: "6px 0 2px" }}>
+            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--chart-negative, #DC2626)" }}>
+              -{fmtMoney(summary.totalRent, currency)}
             </Typography.Text>
           </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("cashflow.store.sub_occupancy", language)}
+          </Text>
         </div>
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
+
+        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
           <Flex justify="space-between" align="center">
-            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("cashflow.stat_store_net_cash", language)}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-secondary)", background: "#F1F5F9", padding: "1px 6px", borderRadius: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+              {t("cashflow.stat_store_net_cash", language)}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-secondary)", background: "var(--bg-subtle, #F1F5F9)", padding: "1px 6px", borderRadius: 4 }}>
               {summary.netMargin.toFixed(1)}%
             </span>
           </Flex>
-          <div style={{ margin: "8px 0 0" }}>
-            <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+          <div style={{ margin: "6px 0 2px" }}>
+            <Typography.Text
+              className="font-tabular"
+              style={{
+                fontSize: 20,
+                fontWeight: 600,
+                color: summary.totalNetCash >= 0 ? "var(--fg-primary)" : "var(--state-error-text, #C93B2B)",
+              }}
+            >
               {fmtMoney(summary.totalNetCash, currency)}
             </Typography.Text>
           </div>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            {t("cashflow.store.sub_net", language)}
+          </Text>
         </div>
       </div>
 
@@ -250,7 +280,7 @@ export function StoreCashflowPanel({
             <Space direction="vertical" style={{ width: "100%" }} size={12}>
               <div>
                 <Flex justify="space-between" align="center" style={{ marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>基准月营收</Text>
+                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.base_sales", language)}</Text>
                   <InputNumber
                     size="small"
                     value={baseMonthlySales}
@@ -264,7 +294,7 @@ export function StoreCashflowPanel({
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>毛利率 %</Text>
+                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.gross_margin_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={grossMarginPct}
@@ -286,7 +316,7 @@ export function StoreCashflowPanel({
 
               <div>
                 <Flex justify="space-between" align="center" style={{ marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>固定月租金</Text>
+                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.fixed_rent", language)}</Text>
                   <InputNumber
                     size="small"
                     value={fixedRent}
@@ -300,7 +330,7 @@ export function StoreCashflowPanel({
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>变动提成扣点 %</Text>
+                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.variable_rent_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={variableRentPct}
@@ -315,7 +345,7 @@ export function StoreCashflowPanel({
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>预估人工费率 %</Text>
+                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.labor_cost_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={laborCostPct}
@@ -330,7 +360,7 @@ export function StoreCashflowPanel({
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>月营收年化增幅 %</Text>
+                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.sales_growth_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={salesGrowthPct}
@@ -348,7 +378,7 @@ export function StoreCashflowPanel({
 
         <Col xs={24} lg={16} style={{ display: "flex" }}>
           <Card
-            title={<span style={{ fontWeight: 600, fontSize: 14 }}>门店现金流入、支出与净结余趋势</span>}
+            title={<span style={{ fontWeight: 600, fontSize: 14 }}>{t("cashflow.store.chart_title", language)}</span>}
             style={{ width: "100%", borderRadius: 10, display: "flex", flexDirection: "column" }}
             styles={{
               header: { padding: "12px 20px", minHeight: 48 },
@@ -362,8 +392,8 @@ export function StoreCashflowPanel({
                   margin={{ top: 12, right: 12, left: 0, bottom: 4 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-default, #D9D9D9)" opacity={0.6} />
-                  <XAxis dataKey="month" tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary, #595959)" }} />
-                  <YAxis tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary, #595959)" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={48} />
+                  <XAxis dataKey="month" tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary, #667085)" }} />
+                  <YAxis tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary, #667085)" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={48} />
                   <ChartTooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload || !payload.length) return null;
@@ -379,7 +409,7 @@ export function StoreCashflowPanel({
                           }}
                         >
                           <div style={{ fontWeight: 600, color: "var(--fg-primary, #000000)", marginBottom: 4 }}>
-                            期间: {label}
+                            {t("cashflow.col_period", language)}: {label}
                           </div>
                           {payload.map((item: any, idx: number) => (
                             <div key={idx} style={{ color: item.color || "var(--fg-secondary)", marginBottom: 2 }}>
@@ -391,9 +421,9 @@ export function StoreCashflowPanel({
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} />
-                  <Bar dataKey="grossProfit" name="毛利流入" fill="var(--morandi-sand, #D8BB8F)" radius={[3, 3, 0, 0]} maxBarSize={26} />
-                  <Bar dataKey="totalOutflow" name="租金与营运支出" fill="var(--morandi-terracotta, #A57F6C)" radius={[3, 3, 0, 0]} maxBarSize={26} />
-                  <Line type="monotone" dataKey="netCashflow" name="门店净现金流" stroke="var(--morandi-slate, #5A5958)" strokeWidth={2} dot={{ r: 3, fill: "var(--morandi-slate, #5A5958)" }} />
+                  <Bar dataKey="grossProfit" name={t("cashflow.store.gross_inflow", language)} fill="var(--chart-accent, #2D4B46)" radius={[3, 3, 0, 0]} maxBarSize={26} />
+                  <Bar dataKey="totalOutflow" name={t("cashflow.store.rent_operating_outflow", language)} fill="var(--chart-negative, #7F473E)" radius={[3, 3, 0, 0]} maxBarSize={26} />
+                  <Line type="monotone" dataKey="netCashflow" name={t("cashflow.store.net_cashflow", language)} stroke="var(--chart-primary, #1E293B)" strokeWidth={2} dot={{ r: 3, fill: "var(--chart-primary, #1E293B)" }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -404,7 +434,7 @@ export function StoreCashflowPanel({
       {/* Projection Table */}
       <Card
         size="small"
-        title="未来期间经营现金流明细表"
+        title={t("cashflow.store.table_title", language)}
         style={{ borderRadius: 10 }}
       >
         <Table

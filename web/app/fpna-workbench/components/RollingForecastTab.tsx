@@ -97,7 +97,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
 
   const handleCommit = async () => {
     if (!versionName) {
-      message.warning("Please provide a name for this forecast version");
+      message.warning(t("fpna.msg_name_required", language));
       return;
     }
 
@@ -115,7 +115,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
       };
       const created = await commands.commitHybridForecast(input);
       if (created) {
-        message.success(t("fpna.forecast_created_success", language) || "Forecast version committed successfully!");
+        message.success(t("fpna.forecast_created_success", language));
         setCurrentStep(2);
       }
     } catch (err: unknown) {
@@ -125,7 +125,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
 
   const handleFetchTrend = async () => {
     if (!trendForecastId || !trendActualId) {
-      message.warning("Please select both forecast and actual versions");
+      message.warning(t("fpna.msg_select_both_versions", language));
       return;
     }
     await commands.fetchAccuracyTrend(trendForecastId, trendActualId);
@@ -144,12 +144,12 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
       key: "source_type",
       render: (st: string, row: PeriodBlendSummary) => (
         <Tag color={row.replaced ? "blue" : "purple"}>
-          {row.replaced ? t("fpna.source_actual_replaced", language) || "Actual (Replaced)" : t("fpna.source_forecast_retained", language) || "Forecast (Retained)"}
+          {row.replaced ? t("fpna.source_actual_replaced", language) : t("fpna.source_forecast_retained", language)}
         </Tag>
       ),
     },
     {
-      title: t("fpna.col_record_count", language) || "Record Count",
+      title: t("fpna.col_record_count", language),
       dataIndex: "record_count",
       key: "record_count",
     },
@@ -163,13 +163,13 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
       render: (p: string) => <strong>{p}</strong>,
     },
     {
-      title: t("fpna.col_forecast_amount", language) || "Forecast",
+      title: t("fpna.col_forecast_amount", language),
       dataIndex: "forecast",
       key: "forecast",
       render: (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2 }),
     },
     {
-      title: t("fpna.col_actual_amount", language) || "Actual",
+      title: t("fpna.col_actual_amount", language),
       dataIndex: "actual",
       key: "actual",
       render: (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 2 }),
@@ -185,13 +185,13 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
       ),
     },
     {
-      title: t("fpna.col_accuracy", language) || "Accuracy",
+      title: t("fpna.col_accuracy", language),
       dataIndex: "accuracy",
       key: "accuracy",
       render: (acc: number | undefined) => (acc !== undefined ? `${acc.toFixed(1)}%` : "-"),
     },
     {
-      title: t("fpna.col_bias", language) || "Bias (Actual - Forecast)",
+      title: t("fpna.col_bias", language),
       dataIndex: "bias",
       key: "bias",
       render: (b: number) => (
@@ -232,11 +232,8 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
         showIcon
         icon={<ThunderboltOutlined />}
         className="fpna-margin-bottom-16"
-        message={t("fpna.rolling_forecast_notice_title", language) || "滚动预测编制（Forecast Composition）"}
-        description={
-          t("fpna.rolling_forecast_notice_desc", language) ||
-          "系统严格遵守单 Draft 预测不变量与混合替换纪律：截止期（Cutoff）前的期间自动由已关账的实际数替换，未来期间保留基准预测。编制完成后将生成带完整血缘关系的独立 Forecast 版本。"
-        }
+        message={t("fpna.rolling_forecast_notice_title", language)}
+        description={t("fpna.rolling_forecast_notice_desc", language)}
       />
 
       {/* Composition Wizard Card */}
@@ -244,7 +241,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
         title={
           <Space>
             <ThunderboltOutlined className="fpna-tree-icon" />
-            <span>{t("fpna.wizard_title", language) || "滚动预测编制向导"}</span>
+            <span>{t("fpna.wizard_title", language)}</span>
           </Space>
         }
         className="fpna-margin-bottom-16"
@@ -252,9 +249,9 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
         <Steps
           current={currentStep}
           items={[
-            { title: t("fpna.step_config", language) || "选择基准与实际" },
-            { title: t("fpna.step_preview", language) || "混合差异预览" },
-            { title: t("fpna.step_complete", language) || "固化为新版本" },
+            { title: t("fpna.step_config", language) },
+            { title: t("fpna.step_preview", language) },
+            { title: t("fpna.step_complete", language) },
           ]}
           className="fpna-margin-bottom-16"
         />
@@ -262,7 +259,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
         {currentStep === 0 && (
           <Row gutter={[16, 16]}>
             <Col xs={24} md={8}>
-              <Text strong>{t("fpna.label_baseline_version", language) || "基准预测/预算版本"} *</Text>
+              <Text strong>{t("fpna.label_baseline_version", language)} *</Text>
               <Select
                 className="fpna-width-full"
                 placeholder={t("fpna.placeholder_pick_left_version", language)}
@@ -275,7 +272,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
               />
             </Col>
             <Col xs={24} md={8}>
-              <Text strong>{t("fpna.label_actual_version", language) || "实际发生数据版本"} *</Text>
+              <Text strong>{t("fpna.label_actual_version", language)} *</Text>
               <Select
                 className="fpna-width-full"
                 placeholder={t("fpna.placeholder_pick_right_version", language)}
@@ -288,9 +285,9 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
               />
             </Col>
             <Col xs={24} md={8}>
-              <Text strong>{t("fpna.label_actual_cutoff", language) || "实际数据截止期间 (Cutoff)"} *</Text>
+              <Text strong>{t("fpna.label_actual_cutoff", language)} *</Text>
               <Input
-                placeholder="YYYY-MM (例: 2026-03)"
+                placeholder={t("fpna.placeholder_cutoff", language)}
                 value={cutoffPeriod}
                 onChange={(e) => setCutoffPeriod(e.target.value.trim())}
               />
@@ -304,7 +301,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
                 loading={snapshot.forecastLoading}
                 onClick={handlePreview}
               >
-                {t("fpna.btn_preview_blend", language) || "生成混合预测预览 →"}
+                {t("fpna.btn_preview_blend", language)}
               </Button>
             </Col>
           </Row>
@@ -312,22 +309,42 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
 
         {currentStep === 1 && snapshot.proposedForecast && (
           <div>
-            <Row gutter={[16, 16]} className="fpna-margin-bottom-16">
-              <Col xs={12} md={6}>
-                <Statistic title="From Period" value={snapshot.proposedForecast.from_period} />
-              </Col>
-              <Col xs={12} md={6}>
-                <Statistic title="To Period" value={snapshot.proposedForecast.to_period} />
-              </Col>
-              <Col xs={12} md={6}>
-                <Statistic title="Actual Cutoff" value={snapshot.proposedForecast.actual_cutoff_period} />
-              </Col>
-              <Col xs={12} md={6}>
-                <Statistic title="Total Plan Lines" value={snapshot.proposedForecast.lines.length} />
-              </Col>
-            </Row>
+            <div className="stripe-metric-grid fpna-margin-bottom-16" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_from_period", language)}</span>
+                <div style={{ margin: "6px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {snapshot.proposedForecast.from_period}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_to_period", language)}</span>
+                <div style={{ margin: "6px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {snapshot.proposedForecast.to_period}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_actual_cutoff", language)}</span>
+                <div style={{ margin: "6px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {snapshot.proposedForecast.actual_cutoff_period}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_total_plan_lines", language)}</span>
+                <div style={{ margin: "6px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {snapshot.proposedForecast.lines.length}
+                  </Typography.Text>
+                </div>
+              </div>
+            </div>
 
-            <Title level={5}>{t("fpna.title_period_blend_breakdown", language) || "期间替换明细"}</Title>
+            <Title level={5}>{t("fpna.title_period_blend_breakdown", language)}</Title>
             <Table
               dataSource={snapshot.proposedForecast.period_blends}
               columns={blendColumns}
@@ -339,14 +356,14 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
             />
 
             <Divider />
-            <Title level={5}>{t("fpna.title_commit_details", language) || "版本固化参数"}</Title>
+            <Title level={5}>{t("fpna.title_commit_details", language)}</Title>
             <Row gutter={[16, 16]} className="fpna-margin-bottom-16">
               <Col xs={24} md={12}>
                 <Text strong>{t("fpna.col_version_name", language)} *</Text>
                 <Input
                   value={versionName}
                   onChange={(e) => setVersionName(e.target.value)}
-                  placeholder="例: FC-2026-Q1"
+                  placeholder={t("fpna.placeholder_version_name", language)}
                 />
               </Col>
               <Col xs={24} md={6}>
@@ -356,25 +373,25 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
                   value={scenarioType}
                   onChange={setScenarioType}
                   options={[
-                    { value: "baseline", label: "Baseline" },
-                    { value: "upside", label: "Upside" },
-                    { value: "downside", label: "Downside" },
+                    { value: "baseline", label: t("fpna.scenario_baseline", language) },
+                    { value: "upside", label: t("fpna.scenario_upside", language) },
+                    { value: "downside", label: t("fpna.scenario_downside", language) },
                   ]}
                 />
               </Col>
               <Col xs={24} md={6}>
-                <Text strong>Assumption Version</Text>
+                <Text strong>{t("fpna.form_assumption_version", language)}</Text>
                 <Input
                   value={assumptionVersion}
                   onChange={(e) => setAssumptionVersion(e.target.value)}
-                  placeholder="例: macro-growth-v1"
+                  placeholder={t("fpna.placeholder_assumption_version", language)}
                 />
               </Col>
             </Row>
 
             <Space>
               <Button onClick={() => setCurrentStep(0)}>
-                ← {t("fpna.btn_back_to_config", language) || "返回调整"}
+                ← {t("fpna.btn_back_to_config", language)}
               </Button>
               <Button
                 type="primary"
@@ -382,7 +399,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
                 loading={snapshot.forecastLoading}
                 onClick={handleCommit}
               >
-                {t("fpna.btn_commit_forecast", language) || "确认保存为正式预测版本"}
+                {t("fpna.btn_commit_forecast", language)}
               </Button>
             </Space>
           </div>
@@ -391,13 +408,12 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
         {currentStep === 2 && (
           <div className="fpna-text-center">
             <CheckCircleOutlined className="fpna-success-icon" />
-            <Title level={4}>{t("fpna.forecast_commit_success_title", language) || "滚动预测版本已成功创建！"}</Title>
+            <Title level={4}>{t("fpna.forecast_commit_success_title", language)}</Title>
             <Paragraph type="secondary">
-              {t("fpna.forecast_commit_success_desc", language) ||
-                "新版本已归档并接入版本谱系树（Lineage Tree）。您可在「版本管理」中查看、审核或冻结。"}
+              {t("fpna.forecast_commit_success_desc", language)}
             </Paragraph>
             <Button type="primary" onClick={() => setCurrentStep(0)}>
-              {t("fpna.btn_create_another", language) || "继续编制下一个预测"}
+              {t("fpna.btn_create_another", language)}
             </Button>
           </div>
         )}
@@ -408,7 +424,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
         title={
           <Space>
             <LineChartOutlined className="fpna-tree-icon" />
-            <span>{t("fpna.title_accuracy_trend", language) || "预测准确度与系统性偏差复盘 (Bias Trend)"}</span>
+            <span>{t("fpna.title_accuracy_trend", language)}</span>
           </Space>
         }
         extra={
@@ -421,7 +437,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
       >
         <Row gutter={[16, 16]} className="fpna-margin-bottom-16">
           <Col xs={24} md={10}>
-            <Text strong>{t("fpna.label_baseline_version", language) || "待复盘预测版本"}</Text>
+            <Text strong>{t("fpna.label_forecast_to_review", language)}</Text>
             <Select
               className="fpna-width-full"
               placeholder={t("fpna.placeholder_pick_left_version", language)}
@@ -434,7 +450,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
             />
           </Col>
           <Col xs={24} md={10}>
-            <Text strong>{t("fpna.label_actual_version", language) || "比对实际版本"}</Text>
+            <Text strong>{t("fpna.label_actual_to_compare", language)}</Text>
             <Select
               className="fpna-width-full"
               placeholder={t("fpna.placeholder_pick_right_version", language)}
@@ -453,7 +469,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
               loading={snapshot.accuracyLoading}
               onClick={handleFetchTrend}
             >
-              {t("fpna.btn_analyze_accuracy", language) || "分析准确度"}
+              {t("fpna.btn_analyze_accuracy", language)}
             </Button>
           </Col>
         </Row>
@@ -467,14 +483,13 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
                 showIcon
                 icon={<WarningOutlined />}
                 className="fpna-margin-bottom-16"
-                message={t("fpna.alert_systemic_bias_title", language) || "检测到显著系统性偏差 (Systemic Bias Detected)"}
+                message={t("fpna.alert_systemic_bias_title", language)}
                 description={
                   <span>
                     {snapshot.accuracyTrend.systemic_direction === "overestimation"
-                      ? "连续 3 期以上实际值低于预测值（系统性高估/Overestimation），建议在下一轮滚动预测中审慎调低基线增长假设。"
-                      : "连续 3 期以上实际值高于预测值（系统性低估/Underestimation），业务动能可能强于原定假设。"}
-                    （连续同向期数: {snapshot.accuracyTrend.consecutive_bias_count} 期，累计偏差:{" "}
-                    {snapshot.accuracyTrend.total_bias.toLocaleString()}）
+                      ? t("fpna.bias_overestimation", language)
+                      : t("fpna.bias_underestimation", language)}
+                    {t("fpna.bias_streak_count", language, { count: String(snapshot.accuracyTrend.consecutive_bias_count), total: snapshot.accuracyTrend.total_bias.toLocaleString() })}
                   </span>
                 }
               />
@@ -483,20 +498,20 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
             <Row gutter={[16, 16]} className="fpna-margin-bottom-16">
               <Col xs={12} md={6}>
                 <Statistic
-                  title={t("fpna.stat_overall_mape", language) || "平均绝对百分比误差 (MAPE)"}
+                  title={t("fpna.stat_overall_mape", language)}
                   value={snapshot.accuracyTrend.overall_mean_abs_pct !== undefined ? `${snapshot.accuracyTrend.overall_mean_abs_pct}%` : "-"}
                 />
               </Col>
               <Col xs={12} md={6}>
                 <Statistic
-                  title={t("fpna.stat_total_bias", language) || "累计净偏差 (Total Bias)"}
+                  title={t("fpna.stat_total_bias", language)}
                   value={snapshot.accuracyTrend.total_bias}
                   precision={2}
                 />
               </Col>
               <Col xs={12} md={6}>
                 <Statistic
-                  title={t("fpna.stat_consecutive_streak", language) || "最长连续同向偏差期数"}
+                  title={t("fpna.stat_consecutive_streak", language)}
                   value={snapshot.accuracyTrend.consecutive_bias_count}
                 />
               </Col>

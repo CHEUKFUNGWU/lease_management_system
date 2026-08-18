@@ -18,18 +18,18 @@
 | [AI 底稿与 Paperwork Agent 设计方案](AI_底稿与Paperwork_Agent设计方案.md) | **Current** | **能力层现行依据**。双轨执行、WorkingPaper、不变量、分阶段与验收 |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current（清单陈旧） | 业务需求仍有效；§12 的工具勾选状态已过时，以代码为准 |
 | [PRD：租赁经营决策与 AI Copilot 平台](PRD_租赁经营决策与AI_Copilot平台.md) | Current | 产品边界与用户故事 |
-| [AI Agent 填表升级（tau + anydoc）实施计划](AI_Agent_填表升级_tau_anydoc_实施计划.md) | **Partially Superseded** | **tau 作废**（ADR-0022）；**anydoc 保留并升格**（ADR-0024）；Wave T3/T4 填表缝保留 |
-| [CodebaseDesign：Agent 填表升级模块深化](CodebaseDesign_Agent填表_tau_anydoc_模块深化.md) | **Partially Superseded** | 同上 |
-| [AI Chat 升级方案（参考 Pi Coding Agent）](AI_Chat_升级方案_pi_agent_参考.md) | **Superseded** | 早期 pi 借鉴，P0 建议已交付；对 pi 的精确映射见 Agent Core 设计 |
+| ~~AI Agent 填表升级（tau + anydoc）实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | tau 作废（ADR-0022）；anydoc 与填表缝**已迁入** Agent Core 设计 §8.2 与附录 A |
+| ~~CodebaseDesign：Agent 填表升级模块深化~~ | **已归档** 同上 | 同上（M1 → §8.2，M4 → 附录 A） |
+| ~~AI Chat 升级方案（参考 Pi Coding Agent）~~ | **已归档** 同上 | 早期 pi 借鉴，P0 建议已交付；精确映射见 Agent Core 设计 |
 
 ### 1.2 已交付的运行时文档
 
 | 文档 | 状态 | 说明 |
 |---|---|---|
 | [AI Agent 与 CLI 架构演进 PRD](AI_Agent_与_CLI_架构演进_PRD.md) | **Historical** | AG-001~035 已交付（`b1532b4`）。Tool Runtime / Gateway / Capability 契约**仍然有效且不变** |
-| [AI Agent 与 CLI 架构演进实施计划](AI_Agent_与_CLI_架构演进实施计划.md) | **Historical** | 同上。§9.1「Runner 不经 shell 调 CLI」的旧结论已被填表计划 D1 推翻 |
+| ~~AI Agent 与 CLI 架构演进实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | 交付记录，1816 行；对外契约以保留的 PRD 为准 |
 | [AI Agent 运行运维手册](AI_Agent_运行运维手册.md) | Current（**待随 W4/W5 修订**） | ai-service 与 `AGENT_PLANNER_TOKEN` 退役后需重写相关章节 |
-| [AI Agent 外部验收清单](AI_Agent_外部验收清单.md) | Current | 客户/生产环境签字项 |
+| ~~AI Agent 外部验收清单~~ | **已归档** 同上 | 后续验收以 Agent Core 设计 §11 与底稿方案 §12 为准 |
 
 ### 1.3 合规、契约与评测
 

@@ -37,8 +37,6 @@
 
 对齐由 `web/app/design-system/tokens-alignment.test.ts` 守护，任何一边改动未同步即失败。暗色令牌另有 `theme-dark.test.ts`。
 
-> ⚠️ **`depth` 令牌内部尚未跟上换色。** `depth.hover.border` / `depth.card.border` 仍写着 `#D9D9D9`、`depth.dropdown.border` 写着 `#E5E5E5`，那是换色前的中性灰，而 `colors.border.default` 已经是 `#E2E8F0`。按 §6，边框一律走 `--shadow-*` 环形阴影，所以这几个 `border` 字段实际上不该再被使用——**不要引用它们**，待清理。
-
 ---
 
 ## 2. 设计原则

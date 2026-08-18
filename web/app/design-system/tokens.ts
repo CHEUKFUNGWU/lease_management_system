@@ -168,22 +168,18 @@ export const depth = {
   },
 
   hover: {
-    border: "1px solid #D9D9D9",
     shadow: "0 1px 2px rgba(0, 0, 0, 0.06)",
   },
 
   card: {
-    border: "1px solid #D9D9D9",
     shadow: "0 0 0 1px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04)",
   },
 
   dropdown: {
-    border: "1px solid #E5E5E5",
     shadow: "0 0 0 1px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.06)",
   },
 
   modal: {
-    border: "1px solid #E5E5E5",
     shadow: "0 0 0 1px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08)",
     overlay: "rgba(0, 0, 0, 0.4)",
   },
@@ -263,13 +259,13 @@ export const darkColors = {
     terracotta: "#D98E73",
   },
   chart: {
-    blue: "#D1D5DB",
-    purple: "#D98E73",
-    primary: "#D1D5DB",
-    accent: "#E5C896",
-    secondary: "#9CA3AF",
-    negative: "#D98E73",
-    fill: "#262626",
+    blue: "#7EA2D6",
+    purple: "#9D8BC9",
+    primary: "#7BA4D0",
+    accent: "#4E9B7E",
+    secondary: "#A0AEC0",
+    negative: "#C96868",
+    fill: "#475569",
   },
   // Brand mark stays the same in both themes; only the inverse variant
   // flips. Surface slots (admin sider / code) are the same dark values.

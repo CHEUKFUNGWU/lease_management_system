@@ -215,15 +215,19 @@ func (r *PromotionRepository) GetOverlappingPromotions(ctx context.Context, lega
 }
 
 func (r *PromotionRepository) GetPromotionActualFacts(ctx context.Context, legalEntityID, startDate, endDate string, storeIDs []string) ([]promotionattribution.DailyFact, error) {
+	// retail_store_day_facts carries no legal_entity_id; tenancy is reached
+	// through the store, and the join is INNER so a fact whose store is missing
+	// cannot slip past the tenant filter.
 	query := `
-		SELECT store_id, business_date, currency, COALESCE(revenue, 0), COALESCE(gross_profit, 0), COALESCE(transactions, 0)
-		FROM retail_store_day_facts
-		WHERE legal_entity_id = $1
-		  AND business_date >= $2 AND business_date <= $3
+		SELECT f.store_id, f.business_date, f.currency, COALESCE(f.revenue, 0), COALESCE(f.gross_profit, 0), COALESCE(f.transactions, 0)
+		FROM retail_store_day_facts f
+		JOIN stores s ON s.id = f.store_id
+		WHERE s.legal_entity_id = $1
+		  AND f.business_date >= $2 AND f.business_date <= $3
 	`
 	args := []interface{}{legalEntityID, startDate, endDate}
 	if len(storeIDs) > 0 {
-		query += " AND store_id = ANY($4)"
+		query += " AND f.store_id = ANY($4)"
 		args = append(args, storeIDs)
 	}
 

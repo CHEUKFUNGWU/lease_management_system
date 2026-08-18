@@ -218,30 +218,34 @@ func (r *CategoryRepository) GetCategoryReconciliationData(
 	}
 
 	// 2. Fetch store daily summary facts
+	// Unlike retail_store_day_category_facts above, retail_store_day_facts has no
+	// legal_entity_id: tenancy is reached through the store. The join is INNER so
+	// a fact whose store is missing cannot slip past the tenant filter.
 	sumQuery := `
-		SELECT store_id, business_date, currency, COALESCE(revenue, 0), COALESCE(gross_profit, 0)
-		FROM retail_store_day_facts
-		WHERE legal_entity_id = $1
+		SELECT f.store_id, f.business_date, f.currency, COALESCE(f.revenue, 0), COALESCE(f.gross_profit, 0)
+		FROM retail_store_day_facts f
+		JOIN stores s ON s.id = f.store_id
+		WHERE s.legal_entity_id = $1
 	`
 	sumArgs := []interface{}{legalEntityID}
 	sIdx := 2
 	if len(storeIDs) > 0 {
-		sumQuery += fmt.Sprintf(" AND store_id = ANY($%d)", sIdx)
+		sumQuery += fmt.Sprintf(" AND f.store_id = ANY($%d)", sIdx)
 		sumArgs = append(sumArgs, storeIDs)
 		sIdx++
 	}
 	if fromDate != "" {
-		sumQuery += fmt.Sprintf(" AND business_date >= $%d", sIdx)
+		sumQuery += fmt.Sprintf(" AND f.business_date >= $%d", sIdx)
 		sumArgs = append(sumArgs, fromDate)
 		sIdx++
 	}
 	if toDate != "" {
-		sumQuery += fmt.Sprintf(" AND business_date <= $%d", sIdx)
+		sumQuery += fmt.Sprintf(" AND f.business_date <= $%d", sIdx)
 		sumArgs = append(sumArgs, toDate)
 		sIdx++
 	}
 	if dataClassification != "" {
-		sumQuery += fmt.Sprintf(" AND data_classification = $%d", sIdx)
+		sumQuery += fmt.Sprintf(" AND f.data_classification = $%d", sIdx)
 		sumArgs = append(sumArgs, dataClassification)
 		sIdx++
 	}

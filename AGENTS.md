@@ -37,7 +37,17 @@
 - IFRS 16 回归：22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，未经第三方会计师复核，**不得对外表述为审计背书**
 - 零售 MVP 只完成固定 seed 的内部模拟验证；**无真实 POS/ERP 联调，无客户验证**，相关结论一律保持 `unvalidated`
 
-**命名现状：** 仓库、容器、数据库、JWT、Go 包与 CLI 仍使用 `lease_*`。产品定位已变更，但物理重命名被刻意推迟到内部验证门槛通过之后（2026-05 已改过一次名）。**不要顺手重命名。** 显示名（`app.title`、Logo、页面文案）与代码命名空间是两件事。
+**命名现状：** GitHub 仓库已于 2026-08 改名为 `retail_performance_workstation`，**但代码命名空间没有跟着改，也不打算改**：容器、数据库、MinIO bucket、JWT、Go module（`github.com/lease-management-system/core-service`）、CLI 与 Compose 项目名仍是 `lease_*`。
+
+**不要顺手重命名。** 三处尤其危险：
+
+| 位置 | 后果 |
+|---|---|
+| `docker-compose.yml` 的 `name:` | 改了会**孤立现有 postgres 卷与网络**，等于清库 |
+| `core-service/go.mod` 的 module 路径 | 要改全仓每一个 import |
+| `docs/archive/**` 里的旧名 | 归档是历史记录，本就该保留当时的事实 |
+
+显示名（`app.title`、Logo、页面文案）与代码命名空间是两件事；2026-05 已经做过一次物理重命名，第二次被刻意推迟到内部验证门槛通过之后。
 
 ## 转型是增量叠加
 

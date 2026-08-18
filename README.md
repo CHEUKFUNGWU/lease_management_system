@@ -155,7 +155,7 @@ No change made during the retail transformation may weaken these five. Each was 
 ## 项目结构 / Repository Layout
 
 ```text
-lease_management_system/
+<repo>/                              # GitHub: retail_performance_workstation
 ├── db/
 │   ├── init/                      # PostgreSQL 首次初始化 schema / first-run schema
 │   └── migrations/                # 增量迁移 SQL / incremental migrations

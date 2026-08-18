@@ -134,6 +134,8 @@ func main() {
 	cashPlanHandler := handlers.NewCashPlanHandler(cashPlanRepo)
 	categoryRepo := repository.NewCategoryRepository(database.Pool)
 	categoryHandler := handlers.NewCategoryHandler(categoryRepo)
+	promotionRepo := repository.NewPromotionRepository(database.Pool)
+	promotionHandler := handlers.NewPromotionHandler(promotionRepo)
 	exchangeRateVersionHandler := handlers.NewExchangeRateVersionHandler(exchangeRateRepo)
 	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
 	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
@@ -368,6 +370,13 @@ func main() {
 		protected.Handle(http.MethodGet, "/retail/store-day-category-facts", permission("operating_facts", "read"), categoryHandler.ListCategoryFacts)
 		protected.Handle(http.MethodPost, "/retail/category-facts/reconcile", permission("operating_facts", "read"), categoryHandler.ReconcileCategoryFacts)
 		protected.Handle(http.MethodPost, "/retail/margin-decomposition", permission("operating_facts", "read"), categoryHandler.GetMarginDecomposition)
+		protected.Handle(http.MethodGet, "/retail/promotions", permission("operating_facts", "read"), promotionHandler.ListPromotions)
+		protected.Handle(http.MethodPost, "/retail/promotions", permission("operating_facts", "write"), promotionHandler.CreatePromotion)
+		protected.Handle(http.MethodGet, "/retail/promotions/:id", permission("operating_facts", "read"), promotionHandler.GetPromotion)
+		protected.Handle(http.MethodPut, "/retail/promotions/:id", permission("operating_facts", "write"), promotionHandler.UpdatePromotion)
+		protected.Handle(http.MethodGet, "/retail/promotions/:id/costs", permission("operating_facts", "read"), promotionHandler.ListPromotionCosts)
+		protected.Handle(http.MethodPost, "/retail/promotions/:id/costs", permission("operating_facts", "write"), promotionHandler.AddPromotionCost)
+		protected.Handle(http.MethodGet, "/retail/promotions/:id/roi", permission("operating_facts", "read"), promotionHandler.EvaluateROI)
 
 		// Budget versions freeze the measured forward schedule so later actuals
 		// can be explained against a stable plan.

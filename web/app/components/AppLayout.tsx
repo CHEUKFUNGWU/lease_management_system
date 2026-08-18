@@ -107,6 +107,7 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
             item("/deal-compare", "/deal-compare", <SwapOutlined />, t("nav.deal_compare", language as any)),
             item("/sensitivity", "/sensitivity", <LineChartOutlined />, t("nav.sensitivity", language as any)),
             item("/cashflow-forecast", "/cashflow-forecast", <DollarOutlined />, t("nav.cashflow", language as any)),
+            item("/promotions", "/promotions", <AuditOutlined />, t("promotion.title", language as any)),
           ],
         });
       }

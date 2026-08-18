@@ -1140,6 +1140,111 @@ const dict: TranslationDict = {
     "zh-HK": "暫無品類明細數據",
     en: "No Category Details",
   },
+  "promotion.title": {
+    "zh-CN": "促销活动与 ROI 闭环",
+    "zh-HK": "促銷活動與 ROI 閉環",
+    en: "Promotions & ROI Closed-Loop",
+  },
+  "promotion.create": {
+    "zh-CN": "新建促销活动",
+    "zh-HK": "新建促銷活動",
+    en: "Create Promotion",
+  },
+  "promotion.edit": {
+    "zh-CN": "编辑活动",
+    "zh-HK": "編輯活動",
+    en: "Edit Promotion",
+  },
+  "promotion.tab_list": {
+    "zh-CN": "活动清单",
+    "zh-HK": "活動清單",
+    en: "Promotion List",
+  },
+  "promotion.tab_budget_review": {
+    "zh-CN": "事前预算审查",
+    "zh-HK": "事前預算審查",
+    en: "Pre-Event Budget Review",
+  },
+  "promotion.tab_roi_attribution": {
+    "zh-CN": "事后 ROI 复盘",
+    "zh-HK": "事後 ROI 複盤",
+    en: "Post-Event ROI Attribution",
+  },
+  "promotion.field_code": {
+    "zh-CN": "活动编码",
+    "zh-HK": "活動編碼",
+    en: "Promo Code",
+  },
+  "promotion.field_name": {
+    "zh-CN": "活动名称",
+    "zh-HK": "活動名稱",
+    en: "Name",
+  },
+  "promotion.field_type": {
+    "zh-CN": "活动类型",
+    "zh-HK": "活動類型",
+    en: "Type",
+  },
+  "promotion.field_period": {
+    "zh-CN": "活动期间",
+    "zh-HK": "活動期間",
+    en: "Period",
+  },
+  "promotion.field_scope": {
+    "zh-CN": "适用范围",
+    "zh-HK": "適用範圍",
+    en: "Target Scope",
+  },
+  "promotion.field_budget": {
+    "zh-CN": "预算金额",
+    "zh-HK": "預算金額",
+    en: "Budget Amount",
+  },
+  "promotion.field_actual_cost": {
+    "zh-CN": "实际发生费用",
+    "zh-HK": "實際發生費用",
+    en: "Total Actual Cost",
+  },
+  "promotion.field_status": {
+    "zh-CN": "审批状态",
+    "zh-HK": "審批狀態",
+    en: "Approval Status",
+  },
+  "promotion.roi": {
+    "zh-CN": "营销 ROI (增量毛利/总成本)",
+    "zh-HK": "行銷 ROI (增量毛利/總成本)",
+    en: "Campaign ROI (Inc. GP / Cost)",
+  },
+  "promotion.inc_revenue": {
+    "zh-CN": "增量销售额",
+    "zh-HK": "增量銷售額",
+    en: "Incremental Revenue",
+  },
+  "promotion.inc_gross_profit": {
+    "zh-CN": "增量毛利额",
+    "zh-HK": "增量毛利額",
+    en: "Incremental Gross Profit",
+  },
+  "promotion.status_separable": {
+    "zh-CN": "归因独立可分离",
+    "zh-HK": "歸因獨立可分離",
+    en: "Attribution Separable",
+  },
+  "promotion.status_non_separable": {
+    "zh-CN": "存在重叠活动，归因不可完全分离",
+    "zh-HK": "存在重疊活動，歸因不可完全分離",
+    en: "Non-separable (Concurrent Promotions Detected)",
+  },
+  "promotion.create_action": {
+    "zh-CN": "一键转行动项",
+    "zh-HK": "一鍵轉行動項",
+    en: "Create FP&A Action Item",
+  },
+  "promotion.disclaimer": {
+    "zh-CN": "测算说明与诚实约束",
+    "zh-HK": "測算說明與誠實約束",
+    en: "Attribution Disclaimers",
+  },
   "store360.evidence_title": {
     "zh-CN": "证据与可追溯性",
     "zh-HK": "證據與可追溯性",

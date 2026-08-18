@@ -2320,6 +2320,86 @@ export const categoryApi = {
     }),
 };
 
+export interface Promotion {
+  id: string;
+  legal_entity_id: string;
+  promo_code: string;
+  name: string;
+  promo_type: string;
+  start_date: string;
+  end_date: string;
+  target_scope: string;
+  scope_values: string[];
+  currency: string;
+  budget_amount: number;
+  approval_status: "draft" | "approved" | "completed" | "cancelled";
+  owner?: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface PromotionCost {
+  id?: string;
+  promotion_id?: string;
+  period: string;
+  cost_category: string;
+  amount: number;
+  currency: string;
+  notes?: string;
+}
+
+export interface PromotionROIResult {
+  promo_code: string;
+  name: string;
+  currency: string;
+  event_days: number;
+  actual_revenue: number;
+  actual_gross_profit: number;
+  baseline_revenue: number;
+  baseline_gross_profit: number;
+  incremental_revenue: number;
+  incremental_gross_profit: number;
+  total_cost: number;
+  budget_amount: number;
+  cost_breakdown: Record<string, number>;
+  roi?: number;
+  status: "separable" | "non_separable";
+  is_separable: boolean;
+  overlap_warnings: string[];
+  disclaimers: string[];
+}
+
+export const promotionApi = {
+  list: (token: string, status?: string): Promise<{ promotions: Promotion[] }> => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return apiRequest(`/api/v1/retail/promotions${qs}`, { token });
+  },
+  get: (id: string, token: string): Promise<Promotion> =>
+    apiRequest(`/api/v1/retail/promotions/${encodeURIComponent(id)}`, { token }),
+  create: (data: Partial<Promotion>, token: string): Promise<Promotion> =>
+    apiRequest("/api/v1/retail/promotions", {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  update: (id: string, data: Partial<Promotion>, token: string): Promise<Promotion> =>
+    apiRequest(`/api/v1/retail/promotions/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+      token,
+    }),
+  listCosts: (id: string, token: string): Promise<{ costs: PromotionCost[] }> =>
+    apiRequest(`/api/v1/retail/promotions/${encodeURIComponent(id)}/costs`, { token }),
+  addCost: (id: string, data: Partial<PromotionCost>, token: string): Promise<PromotionCost> =>
+    apiRequest(`/api/v1/retail/promotions/${encodeURIComponent(id)}/costs`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+  evaluateROI: (id: string, token: string): Promise<PromotionROIResult> =>
+    apiRequest(`/api/v1/retail/promotions/${encodeURIComponent(id)}/roi`, { token }),
+};
+
 export const cashPlanApi = {
   compose: (
     req: {

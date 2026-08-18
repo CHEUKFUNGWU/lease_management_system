@@ -1934,4 +1934,41 @@ CREATE TABLE IF NOT EXISTS retail_store_day_category_facts (
 CREATE INDEX IF NOT EXISTS idx_retail_store_day_category_facts_lookup 
 ON retail_store_day_category_facts(legal_entity_id, store_id, business_date);
 
+-- Migration 049: Promotion Master Data & ROI Attribution (Batch F5)
+CREATE TABLE IF NOT EXISTS promotions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_entity_id VARCHAR(64) NOT NULL,
+    promo_code VARCHAR(64) NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    promo_type VARCHAR(32) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    target_scope VARCHAR(32) NOT NULL DEFAULT 'all',
+    scope_values TEXT[] DEFAULT '{}',
+    currency VARCHAR(16) NOT NULL DEFAULT 'CNY',
+    budget_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    owner VARCHAR(64),
+    approval_status VARCHAR(32) NOT NULL DEFAULT 'draft',
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_promotions_code UNIQUE (legal_entity_id, promo_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotions_lookup 
+ON promotions(legal_entity_id, start_date, end_date);
+
+CREATE TABLE IF NOT EXISTS promotion_costs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    promotion_id UUID NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+    period VARCHAR(32) NOT NULL,
+    cost_category VARCHAR(50) NOT NULL,
+    amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    currency VARCHAR(16) NOT NULL DEFAULT 'CNY',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_promotion_costs_promo 
+ON promotion_costs(promotion_id, period);
+
 -- End of init script

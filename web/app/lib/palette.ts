@@ -69,6 +69,7 @@ export const PALETTE_PAGES: PalettePageDef[] = [
   { path: "/deal-compare", labelKey: "nav.deal_compare", group: "analysis", visible: byGroup("analysis") },
   { path: "/sensitivity", labelKey: "nav.sensitivity", group: "analysis", visible: byGroup("analysis") },
   { path: "/cashflow-forecast", labelKey: "nav.cashflow", group: "analysis", visible: byGroup("analysis") },
+  { path: "/promotions", labelKey: "promotion.title", group: "analysis", visible: byGroup("analysis") },
 
   // 会计与合规（admin / auditor / editor / reviewer / approver）
   { path: "/reports", labelKey: "nav.reports", group: "accounting", visible: byGroup("accounting") },

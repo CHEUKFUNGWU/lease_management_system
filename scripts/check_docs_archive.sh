@@ -61,7 +61,7 @@ while IFS= read -r doc; do
      grep -qE -- '^\[[^]]+\]:[[:space:]]*[^[:space:]]*archive/' "$doc"; then
     fail "$doc links into $ARCHIVE_DIR (archiving is one-way; drop the link or restate the conclusion inline)"
   fi
-done < <(find docs -name '*.md' -type f; ls AGENTS.md CONTEXT.md README.md 2>/dev/null)
+done < <(find docs -name '*.md' -type f; find . -maxdepth 1 -name '*.md' -type f -printf '%P\n' 2>/dev/null || ls *.md 2>/dev/null)
 
 if [ "$failures" -gt 0 ]; then
   printf '\narchive guard: %d violation(s)\n' "$failures"

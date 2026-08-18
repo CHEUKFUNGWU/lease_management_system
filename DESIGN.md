@@ -22,28 +22,22 @@
 
 ---
 
-## 1. 单一真相源（当前是坏的，必须先知道）
+## 1. 单一真相源
 
-设计令牌现在有**两套并存的定义，且已经漂移**：
+**`web/app/design-system/tokens.ts` 是唯一真相源。**
 
 | 定义位置 | 消费者 |
 |---|---|
-| `web/app/design-system/tokens.ts` | → `theme.ts` → `ThemeProvider` → **所有 Ant Design 组件**；`StatusTag.tsx` 也直接引用 |
-| `web/app/globals.css` 的 `:root` | → **所有自定义 CSS 与 `var(--*)` 引用** |
+| `tokens.ts` | → `theme.ts` → `ThemeProvider` → **所有 Ant Design 组件**；`StatusTag` 等组件也直接引用 |
+| `globals.css` 的 `:root` | → **所有自定义 CSS 与 `var(--*)` 引用**，必须逐项镜像 `tokens.ts` |
 
-已确认的漂移（**STY-001 已全部消除**，保留历史供追溯）：
+源必须在 TS 侧，因为 AntD 的 `ConfigProvider` 只吃 JS 值。
 
-| 项 | 修复前 `tokens.ts` | 修复前 `:root` | 定为（STY-001） |
-|---|---|---|---|
-| `border.default` | `#E5E5E5` | `--mono-90` = `#D9D9D9` | **`#D9D9D9`** |
-| `border.strong` | `#D9D9D9` | `--mono-70` = `#A6A6A6` | **`#A6A6A6`** |
-| 页面主标题 | `display` 32px / 700 | `.page-header-title` 28px / 700 | **28px / 600**（DESIGN.md §4.1/§4.2） |
-| 静态深度 | `depth.static` = `1px solid #D9D9D9` | `--shadow-static` = `0 0 0 1px rgba(0,0,0,.04)` | **环形阴影**（DESIGN.md §6） |
-| 等宽字体 | `JetBrains Mono`（死配置） | `ui-monospace, SFMono-Regular, Menlo` | **`ui-monospace` 栈** |
+**改令牌的顺序：改 `tokens.ts` → 同步 `:root` → 跑对齐测试。** 只改一边就是引入下一次漂移——两套定义曾经漂移过一轮（STY-001），修的时候才发现边框色、标题字重、静态深度、等宽字体四处各不相同。
 
-**规则：`tokens.ts` 是唯一真相源。** `globals.css` 的 `:root` 必须与之逐项对齐（AntD 的 `ConfigProvider` 只能吃 JS 值，所以源必须在 TS 侧）。
+对齐由 `web/app/design-system/tokens-alignment.test.ts` 守护，任何一边改动未同步即失败。暗色令牌另有 `theme-dark.test.ts`。
 
-**改令牌时：改 `tokens.ts` → 同步 `:root` → 跑对齐测试。** 只改一边就是引入下一次漂移。对齐测试见 `web/app/design-system/tokens-alignment.test.ts`，任何一边改动未同步即失败。
+> ⚠️ **`depth` 令牌内部尚未跟上换色。** `depth.hover.border` / `depth.card.border` 仍写着 `#D9D9D9`、`depth.dropdown.border` 写着 `#E5E5E5`，那是换色前的中性灰，而 `colors.border.default` 已经是 `#E2E8F0`。按 §6，边框一律走 `--shadow-*` 环形阴影，所以这几个 `border` 字段实际上不该再被使用——**不要引用它们**，待清理。
 
 ---
 
@@ -62,40 +56,72 @@
 
 ## 3. 颜色
 
-### 3.1 灰度（唯一的底色系统）
+### 3.1 中性阶（唯一的底色系统）
 
-```
---mono-0   #000000   --fg-primary     标题、主要操作、关键数据
---mono-20  #262626   --fg-secondary   正文、重要标签
---mono-40  #595959   --fg-tertiary    描述、元数据
---mono-60  #737373   --fg-muted       占位符、禁用、提示（白底 AA 达标）
---mono-70  #A6A6A6   --border-strong  hover 边框
---mono-90  #D9D9D9   --border-default 标准边框
---mono-95  #F0F0F0   --bg-inset       表头、次级面板
---mono-98  #F7F7F7   --bg-surface     卡片、面板
---mono-100 #FFFFFF   --bg-page        页面画布
-```
+2026-08 换色为 **Coastal Navy（Slate 冷调中性阶）**，取代此前的纯灰阶。它仍然是「无彩底色」——只是中性色带极轻的蓝调，比纯灰更有层次且不刺眼。**这些是 `tokens.ts` 的实际值，不要凭印象写 `#595959` 一类的旧灰。**
+
+| 语义 | 值 | 用途 |
+|---|---|---|
+| `foreground.primary` | `#0F172A` | 标题、主要操作、关键数据 |
+| `foreground.secondary` | `#1E293B` | 正文、重要标签 |
+| `foreground.tertiary` | `#334155` | 描述、元数据 |
+| `foreground.muted` | `#64748B` | 占位符、禁用、提示、对比基线 |
+| `foreground.inverse` | `#FFFFFF` | 深色底上的文字 |
+| `border.strong` | `#64748B` | hover / 激活边框 |
+| `border.default` | `#E2E8F0` | 标准边框、卡片描边 |
+| `border.subtle` | `#F1F5F9` | 内部分隔线、表格行 |
+| `background.inset` | `#F1F5F9` | 表头、次级面板 |
+| `background.surface` | `#FFFFFF` | 卡片、面板 |
+| `background.page` | `#F8FAFC` | 页面画布 |
+
+**页面画布不是纯白。** `#F8FAFC` 与 `#FFFFFF` 的卡片形成层次，这是不靠边框分区的前提（§2 原则 5）。
+
+**身份面（identity surface）例外**：`background.brandSlab` = `#000000` / `onBrandSlab` = `#FFFFFF`。登录页那块品牌黑板是**图形**不是前景色，两个主题下都保持黑底白字（DARK-003）。不要拿 `--fg-primary` 去画它，暗色模式会把它翻成白色。
 
 ### 3.2 语义色
 
-只有四种状态色，且**只有成对的 bg / text / border 三件套**可用：
+**五种**状态色，且**只有成对的 bg / text / border 三件套**可用：
 
 | 状态 | text | bg | border |
 |---|---|---|---|
-| success | `#216E39` | `#ECF5EE` | `#CFE5D6` |
-| info / processing | `#1F4E9C` | `#EDF2FA` | `#CFDDF2` |
-| warning | `#8A5300` | `#FDF3E3` | `#F0DCB8` |
-| error | `#A8071A` | `#FDEDED` | `#F5C9C9` |
+| success | `#065F46` | `#ECFDF5` | `#A7F3D0` |
+| processing / info | `#1E40AF` | `#EFF6FF` | `#BFDBFE` |
+| warning | `#92400E` | `#FFFBEB` | `#FDE68A` |
+| error | `#9F1239` | `#FFF1F2` | `#FECDD3` |
+| neutral | `#475569` | `#F1F5F9` | `#E2E8F0` |
 
 全部 text 值在对应 bg 上通过 WCAG AA。
+
+另有**独立的强调色** `state.*`，用于图标与细描边，不用于大面积填充：success `#059669`、warning `#D97706`、error `#E11D48`、info `#2563EB`。
+
+> `colors.morandi.*` 是上一轮配色的遗留映射，标着 `legacy … backwards compatibility`。**新代码不要引用**，它随时会被删。
 
 ### 3.3 硬规则
 
 - ❌ **不使用 Ant Design 的预设色名**：`<Tag color="red">`、`color="gold"` 一律禁止。它们不在我们的色板里，且是大面积填充。
 - ❌ **状态不做大面积彩色填充。** 严重度、优先级这类信息用 **8px 状态点 + 常规字色**，不用彩色 Tag。一屏出现几十个红色标签会让真正的异常失去意义。
 - ✅ 需要状态标签时用 `<StatusTag kind="success|processing|warning|error|neutral">`。
-- **图表**：单序列用 `--chart-blue`；多序列优先用灰度深浅 + 形状区分，确需多色时不超过 3 色。数据缺口必须可见（不要 `connectNulls`），不能用 0 冒充缺失。
 - **强调色**：蓝色只表示「可交互」。不要用蓝色做装饰或表示「好」。
+
+### 3.4 图表色板
+
+图表有自己的一套令牌（`colors.chart.*`），是**深炭石板系**，不是通用强调色。**槽位是有语义的，按语义取，不要按「第几条线」取。**
+
+| 令牌 | 值 | 语义 |
+|---|---|---|
+| `chart.primary` | `#0F172A` | 主序列 |
+| `chart.blue` | `#1E293B` | 次主序列（名字是历史遗留，它不是蓝色）|
+| `chart.purple` | `#334155` | 第三序列（同上，不是紫色）|
+| `chart.secondary` | `#64748B` | 对比基线、上年同期 |
+| `chart.accent` | `#2D4B46` | 需要区分的正向序列 |
+| `chart.negative` | `#7F473E` | 负向 / 恶化序列 |
+| `chart.fill` | `#E2E8F0` | 面积填充、参考带 |
+
+规则不变，且因为色板变深更要守住：
+
+- 多序列优先用**深浅 + 形状**区分，确需多色时不超过 3 色。七个槽位是调色板，不是让你一次用满。
+- 数据缺口必须可见——**不要 `connectNulls`**，不能用 0 冒充缺失。
+- `chart.blue` / `chart.purple` 的名字与实际颜色已经对不上，**按语义列选，不要按名字选**。
 
 ---
 
@@ -209,11 +235,22 @@ xs sm md  lg  xl  2xl 3xl 4xl
 | `<ProtectedRoute>` | 鉴权包装 |
 | `<PageHeader title subtitle primaryAction secondaryAction>` | 页面标题区 |
 | `<StatusTag kind>` | 状态标签，唯一合法的彩色标签 |
-| `<GlobalSearch>` / `<NotificationBell>` | 顶栏功能 |
+| `<GlobalSearch>` / `<NotificationBell>` / `<CommandPalette>` | 顶栏功能 |
+| `<ThemeToggle>` / `<LanguageToggle>` | 主题与语言切换 |
 
-**待建（改善方案阶段二、三，建成后同样强制复用）：** `<DataTrustBar>`、`<StateBlock>`、`<SeverityDot>`、`<ToolChip>`、`<ThinkingTrace>`、`<SourceCitation>`、`<ApprovalCard>`、`<ContextCard>`、`<ConfidenceBadge>`。
+**曾列为「待建」的共享组件已全部建成（`ContextCard` 除外），现在是强制复用项：**
 
-在这些组件建成前，**不要在页面里现搓一个同名功能**——现在 `/operating-pulse` 用 `Empty` + `Spin` + `Alert` 拼出三套空/载/错语言，就是这么来的。
+| 组件 | 用途 |
+|---|---|
+| `<DataTrustBar>` | 覆盖率 / 来源 / 版本 / decision-ready（§10 的唯一渲染方式） |
+| `<StateBlock>` | 空 / 载入 / 错误 / `scope_denied` 四态。**`scope_denied` 与 `failed` 必须可区分**，不得软化成「无数据」 |
+| `<SeverityDot>` | 严重度点，替代彩色 Tag |
+| `<StatusTag>` | 状态标签，唯一合法的彩色标签 |
+| `<ToolChip>` / `<ThinkingTrace>` / `<SourceCitation>` / `<ConfidenceBadge>` / `<ApprovalCard>` | AI 界面五件套，见 §9 |
+
+另有成套目录组件：`components/charts/`、`components/bento/`、`components/dashboard/`、`components/enterprise-table/`。**新页面从这里取，不要自己拼。**
+
+`<ContextCard>` 仍未建。需要它时先建组件再用，不要在页面里现搓——`/operating-pulse` 早期用 `Empty` + `Spin` + `Alert` 拼出三套空/载/错语言，`<StateBlock>` 就是为收拾那个局面才建的。
 
 ### 8.1 容器原语（PRIM-001，2026-08-15）
 
@@ -320,41 +357,41 @@ xs sm md  lg  xl  2xl 3xl 4xl
 
 以下是本文规则与当前代码**已确认的不一致**。它们是债务，不是先例，**不要拿来当「现在就是这么写的」的依据**：
 
-| 偏离 | 规模 | 整改 |
+**实测于 2026-08-18**（此前记的是 08-13 的数，已全部过期）：
+
+| 偏离 | 上次（08-13） | 现在 | 走向 |
+|---|---|---|---|
+| 内联 `style={{}}` | 906 | **946** | ⬆️ 变差 |
+| `border: 1px solid`（tsx） | 11 | **29** | ⬆️ 变差 |
+| JS hover handler | 6 | **8** | ⬆️ 变差 |
+| `globals.css` 的 `!important` | 142 | **34** | ⬇️ 大幅改善 |
+| 字重 700 / 800 | 13 | **2** | ⬇️ 改善 |
+| `.ant-` 覆盖 | 91 | **91** | ➡️ 未动 |
+| `next/font` | 0 处 | **已接入** | ✅ 已解决 |
+| `tokens.ts` 与 `:root` 漂移 | 已消除 | 对齐测试守护 | ✅ 已解决 |
+| 三个零售页无 `t()` | 3 页 | **3 页均已接入** | ✅ 已解决 |
+| 无暗色模式 | 全站无 | **已有**（`ThemeToggle` + `darkColors` + `theme-dark.test.ts`，DARK-003 服务端决定主题） | ✅ 已解决 |
+| 单环 focus，深色面上不可见 | 全站 | 未复测 | ❓ |
+
+**前三行要认真对待。** 内联样式、字面量边框、JS hover 在这一轮 UI 升级中**不降反增**——§13 的守卫是 diff 级的（只拦新增行、放行存量），所以这些增量本应被拦住。要么是绕过了 `npm run lint`，要么是守卫的匹配规则有漏网。下次动前端前值得先查一次。
+
+整改排期见 [docs/UIUX改善方案.md](docs/UIUX改善方案.md)。
+
+## 15. 执行机制：本文现在有牙齿了
+
+上一版这一节写的是「本文目前没有牙齿，效力仅限于人工 code review」。**那已经不成立**，写在这里是因为它会直接影响你要不要认真对待前面 14 节。
+
+| 执行机制 | 状态 | 位置 |
 |---|---|---|
-| 内联 `style={{}}` | **906 处**（全 `web/app`，其中 `AppLayout.tsx` 30 处） | 改善方案阶段一 |
-| `globals.css` 的 `!important` | 142 处 | 阶段一 |
-| `.ant-` 覆盖 | 91 处 | 阶段一 |
-| 字重 700 / 800 | 13 处 | 阶段一 |
-| `border: 1px solid` | 11 处 | 阶段一 |
-| JS hover handler | 6 处 | 阶段一 |
-| ~~`tokens.ts` 与 `:root` 漂移~~ | ✅ STY-001 已消除，对齐测试守护 | 已完成 |
-| 字体走 Google Fonts `@import`，未用 `next/font` | 全仓 0 处 `next/font` | 阶段一 |
-| 单环 focus，深色面上不可见 | 全站 | 阶段一 |
-| 三个零售页无 `t()` | 3 页 | 阶段四 |
-| 无暗色模式 | 全站 | 阶段四 |
+| §13 止血条款自动拦截 | ✅ **CI 强制** | `web/scripts/enforce-design.mjs`（ENF-001），经 `npm run lint` 在 CI 跑 |
+| §1 `tokens.ts` ↔ `:root` 对齐 | ✅ 测试守护 | `app/design-system/tokens-alignment.test.ts` |
+| 暗色令牌完整性 | ✅ 测试守护 | `app/design-system/theme-dark.test.ts` |
+| §8.1 容器原语 | ✅ 测试守护 | `web/scripts/container-primitives.test.ts` |
+| 类名覆盖 / app shell CSS | ✅ 测试守护 | `app/lib/class-coverage.test.ts`、`app/lib/app-shell-css.test.ts` |
+| i18n 硬编码文案 | ✅ 审计脚本 | `web/scripts/audit-i18n.mjs` |
+| 组件测试 | ✅ 13 个 `.test.tsx` | 用 `renderToStaticMarkup` SSR 断言，不依赖 `@testing-library` |
+| ESLint 配置文件 | ❌ **仍不存在** | `next lint` 无配置文件可读，实际拦截全靠 `enforce-design.mjs` |
 
-整改排期与验收标准见 [docs/UIUX改善方案.md](docs/UIUX改善方案.md)。
+**`enforce-design.mjs` 是 diff 级拦截器**：基线 CI 用 `origin/main`、本地用 `main`，只检查**新增行**。存量违规（§14 那批）一律放行——全树扫描会立刻全红，变成没人能合的噪音。
 
-## 15. 这份文档目前没有牙齿
-
-必须写在最后，否则前面 13 节会被误读为「已经在执行的规则」：
-
-| 执行机制 | 状态 |
-|---|---|
-| ESLint 配置文件 | ❌ **不存在**。`web/package.json` 有 `"lint": "next lint"`，但没有配置文件，CI 也不跑 |
-| §1 要求的 `tokens.ts` ↔ `:root` 对齐测试 | ❌ **从未写过** |
-| 组件测试 | ❌ 未安装 `@testing-library`，61 个用例全是纯逻辑 |
-| §13 止血条款的自动拦截 | ❌ 无 |
-
-**906 处内联样式说明「自觉遵守」从来没有奏效过。** 在补上执行机制之前，本文的效力仅限于人工 code review。
-
-最小执行机制（当天可落，列为阶段一的第一项）：
-
-```
-1. ESLint 配置 + 内联样式规则（新文件 error，存量 warn）
-2. CI 检查：新增 !important / fontWeight>600 / 硬编码 CJK 即失败
-3. tokens.ts ↔ globals.css 对齐测试
-```
-
-来源：[docs/架构改善方案.md](docs/架构改善方案.md) §3。
+这个设计的代价写在 §14：**它只在你跑了 `npm run lint` 时生效。** 内联样式从 906 涨到 946 说明这条路径被绕过过，或者匹配规则漏了某些写法。ESLint 配置文件仍然缺失，是这套机制里唯一还没补上的一环。

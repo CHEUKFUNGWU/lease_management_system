@@ -103,10 +103,32 @@ export function changeTone(code: PulseMetricCode, metric: RetailSummaryMetric | 
   return unfavorable ? "bad" : "good";
 }
 
+export function translateReason(reason: string | undefined, language: Language): string {
+  if (!reason) return "";
+  const key = `reason.${reason}`;
+  const translated = t(key, language);
+  return translated !== key ? translated : reason;
+}
+
+export function formatSeverity(severity: string | undefined, language: Language): string {
+  if (!severity) return "—";
+  const key = `severity.${severity.toLowerCase()}`;
+  const translated = t(key, language);
+  return translated !== key ? translated : severity;
+}
+
+export function formatSourceSystem(source: string | undefined, language: Language): string {
+  if (!source) return "—";
+  const key = `source.${source.replace(/-/g, "_")}`;
+  const translated = t(key, language);
+  return translated !== key ? translated : source;
+}
+
 export function metricStatusLabel(metric: RetailSummaryMetric | null | undefined, language: Language): { status: "complete" | "partial" | "missing"; label: string; reason?: string } {
   if (!metric) return { status: "missing", label: t("retail.status.missing", language), reason: t("retail.status_reason.unavailable", language) };
   const statuses = [metric.current.status, metric.comparison.status];
-  const reasons = [metric.current.reason, metric.comparison.reason, metric.reason].filter(Boolean);
+  const rawReasons = [metric.current.reason, metric.comparison.reason, metric.reason].filter(Boolean) as string[];
+  const reasons = rawReasons.map((r) => translateReason(r, language));
   if (statuses.some((status) => status === "unavailable")) return { status: "missing", label: t("retail.status.missing", language), reason: reasons.join(" / ") || t("retail.status_reason.facts_unavailable", language) };
   if (statuses.some((status) => status === "partial")) return { status: "partial", label: t("retail.status.partial", language), reason: reasons.join(" / ") || t("retail.status_reason.coverage_incomplete", language) };
   return { status: "complete", label: t("retail.status.complete", language), reason: reasons.join(" / ") || undefined };

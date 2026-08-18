@@ -3,7 +3,7 @@
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Tag, message } from "antd";
+import { Alert, Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
 import { CalculatorOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -163,23 +163,32 @@ function SensitivityPage() {
               />
             )}
 
-            <Row gutter={16}>
-              <Col xs={24} md={8}>
-                <Card>
-                  <Statistic title="基准初始负债" value={summary.base} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} />
-                </Card>
-              </Col>
-              <Col xs={24} md={8}>
-                <Card>
-                  <Statistic title="最大上行影响" value={summary.maxUp} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxUp > 0 ? "var(--state-error-text)" : undefined }} />
-                </Card>
-              </Col>
-              <Col xs={24} md={8}>
-                <Card>
-                  <Statistic title="最大下行影响" value={summary.maxDown} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} valueStyle={{ color: summary.maxDown < 0 ? "var(--state-success-text)" : undefined }} />
-                </Card>
-              </Col>
-            </Row>
+            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>基准初始负债</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {fmtMoney(summary.base, meta?.currency)}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>最大上行影响</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: summary.maxUp > 0 ? "var(--state-error-text)" : "var(--fg-primary)" }}>
+                    {fmtMoney(summary.maxUp, meta?.currency)}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>最大下行影响</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: summary.maxDown < 0 ? "var(--state-success-text)" : "var(--fg-primary)" }}>
+                    {fmtMoney(summary.maxDown, meta?.currency)}
+                  </Typography.Text>
+                </div>
+              </div>
+            </div>
 
             {rows.length > 0 && (
               <Card title="利率敏感性龙卷风图 (Tornado Sensitivity)">

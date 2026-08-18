@@ -28,7 +28,7 @@ type FPnAPlanImportHandler struct {
 
 type planImportStore interface {
 	CreatePlanVersion(context.Context, *repository.FPnAPlanVersion) (*repository.FPnAPlanVersion, error)
-	ListPlanVersions(context.Context, access.EntityFilter, string) ([]*repository.FPnAPlanVersion, error)
+	ListPlanVersions(context.Context, access.EntityFilter, string, string, string) ([]*repository.FPnAPlanVersion, error)
 	CreatePlanLine(context.Context, *repository.FPnAPlanLine) (*repository.FPnAPlanLine, error)
 	DeletePlanVersion(context.Context, string, access.EntityFilter) error
 }
@@ -99,7 +99,7 @@ func (h *FPnAPlanImportHandler) Import(c *gin.Context) {
 
 	// Business-level idempotency: (entity, name, as_of_period) is unique;
 	// a replay of the same version returns the existing one untouched.
-	existing, err := h.plans.ListPlanVersions(c.Request.Context(), entity, "")
+	existing, err := h.plans.ListPlanVersions(c.Request.Context(), entity, "", "", "")
 	if err != nil {
 		writeSystemFailure(c, http.StatusInternalServerError, err)
 		return

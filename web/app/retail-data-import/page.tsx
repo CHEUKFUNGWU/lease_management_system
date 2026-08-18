@@ -242,22 +242,28 @@ export default function RetailDataImportPage() {
               </Button>
             }
           >
-            <Flex gap={12} wrap="wrap" align="center" style={{ marginBottom: 12 }}>
-              <span>{t("retail_import.source_system", language)}</span>
-              <Input
-                className="retail-import-source-input"
-                style={{ width: 140 }}
-                value={sourceSystem}
-                onChange={(event) => setSourceSystem(event.target.value.trim())}
-                onPressEnter={() => file && runPreview(file, null, sourceSystem || "pos")}
-              />
-              <span>{t("retail_import.as_of", language)}</span>
-              <DatePicker
-                allowClear={false}
-                value={dayjs(asOf)}
-                onChange={(value) => value && setAsOf(value.format("YYYY-MM-DD"))}
-              />
-            </Flex>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+              <div className="precision-filter-group">
+                <span className="precision-filter-label">{t("retail_import.source_system", language)}:</span>
+                <Input
+                  size="small"
+                  className="retail-import-source-input"
+                  style={{ width: 140 }}
+                  value={sourceSystem}
+                  onChange={(event) => setSourceSystem(event.target.value.trim())}
+                  onPressEnter={() => file && runPreview(file, null, sourceSystem || "pos")}
+                />
+              </div>
+              <div className="precision-filter-group">
+                <span className="precision-filter-label">{t("retail_import.as_of", language)}:</span>
+                <DatePicker
+                  size="small"
+                  allowClear={false}
+                  value={dayjs(asOf)}
+                  onChange={(value) => value && setAsOf(value.format("YYYY-MM-DD"))}
+                />
+              </div>
+            </div>
 
             {/* 拖拽上传区域 */}
             <Upload.Dragger

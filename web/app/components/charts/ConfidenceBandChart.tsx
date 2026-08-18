@@ -146,7 +146,7 @@ export default function ConfidenceBandChart({
             iconType="circle"
             wrapperStyle={{ fontSize: 11, paddingBottom: 8 }}
             formatter={(value) => (
-              <span style={{ color: "var(--fg-secondary, #475569)", marginRight: 8 }}>
+              <span style={{ color: "#334155", fontWeight: 500, marginRight: 8 }}>
                 {value === "bandRange"
                   ? "同群置信安全带 (P25~P75)"
                   : value === "median"
@@ -156,7 +156,7 @@ export default function ConfidenceBandChart({
             )}
           />
 
-          {/* 堆叠置信带：下边界透明，差值渲染浅灰安全带 */}
+          {/* 堆叠置信带：下边界透明，差值渲染清晰高辨识度安全带 */}
           <Area
             type="monotone"
             dataKey="bandBase"
@@ -171,32 +171,32 @@ export default function ConfidenceBandChart({
             dataKey="bandRange"
             stackId="band"
             stroke="none"
-            fill="var(--morandi-cream, #F2EDE9)"
+            fill="#CBD5E1"
             fillOpacity={0.7}
             name="bandRange"
             isAnimationActive={false}
           />
 
-          {/* 基准中位数虚线 */}
+          {/* 基准中位数虚线：清晰高对比度深冷灰 */}
           <Line
             type="monotone"
             dataKey="median"
-            stroke="var(--morandi-greige, #C1B5A7)"
+            stroke="#475569"
             strokeDasharray="4 4"
-            strokeWidth={1.5}
+            strokeWidth={1.75}
             dot={false}
             name="median"
             isAnimationActive={false}
           />
 
-          {/* 本店实际走势 */}
+          {/* 本店实际走势：沉稳禁欲系深蓝黑/墨岩主线 */}
           <Line
             type="monotone"
             dataKey="value"
-            stroke="var(--morandi-slate, #5A5958)"
-            strokeWidth={2.4}
-            dot={{ r: 3, fill: "var(--morandi-slate, #5A5958)", strokeWidth: 0 }}
-            activeDot={{ r: 5, stroke: "#FFFFFF", strokeWidth: 2, fill: "var(--morandi-slate, #5A5958)" }}
+            stroke="#0F172A"
+            strokeWidth={2.5}
+            dot={{ r: 3.5, fill: "#0F172A", stroke: "#FFFFFF", strokeWidth: 1.5 }}
+            activeDot={{ r: 5.5, stroke: "#FFFFFF", strokeWidth: 2, fill: "#0F172A" }}
             name="value"
             connectNulls={false}
           />

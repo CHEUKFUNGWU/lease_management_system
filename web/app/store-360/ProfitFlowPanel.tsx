@@ -7,6 +7,7 @@ import { t, type Language } from "../lib/i18n";
 import type { RetailPlFlowResponse } from "../lib/api";
 import { fmtMoney } from "../lib/format";
 import { StateBlock } from "../components/StateBlock";
+import { kpiLabel } from "../operating-pulse/logic";
 
 /**
  * SANKEY-001: 门店利润流向桑基图。
@@ -105,16 +106,16 @@ export default function ProfitFlowPanel({
         </ResponsiveContainer>
       </div>
       <div className="pl-flow-meta">
-        <span>{t("store360.pl_flow.status", language)}: {flow.status}</span>
+        <span>{t("store360.pl_flow.status", language)}: {flow.status === "complete" ? t("store360.pl_flow.status_complete", language) : flow.status === "partial" ? t("store360.pl_flow.status_partial", language) : flow.status}</span>
         <span>
           {t("store360.pl_flow.residual", language)}: {fmtMoney(flow.residual, unit)}
         </span>
         {flow.missing && flow.missing.length > 0 && (
           <span>
-            {t("store360.pl_flow.missing", language)}: {flow.missing.join(", ")}
+            {t("store360.pl_flow.missing", language)}: {flow.missing.map((m) => kpiLabel(m, language) || m).join(", ")}
           </span>
         )}
-        <span>模型版本: {flow.formula_version}</span>
+        <span>{t("trust.formula", language)}: {flow.formula_version}</span>
       </div>
     </>
   );

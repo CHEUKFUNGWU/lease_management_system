@@ -233,44 +233,40 @@ export default function PreDealPage() {
                 description={briefing.headline}
               />
 
-              <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-                <Col xs={12} md={6}>
-                  <Card style={{ borderRadius: 10 }}>
-                    <Statistic
-                      title={t("pre_deal.stat_liability", language)}
-                      value={briefing.balance_sheet.initial_liability}
-                      formatter={() => fmtMoney(briefing.balance_sheet.initial_liability, currency)}
-                    />
-                  </Card>
-                </Col>
-                <Col xs={12} md={6}>
-                  <Card style={{ borderRadius: 10 }}>
-                    <Statistic
-                      title={t("pre_deal.stat_rou", language)}
-                      value={briefing.balance_sheet.initial_rou}
-                      formatter={() => fmtMoney(briefing.balance_sheet.initial_rou, currency)}
-                    />
-                  </Card>
-                </Col>
-                <Col xs={12} md={6}>
-                  <Card style={{ borderRadius: 10 }}>
-                    <Statistic
-                      title={t("pre_deal.stat_commitment", language)}
-                      value={briefing.balance_sheet.undiscounted_commitment}
-                      formatter={() => fmtMoney(briefing.balance_sheet.undiscounted_commitment, currency)}
-                    />
-                  </Card>
-                </Col>
-                <Col xs={12} md={6}>
-                  <Card style={{ borderRadius: 10 }}>
-                    <Statistic
-                      title={t("pre_deal.stat_discount_effect", language)}
-                      value={briefing.balance_sheet.discounting_effect}
-                      formatter={() => fmtMoney(briefing.balance_sheet.discounting_effect, currency)}
-                    />
-                  </Card>
-                </Col>
-              </Row>
+              <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", marginBottom: 16 }}>
+                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_liability", language)}</span>
+                  <div style={{ margin: "8px 0 0" }}>
+                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                      {fmtMoney(briefing.balance_sheet.initial_liability, currency)}
+                    </Typography.Text>
+                  </div>
+                </div>
+                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_rou", language)}</span>
+                  <div style={{ margin: "8px 0 0" }}>
+                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                      {fmtMoney(briefing.balance_sheet.initial_rou, currency)}
+                    </Typography.Text>
+                  </div>
+                </div>
+                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_commitment", language)}</span>
+                  <div style={{ margin: "8px 0 0" }}>
+                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                      {fmtMoney(briefing.balance_sheet.undiscounted_commitment, currency)}
+                    </Typography.Text>
+                  </div>
+                </div>
+                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_discount_effect", language)}</span>
+                  <div style={{ margin: "8px 0 0" }}>
+                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                      {fmtMoney(briefing.balance_sheet.discounting_effect, currency)}
+                    </Typography.Text>
+                  </div>
+                </div>
+              </div>
 
               <Card title={t("pre_deal.card_expense_curve", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
                 <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>

@@ -5,6 +5,7 @@ import { Button, Space } from "antd";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import type { SourceEnvelope, SourceEnvelopeCoverage } from "../lib/api";
+import { formatSourceSystem } from "../operating-pulse/logic";
 
 // ENV-002: the single trust-rendering component for DESIGN.md §10. It
 // consumes the ENV-001 Source Envelope; no page renders provenance any
@@ -40,6 +41,13 @@ function coverageText(coverage: SourceEnvelopeCoverage | undefined, language: Re
   if (!coverage) return "—";
   const rate = coverage.coverage_rate == null ? "—" : `${coverage.coverage_rate.toFixed(1)}%`;
   return `${coverage.observed_store_days ?? 0}/${coverage.expected_store_days ?? 0} ${t("trust.store_days", language)} · ${rate}`;
+}
+
+function formatBasis(basis: string | undefined, language: ReturnType<typeof useLanguage>["language"]): string | undefined {
+  if (!basis) return undefined;
+  if (basis.toLowerCase() === "working") return t("trust.basis_working", language);
+  if (basis.toLowerCase() === "official") return t("trust.basis_official", language);
+  return basis;
 }
 
 // The uniform KPI-card badge shown whenever decision_ready is false.
@@ -84,6 +92,7 @@ export default function DataTrustBar({
   const comparison = envelope.comparison_coverage && (envelope.comparison_coverage.expected_store_days ?? 0) > 0
     ? coverageText(envelope.comparison_coverage, language)
     : null;
+  const displayBasis = formatBasis(basis, language);
   return (
     <div className={`data-trust-bar${degraded ? " is-degraded" : ""}`}>
       <div className="data-trust-bar-summary">
@@ -92,7 +101,7 @@ export default function DataTrustBar({
             <span className={`trust-classification-dot is-${envelope.data_classification}`} aria-hidden="true" />
             {classificationLabel(envelope.data_classification, language)}
           </span>
-          {basis && <span>{basis}</span>}
+          {displayBasis && <span>{displayBasis}</span>}
           <span>{coverageText(envelope.current_coverage, language)}</span>
           {!hideComparison && comparison && <span>{t("trust.comparison", language)} {comparison}</span>}
           <span className={degraded ? "is-not-ready" : "is-ready"}>
@@ -114,7 +123,7 @@ export default function DataTrustBar({
       {isOpen && (
         <div className="data-trust-bar-detail">
           <Space size={10} wrap>
-            <span>{t("trust.source", language)}: {envelope.source_systems.join(", ") || "—"}</span>
+            <span>{t("trust.source", language)}: {envelope.source_systems.map((s) => formatSourceSystem(s, language)).join(", ") || "—"}</span>
             <span>{t("trust.dataset", language)}: {envelope.dataset_versions.join(", ") || "—"}</span>
             <span>{t("trust.fact_version", language)}: {envelope.fact_version_min}–{envelope.fact_version_max}</span>
             {envelope.highest_as_of && <span>{t("trust.as_of", language)}: {envelope.highest_as_of}</span>}

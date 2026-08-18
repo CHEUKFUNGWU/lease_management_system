@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card, Col, Input, InputNumber, Row, Statistic, Table, Typography } from "antd";
+import { Button, Card, Col, Input, InputNumber, Row, Statistic, Table, Typography } from "antd";
 import { CalculatorOutlined, ClockCircleOutlined, DollarOutlined, SafetyOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -14,14 +14,25 @@ const { Text } = Typography;
 
 export default function RoiPage() {
   const { language } = useLanguage();
-  const [contracts, setContracts] = useState<number | null>(null);
-  const [currencyCode, setCurrencyCode] = useState<string | undefined>();
-  const [hourlyCost, setHourlyCost] = useState<number | null>(null);
-  const [manualHours, setManualHours] = useState<number | null>(null);
-  const [aiHours, setAiHours] = useState<number | null>(null);
-  const [monthlyCloseDays, setMonthlyCloseDays] = useState<number | null>(null);
-  const [systemCloseDays, setSystemCloseDays] = useState<number | null>(null);
-  const [auditReworkHours, setAuditReworkHours] = useState<number | null>(null);
+  const [contracts, setContracts] = useState<number | null>(50);
+  const [currencyCode, setCurrencyCode] = useState<string | undefined>("CNY");
+  const [hourlyCost, setHourlyCost] = useState<number | null>(120);
+  const [manualHours, setManualHours] = useState<number | null>(2.5);
+  const [aiHours, setAiHours] = useState<number | null>(0.3);
+  const [monthlyCloseDays, setMonthlyCloseDays] = useState<number | null>(3.0);
+  const [systemCloseDays, setSystemCloseDays] = useState<number | null>(0.5);
+  const [auditReworkHours, setAuditReworkHours] = useState<number | null>(40);
+
+  const applyPreset = (c: number, cost: number, closeM: number, closeS: number, audit: number) => {
+    setContracts(c);
+    setCurrencyCode("CNY");
+    setHourlyCost(cost);
+    setManualHours(2.5);
+    setAiHours(0.3);
+    setMonthlyCloseDays(closeM);
+    setSystemCloseDays(closeS);
+    setAuditReworkHours(audit);
+  };
 
   const result = useMemo(() => {
     if (
@@ -72,10 +83,24 @@ export default function RoiPage() {
       <AppLayout>
         <PageHeader
           title={<>{t("roi.title", language)}<span className="page-header-count">{t("roi.header_count", language, { count: contracts == null ? "—" : contracts.toLocaleString() })}</span></>}
+          meta={t("roi.meta_desc", language)}
         />
 
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={8}>
+            <Card
+              size="small"
+              title={t("roi.preset_title", language)}
+              style={{ borderRadius: 10, marginBottom: 16 }}
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <Button size="small" onClick={() => applyPreset(20, 100, 2.0, 0.5, 20)}>{t("roi.preset_small", language)}</Button>
+                <Button size="small" onClick={() => applyPreset(80, 120, 4.0, 0.5, 60)}>{t("roi.preset_medium", language)}</Button>
+                <Button size="small" onClick={() => applyPreset(200, 150, 6.0, 1.0, 120)}>{t("roi.preset_large", language)}</Button>
+                <Button size="small" onClick={() => applyPreset(50, 120, 3.0, 0.5, 40)}>{t("roi.preset_reset", language)}</Button>
+              </div>
+            </Card>
+
             <Card title={t("roi.card_assumptions", language)} style={{ borderRadius: 10 }}>
               <div style={{ display: "grid", gap: 16 }}>
                 <label>
@@ -120,28 +145,40 @@ export default function RoiPage() {
           </Col>
 
           <Col xs={24} lg={16}>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
-                <Card style={{ borderRadius: 10 }}>
-                  <Statistic title={t("roi.stat_hours_saved", language)} value={result ? Math.round(result.totalHoursSaved) : undefined} suffix={hoursUnit} prefix={<ClockCircleOutlined />} />
-                </Card>
-              </Col>
-              <Col xs={24} md={12}>
-                <Card style={{ borderRadius: 10 }}>
-                  <Statistic title={t("roi.stat_labor_savings", language)} value={result ? fmtMoney(Math.round(result.laborSavings), result.currency) : "—"} prefix={<DollarOutlined />} />
-                </Card>
-              </Col>
-              <Col xs={24} md={12}>
-                <Card style={{ borderRadius: 10 }}>
-                  <Statistic title={t("roi.stat_ai_saved", language)} value={result ? Math.round(result.intakeHoursSaved) : undefined} suffix={hoursUnit} prefix={<CalculatorOutlined />} />
-                </Card>
-              </Col>
-              <Col xs={24} md={12}>
-                <Card style={{ borderRadius: 10 }}>
-                  <Statistic title={t("roi.stat_audit_reduced", language)} value={result ? Math.round(result.auditHoursSaved) : undefined} suffix={hoursUnit} prefix={<SafetyOutlined />} />
-                </Card>
-              </Col>
-            </Row>
+            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", marginBottom: 16 }}>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_hours_saved", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {result ? `${Math.round(result.totalHoursSaved)} ${hoursUnit}` : "—"}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_labor_savings", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {result ? fmtMoney(Math.round(result.laborSavings), result.currency) : "—"}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px", borderTop: "1px solid var(--border-subtle)" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_ai_saved", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {result ? `${Math.round(result.intakeHoursSaved)} ${hoursUnit}` : "—"}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px", borderTop: "1px solid var(--border-subtle)" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_audit_reduced", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {result ? `${Math.round(result.auditHoursSaved)} ${hoursUnit}` : "—"}
+                  </Typography.Text>
+                </div>
+              </div>
+            </div>
 
             <Card title={t("roi.card_basis", language)} style={{ borderRadius: 10, marginTop: 16 }}>
               <Table

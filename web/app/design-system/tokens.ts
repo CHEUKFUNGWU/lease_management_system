@@ -22,13 +22,13 @@
 // ─── Color Tokens ──────────────────────────────────────────────
 
 export const colors = {
-  // Monochrome scale — semantic names for clarity
+  // Coastal Navy & Emerald Palette (Professional High-Trust SaaS)
   background: {
-    page: "#FFFFFF",        // Page canvas
-    surface: "#F7F7F7",     // Cards, panels, subtle elevation
-    elevated: "#FFFFFF",    // Modal, dropdown — same as page but with shadow
-    inset: "#F0F0F0",       // Table headers, secondary panels
-    code: "#F7F7F7",        // Code blocks, diff backgrounds
+    page: "#F8FAFC",        // Cool slate canvas (clean, crisp, modern foundation)
+    surface: "#FFFFFF",     // Crisp pure white card surface
+    elevated: "#FFFFFF",    // Modal, dropdown
+    inset: "#F1F5F9",       // Table headers, secondary panels
+    code: "#F8FAFC",        // Code blocks, diff backgrounds
     // DARK-003: the login brand slab is an identity surface, not a foreground.
     // It used var(--fg-primary), so the dark theme flipped it white — the black
     // slab is the brand, and it stays black in both themes. Its text is pinned
@@ -38,54 +38,54 @@ export const colors = {
   },
 
   foreground: {
-    primary: "#000000",     // Headlines, primary actions, key data
-    secondary: "#262626",   // Body text, important labels
-    tertiary: "#595959",    // Descriptions, metadata
-    muted: "#737373",       // Placeholders, disabled, hints (AA on white)
+    primary: "#0F172A",     // Deep Coastal Obsidian Navy (rich high-contrast authority)
+    secondary: "#1E293B",   // Slate 800 (high contrast body text, important labels)
+    tertiary: "#334155",    // Slate 700 (descriptions, metadata, labels)
+    muted: "#64748B",       // Slate 500 (hints, placeholders, comparison baseline)
     inverse: "#FFFFFF",     // Text on dark backgrounds
   },
 
   border: {
-    default: "#D9D9D9",     // Standard dividers, card borders (--mono-90)
-    strong: "#A6A6A6",      // Hover states, active borders (--mono-70)
-    subtle: "#F0F0F0",      // Internal dividers, table rows (--mono-95)
-    inverse: "rgba(255,255,255,0.1)", // Borders on dark elements
+    default: "#E2E8F0",     // Standard dividers, card borders (--mono-90)
+    strong: "#64748B",      // Hover states, active borders (--mono-70)
+    subtle: "#F1F5F9",      // Internal dividers, table rows (--mono-95)
+    inverse: "rgba(255,255,255,0.12)", // Borders on dark elements
   },
 
-  // State colors — restrained semantic accents, all text passes WCAG AA.
+  // State colors — crisp, vibrant semantic accents with high contrast
   state: {
-    success: "#216E39",
-    warning: "#8A5300",
-    error: "#A8071A",
-    info: "#1F4E9C",
+    success: "#059669",     // Crisp Emerald Green
+    warning: "#D97706",     // Amber Ochre
+    error: "#E11D48",       // Ruby Rose Red
+    info: "#2563EB",        // Royal Cobalt Blue
   },
 
   status: {
-    success: { bg: "#ECF5EE", text: "#216E39", border: "#CFE5D6" },
-    processing: { bg: "#EDF2FA", text: "#1F4E9C", border: "#CFDDF2" },
-    warning: { bg: "#FDF3E3", text: "#8A5300", border: "#F0DCB8" },
-    error: { bg: "#FDEDED", text: "#A8071A", border: "#F5C9C9" },
-    neutral: { bg: "#F0F0F0", text: "#595959", border: "#E0E0E0" },
+    success: { bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0" },
+    processing: { bg: "#EFF6FF", text: "#1E40AF", border: "#BFDBFE" },
+    warning: { bg: "#FFFBEB", text: "#92400E", border: "#FDE68A" },
+    error: { bg: "#FFF1F2", text: "#9F1239", border: "#FECDD3" },
+    neutral: { bg: "#F1F5F9", text: "#475569", border: "#E2E8F0" },
   },
 
-  // Giorgio Morandi Palette Tokens
+  // Morandi legacy mappings preserved for backwards compatibility
   morandi: {
-    slate: "#5A5958",      // Primary data line / dark warm charcoal
-    cream: "#F2EDE9",      // Soft alabaster background / area fill
-    sand: "#D8BB8F",       // Warm camel sand / positive growth / revenue
-    greige: "#C1B5A7",     // Muted greige / peer median / comparison
-    terracotta: "#A57F6C", // Dusty terracotta / occupancy cost / drag
+    slate: "#0F172A",
+    cream: "#EFF6FF",
+    sand: "#10B981",
+    greige: "#64748B",
+    terracotta: "#E11D48",
   },
 
-  // Chart series — Giorgio Morandi palette for editorial financial clarity
+  // Chart series — Ascetic & high-clarity financial data palette
   chart: {
-    blue: "#5A5958",
-    purple: "#A57F6C",
-    primary: "#5A5958",
-    accent: "#D8BB8F",
-    secondary: "#C1B5A7",
-    negative: "#A57F6C",
-    fill: "#F2EDE9",
+    blue: "#1E293B",        // Deep Charcoal Slate / Midnight Blue-Black
+    purple: "#334155",      // Dark Slate
+    primary: "#0F172A",     // Obsidian Navy
+    accent: "#2D4B46",      // Deep Ascetic Pine
+    secondary: "#64748B",   // Cool Slate
+    negative: "#7F473E",    // Deep Muted Rust
+    fill: "#E2E8F0",        // Subtle Gray Slate
   },
 
   // Brand mark (BrandIcon) — graphic-specific values, not UI semantics.

@@ -4,7 +4,7 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Card, Col, Empty, Row, Segmented, Space, Statistic, Table, Tag } from "antd";
+import { Alert, Button, Card, Col, Empty, Row, Segmented, Space, Statistic, Table, Tag, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -183,6 +183,7 @@ function PortfolioPage() {
               primaryAction={
                 <Space>
                   <Segmented
+                    className="precision-segmented"
                     value={mode}
                     onChange={(value) => setModeParam(value as string)}
                     options={[
@@ -212,38 +213,48 @@ function PortfolioPage() {
               message={mode === "official" ? t("pf.mode_official", language) : t("pf.mode_working", language)}
             />
 
-            <Row gutter={16}>
-              <Col xs={24} md={6}>
-                <Card>
-                  <Statistic title={t("pf.kpi.contracts", language)} value={totals.contracts} />
-                </Card>
-              </Col>
-              <Col xs={24} md={6}>
-                <Card>
-                  <Statistic title={t("pf.kpi.active", language)} value={totals.active} />
-                </Card>
-              </Col>
-              <Col xs={24} md={6}>
-                <Card>
-                  <Statistic
-                    title={totalsCurrency ? t("pf.kpi.fixed_commitment", language) : t("pf.kpi.fixed_commitment_multi", language)}
-                    value={totals.fixed}
-                    precision={2}
-                    formatter={() => fmtMoney(totals.fixed, totalsCurrency)}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} md={6}>
-                <Card>
-                  <Statistic title={t("pf.kpi.missing_rate", language)} value={totals.missingRates} valueStyle={{ color: totals.missingRates ? "var(--state-error-text)" : undefined }} />
-                </Card>
-              </Col>
-            </Row>
+            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pf.kpi.contracts", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {totals.contracts}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pf.kpi.active", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {totals.active}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                  {totalsCurrency ? t("pf.kpi.fixed_commitment", language) : t("pf.kpi.fixed_commitment_multi", language)}
+                </span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {fmtMoney(totals.fixed, totalsCurrency)}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pf.kpi.missing_rate", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: totals.missingRates ? "var(--state-error-text)" : "var(--fg-primary)" }}>
+                    {totals.missingRates}
+                  </Typography.Text>
+                </div>
+              </div>
+            </div>
 
             <Card
               title={t("pf.card.rent_per_sqm", language)}
               extra={
                 <Segmented
+                  className="precision-segmented"
                   value={grouping}
                   onChange={(value) => setGroupingParam(value as string)}
                   options={(["store", "brand", "region"] as UnitPriceGrouping[]).map((value) => ({

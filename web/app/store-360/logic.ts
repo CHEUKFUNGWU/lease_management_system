@@ -4,12 +4,10 @@ import { formatKPIValue, formatSignalValue, kpiLabel, metricStatusLabel, metricU
 
 export const STORE360_CODES = ["revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "store_contribution"] as const;
 export const STORE360_AUX_CODES = ["average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution_margin", "sales_per_sqm"] as const;
-export const WINDOW_OPTIONS = [7, 14, 28] as const;
+export const WINDOW_OPTIONS = [1, 7, 14, 30, 90] as const;
 
 export function validWindow(value: number): boolean {
-  // M2: custom rolling windows are legal anywhere in 7-28 (server contract);
-  // WINDOW_OPTIONS stays the quick-pick list.
-  return Number.isInteger(value) && value >= 7 && value <= 28;
+  return Number.isInteger(value) && value >= 1 && value <= 365;
 }
 
 export function optionFields(option: RetailStore360Option) {

@@ -1,75 +1,77 @@
 "use client";
 
-/**
- * HELP-001: a zero-dependency linear flow diagram rendered as inline SVG.
- *
- * Selection rationale (against mermaid): the sample tutorials are short
- * fixed linear flows; mermaid would add a ~500KB runtime dependency and a
- * separate styling surface for no maintenance gain here. Inline SVG keeps
- * node fill, stroke and text on the design tokens, and step labels come
- * from i18n so all three languages work without extra artifacts. If a page
- * tutorial ever needs branching or loops, revisit mermaid then.
- */
+import React from "react";
 
 export interface FlowStep {
   key: string;
   label: string;
+  desc?: string;
 }
 
-const NODE_W = 168;
-const NODE_H = 44;
-const GAP = 36;
-const ARROW_W = 16;
+export default function HelpFlowDiagram({ steps }: { steps: FlowStep[] }) {
+  if (!steps || steps.length === 0) return null;
 
-export default function FlowDiagram({ steps }: { steps: FlowStep[] }) {
-  const width = steps.length * NODE_W + (steps.length - 1) * (GAP + ARROW_W);
-  const height = NODE_H + 16;
   return (
-    <svg
-      className="help-flow-diagram"
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label={steps.map((s) => s.label).join(" → ")}
-    >
+    <div className="help-flow-vertical" style={{ display: "flex", flexDirection: "column", gap: 0, padding: "4px 0 12px" }}>
       {steps.map((step, index) => {
-        const x = index * (NODE_W + GAP + ARROW_W);
-        const arrowX = x + NODE_W + GAP / 2;
+        const isLast = index === steps.length - 1;
         return (
-          <g key={step.key}>
-            <rect
-              x={x}
-              y={8}
-              width={NODE_W}
-              height={NODE_H}
-              rx={8}
-              fill="var(--bg-surface)"
-              stroke="var(--border-default)"
-            />
-            <text
-              x={x + NODE_W / 2}
-              y={8 + NODE_H / 2 + 4}
-              textAnchor="middle"
-              fontSize={12}
-              fill="var(--fg-primary)"
-            >
-              {step.label}
-            </text>
-            {index < steps.length - 1 && (
-              <>
-                <line x1={x + NODE_W} y1={8 + NODE_H / 2} x2={arrowX} y2={8 + NODE_H / 2} stroke="var(--border-strong)" strokeWidth={1.5} />
-                <path
-                  d={`M ${arrowX} ${8 + NODE_H / 2 - 5} L ${arrowX + ARROW_W / 2} ${8 + NODE_H / 2} L ${arrowX} ${8 + NODE_H / 2 + 5}`}
-                  fill="none"
-                  stroke="var(--border-strong)"
-                  strokeWidth={1.5}
+          <div key={step.key} style={{ display: "flex", gap: 12 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 22 }}>
+              <div
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  background: "var(--bg-inset, #F1F5F9)",
+                  border: "1.5px solid var(--fg-primary, #0F172A)",
+                  color: "var(--fg-primary, #0F172A)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                {index + 1}
+              </div>
+              {!isLast && (
+                <div
+                  style={{
+                    width: 1.5,
+                    flex: 1,
+                    minHeight: 20,
+                    background: "var(--border-strong, #CBD5E1)",
+                    margin: "4px 0",
+                  }}
                 />
-              </>
-            )}
-          </g>
+              )}
+            </div>
+            <div style={{ paddingBottom: isLast ? 0 : 12, flex: 1 }}>
+              <div
+                style={{
+                  background: "var(--bg-surface, #FFFFFF)",
+                  border: "1px solid var(--border-default, #E2E8F0)",
+                  borderRadius: 6,
+                  padding: "6px 12px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary, #0F172A)" }}>
+                  {step.label}
+                </div>
+                {step.desc && (
+                  <div style={{ fontSize: 12, color: "var(--fg-secondary, #64748B)", marginTop: 2 }}>
+                    {step.desc}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         );
       })}
-    </svg>
+    </div>
   );
 }
+

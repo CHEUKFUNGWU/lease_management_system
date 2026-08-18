@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Result, Row, Select, Slider, Space, Spin, Table, Tag, Typography, message } from "antd";
-import { ArrowLeftOutlined, PlayCircleOutlined, SaveOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Result, Row, Segmented, Select, Slider, Space, Spin, Table, Tag, Typography, message } from "antd";
+import { ArrowLeftOutlined, CheckCircleFilled, ControlOutlined, PlayCircleOutlined, SaveOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -26,6 +26,7 @@ import { envelopeFromScenario, scenarioRowsFromResponse } from "../lib/retail-ex
 import { acceptsEvaluation, actionKey, bridgeConservation, canSaveScenario, defaultAssumptions, evaluationSnapshotKey, formatScenarioValue, responseHorizonLabel, returnScenarioQuery, SCENARIO_CODES, scenarioLabel } from "./logic";
 import { StatusTag } from "../components/StatusTag";
 
+const TODAY = dayjs().format("YYYY-MM-DD");
 const WINDOW_OPTIONS = [7, 14, 28] as const;
 const DELTA_FIELDS: Array<{ key: keyof RetailScenarioAssumptions; labelKey: string; unit: "pct" | "pp"; min: number; max: number; step: number }> = [
   { key: "fixed_rent_change_pct", labelKey: "scenario.delta.fixed_rent_change_pct", unit: "pct", min: -50, max: 50, step: 1 },
@@ -41,7 +42,7 @@ function parseURL(params: { get(name: string): string | null }) {
   const classification = params.get("data_classification");
   const validClassification: RetailDataClassification = classification === "production" ? "production" : "simulated";
   const rawWindow = Number(params.get("window_days") || 14);
-  const windowDays = Number.isInteger(rawWindow) && rawWindow >= 7 && rawWindow <= 28 ? rawWindow : 14;
+  const windowDays = Number.isInteger(rawWindow) && (rawWindow === 7 || rawWindow === 14 || rawWindow === 28) ? rawWindow : 14;
   const defaults = defaultAssumptions();
   const assumptionKeys = Object.keys(defaults) as Array<keyof RetailScenarioAssumptions>;
   const assumptions = { ...defaults };
@@ -97,9 +98,13 @@ function MetricTable({ response, selectedKey, notReady, language }: { response: 
           render: (_: unknown, row: typeof rows[number]) => (
             <Flex align="center" gap={4}>
               {notReady && <KPIReadyBadge />}
-              <StatusTag kind={row.result?.status === "complete" ? "success" : "warning"}>
-                {row.result?.status || "unavailable"}{row.result?.reason ? ` · ${row.result.reason}` : ""}
-              </StatusTag>
+              {row.result?.status === "complete" ? (
+                <CheckCircleFilled style={{ color: "#166534", fontSize: 13 }} />
+              ) : (
+                <span style={{ fontSize: 11, color: "var(--state-warning-text)" }}>
+                  {row.result?.status || "unavailable"}{row.result?.reason ? ` · ${row.result.reason}` : ""}
+                </span>
+              )}
             </Flex>
           ),
         },
@@ -262,20 +267,20 @@ function ScenarioPageInner() {
   };
 
   const backURL = query.returnQuery ? `/store-360?${query.returnQuery}` : returnScenarioQuery(searchParams);
-
   const waterfallItems = useMemo(() => {
     if (!response) return [];
     const selected = response.scenarios.find((item) => item.key === selectedKey);
     if (!selected || !selected.bridge || !selected.bridge.items) return [];
-    const baseVal = response.baseline.monthly_contribution_change || 0;
+    const baseVal = response.baseline?.metrics?.store_contribution?.result ?? 0;
     const items = selected.bridge.items.map((item) => ({
       label: item.label,
       value: item.contribution ?? 0,
     }));
+    const planVal = selected.metrics?.store_contribution?.result ?? (baseVal + (selected.monthly_contribution_change || 0));
     return [
-      { label: t("scenario.option_baseline", language), value: baseVal, isTotal: true },
+      { label: `${t("scenario.option_baseline", language)} (${t("retail.kpi.store_contribution", language)})`, value: baseVal, isTotal: true },
       ...items,
-      { label: t("scenario.title", language), value: baseVal + (selected.monthly_contribution_change || 0), isTotal: true },
+      { label: `${t("scenario.plan_title", language)} (${t("retail.kpi.store_contribution", language)})`, value: planVal, isTotal: true },
     ];
   }, [response, selectedKey, language]);
 
@@ -320,21 +325,21 @@ function ScenarioPageInner() {
           <Row gutter={[16, 16]} style={{ marginTop: 12 }}>
             <Col xs={24} lg={10}>
               <Space direction="vertical" style={{ width: "100%" }} size={12}>
-                <Card size="small" title={<Space><SlidersGlyph size={13} /><span>{t("scenario.assumptions", language)}</span></Space>}>
+                <Card size="small" title={<Space><ControlOutlined /><span>{t("scenario.controls", language)}</span></Space>}>
                   <Space direction="vertical" style={{ width: "100%" }} size={10}>
-                    <Radio.Group
+                    <Segmented
+                      className="precision-segmented"
                       value={query.classification}
-                      optionType="button"
-                      buttonStyle="solid"
+                      onChange={(val) => {
+                        const next = val as RetailDataClassification;
+                        if (next === "production") setQuery({ classification: next, datasetVersion: "", asOf: TODAY });
+                        else if (latest) setQuery({ classification: next, datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest) });
+                        else setQuery({ classification: next, datasetVersion: "" });
+                      }}
                       options={[
                         { label: t("retail.classification.simulated", language), value: "simulated" },
                         { label: t("retail.classification.production", language), value: "production" },
                       ]}
-                      onChange={(event) => {
-                        const next = event.target.value as RetailDataClassification;
-                        if (next === "production") setQuery({ classification: next, datasetVersion: "", storeID: "" });
-                        else setQuery({ classification: next, datasetVersion: latest?.dataset_version || "", asOf: latest ? latestAnomalyDate(latest) : query.asOf, storeID: "" });
-                      }}
                     />
                     <Select
                       showSearch
@@ -361,21 +366,24 @@ function ScenarioPageInner() {
                         style={{ width: "50%" }}
                         value={WINDOW_OPTIONS.includes(query.windowDays as (typeof WINDOW_OPTIONS)[number]) ? query.windowDays : undefined}
                         placeholder={t("pulse.custom_window", language)}
-                        options={WINDOW_OPTIONS.map((value) => ({ label: `${value}${t("common.days_suffix", language)}`, value }))}
+                        options={WINDOW_OPTIONS.map((val) => ({
+                          label: t(`period.day_${val}`, language),
+                          value: val,
+                        }))}
                         onChange={(value) => setQuery({ windowDays: value })}
                       />
                     </Flex>
                   </Space>
                 </Card>
 
-                <Card size="small" title={<Space><ThunderboltOutlined /><span>Presets</span></Space>}>
+                <Card size="small" title={<Space><ThunderboltOutlined /><span>{t("scenario.preset_title", language)}</span></Space>}>
                   <Flex wrap="wrap" gap={8}>
-                    <Button size="small" onClick={() => applyPreset({ fixedRent: -5 })}>Rent -5%</Button>
-                    <Button size="small" onClick={() => applyPreset({ fixedRent: -10 })}>Rent -10%</Button>
-                    <Button size="small" onClick={() => applyPreset({ fixedRent: -15 })}>Rent -15%</Button>
-                    <Button size="small" onClick={() => applyPreset({ fixedRent: -20, variableRent: 2 })}>Rent -20% + 2%</Button>
-                    <Button size="small" onClick={() => applyPreset({ revenue: 5 })}>Sales +5%</Button>
-                    <Button size="small" onClick={() => applyPreset({ fixedRent: 0, variableRent: 0, revenue: 0 })}>Reset</Button>
+                    <Button size="small" onClick={() => applyPreset({ fixedRent: -5 })}>{t("scenario.preset_rent_5", language)}</Button>
+                    <Button size="small" onClick={() => applyPreset({ fixedRent: -10 })}>{t("scenario.preset_rent_10", language)}</Button>
+                    <Button size="small" onClick={() => applyPreset({ fixedRent: -15 })}>{t("scenario.preset_rent_15", language)}</Button>
+                    <Button size="small" onClick={() => applyPreset({ fixedRent: -20, variableRent: 2 })}>{t("scenario.preset_rent_20_var_2", language)}</Button>
+                    <Button size="small" onClick={() => applyPreset({ revenue: 5 })}>{t("scenario.preset_sales_5", language)}</Button>
+                    <Button size="small" onClick={() => applyPreset({ fixedRent: 0, variableRent: 0, revenue: 0 })}>{t("scenario.preset_reset", language)}</Button>
                   </Flex>
                 </Card>
 
@@ -512,7 +520,7 @@ function ScenarioPageInner() {
                       </Col>
                     </Row>
 
-                    <Card size="small" title="P&L Bridge">
+                    <Card size="small" title={t("scenario.bridge_title", language)}>
                       <WaterfallChart
                         items={waterfallItems}
                         currency={response.currency}
@@ -525,14 +533,20 @@ function ScenarioPageInner() {
                       title={
                         <Flex justify="space-between" align="center">
                           <span>{t("scenario.title", language)}</span>
-                          <Radio.Group
-                            size="small"
-                            optionType="button"
-                            buttonStyle="solid"
-                            value={selectedKey}
-                            onChange={(event) => setSelectedKey(event.target.value)}
-                            options={response.scenarios.map((item) => ({ label: item.key === "baseline" ? t("scenario.option_baseline", language) : item.name, value: item.key }))}
-                          />
+                          {response.scenarios.length > 1 ? (
+                            <Radio.Group
+                              size="small"
+                              optionType="button"
+                              buttonStyle="solid"
+                              value={selectedKey}
+                              onChange={(event) => setSelectedKey(event.target.value)}
+                              options={response.scenarios.map((item) => ({ label: item.name || item.key, value: item.key }))}
+                            />
+                          ) : (
+                            <Tag color="blue" style={{ margin: 0 }}>
+                              {response.scenarios[0]?.name === "Plan" ? t("scenario.plan_title", language) : (response.scenarios[0]?.name || t("scenario.plan_title", language))}
+                            </Tag>
+                          )}
                         </Flex>
                       }
                     >

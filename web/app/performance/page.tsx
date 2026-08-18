@@ -187,82 +187,91 @@ export default function PerformancePage() {
             meta={t("perf.meta", language).replace("{period}", period).replace("{stamp}", dayjs().format("YYYY-MM-DD HH:mm"))}
             help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
           />
-          <Card size="small" style={{ marginBottom: 16 }}>
-            <Space wrap>
-              <span>{t("perf.analysis_period", language)}</span>
-              <Input
-                value={periodDraft}
-                onChange={event => setPeriodDraft(event.target.value)}
-                onPressEnter={applyPeriod}
-                status={periodDraftValid ? undefined : "error"}
-                style={{ width: 120 }}
-                placeholder="YYYY-MM"
-              />
-              <Button icon={<ReloadOutlined />} onClick={applyPeriod} disabled={!periodDraftValid} loading={loading}>
+          <div className="precision-filter-bar" style={{ marginBottom: 16 }}>
+            <Space wrap size={12} align="center">
+              <div className="precision-filter-group">
+                <span className="precision-filter-label">{t("perf.analysis_period", language)}:</span>
+                <Input
+                  value={periodDraft}
+                  size="small"
+                  onChange={event => setPeriodDraft(event.target.value)}
+                  onPressEnter={applyPeriod}
+                  status={periodDraftValid ? undefined : "error"}
+                  style={{ width: 110 }}
+                  placeholder="YYYY-MM"
+                />
+              </div>
+              <Button size="small" icon={<ReloadOutlined />} onClick={applyPeriod} disabled={!periodDraftValid} loading={loading}>
                 {t("common.refresh", language)}
               </Button>
               <Button
+                size="small"
                 icon={<SparkleGlyph size={13} />}
                 onClick={() => window.location.href = `/ai-chat?message=${encodeURIComponent(t("perf.ai_prompt", language).replace("{period}", period))}`}
               >
                 {t("perf.ask_ai", language)}
               </Button>
-              <Input
-                aria-label={t("perf.import_source", language)}
-                value={importSource}
-                onChange={(event) => setImportSource(event.target.value)}
-                placeholder={t("perf.import_source", language)}
-                className="perf-import-source"
-              />
+              <div className="precision-filter-group">
+                <Input
+                  size="small"
+                  aria-label={t("perf.import_source", language)}
+                  value={importSource}
+                  onChange={(event) => setImportSource(event.target.value)}
+                  placeholder={t("perf.import_source", language)}
+                  className="perf-import-source"
+                  style={{ width: 130 }}
+                />
+              </div>
               <Upload
                 accept=".csv,.xlsx"
                 maxCount={1}
                 showUploadList={false}
                 beforeUpload={(file) => { void handleMonthlyImport(file); return false; }}
               >
-                <Button icon={<UploadOutlined />} loading={importing}>
+                <Button size="small" icon={<UploadOutlined />} loading={importing}>
                   {t("perf.import_monthly", language)}
                 </Button>
               </Upload>
             </Space>
-          </Card>
+          </div>
           {overview && (
-            <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title={t("perf.kpi.store_facts", language)}
-                    value={overview.store_fact_count}
-                    suffix={<Typography.Text type="secondary">/ {overview.store_fact_ready_count} {t("perf.kpi.reconciled_suffix", language)}</Typography.Text>}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title={t("perf.kpi.equipment_facts", language)}
-                    value={overview.equipment_fact_count}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title={t("perf.kpi.open_actions", language)}
-                    value={overview.open_action_count}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title={t("perf.kpi.open_impact", language)}
-                    value={overview.open_action_impact}
-                    precision={2}
-                  />
-                </Card>
-              </Col>
-            </Row>
+            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", marginBottom: 16 }}>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.store_facts", language)}</span>
+                <div style={{ margin: "8px 0 0", display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {overview.store_fact_count}
+                  </Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    / {overview.store_fact_ready_count} {t("perf.kpi.reconciled_suffix", language)}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.equipment_facts", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {overview.equipment_fact_count}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.open_actions", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {overview.open_action_count}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.open_impact", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {overview.open_action_impact.toFixed(2)}
+                  </Typography.Text>
+                </div>
+              </div>
+            </div>
           )}
 
           {governanceCounts.some((item) => item.value > 0) ? (

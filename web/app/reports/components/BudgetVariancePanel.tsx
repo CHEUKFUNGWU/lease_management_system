@@ -247,6 +247,25 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
 
   return (
     <>
+      {/* 0. Scope Clarification Notice */}
+      <Alert
+        type="info"
+        showIcon
+        className="fpna-margin-bottom-16"
+        message={
+          <div className="fpna-scope-alert-content">
+            <span>
+              <strong>{t("budget.scope_notice_title", language)}</strong>
+              {": "}
+              {t("budget.scope_notice_desc", language)}
+            </span>
+            <a href="/fpna-workbench" className="fpna-bold-link">
+              {t("budget.link_fpna_workbench", language)}
+            </a>
+          </div>
+        }
+      />
+
       {/* 1. Comparison Parameters Bar */}
       <Card styles={{ body: { padding: "16px 20px" } }} style={{ marginBottom: 16 }}>
         <Row gutter={[16, 12]} align="middle">

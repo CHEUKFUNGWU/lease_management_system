@@ -5,7 +5,7 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { motion } from "framer-motion";
 import {
-  Card, Radio, Tag, Typography, Table, Spin, Statistic, Empty,
+  Card, Segmented, Tag, Typography, Table, Spin, Statistic, Empty,
   Row, Col, Button, Tabs, DatePicker, Select, Input, Space, message,
 } from "antd";
 import {
@@ -397,19 +397,15 @@ function ReportsPageContent() {
               <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-secondary)" }}>
                 {t("reports.mode", language)}:
               </span>
-              <Radio.Group
+              <Segmented
+                className="precision-segmented"
                 value={reportMode}
-                onChange={(e) => setReportMode(e.target.value)}
-                buttonStyle="solid"
-                size="middle"
-              >
-                <Radio.Button value="working">
-                  <FileTextOutlined /> {t("reports.working", language)}
-                </Radio.Button>
-                <Radio.Button value="official">
-                  <SafetyOutlined /> {t("reports.official", language)}
-                </Radio.Button>
-              </Radio.Group>
+                onChange={(val) => setReportMode(val as "working" | "official")}
+                options={[
+                  { label: <span><FileTextOutlined style={{ marginRight: 4 }} />{t("reports.working", language)}</span>, value: "working" },
+                  { label: <span><SafetyOutlined style={{ marginRight: 4 }} />{t("reports.official", language)}</span>, value: "official" },
+                ]}
+              />
 
               <span
                 style={{
@@ -655,16 +651,15 @@ function ReportsPageContent() {
                           </Space>
                         </Col>
                         <Col>
-                          <Space size={4}>
-                            <span className="sty-68c261a9">
+                          <Space size={8} align="center">
+                            <span style={{ fontSize: 13, color: "var(--fg-secondary)", whiteSpace: "nowrap" }}>
                               {t("reports.date_range", language)}
                             </span>
                             <RangePicker
                               value={amortDateRange}
                               onChange={(dates) => { setAmortDateRange(dates as any); setAmortFetched(false); }}
                               allowClear={false}
-                              size="small"
-                              className="sty-f8c8af9b"
+                              style={{ width: 250 }}
                             />
                           </Space>
                         </Col>

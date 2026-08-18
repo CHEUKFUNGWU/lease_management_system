@@ -1427,8 +1427,17 @@ export const performanceApi = {
     apiRequest(`/api/v1/performance/actions/${encodeURIComponent(id)}/realizations`, { token }),
   createActionRealization: (id: string, data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/actions/${encodeURIComponent(id)}/realizations`, { method: "POST", body: JSON.stringify(data), token }),
-  planVersions: (versionType: string | undefined, token: string) => {
-    const query = versionType ? `?version_type=${encodeURIComponent(versionType)}` : "";
+  planVersions: (params: string | { version_type?: string; status?: string; as_of_period?: string } | undefined, token: string) => {
+    let query = "";
+    if (typeof params === "string") {
+      query = params ? `?version_type=${encodeURIComponent(params)}` : "";
+    } else if (params) {
+      const qs = new URLSearchParams();
+      if (params.version_type) qs.set("version_type", params.version_type);
+      if (params.status) qs.set("status", params.status);
+      if (params.as_of_period) qs.set("as_of_period", params.as_of_period);
+      query = qs.toString() ? `?${qs.toString()}` : "";
+    }
     return apiRequest(`/api/v1/performance/plan-versions${query}`, { token });
   },
   createPlanVersion: (data: Record<string, unknown>, token: string) =>
@@ -1464,7 +1473,7 @@ export const performanceApi = {
   },
   createAgentSignal: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/agent-signals`, { method: "POST", body: JSON.stringify(data), token }),
-  dataQuality: (params: { period?: string; status?: string }, token: string) => {
+  dataQuality: (params: { period?: string; status?: string; severity?: string }, token: string) => {
     const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
     return apiRequest(`/api/v1/performance/data-quality${qs.toString() ? `?${qs}` : ""}`, { token });
   },

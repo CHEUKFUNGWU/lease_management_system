@@ -18,6 +18,7 @@ import { ScenarioPanel } from "./ScenarioPanel";
 import { reportApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import StackedCashflowChart from "../components/charts/StackedCashflowChart";
+import { StoreCashflowPanel } from "./StoreCashflowPanel";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -90,6 +91,9 @@ const buildColumns = (view: string, language: Language) => {
 function CashflowForecastPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
+
+  /* ---- module perspective tab ---- */
+  const [activeTab, setActiveTab] = useState<"store_operating" | "ifrs16_lease">("store_operating");
 
   /* ---- controls ---- */
   const [reportModeParam, setReportModeParam] = useUrlState("mode", "working");
@@ -215,48 +219,62 @@ function CashflowForecastPage() {
         {/* ─── page heading ─── */}
         <PageHeader
           title={<><LineChartOutlined style={{ marginRight: 8 }} />{t("cashflow.title", language)}</>}
-
+          primaryAction={
+            <Radio.Group
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              buttonStyle="solid"
+              optionType="button"
+            >
+              <Radio.Button value="store_operating">{t("cashflow.tab_store_operating", language)}</Radio.Button>
+              <Radio.Button value="ifrs16_lease">{t("cashflow.tab_ifrs16_lease", language)}</Radio.Button>
+            </Radio.Group>
+          }
         />
 
-        {/* ─── report mode card ─── */}
-        <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Space>
-              <span style={{ fontWeight: 600 }}>{t("cashflow.report_mode", language)}</span>
-              <Radio.Group
-                value={reportMode}
-                onChange={(e) => { setReportModeParam(e.target.value); setFetched(false); }}
-                buttonStyle="solid"
-              >
-                <Radio.Button value="working">
-                  <FileTextOutlined /> {t("cashflow.working_mode", language)}
-                </Radio.Button>
-                <Radio.Button value="official">
-                  <SafetyOutlined /> {t("cashflow.official_mode", language)}
-                </Radio.Button>
-              </Radio.Group>
-            </Space>
-          </div>
+        {activeTab === "store_operating" ? (
+          <StoreCashflowPanel currency="CNY" />
+        ) : (
+          <>
+            {/* ─── report mode card ─── */}
+            <Card style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Space>
+                  <span style={{ fontWeight: 600 }}>{t("cashflow.report_mode", language)}</span>
+                  <Radio.Group
+                    value={reportMode}
+                    onChange={(e) => { setReportModeParam(e.target.value); setFetched(false); }}
+                    buttonStyle="solid"
+                  >
+                    <Radio.Button value="working">
+                      <FileTextOutlined /> {t("cashflow.working_mode", language)}
+                    </Radio.Button>
+                    <Radio.Button value="official">
+                      <SafetyOutlined /> {t("cashflow.official_mode", language)}
+                    </Radio.Button>
+                  </Radio.Group>
+                </Space>
+              </div>
 
-          {reportMode === "working" && (
-            <Alert
-              message={t("reports.working_alert_title", language)}
-              description={t("reports.working_alert_desc", language)}
-              type="warning"
-              showIcon
-              style={{ marginTop: 12 }}
-            />
-          )}
-          {reportMode === "official" && (
-            <Alert
-              message={t("reports.official_alert_title", language)}
-              description={t("reports.official_alert_desc", language)}
-              type="success"
-              showIcon
-              style={{ marginTop: 12 }}
-            />
-          )}
-        </Card>
+              {reportMode === "working" && (
+                <Alert
+                  message={t("reports.working_alert_title", language)}
+                  description={t("reports.working_alert_desc", language)}
+                  type="warning"
+                  showIcon
+                  style={{ marginTop: 12 }}
+                />
+              )}
+              {reportMode === "official" && (
+                <Alert
+                  message={t("reports.official_alert_title", language)}
+                  description={t("reports.official_alert_desc", language)}
+                  type="success"
+                  showIcon
+                  style={{ marginTop: 12 }}
+                />
+              )}
+            </Card>
 
         {/* ─── filter controls ─── */}
         <Card style={{ marginBottom: 16 }}>
@@ -491,6 +509,8 @@ function CashflowForecastPage() {
         </Card>
 
         <ScenarioPanel token={token} />
+          </>
+        )}
       </AppLayout>
     </ProtectedRoute>
   );

@@ -289,8 +289,9 @@ export default function AuditLogsPage() {
           <Card size="small" style={{ marginBottom: 16 }}>
             <Row gutter={[12, 12]}>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_table", language)}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_table", language)}</span>
                 <Select
+                  size="small"
                   value={tableName}
                   onChange={setTableName}
                   options={TABLE_NAME_OPTIONS}
@@ -299,8 +300,9 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_action", language)}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_action", language)}</span>
                 <Select
+                  size="small"
                   value={action}
                   onChange={setAction}
                   options={ACTION_OPTIONS}
@@ -309,8 +311,9 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_record_id", language)}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_record_id", language)}</span>
                 <Input
+                  size="small"
                   value={recordId}
                   onChange={(e) => setRecordId(e.target.value)}
                   placeholder={t("audit.filter_record_placeholder", language)}
@@ -318,8 +321,9 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_run_id", language)}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_run_id", language)}</span>
                 <Input
+                  size="small"
                   value={runId}
                   onChange={(e) => setRunId(e.target.value)}
                   placeholder={t("audit.filter_run_placeholder", language)}
@@ -327,8 +331,9 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_tool_name", language)}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_tool_name", language)}</span>
                 <Input
+                  size="small"
                   value={toolName}
                   onChange={(e) => setToolName(e.target.value)}
                   placeholder={t("audit.filter_tool_placeholder", language)}
@@ -336,8 +341,9 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 13, marginBottom: 4, display: "block" }}>{t("audit.filter_time_range", language)}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_time_range", language)}</span>
                 <RangePicker
+                  size="small"
                   value={dateRange as any}
                   onChange={(dates) => setDateRange(dates as any)}
                   style={{ width: "100%" }}
@@ -345,10 +351,10 @@ export default function AuditLogsPage() {
               </Col>
             </Row>
             <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
+              <Button size="small" type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
                 {t("audit.query", language)}
               </Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>
+              <Button size="small" icon={<ReloadOutlined />} onClick={handleReset}>
                 {t("audit.reset", language)}
               </Button>
             </div>

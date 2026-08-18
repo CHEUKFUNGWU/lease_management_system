@@ -12,23 +12,23 @@
      is exactly what a palette-level contrast table cannot catch. */
   color-scheme: light;
 
-  /* Monochrome Scale — only levels consumed by the application */
-  --mono-0: #000000;
-  --mono-20: #262626;
-  --mono-40: #595959;
-  --mono-60: #737373;
-  --mono-70: #A6A6A6;
-  --mono-90: #D9D9D9;
-  --mono-95: #F0F0F0;
-  --mono-98: #F7F7F7;
-  --mono-100: #FFFFFF;
+  /* Monochrome Scale — Coastal Navy & Slate palette */
+  --mono-0: #0F172A;
+  --mono-20: #1E293B;
+  --mono-40: #334155;
+  --mono-60: #64748B;
+  --mono-70: #64748B;
+  --mono-90: #E2E8F0;
+  --mono-95: #F1F5F9;
+  --mono-98: #FFFFFF;
+  --mono-100: #F8FAFC;
 
   /* Background */
   --bg-page: var(--mono-100);
   --bg-surface: var(--mono-98);
-  --bg-elevated: var(--mono-100);
+  --bg-elevated: var(--mono-98);
   --bg-inset: var(--mono-95);
-  --bg-code: var(--mono-98);
+  --bg-code: var(--mono-100);
   /* DARK-003: identity surface — the brand slab is black in both themes. */
   --bg-brand-slab: #000000;
   --fg-on-brand-slab: #FFFFFF;
@@ -38,42 +38,42 @@
   --fg-secondary: var(--mono-20);
   --fg-tertiary: var(--mono-40);
   --fg-muted: var(--mono-60);
-  --fg-inverse: var(--mono-100);
+  --fg-inverse: #FFFFFF;
 
   /* Border */
   --border-default: var(--mono-90);
   --border-strong: var(--mono-70);
   --border-subtle: var(--mono-95);
 
-  /* Semantic and visualization tokens. Status colors are always paired with
-     an icon or label; charts use the same restrained palette. */
-  --state-success-bg: #ECF5EE;
-  --state-success-text: #216E39;
-  --state-success-border: #CFE5D6;
-  --state-info-bg: #EDF2FA;
-  --state-info-text: #1F4E9C;
-  --state-info-border: #CFDDF2;
-  --state-warning-bg: #FDF3E3;
-  --state-warning-text: #8A5300;
-  --state-warning-border: #F0DCB8;
-  --state-error-bg: #FDEDED;
-  --state-error-text: #A8071A;
-  --state-error-border: #F5C9C9;
-  /* Giorgio Morandi Palette Tokens */
-  --morandi-slate: #5A5958;
-  --morandi-cream: #F2EDE9;
-  --morandi-sand: #D8BB8F;
-  --morandi-greige: #C1B5A7;
-  --morandi-terracotta: #A57F6C;
-  --chart-blue: #5A5958;
-  --chart-purple: #A57F6C;
-  --chart-primary: #5A5958;
-  --chart-accent: #D8BB8F;
-  --chart-secondary: #C1B5A7;
-  --chart-negative: #A57F6C;
-  --chart-fill: #F2EDE9;
-  --admin-surface: #001529;
-  --code-surface: #1E1E1E;
+  /* Semantic and visualization tokens */
+  --state-success-bg: #ECFDF5;
+  --state-success-text: #059669;
+  --state-success-border: #A7F3D0;
+  --state-info-bg: #EFF6FF;
+  --state-info-text: #2563EB;
+  --state-info-border: #BFDBFE;
+  --state-warning-bg: #FFFBEB;
+  --state-warning-text: #D97706;
+  --state-warning-border: #FDE68A;
+  --state-error-bg: #FFF1F2;
+  --state-error-text: #E11D48;
+  --state-error-border: #FECDD3;
+
+  /* Ascetic & High Trust Dark Chart Tokens */
+  --morandi-slate: #0F172A;
+  --morandi-cream: #E2E8F0;
+  --morandi-sand: #2D4B46;
+  --morandi-greige: #64748B;
+  --morandi-terracotta: #7F473E;
+  --chart-blue: #1E293B;
+  --chart-purple: #334155;
+  --chart-primary: #0F172A;
+  --chart-accent: #2D4B46;
+  --chart-secondary: #64748B;
+  --chart-negative: #7F473E;
+  --chart-fill: #E2E8F0;
+  --admin-surface: #0F172A;
+  --code-surface: #1E293B;
 
   /* Brand panel overlays (login) — white alpha on the fixed dark panel */
   --brand-overlay-badge: rgba(255, 255, 255, 0.08);
@@ -292,27 +292,158 @@ body {
 
 /* MAX-005 additive operating-pulse layout; it uses the existing token
    palette and card/grid language without changing global theme behavior. */
-/* FIX-003: fixed height, not min-height — KPI cards in one grid row must not
-   grow apart when a value wraps. Inner lines that can exceed the card width
-   (value, change, comparison) truncate instead of reflowing the card; the
-   value line keeps the full figure in its tooltip. */
+/* Stripe-style Unified Metric Strip (Seamless Hairline Grid) */
+.stripe-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+@media (max-width: 991px) {
+  .stripe-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 575px) {
+  .stripe-metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .pulse-kpi-card {
   height: 156px;
   overflow: hidden;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  box-shadow: none;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justifyContent: space-between;
+  transition: background 0.15s ease;
+}
+
+.store-360-kpi-card {
+  height: 156px;
+  overflow: hidden;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  box-shadow: none;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justifyContent: space-between;
+  transition: background 0.15s ease;
+}
+
+.pulse-kpi-card:hover,
+.store-360-kpi-card:hover {
+  background: var(--bg-inset, #F8FAFC);
+}
+
+/* Precision Filter Bar (Linear / Attio inspired precision toolbars) */
+.precision-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--bg-surface, #FFFFFF);
+  border: 1px solid var(--border-default, #E2E8F0);
+  border-radius: 10px;
+  padding: 10px 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.precision-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.precision-filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-tertiary, #334155);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.precision-segmented {
+  background: var(--bg-inset, #F1F5F9) !important;
+  padding: 2px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--border-subtle, #E2E8F0) !important;
+}
+
+.precision-segmented .ant-segmented-item {
+  color: var(--fg-secondary, #475569) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 2px 10px !important;
+  min-height: 24px !important;
+  line-height: 20px !important;
+  border-radius: 4px !important;
+  transition: all 0.15s ease !important;
+}
+
+.precision-segmented .ant-segmented-item .ant-segmented-item-label {
+  color: var(--fg-secondary, #475569) !important;
+}
+
+.precision-segmented .ant-segmented-item-selected {
+  background: #0F172A !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+}
+
+.precision-segmented .ant-segmented-item-selected,
+.precision-segmented .ant-segmented-item-selected .ant-segmented-item-label,
+.precision-segmented .ant-segmented-item-selected span,
+.precision-segmented .ant-segmented-item-selected * {
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+}
+
+.pulse-kpi-card:nth-child(3n),
+.store-360-kpi-card:nth-child(3n) {
+  border-right: none;
+}
+
+.pulse-kpi-card:nth-last-child(-n+3),
+.store-360-kpi-card:nth-last-child(-n+3) {
+  border-bottom: none;
 }
 
 .pulse-kpi-card .pulse-kpi-value,
 .store-360-kpi-card .pulse-kpi-value {
   margin: 12px 0 4px;
   max-width: 100%;
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  color: var(--fg-primary) !important;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .pulse-kpi-card .pulse-change,
 .store-360-kpi-card .pulse-change,
 .pulse-kpi-card .pulse-kpi-comparison,
 .store-360-kpi-card .pulse-kpi-comparison {
-  display: block;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -321,26 +452,39 @@ body {
 .pulse-kpi-null {
   margin-top: 22px;
   color: var(--fg-muted);
-  font-size: 28px;
+  font-size: 24px;
 }
 
 .pulse-kpi-comparison {
-  display: block;
-  margin-top: 6px;
+  display: inline-block;
+  margin-top: 0;
   font-size: 12px;
+  color: var(--fg-muted);
 }
 
 .pulse-change {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  background: transparent;
+  padding: 0;
+  border: none;
 }
 
-.pulse-change-bad { color: var(--state-error-text); }
-.pulse-change-good { color: var(--state-success-text); }
-.pulse-change-neutral, .pulse-change-missing { color: var(--fg-muted); }
+.pulse-change-bad {
+  color: var(--state-error-text);
+}
+
+.pulse-change-good {
+  color: var(--state-success-text);
+}
+
+.pulse-change-neutral, .pulse-change-missing {
+  color: var(--fg-muted);
+}
 
 .pulse-aux-row {
   display: grid;
@@ -456,7 +600,33 @@ h3 {
 
 body .ant-card-head {
   box-shadow: 0 1px 0 0 var(--border-subtle);
-  padding: 16px 20px;
+  padding: 0 20px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+body .ant-card-head-wrapper {
+  width: 100%;
+  align-items: center;
+}
+
+body .ant-card-head-title {
+  padding: 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-primary);
+  line-height: 1.5;
+}
+
+body .ant-card-small > .ant-card-head {
+  padding: 0 16px;
+  min-height: 40px;
+}
+
+body .ant-card-small > .ant-card-head > .ant-card-head-wrapper > .ant-card-head-title {
+  padding: 8px 0;
+  font-size: 13px;
 }
 
 /* Button: refined press state.
@@ -3866,3 +4036,107 @@ html {
   font-weight: 500;
   background: var(--bg-inset);
 }
+
+.ant-card .ant-table-pagination.ant-pagination {
+  padding: 0 16px 16px 16px;
+  margin: 16px 0 0 0;
+}
+
+.help-flow-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ─── FP&A Workbench Styles (N1 / F0) ────────────────────────── */
+.fpna-page-container {
+  padding: 0 4px;
+}
+.fpna-header-row {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.fpna-header-title {
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fpna-header-subtitle {
+  margin: 4px 0 0 0 !important;
+  color: var(--fg-secondary);
+}
+.fpna-tree-node-wrap {
+  margin-bottom: 8px;
+}
+.fpna-tree-card-inner {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+.fpna-param-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fpna-param-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-secondary);
+}
+.fpna-full-width {
+  width: 100%;
+}
+.fpna-scope-alert-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fpna-bold-link {
+  font-weight: 600;
+}
+.fpna-variance-up {
+  color: var(--state-success-text);
+  font-weight: 600;
+}
+.fpna-variance-down {
+  color: var(--state-error-text);
+  font-weight: 600;
+}
+.fpna-variance-neutral {
+  color: var(--fg-secondary);
+}
+.fpna-form-flex-1 {
+  flex: 1;
+}
+.fpna-desc-pre {
+  margin: 0;
+  font-family: inherit;
+  white-space: pre-wrap;
+}
+.fpna-margin-bottom-16 {
+  margin-bottom: 16px;
+}
+.fpna-font-12 {
+  font-size: 12px;
+}
+.fpna-tree-icon {
+  color: var(--color-primary, #1677ff);
+}
+.fpna-select-status {
+  width: 140px;
+}
+.fpna-select-severity {
+  width: 130px;
+}
+.fpna-select-search {
+  width: 280px;
+}
+

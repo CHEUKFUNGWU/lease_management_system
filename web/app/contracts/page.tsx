@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
@@ -42,6 +42,8 @@ import { StatusTag, type StatusKind } from "../components/StatusTag";
 import { fmtDate, fmtMoney } from "../lib/format";
 import { useUrlState } from "../hooks/useUrlState";
 import { useRetailQuery } from "../retail/useRetailQuery";
+import { EnterpriseTable } from "../components/enterprise-table/EnterpriseTable";
+import type { EnterpriseColumn, SavedView } from "../components/enterprise-table/types";
 
 interface Contract {
   id: string;
@@ -415,6 +417,138 @@ function ContractsPage() {
     },
   ];
 
+  const enterpriseColumns: EnterpriseColumn<Contract>[] = useMemo(() => [
+    {
+      key: "contract_number",
+      title: t("contracts.col_number", language),
+      dataIndex: "contract_number",
+      fixed: "left",
+      minWidth: 150,
+      render: (num: string, record: Contract) => (
+        <a
+          onClick={() => router.push(`/contracts/${record.id}`)}
+          style={{ fontWeight: 600, color: "var(--fg-primary)", cursor: "pointer" }}
+        >
+          {num}
+        </a>
+      ),
+    },
+    {
+      key: "contract_name",
+      title: t("contracts.col_name", language),
+      dataIndex: "contract_name",
+      editable: true,
+      minWidth: 180,
+    },
+    {
+      key: "currency",
+      title: t("contracts.col_currency", language),
+      dataIndex: "currency",
+      width: 70,
+    },
+    {
+      key: "lease_start_date",
+      title: t("contracts.col_start_date", language),
+      dataIndex: "lease_start_date",
+      width: 110,
+      render: (d: string) => <span className="font-tabular" style={{ fontSize: 12 }}>{fmtDate(d)}</span>,
+    },
+    {
+      key: "lease_end_date",
+      title: t("contracts.col_end_date", language),
+      dataIndex: "lease_end_date",
+      width: 110,
+      render: (d: string) => <span className="font-tabular" style={{ fontSize: 12 }}>{fmtDate(d)}</span>,
+    },
+    {
+      key: "latest_liability",
+      title: t("contracts.col_liability", language),
+      dataIndex: "latest_liability",
+      align: "right",
+      width: 130,
+      render: (val: number, record: Contract) => (
+        <span className="font-tabular" style={{ fontSize: 12 }}>{val ? fmtMoney(val, record.currency) : "—"}</span>
+      ),
+    },
+    {
+      key: "latest_rou_asset",
+      title: t("contracts.col_rou", language),
+      dataIndex: "latest_rou_asset",
+      align: "right",
+      width: 130,
+      render: (val: number, record: Contract) => (
+        <span className="font-tabular" style={{ fontSize: 12 }}>{val ? fmtMoney(val, record.currency) : "—"}</span>
+      ),
+    },
+    {
+      key: "approval_status",
+      title: t("contracts.col_status", language),
+      dataIndex: "approval_status",
+      width: 140,
+      render: (status: string, record: Contract) => (
+        <Space size={4}>
+          <StatusTag kind={STATUS_COLORS[status] || "neutral"}>
+            {STATUS_LABELS[status] || status}
+          </StatusTag>
+          {record.is_official_version && (
+            <Badge
+              count={t("contracts.official", language)}
+              style={{ backgroundColor: "var(--fg-primary)", color: "var(--fg-inverse)", fontSize: 10 }}
+            />
+          )}
+        </Space>
+      ),
+    },
+    {
+      key: "lease_scope",
+      title: t("contracts.col_lease_scope", language),
+      dataIndex: "lease_scope",
+      width: 120,
+      render: (scope: string) => (
+        <StatusTag kind={LEASE_SCOPE_COLORS[scope || "in_scope"]}>
+          {t(LEASE_SCOPE_KEYS[scope || "in_scope"] || "contracts.scope_in_scope", language)}
+        </StatusTag>
+      ),
+    },
+    {
+      key: "action",
+      title: "",
+      width: 50,
+      align: "right",
+      render: (_: any, record: Contract) => (
+        <Button
+          type="text"
+          size="small"
+          icon={<ArrowRightOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
+          onClick={() => router.push(`/contracts/${record.id}`)}
+        />
+      ),
+    },
+  ], [language, router]);
+
+  const savedViews: SavedView<Contract>[] = useMemo(() => [
+    {
+      id: "pending_review",
+      name: "待复核与审批",
+      predicate: (c: Contract) => c.approval_status === "draft" || c.approval_status === "pending_approval" || c.approval_status === "submitted" || c.approval_status === "reviewed",
+    },
+    {
+      id: "official",
+      name: "已生效正式台账",
+      predicate: (c: Contract) => Boolean(c.is_official_version || c.approval_status === "approved"),
+    },
+    {
+      id: "risk",
+      name: "缺失折现率",
+      predicate: (c: Contract) => Boolean(c.discount_rate_missing),
+    },
+    {
+      id: "large",
+      name: "大额负债 (>500万)",
+      predicate: (c: Contract) => (c.latest_liability || 0) > 5000000,
+    },
+  ], []);
+
   const handleTableChange = (_pagination: any, _filters: any, sorter: any) => {
     if (sorter.field) {
       setSortBy(sorter.field);
@@ -445,182 +579,41 @@ function ContractsPage() {
           />
         </motion.div>
 
-        {/* Filter Bar */}
+        {/* Table */}
         <motion.div
           initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.05 }}
         >
-          <Card
-            size="small"
-            style={{ marginBottom: 16 }}
-          >
-            <Flex wrap="wrap" gap={10} align="center">
-              <Input
-                prefix={<SearchOutlined style={{ color: "var(--fg-muted)" }} />}
-                placeholder={t("contracts.search_placeholder", language)}
-                value={search}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                allowClear
-                style={{ width: 240 }}
-              />
-              <Select
-                value={statusFilter || undefined}
-                onChange={(value) => { setPageParam("1"); setStatusFilter(value || ""); }}
-                allowClear
-                placeholder={t("contracts.filter_status", language)}
-                options={STATUS_OPTIONS.filter((o) => o.value !== "")}
-                style={{ width: 140 }}
-              />
-              <Select
-                value={riskFilter || undefined}
-                onChange={(value) => { setPageParam("1"); setRiskFilter(value || ""); }}
-                allowClear
-                placeholder={t("contracts.filter_risk", language)}
-                options={[{ value: "discount_rate_missing", label: t("contracts.risk_missing_discount_rate", language) }]}
-                style={{ width: 150 }}
-              />
-              <Select
-                value={scopeFilter || undefined}
-                onChange={(value) => { setPageParam("1"); setScopeFilter(value || ""); }}
-                allowClear
-                placeholder={t("contracts.filter_scope", language)}
-                options={Object.entries(LEASE_SCOPE_KEYS).map(([value, key]) => ({ value, label: t(key, language) }))}
-                style={{ width: 140 }}
-              />
-              <Select
-                value={assetFilter || undefined}
-                onChange={(value) => { setPageParam("1"); setAssetFilter(value || ""); }}
-                allowClear
-                placeholder={t("contracts.filter_asset_type", language)}
-                options={Object.entries(ASSET_TYPE_KEYS).map(([value, key]) => ({ value, label: t(key, language) }))}
-                style={{ width: 130 }}
-              />
-              <Select
-                value={expiryFilter || undefined}
-                onChange={(value) => { setPageParam("1"); setExpiryFilter(value || ""); }}
-                allowClear
-                placeholder={t("contracts.filter_expiry", language)}
-                options={[
-                  { value: "90", label: t("contracts.expiry_90", language) },
-                  { value: "180", label: t("contracts.expiry_180", language) },
-                ]}
-                style={{ width: 130 }}
-              />
-              <Space size={4}>
-                <Button
-                  type={sortOrder === "desc" ? "primary" : "default"}
-                  size="small"
-                  icon={<SortDescendingOutlined />}
-                  onClick={() => setSortOrder("desc")}
-                />
-                <Button
-                  type={sortOrder === "asc" ? "primary" : "default"}
-                  size="small"
-                  icon={<SortAscendingOutlined />}
-                  onClick={() => setSortOrder("asc")}
-                />
-              </Space>
-              {hasFilters && (
-                <Button onClick={clearFilters} size="small" type="dashed">
-                  {t("contracts.clear_filters", language)}
-                </Button>
-              )}
-            </Flex>
-          </Card>
-        </motion.div>
-
-        {/* Table */}
-        <motion.div
-          initial={false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, delay: 0.1 }}
-        >
-          {selectedRowKeys.length > 0 && (
-            <div
-              className="sty-e3e86ee5"
-            >
-              <span className="sty-073b2a94">
-                {t("contracts.selected_count", language, { count: String(selectedRowKeys.length) })}
-              </span>
-              <Button size="small" type="primary" loading={bulkSubmitting} onClick={handleBulkSubmit}>
-                {t("contracts.bulk_submit", language)}
-              </Button>
-              <Button size="small" onClick={() => setSelectedRowKeys([])}>
-                {t("contracts.clear_selection", language)}
-              </Button>
-            </div>
-          )}
-
-          <div className="contracts-desktop-table">
-          <Card
-            styles={{ body: { padding: contracts.length === 0 && !loading ? "48px 24px" : 0 } }}
-            className="sty-c6e381ce"
-          >
-            {contracts.length === 0 && !loading ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={
-                  <span className="sty-22a08c80">
-                    {hasFilters
-                      ? t("contracts.no_search_results", language)
-                      : t("contracts.no_data", language)}
-                  </span>
+          <div className="contracts-desktop-table" style={{ marginTop: 8 }}>
+            <EnterpriseTable<Contract>
+              data={contracts}
+              columns={enterpriseColumns}
+              rowKey={(r) => r.id}
+              loading={loading}
+              savedViews={savedViews}
+              searchPlaceholder={t("contracts.search_placeholder", language)}
+              emptyText={hasFilters ? t("contracts.no_search_results", language) : t("contracts.no_data", language)}
+              batchActions={[
+                { key: "submit", label: t("contracts.bulk_submit", language) },
+              ]}
+              onBatchAction={async (actionKey, selected) => {
+                if (actionKey === "submit") {
+                  setSelectedRowKeys(selected.map((s) => s.id));
+                  await handleBulkSubmit();
                 }
-              >
-                {!hasFilters ? (
-                  <Space size={12} style={{ marginTop: 8 }}>
-                    <Button type="primary" size="small" icon={<PlusOutlined />} onClick={() => router.push("/contracts/new")}>{t("contracts.add_contract", language)}</Button>
-                    <Button size="small" icon={<RobotOutlined />} onClick={() => router.push("/ai-chat")}>{t("dashboard.upload_file", language)}</Button>
-                  </Space>
-                ) : <Button size="small" onClick={clearFilters}>{t("contracts.clear_filters", language)}</Button>}
-              </Empty>
-            ) : (
-              <Table
-                columns={columns}
-                dataSource={contracts}
-                scroll={tableScrollX(contracts.length, 1200)}
-                rowKey="id"
-                loading={{
-                  spinning: loading,
-                  indicator: <Skeleton active paragraph={{ rows: 5 }} />,
-                }}
-                rowSelection={{
-                  selectedRowKeys,
-                  onChange: (keys) => setSelectedRowKeys(keys),
-                  // Only a draft contract can be submitted, so anything else is
-                  // not selectable for the bulk action.
-                  getCheckboxProps: (record: Contract) => ({
-                    disabled: record.approval_status !== "draft",
-                  }),
-                }}
-                pagination={{
-                  current: page,
-                  pageSize,
-                  total,
-                  showSizeChanger: true,
-                  onChange: (nextPage, nextSize) => {
-                    setSelectedRowKeys([]);
-                    setPageParam(String(nextPage));
-                    setPageSizeParam(String(nextSize));
-                  },
-                  showTotal: (total) => {
-                    const text = t("contracts.total_items", language, { total: "__TOTAL__" });
-                    const [before, after] = text.split("__TOTAL__");
-                    return (
-                      <span className="sty-73be230f">
-                        {before}
-                        <strong className="sty-96007dcc">{total}</strong>
-                        {after}
-                      </span>
-                    );
-                  },
-                }}
-                onChange={handleTableChange}
-                rowClassName={() => "contract-row"}
-              />
-            )}
-          </Card>
+              }}
+              onSaveInLineEdit={async (id, field, newValue) => {
+                try {
+                  await contractApi.update(id, { [field]: newValue }, token || "");
+                  message.success("已更新");
+                  return true;
+                } catch (e: any) {
+                  message.error(e?.message || "更新失败");
+                  return false;
+                }
+              }}
+            />
           </div>
 
           <div className="contracts-mobile-list">

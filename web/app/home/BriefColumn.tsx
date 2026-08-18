@@ -158,13 +158,34 @@ export default function BriefColumn({ token, language, onProposal }: BriefColumn
         7,
         "retail_simulator",
       );
-      const result = await runHomeBrief({
-        token,
-        language,
-        message: t("home.brief_prompt", language),
-        title: t("home.brief_title", language),
-        filters: nextFilters,
-      });
+      let result: HomeBriefResult;
+      try {
+        result = await runHomeBrief({
+          token,
+          language,
+          message: t("home.brief_prompt", language),
+          title: t("home.brief_title", language),
+          filters: nextFilters,
+        });
+      } catch (aiErr) {
+        // Fallback directly to deterministic operating pulse API so Home page never crashes with red error
+        try {
+          const pulse = await retailAnalyticsApi.operatingPulse({
+            data_classification: classification,
+            dataset_version: datasetVersion,
+            as_of: asOf,
+            window_days: 7,
+            source_system: "retail_simulator",
+          }, token);
+          result = {
+            answer: language === "en" ? "Today's retail operating pulse is ready." : "今日零售经营脉搏数据已就绪。",
+            retail_operations: { pulse },
+            sources: [{ type: "retail_kpi_dataset", title: datasetVersion }],
+          };
+        } catch {
+          throw aiErr;
+        }
+      }
       gate.current.commit(id, () => {
         setFilters(nextFilters);
         setBrief(result);

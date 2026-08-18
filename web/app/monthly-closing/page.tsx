@@ -48,6 +48,8 @@ import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { fmtMoney } from "../lib/format";
+import { EnterpriseTable } from "../components/enterprise-table/EnterpriseTable";
+import type { EnterpriseColumn, SavedView } from "../components/enterprise-table/types";
 import { useUrlState } from "../hooks/useUrlState";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
@@ -112,11 +114,11 @@ function CloseProcessRail({
   const current = isLocked ? 5 : summary?.posted_count ? 4 : summary?.approved_count ? 3 : summary?.total ? 2 : result ? 1 : 0;
   const nextLabel = current === 0 ? t("monthly.process_generate", language) : current === 1 ? t("monthly.process_review", language) : current === 2 ? t("monthly.process_approve", language) : current === 3 ? t("monthly.process_post", language) : current === 4 ? t("monthly.process_lock", language) : t("monthly.process_complete", language);
   return (
-    <Card styles={{ body: { padding: "16px 20px" } }} className="sty-0ee503b7">
-      <div className="sty-4757b38c">
+    <Card style={{ marginBottom: 16, borderRadius: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <div className="sty-99d8c40b">{period || t("monthly.process_select_period", language)}</div>
-          <div className="sty-6319d0fa">{t("monthly.process_title", language)}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-primary)" }}>{period || t("monthly.process_select_period", language)}</div>
+          <div style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("monthly.process_title", language)}</div>
         </div>
         <Button type="primary" onClick={onNext} disabled={!period && current > 0}>{nextLabel}</Button>
       </div>
@@ -1016,40 +1018,43 @@ function MonthlyClosingPage() {
           )}
           {entriesLoading && !entriesLoaded ? (
             <EntrySkeleton />
-          ) : entries.length === 0 ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                selectedPeriod
-                  ? t("monthly.no_entries", language)
-                  : "尚无任何已生成分录的期间，请先在「生成月结」中运行一次结账"
-              }
-            />
           ) : (
-            <Spin spinning={entriesLoading && entriesLoaded}>
-              <Table
-                columns={entryColumns}
-                dataSource={entries}
-                rowKey="id"
-                // The server holds the period; the table shows one page of it,
-                // so the count comes from the summary rather than the rows.
-                pagination={{
-                  current: entryPage,
-                  pageSize: entryPageSize,
-                  total: entrySummary?.total ?? entries.length,
-                  showSizeChanger: true,
-                  pageSizeOptions: ["20", "50", "100", "200"],
-                  showTotal: (total) => `共 ${total} 笔`,
-                  onChange: (page, size) => {
-                    setEntryPage(page);
-                    setEntryPageSize(size);
-                    if (selectedPeriod) loadEntries(selectedPeriod, { page, pageSize: size });
-                  },
-                }}
-                size="small"
-                scroll={tableScrollX((entries || []).length, 1360)}
-              />
-            </Spin>
+            <EnterpriseTable<any>
+              data={entries}
+              columns={entryColumns as any}
+              rowKey={(r) => r.id}
+              loading={entriesLoading && entriesLoaded}
+              savedViews={[
+                { id: "pending_review", name: "待复核草稿", predicate: (e: any) => e.posting_status === "draft" },
+                { id: "pending_post", name: "待过账", predicate: (e: any) => e.posting_status === "approved" },
+                { id: "posted_only", name: "已过账分录", predicate: (e: any) => e.posting_status === "posted" },
+                { id: "interest_only", name: "利息分录", predicate: (e: any) => e.entry_type === "interest" },
+                { id: "depr_only", name: "折旧分录", predicate: (e: any) => e.entry_type === "depreciation" },
+              ]}
+              searchPlaceholder="过滤科目、分录类型、凭证号..."
+              emptyText={selectedPeriod ? t("monthly.no_entries", language) : "尚无任何已生成分录的期间，请先在「生成月结」中运行一次结账"}
+              batchActions={[
+                { key: "batch_approve", label: "批量审批选中项" },
+                { key: "batch_post", label: "批量过账选中项" },
+              ]}
+              onBatchAction={async (actionKey, selected) => {
+                if (actionKey === "batch_approve") {
+                  for (const entry of selected) {
+                    if (entry.posting_status === "draft") {
+                      await handleApproveEntry(entry.id);
+                    }
+                  }
+                } else if (actionKey === "batch_post") {
+                  for (const entry of selected) {
+                    if (entry.posting_status === "approved") {
+                      await monthlyClosingApi.postEntry(entry.id, "", token || "");
+                    }
+                  }
+                  message.success("批量过账已提交");
+                  refresh();
+                }
+              }}
+            />
           )}
         </Card>
       ),

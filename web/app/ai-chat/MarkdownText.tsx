@@ -24,6 +24,7 @@ type Block =
   | { kind: "table"; header: string[]; rows: string[][] };
 
 const HEADING = /^(#{1,4})\s+(.*)$/;
+const BRACKET_HEADING = /^\s*【([^】]+)】\s*(.*)$/;
 const BULLET = /^\s*[-*]\s+(.*)$/;
 const ORDERED = /^\s*\d+[.)]\s+(.*)$/;
 const TABLE_ROW = /^\s*\|(.+)\|\s*$/;
@@ -41,15 +42,16 @@ export function parseBlocks(source: string): Block[] {
   let paragraph: string[] = [];
 
   const flushParagraph = () => {
-    const text = paragraph.join("\n").trim();
+    const text = paragraph.map((l) => l.trim()).filter(Boolean).join("\n");
     if (text) blocks.push({ kind: "paragraph", text });
     paragraph = [];
   };
 
   for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
+    const rawLine = lines[i];
+    const line = rawLine.trim();
 
-    if (!line.trim()) {
+    if (!line) {
       flushParagraph();
       continue;
     }
@@ -61,15 +63,22 @@ export function parseBlocks(source: string): Block[] {
       continue;
     }
 
+    const bracket = BRACKET_HEADING.exec(line);
+    if (bracket) {
+      flushParagraph();
+      blocks.push({ kind: "heading", level: 3, text: bracket[2] ? `【${bracket[1]}】 ${bracket[2]}` : `【${bracket[1]}】` });
+      continue;
+    }
+
     // A table needs a header row followed by a divider; without the divider the
     // pipes are just characters in a sentence.
-    if (TABLE_ROW.test(line) && i + 1 < lines.length && TABLE_DIVIDER.test(lines[i + 1]) && TABLE_ROW.test(lines[i + 1])) {
+    if (TABLE_ROW.test(line) && i + 1 < lines.length && TABLE_DIVIDER.test(lines[i + 1].trim()) && TABLE_ROW.test(lines[i + 1].trim())) {
       flushParagraph();
       const header = splitTableRow(line);
       const rows: string[][] = [];
       i += 2;
-      while (i < lines.length && TABLE_ROW.test(lines[i])) {
-        rows.push(splitTableRow(lines[i]));
+      while (i < lines.length && TABLE_ROW.test(lines[i].trim())) {
+        rows.push(splitTableRow(lines[i].trim()));
         i += 1;
       }
       i -= 1;
@@ -82,8 +91,9 @@ export function parseBlocks(source: string): Block[] {
       const ordered = !BULLET.test(line);
       const items: string[] = [];
       while (i < lines.length) {
-        const bullet = BULLET.exec(lines[i]);
-        const numbered = ORDERED.exec(lines[i]);
+        const itemLine = lines[i].trim();
+        const bullet = BULLET.exec(itemLine);
+        const numbered = ORDERED.exec(itemLine);
         if (ordered && numbered) items.push(numbered[1]);
         else if (!ordered && bullet) items.push(bullet[1]);
         else break;

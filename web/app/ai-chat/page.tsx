@@ -355,6 +355,21 @@ function CodeBlock({ code, language, i18nLang }: { code: string; language: strin
   );
 }
 
+function humanizeAssistantMessage(content: string): string {
+  if (!content) return "";
+  if (content.includes("请提供 as_of、window_days、data_classification")) {
+    return `### 💡 零售经营分析需要明确分析范围
+
+为了给您提供准确的经营洞察与测算，请指定以下分析条件：
+- **分析基准日期**：例如 \`2026-06-05\`（支持分析当日及历史趋势）
+- **时间窗口**：例如 \`近 7 天\`、\`近 14 天\` 或 \`近 28 天\`
+- **数据环境**：\`模拟数据\`（用于情景演练与方案测算）或 \`正式数据\`（用于经营月结与实绩核算）
+
+您也可以直接点击下方卡片中的快捷选项开始分析。`;
+  }
+  return content;
+}
+
 // ─── Message Content Renderer ──────────────────────────────────
 
 function MessageContent({
@@ -380,6 +395,13 @@ function MessageContent({
 }) {
   const textColor = role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)";
 
+  const formattedContent = useMemo(() => {
+    if (role === "assistant") {
+      return humanizeAssistantMessage(content);
+    }
+    return content;
+  }, [content, role]);
+
   // Parse markdown-like code blocks
   const parts = useMemo(() => {
     const result: { type: "text" | "code"; content: string; language?: string }[] = [];
@@ -387,9 +409,9 @@ function MessageContent({
     let lastIndex = 0;
     let match;
 
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = regex.exec(formattedContent)) !== null) {
       if (match.index > lastIndex) {
-        result.push({ type: "text", content: content.slice(lastIndex, match.index) });
+        result.push({ type: "text", content: formattedContent.slice(lastIndex, match.index) });
       }
       result.push({ type: "code", content: match[2], language: match[1] });
       lastIndex = match.index + match[0].length;
@@ -419,7 +441,7 @@ function MessageContent({
           <CodeBlock key={idx} code={part.content} language={part.language || "text"} i18nLang={i18nLang} />
         ) : role === "user" ? (
           // The user's own text is shown verbatim — they did not write markdown.
-          <Text key={idx} style={{ color: "#FFFFFF", fontSize: 14, lineHeight: 1.6 }}>
+          <Text key={idx} style={{ color: "var(--fg-primary, #262626)", fontSize: 14, lineHeight: 1.6 }}>
             {part.content}
           </Text>
         ) : (
@@ -429,41 +451,39 @@ function MessageContent({
         )
       )}
 
-      {toolCalls && toolCalls.length > 0 && (
-        <div className="ai-tool-row">
-          {toolCalls.map((call, idx) => <ToolChip key={idx} call={call} />)}
-        </div>
-      )}
+      {(() => {
+        const visibleCalls = (toolCalls || []).filter((call) => call.tool !== "llm.chat_completion" && call.tool !== "llm.completion");
+        return visibleCalls.length > 0 ? (
+          <div className="ai-tool-row">
+            {visibleCalls.map((call, idx) => <ToolChip key={idx} call={call} />)}
+          </div>
+        ) : null;
+      })()}
 
-      {typeof confidence === "number" && (
-        <div className="ai-confidence-row">
-          <ConfidenceBadge confidence={confidence} reason={confidenceReason} />
-        </div>
-      )}
-
-      {sources && sources.length > 0 && (
-        <div className="sty-c9f7b4b7">
-          <Text type="secondary" className="sty-090832a7">
-            {t("ai.sources", i18nLang)}
-          </Text>
-          {sources.map((source, idx) => {
-            const value = typeof source === "string" ? source : { ...source, url: safeInternalAIURL(source.url) };
-            return <SourceCitation key={idx} source={value} />;
-          })}
-        </div>
-      )}
-      {/* M6.2: an answer without citations is labeled honestly, never padded
-          with "all known sources" the model never claimed. */}
-      {!thinking && content && sources && sources.length === 0 && (
-        <div className="sty-c9f7b4b7">
-          <Text type="secondary" className="sty-090832a7">{t("ai.no_sources", i18nLang)}</Text>
-        </div>
-      )}
-
-      {model && (
-        <div style={{ marginTop: 8, fontSize: 11, color: "var(--fg-muted, #94A3B8)", display: "flex", alignItems: "center", gap: 6 }}>
-          <span>{t("ai.model_label", i18nLang)}:</span>
-          <code style={{ background: "var(--bg-inset, #F1F5F9)", padding: "1px 6px", borderRadius: 4, fontSize: 10, color: "var(--fg-secondary, #64748B)" }}>{model}</code>
+      {(typeof confidence === "number" || (sources && sources.length > 0) || model) && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle, #F1F5F9)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {typeof confidence === "number" && (
+              <ConfidenceBadge confidence={confidence} reason={confidenceReason} />
+            )}
+            {sources && sources.length > 0 ? (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>{t("ai.sources", i18nLang)}:</span>
+                {sources.map((source, idx) => {
+                  const value = typeof source === "string" ? source : { ...source, url: safeInternalAIURL(source.url) };
+                  return <SourceCitation key={idx} source={value} />;
+                })}
+              </div>
+            ) : !thinking && content ? (
+              <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>{t("ai.no_sources", i18nLang)}</span>
+            ) : null}
+          </div>
+          {model && (
+            <div style={{ fontSize: 11, color: "var(--fg-muted, #64748B)", display: "flex", alignItems: "center", gap: 4 }}>
+              <span>{t("ai.model_label", i18nLang)}</span>
+              <code style={{ background: "var(--bg-inset, #F1F5F9)", padding: "1px 5px", borderRadius: 4, fontSize: 10, color: "var(--fg-secondary, #334155)" }}>{model}</code>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -518,12 +538,9 @@ function statusMeta(status: string, language: Language) {
     return { color: "warning", label: t("ai.agent_status_needs_review", language), icon: <ExclamationCircleOutlined /> };
   }
   if (status === "failed") {
-    return { color: "error", label: t("ai.agent_status_failed", language), icon: <ExclamationCircleOutlined /> };
+    return { color: "error", label: t("ai.agent_status_failed", language), icon: <CloseCircleOutlined /> };
   }
-  if (status === "running") {
-    return { color: "processing", label: t("ai.agent_status_running", language), icon: <ToolOutlined /> };
-  }
-  return { color: "default", label: t("ai.agent_status_pending", language), icon: <ToolOutlined /> };
+  return { color: "processing", label: t("ai.agent_status_running", language), icon: <ClockCircleOutlined /> };
 }
 
 function AgentTracePanel({
@@ -535,129 +552,190 @@ function AgentTracePanel({
   toolCalls?: AgentToolCall[];
   language: Language;
 }) {
+  const [expanded, setExpanded] = useState(false);
   plan = Array.isArray(plan) ? plan : [];
   toolCalls = Array.isArray(toolCalls) ? toolCalls : [];
   if (plan.length === 0 && toolCalls.length === 0) return null;
 
+  const totalSteps = plan.length || toolCalls.length;
+
   return (
     <div
-      className="sty-6eac3fc5"
+      style={{
+        marginTop: 12,
+        background: "var(--bg-inset, #F8FAFC)",
+        border: "1px solid var(--border-default, #E2E8F0)",
+        borderRadius: 8,
+        padding: "8px 12px",
+        fontSize: 12,
+      }}
     >
       <div
-        className="sty-3974a389"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+        onClick={() => setExpanded(!expanded)}
       >
-        <ToolOutlined className="sty-e3e86ee5" />
-        <Text strong style={{ fontSize: 13 }}>
-          {t("ai.agent_trace_title", language)}
-        </Text>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <ToolOutlined style={{ color: "var(--fg-muted, #64748B)", fontSize: 12 }} />
+          <Text strong style={{ fontSize: 12, color: "var(--fg-secondary, #334155)" }}>
+            {t("ai.agent_trace_title", language)} · {totalSteps} 项执行步骤
+          </Text>
+        </div>
+        <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>
+          {expanded ? "收起 ▲" : "展开详情 ▼"}
+        </span>
       </div>
 
-      {plan.length > 0 && (
-        <div className="sty-e24ca831">
-          <div className="sty-57670c22">
-            {plan.map((step) => {
-              const meta = statusMeta(step.status, language);
-              return (
-                <StatusTag key={step.id} kind={statusKindFromAntColor(meta.color as any)} icon={meta.icon} className="sty-51302e56">
-                  {step.title}
-                </StatusTag>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {toolCalls.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {toolCalls.map((call, index) => {
-            const meta = statusMeta(call.status, language);
-            return (
-              <div
-                key={`${call.tool}-${index}`}
-                className="sty-1696a1bb"
-              >
-                <div className="sty-32c4a785">
-                  <Text strong className="sty-f1e765ee">
-                    {call.skill}
-                  </Text>
-                  <StatusTag kind={statusKindFromAntColor(meta.color as any)} className="sty-6319d0fa">
-                    {meta.label}
+      {expanded && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle, #E2E8F0)", display: "flex", flexDirection: "column", gap: 6 }}>
+          {plan.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {plan.map((step) => {
+                const meta = statusMeta(step.status, language);
+                return (
+                  <StatusTag key={step.id} kind={statusKindFromAntColor(meta.color as any)} icon={meta.icon}>
+                    {step.title}
                   </StatusTag>
-                  <Text type="secondary" className="sty-1f609006">
-                    {call.tool}
-                  </Text>
-                </div>
-                <Text className="sty-14aa9694">
-                  {call.output_summary || call.input_summary}
-                </Text>
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
+
+          {toolCalls.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {toolCalls.map((call, index) => {
+                const meta = statusMeta(call.status, language);
+                return (
+                  <div
+                    key={`${call.tool}-${index}`}
+                    style={{
+                      padding: "6px 10px",
+                      background: "var(--bg-surface, #FFFFFF)",
+                      border: "1px solid var(--border-subtle, #E2E8F0)",
+                      borderRadius: 6,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Text strong style={{ fontSize: 11, color: "var(--fg-primary, #0F172A)" }}>{call.skill || call.tool}</Text>
+                      <StatusTag kind={statusKindFromAntColor(meta.color as any)} style={{ fontSize: 10, padding: "0 4px" }}>
+                        {meta.label}
+                      </StatusTag>
+                    </div>
+                    {(call.output_summary || call.input_summary) && (
+                      <div style={{ fontSize: 11, color: "var(--fg-secondary, #334155)", marginTop: 2 }}>
+                        {call.output_summary || call.input_summary}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function reviewSeverityMeta(severity: string) {
-  if (severity === "critical") {
-    return { color: "var(--state-error-text)", background: "var(--state-error-bg)", border: "var(--state-error-border)" };
-  }
-  if (severity === "warning") {
-    return { color: "var(--state-warning-text)", background: "var(--state-warning-bg)", border: "var(--state-warning-border)" };
-  }
-  return { color: "var(--state-info-text)", background: "var(--state-info-bg)", border: "var(--state-info-border)" };
+function cleanPromptText(text?: string): string {
+  if (!text) return "";
+  return text
+    .replace(/as_of/g, "分析基准日期 (如 2026-06-05)")
+    .replace(/window_days/g, "分析周期天数 (如 7/14/28天)")
+    .replace(/data_classification/g, "数据环境 (模拟/正式)")
+    .replace(/dataset_version/g, "数据集版本")
+    .replace(/provide_retail_context/g, "")
+    .trim();
 }
 
 function AgentReviewPanel({
   prompts = [],
   language,
+  onQuickSelect,
 }: {
   prompts?: AgentReviewPrompt[];
   language: Language;
+  onQuickSelect?: (text: string) => void;
 }) {
   prompts = Array.isArray(prompts) ? prompts : [];
   if (prompts.length === 0) return null;
 
   return (
     <div
-      className="sty-6eac3fc5"
+      style={{
+        marginTop: 12,
+        background: "var(--bg-inset, #F8FAFC)",
+        border: "1px solid var(--border-default, #E2E8F0)",
+        borderRadius: 8,
+        padding: "12px 16px",
+      }}
     >
-      <div
-        className="sty-e5092e30"
-      >
-        <ExclamationCircleOutlined className="sty-e3e86ee5" />
-        <Text strong className="sty-51302e56">
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <ExclamationCircleOutlined style={{ color: "var(--state-warning-text, #D97706)", fontSize: 13 }} />
+        <Text strong style={{ fontSize: 12, color: "var(--fg-primary, #0F172A)" }}>
           {t("ai.agent_review_title", language)}
         </Text>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {prompts.map((prompt, index) => {
-          const meta = reviewSeverityMeta(prompt.severity);
+          const cleanedTitle = cleanPromptText(prompt.title);
+          const cleanedDesc = cleanPromptText(prompt.description);
+          const isContextNeed = prompt.action?.includes("provide_retail_context") || prompt.title?.includes("as_of") || prompt.description?.includes("window_days");
+
           return (
             <div
               key={prompt.id || index}
-              className="sty-1696a1bb"
+              style={{
+                padding: "8px 12px",
+                background: "var(--bg-surface, #FFFFFF)",
+                border: "1px solid var(--border-subtle, #E2E8F0)",
+                borderRadius: 6,
+              }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <Text strong style={{ fontSize: 12, color: meta.color }}>
-                  {prompt.title}
-                </Text>
-                <StatusTag className="sty-1f609006">
-                  {prompt.severity === "critical" ? t("ai.agent_severity_critical", language) : prompt.severity === "warning" ? t("ai.agent_severity_warning", language) : t("ai.agent_severity_info", language)}
-                </StatusTag>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-primary, #0F172A)", marginBottom: 4 }}>
+                {cleanedTitle || prompt.title}
               </div>
-              <Text className="sty-d9bf0a72">
-                {prompt.description}
-              </Text>
-              <Text className="sty-8d0db302">
-                {prompt.action}
-              </Text>
+              {cleanedDesc && (
+                <div style={{ fontSize: 12, color: "var(--fg-secondary, #334155)", lineHeight: 1.5 }}>
+                  {cleanedDesc}
+                </div>
+              )}
+              {isContextNeed && (
+                <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "var(--fg-muted, #64748B)" }}>快捷填入:</span>
+                  <Button
+                    size="small"
+                    style={{ fontSize: 11, height: 24, borderRadius: 4 }}
+                    onClick={() => onQuickSelect?.("按模拟数据、近7天分析所有门店经营情况")}
+                  >
+                    近 7 天 · 模拟数据
+                  </Button>
+                  <Button
+                    size="small"
+                    style={{ fontSize: 11, height: 24, borderRadius: 4 }}
+                    onClick={() => onQuickSelect?.("按模拟数据、近14天分析所有门店经营情况")}
+                  >
+                    近 14 天 · 模拟数据
+                  </Button>
+                  <Button
+                    size="small"
+                    style={{ fontSize: 11, height: 24, borderRadius: 4 }}
+                    onClick={() => onQuickSelect?.("按正式数据、上月月结分析所有门店经营情况")}
+                  >
+                    上月 · 正式数据
+                  </Button>
+                </div>
+              )}
               {prompt.contract_numbers && prompt.contract_numbers.length > 0 && (
-                <div className="sty-c60b95f4">
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
                   {prompt.contract_numbers.map((contractNumber) => (
-                    <StatusTag key={contractNumber} className="sty-14aa9694">
+                    <StatusTag key={contractNumber}>
                       {contractNumber}
                     </StatusTag>
                   ))}
@@ -1852,8 +1930,9 @@ function AIChatPageContent() {
     handleSend(question);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      if ((e.nativeEvent as any).isComposing) return;
       e.preventDefault();
       if (input.trim() || activePendingUpload) {
         handleSend();
@@ -2122,12 +2201,20 @@ function AIChatPageContent() {
 
               {/* Messages */}
               <AnimatePresence>
-                {currentMessages.map((msg, index) => (
+                {currentMessages
+                  .filter((msg) =>
+                    (msg.content && msg.content.trim().length > 0) ||
+                    msg.thinking ||
+                    (msg.toolCalls && msg.toolCalls.length > 0) ||
+                    (msg.attachments && msg.attachments.length > 0) ||
+                    typingMessageId === msg.id
+                  )
+                  .map((msg, index, arr) => (
                   <motion.div
                     key={msg.id}
                     initial={false}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: index === currentMessages.length - 1 ? 0 : 0 }}
+                    transition={{ duration: 0.25, delay: index === arr.length - 1 ? 0 : 0 }}
                     style={{
                       display: "flex",
                       justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
@@ -2144,7 +2231,7 @@ function AIChatPageContent() {
                       <Avatar
                         icon={msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
                         style={{
-                          backgroundColor: msg.role === "user" ? "var(--fg-secondary)" : "var(--fg-primary)",
+                          backgroundColor: msg.role === "user" ? "#1E293B" : "#0F172A",
                           flexShrink: 0,
                         }}
                         size={32}
@@ -2154,10 +2241,10 @@ function AIChatPageContent() {
                         style={{
                           borderRadius: 12,
                           padding: "12px 18px",
-                          background: msg.role === "user" ? "var(--mono-20, #1E293B)" : "var(--bg-elevated, #FFFFFF)",
-                          color: msg.role === "user" ? "#FFFFFF" : "var(--fg-primary, #0F172A)",
-                          border: msg.role === "user" ? "none" : "1px solid var(--border-default, #E2E8F0)",
-                          boxShadow: msg.role === "user" ? "0 1px 2px rgba(0,0,0,0.12)" : "0 1px 3px rgba(0,0,0,0.04)",
+                          background: msg.role === "user" ? "var(--bg-inset, #F1F5F9)" : "var(--bg-elevated, #FFFFFF)",
+                          color: "var(--fg-primary, #0F172A)",
+                          border: "1px solid var(--border-default, #E2E8F0)",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
                           maxWidth: "100%",
                           wordBreak: "break-word",
                         }}
@@ -2199,6 +2286,7 @@ function AIChatPageContent() {
                           <AgentReviewPanel
                             prompts={msg.reviewPrompts}
                             language={language}
+                            onQuickSelect={(text) => void handleSend(text)}
                           />
                         )}
 
@@ -2231,9 +2319,9 @@ function AIChatPageContent() {
                                
                                 style={{
                                   borderRadius: 4,
-                                  background: msg.role === "user" ? "rgba(255,255,255,0.1)" : "var(--fg-inverse)",
-                                  border: msg.role === "user" ? "1px solid rgba(255,255,255,0.2)" : "1px solid var(--border-default)",
-                                  color: msg.role === "user" ? "var(--fg-inverse)" : "var(--fg-secondary)",
+                                  background: "var(--bg-surface, #FFFFFF)",
+                                  border: "1px solid var(--border-default, #E2E8F0)",
+                                  color: "var(--fg-secondary, #334155)",
                                 }}
                               >
                                 {att.original_name}
@@ -2434,7 +2522,7 @@ function AIChatPageContent() {
                             style={{
                               marginTop: 10,
                               paddingTop: 8,
-                              borderTop: msg.role === "user" ? "1px solid rgba(255,255,255,0.12)" : "1px solid var(--border-subtle, #F1F5F9)",
+                              borderTop: "1px solid var(--border-subtle, #E2E8F0)",
                               display: "flex",
                               gap: 6,
                               flexWrap: "wrap",
@@ -2451,7 +2539,7 @@ function AIChatPageContent() {
                                 fontSize: 11,
                                 paddingInline: 6,
                                 height: 22,
-                                color: msg.role === "user" ? "rgba(255,255,255,0.8)" : "var(--fg-muted, #94A3B8)",
+                                color: "var(--fg-secondary, #334155)",
                               }}
                             >
                               {t("ai.continue_from_message", language)}
@@ -2468,7 +2556,7 @@ function AIChatPageContent() {
                                     fontSize: 11,
                                     paddingInline: 6,
                                     height: 22,
-                                    color: msg.role === "user" ? "rgba(255,255,255,0.8)" : "var(--fg-muted, #94A3B8)",
+                                    color: "var(--fg-secondary, #334155)",
                                   }}
                                 >
                                   {t("ai.view_trace", language)}
@@ -2524,24 +2612,44 @@ function AIChatPageContent() {
                 <motion.div
                   initial={false}
                   animate={{ opacity: 1 }}
-                  className="sty-ab5dc9e7"
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-start",
+                    marginBottom: 20,
+                  }}
                 >
-                  <Avatar
-                    icon={<RobotOutlined />}
-                    className="sty-e495fd05"
-                    size={32}
-                  />
-                  <div
-                    className="sty-b561115b"
-                  >
-                    <Spin />
-                    <span className="sty-879ad78b">
-                      {t("ai.thinking", language)}
-                    </span>
-                    <Typography.Text type="secondary" className="ai-thinking-progress">
-                      {t("ai.thinking_progress", language)}
-                    </Typography.Text>
-                  </div>
+                  <Space align="start" style={{ maxWidth: "85%" }}>
+                    <Avatar
+                      icon={<RobotOutlined />}
+                      style={{
+                        backgroundColor: "var(--fg-primary, #000000)",
+                        flexShrink: 0,
+                      }}
+                      size={32}
+                    />
+                    <div
+                      style={{
+                        borderRadius: 12,
+                        padding: "12px 18px",
+                        background: "var(--bg-elevated, #FFFFFF)",
+                        border: "1px solid var(--border-default, #D9D9D9)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <Space size={8} align="center">
+                        <Spin size="small" />
+                        <span style={{ fontSize: 13, color: "var(--fg-secondary, #262626)", fontWeight: 500 }}>
+                          {t("ai.thinking", language)}
+                        </span>
+                      </Space>
+                      <Typography.Text type="secondary" style={{ fontSize: 11, color: "var(--fg-muted, #737373)" }}>
+                        {t("ai.thinking_progress", language)}
+                      </Typography.Text>
+                    </div>
+                  </Space>
                 </motion.div>
               )}
 

@@ -70,8 +70,8 @@ describe("operating pulse presentation adapter", () => {
     const partial = { current: { ...value("percent", 10), status: "partial", reason: "coverage_below_threshold" }, comparison: value("percent", 9), change_value: null, change_type: "percentage_point", status: "partial" } as const;
     const unavailable = { current: { ...value("percent", null), status: "unavailable", reason: "zero_denominator" }, comparison: value("percent", 9), change_value: null, change_type: "percentage_point", status: "unavailable" } as const;
     expect(metricStatusLabel(complete, "zh-CN")).toEqual({ status: "complete", label: "完整", reason: undefined });
-    expect(metricStatusLabel(partial, "zh-CN")).toEqual({ status: "partial", label: "部分", reason: "coverage_below_threshold" });
-    expect(metricStatusLabel(unavailable, "zh-CN")).toEqual({ status: "missing", label: "缺失", reason: "zero_denominator" });
+    expect(metricStatusLabel(partial, "zh-CN")).toEqual({ status: "partial", label: "部分", reason: "覆盖率低于门槛" });
+    expect(metricStatusLabel(unavailable, "zh-CN")).toEqual({ status: "missing", label: "缺失", reason: "分母为零" });
     expect(metricStatusLabel(null, "zh-CN")).toEqual({ status: "missing", label: "缺失", reason: "指标不可用" });
   });
 });

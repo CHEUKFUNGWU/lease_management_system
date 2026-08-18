@@ -36,6 +36,7 @@ import NotificationBell from "./NotificationBell";
 import ThemeToggle from "./ThemeToggle";
 import LanguageToggle from "./LanguageToggle";
 import BrandIcon from "./BrandIcon";
+import { CommandPalette } from "./CommandPalette/CommandPalette";
 
 const { Header, Sider, Content } = Layout;
 
@@ -52,6 +53,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     "operating-pulse": t("nav.operating_pulse", language as any),
     "store-360": t("nav.store_360", language as any),
     "scenario-workbench": t("nav.scenario_workbench", language as any),
+    "fpna-workbench": t("nav.fpna_workbench", language as any),
     portfolio: t("nav.portfolio", language as any),
     sensitivity: t("nav.sensitivity", language as any),
     "deal-compare": t("nav.deal_compare", language as any),
@@ -98,13 +100,13 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
             item("/operating-pulse", "/operating-pulse", <LineChartOutlined />, t("nav.operating_pulse", language as any)),
             item("/store-360", "/store-360", <LineChartOutlined />, t("nav.store_360", language as any)),
             item("/scenario-workbench", "/scenario-workbench", <LineChartOutlined />, t("nav.scenario_workbench", language as any)),
+            item("/fpna-workbench", "/fpna-workbench", <CalculatorOutlined />, t("nav.fpna_workbench", language as any)),
             item("/performance", "/performance", <DashboardOutlined />, t("nav.performance", language as any)),
             item("/portfolio", "/portfolio", <PieChartOutlined />, t("nav.portfolio", language as any)),
             item("/pre-deal", "/pre-deal", <FileSearchOutlined />, t("nav.pre_deal", language as any)),
             item("/deal-compare", "/deal-compare", <SwapOutlined />, t("nav.deal_compare", language as any)),
             item("/sensitivity", "/sensitivity", <LineChartOutlined />, t("nav.sensitivity", language as any)),
             item("/cashflow-forecast", "/cashflow-forecast", <DollarOutlined />, t("nav.cashflow", language as any)),
-            item("/roi", "/roi", <CalculatorOutlined />, t("nav.roi", language as any)),
           ],
         });
       }
@@ -382,6 +384,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </Content>
       </Layout>
+      <CommandPalette />
     </Layout>
   );
 }

@@ -30,7 +30,7 @@ func (f *fakePlanImportStore) CreatePlanVersion(_ context.Context, item *reposit
 	return item, nil
 }
 
-func (f *fakePlanImportStore) ListPlanVersions(context.Context, access.EntityFilter, string) ([]*repository.FPnAPlanVersion, error) {
+func (f *fakePlanImportStore) ListPlanVersions(context.Context, access.EntityFilter, string, string, string) ([]*repository.FPnAPlanVersion, error) {
 	return f.versions, nil
 }
 

@@ -9,6 +9,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { PULSE_KPI_CODES } from "../operating-pulse/logic";
 import { STORE360_CODES } from "../store-360/logic";
+import {
+  VERSION_TYPES,
+  SCENARIO_TYPES,
+  PLAN_STATUSES,
+  DQ_CATEGORIES,
+  DQ_STATUSES,
+} from "../fpna-workbench/types";
 
 const repoRoot = path.join(import.meta.dirname, "../../../");
 const pulseBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailpulse/retail_pulse.go"), "utf8");
@@ -17,6 +24,7 @@ const plFlowBackend = readFileSync(path.join(repoRoot, "core-service/internal/se
 const plFlowPanel = readFileSync(path.join(import.meta.dirname, "../store-360/ProfitFlowPanel.tsx"), "utf8");
 const ingestBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailingest/retailingest.go"), "utf8");
 const ingestPage = readFileSync(path.join(import.meta.dirname, "../retail-data-import/page.tsx"), "utf8");
+const sqlInit = readFileSync(path.join(repoRoot, "db/init/01_init.sql"), "utf8");
 
 function quotedTokens(source: string, pattern: RegExp): string[] {
   return Array.from(source.matchAll(pattern), (m) => m[1]);
@@ -81,5 +89,34 @@ describe("CONTRACT-001 code-list contracts", () => {
     for (const optionalField of ["\"gross_profit\"", "\"area_sqm\"", "\"other_controllable_cost\""]) {
       expect(ingestPage, `page must not copy the backend field list (${optionalField})`).not.toContain(optionalField);
     }
+  });
+
+  it("FP&A 计划版本与情景枚举 = DB CHECK 约束（单一来源）", () => {
+    const versionMatch = /fpna_plan_versions[\s\S]*?CHECK\s*\(\s*version_type\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(versionMatch, "version_type CHECK constraint found").not.toBeNull();
+    const dbVersions = quotedTokens(versionMatch![1], /'([^']+)'/g).sort();
+    expect([...VERSION_TYPES].sort()).toEqual(dbVersions);
+
+    const scenarioMatch = /fpna_plan_versions[\s\S]*?CHECK\s*\(\s*scenario_type\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(scenarioMatch, "scenario_type CHECK constraint found").not.toBeNull();
+    const dbScenarios = quotedTokens(scenarioMatch![1], /'([^']+)'/g).sort();
+    expect([...SCENARIO_TYPES].sort()).toEqual(dbScenarios);
+
+    const statusMatch = /fpna_plan_versions[\s\S]*?CHECK\s*\(\s*status\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(statusMatch, "fpna_plan_versions status CHECK constraint found").not.toBeNull();
+    const dbStatuses = quotedTokens(statusMatch![1], /'([^']+)'/g).sort();
+    expect([...PLAN_STATUSES].sort()).toEqual(dbStatuses);
+  });
+
+  it("FP&A 数据质量类别与状态枚举 = DB CHECK 约束（单一来源）", () => {
+    const categoryMatch = /fpna_data_quality_items[\s\S]*?CHECK\s*\(\s*category\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(categoryMatch, "category CHECK constraint found").not.toBeNull();
+    const dbCategories = quotedTokens(categoryMatch![1], /'([^']+)'/g).sort();
+    expect([...DQ_CATEGORIES].sort()).toEqual(dbCategories);
+
+    const dqStatusMatch = /fpna_data_quality_items[\s\S]*?CHECK\s*\(\s*status\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(dqStatusMatch, "fpna_data_quality_items status CHECK constraint found").not.toBeNull();
+    const dbDqStatuses = quotedTokens(dqStatusMatch![1], /'([^']+)'/g).sort();
+    expect([...DQ_STATUSES].sort()).toEqual(dbDqStatuses);
   });
 });

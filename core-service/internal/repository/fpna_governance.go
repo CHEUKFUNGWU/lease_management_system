@@ -248,9 +248,9 @@ func (r *FPnAGovernanceRepository) CreatePlanVersion(ctx context.Context, item *
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListPlanVersions(ctx context.Context, entity access.EntityFilter, versionType string) ([]*FPnAPlanVersion, error) {
-	args := []any{versionType}
-	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE ($1='' OR version_type=$1)`
+func (r *FPnAGovernanceRepository) ListPlanVersions(ctx context.Context, entity access.EntityFilter, versionType, status, asOfPeriod string) ([]*FPnAPlanVersion, error) {
+	args := []any{versionType, status, asOfPeriod}
+	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE ($1='' OR version_type=$1) AND ($2='' OR status=$2) AND ($3='' OR as_of_period=$3)`
 	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
 		return nil, err
 	} else if clause != "" {
@@ -528,9 +528,9 @@ func (r *FPnAGovernanceRepository) CreateDataQuality(ctx context.Context, item *
 	return item, nil
 }
 
-func (r *FPnAGovernanceRepository) ListDataQuality(ctx context.Context, entity access.EntityFilter, period, status string) ([]*FPnADataQualityItem, error) {
-	args := []any{period, status}
-	query := `SELECT id,legal_entity_id,batch_id,COALESCE(period,''),dimension,category,severity,source_table,source_record_id,data_version,description,status,evidence,created_by,created_at,resolved_at FROM fpna_data_quality_items WHERE ($1='' OR period=$1) AND ($2='' OR status=$2)`
+func (r *FPnAGovernanceRepository) ListDataQuality(ctx context.Context, entity access.EntityFilter, period, status, severity string) ([]*FPnADataQualityItem, error) {
+	args := []any{period, status, severity}
+	query := `SELECT id,legal_entity_id,batch_id,COALESCE(period,''),dimension,category,severity,source_table,source_record_id,data_version,description,status,evidence,created_by,created_at,resolved_at FROM fpna_data_quality_items WHERE ($1='' OR period=$1) AND ($2='' OR status=$2) AND ($3='' OR severity=$3)`
 	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
 		return nil, err
 	} else if clause != "" {
@@ -557,7 +557,7 @@ func (r *FPnAGovernanceRepository) ListDataQuality(ctx context.Context, entity a
 func (r *FPnAGovernanceRepository) UpdateDataQualityStatus(ctx context.Context, id string, entity access.EntityFilter, status string) (*FPnADataQualityItem, error) {
 	item := &FPnADataQualityItem{}
 	args := []any{id, status}
-	query := `UPDATE fpna_data_quality_items SET status=$2,resolved_at=CASE WHEN $2 IN ('resolved','accepted') THEN NOW() ELSE NULL END WHERE id=$1`
+	query := `UPDATE fpna_data_quality_items SET status=$2::varchar,resolved_at=CASE WHEN $2::varchar IN ('resolved','accepted') THEN NOW() ELSE NULL END WHERE id=$1`
 	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
 		return nil, err
 	} else if clause != "" {

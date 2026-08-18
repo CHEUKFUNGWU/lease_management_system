@@ -28,11 +28,11 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed plan version: %v", err)
 	}
-	versionsA, err := repo.ListPlanVersions(ctx, mustEntityFilter(t, pair.entityA), "")
+	versionsA, err := repo.ListPlanVersions(ctx, mustEntityFilter(t, pair.entityA), "", "", "")
 	if err != nil || len(versionsA) != 1 {
 		t.Fatalf("entity A plan versions = %d, err %v; want 1", len(versionsA), err)
 	}
-	versionsB, err := repo.ListPlanVersions(ctx, mustEntityFilter(t, pair.entityB), "")
+	versionsB, err := repo.ListPlanVersions(ctx, mustEntityFilter(t, pair.entityB), "", "", "")
 	if err != nil || len(versionsB) != 0 {
 		t.Fatalf("entity B saw entity A plan versions: %d, err %v", len(versionsB), err)
 	}
@@ -104,11 +104,11 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed data-quality item: %v", err)
 	}
-	dqA, err := repo.ListDataQuality(ctx, mustEntityFilter(t, pair.entityA), "", "")
+	dqA, err := repo.ListDataQuality(ctx, mustEntityFilter(t, pair.entityA), "", "", "")
 	if err != nil || len(dqA) != 1 {
 		t.Fatalf("entity A data-quality = %d, err %v; want 1", len(dqA), err)
 	}
-	dqB, err := repo.ListDataQuality(ctx, mustEntityFilter(t, pair.entityB), "", "")
+	dqB, err := repo.ListDataQuality(ctx, mustEntityFilter(t, pair.entityB), "", "", "")
 	if err != nil || len(dqB) != 0 {
 		t.Fatalf("entity B saw entity A data-quality items: %d, err %v", len(dqB), err)
 	}

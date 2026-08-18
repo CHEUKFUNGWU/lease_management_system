@@ -145,7 +145,7 @@ func (h *FPnAGovernanceHandler) ListPlanVersions(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
 		return
 	}
-	rows, err := h.repo.ListPlanVersions(c.Request.Context(), entity, c.Query("version_type"))
+	rows, err := h.repo.ListPlanVersions(c.Request.Context(), entity, c.Query("version_type"), c.Query("status"), c.Query("as_of_period"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -525,7 +525,7 @@ func (h *FPnAGovernanceHandler) ListDataQuality(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
 		return
 	}
-	rows, err := h.repo.ListDataQuality(c.Request.Context(), entity, c.Query("period"), c.Query("status"))
+	rows, err := h.repo.ListDataQuality(c.Request.Context(), entity, c.Query("period"), c.Query("status"), c.Query("severity"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

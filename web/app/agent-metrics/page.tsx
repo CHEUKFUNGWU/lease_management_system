@@ -192,26 +192,40 @@ export default function AgentMetricsPage() {
           <Card><Spin /></Card>
         ) : (
           <>
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12} lg={6}>
-                <Card><Statistic title={t("agent_metrics.calls", language)} value={formatNumber(summary?.planner_calls)} prefix={<BarChartOutlined />} /></Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card><Statistic title={t("agent_metrics.input_tokens", language)} value={formatNumber(summary?.input_tokens)} prefix={<DatabaseOutlined />} /></Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card><Statistic title={t("agent_metrics.output_tokens", language)} value={formatNumber(summary?.output_tokens)} prefix={<ClockCircleOutlined />} /></Card>
-              </Col>
-              <Col xs={24} sm={12} lg={6}>
-                <Card>
-                  <Statistic
-                    title={t("agent_metrics.cost", language)}
-                    value={formatCost(summary?.cost_micros, summary?.cost_accounting_available === true)}
-                    prefix={<DollarOutlined />}
-                  />
-                </Card>
-              </Col>
-            </Row>
+            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.calls", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {formatNumber(summary?.planner_calls)}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.input_tokens", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {formatNumber(summary?.input_tokens)}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.output_tokens", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {formatNumber(summary?.output_tokens)}
+                  </Typography.Text>
+                </div>
+              </div>
+              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.cost", language)}</span>
+                <div style={{ margin: "8px 0 0" }}>
+                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    {formatCost(summary?.cost_micros, summary?.cost_accounting_available === true)}
+                  </Typography.Text>
+                </div>
+              </div>
+            </div>
 
             {summary && !summary.cost_accounting_available && summary.planner_calls > 0 && (
               <Alert

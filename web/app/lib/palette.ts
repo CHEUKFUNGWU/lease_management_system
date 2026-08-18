@@ -62,13 +62,13 @@ export const PALETTE_PAGES: PalettePageDef[] = [
   { path: "/operating-pulse", labelKey: "nav.operating_pulse", group: "analysis", visible: byGroup("analysis") },
   { path: "/store-360", labelKey: "nav.store_360", group: "analysis", visible: byGroup("analysis") },
   { path: "/scenario-workbench", labelKey: "nav.scenario_workbench", group: "analysis", visible: byGroup("analysis") },
+  { path: "/fpna-workbench", labelKey: "nav.fpna_workbench", group: "analysis", visible: byGroup("analysis") },
   { path: "/performance", labelKey: "nav.performance", group: "analysis", visible: byGroup("analysis") },
   { path: "/portfolio", labelKey: "nav.portfolio", group: "analysis", visible: byGroup("analysis") },
   { path: "/pre-deal", labelKey: "nav.pre_deal", group: "analysis", visible: byGroup("analysis") },
   { path: "/deal-compare", labelKey: "nav.deal_compare", group: "analysis", visible: byGroup("analysis") },
   { path: "/sensitivity", labelKey: "nav.sensitivity", group: "analysis", visible: byGroup("analysis") },
   { path: "/cashflow-forecast", labelKey: "nav.cashflow", group: "analysis", visible: byGroup("analysis") },
-  { path: "/roi", labelKey: "nav.roi", group: "analysis", visible: byGroup("analysis") },
 
   // 会计与合规（admin / auditor / editor / reviewer / approver）
   { path: "/reports", labelKey: "nav.reports", group: "accounting", visible: byGroup("accounting") },
@@ -83,11 +83,12 @@ export const PALETTE_PAGES: PalettePageDef[] = [
   { path: "/admin/users", labelKey: "nav.users", group: "system", visible: (user) => hasRole(user, "admin") },
 ];
 
-/** U3：app/ 下被排除在面板之外的页面（auth / 首页 / 详情 / 新建动作页）。 */
+/** U3：app/ 下被排除在面板之外的页面（auth / 首页 / 详情 / 新建动作页 / 外部营销落地页）。 */
 export const PALETTE_EXCLUDED_ROUTES = new Set([
   "/",
   "/login",
   "/admin/login",
   "/contracts/[id]",
   "/contracts/new",
+  "/roi",
 ]);

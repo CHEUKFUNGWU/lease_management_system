@@ -1,6 +1,6 @@
 # AI 文档索引与现行决策
 
-> 末次统一：2026-08-18
+> 末次统一：2026-08-19
 > 用途：**读任何一份 AI 文档之前先看这里**，确认它是否仍然有效。
 > 维护规则：任何改变下表 §2 决策的变更，必须同时写 ADR 并更新本文；只改方案文档不算数。
 
@@ -47,6 +47,8 @@ FP&A 版本治理与滚动预测
 | [CodebaseDesign：AI 阶段 4 PageFill 填表缝模块深化](CodebaseDesign_AI阶段4_PageFill填表缝_模块深化.md) | **Current** | page_fill 协议（Exploratory 结构性不入 payload，I5/ACORE-12）、`retail.store_days.import.preview` 工具、导入页 `?fill=` 消费；D-D1~D3 |
 | [CodebaseDesign：AI 阶段 5 MinIO 接线与三入口汇流模块深化](CodebaseDesign_AI阶段5_MinIO接线与三入口汇流_模块深化.md) | **Current** | MinIO 读取接线（page_fill 点亮）、三入口统一、G1 两平面汇流；D-E1~E4。**M1 已交付，M2/M3 进行中** |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current | 业务需求有效。**§9 制造功能已标注为不在当前范围**；§12 的工具勾选表已移除，实现状态以代码为准 |
+| [PRD：三表财务模型与单店利润表](PRD_三表财务模型与单店利润表.md) | Current | 业务需求（财务经理视角）：S1 单店利润表页、S2 法人级三表模型、S3 受治理模板自定义、S4 AI 填数与报表生成、S5 集团合并视图。AI 相关诉求均声明沿用 ADR-0019/0025 与既有 WorkingPaper 先例，未改动 §2 任何决策。**落地状态逐项对照见其附录 E（2026-08-19），缺口列为 S1-7 未做与若干「生产接线待工作台」** |
+| [CodebaseDesign：三表财务模型与单店利润表模块深化](CodebaseDesign_三表模型与单店利润表_模块深化.md) | Current | **实施级设计**（上述 PRD 的配套；SM1–SM8 已按本设计落地，未落地接线点对应 PRD 附录 E 的 ⚠ 行）：SM1 模板/DSL、SM2 纯函数引擎（Run/Persist）、SM3 门店利润表投影、SM4 期初三道闸、SM5 AI 假设草稿、SM6 finmodel 底稿构建器、SM7 三个 Agent 工具、SM8 集团视图（克制）；决策留痕 D-S1~S9；含 finmodel 不得 import ifrs16 的 import guard 与唯一写入口两条架构测试 |
 | ~~PRD：租赁经营决策与 AI Copilot 平台~~ | **已归档** `archive/superseded-prds-2026-08/` | 编于零售转型前，标题与内容以「租赁」为主体；产品边界已由零售 PRD (P0–P5) 与财务BP/FP&A PRD (F0–F9) 取代 |
 | ~~AI Agent 填表升级（tau + anydoc）实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | tau 作废（ADR-0022）；anydoc 与填表缝**已迁入** Agent Core 设计 §8.2 与附录 A |
 | ~~CodebaseDesign：Agent 填表升级模块深化~~ | **已归档** 同上 | 同上（M1 → §8.2，M4 → 附录 A） |

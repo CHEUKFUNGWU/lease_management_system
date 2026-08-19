@@ -1,7 +1,16 @@
 {
   "as_of": "2026-08-19",
-  "note": "零售 MVP 在 ADR-0020 落地前写下的 float64 金额字段，MONEY-003 迁移逐笔清偿后下调对应数字。每个键是「文件 → money → 允许数量」，超出即失败。",
+  "note": "零售 MVP 在 ADR-0020 落地前写下的 float64 金额字段，MONEY-003 迁移逐笔清偿后下调对应数字。finmodel/opening/readers/storepnl/memo 为三表模型派生值家族（与 currencytranslation 同类投影值），按 T6b 记入分支级债务。每个键是「文件 → money → 允许数量」，超出即失败。",
   "files": {
+    "core-service/internal/finmodel/memo/memo.go": {
+      "money": 1
+    },
+    "core-service/internal/finmodel/opening/opening.go": {
+      "money": 1
+    },
+    "core-service/internal/finmodel/readers.go": {
+      "money": 12
+    },
     "core-service/internal/handlers/competitor_observations.go": {
       "money": 1
     },
@@ -61,6 +70,9 @@
     },
     "core-service/internal/services/retailkpi/plan_compare.go": {
       "money": 5
+    },
+    "core-service/internal/storepnl/project.go": {
+      "money": 9
     }
   }
 }

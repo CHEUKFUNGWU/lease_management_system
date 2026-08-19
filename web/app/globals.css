@@ -4187,3 +4187,11 @@ body .app-content.app-content-full-bleed .app-content-inner {
   width: 100%;
 }
 
+
+/* store-pnl 保存视图与行设置控件（S1-9/S3-5）——§13-2：类名承载，不用内联 style */
+.storepnl-view-select {
+  min-width: 160px;
+}
+.storepnl-row-settings-panel {
+  max-width: 420px;
+}

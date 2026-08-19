@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Card, Select, Space, Spin, Table, Tooltip, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, Input, Modal, Popover, Select, Space, Spin, Table, Tooltip, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -16,7 +16,7 @@ import { useLanguage } from "../context/LanguageContext";
 
 type StoreRef = { id: string; code: string; name: string };
 type RowValue = {
-  key: string; label: string; kind: string; basis: string;
+  key: string; label: string; kind: string; basis: string; children?: string[];
   actual?: number | null; other?: number | null;
   variance?: number | null; pct?: number | null;
   peer?: number | null; peer_status?: string; ungoverned?: boolean;
@@ -29,6 +29,7 @@ type RowValue = {
   components?: { label: string; value?: number | null }[];
 };
 type Block = { basis: string; rows: RowValue[] };
+type SavedViewRef = { id: string; name: string; config?: { rows_hidden?: string[]; rows_fold?: string[] } };
 type PnlResponse = {
   store_id: string; as_of: string; window_days: number;
   basis_mode: string; columns: string[];
@@ -58,6 +59,12 @@ export default function StorePnlPage() {
   const [pnl, setPnl] = useState<PnlResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // S1-9/S3-5：行显隐、分组合并与个人视图。视图只改呈现，不改数据。
+  const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
+  const [foldKeys, setFoldKeys] = useState<string[]>([]);
+  const [views, setViews] = useState<SavedViewRef[]>([]);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -74,6 +81,22 @@ export default function StorePnlPage() {
         setStores(list);
       } catch {
         // store list is advisory; the projection fetch reports its own errors
+      }
+    })();
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const response = await fetch("/api/v1/financial-model/saved-views?kind=store_pnl", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const body = await response.json();
+        setViews((body.views || []) as SavedViewRef[]);
+      } catch {
+        // 视图列表是增强能力；加载失败不阻断主表
       }
     })();
   }, [token]);
@@ -99,6 +122,54 @@ export default function StorePnlPage() {
       }
     })();
   }, [token, storeId]);
+
+  const allRows = useMemo(() => (pnl?.operating?.rows || []).concat(pnl?.ifrs16?.rows || []), [pnl]);
+  const subtotalRows = useMemo(() => allRows.filter((row) => row.kind === "subtotal"), [allRows]);
+
+  // folded subtotals hide their children (分组合并)。
+  const foldedChildren = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of allRows) {
+      if (row.kind === "subtotal" && foldKeys.includes(row.key)) {
+        (row.children || []).forEach((key) => set.add(key));
+      }
+    }
+    return set;
+  }, [allRows, foldKeys]);
+
+  const visibleRowsFor = (block?: Block): any[] =>
+    rowsFor(block).filter((row) => !hiddenKeys.includes(row.key) && !foldedChildren.has(row.key));
+
+  const currentViewConfig = (): ViewConfigLike => ({ rows_hidden: hiddenKeys, rows_fold: foldKeys });
+
+  const saveView = async () => {
+    if (!token || !viewName.trim()) return;
+    try {
+      const response = await fetch("/api/v1/financial-model/saved-views", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "store_pnl", name: viewName.trim(), config: currentViewConfig() }),
+      });
+      if (!response.ok) return;
+      setSaveOpen(false);
+      setViewName("");
+      const list = await fetch("/api/v1/financial-model/saved-views?kind=store_pnl", {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => r.json());
+      setViews((list.views || []) as SavedViewRef[]);
+    } catch {
+      // 保存失败静默由服务端 4xx 表达；前端保持当前呈现
+    }
+  };
+
+  const applyView = (viewID: string) => {
+    const view = views.find((candidate) => candidate.id === viewID);
+    if (!view) return;
+    setHiddenKeys(view.config?.rows_hidden || []);
+    setFoldKeys(view.config?.rows_fold || []);
+  };
+
+  type ViewConfigLike = { rows_hidden: string[]; rows_fold: string[] };
 
   // S3-7: 金额单位缩放与负数显示是显示层约定 — 存储值不缩放，只有
   // 渲染值除以缩放因子；负数括号/红色随模板格式走。
@@ -200,6 +271,38 @@ export default function StorePnlPage() {
                   label: `${store.code} ${store.name}`,
                 }))}
               />
+              <Popover
+                placement="bottom"
+                trigger="click"
+                title={t("storepnl.row_settings", language)}
+                content={
+                  <Space direction="vertical" className="storepnl-row-settings-panel">
+                    <Typography.Text strong>{t("storepnl.hide_rows", language)}</Typography.Text>
+                    <Checkbox.Group
+                      value={hiddenKeys}
+                      onChange={(values) => setHiddenKeys(values as string[])}
+                      options={allRows.map((row) => ({ label: row.label, value: row.key }))}
+                    />
+                    <Typography.Text strong>{t("storepnl.fold_groups", language)}</Typography.Text>
+                    <Checkbox.Group
+                      value={foldKeys}
+                      onChange={(values) => setFoldKeys(values as string[])}
+                      options={subtotalRows.map((row) => ({ label: row.label, value: row.key }))}
+                    />
+                  </Space>
+                }
+              >
+                <Button disabled={!pnl}>{t("storepnl.row_settings", language)}</Button>
+              </Popover>
+              <Select
+                placeholder={t("storepnl.my_views", language)}
+                className="storepnl-view-select"
+                onChange={applyView}
+                options={views.map((view) => ({ value: view.id, label: view.name }))}
+              />
+              <Button disabled={!pnl} onClick={() => setSaveOpen(true)}>
+                {t("storepnl.save_view", language)}
+              </Button>
               <Button icon={<DownloadOutlined />} disabled={!pnl} onClick={downloadCSV}>
                 CSV
               </Button>
@@ -248,16 +351,30 @@ export default function StorePnlPage() {
             )}
             {pnl.operating && (
               <Card title={`${t("storepnl.block", language)} · ${t("storepnl.operating_basis", language)}`} size="small">
-                <Table size="small" bordered pagination={false} dataSource={rowsFor(pnl.operating, true)} columns={columns.filter((c) => c.key !== "comps" || true)} />
+                <Table size="small" bordered pagination={false} dataSource={visibleRowsFor(pnl.operating)} columns={columns.filter((c) => c.key !== "comps" || true)} />
               </Card>
             )}
             {pnl.ifrs16 && (
               <Card title={`${t("storepnl.block", language)} · ${t("storepnl.ifrs16_basis", language)}`} size="small">
-                <Table size="small" bordered pagination={false} dataSource={rowsFor(pnl.ifrs16)} columns={columns.filter((c) => c.key !== "comps")} />
+                <Table size="small" bordered pagination={false} dataSource={visibleRowsFor(pnl.ifrs16)} columns={columns.filter((c) => c.key !== "comps")} />
               </Card>
             )}
           </Space>
         )}
+        <Modal
+          open={saveOpen}
+          title={t("storepnl.save_view", language)}
+          okText={t("storepnl.save_view", language)}
+          onOk={saveView}
+          onCancel={() => setSaveOpen(false)}
+          okButtonProps={{ disabled: !viewName.trim() }}
+        >
+          <Input
+            value={viewName}
+            onChange={(event) => setViewName(event.target.value)}
+            placeholder={t("storepnl.view_name", language)}
+          />
+        </Modal>
       </AppLayout>
     </ProtectedRoute>
   );

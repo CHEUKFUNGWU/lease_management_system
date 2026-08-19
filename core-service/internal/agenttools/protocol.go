@@ -183,6 +183,9 @@ type ToolResult struct {
 	Error             *ToolError   `json:"error,omitempty"`
 	RetryAfterSeconds int          `json:"retry_after_seconds,omitempty"`
 	Truncated         bool         `json:"truncated,omitempty"`
+	// Terminate asks the agent loop to stop early after this call completes
+	// (the pi "terminate: true" capability). Additive; omitted when false.
+	Terminate bool `json:"terminate,omitempty"`
 }
 
 // ToolRuntime is the highest external seam. Registry, policy, scope, audit,

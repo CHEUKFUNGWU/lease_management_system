@@ -16,46 +16,46 @@ import (
 
 // Input is one persisted run plus the cover metadata the paper must state.
 type Input struct {
-	Title              string
-	LegalEntityID      string
-	Currency           string
-	DataClassification string
+	Title              string `json:"title"`
+	LegalEntityID      string `json:"legal_entity_id"`
+	Currency           string `json:"currency"`
+	DataClassification string `json:"data_classification"`
 
 	// Five version lines (cover).
-	ModelDefinitionVersion  string
-	TemplateVersion         string
-	DataVersion             string
-	AssumptionVersion       string
-	ExchangeRateVersion     string
-	MetricDefinitionVersion string
+	ModelDefinitionVersion  string `json:"model_definition_version"`
+	TemplateVersion         string `json:"template_version"`
+	DataVersion             string `json:"data_version"`
+	AssumptionVersion       string `json:"assumption_version"`
+	ExchangeRateVersion     string `json:"exchange_rate_version"`
+	MetricDefinitionVersion string `json:"metric_definition_version"`
 
-	Periods    []string
-	Lines      []LineValue
-	TieOuts    []TieOutValue
-	GapDetails []string
+	Periods    []string      `json:"periods"`
+	Lines      []LineValue   `json:"lines"`
+	TieOuts    []TieOutValue `json:"tie_outs"`
+	GapDetails []string      `json:"gap_details,omitempty"`
 	// ToolCallID anchors certified cells to the generating tool call (I2).
-	ToolCallID  string
-	GeneratedBy string
+	ToolCallID  string `json:"tool_call_id"`
+	GeneratedBy string `json:"generated_by,omitempty"`
 }
 
 // LineValue mirrors the engine result (Value nil = missing — never zero).
 type LineValue struct {
-	RowKey         string
-	Label          string
-	Period         string
-	Value          *float64
-	SourceType     string // fact_aggregate | ifrs16_engine | contract_schedule | assumption | formula | opening_balance
-	Classification string
+	RowKey         string   `json:"row_key"`
+	Label          string   `json:"label"`
+	Period         string   `json:"period"`
+	Value          *float64 `json:"value"`
+	SourceType     string   `json:"source_type"` // fact_aggregate | ifrs16_engine | contract_schedule | assumption | formula | opening_balance
+	Classification string   `json:"classification,omitempty"`
 }
 
 // TieOutValue mirrors one tie-out result.
 type TieOutValue struct {
-	CheckCode string
-	Period    string
-	Expected  *float64
-	Actual    *float64
-	Diff      *float64
-	Status    string
+	CheckCode string   `json:"check_code"`
+	Period    string   `json:"period"`
+	Expected  *float64 `json:"expected"`
+	Actual    *float64 `json:"actual"`
+	Diff      *float64 `json:"diff"`
+	Status    string   `json:"status"`
 }
 
 // cellBasis maps the engine source type to the working-paper basis class.
@@ -138,18 +138,21 @@ func Build(in Input) (workingpaper.Paper, error) {
 	}
 
 	return workingpaper.Paper{
-		Title:               in.Title,
-		Period:              strings.Join(in.Periods, " ~ "),
-		LegalEntityScope:    in.LegalEntityID,
-		ReviewState:         review,
-		DataVersion:         in.DataVersion,
-		AssumptionVersion:   in.AssumptionVersion,
-		EngineVersion:       "finmodel@" + in.ModelDefinitionVersion,
-		GeneratedBy:         in.GeneratedBy,
-		DataGaps:            gaps,
-		UnexplainedResidual: "",
-		OpenQuestions:       []string{"IFRS 16 租赁附表数字均来自计量引擎投影（模型不自算，D-S3）"},
-		Sections:            []workingpaper.Section{section, checkSection},
+		Title:                   in.Title,
+		Period:                  strings.Join(in.Periods, " ~ "),
+		LegalEntityScope:        in.LegalEntityID,
+		ReviewState:             review,
+		DataVersion:             in.DataVersion,
+		AssumptionVersion:       in.AssumptionVersion,
+		EngineVersion:           "finmodel@" + in.ModelDefinitionVersion,
+		ExchangeRateVersion:     in.ExchangeRateVersion,
+		MetricDefinitionVersion: in.MetricDefinitionVersion,
+		TemplateVersion:         in.TemplateVersion,
+		GeneratedBy:             in.GeneratedBy,
+		DataGaps:                gaps,
+		UnexplainedResidual:     "",
+		OpenQuestions:           []string{"IFRS 16 租赁附表数字均来自计量引擎投影（模型不自算，D-S3）"},
+		Sections:                []workingpaper.Section{section, checkSection},
 	}, nil
 }
 

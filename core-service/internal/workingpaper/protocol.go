@@ -101,20 +101,23 @@ type CoverPage struct {
 // honesty fields the cover page surfaces (data gaps, unexplained residual,
 // open questions).
 type Paper struct {
-	Title               string      `json:"title"`
-	Period              string      `json:"period"`
-	LegalEntityScope    string      `json:"legal_entity_scope"`
-	Sections            []Section   `json:"sections"`
-	DataGaps            []string    `json:"data_gaps,omitempty"`
-	UnexplainedResidual string      `json:"unexplained_residual,omitempty"`
-	OpenQuestions       []string    `json:"open_questions,omitempty"`
-	ReviewState         ReviewState `json:"review_state"`
-	DataVersion         string      `json:"data_version,omitempty"`
-	AssumptionVersion   string      `json:"assumption_version,omitempty"`
-	EngineVersion       string      `json:"engine_version,omitempty"`
-	SandboxImageDigest  string      `json:"sandbox_image_digest,omitempty"`
-	GeneratedBy         string      `json:"generated_by,omitempty"`
-	Cover               CoverPage   `json:"cover,omitempty"`
+	Title                   string      `json:"title"`
+	Period                  string      `json:"period"`
+	LegalEntityScope        string      `json:"legal_entity_scope"`
+	Sections                []Section   `json:"sections"`
+	DataGaps                []string    `json:"data_gaps,omitempty"`
+	UnexplainedResidual     string      `json:"unexplained_residual,omitempty"`
+	OpenQuestions           []string    `json:"open_questions,omitempty"`
+	ReviewState             ReviewState `json:"review_state"`
+	DataVersion             string      `json:"data_version,omitempty"`
+	AssumptionVersion       string      `json:"assumption_version,omitempty"`
+	EngineVersion           string      `json:"engine_version,omitempty"`
+	ExchangeRateVersion     string      `json:"exchange_rate_version,omitempty"`
+	MetricDefinitionVersion string      `json:"metric_definition_version,omitempty"`
+	TemplateVersion         string      `json:"template_version,omitempty"`
+	SandboxImageDigest      string      `json:"sandbox_image_digest,omitempty"`
+	GeneratedBy             string      `json:"generated_by,omitempty"`
+	Cover                   CoverPage   `json:"cover,omitempty"`
 }
 
 // Build normalizes the paper and computes its cover page. It is the only

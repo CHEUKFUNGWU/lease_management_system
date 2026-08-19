@@ -123,3 +123,15 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+func TestCoverCarriesAllFiveVersionLines(t *testing.T) {
+	paper, err := Build(sampleInput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if paper.DataVersion != "ds-1" || paper.AssumptionVersion != "as-1" ||
+		paper.ExchangeRateVersion != "fx-1" || paper.MetricDefinitionVersion != "md-1" ||
+		paper.TemplateVersion != "v1" || paper.EngineVersion != "finmodel@v3" {
+		t.Fatalf("cover must carry all five version lines + engine version, got %+v", paper)
+	}
+}

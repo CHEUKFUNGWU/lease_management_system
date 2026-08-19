@@ -39,20 +39,26 @@ func fakePaddleOCR(t *testing.T) *httptest.Server {
 	layoutJSON, _ := json.Marshal(layout)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v2/ocr/jobs/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			if got := r.Header.Get("Authorization"); got != "bearer test-token" {
-				http.Error(w, "bad auth", http.StatusForbidden)
-				return
-			}
-			if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-				http.Error(w, "must be multipart", http.StatusInternalServerError)
-				return
-			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"jobId": "job-1"}})
+	// POST lands on the EXACT path: a trailing-slash-only pattern would make
+	// ServeMux redirect the slash-less path, and pre-1.26 http clients turn
+	// that 301 into a GET — silently hitting the poll branch (CI Go 1.25).
+	mux.HandleFunc("/api/v2/ocr/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		// GET /api/v2/ocr/jobs/job-1
+		if got := r.Header.Get("Authorization"); got != "bearer test-token" {
+			http.Error(w, "bad auth", http.StatusForbidden)
+			return
+		}
+		if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			http.Error(w, "must be multipart", http.StatusInternalServerError)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"jobId": "job-1"}})
+	})
+	// GET /api/v2/ocr/jobs/job-1 (subtree).
+	mux.HandleFunc("/api/v2/ocr/jobs/", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		polls++
 		p := polls
@@ -124,11 +130,14 @@ func TestPaddleOCRUnavailable(t *testing.T) {
 
 func TestPaddleOCRFailedJob(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v2/ocr/jobs/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"jobId": "job-9"}})
+	mux.HandleFunc("/api/v2/ocr/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"jobId": "job-9"}})
+	})
+	mux.HandleFunc("/api/v2/ocr/jobs/", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{
 			"state":    "failed",
 			"errorMsg": "document too damaged",

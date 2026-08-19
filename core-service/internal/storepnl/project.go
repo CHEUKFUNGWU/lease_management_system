@@ -35,21 +35,28 @@ const (
 	ColForecast  ColumnRef = "forecast"
 )
 
-// StoreRef addresses the store.
+// StoreRef addresses the store and one resolved period. DateFrom/DateTo
+// carry the resolved retailperiod window (day/week/month/quarter/year);
+// when empty the adapter falls back to the rolling AsOf+WindowDays anchor.
 type StoreRef struct {
 	StoreID        string
 	AsOf           string // YYYY-MM-DD, retailperiod rolling anchor
 	WindowDays     int
+	DateFrom       string // YYYY-MM-DD, resolved by retailperiod (calendar + day grains)
+	DateTo         string
+	PeriodLabel    string // display label of the resolved window ("2026-Q3")
+	PeriodKind     string // rolling | calendar
 	LegalEntityID  string
 	Classification string // production | simulated
 	DatasetVersion string
 	SourceSystem   string
 }
 
-// KPI aggregate port: the retailkpi semantic layer's per-store monthly
-// aggregates. Values nil when the KPI is unavailable — never zero.
+// KPI aggregate port: the retailkpi semantic layer's per-store aggregates
+// over the resolved window in StoreRef. Values nil when the KPI is
+// unavailable — never zero.
 type KPIReader interface {
-	Operating(ctx context.Context, ref StoreRef, period string) (KPIAggregates, error)
+	Operating(ctx context.Context, ref StoreRef) (KPIAggregates, error)
 }
 
 // KPIAggregates carries the store-day aggregates the template consumes.
@@ -144,6 +151,8 @@ type StorePnl struct {
 	StoreID             string      `json:"store_id"`
 	AsOf                string      `json:"as_of"`
 	WindowDays          int         `json:"window_days"`
+	PeriodLabel         string      `json:"period_label,omitempty"`
+	PeriodKind          string      `json:"period_kind,omitempty"` // rolling | calendar
 	Period              Period      `json:"period"`
 	BasisMode           BasisMode   `json:"basis_mode"`
 	Columns             []ColumnRef `json:"columns"`
@@ -174,10 +183,11 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 
 	pnl := &StorePnl{
 		StoreID: ref.StoreID, AsOf: ref.AsOf, WindowDays: ref.WindowDays,
+		PeriodLabel: ref.PeriodLabel, PeriodKind: ref.PeriodKind,
 		Period: period, BasisMode: basis, Columns: []ColumnRef{pair[0], pair[1]},
 	}
 
-	facts, err := readers.KPI.Operating(ctx, ref, monthOf(ref.AsOf))
+	facts, err := readers.KPI.Operating(ctx, ref)
 	if err != nil {
 		return nil, fmt.Errorf("storepnl: kpi aggregates: %w", err)
 	}

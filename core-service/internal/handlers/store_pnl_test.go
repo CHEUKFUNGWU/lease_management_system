@@ -13,7 +13,7 @@ import (
 
 type memStorePnlKPI struct{}
 
-func (memStorePnlKPI) Operating(_ context.Context, _ storepnl.StoreRef, _ string) (storepnl.KPIAggregates, error) {
+func (memStorePnlKPI) Operating(_ context.Context, _ storepnl.StoreRef) (storepnl.KPIAggregates, error) {
 	v := 1000.0
 	return storepnl.KPIAggregates{
 		Revenue: &v, DecisionReady: true, Classification: "production", Currency: "CNY",

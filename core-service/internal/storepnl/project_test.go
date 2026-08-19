@@ -9,7 +9,7 @@ import (
 
 type memKPI struct{ facts KPIAggregates }
 
-func (m memKPI) Operating(_ context.Context, _ StoreRef, _ string) (KPIAggregates, error) {
+func (m memKPI) Operating(_ context.Context, _ StoreRef) (KPIAggregates, error) {
 	return m.facts, nil
 }
 

@@ -156,3 +156,55 @@ func TestNormalizeAndDefault(t *testing.T) {
 		t.Fatal("366-day rolling accepted")
 	}
 }
+
+func TestParseCalendarWeekISO(t *testing.T) {
+	// 2026-W01 的周一是 2025-12-29（ISO 周 1 含 1 月 4 日）。
+	w, err := Parse("2026-W01", date("2026-02-10"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.Period.Week != 1 || w.From.Format("2006-01-02") != "2025-12-29" || w.To.Format("2006-01-02") != "2026-01-04" {
+		t.Fatalf("week window = %+v", w)
+	}
+	if w.CompareTo.Format("2006-01-02") != "2025-12-28" || w.CompareFrom.Format("2006-01-02") != "2025-12-22" {
+		t.Fatalf("week comparison = %s..%s", w.CompareFrom.Format("2006-01-02"), w.CompareTo.Format("2006-01-02"))
+	}
+	if w.Label != "2026-W01" {
+		t.Fatalf("label = %q", w.Label)
+	}
+	// 非法周号拒绝，无静默回退。
+	if _, err := Parse("2026-W54", date("2026-02-10")); err == nil {
+		t.Fatal("week 54 must be rejected")
+	}
+	if _, err := Parse("2025-W53", date("2026-02-10")); err != nil {
+		t.Fatalf("2025 has an ISO week 53: %v", err)
+	}
+}
+
+func TestParseCalendarYear(t *testing.T) {
+	w, err := Parse("2026", date("2026-02-10"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w.From.Format("2006-01-02") != "2026-01-01" || w.To.Format("2006-01-02") != "2026-12-31" {
+		t.Fatalf("year window = %s..%s", w.From.Format("2006-01-02"), w.To.Format("2006-01-02"))
+	}
+	if w.CompareFrom.Format("2006-01-01") != "2025-01-01" || w.CompareTo.Format("2006-01-02") != "2025-12-31" {
+		t.Fatalf("year comparison = %s..%s", w.CompareFrom.Format("2006-01-02"), w.CompareTo.Format("2006-01-02"))
+	}
+	if w.Period.Kind != KindCalendar || w.Period.Year != 2026 || w.Period.Month != 0 {
+		t.Fatalf("period = %+v", w.Period)
+	}
+}
+
+func TestNormalizeWeekExclusivity(t *testing.T) {
+	if _, err := Normalize(Period{Kind: KindCalendar, Year: 2026, Month: 3, Week: 5}); err == nil {
+		t.Fatal("month+week together must be rejected")
+	}
+	if _, err := Normalize(Period{Kind: KindCalendar, Year: 2026, Week: 32}); err != nil {
+		t.Fatalf("year-week must normalize: %v", err)
+	}
+	if _, err := Normalize(Period{Kind: KindRolling, Days: 7, Week: 3}); err == nil {
+		t.Fatal("rolling with week field must be rejected")
+	}
+}

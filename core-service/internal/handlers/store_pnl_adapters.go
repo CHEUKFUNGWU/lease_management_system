@@ -26,16 +26,34 @@ func NewStorePnlKPIAdapter(facts StoreFactsSource) storepnl.KPIReader {
 	return storePnlKPIAdapter{facts: facts}
 }
 
-func (a storePnlKPIAdapter) Operating(ctx context.Context, ref storepnl.StoreRef, period string) (storepnl.KPIAggregates, error) {
-	asOf, err := time.Parse("2006-01-02", ref.AsOf)
-	if err != nil {
-		return storepnl.KPIAggregates{}, err
+func (a storePnlKPIAdapter) Operating(ctx context.Context, ref storepnl.StoreRef) (storepnl.KPIAggregates, error) {
+	query := retailstore360.Query{
+		LegalEntityID: ref.LegalEntityID, StoreID: ref.StoreID,
+		Classification: ref.Classification, DatasetVersion: ref.DatasetVersion,
+		SourceSystem: ref.SourceSystem, PeriodLabel: ref.PeriodLabel,
 	}
-	response, err := retailstore360.NewService(a.facts).Build(ctx, retailstore360.Query{
-		LegalEntityID: ref.LegalEntityID, StoreID: ref.StoreID, AsOf: asOf,
-		WindowDays: ref.WindowDays, Classification: ref.Classification,
-		DatasetVersion: ref.DatasetVersion,
-	})
+	// S1-2: resolved calendar/rolling window wins; the legacy AsOf+WindowDays
+	// anchor stays as the fallback for callers that pass neither.
+	if ref.DateFrom != "" && ref.DateTo != "" {
+		from, err := time.Parse("2006-01-02", ref.DateFrom)
+		if err != nil {
+			return storepnl.KPIAggregates{}, err
+		}
+		to, err := time.Parse("2006-01-02", ref.DateTo)
+		if err != nil {
+			return storepnl.KPIAggregates{}, err
+		}
+		query.DateFrom, query.DateTo = from, to
+		query.AsOf = to
+	} else {
+		asOf, err := time.Parse("2006-01-02", ref.AsOf)
+		if err != nil {
+			return storepnl.KPIAggregates{}, err
+		}
+		query.AsOf = asOf
+		query.WindowDays = ref.WindowDays
+	}
+	response, err := retailstore360.NewService(a.facts).Build(ctx, query)
 	if err != nil {
 		return storepnl.KPIAggregates{}, err
 	}

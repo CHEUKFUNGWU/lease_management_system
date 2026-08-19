@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/retailperiod"
 	"github.com/lease-management-system/core-service/internal/storepnl"
 )
 
@@ -41,7 +43,10 @@ func (unavailableLease) Monthly(_ context.Context, _, _ string) (storepnl.LeaseM
 	return storepnl.LeaseMonthValues{}, errors.New("IFRS 16 口径尚未接通：门店级 ROU/利息投影适配器待接线（诚实降级，不产出数字）")
 }
 
-// Projection is GET /api/v1/stores/:id/pnl.
+// Projection is GET /api/v1/stores/:id/pnl. The period grain (day/week/
+// month/quarter/year, S1-2) resolves through retailperiod: a ?period spec
+// (rolling days, YYYY-MM, YYYY-Qn, YYYY-Wnn, YYYY, last-month,
+// this-quarter) wins; the legacy window_days/as_of pair stays as fallback.
 func (h *StorePnlHandler) Projection(c *gin.Context) {
 	storeID := c.Param("id")
 	asOf := strings.TrimSpace(c.Query("as_of"))
@@ -58,6 +63,28 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 		Classification: classification, DatasetVersion: datasetVersion,
 	}
 	period := storepnl.Period{From: monthOf(asOf), To: monthOf(asOf)}
+
+	if spec := strings.TrimSpace(c.Query("period")); spec != "" {
+		anchor := time.Now()
+		if asOf != "" {
+			parsed, err := time.Parse("2006-01-02", asOf)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "as_of must be YYYY-MM-DD"})
+				return
+			}
+			anchor = parsed
+		}
+		window, err := retailperiod.Parse(spec, anchor)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		ref.DateFrom = window.From.Format("2006-01-02")
+		ref.DateTo = window.To.Format("2006-01-02")
+		ref.PeriodLabel = window.Label
+		ref.PeriodKind = string(window.Period.Kind)
+		period = storepnl.Period{From: ref.DateFrom, To: ref.DateTo}
+	}
 	planReader := h.plan
 	if versionID := strings.TrimSpace(c.Query("plan_version_id")); versionID != "" && h.planRepo != nil {
 		planReader = SetStorePnlPlanReader(h.planRepo, versionID)

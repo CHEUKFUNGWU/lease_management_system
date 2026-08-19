@@ -552,6 +552,7 @@ type Response struct {
 	EventDraft             *EventDraftData                   `json:"event_draft,omitempty"`
 	RetailOperations       *RetailOperationsData             `json:"retail_operations,omitempty"`
 	RetailActionProposal   *RetailActionProposal             `json:"retail_action_proposal,omitempty"`
+	FileTriage             *agenttooldefs.TriageResult       `json:"file_triage,omitempty"`
 }
 
 type AuditPackData struct {
@@ -718,7 +719,13 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 用户消息: %s`, req.ObjectName, req.ContentType, req.Message)
 
 		_, modelName, toolCalls, err := h.callLLMWithTools(ctx, authHeader, fileSystemPrompt, req.Message, req.History, req.Language, fileParseTools)
-		fallbackTool := detectFileParseTool(req.Message)
+		triage := agenttooldefs.DeterministicTriage(agenttooldefs.TriageRequest{
+			FileID:      req.FileID,
+			ObjectName:  req.ObjectName,
+			ContentType: req.ContentType,
+			UserMessage: req.Message,
+		})
+		fallbackTool := triageToParseTool(triage)
 		selectedTool := fallbackTool
 		toolExecutionChain := []AgentToolCall{}
 		contractID := effectiveContractID
@@ -728,6 +735,12 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			toolExecutionChain = toolCalls
 		} else if fallbackTool != "" {
 			modelName = "deterministic-router"
+		}
+
+		if selectedTool == "" {
+			// R3: no silent fallback. Unknown or unsupported files stop the
+			// pipeline and ask the user.
+			return fileTriageRefusal(req, triage), nil
 		}
 
 		if selectedTool != "" {
@@ -2527,14 +2540,42 @@ func containsAny(msg string, targets []string) bool {
 	return false
 }
 
-func detectFileParseTool(message string) string {
-	msgLower := strings.ToLower(message)
-	switch {
-	case containsAny(msgLower, []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"}):
+// triageToParseTool maps a triage result to the file-parse tool selector. No
+// match — including unknown and classes without an automated parse path —
+// maps to "" so the pipeline stops and asks the user instead of guessing.
+func triageToParseTool(triage agenttooldefs.TriageResult) string {
+	if triage.Confidence < agenttooldefs.TriageThreshold {
+		return ""
+	}
+	switch triage.DocClass {
+	case agenttooldefs.DocRentSchedule:
 		return "parse_payment_schedule"
-	case containsAny(msgLower, []string{"录入", "导入", "录入台账", "批量创建", "创建合同", "导入台账", "import", "batch create", "create contracts", "ledger"}):
+	case agenttooldefs.DocContractLedger:
 		return "parse_contract_batch"
-	default:
+	case agenttooldefs.DocLeaseContract, agenttooldefs.DocAmendment:
 		return "parse_contract"
+	default:
+		return ""
+	}
+}
+
+// fileTriageRefusal stops the pipeline when the file class is unknown or has
+// no automated parse path. It is the honest replacement for the former
+// "default to contract" fallback.
+func fileTriageRefusal(req Request, triage agenttooldefs.TriageResult) Response {
+	var answer string
+	switch triage.DocClass {
+	case agenttooldefs.DocUnknown:
+		answer = "我不确定这份文件是什么类型。请告诉我它是哪一类：租赁合同、租金表/付款计划、合同台账、经营数据、财务报表、发票或其他。"
+	case agenttooldefs.DocOperatingData:
+		answer = "这是经营数据文件。请前往「零售数据导入」页面上传，系统会引导列映射与入库确认。"
+	default:
+		answer = fmt.Sprintf("该文件类型（%s）暂不支持自动解析，请人工处理或换一个文件。", triage.DocClass)
+	}
+	return Response{
+		Answer:     answer,
+		Confidence: 0.4,
+		Model:      "deterministic-router",
+		FileTriage: &triage,
 	}
 }

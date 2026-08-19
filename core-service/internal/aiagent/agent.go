@@ -16,6 +16,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
+	agentcorehooks "github.com/lease-management-system/core-service/internal/agentcore/hooks"
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
@@ -23,6 +24,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/aiintake"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
+	"github.com/lease-management-system/core-service/internal/workingpaper"
 )
 
 type Agent struct {
@@ -54,11 +56,11 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 // NewWithOperationalReadersAndGovernanceAndRetail is the production
 // constructor: it wires the operating-facts / close-readiness / control /
 // governance / retail seams into the same governed Agent Tool Runtime.
-func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, draftServices...)
+func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, draftServices...)
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, draftServices ...*draftapp.Service) *Agent {
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
@@ -82,6 +84,12 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		if err := registry.Register(definition); err == nil {
 			registered = true
 		}
+	}
+	if err := registry.Register(agenttooldefs.NewDocTriageDefinition(nil)); err == nil {
+		registered = true
+	}
+	if err := registry.Register(agenttooldefs.NewS1GenerateDefinition()); err == nil {
+		registered = true
 	}
 	if len(draftServices) > 0 && draftServices[0] != nil {
 		if err := registry.Register(agenttooldefs.NewContractDraftDefinition(draftServices[0])); err == nil {
@@ -170,8 +178,24 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 			}
 		}
 	}
+	if sensitivity != nil {
+		if err := registry.Register(agenttooldefs.NewSensitivityDefinition(sensitivity)); err == nil {
+			registered = true
+		}
+	}
 	if registered {
-		agent.toolRuntime = agenttools.NewRuntime(registry, agenttools.RuntimeOptions{})
+		// W2: every tool call in the chat plane crosses the ordered governance
+		// chain (TenantScope → CapabilityCheck → ProtectedMeasure →
+		// BudgetGuard → IdempotencyGuard → ReviewGate) instead of scattered
+		// policy checks. Behaviour is equivalent; the chain is the mount
+		// point for future controls.
+		before, after := agentcorehooks.Governance(agentcorehooks.Deps{
+			Policy:             agenttools.DefaultPolicy(),
+			RequireDraftReview: true,
+		})
+		agent.toolRuntime = agenttools.NewRuntime(registry, agenttools.RuntimeOptions{
+			Guard: agentcorehooks.NewExecutionGuard(before, after),
+		})
 	}
 	return agent
 }
@@ -427,6 +451,22 @@ func ProjectResult(response Response) aichat.Result {
 			Data: map[string]any{"event": response.EventDraft},
 		})
 	}
+	if response.WorkingPaper != nil {
+		paper := *response.WorkingPaper
+		paper = workingpaper.Build(paper, time.Now())
+		evidenceRefs := response.EvidenceRefs
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type: string(agentartifact.ArtifactWorkingPaper), Title: paper.Title,
+			ReviewRequired:   true,
+			SchemaVersion:    agentartifact.SchemaVersion,
+			EvidenceRefs:     evidenceRefs,
+			EvidenceComplete: false,
+			ReviewReasons:    workingPaperReviewReasons(paper),
+			ModelVersion:     response.Model,
+			RuleVersion:      "s1-paper-rule.v1",
+			Data:             paper,
+		})
+	}
 	if response.RetailActionProposal != nil {
 		proposal := response.RetailActionProposal
 		evidenceRefs := response.EvidenceRefs
@@ -553,6 +593,7 @@ type Response struct {
 	RetailOperations       *RetailOperationsData             `json:"retail_operations,omitempty"`
 	RetailActionProposal   *RetailActionProposal             `json:"retail_action_proposal,omitempty"`
 	FileTriage             *agenttooldefs.TriageResult       `json:"file_triage,omitempty"`
+	WorkingPaper           *workingpaper.Paper               `json:"working_paper,omitempty"`
 }
 
 type AuditPackData struct {
@@ -703,6 +744,12 @@ func effectiveContractIDFromRequest(req Request) string {
 func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req Request, legalEntityID, userIDStr, roleStr string, emit func(context.Context, string, any) error, agentRunbook *AgentRunbook, toolRuntime *agenttools.Runtime) (Response, error) {
 	if agentRunbook != nil && agentRunbook.SkillID == "retail_operations" {
 		return h.executeRetailOperations(ctx, req, emit, toolRuntime)
+	}
+	// S1 pre-deal working paper: a message carrying a structured, human-
+	// confirmed assumption block is routed deterministically to the paper
+	// tool — no LLM guessing, no discount-rate invention.
+	if s1Block, ok := extractS1Input(req.Message); ok {
+		return h.executeS1Paper(ctx, req, s1Block, emit, toolRuntime)
 	}
 	var sources []Source
 	var contextData strings.Builder
@@ -1201,6 +1248,16 @@ func evidenceReferencesFromSources(sources []Source) []agentartifact.EvidenceRef
 		})
 	}
 	return refs
+}
+
+// workingPaperReviewReasons lists the review topics for a generated paper,
+// naming the honesty fields the reviewer must check.
+func workingPaperReviewReasons(paper workingpaper.Paper) []string {
+	reasons := []string{"s1_paper_review", "assumptions_human_confirmed"}
+	if len(paper.DataGaps) > 0 {
+		reasons = append(reasons, "data_gaps_acknowledged")
+	}
+	return reasons
 }
 
 func emitAgentEvent(ctx context.Context, emit func(context.Context, string, any) error, eventType string, payload any) error {
@@ -2538,6 +2595,104 @@ func containsAny(msg string, targets []string) bool {
 		}
 	}
 	return false
+}
+
+// extractS1Input detects a structured S1 assumption block in the user
+// message. It requires the human-confirmed essentials the engine cannot live
+// without: commencement date, monthly rent and — explicitly — a discount
+// rate, which AI is never allowed to guess.
+func extractS1Input(message string) (json.RawMessage, bool) {
+	start := strings.Index(message, "{")
+	end := strings.LastIndex(message, "}")
+	if start < 0 || end <= start {
+		return nil, false
+	}
+	candidate := message[start : end+1]
+	var probe map[string]json.RawMessage
+	if json.Unmarshal([]byte(candidate), &probe) != nil {
+		return nil, false
+	}
+	draftRaw, ok := probe["draft"]
+	if !ok {
+		return nil, false
+	}
+	var draft map[string]json.RawMessage
+	if json.Unmarshal(draftRaw, &draft) != nil {
+		return nil, false
+	}
+	for _, key := range []string{"commencement_date", "monthly_rent", "discount_rate", "term_months"} {
+		if _, ok := draft[key]; !ok {
+			return nil, false
+		}
+	}
+	return json.RawMessage(candidate), true
+}
+
+// executeS1Paper runs the S1 paper tool for a confirmed assumption block and
+// shapes the review-gated response. The tool is LevelDraft with review
+// required: the runtime marks the call needs_review and the paper becomes a
+// working_paper artifact awaiting human confirmation.
+func (h *Agent) executeS1Paper(ctx context.Context, req Request, s1Block json.RawMessage, emit func(context.Context, string, any) error, toolRuntime *agenttools.Runtime) (Response, error) {
+	execution, err := agenttools.RequireExecutionContext(ctx)
+	if err != nil {
+		return Response{Answer: "agent execution context missing", Model: "runtime"}, err
+	}
+	arguments := json.RawMessage(fmt.Sprintf(`{"input":%s}`, s1Block))
+
+	if err := emitAgentEvent(ctx, emit, "tool_start", map[string]interface{}{
+		"tool":   "lease.working_paper.s1.generate",
+		"status": "running",
+	}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+	result, durationMs, err := h.executeToolCall(ctx, toolRuntime, "lease.working_paper.s1.generate", arguments, "tool:s1:"+execution.RunID)
+	if err != nil {
+		if emitErr := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+			"tool": "lease.working_paper.s1.generate", "skill": "", "status": "failed",
+			"input_summary": "S1 假设块", "output_summary": err.Error(), "requires_review": false,
+		}}); emitErr != nil {
+			return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, emitErr
+		}
+		return Response{
+			Answer:     fmt.Sprintf("S1 底稿生成失败：%s。请检查假设数值（折现率必须由你确认，AI 不猜测）。", err.Error()),
+			Model:      "deterministic-router",
+			Confidence: 0.4,
+		}, nil
+	}
+
+	status := string(result.Status)
+	summary := ""
+	if result.Error != nil {
+		summary = result.Error.Message
+	}
+	if err := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+		"tool": "lease.working_paper.s1.generate", "skill": "", "status": status,
+		"input_summary": "S1 假设块", "output_summary": summary,
+		"requires_review": result.Review.Required, "duration_ms": durationMs,
+	}}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		return Response{Answer: "S1 底稿生成失败：工具结果格式无效", Model: "deterministic-router"}, nil
+	}
+	paper, ok := data["paper"].(workingpaper.Paper)
+	if !ok {
+		return Response{Answer: "S1 底稿生成失败：底稿格式无效", Model: "deterministic-router"}, nil
+	}
+
+	return Response{
+		Answer:       "S1 签约前决策底稿已生成。所有数字来自确定性引擎（predeal/dealcompare），并标注了出处；请复核关键假设（尤其折现率）后确认。",
+		Model:        "deterministic-router",
+		Confidence:   0.9,
+		WorkingPaper: &paper,
+		ReviewPrompts: []AgentReviewPrompt{{
+			ID: "s1_paper_review", Title: "复核 S1 底稿",
+			Description: "底稿内的 IFRS 16 影响、EBITDA 桥与退出曲线均为引擎计算值；复核折现率与关键假设后确认。",
+			Severity:    "critical", Action: "review_confirm",
+		}},
+	}, nil
 }
 
 // triageToParseTool maps a triage result to the file-parse tool selector. No

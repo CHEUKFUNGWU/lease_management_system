@@ -571,6 +571,7 @@ func retailScenarioEvidence(response *retailscenario.Response) string {
 	}
 	return "complete"
 }
+
 // P3-35: retail confidence is derived from real signals — coverage rate,
 // sample size and rule-hit strength — instead of a hard-coded status table.
 // The output stays a 0..1 float (backward compatible) with the derivation

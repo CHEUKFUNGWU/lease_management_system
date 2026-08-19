@@ -25,6 +25,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
 	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 	"github.com/lease-management-system/core-service/internal/services/monthend"
+	"github.com/lease-management-system/core-service/internal/services/reporting"
 )
 
 func main() {
@@ -109,7 +110,8 @@ func main() {
 		Cashflow: agentreaders.NewCashflowScenarioReader(contractRepo, psRepo),
 		Renewal:  agentreaders.NewRenewalDecisionReader(contractRepo, renewalDecisionRepo),
 	}
-	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
+	sensitivityReader := agenttooldefs.NewReportingSensitivityReader(reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo, mcRepo).WithStores(masterDataRepo))
+	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)

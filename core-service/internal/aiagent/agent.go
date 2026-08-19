@@ -111,6 +111,14 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 	if err := registry.Register(agenttooldefs.NewAssumptionSuggestionDefinition(nil)); err == nil {
 		registered = true
 	}
+	// S4-3 / S4-4：批量假设初稿（按区块）与模型差异四层备忘录。与 SM7 同一
+	// 策略：写入端口当前为空，工具诚实拒绝；生产接线随工作台阶段落地。
+	if err := registry.Register(agenttooldefs.NewAssumptionSuggestionBatchDefinition(nil)); err == nil {
+		registered = true
+	}
+	if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(nil)); err == nil {
+		registered = true
+	}
 	if len(draftServices) > 0 && draftServices[0] != nil {
 		if err := registry.Register(agenttooldefs.NewContractDraftDefinition(draftServices[0])); err == nil {
 			registered = true

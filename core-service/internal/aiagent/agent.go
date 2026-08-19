@@ -250,12 +250,69 @@ func (h *Agent) Plan(input aichat.Input, sourceRun *repository.AIChatRun) aichat
 	if runbook == nil {
 		return aichat.Plan{}
 	}
+	// G1 bridge trigger: a user request that asks for a runner-executed
+	// scenario (structured assumptions → planner → engine) queues the run
+	// for the worker instead of answering with display-only cards. The
+	// system-initiated morning brief and the retail deterministic plane are
+	// never dispatched.
+	queueForWorker := false
+	if input.Initiator != "system" && runbook.SkillID != "retail_operations" {
+		if tool, ok := runnerIntentTool(input.Message); ok && runbookHasTool(runbook, tool) {
+			queueForWorker = true
+		}
+	}
 	return aichat.Plan{
 		AgentMode: true, SkillID: runbook.SkillID, SkillVersion: runbook.SkillVersion,
 		ReviewRequired: len(runbook.ReviewPrompts) > 0,
 		AgentPlan:      runbook.AgentPlan, ToolCalls: runbook.ToolCalls,
 		ReviewPrompts: runbook.ReviewPrompts, Payload: runbook,
+		QueueForWorker: queueForWorker,
 	}
+}
+
+// runnerIntentFamilies maps user phrases to the runner-executed simulation
+// tools. A phrase family that hits a card the chat plane never executes
+// deterministically is the G1 dispatch signal; misses keep today's behaviour.
+var runnerIntentFamilies = []struct {
+	tool  string
+	terms []string
+}{
+	{"lease.renewal.simulate", []string{"续租方案", "退租", "关店测算", "搬迁", "议价空间", "renewal scenario"}},
+	{"lease.deal.simulate", []string{"对比报价", "报价对比", "compare offers", "deal simulate"}},
+	{"lease.predeal.simulate", []string{"签约前测算", "签约前方案", "pre-deal"}},
+	{"lease.cashflow.scenario", []string{"现金流情景", "cashflow scenario", "现金流测算"}},
+	{"lease.store.scenario.simulate", []string{"门店情景测算", "门店搬迁测算", "门店关店测算"}},
+	{"lease.equipment.scenario.simulate", []string{"设备 buy/lease", "设备情景"}},
+	{"lease.decision.summary", []string{"决策摘要", "决策备忘", "decision summary"}},
+	{"lease.fpna.action.draft.create", []string{"行动草稿", "action draft"}},
+	{"lease.decision.memo.draft.create", []string{"决策备忘录草稿"}},
+	{"lease.meeting.action.draft.create", []string{"会议行动草稿"}},
+}
+
+// runnerIntentTool returns the runner tool a message asks for, if any.
+func runnerIntentTool(message string) (string, bool) {
+	lower := strings.ToLower(message)
+	for _, family := range runnerIntentFamilies {
+		for _, term := range family.terms {
+			if strings.Contains(lower, term) {
+				return family.tool, true
+			}
+		}
+	}
+	return "", false
+}
+
+// runbookHasTool reports whether the runbook declares the given tool card.
+func runbookHasTool(runbook *AgentRunbook, tool string) bool {
+	if runbook == nil {
+		return false
+	}
+	for _, call := range runbook.ToolCalls {
+		if strings.EqualFold(strings.TrimSpace(call.Tool), tool) {
+			return true
+		}
+	}
+	return false
 }
 
 func runbookForSkillID(skillID string, req Request, effectiveContractID string) *AgentRunbook {

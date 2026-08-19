@@ -82,15 +82,17 @@ func (r *Runtime[T]) Start(ctx context.Context, input Input) (*Started, error) {
 		return nil, err
 	}
 	started := r.started(prepared, nil)
-	r.dispatch(func() {
-		// Keep authenticated request values (notably the access.Scope installed
-		// by DataScopeMiddleware) while detaching the background run from the
-		// HTTP request cancellation. The old Background() call silently dropped
-		// the scope before asynchronous Agent execution.
-		runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.timeout)
-		defer cancel()
-		r.executeDispatched(runCtx, prepared)
-	})
+	if !prepared.plan.QueueForWorker {
+		r.dispatch(func() {
+			// Keep authenticated request values (notably the access.Scope installed
+			// by DataScopeMiddleware) while detaching the background run from the
+			// HTTP request cancellation. The old Background() call silently dropped
+			// the scope before asynchronous Agent execution.
+			runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.timeout)
+			defer cancel()
+			r.executeDispatched(runCtx, prepared)
+		})
+	}
 	return started, nil
 }
 
@@ -231,6 +233,17 @@ func (r *Runtime[T]) prepare(ctx context.Context, input Input, session *reposito
 		if err := r.store.CreateAttachment(ctx, attachment); err != nil {
 			return nil, fmt.Errorf("persist AI chat attachment: %w", err)
 		}
+	}
+	if plan.QueueForWorker {
+		// G1 bridge: the run stays queued for the Gateway worker. No
+		// in-process execution, no assistant message — the worker's events
+		// (run_started → tool_* → run_finished) become the conversation.
+		if err := r.appendEvent(ctx, prepared, "run_dispatched", map[string]any{
+			"run_id": run.ID, "skill_id": run.SkillID, "status": "queued",
+		}, false); err != nil {
+			return nil, err
+		}
+		return prepared, nil
 	}
 	startedAt := r.now()
 	if err := r.store.UpdateRunStatus(ctx, run.ID, "running", run.ReviewRequired, nil, nil, &startedAt, nil); err != nil {

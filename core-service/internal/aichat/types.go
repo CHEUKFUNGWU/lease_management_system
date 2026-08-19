@@ -67,6 +67,11 @@ type Plan struct {
 	ToolCalls      any
 	ReviewPrompts  any
 	Payload        any
+	// QueueForWorker marks the plan for the Gateway plane (G1 bridge): the
+	// chat run stays queued, the agent-runner worker claims it and executes
+	// the planner-driven tool sequence, and its events stream back into the
+	// same chat timeline. The chat plane must not execute such runs.
+	QueueForWorker bool
 }
 
 type ArtifactDraft struct {

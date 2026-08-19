@@ -17,18 +17,27 @@ import (
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/audit"
 )
 
-// FinModelHandler is the /financial-model backend (PRD S2/S3): templates,
-// definitions, assumption-driven runs with the publish gate, the opening
-// three-gate validation and result/tie-out reads.
+// FinModelHandler is the /financial-model backend (PRD S2/S3): templates
+// with the S3-4 governance flow, definitions, assumption-driven runs with
+// the publish gate, the opening three-gate validation and result/tie-out
+// reads.
 type FinModelHandler struct {
-	repo *repository.FinModelRepository
+	repo  *repository.FinModelRepository
+	audit *audit.Logger
 }
 
-// NewFinModelHandler builds the handler.
+// NewFinModelHandler builds the handler without an audit sink.
 func NewFinModelHandler(repo *repository.FinModelRepository) *FinModelHandler {
 	return &FinModelHandler{repo: repo}
+}
+
+// NewFinModelHandlerWithAudit builds the handler with the audit logger used
+// for the governance transitions (关键动作: 复核 / 审批).
+func NewFinModelHandlerWithAudit(repo *repository.FinModelRepository, auditLogger *audit.Logger) *FinModelHandler {
+	return &FinModelHandler{repo: repo, audit: auditLogger}
 }
 
 // CreateTemplate saves a parsed template (illegal templates never persist).
@@ -52,6 +61,87 @@ func (h *FinModelHandler) CreateTemplate(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"saved": true, "name": def.Name, "version": def.Version})
+}
+
+// ReviewTemplate is the reviewer hop of the S3-4 three-state flow.
+// approved=true moves draft → review (or re-confirms review) and stamps the
+// reviewer; approved=false returns a reviewed template to draft. The
+// transition itself is guarded in the repository by the FROM status, so a
+// concurrent writer cannot skip a state.
+func (h *FinModelHandler) ReviewTemplate(c *gin.Context) {
+	userID, ok := userID(c)
+	if !ok {
+		return
+	}
+	id := c.Param("id")
+	if err := h.requireScopedTemplate(c, id); err != nil {
+		return
+	}
+	var req struct {
+		Approved bool   `json:"approved"`
+		Reason   string `json:"reason,omitempty"`
+	}
+	if err := decodeStrictJSON(c, &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.repo.ReviewStatementTemplate(c.Request.Context(), id, userID, req.Approved); err != nil {
+		writeWorkflowMutationError(c, "review statement template", err)
+		return
+	}
+	status, action := "in_review", "review"
+	if !req.Approved {
+		status, action = "returned_to_draft", "review_returned"
+	}
+	if h.audit != nil {
+		_ = h.audit.Log(c.Request.Context(), "fin_statement_templates", id, action, nil, gin.H{"reason": req.Reason}, userID, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"template_id": id, "status": status})
+}
+
+// ApproveTemplate is the approver hop: review → approved, stamped by the
+// approver. The route chains RequireApprovalSeparation, so the approver can
+// never be the creator or the reviewer of the same template. Once approved
+// the template version is frozen — there is no edit path, only new versions.
+func (h *FinModelHandler) ApproveTemplate(c *gin.Context) {
+	userID, ok := userID(c)
+	if !ok {
+		return
+	}
+	id := c.Param("id")
+	if err := h.requireScopedTemplate(c, id); err != nil {
+		return
+	}
+	if err := h.repo.ApproveStatementTemplate(c.Request.Context(), id, userID); err != nil {
+		writeWorkflowMutationError(c, "approve statement template", err)
+		return
+	}
+	if h.audit != nil {
+		_ = h.audit.Log(c.Request.Context(), "fin_statement_templates", id, "approve", nil, nil, userID, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"template_id": id, "status": "approved"})
+}
+
+// requireScopedTemplate loads the target template and answers 404 unless it
+// belongs to the caller's tenant (or the caller is a global admin): bottom
+// line 1 — tenant A's reviewer cannot touch tenant B's template, whatever
+// the id.
+func (h *FinModelHandler) requireScopedTemplate(c *gin.Context, id string) error {
+	if h.repo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		return errors.New("repository unavailable")
+	}
+	row, err := h.repo.GetStatementTemplate(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		return err
+	}
+	tenant := middleware.GetTenantID(c)
+	if tenant != "" && row.LegalEntityID != nil && *row.LegalEntityID != tenant {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		return errors.New("template outside caller scope")
+	}
+	return nil
 }
 
 // ValidateOpening runs the SM4 three gates and returns the failures.

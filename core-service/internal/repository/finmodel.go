@@ -25,6 +25,8 @@ type FinStatementTemplate struct {
 	Rows          json.RawMessage `json:"rows"`
 	CreatedBy     *string         `json:"created_by,omitempty"`
 	CreatedAt     time.Time       `json:"created_at"`
+	ReviewedBy    *string         `json:"reviewed_by,omitempty"`
+	ReviewedAt    *time.Time      `json:"reviewed_at,omitempty"`
 	ApprovedBy    *string         `json:"approved_by,omitempty"`
 	ApprovedAt    *time.Time      `json:"approved_at,omitempty"`
 }
@@ -100,7 +102,19 @@ type FinModelRepository struct{ db DBTX }
 // NewFinModelRepository builds the repository over the pool.
 func NewFinModelRepository(db DBTX) *FinModelRepository { return &FinModelRepository{db: db} }
 
-const finTemplateCols = "id, legal_entity_id, name, version, status, rows, created_by, created_at, approved_by, approved_at"
+const finTemplateCols = "id, legal_entity_id, name, version, status, rows, created_by, created_at, reviewed_by, reviewed_at, approved_by, approved_at"
+
+// rowScanner is the Scan surface shared by pgx.Row and pgx.Rows.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanStatementTemplate(s rowScanner) (*FinStatementTemplate, error) {
+	var t FinStatementTemplate
+	err := s.Scan(&t.ID, &t.LegalEntityID, &t.Name, &t.Version, &t.Status, &t.Rows,
+		&t.CreatedBy, &t.CreatedAt, &t.ReviewedBy, &t.ReviewedAt, &t.ApprovedBy, &t.ApprovedAt)
+	return &t, err
+}
 
 func (r *FinModelRepository) CreateStatementTemplate(ctx context.Context, t *FinStatementTemplate) error {
 	_, err := r.db.Exec(ctx, `INSERT INTO fin_statement_templates
@@ -111,24 +125,49 @@ func (r *FinModelRepository) CreateStatementTemplate(ctx context.Context, t *Fin
 }
 
 func (r *FinModelRepository) GetStatementTemplate(ctx context.Context, id string) (*FinStatementTemplate, error) {
-	var t FinStatementTemplate
-	err := r.db.QueryRow(ctx, `SELECT `+finTemplateCols+` FROM fin_statement_templates WHERE id=$1`, id).
-		Scan(&t.ID, &t.LegalEntityID, &t.Name, &t.Version, &t.Status, &t.Rows, &t.CreatedBy, &t.CreatedAt, &t.ApprovedBy, &t.ApprovedAt)
-	return &t, err
+	return scanStatementTemplate(r.db.QueryRow(ctx, `SELECT `+finTemplateCols+` FROM fin_statement_templates WHERE id=$1`, id))
 }
 
 func (r *FinModelRepository) FindStatementTemplate(ctx context.Context, legalEntityID *string, name string, version int) (*FinStatementTemplate, error) {
-	var t FinStatementTemplate
-	err := r.db.QueryRow(ctx, `SELECT `+finTemplateCols+` FROM fin_statement_templates
+	return scanStatementTemplate(r.db.QueryRow(ctx, `SELECT `+finTemplateCols+` FROM fin_statement_templates
 		WHERE name=$1 AND version=$2 AND (legal_entity_id=$3 OR (legal_entity_id IS NULL AND $3::uuid IS NULL))
-		ORDER BY created_at DESC LIMIT 1`, name, version, legalEntityID).
-		Scan(&t.ID, &t.LegalEntityID, &t.Name, &t.Version, &t.Status, &t.Rows, &t.CreatedBy, &t.CreatedAt, &t.ApprovedBy, &t.ApprovedAt)
-	return &t, err
+		ORDER BY created_at DESC LIMIT 1`, name, version, legalEntityID))
 }
 
-func (r *FinModelRepository) UpdateStatementTemplateStatus(ctx context.Context, id, status string, approver *string) error {
-	_, err := r.db.Exec(ctx, `UPDATE fin_statement_templates SET status=$2, approved_by=$3, approved_at=NOW() WHERE id=$1`, id, status, approver)
-	return err
+// Template governance transitions (S3-4): draft → review → approved, with
+// the reviewer stamped on the middle hop. Each UPDATE is guarded by the
+// current status so concurrent writers cannot skip a state; a zero-row
+// result surfaces as the invalid-transition error the workflow mapping
+// answers with 409. Retirement is deliberately absent — retiring a frozen
+// template has no caller yet, and an unguarded path would be a hole.
+func (r *FinModelRepository) ReviewStatementTemplate(ctx context.Context, id, reviewerID string, approved bool) error {
+	stmt := `UPDATE fin_statement_templates SET status='review', reviewed_by=$2, reviewed_at=NOW()
+		WHERE id=$1 AND status IN ('draft','review')`
+	if !approved {
+		stmt = `UPDATE fin_statement_templates SET status='draft', reviewed_by=$2, reviewed_at=NOW()
+			WHERE id=$1 AND status='review'`
+	}
+	tag, err := r.db.Exec(ctx, stmt, id, reviewerID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrInvalidWorkflowTransition
+	}
+	return nil
+}
+
+func (r *FinModelRepository) ApproveStatementTemplate(ctx context.Context, id, approverID string) error {
+	tag, err := r.db.Exec(ctx, `UPDATE fin_statement_templates
+		SET status='approved', approved_by=$2, approved_at=NOW()
+		WHERE id=$1 AND status='review'`, id, approverID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrInvalidWorkflowTransition
+	}
+	return nil
 }
 
 func (r *FinModelRepository) CreateModelDefinition(ctx context.Context, d *FinModelDefinition) error {

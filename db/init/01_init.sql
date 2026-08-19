@@ -2185,6 +2185,59 @@ ALTER TABLE fpna_assumption_versions
 ALTER TABLE fpna_assumption_versions
     ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION;
 
+-- ── 055_saved_views_and_template_governance — PRD S3-4 / S3-5 ───────────
+ALTER TABLE fin_statement_templates ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id);
+ALTER TABLE fin_statement_templates ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP WITH TIME ZONE;
+
+CREATE TABLE IF NOT EXISTS fin_saved_views (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legal_entity_id UUID NOT NULL REFERENCES legal_entities(id),
+    kind VARCHAR(30) NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    config JSONB NOT NULL DEFAULT '{}'::jsonb,
+    is_shared BOOLEAN NOT NULL DEFAULT false,
+    is_default BOOLEAN NOT NULL DEFAULT false,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CHECK (kind IN ('store_pnl','financial_model','group_view')),
+    UNIQUE (legal_entity_id, kind, name, created_by)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fin_saved_views_default
+    ON fin_saved_views(created_by, kind) WHERE is_default;
+CREATE INDEX IF NOT EXISTS idx_fin_saved_views_lookup
+    ON fin_saved_views(legal_entity_id, kind, created_at DESC);
+
+INSERT INTO permissions (role_id, resource, action) VALUES
+    ('22222222-2222-2222-2222-222222222222', 'statement_templates', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'statement_templates', 'write'),
+    ('33333333-3333-3333-3333-333333333333', 'statement_templates', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'statement_templates', 'review'),
+    ('44444444-4444-4444-4444-444444444444', 'statement_templates', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'statement_templates', 'approve'),
+    ('55555555-5555-5555-5555-555555555555', 'statement_templates', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'statement_templates', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'fin_models', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'fin_models', 'write'),
+    ('33333333-3333-3333-3333-333333333333', 'fin_models', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'fin_models', 'review'),
+    ('44444444-4444-4444-4444-444444444444', 'fin_models', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'fin_models', 'approve'),
+    ('55555555-5555-5555-5555-555555555555', 'fin_models', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'fin_models', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'fin_views', 'read'),
+    ('22222222-2222-2222-2222-222222222222', 'fin_views', 'write'),
+    ('22222222-2222-2222-2222-222222222222', 'fin_views', 'share'),
+    ('33333333-3333-3333-3333-333333333333', 'fin_views', 'read'),
+    ('33333333-3333-3333-3333-333333333333', 'fin_views', 'write'),
+    ('33333333-3333-3333-3333-333333333333', 'fin_views', 'share'),
+    ('44444444-4444-4444-4444-444444444444', 'fin_views', 'read'),
+    ('44444444-4444-4444-4444-444444444444', 'fin_views', 'write'),
+    ('44444444-4444-4444-4444-444444444444', 'fin_views', 'share'),
+    ('55555555-5555-5555-5555-555555555555', 'fin_views', 'read'),
+    ('66666666-6666-6666-6666-666666666666', 'fin_views', 'read')
+ON CONFLICT (role_id, resource, action) DO NOTHING;
+
 -- an existing volume tracks its own progress in this same table. Keep this list
 -- in sync whenever a new migration is added to db/migrations/.
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -2214,5 +2267,6 @@ INSERT INTO schema_migrations (version) VALUES
 ('047_capex_and_exchange_rates'), ('048_category_facts_and_reconciliation'),
 ('049_promotions_and_roi'), ('050_machine_credentials_and_source_feeds'),
 ('051_inventory_masterdata_and_competitors'), ('052_env_envelope_and_dedup_keys'),
-('053_statement_models'), ('054_assumption_suggestion')
+('053_statement_models'), ('054_assumption_suggestion'),
+('055_saved_views_and_template_governance')
 ON CONFLICT (version) DO NOTHING;

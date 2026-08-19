@@ -24,6 +24,7 @@ const (
 	ArtifactMonthlyCloseBlockers ArtifactType = "monthly_close_blockers"
 	ArtifactRetailActionProposal ArtifactType = "retail_action_proposal"
 	ArtifactWorkingPaper          ArtifactType = "working_paper"
+	ArtifactPageFill              ArtifactType = "page_fill"
 	ArtifactGeneric               ArtifactType = "generic"
 )
 
@@ -114,7 +115,7 @@ func knownArtifactType(artifactType ArtifactType) bool {
 	case ArtifactContractDraft, ArtifactPaymentScheduleDraft, ArtifactEventDraft,
 		ArtifactAuditPack, ArtifactDataQualityIssues, ArtifactReportExplanation,
 		ArtifactMonthlyCloseBlockers, ArtifactRetailActionProposal, ArtifactWorkingPaper,
-		ArtifactGeneric:
+		ArtifactPageFill, ArtifactGeneric:
 		return true
 	default:
 		return false

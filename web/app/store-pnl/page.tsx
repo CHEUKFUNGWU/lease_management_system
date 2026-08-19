@@ -16,7 +16,8 @@ import { useLanguage } from "../context/LanguageContext";
 
 type StoreRef = { id: string; code: string; name: string };
 type RowValue = {
-  key: string; label: string; kind: string; basis: string; children?: string[];
+  key: string; label: string; kind: string; basis: string; children?: string[]; subtracted?: string[];
+  source?: string; formula_text?: string;
   actual?: number | null; other?: number | null;
   variance?: number | null; pct?: number | null;
   peer?: number | null; peer_status?: string; ungoverned?: boolean;
@@ -69,6 +70,15 @@ export default function StorePnlPage() {
   const [views, setViews] = useState<SavedViewRef[]>([]);
   const [saveOpen, setSaveOpen] = useState(false);
   const [viewName, setViewName] = useState("");
+  // S1-3：第二对比列；S1-9：自定义公式行编辑（后端 DSL 求值）。
+  const [secondary, setSecondary] = useState<string>("budget");
+  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorName, setEditorName] = useState("");
+  const [editorLabel, setEditorLabel] = useState("");
+  const [editorKey, setEditorKey] = useState("");
+  const [editorFormula, setEditorFormula] = useState("");
+  const [editorBusy, setEditorBusy] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -111,8 +121,10 @@ export default function StorePnlPage() {
     setError(null);
     (async () => {
       try {
+        const params = new URLSearchParams({ as_of: "2026-08-18", window_days: "7", basis: "side_by_side", secondary });
+        if (templateId) params.set("template_id", templateId);
         const response = await fetch(
-          `/api/v1/stores/${encodeURIComponent(storeId)}/pnl?as_of=2026-08-18&window_days=7&basis=side_by_side`,
+          `/api/v1/stores/${encodeURIComponent(storeId)}/pnl?${params.toString()}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
         const body = await response.json();
@@ -125,7 +137,7 @@ export default function StorePnlPage() {
         setLoading(false);
       }
     })();
-  }, [token, storeId]);
+  }, [token, storeId, secondary, templateId]);
 
   const allRows = useMemo(() => (pnl?.operating?.rows || []).concat(pnl?.ifrs16?.rows || []), [pnl]);
   const subtotalRows = useMemo(() => allRows.filter((row) => row.kind === "subtotal"), [allRows]);
@@ -174,6 +186,39 @@ export default function StorePnlPage() {
   };
 
   type ViewConfigLike = { rows_hidden: string[]; rows_fold: string[] };
+
+  // S1-9：自定义公式行——把当前模板行 + 新公式行 POST 为个人模板
+  // （DSL/合法性由后端 Parse 期校验，非法公式整体拒绝），随后以该模板
+  // 版本重渲染门店利润表。
+  const saveCustomTemplate = async () => {
+    if (!token || !pnl || !editorName.trim() || !editorKey.trim() || !editorLabel.trim() || !editorFormula.trim()) return;
+    setEditorBusy(true);
+    try {
+      const rows = (pnl.operating?.rows || []).concat(pnl.ifrs16?.rows || []).map((row) => ({
+        key: row.key, label: row.label, kind: row.kind, basis: row.basis,
+        source: row.source || undefined,
+        formula: row.formula_text || undefined,
+        children: row.children || undefined,
+        subtract: row.subtracted || undefined,
+        format: row.format || undefined,
+      }));
+      rows.push({ key: editorKey.trim(), label: editorLabel.trim(), kind: "formula", basis: "shared", formula: editorFormula.trim() } as typeof rows[number]);
+      const response = await fetch("/api/v1/financial-model/templates", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editorName.trim(), version: 1, visibility: "personal", rows }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error || "template save failed");
+      setTemplateId(body.id || null);
+      setEditorOpen(false);
+      setEditorLabel(""); setEditorKey(""); setEditorFormula("");
+    } catch (err: any) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setEditorBusy(false);
+    }
+  };
 
   // S3-7: 金额单位缩放与负数显示是显示层约定 — 存储值不缩放，只有
   // 渲染值除以缩放因子；负数括号/红色随模板格式走。
@@ -279,6 +324,19 @@ export default function StorePnlPage() {
                   label: `${store.code} ${store.name}`,
                 }))}
               />
+              <Select
+                value={secondary}
+                onChange={setSecondary}
+                className="storepnl-view-select"
+                options={[
+                  { value: "budget", label: t("storepnl.col_budget", language) },
+                  { value: "forecast", label: t("storepnl.col_forecast", language) },
+                  { value: "prior_year", label: t("storepnl.col_prior_year", language) },
+                ]}
+              />
+              <Button disabled={!pnl} onClick={() => setEditorOpen(true)}>
+                {t("storepnl.custom_formula", language)}
+              </Button>
               <Popover
                 placement="bottom"
                 trigger="click"
@@ -369,6 +427,22 @@ export default function StorePnlPage() {
             )}
           </Space>
         )}
+        <Modal
+          open={editorOpen}
+          title={t("storepnl.custom_formula", language)}
+          okText={t("storepnl.save_view", language)}
+          confirmLoading={editorBusy}
+          onOk={saveCustomTemplate}
+          onCancel={() => setEditorOpen(false)}
+          okButtonProps={{ disabled: !editorName.trim() || !editorKey.trim() || !editorLabel.trim() || !editorFormula.trim() }}
+        >
+          <Space direction="vertical" className="storepnl-row-settings-panel">
+            <Input value={editorName} onChange={(e) => setEditorName(e.target.value)} placeholder={t("storepnl.template_name", language)} />
+            <Input value={editorLabel} onChange={(e) => setEditorLabel(e.target.value)} placeholder={t("storepnl.row_label", language)} />
+            <Input value={editorKey} onChange={(e) => setEditorKey(e.target.value)} placeholder={t("storepnl.row_key", language)} />
+            <Input.TextArea value={editorFormula} onChange={(e) => setEditorFormula(e.target.value)} rows={2} placeholder={t("storepnl.formula_hint", language)} />
+          </Space>
+        </Modal>
         <Modal
           open={saveOpen}
           title={t("storepnl.save_view", language)}

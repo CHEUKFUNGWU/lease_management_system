@@ -64,13 +64,13 @@ func TestPublishLineageAndReplayPostgres(t *testing.T) {
 
 	// 门：未通过勾稽的 run 不得发布。
 	failedRun := makeRun("failed")
-	if _, err := writer.Publish(ctx, failedRun, nil); err == nil {
+	if _, err := writer.Publish(ctx, failedRun, nil, ""); err == nil {
 		t.Fatal("unpassed tie-outs must refuse publish (S2-6 gate)")
 	}
 
 	// 发布 1：谱系为空。
 	runA := makeRun("passed")
-	first, err := writer.Publish(ctx, runA, nil)
+	first, err := writer.Publish(ctx, runA, nil, "")
 	if err != nil {
 		t.Fatalf("publish runA: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestPublishLineageAndReplayPostgres(t *testing.T) {
 
 	// 发布 2：prior 指向发布 1。
 	runB := makeRun("passed")
-	if _, err := writer.Publish(ctx, runB, nil); err != nil {
+	if _, err := writer.Publish(ctx, runB, nil, "upside"); err != nil {
 		t.Fatalf("publish runB: %v", err)
 	}
 	v2, err := plans.FindPlanVersionBySource(ctx, publishSourcePrefix+runB)
@@ -107,9 +107,17 @@ func TestPublishLineageAndReplayPostgres(t *testing.T) {
 	if v2.PriorVersionID == nil || *v2.PriorVersionID != v1.ID {
 		t.Fatalf("lineage must chain runB → runA, got %v", v2.PriorVersionID)
 	}
+	if v2.ScenarioType != "upside" {
+		t.Fatalf("scenario_type must ride the published version, got %q", v2.ScenarioType)
+	}
+
+	// 非法情景拒绝，不静默归为 baseline。
+	if _, err := writer.Publish(ctx, makeRun("passed"), nil, "optimistic"); err == nil {
+		t.Fatal("an unknown scenario_type must be refused")
+	}
 
 	// 幂等：同一 run 重复发布 = 同一版本，不产生第二条谱系。
-	replay, err := writer.Publish(ctx, runB, nil)
+	replay, err := writer.Publish(ctx, runB, nil, "upside")
 	if err != nil || replay.VersionID != v2.ID {
 		t.Fatalf("replay must return the same version, got %+v err=%v", replay, err)
 	}

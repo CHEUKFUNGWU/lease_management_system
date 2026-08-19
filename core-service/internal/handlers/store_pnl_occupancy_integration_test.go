@@ -159,3 +159,164 @@ func TestStorePnlOccupancyContractSplitPostgres(t *testing.T) {
 	}
 	t.Fatal("narrow-window prorated split missing")
 }
+
+// TestStorePnlLeaseBlockFromEngineRowsPostgres locks S1-1's IFRS 16 block:
+// the store's contracts' measurement rows flow through the production
+// LeasePort into the rou_depreciation / lease_interest rows — the same
+// engine numbers, no second calculation.
+func TestStorePnlLeaseBlockFromEngineRowsPostgres(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("connect to Postgres: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("fixture exec: %v (%s)", err, sql)
+		}
+	}
+	suffix := uuid.NewString()[:8]
+	entity := uuid.NewString()
+	exec(`INSERT INTO legal_entities (id, code, name, country, currency) VALUES ($1,$2,$3,'CN','CNY')`,
+		entity, "LSB-E-"+suffix, "LeaseBlock "+suffix)
+	landlord := uuid.NewString()
+	exec(`INSERT INTO landlords (id, code, name) VALUES ($1,$2,$3)`, landlord, "LSB-L-"+suffix, "Landlord")
+	storeID := uuid.NewString()
+	exec(`INSERT INTO stores (id, code, name, legal_entity_id, region, brand, is_active) VALUES ($1,$2,$3,$4,'east','b1',true)`,
+		storeID, "LSB-S-"+suffix, "Store", entity)
+	contract := uuid.NewString()
+	exec(`INSERT INTO lease_contracts (id, contract_number, contract_name, legal_entity_id, store_id, landlord_id, asset_type, commencement_date, lease_start_date, lease_end_date, currency, status, approval_status, lease_scope)
+		VALUES ($1,$2,$3,$4,$5,$6,'real_estate','2025-01-01','2025-01-01','2029-12-31','CNY','active','approved','in_scope')`,
+		contract, "LSB-C-"+suffix, "Lease contract", entity, storeID, landlord)
+	exec(`INSERT INTO measurement_results
+		(contract_id, accounting_period, period_start_date, period_end_date,
+		 opening_liability, interest_expense, principal_repayment, total_payment,
+		 closing_liability, opening_rou_asset, depreciation, closing_rou_asset,
+		 non_lease_expense, discount_rate, is_calculated)
+		VALUES ($1,'2026-07','2026-07-01','2026-07-31',400,12,50,62,350,600,25,575,0,0.05,true)`, contract)
+
+	revenue := 10000.0
+	handler := NewStorePnlHandler(occupancyFakeKPI{storeID: {Revenue: &revenue, DecisionReady: true, Classification: "production", Currency: "CNY"}}, nil, nil).
+		WithLease(NewStorePnlLeaseAdapter(repository.NewMonthlyClosingRepository(pool)))
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/stores/:id/pnl", func(c *gin.Context) {
+		c.Set("legal_entity_id", entity)
+		handler.Projection(c)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/stores/"+storeID+"/pnl?as_of=2026-08-19&period=2026-07&basis=side_by_side", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Pnl struct {
+			Ifrs16 struct {
+				Rows []struct {
+					Key    string   `json:"key"`
+					Actual *float64 `json:"actual"`
+				} `json:"rows"`
+			} `json:"ifrs16"`
+		} `json:"pnl"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	byKey := map[string]*float64{}
+	for _, row := range body.Pnl.Ifrs16.Rows {
+		byKey[row.Key] = row.Actual
+	}
+	if byKey["rou_depreciation"] == nil || *byKey["rou_depreciation"] != 25 || byKey["lease_interest"] == nil || *byKey["lease_interest"] != 12 {
+		t.Fatalf("IFRS 16 block must show engine numbers: %+v", byKey)
+	}
+}
+
+// TestStorePnlCustomTemplateRowsPostgres locks S1-9's page-affordance
+// backend half: rendering through an explicit template_id loads the
+// version through Parse, and a custom formula row the editor created
+// evaluates server-side like any row.
+func TestStorePnlCustomTemplateRowsPostgres(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("connect to Postgres: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("fixture exec: %v (%s)", err, sql)
+		}
+	}
+	suffix := uuid.NewString()[:8]
+	entity := uuid.NewString()
+	exec(`INSERT INTO legal_entities (id, code, name, country, currency) VALUES ($1,$2,$3,'CN','CNY')`,
+		entity, "CTM-E-"+suffix, "CustomTpl "+suffix)
+	userID := uuid.NewString()
+	exec(`INSERT INTO users (id, username, email, password_hash, legal_entity_id) VALUES ($1,$2,$3,'integration-only',$4)`,
+		userID, "ctm-user-"+suffix, "ctm-"+suffix+"@example.com", entity)
+	storeID := uuid.NewString()
+	exec(`INSERT INTO stores (id, code, name, legal_entity_id, region, brand, is_active) VALUES ($1,$2,$3,$4,'east','b1',true)`,
+		storeID, "CTM-S-"+suffix, "Store", entity)
+	templateID := uuid.NewString()
+	def := `{"name":"CTM-TPL","version":1,"rows":[
+		{"key":"revenue","label":"营业收入","kind":"link","basis":"shared","source":"fact.revenue"},
+		{"key":"labor_cost","label":"人工","kind":"link","basis":"shared","source":"fact.labor_cost"},
+		{"key":"custom_gap","label":"自定义差额","kind":"formula","basis":"shared","formula":"rows.revenue - rows.labor_cost"}
+	]}`
+	exec(`INSERT INTO fin_statement_templates (id, legal_entity_id, name, version, status, rows, created_by)
+		VALUES ($1,$2,'CTM-TPL',1,'draft',$3::jsonb,$4)`, templateID, entity, json.RawMessage(def), userID)
+
+	revenue, labor := 1000.0, 200.0
+	handler := NewStorePnlHandler(occupancyFakeKPI{storeID: {
+		Revenue: &revenue, LaborCost: &labor, DecisionReady: true, Classification: "production", Currency: "CNY",
+	}}, nil, nil).WithTemplates(repository.NewFinModelRepository(pool))
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/stores/:id/pnl", func(c *gin.Context) {
+		c.Set("legal_entity_id", entity)
+		c.Set("user_id", userID)
+		handler.Projection(c)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/stores/"+storeID+"/pnl?as_of=2026-08-19&basis=operating&template_id="+templateID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Pnl struct {
+			Operating struct {
+				Rows []struct {
+					Key    string   `json:"key"`
+					Actual *float64 `json:"actual"`
+				} `json:"rows"`
+			} `json:"operating"`
+		} `json:"pnl"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range body.Pnl.Operating.Rows {
+		if row.Key == "custom_gap" {
+			if row.Actual == nil || *row.Actual != 800 {
+				t.Fatalf("the custom formula row must evaluate server-side: %v", row.Actual)
+			}
+			return
+		}
+	}
+	t.Fatal("custom formula row missing from the rendered template")
+}

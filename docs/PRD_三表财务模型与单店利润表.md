@@ -489,15 +489,15 @@
 
 | 项 | 状态 | 落地物 / 缺口 |
 |---|---|---|
-| S1-1 科目结构（附录 D 双口径并列） | ⚠ | `finmodel/template.DefaultStorePnlTemplate` 出厂模板完整；IFRS 16 区经 `unavailableLease` 诚实降级（门店级 ROU/利息适配器未接线） |
+| S1-1 科目结构（附录 D 双口径并列） | ✅ | `finmodel/template.DefaultStorePnlTemplate` 出厂模板完整；门店 IFRS 16 区经生产 LeasePort（门店合同的 measurement_results 只读投影）给出 ROU 折旧与租赁利息——与实体模型同一批引擎数字 |
 | S1-2 日/周/月/季/年期间视图 | ✅ | `retailperiod` + `YYYY-Wnn`/`YYYY`；`GET /stores/:id/pnl?period=` 全形态测试锁定 |
-| S1-3 版本并排 | ⚠ | Actual + 单计划列（`plan_version_id` 指定 budget/forecast/prior_year）已通；页面未暴露第二列切换 |
+| S1-3 版本并排 | ✅ | Actual + 第二列（budget/forecast/prior_year，`plan_version_id` 绑定计划版本）；页面已暴露对比列切换 |
 | S1-4 双口径与 basis 标签 | ✅ | side_by_side / operating / ifrs16 三模式，块级 basis 标签，T15 禁混有测试 |
 | S1-5 行下钻 | ✅ | 三级全通：金额 → 构成（占用成本 → 合同级拆分：逐合同基本租金/服务费/变量租金，payment schedule 只读投影 + 覆盖天数日级摊配，聚合组件由拆分求和导出保证两级一致）→ 来源事实（行级 Source Envelope + 门店级语义信封卡；页面同屏展示拆分与信封） |
 | S1-6 同群对比列 | ✅ | store-360 peer benchmark 经共享适配器进列；样本不足/混币种显式降级（测试锁定不编数字） |
 | S1-7 多店汇总模式 | ✅ | `GET /store-pnl/aggregate?group_by=region\|brand\|legal_entity`：门店集来自 Data Scope 收紧的主数据读取（跨法人隔离），逐店同参投影后纯函数聚合；混币种按 Currency Partition 分区呈现、无任何跨币种合计（T14，测试锁定）；投影失败门店列入 degraded_stores 显式呈现 |
 | S1-8 CSV + 带公式 XLSX | ✅ | 活公式、小计 SUM、basis 标签；xlsx 重开断言公式串 |
-| S1-9 自定义与保存视图 | ⚠ | 公式 DSL、模板治理、保存视图后端（S3-5）已落地；页面行显隐/分组合并/存视图-读视图 UI 已接通（配置即呈现，视图随个人可见性走）；模板在线编辑（新公式行）仍走 API 而非页面 |
+| S1-9 自定义与保存视图 | ✅ | 公式 DSL、模板治理、保存视图后端落地；页面行显隐/分组合并/存-读视图接通；**自定义公式行页面编辑**：当前行 + 新公式行 POST 为个人模板（DSL 由后端 Parse 期校验，非法整体拒绝）并以 template_id 重渲染；公式行/小计行由后端同一 AST 求值（前端不重算任何模型行，测试锁定 cogs=rev−gp、缺子行小计降级） |
 | S1-10 数据状态诚实呈现 | ✅ | DecisionReady/StateBlock/gaps；缺失行是 dash 不是 0 |
 
 ### S2 三表模型
@@ -505,12 +505,12 @@
 | 项 | 状态 | 落地物 / 缺口 |
 |---|---|---|
 | S2-1 模型范围与冻结线 | ✅ | `fin_model_definitions`（实体/期间/actual_cutoff）；快照留痕 |
-| S2-2 三表内置结构 | ⚠ | `DefaultStatementTemplate` 三表+附表行结构在手；租赁附表行依赖 LeaseRollforwardReader（生产中为空 → 诚实缺失） |
-| S2-3 输入带版本与溯源 | ⚠ | 五条版本线随 run 持久化；**FactReader 已接生产**（store-day 事实折叠为实体-月营口径，覆盖不足/混币降级），租赁/付款计划/期初三个生产适配器仍诚实降级（有注释与降级路径） |
-| S2-4 预测驱动 | ⚠ | 期初余额法计息/SSSG/growth/比率驱动在引擎内；新店爬坡组合驱动未做 |
-| S2-5 模型运行 | ✅ | `async=true` 走异步路径：run 先行落库 queued（幂等重放返回同一 run），后台 worker 执行并流转 running→completed/failed/cancelled；`GET /runs/:id` 查进度与行数，`POST /runs/:id/cancel` 取消（内存 cancel + SQL 状态守卫双保险，worker panic 落 failed 而非僵尸 running）；引擎对四个未接线端口诚实降级为缺口而非崩溃 |
+| S2-2 三表内置结构 | ✅ | `DefaultStatementTemplate` 三表+附表行结构在手；租赁附表行经生产 LeaseRollforwardReader 吃计量引擎落库行 |
+| S2-3 输入带版本与溯源 | ✅ | 五条版本线随 run 持久化；四个生产适配器全部接线（Fact 折叠 / 计量引擎投影 / 付款计划+计划 capex / TB 标准屏过三闸），任何来源缺一条即该行缺失 |
+| S2-4 预测驱动 | ✅ | SSSG + 新店爬坡（ramp_factor）+ 门店增减（store_count_growth）组合驱动：全部以版本化批准假设供应（run-rate × (1+sssg) × Π(1+驱动)），未登记即中性——测试锁定组合乘法与中性回退 |
+| S2-5 模型运行 | ✅ | `async=true` 走异步路径：run 先行落库 queued（幂等重放返回同一 run），后台 worker 执行并流转 running→completed/failed/cancelled；`GET /runs/:id` 查进度与行数，`POST /runs/:id/cancel` 取消（内存 cancel + SQL 状态守卫双保险，worker panic 落 failed 而非僵尸 running）；任一端口未接线时引擎诚实降级为缺口而非崩溃 |
 | S2-6 勾稽门禁 | ✅ | T1–T16 为值；persist 拒绝失败发布；每题有反向测试 |
-| S2-7 版本与情景 | ⚠ | `/financial-model/runs/:id/publish` → forecast `fpna_plan_versions` 带 prior 谱系、幂等；upside/downside/custom 情景化发布与贡献桥 UI 未做 |
+| S2-7 版本与情景 | ✅ | `/financial-model/runs/:id/publish` 支持 scenario_type（baseline/upside/downside/custom，非法值拒绝）→ `fpna_plan_versions` 带 prior 谱系、幂等；情景间对比走既有计划版本对比服务（currencytranslation 折算 + 残差显式，ComparePlanLines 测试在手） |
 | S2-8 循环引用政策 | ✅ | 期初余额法默认，模式为 ModelPolicy 显式开关并进入快照 |
 | S2-9 导出 | ✅ | `GET /financial-model/runs/:id/export?fold=month\|quarter\|year`：run 行值按期折叠（流量求和、存量取期末、缺口即缺失）渲染为活公式工作簿——小计为带符号 SUM 表达式、口径头含 data_classification（模拟标识）、basis 标签、数据集与五条版本线；月/季/年三粒度与部分季度标注有测试 |
 | 验收：Golden 模型/反向勾稽/无假平衡 BS/期初三道闸/确定性重跑 | ✅ | engine golden 数字、opening 三道闸反向测试、hasOpening 降级、tie-out 反向测试均有 |
@@ -569,5 +569,6 @@
 | 2026-08-19 | S2-3 FactReader 接生产（store-day 事实折叠实体-月事实）；S4 工具全部接生产（read/evaluate/paper 端口 + suggest/batch 写口 + model_diff 备忘录写口） |
 | 2026-08-19 | S2-3 收尾：租赁/付款计划/期初三适配器接生产（measurement_results 只读投影、非租赁成分+计划 capex+假设、TB 标准屏过三闸），T7/T8 假单修复 nil 项降级；附录 E 对应行改 ✅ |
 | 2026-08-19 | S1-5 收尾：占用成本合同级拆分（payment schedule 只读投影 + 日级摊配）接进 /stores/:id/pnl 组件层与页面，拆分与聚合组件由同一求和导出；附录 E 无 ⚠/❌ 行 |
+| 2026-08-20 | 收尾补充：门店 IFRS 16 区接生产 LeasePort（S1-1）；SM3 后端求值公式/小计行并页面接入自定义公式行编辑与对比列切换（S1-3/S1-9）；发布支持 scenario_type 与非法值拒绝（S2-7）；预测组合驱动 ramp/store_count（S2-4）；附录 E 全部 ✅ |
 | 2026-08-19 | 落地状态对照（附录 E）：S1–S5 逐项标记 ✅/⚠/❌，随代码与测试可复验，缺口列名 |
 | 2026-08-19 | 吸收外部三表方法论评审的两点补充：S2-3 期初导入三道闸（期初表自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）及对应验收；附录 A Step 1 补历史数据标准化归并；附录 B 补三表联动计算顺序图与「通用方法论无租赁维度」防误用提示；附录 C 补公式字面量禁忌的具体 lint 规则 |

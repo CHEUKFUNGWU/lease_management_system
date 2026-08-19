@@ -392,6 +392,39 @@ func (r *MonthlyClosingRepository) SaveMeasurementResult(ctx context.Context, mr
 	return nil
 }
 
+// ListMeasurementResultsByStorePeriod is the store-level sibling: the
+// engine rows of every contract of one store for one period — the source
+// behind the store P&L's IFRS 16 block (S1-1: ROU depreciation and lease
+// interest per store, identical numbers to the entity fold).
+func (r *MonthlyClosingRepository) ListMeasurementResultsByStorePeriod(ctx context.Context, storeID, period string) ([]*MeasurementResult, error) {
+	rows, err := r.db.Query(ctx, `SELECT mr.id, mr.contract_id, mr.accounting_period, mr.period_start_date, mr.period_end_date,
+			mr.opening_liability, mr.interest_expense, mr.principal_repayment, mr.total_payment,
+			mr.closing_liability, mr.opening_rou_asset, mr.depreciation, mr.closing_rou_asset,
+			mr.variable_rent_expense, mr.non_lease_expense, mr.discount_rate,
+			mr.is_calculated, mr.calculation_batch_id, mr.calculated_at, mr.created_at, mr.updated_at
+		FROM measurement_results mr
+		JOIN lease_contracts c ON c.id = mr.contract_id
+		WHERE c.store_id=$1 AND mr.accounting_period=$2
+		ORDER BY mr.contract_id`, storeID, period)
+	if err != nil {
+		return nil, fmt.Errorf("list measurement results by store period: %w", err)
+	}
+	defer rows.Close()
+	var out []*MeasurementResult
+	for rows.Next() {
+		item := &MeasurementResult{}
+		if err := rows.Scan(&item.ID, &item.ContractID, &item.AccountingPeriod, &item.PeriodStartDate, &item.PeriodEndDate,
+			&item.OpeningLiability, &item.InterestExpense, &item.PrincipalRepayment, &item.TotalPayment,
+			&item.ClosingLiability, &item.OpeningROUAsset, &item.Depreciation, &item.ClosingROUAsset,
+			&item.VariableRentExpense, &item.NonLeaseExpense, &item.DiscountRate,
+			&item.IsCalculated, &item.CalculationBatchID, &item.CalculatedAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan measurement result: %w", err)
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
 // ListMeasurementResultsByEntityPeriod reads the official engine outputs of
 // every contract in one legal entity for one accounting period — the source
 // the finmodel LeaseRollforwardReader folds into entity-month values (the

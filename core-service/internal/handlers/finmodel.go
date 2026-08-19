@@ -123,11 +123,12 @@ func (h *FinModelHandler) CreateTemplate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "visibility must be shared or personal"})
 		return
 	}
-	if _, err := h.repo.SaveStatementTemplate(c.Request.Context(), req.TemplateDef, entityPtr, &userID, uuid.NewString()); err != nil {
+	templateID := uuid.NewString()
+	if _, err := h.repo.SaveStatementTemplate(c.Request.Context(), req.TemplateDef, entityPtr, &userID, templateID); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"saved": true, "name": req.Name, "version": req.Version, "visibility": deref2(entityPtr)})
+	c.JSON(http.StatusCreated, gin.H{"saved": true, "id": templateID, "name": req.Name, "version": req.Version, "visibility": deref2(entityPtr)})
 }
 
 // ListTemplates serves the S3-4 visibility surface: entity-shared
@@ -409,7 +410,16 @@ func (h *FinModelHandler) PublishRun(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
 		return
 	}
-	published, err := persist.NewPublishWriter(h.repo, h.plans).Publish(c.Request.Context(), id, &userID)
+	var req struct {
+		ScenarioType string `json:"scenario_type"`
+	}
+	if c.Request.ContentLength > 0 {
+		if err := decodeStrictJSON(c, &req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	published, err := persist.NewPublishWriter(h.repo, h.plans).Publish(c.Request.Context(), id, &userID, strings.TrimSpace(req.ScenarioType))
 	if err != nil {
 		if errors.Is(err, persist.ErrPublishGate) {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})

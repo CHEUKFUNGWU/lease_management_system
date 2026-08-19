@@ -86,9 +86,22 @@ var planColumns = map[string]string{
 	"capex": "capex", "net_debt": "net_debt",
 }
 
+// ScenarioType is the S2-7 publish classification; anything outside the
+// four values is refused rather than silently labeled baseline.
+func normalizeScenarioType(value string) (string, error) {
+	switch value {
+	case "", "baseline", "upside", "downside", "custom":
+		if value == "" {
+			return "baseline", nil
+		}
+		return value, nil
+	}
+	return "", fmt.Errorf("scenario_type must be baseline, upside, downside or custom, got %q", value)
+}
+
 // Publish reads the run, enforces the tie-out gate, maps its lines onto
 // plan-line columns and creates the versioned result set with lineage.
-func (w *PublishWriter) Publish(ctx context.Context, runID string, createdBy *string) (*PublishedRun, error) {
+func (w *PublishWriter) Publish(ctx context.Context, runID string, createdBy *string, scenarioType string) (*PublishedRun, error) {
 	if w.runs == nil || w.plans == nil {
 		return nil, errors.New("finmodel publish: repositories unavailable")
 	}
@@ -160,9 +173,13 @@ func (w *PublishWriter) Publish(ctx context.Context, runID string, createdBy *st
 		entityPtr = &entity
 	}
 	prior := w.latestPrior(ctx, entityPtr)
+	scenario, err := normalizeScenarioType(scenarioType)
+	if err != nil {
+		return nil, err
+	}
 	version := &repository.FPnAPlanVersion{
 		ID: uuid.NewString(), LegalEntityID: entityPtr,
-		Name: "模型发布 · " + shortID(runID), VersionType: "forecast", ScenarioType: "baseline",
+		Name: "模型发布 · " + shortID(runID), VersionType: "forecast", ScenarioType: scenario,
 		Source: source, CoverageScope: json.RawMessage(`{"grain":"group"}`),
 		Currency:   runCurrencyFmt(run),
 		AsOfPeriod: periods[len(periods)-1], FromPeriod: periods[0], ToPeriod: periods[len(periods)-1],

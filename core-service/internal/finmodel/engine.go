@@ -440,10 +440,29 @@ func (s *runState) forecastFact(ctx context.Context, row template.Row, period st
 			}
 		}
 	}
-	value := *prev * (1 + rate)
+	// S2-4 组合驱动：新店爬坡因子与门店增减计划以批准假设显式登记，未登记
+	// 即中性 1.0（驱动的取值是有来源、有版本、有责任人的假设，绝不内置常数）。
+	factor := 1.0
+	activeDrivers := []string{}
+	for _, driver := range []string{"ramp_factor", "store_count_growth"} {
+		if s.in.Assumptions == nil {
+			continue
+		}
+		if raw, err := s.in.Assumptions.Value(ctx, s.def.LegalEntityID, driver, period); err == nil && raw != nil {
+			if v, ok := jsonNumber(raw); ok {
+				factor *= 1 + v
+				activeDrivers = append(activeDrivers, driver+"="+fmt.Sprintf("%.4f", v))
+			}
+		}
+	}
+	value := *prev * (1 + rate) * factor
 	s.setValue(row.Key, period, &value, Provenance{SourceType: "assumption", Ref: "driver." + key, DataClassification: s.in.DataClassification})
 	if row.Source == "fact.revenue" {
-		s.gaps = append(s.gaps, DataGap{Kind: "revenue_driver_note", Period: period, Detail: "预测收入以 SSSG 驱动（run-rate × (1+sssg)）；新店爬坡与门店增减计划未单独建模，需在假设面板显式登记"})
+		detail := "预测收入以 SSSG 驱动（run-rate × (1+sssg)）"
+		if len(activeDrivers) > 0 {
+			detail += "；组合驱动：" + strings.Join(activeDrivers, "、")
+		}
+		s.gaps = append(s.gaps, DataGap{Kind: "revenue_driver_note", Period: period, Detail: detail})
 	}
 }
 

@@ -114,7 +114,11 @@ type Row struct {
 	Children []string
 	Subtract []string // ⊆ Children; subtotal = Σ Children − Σ Subtract
 	Formula  *Expr    // nil unless kind is formula or check
-	Format   Format   // S3-7 display contract, defaults to yuan/minus
+	// FormulaText keeps the declared DSL text (Formula is the compiled AST):
+	// the page's editor round-trips rows through the def, so the source text
+	// must survive Parse (S1-9).
+	FormulaText string
+	Format      Format // S3-7 display contract, defaults to yuan/minus
 }
 
 // ChildSign reports whether a child is added (+1) or subtracted (−1) in a

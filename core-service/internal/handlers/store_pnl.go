@@ -28,6 +28,7 @@ type StorePnlHandler struct {
 	occupancy storepnl.OccupancyReader
 	stores    *repository.MasterDataRepository
 	tmpl      *template.Template
+	templates *repository.FinModelRepository
 }
 
 // NewStorePnlHandler builds the handler. The lease port arrives honest:
@@ -58,6 +59,21 @@ func (h *StorePnlHandler) WithMasterData(stores *repository.MasterDataRepository
 // WithOccupancy attaches the S1-5 contract-level occupancy split port.
 func (h *StorePnlHandler) WithOccupancy(occupancy storepnl.OccupancyReader) *StorePnlHandler {
 	h.occupancy = occupancy
+	return h
+}
+
+// WithLease attaches the S1-1 production lease port; the default remains
+// the honest unavailable adapter (ROU/interest rows stay missing rather
+// than fabricated) when no measurement source is wired.
+func (h *StorePnlHandler) WithLease(lease storepnl.LeasePort) *StorePnlHandler {
+	h.lease = lease
+	return h
+}
+
+// WithTemplates attaches the template repository so a request can render
+// through an explicit template version (S1-9 custom rows).
+func (h *StorePnlHandler) WithTemplates(templates *repository.FinModelRepository) *StorePnlHandler {
+	h.templates = templates
 	return h
 }
 
@@ -139,7 +155,11 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 	if !ok {
 		return
 	}
-	pnl, err := storepnl.Project(c.Request.Context(), h.tmpl, params.ref, params.period, params.pair, params.basis, storepnl.Readers{
+	tmpl, renderErr := h.templateFor(c)
+	if renderErr != nil {
+		return
+	}
+	pnl, err := storepnl.Project(c.Request.Context(), tmpl, params.ref, params.period, params.pair, params.basis, storepnl.Readers{
 		KPI: h.kpi, Plan: h.planReaderFor(c), Lease: h.lease, Peer: h.peer, Occupancy: h.occupancy, Governed: h.governedRows(c),
 	})
 	if err != nil {
@@ -212,6 +232,45 @@ func (h *StorePnlHandler) AggregateProjection(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"aggregate": result})
+}
+
+// templateFor resolves the render template: an explicit template_id loads
+// that version through Parse (visible to the caller's entity or a
+// creator-owned personal draft); otherwise the factory template serves.
+func (h *StorePnlHandler) templateFor(c *gin.Context) (*template.Template, error) {
+	id := strings.TrimSpace(c.Query("template_id"))
+	if id == "" {
+		return h.tmpl, nil
+	}
+	if h.templates == nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "template_id requested but the template repository is unavailable"})
+		return nil, errors.New("template repository unavailable")
+	}
+	row, err := h.templates.GetStatementTemplate(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		return nil, err
+	}
+	tenant := middleware.GetTenantID(c)
+	if tenant != "" {
+		if row.LegalEntityID != nil && *row.LegalEntityID != tenant {
+			c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+			return nil, errors.New("template outside caller scope")
+		}
+		if row.LegalEntityID == nil {
+			userID, ok := userID(c)
+			if !ok || row.CreatedBy == nil || *row.CreatedBy != userID {
+				c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+				return nil, errors.New("personal template outside caller ownership")
+			}
+		}
+	}
+	tmpl, err := h.templates.LoadStatementTemplate(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return nil, err
+	}
+	return tmpl, nil
 }
 
 func monthOf(asOf string) string {

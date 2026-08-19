@@ -342,3 +342,70 @@ func TestRunRefusesMissingPolicySwitch(t *testing.T) {
 		t.Fatal("missing interest presentation policy must refuse the run")
 	}
 }
+
+func TestForecastCombinedDriversRampAndStoreGrowth(t *testing.T) {
+	// 预测收入 = run-rate × (1+sssg) × (1+ramp_factor) × (1+store_count_growth)：
+	// 100 × 1.02 × 1.05 × 1.10 = 117.81。
+	tmpl := goldenTemplate(t)
+	def := ModelDef{
+		Name: "drivers", LegalEntityID: "LE-1", Currency: "CNY",
+		Template: tmpl, PeriodStart: "2026-01", HistoricalMonths: 1, ForecastMonths: 2,
+		ActualCutoffPeriod: "2026-01",
+		Policy:             ModelPolicy{Version: "p1", InterestCashFlowPresentation: "financing"},
+	}
+	facts := memFacts{byPeriod: map[string]OperatingFacts{
+		"2026-01": {Revenue: f(100), DecisionReady: true, DataClassification: "production"},
+	}}
+	assumps := memAssumptions{byKey: map[string]float64{
+		"sssg": 0.02, "ramp_factor": 0.05, "store_count_growth": 0.10,
+	}}
+	inputs := ModelInputs{
+		Assumptions: assumps, Versions: VersionSet{}, DataClassification: "production",
+		Facts: facts, Lease: nil, Schedules: nil, Opening: nil,
+	}
+	result, err := Run(context.Background(), def, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := 100.0 * 1.02 * 1.05 * 1.10
+	for _, line := range result.Lines {
+		if line.RowKey == "rev" && line.Period == "2026-02" {
+			if line.Value == nil || *line.Value < want-0.01 || *line.Value > want+0.01 {
+				t.Fatalf("combined-driver revenue = %v, want %v", line.Value, want)
+			}
+			return
+		}
+	}
+	t.Fatal("forecast revenue row missing")
+}
+
+func TestForecastCombinedDriversAreNeutralWhenUnregistered(t *testing.T) {
+	// 未登记 ramp/growth：与仅 SSSG 的旧语义一致——驱动是假设，不是内置常数。
+	tmpl := goldenTemplate(t)
+	def := ModelDef{
+		Name: "neutral", LegalEntityID: "LE-1", Currency: "CNY",
+		Template: tmpl, PeriodStart: "2026-01", HistoricalMonths: 1, ForecastMonths: 2,
+		ActualCutoffPeriod: "2026-01",
+		Policy:             ModelPolicy{Version: "p1", InterestCashFlowPresentation: "financing"},
+	}
+	inputs := ModelInputs{
+		Assumptions: memAssumptions{byKey: map[string]float64{"sssg": 0.02}},
+		Versions:    VersionSet{}, DataClassification: "production",
+		Facts: memFacts{byPeriod: map[string]OperatingFacts{
+			"2026-01": {Revenue: f(100), DecisionReady: true, DataClassification: "production"},
+		}},
+	}
+	result, err := Run(context.Background(), def, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range result.Lines {
+		if line.RowKey == "rev" && line.Period == "2026-02" {
+			if line.Value == nil || *line.Value < 101.99 || *line.Value > 102.01 {
+				t.Fatalf("neutral drivers must preserve the sssg-only value: %v", line.Value)
+			}
+			return
+		}
+	}
+	t.Fatal("forecast revenue row missing")
+}

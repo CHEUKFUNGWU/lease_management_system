@@ -291,3 +291,34 @@ func TestRowsSurfaceSourceEnvelopeProvenance(t *testing.T) {
 		t.Fatalf("envelope must be carried from the KPI port: %+v", pnl.Envelope)
 	}
 }
+
+func TestFormulaRowsEvaluateServerSide(t *testing.T) {
+	// PRD §3：公式行由后端求值——cogs = revenue − gross_profit 在投影侧
+	// 与引擎同一 AST 算出，缺失子行的小计整体缺失。
+	tmpl := testTemplate(t)
+	ref := StoreRef{StoreID: "S1", AsOf: "2026-08-19", WindowDays: 7}
+	pnl, err := Project(context.Background(), tmpl, ref, Period{From: "2026-08", To: "2026-08"}, [2]ColumnRef{ColActual, ColBudget}, BasisOperating, Readers{
+		KPI: memKPI{facts: testFacts()}, Plan: memPlan{values: map[string]*float64{}}, Governed: map[string]bool{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKey := map[string]RowValue{}
+	for _, row := range pnl.Operating.Rows {
+		byKey[row.Key] = row
+	}
+	// cogs = revenue(1000) − gross_profit(400) = 600。
+	if v := byKey["cogs"].Actual; v == nil || *v != 600 {
+		t.Fatalf("formula row must be evaluated server-side: %v", byKey["cogs"].Actual)
+	}
+	// labor_cost 行缺其他可控成本？store_contribution 子行全员在场：
+	// gross_profit 400 − labor 200 − marketing(nil!) … 营销无事实 → nil →
+	// 小计降级 nil，绝不编造。
+	if v := byKey["store_contribution"].Actual; v != nil {
+		t.Fatalf("a subtotal with a missing child must stay missing, got %v", *v)
+	}
+	// 全子行在场的小计照常求值：occupancy_cost = fixed(150)+service(20)+variable(50)。
+	if v := byKey["occupancy_cost"].Actual; v == nil || *v != 220 {
+		t.Fatalf("subtotal evaluation wrong: %v", byKey["occupancy_cost"].Actual)
+	}
+}

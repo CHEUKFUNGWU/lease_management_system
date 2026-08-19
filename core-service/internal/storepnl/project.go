@@ -166,7 +166,11 @@ type RowValue struct {
 	// ContractSplit is the occupancy contract-level drill (S1-5 level 2): per
 	// contract 基本租金/服务费/变量租金.
 	ContractSplit []ContractSplit `json:"contract_split,omitempty"`
-	Components    []Component     `json:"components,omitempty"` // drilldown (occupancy)
+	// Source and FormulaText round-trip the template declaration (S1-9's
+	// page editor rebuilds defs from the rendered rows).
+	Source      string      `json:"source,omitempty"`
+	FormulaText string      `json:"formula_text,omitempty"`
+	Components  []Component `json:"components,omitempty"` // drilldown (occupancy)
 	// Subtotal wiring for live-formula exports: children ± subtracted rows.
 	Children   []string `json:"children,omitempty"`
 	Subtracted []string `json:"subtracted,omitempty"`
@@ -242,7 +246,16 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 
 	var lease LeaseMonthValues
 	if readers.Lease != nil {
-		if lease, err = readers.Lease.Monthly(ctx, ref.StoreID, monthOf(ref.AsOf)); err != nil {
+		// 计量引擎按月出数：用窗口起始月（calendar 期间即其月份；滚窗跨月
+		// 取起始月，与引擎粒度一致）。
+		leasePeriod := period.From
+		if len(leasePeriod) >= 7 {
+			leasePeriod = leasePeriod[:7]
+		}
+		if leasePeriod == "" {
+			leasePeriod = monthOf(ref.AsOf)
+		}
+		if lease, err = readers.Lease.Monthly(ctx, ref.StoreID, leasePeriod); err != nil {
 			pnl.Gaps = append(pnl.Gaps, "IFRS 16 口径降级："+err.Error())
 		}
 	}
@@ -290,7 +303,152 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 	}
 
 	pnl.PeerStatus = aggregatePeerStatus(peers)
+
+	// 后端求值（PRD §3）：公式行与小计行用与引擎同一份 AST 在后端算出——
+	// 前端严禁重算任何模型行。单窗口投影无跨期值，lag(x,n>0) 一律缺失。
+	evaluateTemplateRows(tmpl, pnl, pair)
 	return pnl, nil
+}
+
+// evaluateTemplateRows fills formula/subtotal row values per column and
+// recomputes variance/pct uniformly. Evaluation is template-wide in
+// dependency order (formula Deps + subtotal Children, exactly the engine's
+// graph); missing children degrade a subtotal to nil like the engine's
+// evalSubtotal. Both basis blocks share the same row copies, so each
+// evaluated row is written back to every block it appears in.
+func evaluateTemplateRows(tmpl *template.Template, pnl *StorePnl, pair [2]ColumnRef) {
+	byKey := map[string][]*RowValue{}
+	collect := func(block *Block) {
+		if block == nil {
+			return
+		}
+		for i := range block.Rows {
+			byKey[block.Rows[i].Key] = append(byKey[block.Rows[i].Key], &block.Rows[i])
+		}
+	}
+	collect(pnl.Operating)
+	collect(pnl.Ifrs16)
+
+	ordered := topoRows(tmpl.Rows)
+	for _, column := range []ColumnRef{pair[0], pair[1]} {
+		values := map[string]*float64{}
+		for key, copies := range byKey {
+			var value *float64
+			for _, copy := range copies {
+				if column == pair[0] && copy.Actual != nil {
+					value = copy.Actual
+					break
+				}
+				if column == pair[1] && copy.Other != nil {
+					value = copy.Other
+					break
+				}
+			}
+			values[key] = value
+		}
+		for _, row := range ordered {
+			copies := byKey[row.Key]
+			if len(copies) == 0 {
+				continue
+			}
+			var value *float64
+			switch row.Kind {
+			case template.RowFormula, template.RowCheck:
+				if row.Formula == nil {
+					break
+				}
+				value = row.Formula.Eval(
+					func(ref string) *float64 { return values[ref] },
+					func(ref string, n int) *float64 {
+						if n == 0 {
+							return values[ref]
+						}
+						return nil // 单窗口投影：无跨期值
+					})
+			case template.RowSubtotal:
+				var sum float64
+				complete := true
+				for _, child := range row.Children {
+					v := values[child]
+					if v == nil {
+						complete = false
+						break
+					}
+					sum += *v * row.ChildSign(child)
+				}
+				if complete {
+					value = &sum
+				}
+			default:
+				value = values[row.Key] // link/input 行保留既有值
+			}
+			values[row.Key] = value
+			if column == pair[0] {
+				for _, copy := range copies {
+					copy.Actual = value
+				}
+			} else {
+				for _, copy := range copies {
+					copy.Other = value
+				}
+			}
+		}
+	}
+	// 统一重算差异额/差异率（含新求值的公式与小计行）。
+	for _, copies := range byKey {
+		for _, row := range copies {
+			if row.Actual != nil && row.Other != nil && *row.Other != 0 {
+				v := *row.Actual - *row.Other
+				row.Variance = &v
+				p := v / *row.Other
+				row.Pct = &p
+			} else {
+				row.Variance, row.Pct = nil, nil
+			}
+		}
+	}
+}
+
+// topoRows orders the template rows so every formula/subtotal row follows
+// its dependencies (formula Deps + subtotal Children — the same graph the
+// engine's topoOrder walks).
+func topoRows(rows []template.Row) []template.Row {
+	index := map[string]int{}
+	for i, row := range rows {
+		index[row.Key] = i
+	}
+	deps := map[string][]string{}
+	for _, row := range rows {
+		switch row.Kind {
+		case template.RowFormula, template.RowCheck:
+			deps[row.Key] = append(deps[row.Key], row.Formula.Deps()...)
+		case template.RowSubtotal:
+			deps[row.Key] = append(deps[row.Key], row.Children...)
+		}
+	}
+	order := make([]template.Row, 0, len(rows))
+	placed := map[string]bool{}
+	visiting := map[string]bool{}
+	var visit func(key string)
+	visit = func(key string) {
+		if placed[key] || visiting[key] {
+			return
+		}
+		visiting[key] = true
+		for _, dep := range deps[key] {
+			if idx, ok := index[dep]; ok {
+				_ = idx
+				visit(dep)
+			}
+		}
+		visiting[key] = false
+		order = append(order, rows[index[key]])
+		placed[key] = true
+	}
+	for _, row := range rows {
+		visit(row.Key)
+	}
+	return order
 }
 
 // peerProbe is one resolved peer datum for a row.
@@ -321,7 +479,7 @@ func aggregatePeerStatus(peers map[string]peerProbe) string {
 }
 
 func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease LeaseMonthValues, pair [2]ColumnRef, readers Readers, ref StoreRef, peer peerProbe) RowValue {
-	rv := RowValue{Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis), Children: row.Children, Subtracted: row.Subtract, Format: row.Format}
+	rv := RowValue{Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis), Children: row.Children, Subtracted: row.Subtract, Format: row.Format, Source: row.Source, FormulaText: row.FormulaText}
 	if (row.Kind == template.RowFormula || row.Kind == template.RowCheck) && !readers.Governed[row.Key] {
 		// S3-6: 模板内自定义公式行，未经指标治理 —— fail-closed：登记集为空
 		// 时所有公式行都带标识。

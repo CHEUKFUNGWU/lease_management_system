@@ -314,3 +314,44 @@ func (a storePnlOccupancyAdapter) Contracts(ctx context.Context, storeID, from, 
 	}
 	return storepnl.FoldContractOccupancy(schedules, from, to), nil
 }
+
+// storePnlLeaseAdapter is the S1-1 production LeasePort: the store's
+// contracts' official measurement rows fold into per-period ROU
+// depreciation and lease interest — the projection's IFRS 16 block shows
+// the same numbers the entity model consumes, never a second calculation.
+type storePnlLeaseAdapter struct {
+	measurements storeMeasurementSource
+}
+
+// storeMeasurementSource is the narrow seam the adapter reads engine rows
+// through.
+type storeMeasurementSource interface {
+	ListMeasurementResultsByStorePeriod(ctx context.Context, storeID, period string) ([]*repository.MeasurementResult, error)
+}
+
+// NewStorePnlLeaseAdapter builds the adapter.
+func NewStorePnlLeaseAdapter(measurements storeMeasurementSource) storepnl.LeasePort {
+	return storePnlLeaseAdapter{measurements: measurements}
+}
+
+// Monthly implements storepnl.LeasePort. Other depreciation has no
+// per-store engine source and stays missing (honest, never zero-filled).
+func (a storePnlLeaseAdapter) Monthly(ctx context.Context, storeID, period string) (storepnl.LeaseMonthValues, error) {
+	if a.measurements == nil {
+		return storepnl.LeaseMonthValues{}, errors.New("lease measurement source unavailable")
+	}
+	rows, err := a.measurements.ListMeasurementResultsByStorePeriod(ctx, storeID, period)
+	if err != nil {
+		return storepnl.LeaseMonthValues{}, err
+	}
+	if len(rows) == 0 {
+		return storepnl.LeaseMonthValues{}, nil // 无租赁行：全字段缺失
+	}
+	depreciation := rows[0].Depreciation.Float64()
+	interest := rows[0].InterestExpense.Float64()
+	for _, row := range rows[1:] {
+		depreciation += row.Depreciation.Float64()
+		interest += row.InterestExpense.Float64()
+	}
+	return storepnl.LeaseMonthValues{ROUDepreciation: &depreciation, LeaseInterest: &interest}, nil
+}

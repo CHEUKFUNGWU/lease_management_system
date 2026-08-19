@@ -22,6 +22,13 @@ type Config struct {
 	AgentCapabilityCleanupSeconds int
 	LogLevel                      string
 	Port                          string
+
+	// MinIO read seam for agent-side import preview (page-fill). Empty
+	// endpoint disables it; the agent then refuses honestly (D-D2).
+	MinIOEndpoint  string
+	MinIOAccessKey string
+	MinIOSecretKey string
+	MinIOBucket    string
 }
 
 func Load() (*Config, error) {
@@ -72,6 +79,11 @@ func Load() (*Config, error) {
 		AgentCapabilityCleanupSeconds: capabilityCleanup,
 		LogLevel:                      getEnv("LOG_LEVEL", "info"),
 		Port:                          port,
+
+		MinIOEndpoint:  getEnv("MINIO_ENDPOINT", "minio:9000"),
+		MinIOAccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
+		MinIOSecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
+		MinIOBucket:    getEnv("MINIO_BUCKET", "lease-uploads"),
 	}
 
 	return cfg, nil

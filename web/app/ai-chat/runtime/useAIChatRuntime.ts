@@ -483,6 +483,8 @@ export function useAIChatRuntime({
     activeSession,
     loading,
     typingMessageId,
+    localHydrated,
+    serverHydrated,
     setActiveSessionId,
     setLoading,
     createNewSession,

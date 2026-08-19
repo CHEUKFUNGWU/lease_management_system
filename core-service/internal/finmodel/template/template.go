@@ -1,0 +1,364 @@
+// Package template is SM1: the Statement Template value object. A template is
+// parsed once, validated to death at parse time, and is thereafter an
+// immutable, versioned value — the design decision D-S1 keeps calculation
+// structure in exactly one place shared by the store P&L projection (SM3),
+// the model engine (SM2) and exports.
+//
+// Validation happens in Parse, not at run time: an illegal template simply
+// never becomes a Template. The engine and the projection receive only
+// compile-valid structures.
+package template
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+// RowKind classifies a template row.
+type RowKind string
+
+const (
+	RowInput    RowKind = "input"
+	RowLink     RowKind = "link"
+	RowFormula  RowKind = "formula"
+	RowSubtotal RowKind = "subtotal"
+	RowCheck    RowKind = "check"
+)
+
+// Basis labels the口径 a row belongs to. Shared runs in both blocks; the
+// subtotal mixing rules keep operating and ifrs16 rows from summing.
+type Basis string
+
+const (
+	BasisOperating Basis = "operating_basis"
+	BasisIFRS16    Basis = "ifrs16_basis"
+	BasisShared    Basis = "shared"
+)
+
+// Version identifies one immutable template version.
+type Version struct {
+	Name    string `json:"name"`
+	Version int    `json:"version"`
+}
+
+// RowDef is the declared form of one row before validation.
+type RowDef struct {
+	Key      string   `json:"key"`
+	Label    string   `json:"label"`
+	Kind     RowKind  `json:"kind"`
+	Basis    Basis    `json:"basis"`
+	Source   string   `json:"source,omitempty"`   // link rows: data source binding key
+	Formula  string   `json:"formula,omitempty"`  // formula/check rows: DSL text
+	Children []string `json:"children,omitempty"` // subtotal rows: child row keys
+	// Subtract lists the children that are SUBTRACTED (T12 with C4's
+	// positive-storage convention: 门店贡献 = 毛利 − 费用, stored values all
+	// positive, direction decided here in the template).
+	Subtract []string `json:"subtract,omitempty"`
+}
+
+// TemplateDef is the declared form consumed by Parse.
+type TemplateDef struct {
+	Name    string   `json:"name"`
+	Version int      `json:"version"`
+	Rows    []RowDef `json:"rows"`
+}
+
+// Row is the validated row as seen by the engine.
+type Row struct {
+	Key      string
+	Label    string
+	Kind     RowKind
+	Basis    Basis
+	Source   string
+	Children []string
+	Subtract []string // ⊆ Children; subtotal = Σ Children − Σ Subtract
+	Formula  *Expr    // nil unless kind is formula or check
+}
+
+// ChildSign reports whether a child is added (+1) or subtracted (−1) in a
+// subtotal.
+func (r Row) ChildSign(childKey string) float64 {
+	for _, k := range r.Subtract {
+		if strings.EqualFold(strings.TrimSpace(k), strings.TrimSpace(childKey)) {
+			return -1
+		}
+	}
+	return 1
+}
+
+// Template is the immutable parsed template.
+type Template struct {
+	Name  string
+	Major int
+	Rows  []Row
+}
+
+// Expr is the compiled formula AST. The concrete node kinds are private;
+// the engine evaluates through Eval.
+type Expr struct {
+	node node
+}
+
+// Eval computes the formula for one period. refs resolves row references
+// (rows.<key>) to the CURRENT period value; lagged resolves lag(rows.<key>,n)
+// to the n-periods-earlier value. Missing values are nil — never zero
+// (D-S4): any arithmetic consuming nil yields nil unless guarded by if().
+func (e *Expr) Eval(refs func(key string) *float64, lagged func(key string, n int) *float64) *float64 {
+	return evalNode(e.node, refs, lagged)
+}
+
+// node is the AST node union.
+type node interface{ isNode() }
+
+type literalNode struct{ value float64 }
+type refNode struct {
+	key string
+	lag int
+}
+type unaryNode struct {
+	op      string
+	operand node
+}
+type binaryNode struct {
+	op          string
+	left, right node
+}
+type callNode struct {
+	fn   string
+	args []node
+}
+
+func (literalNode) isNode() {}
+func (refNode) isNode()     {}
+func (unaryNode) isNode()   {}
+func (binaryNode) isNode()  {}
+func (callNode) isNode()    {}
+
+// Parse validates the declaration and compiles formulas. Every rejection
+// carries the row key it occurred on.
+func Parse(def TemplateDef) (*Template, error) {
+	if strings.TrimSpace(def.Name) == "" {
+		return nil, fmt.Errorf("template: name is required")
+	}
+	if def.Version <= 0 {
+		return nil, fmt.Errorf("template: version must be positive")
+	}
+	if len(def.Rows) == 0 {
+		return nil, fmt.Errorf("template: at least one row is required")
+	}
+
+	byKey := make(map[string]int, len(def.Rows))
+	rows := make([]Row, len(def.Rows))
+	for i, rd := range def.Rows {
+		if strings.TrimSpace(rd.Key) == "" {
+			return nil, fmt.Errorf("template: row %d has empty key", i)
+		}
+		key := strings.TrimSpace(rd.Key)
+		if _, dup := byKey[key]; dup {
+			return nil, fmt.Errorf("template: duplicate row key %q", key)
+		}
+		byKey[key] = i
+		if rd.Basis != BasisOperating && rd.Basis != BasisIFRS16 && rd.Basis != BasisShared {
+			return nil, fmt.Errorf("template: row %q has invalid basis %q", key, rd.Basis)
+		}
+		rows[i] = Row{
+			Key: key, Label: rd.Label, Kind: rd.Kind, Basis: rd.Basis,
+			Source: strings.TrimSpace(rd.Source),
+		}
+	}
+
+	// Second pass: children references, formula compilation, basis mixing and
+	// cycle detection — once the key index is complete.
+	for i := range rows {
+		rd := def.Rows[i]
+		rows[i].Children = append([]string(nil), rd.Children...)
+		rows[i].Subtract = append([]string(nil), rd.Subtract...)
+		children := make(map[string]bool, len(rd.Children))
+		for _, child := range rd.Children {
+			child = strings.TrimSpace(child)
+			if _, ok := byKey[child]; !ok {
+				return nil, fmt.Errorf("template: row %q references unknown child row %q", rd.Key, child)
+			}
+			children[child] = true
+		}
+		for _, sub := range rd.Subtract {
+			sub = strings.TrimSpace(sub)
+			if !children[sub] {
+				return nil, fmt.Errorf("template: row %q subtracts %q which is not among its children", rd.Key, sub)
+			}
+		}
+		if rows[i].Kind != RowSubtotal && len(rd.Children) > 0 {
+			return nil, fmt.Errorf("template: row %q declares children but is %s, not subtotal", rd.Key, rows[i].Kind)
+		}
+		switch rows[i].Kind {
+		case RowFormula, RowCheck:
+			if strings.TrimSpace(rd.Formula) == "" {
+				return nil, fmt.Errorf("template: row %q is %s but has no formula", rd.Key, rows[i].Kind)
+			}
+			expr, err := compile(rd.Formula, byKey, rd.Key)
+			if err != nil {
+				return nil, fmt.Errorf("template: row %q: %w", rd.Key, err)
+			}
+			rows[i].Formula = &Expr{node: expr}
+		case RowLink:
+			if rows[i].Source == "" {
+				return nil, fmt.Errorf("template: link row %q must declare a source", rd.Key)
+			}
+		case RowInput:
+		case RowSubtotal:
+			if len(rd.Children) == 0 {
+				return nil, fmt.Errorf("template: subtotal row %q must declare children", rd.Key)
+			}
+		default:
+			return nil, fmt.Errorf("template: row %q has invalid kind %q", rd.Key, rd.Kind)
+		}
+	}
+
+	if err := validateBasisMixing(def, byKey); err != nil {
+		return nil, err
+	}
+	if err := validateNoCycles(def, byKey); err != nil {
+		return nil, err
+	}
+
+	return &Template{Name: strings.TrimSpace(def.Name), Major: def.Version, Rows: rows}, nil
+}
+
+// validateBasisMixing enforces D-S9: a subtotal may not sum children across
+// operating and ifrs16 basis rows; shared subtotals only sum shared rows.
+func validateBasisMixing(def TemplateDef, byKey map[string]int) error {
+	for _, rd := range def.Rows {
+		if rd.Kind != RowSubtotal {
+			continue
+		}
+		for _, child := range rd.Children {
+			childKey := strings.TrimSpace(child)
+			childRow := def.Rows[byKey[childKey]]
+			if childRow.Basis == BasisShared {
+				continue
+			}
+			if rd.Basis == BasisShared {
+				return fmt.Errorf("template: subtotal row %q (shared) must not sum %s child %q", rd.Key, childRow.Basis, childKey)
+			}
+			if rd.Basis != childRow.Basis {
+				return fmt.Errorf("template: subtotal row %q (%s) mixes basis child %q (%s)", rd.Key, rd.Basis, childKey, childRow.Basis)
+			}
+		}
+	}
+	return nil
+}
+
+// validateNoCycles rejects circular same-period references over the
+// reference graph built from formula and subtotal rows.
+func validateNoCycles(def TemplateDef, byKey map[string]int) error {
+	deps := make(map[string][]string, len(def.Rows))
+	for _, rd := range def.Rows {
+		switch rd.Kind {
+		case RowFormula, RowCheck:
+			for _, dep := range refDeps(rd.Formula) {
+				deps[rd.Key] = append(deps[rd.Key], dep)
+			}
+		case RowSubtotal:
+			deps[rd.Key] = append(deps[rd.Key], rd.Children...)
+		}
+	}
+	state := map[string]int{} // 0=white 1=grey 2=black
+	var visit func(key string, path []string) error
+	visit = func(key string, path []string) error {
+		switch state[key] {
+		case 1:
+			return fmt.Errorf("template: circular reference: %s", strings.Join(append(path, key), " -> "))
+		case 2:
+			return nil
+		}
+		state[key] = 1
+		for _, dep := range deps[key] {
+			dep = strings.TrimSpace(dep)
+			if _, exists := byKey[dep]; !exists {
+				continue
+			}
+			if err := visit(dep, append(path, key)); err != nil {
+				return err
+			}
+		}
+		state[key] = 2
+		return nil
+	}
+	keys := make([]string, 0, len(def.Rows))
+	for _, rd := range def.Rows {
+		keys = append(keys, rd.Key)
+	}
+	sort.Strings(keys) // deterministic diagnostics
+	for _, key := range keys {
+		if err := visit(key, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// refDeps extracts the non-lagged `rows.<key>` references from a formula —
+// lag(x, n) is a cross-period reference and cannot form a same-period cycle,
+// so lag call bodies are stripped before scanning.
+func refDeps(formula string) []string {
+	seen := map[string]bool{}
+	var out []string
+	rest := stripFunctionCalls(formula, "lag")
+	for {
+		idx := strings.Index(rest, "rows.")
+		if idx < 0 {
+			break
+		}
+		rest = rest[idx+len("rows."):]
+		var b strings.Builder
+		for _, r := range rest {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+				b.WriteRune(r)
+				continue
+			}
+			break
+		}
+		if key := b.String(); key != "" && !seen[key] {
+			seen[key] = true
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
+// stripFunctionCalls removes every occurrence of name(...) from src,
+// honoring parenthesis nesting.
+func stripFunctionCalls(src, name string) string {
+	var out strings.Builder
+	rest := src
+	for {
+		idx := strings.Index(rest, name+"(")
+		if idx < 0 {
+			out.WriteString(rest)
+			break
+		}
+		out.WriteString(rest[:idx])
+		// start points at the '(' after the function name; the very first
+		// check must see depth 1, not 0.
+		depth := 0
+		start := idx + len(name)
+		j := start
+		for ; j < len(rest); j++ {
+			switch rest[j] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+			if depth == 0 && j > start {
+				break
+			}
+		}
+		if j >= len(rest) {
+			break
+		}
+		rest = rest[j+1:]
+	}
+	return out.String()
+}

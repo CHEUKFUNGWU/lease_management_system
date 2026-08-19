@@ -324,6 +324,8 @@ func main() {
 		protected.Handle(http.MethodPost, "/financial-model/templates", permission("statement_templates", "write"), finModelHandler.CreateTemplate)
 		protected.Handle(http.MethodPost, "/financial-model/templates/:id/review", permission("statement_templates", "review"), finModelHandler.ReviewTemplate)
 		protected.Handle(http.MethodPost, "/financial-model/templates/:id/approve", permission("statement_templates", "approve"), templateApprovalSeparation, finModelHandler.ApproveTemplate)
+		protected.Handle(http.MethodPost, "/financial-model/templates/:id/copy", permission("statement_templates", "write"), finModelHandler.CopyTemplate)
+		protected.Handle(http.MethodDelete, "/financial-model/templates/:id", permission("statement_templates", "write"), finModelHandler.DeleteTemplate)
 		protected.Handle(http.MethodPost, "/financial-model/opening/validate", permission("fin_models", "write"), finModelHandler.ValidateOpening)
 		protected.Handle(http.MethodPost, "/financial-model/definitions/:id/runs", permission("fin_models", "write"), finModelHandler.RunDefinition)
 		protected.Handle(http.MethodPost, "/financial-model/runs/:id/publish", permission("fin_models", "approve"), runPublishSeparation, finModelHandler.PublishRun)

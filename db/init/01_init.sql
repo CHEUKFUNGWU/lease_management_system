@@ -2103,6 +2103,11 @@ CREATE TABLE IF NOT EXISTS fin_statement_templates (
 );
 CREATE INDEX IF NOT EXISTS idx_fin_statement_templates_lookup
     ON fin_statement_templates(legal_entity_id, name, status);
+-- ── 056_template_copy_lineage — PRD S3-4 模板复制谱系 ───────────────────────
+ALTER TABLE fin_statement_templates ADD COLUMN IF NOT EXISTS copied_from UUID REFERENCES fin_statement_templates(id);
+CREATE INDEX IF NOT EXISTS idx_fin_statement_templates_copied_from
+    ON fin_statement_templates(copied_from);
+
 
 CREATE TABLE IF NOT EXISTS fin_model_definitions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2268,5 +2273,5 @@ INSERT INTO schema_migrations (version) VALUES
 ('049_promotions_and_roi'), ('050_machine_credentials_and_source_feeds'),
 ('051_inventory_masterdata_and_competitors'), ('052_env_envelope_and_dedup_keys'),
 ('053_statement_models'), ('054_assumption_suggestion'),
-('055_saved_views_and_template_governance')
+('055_saved_views_and_template_governance'), ('056_template_copy_lineage')
 ON CONFLICT (version) DO NOTHING;

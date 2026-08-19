@@ -29,6 +29,9 @@ type FinStatementTemplate struct {
 	ReviewedAt    *time.Time      `json:"reviewed_at,omitempty"`
 	ApprovedBy    *string         `json:"approved_by,omitempty"`
 	ApprovedAt    *time.Time      `json:"approved_at,omitempty"`
+	// CopiedFrom anchors the S3-4 copy lineage: the template this version
+	// was copied from, nil for original creations.
+	CopiedFrom *string `json:"copied_from,omitempty"`
 }
 
 // FinModelDefinition is one legal-entity-scoped model definition bound to a
@@ -102,7 +105,7 @@ type FinModelRepository struct{ db DBTX }
 // NewFinModelRepository builds the repository over the pool.
 func NewFinModelRepository(db DBTX) *FinModelRepository { return &FinModelRepository{db: db} }
 
-const finTemplateCols = "id, legal_entity_id, name, version, status, rows, created_by, created_at, reviewed_by, reviewed_at, approved_by, approved_at"
+const finTemplateCols = "id, legal_entity_id, name, version, status, rows, created_by, created_at, reviewed_by, reviewed_at, approved_by, approved_at, copied_from"
 
 // rowScanner is the Scan surface shared by pgx.Row and pgx.Rows.
 type rowScanner interface {
@@ -112,7 +115,7 @@ type rowScanner interface {
 func scanStatementTemplate(s rowScanner) (*FinStatementTemplate, error) {
 	var t FinStatementTemplate
 	err := s.Scan(&t.ID, &t.LegalEntityID, &t.Name, &t.Version, &t.Status, &t.Rows,
-		&t.CreatedBy, &t.CreatedAt, &t.ReviewedBy, &t.ReviewedAt, &t.ApprovedBy, &t.ApprovedAt)
+		&t.CreatedBy, &t.CreatedAt, &t.ReviewedBy, &t.ReviewedAt, &t.ApprovedBy, &t.ApprovedAt, &t.CopiedFrom)
 	return &t, err
 }
 
@@ -166,6 +169,48 @@ func (r *FinModelRepository) ApproveStatementTemplate(ctx context.Context, id, a
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrInvalidWorkflowTransition
+	}
+	return nil
+}
+
+// ErrStatementTemplateInUse refuses deleting a template version that a
+// model definition still binds to — deleting it would orphan live runs'
+// structure and break their historical replay.
+var ErrStatementTemplateInUse = errors.New("statement template is bound by a model definition and cannot be deleted")
+
+// CopyStatementTemplate inserts a new draft version of the source's rows
+// with the copy lineage set. Same-name copies continue the source lineage
+// (version = sourceVersion+1); a new name starts a fresh lineage at
+// version 1 — both are ordinary drafts and must pass review/approve like
+// any creation.
+func (r *FinModelRepository) CopyStatementTemplate(ctx context.Context, newID, name string, version int, sourceID, createdBy *string) error {
+	_, err := r.db.Exec(ctx, `INSERT INTO fin_statement_templates
+			(id, legal_entity_id, name, version, status, rows, created_by, copied_from)
+		SELECT $1, legal_entity_id, $2, $3, 'draft', rows, $5, $4
+		FROM fin_statement_templates WHERE id=$4`, newID, name, version, sourceID, createdBy)
+	return err
+}
+
+// DeleteStatementTemplate removes a draft that was never used. The guards
+// are the SQL WHERE: a non-draft status or any fin_model_definitions row
+// bound to the template keeps it — history and replay stay intact.
+func (r *FinModelRepository) DeleteStatementTemplate(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM fin_statement_templates
+		WHERE id=$1 AND status='draft'
+		  AND NOT EXISTS (SELECT 1 FROM fin_model_definitions WHERE template_id=$1)`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		// Distinguish the two refusal reasons for an honest 409.
+		row, err := r.GetStatementTemplate(ctx, id)
+		if err != nil || row == nil {
+			return ErrInvalidWorkflowTransition
+		}
+		if row.Status != "draft" {
+			return ErrInvalidWorkflowTransition
+		}
+		return ErrStatementTemplateInUse
 	}
 	return nil
 }

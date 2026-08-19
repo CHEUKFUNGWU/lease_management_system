@@ -140,6 +140,81 @@ func (h *FinModelHandler) ApproveTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"template_id": id, "status": "approved"})
 }
 
+// CopyTemplate is the S3-4 copy action: the source's rows become a brand-new
+// draft version. Copying under the same name continues the source lineage
+// (version = source+1); a different name starts a fresh lineage at version
+// 1. Either way the copy must pass review/approve like any creation.
+func (h *FinModelHandler) CopyTemplate(c *gin.Context) {
+	userID, ok := userID(c)
+	if !ok {
+		return
+	}
+	id := c.Param("id")
+	if err := h.requireScopedTemplate(c, id); err != nil {
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+	}
+	if c.Request.ContentLength > 0 {
+		if err := decodeStrictJSON(c, &req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	source, err := h.repo.GetStatementTemplate(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	version := 1
+	if name == "" || name == source.Name {
+		name = source.Name
+		version = source.Version + 1 // 同名复制继续同一谱系
+	}
+	newID := uuid.NewString()
+	if err := h.repo.CopyStatementTemplate(c.Request.Context(), newID, name, version, &id, &userID); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+	copied, err := h.repo.GetStatementTemplate(c.Request.Context(), newID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if h.audit != nil {
+		_ = h.audit.Log(c.Request.Context(), "fin_statement_templates", id, "copy", nil, copied, userID, c)
+	}
+	c.JSON(http.StatusCreated, gin.H{"template": copied})
+}
+
+// DeleteTemplate is the S3-4 deletion rule made executable: only a draft
+// that no model definition ever bound may be deleted — history and replay
+// stay intact, the refusal names the reason.
+func (h *FinModelHandler) DeleteTemplate(c *gin.Context) {
+	userID, ok := userID(c)
+	if !ok {
+		return
+	}
+	id := c.Param("id")
+	if err := h.requireScopedTemplate(c, id); err != nil {
+		return
+	}
+	if err := h.repo.DeleteStatementTemplate(c.Request.Context(), id); err != nil {
+		if errors.Is(err, repository.ErrStatementTemplateInUse) {
+			c.JSON(http.StatusConflict, gin.H{"error": "模板已被模型定义引用，拒绝删除"})
+			return
+		}
+		c.JSON(http.StatusConflict, gin.H{"error": "仅可删除从未被使用的草稿"})
+		return
+	}
+	if h.audit != nil {
+		_ = h.audit.Log(c.Request.Context(), "fin_statement_templates", id, "delete", nil, nil, userID, c)
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": true})
+}
+
 // PublishRun is the S2-7 publish action: one tie-out-passed run becomes a
 // forecast plan_version with group-grain lines and prior_version_id lineage.
 // Re-publishing the same run is idempotent (same version id, no second row).

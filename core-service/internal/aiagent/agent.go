@@ -778,6 +778,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	}
 	var sources []Source
 	var contextData strings.Builder
+	var executedCalls []AgentToolCall
 	effectiveContractID := effectiveContractIDFromRequest(req)
 
 	// 1. Handle file upload if present — use Function Calling to let LLM decide which tool to invoke
@@ -934,6 +935,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 				}
 			}
 		}
+
+		// G1 card backfill source: what actually ran in the file branch
+		// becomes the execution record the final response folds into the
+		// runbook's display cards.
+		executedCalls = toolExecutionChain
 	}
 
 	if agentRunbook != nil && agentRunbook.NeedsPortfolioContext {
@@ -1100,6 +1106,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		if agentRunbook != nil {
 			fallbackAnswer = agentRunbook.AnswerPrefix + "\n\n" + fallbackAnswer
 		}
+		plan, calls := foldExecutedIntoRunbook(agentRunbook, executedCalls)
 		resp := Response{
 			Answer:        fallbackAnswer,
 			Sources:       sources,
@@ -1107,8 +1114,8 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			IsOfficial:    false,
 			Model:         "fallback",
 			AgentMode:     agentRunbook != nil,
-			AgentPlan:     agentPlanFromRunbook(agentRunbook),
-			ToolCalls:     toolCallsFromRunbook(agentRunbook),
+			AgentPlan:     plan,
+			ToolCalls:     calls,
 			ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
 		}
 		if agentRunbook != nil && agentRunbook.SkillID == "event_change" {
@@ -1134,6 +1141,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		answer = agentRunbook.AnswerPrefix + "\n\n" + answer
 	}
 
+	plan, calls := foldExecutedIntoRunbook(agentRunbook, executedCalls)
 	resp := Response{
 		Answer:        answer,
 		Sources:       extractedSources,
@@ -1141,8 +1149,8 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		IsOfficial:    false,
 		Model:         modelName,
 		AgentMode:     agentRunbook != nil,
-		AgentPlan:     agentPlanFromRunbook(agentRunbook),
-		ToolCalls:     toolCallsFromRunbook(agentRunbook),
+		AgentPlan:     plan,
+		ToolCalls:     calls,
 		ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
 	}
 	if req.PageContext != nil && strings.EqualFold(strings.TrimSpace(req.PageContext.Page), "reports") {
@@ -1517,6 +1525,50 @@ func toolCallsFromRunbook(runbook *AgentRunbook) []AgentToolCall {
 		return nil
 	}
 	return runbook.ToolCalls
+}
+
+// foldExecutedIntoRunbook is G1's card backfill: the runbook's display cards
+// become a record of what actually ran. Pending cards whose tool executed
+// are replaced with the real call (status + duration); every plan step that
+// had work executed turns completed, or failed when a fold-in call failed.
+// Cards without execution stay pending — they genuinely did not run, and the
+// UI must keep showing that instead of pretending.
+func foldExecutedIntoRunbook(runbook *AgentRunbook, executed []AgentToolCall) ([]AgentPlanStep, []AgentToolCall) {
+	if runbook == nil {
+		return nil, executed
+	}
+	if len(executed) == 0 {
+		return agentPlanFromRunbook(runbook), toolCallsFromRunbook(runbook)
+	}
+	used := make([]bool, len(executed))
+	calls := append([]AgentToolCall(nil), runbook.ToolCalls...)
+	anyFailed := false
+	anyDone := false
+	for i := range calls {
+		for j := range executed {
+			if used[j] || strings.TrimSpace(executed[j].Tool) != strings.TrimSpace(calls[i].Tool) {
+				continue
+			}
+			calls[i] = executed[j]
+			used[j] = true
+			anyDone = true
+			if executed[j].Status == "failed" {
+				anyFailed = true
+			}
+			break
+		}
+	}
+	plan := append([]AgentPlanStep(nil), runbook.AgentPlan...)
+	for i := range plan {
+		if !anyDone {
+			continue
+		}
+		plan[i].Status = "completed"
+		if anyFailed {
+			plan[i].Status = "failed"
+		}
+	}
+	return plan, calls
 }
 
 func reviewPromptsFromRunbook(runbook *AgentRunbook) []AgentReviewPrompt {

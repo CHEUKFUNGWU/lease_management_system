@@ -215,6 +215,95 @@ func (h *FinModelHandler) DeleteTemplate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": true})
 }
 
+// ExportRun is the S2-9 export: GET /financial-model/runs/:id/export with
+// an optional fold grain (month | quarter | year). The run's lines fold
+// through the shared FoldMonthValues semantics (flows sum with缺口即缺失,
+// balance-sheet stocks take the period end) and render as a live-formula
+// workbook — subtotals are signed SUM expressions, the header carries
+// data_classification (模拟标识), dataset and the version lines.
+func (h *FinModelHandler) ExportRun(c *gin.Context) {
+	id := c.Param("id")
+	fold := finmodel.FoldKind(strings.TrimSpace(c.DefaultQuery("fold", "month")))
+	if !finmodel.ValidFoldKind(string(fold)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "fold must be month, quarter or year"})
+		return
+	}
+	if h.repo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		return
+	}
+	run, err := h.repo.GetModelRun(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		return
+	}
+	tenant := middleware.GetTenantID(c)
+	if tenant != "" && run.LegalEntityID != tenant {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		return
+	}
+	def, err := h.repo.GetModelDefinition(c.Request.Context(), run.ModelDefinitionID)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "model definition not found"})
+		return
+	}
+	tmpl, err := h.repo.LoadStatementTemplate(c.Request.Context(), def.TemplateID)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+	lines, err := h.repo.ListRunLines(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	byRow := map[string]map[string]*float64{}
+	months := map[string]bool{}
+	for _, line := range lines {
+		rowMap := byRow[line.RowKey]
+		if rowMap == nil {
+			rowMap = map[string]*float64{}
+			byRow[line.RowKey] = rowMap
+		}
+		rowMap[line.Period] = line.Value
+		months[line.Period] = true
+	}
+	periodList := make([]string, 0, len(months))
+	for period := range months {
+		periodList = append(periodList, period)
+	}
+	sortStrings(periodList)
+	buckets := finmodel.FoldBuckets(periodList, fold)
+	folded := finmodel.FoldMonthValues(byRow, buckets)
+
+	rows := make([]modelExportRow, 0, len(tmpl.Rows))
+	for _, row := range tmpl.Rows {
+		rows = append(rows, modelExportRow{
+			Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis),
+			Children: row.Children, Subtracted: row.Subtract, Values: folded[row.Key],
+		})
+	}
+	meta := ModelExportMeta{
+		ModelName: def.Name, DataClassification: run.DataClassification,
+		DatasetVersion: deref(run.DataVersion), AssumptionVersion: deref(run.AssumptionVersion),
+		ExchangeRateVersion: deref(run.ExchangeRateVersion), MetricDefinitionVersion: deref(run.MetricDefinitionVersion),
+		EngineVersion: "finmodel@" + itoaInt(run.ModelDefinitionVersion),
+		FoldKind:      fold,
+	}
+	out, err := RenderModelRunXLSX(tmpl, rows, buckets, meta)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", "model-run-"+id+"-"+string(fold)+".xlsx"))
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", out)
+}
+
+func itoaInt(value int) string {
+	return fmt.Sprintf("%d", value)
+}
+
 // PublishRun is the S2-7 publish action: one tie-out-passed run becomes a
 // forecast plan_version with group-grain lines and prior_version_id lineage.
 // Re-publishing the same run is idempotent (same version id, no second row).

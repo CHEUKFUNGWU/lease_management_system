@@ -448,6 +448,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/trace", permission("ai_chat", "use"), aiChatHandler.GetAgentRunTrace)
 		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/stream", permission("ai_chat", "use"), aiChatHandler.StreamRunEvents)
 		protected.Handle(http.MethodPost, "/ai/chat/artifacts/:id/actions", permission("ai_chat", "use"), aiChatHandler.CreateReviewAction)
+		protected.Handle(http.MethodGet, "/ai/chat/artifacts/:id/export", permission("ai_chat", "use"), aiChatHandler.ExportArtifact)
 
 		// Agent Gateway: individual Tools enforce their own permissions. Do not
 		// put a broad ai_chat permission in front of this group, otherwise CLI

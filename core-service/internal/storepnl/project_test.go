@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 type memKPI struct{ facts KPIAggregates }
@@ -254,5 +255,39 @@ func TestPeerColumnRendersAndDegrades(t *testing.T) {
 		if row.Peer != nil {
 			t.Fatalf("degraded peer must not fabricate a number: %+v", row)
 		}
+	}
+}
+
+func TestRowsSurfaceSourceEnvelopeProvenance(t *testing.T) {
+	tmpl := testTemplate(t)
+	ref := StoreRef{StoreID: "S1", AsOf: "2026-08-19", WindowDays: 7}
+	facts := testFacts()
+	facts.Provenance = map[string]FactEnvelope{
+		"revenue": {SourceSystems: []string{"pos-a"}, ImportBatchIDs: []string{"b1"}, FactVersionMin: 2, FactVersionMax: 2, HighestAsOf: "2026-08-18T00:00:00Z", DataClassification: "production", SourceDays: 7},
+	}
+	facts.Envelope = &sourceenvelope.Envelope{DataClassification: "production", FormulaVersion: "retail-kpi-v1"}
+	pnl, err := Project(context.Background(), tmpl, ref, Period{From: "2026-08", To: "2026-08"}, [2]ColumnRef{ColActual, ColBudget}, BasisOperating, Readers{
+		KPI: memKPI{facts: facts}, Plan: memPlan{values: map[string]*float64{}}, Governed: map[string]bool{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, row := range pnl.Operating.Rows {
+		if row.Key == "revenue" {
+			found = true
+			if row.Provenance == nil || len(row.Provenance.ImportBatchIDs) != 1 || row.Provenance.ImportBatchIDs[0] != "b1" {
+				t.Fatalf("revenue row must surface its source envelope: %+v", row.Provenance)
+			}
+		}
+		if row.Key == "labor_cost" && row.Provenance != nil {
+			t.Fatalf("labor_cost has no envelope in this fixture and must stay nil: %+v", row.Provenance)
+		}
+	}
+	if !found {
+		t.Fatal("revenue row missing from projection")
+	}
+	if pnl.Envelope == nil || pnl.Envelope.FormulaVersion != "retail-kpi-v1" {
+		t.Fatalf("envelope must be carried from the KPI port: %+v", pnl.Envelope)
 	}
 }

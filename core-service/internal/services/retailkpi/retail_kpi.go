@@ -36,6 +36,7 @@ type DailyFact struct {
 	AsOfAt                                       time.Time
 	Currency, SourceSystem, DataClassification   string
 	SimulationDatasetVersion                     *string
+	ImportBatchID                                *string
 	Version                                      int
 	Revenue, GrossProfit, Transactions, Footfall *float64
 	AreaSqm, LaborCost, FixedRent, VariableRent  *float64

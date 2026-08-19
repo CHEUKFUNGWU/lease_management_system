@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Card, Select, Space, Spin, Table, Typography } from "antd";
+import { Alert, Button, Card, Select, Space, Spin, Table, Tooltip, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -21,6 +21,11 @@ type RowValue = {
   variance?: number | null; pct?: number | null;
   peer?: number | null; peer_status?: string; ungoverned?: boolean;
   format?: { scale?: string; neg_style?: string; bold?: boolean; indent?: number };
+  provenance?: {
+    source_systems: string[]; import_batch_ids?: string[];
+    fact_version_min: number; fact_version_max: number;
+    highest_as_of?: string; data_classification: string; source_days: number;
+  } | null;
   components?: { label: string; value?: number | null }[];
 };
 type Block = { basis: string; rows: RowValue[] };
@@ -34,6 +39,13 @@ type PnlResponse = {
   dataset_version?: string;
   currency?: string;
   period_label?: string; period_kind?: string; peer_status?: string;
+  envelope?: {
+    data_classification?: string; source_systems?: string[];
+    fact_version_min?: number; fact_version_max?: number;
+    highest_as_of?: string; formula_version?: string;
+    semantic_version?: string; pulse_version?: string;
+    decision_ready?: boolean; decision_ready_reason?: string;
+  } | null;
   gaps?: string[];
 };
 
@@ -118,6 +130,7 @@ export default function StorePnlPage() {
     peer: row.peer ?? null,
     peer_status: row.peer_status,
     format: row.format,
+    provenance: row.provenance ?? null,
     comps: withComponent && row.components
       ? row.components.map((c) => `${c.label}: ${c.value ?? "—"}`).join("；")
       : undefined,
@@ -137,6 +150,19 @@ export default function StorePnlPage() {
       render: (v: number | null) => (v == null ? "—" : `${v.toFixed(2)}%`) },
     ...(hasPeer ? [{ title: t("storepnl.peer_col", language), dataIndex: "peer", key: "peer", align: "right" as const,
       render: (v: number | null, row: any) => (v == null ? (row.peer_status || "—") : v.toLocaleString()) }] : []),
+    { title: t("storepnl.provenance", language), dataIndex: "provenance", key: "provenance",
+      render: (provenance: RowValue["provenance"]) => {
+        if (!provenance) return "—";
+        const short = `${provenance.source_systems.join("/")} · v${provenance.fact_version_min}–${provenance.fact_version_max} · ${provenance.source_days}${t("storepnl.days", language)}`;
+        const detail = [
+          `${t("storepnl.source_systems", language)}: ${provenance.source_systems.join(", ")}`,
+          `${t("storepnl.import_batches", language)}: ${(provenance.import_batch_ids || []).join(", ") || "—"}`,
+          `${t("storepnl.fact_versions", language)}: ${provenance.fact_version_min}–${provenance.fact_version_max}`,
+          `as_of: ${provenance.highest_as_of || "—"}`,
+          `${provenance.data_classification} · ${provenance.source_days}${t("storepnl.days", language)}`,
+        ].join("\n");
+        return <Tooltip title={detail}><Typography.Text type="secondary">{short}</Typography.Text></Tooltip>;
+      } },
     { title: t("storepnl.components", language), dataIndex: "comps", key: "comps" },
   ], [language, pnl, hasPeer]);
 
@@ -206,6 +232,13 @@ export default function StorePnlPage() {
                 <Typography.Text type="warning">{pnl.decision_ready_reason}</Typography.Text>
               )}
             </Space>
+            {pnl.envelope && (
+              <Card size="small" title={t("storepnl.source_envelope", language)}>
+                <Typography.Text type="secondary">
+                  {`${t("storepnl.formula_version", language)} ${pnl.envelope.formula_version || "—"} · ${t("storepnl.semantic_version", language)} ${pnl.envelope.semantic_version || "—"} · ${t("storepnl.source_systems", language)}: ${(pnl.envelope.source_systems || []).join(", ") || "—"} · fact v${pnl.envelope.fact_version_min ?? "?"}–${pnl.envelope.fact_version_max ?? "?"} · as_of ${pnl.envelope.highest_as_of || "—"}`}
+                </Typography.Text>
+              </Card>
+            )}
             {(pnl.gaps || []).length > 0 && (
               <Card size="small">
                 <Typography.Text type="warning">

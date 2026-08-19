@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
+	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
 )
 
 // BasisMode selects which blocks appear.
@@ -78,6 +79,27 @@ type KPIAggregates struct {
 	Classification      string
 	DatasetVersion      string
 	Currency            string
+	// Provenance maps KPI code → source envelope (S1-5 level 3): the
+	// sources/batches/versions/as-of of the facts that produced the KPI.
+	// Rows surface the envelope matching their source binding; derived or
+	// assumption-bound rows have no envelope (nil).
+	Provenance map[string]FactEnvelope
+	// Envelope is the store-level semantic-layer envelope (formula/pulse
+	// versions, coverage, decision status).
+	Envelope *sourceenvelope.Envelope
+}
+
+// FactEnvelope is one KPI's source trace: source systems, import
+// batches, fact-version range, highest as-of and the number of
+// contributing store-days.
+type FactEnvelope struct {
+	SourceSystems      []string `json:"source_systems"`
+	ImportBatchIDs     []string `json:"import_batch_ids,omitempty"`
+	FactVersionMin     int      `json:"fact_version_min"`
+	FactVersionMax     int      `json:"fact_version_max"`
+	HighestAsOf        string   `json:"highest_as_of,omitempty"`
+	DataClassification string   `json:"data_classification"`
+	SourceDays         int      `json:"source_days"`
 }
 
 // PlanReader resolves budget/forecast/prior-year plan lines at store grain.
@@ -136,7 +158,10 @@ type RowValue struct {
 	PeerStatus string          `json:"peer_status,omitempty"` // empty = no peer column for this row
 	Format     template.Format `json:"format"`                // S3-7 display contract from the template
 	Ungoverned bool            `json:"ungoverned,omitempty"`  // S3-6: template-custom formula row
-	Components []Component     `json:"components,omitempty"`  // drilldown (occupancy)
+	// Provenance is the row's source envelope (S1-5 level 3); nil for
+	// derived/assumption/lease rows.
+	Provenance *FactEnvelope `json:"provenance,omitempty"` // S1-5 level 3 source trace
+	Components []Component   `json:"components,omitempty"` // drilldown (occupancy)
 	// Subtotal wiring for live-formula exports: children ± subtracted rows.
 	Children   []string `json:"children,omitempty"`
 	Subtracted []string `json:"subtracted,omitempty"`
@@ -156,23 +181,24 @@ type Block struct {
 
 // StorePnl is the full projection response.
 type StorePnl struct {
-	StoreID             string      `json:"store_id"`
-	AsOf                string      `json:"as_of"`
-	WindowDays          int         `json:"window_days"`
-	PeriodLabel         string      `json:"period_label,omitempty"`
-	PeriodKind          string      `json:"period_kind,omitempty"` // rolling | calendar
-	Period              Period      `json:"period"`
-	BasisMode           BasisMode   `json:"basis_mode"`
-	Columns             []ColumnRef `json:"columns"`
-	Operating           *Block      `json:"operating,omitempty"`
-	Ifrs16              *Block      `json:"ifrs16,omitempty"`
-	DecisionReady       bool        `json:"decision_ready"`
-	DecisionReadyReason string      `json:"decision_ready_reason,omitempty"`
-	Classification      string      `json:"data_classification"`
-	DatasetVersion      string      `json:"dataset_version,omitempty"`
-	Currency            string      `json:"currency,omitempty"`
-	PeerStatus          string      `json:"peer_status,omitempty"` // complete | insufficient_peers | mixed_currency | unavailable
-	Gaps                []string    `json:"gaps,omitempty"`
+	StoreID             string                   `json:"store_id"`
+	AsOf                string                   `json:"as_of"`
+	WindowDays          int                      `json:"window_days"`
+	PeriodLabel         string                   `json:"period_label,omitempty"`
+	PeriodKind          string                   `json:"period_kind,omitempty"` // rolling | calendar
+	Period              Period                   `json:"period"`
+	BasisMode           BasisMode                `json:"basis_mode"`
+	Columns             []ColumnRef              `json:"columns"`
+	Operating           *Block                   `json:"operating,omitempty"`
+	Ifrs16              *Block                   `json:"ifrs16,omitempty"`
+	DecisionReady       bool                     `json:"decision_ready"`
+	DecisionReadyReason string                   `json:"decision_ready_reason,omitempty"`
+	Classification      string                   `json:"data_classification"`
+	DatasetVersion      string                   `json:"dataset_version,omitempty"`
+	Currency            string                   `json:"currency,omitempty"`
+	PeerStatus          string                   `json:"peer_status,omitempty"` // complete | insufficient_peers | mixed_currency | unavailable
+	Envelope            *sourceenvelope.Envelope `json:"envelope,omitempty"`    // 门店级语义层信封
+	Gaps                []string                 `json:"gaps,omitempty"`
 }
 
 // Template is the parsed statement template the blocks render (D-S6: the
@@ -204,6 +230,7 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 	pnl.Classification = facts.Classification
 	pnl.DatasetVersion = facts.DatasetVersion
 	pnl.Currency = facts.Currency
+	pnl.Envelope = facts.Envelope
 	if !facts.DecisionReady {
 		pnl.Gaps = append(pnl.Gaps, "decision_ready=false："+facts.DecisionReadyReason)
 	}
@@ -310,6 +337,10 @@ func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease
 		rv.PeerStatus = "complete"
 	} else if peer.status != "" {
 		rv.PeerStatus = peer.status
+	}
+	if envelope, ok := facts.Provenance[kpiCode(row.Source)]; ok {
+		value := envelope
+		rv.Provenance = &value
 	}
 	if row.Key == "occupancy_cost" {
 		rv.Components = []Component{

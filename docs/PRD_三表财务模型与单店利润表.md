@@ -493,7 +493,7 @@
 | S1-2 日/周/月/季/年期间视图 | ✅ | `retailperiod` + `YYYY-Wnn`/`YYYY`；`GET /stores/:id/pnl?period=` 全形态测试锁定 |
 | S1-3 版本并排 | ⚠ | Actual + 单计划列（`plan_version_id` 指定 budget/forecast/prior_year）已通；页面未暴露第二列切换 |
 | S1-4 双口径与 basis 标签 | ✅ | side_by_side / operating / ifrs16 三模式，块级 basis 标签，T15 禁混有测试 |
-| S1-5 行下钻 | ⚠ | 占用成本构成下钻已建；行级 Source Envelope 追溯未建 |
+| S1-5 行下钻 | ⚠ | 占用成本构成下钻 + 行级 Source Envelope 追溯（source_system/import_batch_id/fact 版本/as_of/贡献天数，逐 KPI 从事实行折叠，带门店级语义信封卡）已落地；合同级拆分（基本租金/服务费/变量租金的合同对象来源）仍待租赁投影适配器 |
 | S1-6 同群对比列 | ✅ | store-360 peer benchmark 经共享适配器进列；样本不足/混币种显式降级（测试锁定不编数字） |
 | S1-7 多店汇总模式 | ✅ | `GET /store-pnl/aggregate?group_by=region\|brand\|legal_entity`：门店集来自 Data Scope 收紧的主数据读取（跨法人隔离），逐店同参投影后纯函数聚合；混币种按 Currency Partition 分区呈现、无任何跨币种合计（T14，测试锁定）；投影失败门店列入 degraded_stores 显式呈现 |
 | S1-8 CSV + 带公式 XLSX | ✅ | 活公式、小计 SUM、basis 标签；xlsx 重开断言公式串 |
@@ -561,5 +561,6 @@
 | 2026-08-19 | 初版（财务经理视角）：S1 单店利润表、S2 三表模型、S3 受治理自定义、S4 AI 填数与报表生成、S5 集团合并视图；附录 A 搭建 12 步、附录 B 勾稽 T1–T16、附录 C 最佳实践 C1–C10、附录 D 参考科目结构 |
 | 2026-08-19 | S1-7 多店汇总模式落地（授权集合、Currency Partition 不跨币种加总、degraded 显式），附录 E 对应该行改为 ✅ |
 | 2026-08-19 | S3-4 补齐模板复制谱系（copied_from）与删除限未使用草稿的守卫；仅剩可见性维度待做 |
+| 2026-08-19 | S1-5 补齐行级 Source Envelope（QryFacts 透出 import_batch_id，逐 KPI 折叠来源系统/批次/版本/as-of），页面增信封卡与行溯源列 |
 | 2026-08-19 | 落地状态对照（附录 E）：S1–S5 逐项标记 ✅/⚠/❌，随代码与测试可复验，缺口列名 |
 | 2026-08-19 | 吸收外部三表方法论评审的两点补充：S2-3 期初导入三道闸（期初表自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）及对应验收；附录 A Step 1 补历史数据标准化归并；附录 B 补三表联动计算顺序图与「通用方法论无租赁维度」防误用提示；附录 C 补公式字面量禁忌的具体 lint 规则 |

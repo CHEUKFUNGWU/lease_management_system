@@ -89,13 +89,13 @@ func (r *RetailKPIRepository) QueryFacts(ctx context.Context, legalEntityID, dat
 			f.business_date::text,f.currency,f.revenue,f.gross_profit,f.transactions,f.footfall,f.area_sqm,
 			f.labor_cost,f.fixed_rent,f.variable_rent,f.non_lease_cost,f.other_controllable_cost,
 			f.labor_hours,f.headcount,
-			f.source_system,f.version,f.as_of_at,f.data_quality_status,f.mapping_status,f.data_classification,f.simulation_dataset_version,
+			f.source_system,f.version,f.as_of_at,f.data_quality_status,f.mapping_status,f.data_classification,f.simulation_dataset_version,f.import_batch_id,
 			ROW_NUMBER() OVER (PARTITION BY f.store_id,f.business_date,f.source_system ORDER BY f.version DESC, f.as_of_at DESC, f.id DESC) AS rn
 		FROM retail_store_day_facts f JOIN stores s ON s.id=f.store_id
 		WHERE ` + mainWhere + `)
 		SELECT id,store_id,code,name,brand,region,business_date,currency,revenue,gross_profit,transactions,footfall,area_sqm,
 			labor_cost,fixed_rent,variable_rent,non_lease_cost,other_controllable_cost,labor_hours,headcount,source_system,version,
-			as_of_at,data_quality_status,mapping_status,data_classification,simulation_dataset_version
+			as_of_at,data_quality_status,mapping_status,data_classification,simulation_dataset_version,import_batch_id
 		FROM ranked WHERE rn=1 ORDER BY business_date,store_id,source_system`
 	rows, err := r.db.Query(ctx, query, mainArgs...)
 	if err != nil {
@@ -109,15 +109,15 @@ func (r *RetailKPIRepository) QueryFacts(ctx context.Context, legalEntityID, dat
 		var revenue, grossProfit, transactions, footfall, area, labor, fixedRent, variableRent, nonLease, other, laborHours, headcount *float64
 		var version int
 		var asOf time.Time
-		var dataset *string
-		if err := rows.Scan(&id, &storeID, &code, &name, &brand, &region, &businessDate, &currency, &revenue, &grossProfit, &transactions, &footfall, &area, &labor, &fixedRent, &variableRent, &nonLease, &other, &laborHours, &headcount, &source, &version, &asOf, &quality, &mapping, &factClass, &dataset); err != nil {
+		var dataset, batch *string
+		if err := rows.Scan(&id, &storeID, &code, &name, &brand, &region, &businessDate, &currency, &revenue, &grossProfit, &transactions, &footfall, &area, &labor, &fixedRent, &variableRent, &nonLease, &other, &laborHours, &headcount, &source, &version, &asOf, &quality, &mapping, &factClass, &dataset, &batch); err != nil {
 			return nil, fmt.Errorf("scan KPI fact: %w", err)
 		}
 		parsed, err := time.Parse("2006-01-02", businessDate)
 		if err != nil {
 			return nil, fmt.Errorf("parse KPI business date: %w", err)
 		}
-		result.Facts = append(result.Facts, retailkpi.DailyFact{StoreID: storeID, StoreCode: code, StoreName: name, Brand: brand, Region: region, BusinessDate: parsed, AsOfAt: asOf, Currency: currency, SourceSystem: source, Version: version, Revenue: revenue, GrossProfit: grossProfit, Transactions: transactions, Footfall: footfall, AreaSqm: area, LaborCost: labor, FixedRent: fixedRent, VariableRent: variableRent, NonLeaseCost: nonLease, OtherControllableCost: other, LaborHours: laborHours, Headcount: headcount, DataQualityStatus: quality, MappingStatus: mapping, DataClassification: factClass, SimulationDatasetVersion: dataset})
+		result.Facts = append(result.Facts, retailkpi.DailyFact{StoreID: storeID, StoreCode: code, StoreName: name, Brand: brand, Region: region, BusinessDate: parsed, AsOfAt: asOf, Currency: currency, SourceSystem: source, Version: version, Revenue: revenue, GrossProfit: grossProfit, Transactions: transactions, Footfall: footfall, AreaSqm: area, LaborCost: labor, FixedRent: fixedRent, VariableRent: variableRent, NonLeaseCost: nonLease, OtherControllableCost: other, LaborHours: laborHours, Headcount: headcount, DataQualityStatus: quality, MappingStatus: mapping, DataClassification: factClass, SimulationDatasetVersion: dataset, ImportBatchID: batch})
 		if result.MinFactVersion == 0 || version < result.MinFactVersion {
 			result.MinFactVersion = version
 		}

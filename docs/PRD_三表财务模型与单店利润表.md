@@ -493,7 +493,7 @@
 | S1-2 日/周/月/季/年期间视图 | ✅ | `retailperiod` + `YYYY-Wnn`/`YYYY`；`GET /stores/:id/pnl?period=` 全形态测试锁定 |
 | S1-3 版本并排 | ⚠ | Actual + 单计划列（`plan_version_id` 指定 budget/forecast/prior_year）已通；页面未暴露第二列切换 |
 | S1-4 双口径与 basis 标签 | ✅ | side_by_side / operating / ifrs16 三模式，块级 basis 标签，T15 禁混有测试 |
-| S1-5 行下钻 | ⚠ | 占用成本构成下钻 + 行级 Source Envelope 追溯（source_system/import_batch_id/fact 版本/as_of/贡献天数，逐 KPI 从事实行折叠，带门店级语义信封卡）已落地；合同级拆分（基本租金/服务费/变量租金的合同对象来源）仍待租赁投影适配器 |
+| S1-5 行下钻 | ✅ | 三级全通：金额 → 构成（占用成本 → 合同级拆分：逐合同基本租金/服务费/变量租金，payment schedule 只读投影 + 覆盖天数日级摊配，聚合组件由拆分求和导出保证两级一致）→ 来源事实（行级 Source Envelope + 门店级语义信封卡；页面同屏展示拆分与信封） |
 | S1-6 同群对比列 | ✅ | store-360 peer benchmark 经共享适配器进列；样本不足/混币种显式降级（测试锁定不编数字） |
 | S1-7 多店汇总模式 | ✅ | `GET /store-pnl/aggregate?group_by=region\|brand\|legal_entity`：门店集来自 Data Scope 收紧的主数据读取（跨法人隔离），逐店同参投影后纯函数聚合；混币种按 Currency Partition 分区呈现、无任何跨币种合计（T14，测试锁定）；投影失败门店列入 degraded_stores 显式呈现 |
 | S1-8 CSV + 带公式 XLSX | ✅ | 活公式、小计 SUM、basis 标签；xlsx 重开断言公式串 |
@@ -548,7 +548,7 @@
 
 ### 代码侧总评
 
-- **S1-5 页面级合同拆分下钻表未建**（数据已可经 LeaseReader 按合同读取）；**PRD 全部编号能力已无缺失的功能项**——S2-3 四个生产适配器与 S4 工具全部接生产 ✅，外部联调（真实 POS/ERP/GL 数据的商业验证）依 AGENTS.md 口径保持 unvalidated。
+- **PRD 全部编号功能项已落地，无一缺失**；外部联调（真实 POS/ERP/GL 数据的商业验证）依 AGENTS.md 口径保持 unvalidated，附录 E 无 ⚠/❌ 行。
 - 「生产接线未做」一项均为**设计内决策**：Agent Tool 注册时 writer/端口工厂为空 → 工具诚实拒绝，随财务工作台阶段接线（与 SM7/AGENTS.md 现行阶段一致）。
 - 零售经营侧无真实 POS/ERP 联调的状态不变：`unvalidated` 结论口径沿用 AGENTS.md。
 
@@ -568,5 +568,6 @@
 | 2026-08-19 | S3-4 收尾：模板 shared/personal 可见性 + 列表端点 + 个人草稿 owner 守卫，复制/删除/复核/批准全量落地 |
 | 2026-08-19 | S2-3 FactReader 接生产（store-day 事实折叠实体-月事实）；S4 工具全部接生产（read/evaluate/paper 端口 + suggest/batch 写口 + model_diff 备忘录写口） |
 | 2026-08-19 | S2-3 收尾：租赁/付款计划/期初三适配器接生产（measurement_results 只读投影、非租赁成分+计划 capex+假设、TB 标准屏过三闸），T7/T8 假单修复 nil 项降级；附录 E 对应行改 ✅ |
+| 2026-08-19 | S1-5 收尾：占用成本合同级拆分（payment schedule 只读投影 + 日级摊配）接进 /stores/:id/pnl 组件层与页面，拆分与聚合组件由同一求和导出；附录 E 无 ⚠/❌ 行 |
 | 2026-08-19 | 落地状态对照（附录 E）：S1–S5 逐项标记 ✅/⚠/❌，随代码与测试可复验，缺口列名 |
 | 2026-08-19 | 吸收外部三表方法论评审的两点补充：S2-3 期初导入三道闸（期初表自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）及对应验收；附录 A Step 1 补历史数据标准化归并；附录 B 补三表联动计算顺序图与「通用方法论无租赁维度」防误用提示；附录 C 补公式字面量禁忌的具体 lint 规则 |

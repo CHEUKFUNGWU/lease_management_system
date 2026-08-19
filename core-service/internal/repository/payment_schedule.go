@@ -43,6 +43,49 @@ type PaymentScheduleRepository struct {
 	db DBTX
 }
 
+// OccupancyScheduleRow is one payment row projected for the S1-5
+// contract-level occupancy drill: the coverage window, the amount and the
+// two classification flags that decide its bucket.
+type OccupancyScheduleRow struct {
+	ContractID     string
+	ContractNumber string
+	CoverageStart  time.Time
+	CoverageEnd    time.Time
+	Amount         float64
+	Currency       string
+	IsVariable     bool
+	IsNonLease     bool
+}
+
+// ListOccupancySchedulesByStore reads the store's contracts' payment rows
+// whose coverage intersects the window — the read-only seam behind the
+// occupancy contract split (基本租金 = 租赁成分固定（含指数），变量租金 =
+// 变量成分，服务费 = 非租赁成分).
+func (r *PaymentScheduleRepository) ListOccupancySchedulesByStore(ctx context.Context, storeID, from, to string) ([]OccupancyScheduleRow, error) {
+	rows, err := r.db.Query(ctx, `SELECT c.id, c.contract_number, ps.coverage_start_date, ps.coverage_end_date,
+			ps.amount, ps.currency, ps.is_variable, ps.is_non_lease_component
+		FROM lease_payment_schedules ps
+		JOIN lease_contracts c ON c.id = ps.contract_id
+		WHERE c.store_id=$1
+		  AND ps.coverage_end_date >= $2::date AND ps.coverage_start_date <= $3::date
+		  AND c.lease_start_date <= $3::date AND c.lease_end_date >= $2::date
+		ORDER BY c.id, ps.coverage_start_date`, storeID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("list occupancy schedules by store: %w", err)
+	}
+	defer rows.Close()
+	var out []OccupancyScheduleRow
+	for rows.Next() {
+		row := OccupancyScheduleRow{}
+		if err := rows.Scan(&row.ContractID, &row.ContractNumber, &row.CoverageStart, &row.CoverageEnd,
+			&row.Amount, &row.Currency, &row.IsVariable, &row.IsNonLease); err != nil {
+			return nil, fmt.Errorf("scan occupancy schedule: %w", err)
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func NewPaymentScheduleRepository(db DBTX) *PaymentScheduleRepository {
 	return &PaymentScheduleRepository{db: db}
 }

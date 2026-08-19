@@ -20,13 +20,14 @@ import (
 // StorePnlHandler serves the store profit-and-loss projection (PRD S1):
 // the single-store page and the S1-7 multi-store aggregate.
 type StorePnlHandler struct {
-	kpi      storepnl.KPIReader
-	plan     storepnl.PlanReader // default comparison reader (tests/reuse)
-	planRepo *repository.FPnAGovernanceRepository
-	peer     storepnl.PeerReader
-	lease    storepnl.LeasePort
-	stores   *repository.MasterDataRepository
-	tmpl     *template.Template
+	kpi       storepnl.KPIReader
+	plan      storepnl.PlanReader // default comparison reader (tests/reuse)
+	planRepo  *repository.FPnAGovernanceRepository
+	peer      storepnl.PeerReader
+	lease     storepnl.LeasePort
+	occupancy storepnl.OccupancyReader
+	stores    *repository.MasterDataRepository
+	tmpl      *template.Template
 }
 
 // NewStorePnlHandler builds the handler. The lease port arrives honest:
@@ -51,6 +52,12 @@ func (h *StorePnlHandler) WithPeer(peer storepnl.PeerReader) *StorePnlHandler {
 // repository, not here).
 func (h *StorePnlHandler) WithMasterData(stores *repository.MasterDataRepository) *StorePnlHandler {
 	h.stores = stores
+	return h
+}
+
+// WithOccupancy attaches the S1-5 contract-level occupancy split port.
+func (h *StorePnlHandler) WithOccupancy(occupancy storepnl.OccupancyReader) *StorePnlHandler {
+	h.occupancy = occupancy
 	return h
 }
 
@@ -133,7 +140,7 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 		return
 	}
 	pnl, err := storepnl.Project(c.Request.Context(), h.tmpl, params.ref, params.period, params.pair, params.basis, storepnl.Readers{
-		KPI: h.kpi, Plan: h.planReaderFor(c), Lease: h.lease, Peer: h.peer, Governed: h.governedRows(c),
+		KPI: h.kpi, Plan: h.planReaderFor(c), Lease: h.lease, Peer: h.peer, Occupancy: h.occupancy, Governed: h.governedRows(c),
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

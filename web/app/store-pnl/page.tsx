@@ -26,6 +26,10 @@ type RowValue = {
     fact_version_min: number; fact_version_max: number;
     highest_as_of?: string; data_classification: string; source_days: number;
   } | null;
+  contract_split?: {
+    contract_id: string; contract_number?: string;
+    basic_rent?: number | null; service_fee?: number | null; variable_rent?: number | null;
+  }[];
   components?: { label: string; value?: number | null }[];
 };
 type Block = { basis: string; rows: RowValue[] };
@@ -202,8 +206,12 @@ export default function StorePnlPage() {
     peer_status: row.peer_status,
     format: row.format,
     provenance: row.provenance ?? null,
-    comps: withComponent && row.components
-      ? row.components.map((c) => `${c.label}: ${c.value ?? "—"}`).join("；")
+    comps: withComponent
+      ? [
+          ...(row.components || []).map((c) => `${c.label}: ${c.value ?? "—"}`),
+          ...(row.contract_split || []).map((cs) =>
+            `【${cs.contract_number || cs.contract_id.slice(0, 8)}】${t("storepnl.basic_rent", language)} ${cs.basic_rent ?? "—"} · ${t("storepnl.service_fee", language)} ${cs.service_fee ?? "—"} · ${t("storepnl.variable_rent", language)} ${cs.variable_rent ?? "—"}`),
+        ].join("；") || undefined
       : undefined,
   }));
 

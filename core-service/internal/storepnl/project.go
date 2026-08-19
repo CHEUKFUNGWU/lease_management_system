@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 	"github.com/lease-management-system/core-service/internal/services/sourceenvelope"
@@ -131,11 +132,12 @@ type PeerReader interface {
 // formula/check row not on the list is a template-custom row and must be
 // marked 未经指标治理 (S3-6); an empty map marks every formula row.
 type Readers struct {
-	KPI      KPIReader
-	Plan     PlanReader
-	Lease    LeasePort
-	Peer     PeerReader
-	Governed map[string]bool
+	KPI       KPIReader
+	Plan      PlanReader
+	Lease     LeasePort
+	Peer      PeerReader
+	Occupancy OccupancyReader
+	Governed  map[string]bool
 }
 
 // Period identifies the projected period (YYYY-MM).
@@ -161,7 +163,10 @@ type RowValue struct {
 	// Provenance is the row's source envelope (S1-5 level 3); nil for
 	// derived/assumption/lease rows.
 	Provenance *FactEnvelope `json:"provenance,omitempty"` // S1-5 level 3 source trace
-	Components []Component   `json:"components,omitempty"` // drilldown (occupancy)
+	// ContractSplit is the occupancy contract-level drill (S1-5 level 2): per
+	// contract 基本租金/服务费/变量租金.
+	ContractSplit []ContractSplit `json:"contract_split,omitempty"`
+	Components    []Component     `json:"components,omitempty"` // drilldown (occupancy)
 	// Subtotal wiring for live-formula exports: children ± subtracted rows.
 	Children   []string `json:"children,omitempty"`
 	Subtracted []string `json:"subtracted,omitempty"`
@@ -348,8 +353,42 @@ func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease
 			{Label: "服务费", Value: facts.ServiceFee},
 			{Label: "变量租金", Value: facts.VariableRent},
 		}
+		// S1-5 层级 2：合同级拆分。有拆分时，聚合构成改由拆分求和导出，
+		// 两级永远一致；端口未接或无合同则保留事实层聚合。
+		if readers.Occupancy != nil {
+			from, to := windowSpan(ref)
+			if splits, err := readers.Occupancy.Contracts(ctx, ref.StoreID, from, to); err == nil && len(splits) > 0 {
+				basic, service, variable := ComponentSum(splits)
+				if basic != nil && service != nil && variable != nil {
+					rv.Components = []Component{
+						{Label: "基本租金", Value: basic},
+						{Label: "服务费", Value: service},
+						{Label: "变量租金", Value: variable},
+					}
+				}
+				rv.ContractSplit = splits
+			}
+		}
 	}
 	return rv
+}
+
+// windowSpan resolves the window the store projection aggregates over: the
+// explicit calendar/rolling resolution when present, otherwise the legacy
+// AsOf+WindowDays anchor — same resolution the KPI adapter applies.
+func windowSpan(ref StoreRef) (string, string) {
+	if ref.DateFrom != "" && ref.DateTo != "" {
+		return ref.DateFrom, ref.DateTo
+	}
+	asOf, err := time.Parse("2006-01-02", ref.AsOf)
+	if err != nil {
+		return ref.AsOf, ref.AsOf
+	}
+	days := ref.WindowDays
+	if days < 1 {
+		days = 1
+	}
+	return asOf.AddDate(0, 0, -(days - 1)).Format("2006-01-02"), asOf.Format("2006-01-02")
 }
 
 // kpiCode strips the source-binding prefix (fact. / contract. /

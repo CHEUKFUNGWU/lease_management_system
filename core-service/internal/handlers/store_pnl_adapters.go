@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -279,4 +280,37 @@ func planLineField(line *repository.FPnAPlanLine, source string) *float64 {
 		return line.FourWallEBITDA
 	}
 	return nil
+}
+
+// storePnlOccupancyAdapter is the S1-5 production occupancy port: the
+// store's contract payment rows fold through the pure proration into the
+// per-contract 基本租金/服务费/变量租金 split — read-only, no recompute.
+type storePnlOccupancyAdapter struct {
+	repo *repository.PaymentScheduleRepository
+}
+
+// NewStorePnlOccupancyAdapter builds the adapter.
+func NewStorePnlOccupancyAdapter(repo *repository.PaymentScheduleRepository) storepnl.OccupancyReader {
+	return storePnlOccupancyAdapter{repo: repo}
+}
+
+// Contracts implements storepnl.OccupancyReader.
+func (a storePnlOccupancyAdapter) Contracts(ctx context.Context, storeID, from, to string) ([]storepnl.ContractSplit, error) {
+	if a.repo == nil {
+		return nil, errors.New("occupancy schedule repository unavailable")
+	}
+	rows, err := a.repo.ListOccupancySchedulesByStore(ctx, storeID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	schedules := make([]storepnl.OccupancySchedule, 0, len(rows))
+	for _, row := range rows {
+		schedules = append(schedules, storepnl.OccupancySchedule{
+			ContractID: row.ContractID, ContractNumber: row.ContractNumber,
+			CoverageStart: row.CoverageStart.Format("2006-01-02"),
+			CoverageEnd:   row.CoverageEnd.Format("2006-01-02"),
+			Amount:        row.Amount, IsVariable: row.IsVariable, IsNonLease: row.IsNonLease,
+		})
+	}
+	return storepnl.FoldContractOccupancy(schedules, from, to), nil
 }

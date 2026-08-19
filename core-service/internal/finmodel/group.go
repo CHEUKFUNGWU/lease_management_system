@@ -34,15 +34,15 @@ type GroupRunInput struct {
 // currency); the translated second view additionally carries the rate
 // version banner.
 type GroupSummary struct {
-	Periods            []string            `json:"periods"`
-	CurrencyPartitions map[string][]string `json:"currency_partitions,omitempty"` // currency → run ids (authorized members)
-	Members            []GroupMember       `json:"members"`
-	Totals             map[string]*float64 `json:"totals,omitempty"` // row@period → sum (reporting currency)
-	TotalsCurrency     string              `json:"totals_currency,omitempty"`
-	ExchangeRateVersion string             `json:"exchange_rate_version,omitempty"`
-	ExchangeRateType   string              `json:"exchange_rate_type,omitempty"`
-	TiesOut            bool                `json:"ties_out"`
-	Note               string              `json:"note,omitempty"`
+	Periods             []string            `json:"periods"`
+	CurrencyPartitions  map[string][]string `json:"currency_partitions,omitempty"` // currency → run ids (authorized members)
+	Members             []GroupMember       `json:"members"`
+	Totals              map[string]*float64 `json:"totals,omitempty"` // row@period → sum (reporting currency)
+	TotalsCurrency      string              `json:"totals_currency,omitempty"`
+	ExchangeRateVersion string              `json:"exchange_rate_version,omitempty"`
+	ExchangeRateType    string              `json:"exchange_rate_type,omitempty"`
+	TiesOut             bool                `json:"ties_out"`
+	Note                string              `json:"note,omitempty"`
 }
 
 // GroupMember is one input as seen by the viewer.

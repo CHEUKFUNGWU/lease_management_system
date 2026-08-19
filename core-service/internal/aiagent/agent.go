@@ -172,6 +172,7 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 			agenttooldefs.NewRetailOperatingPulseDefinition(retail),
 			agenttooldefs.NewRetailStoreDiagnosticsDefinition(retail),
 			agenttooldefs.NewRetailScenarioEvaluateDefinition(retail),
+			agenttooldefs.NewRetailPaperDefinition(retail),
 		} {
 			if err := registry.Register(definition); err == nil {
 				registered = true
@@ -750,6 +751,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	// tool — no LLM guessing, no discount-rate invention.
 	if s1Block, ok := extractS1Input(req.Message); ok {
 		return h.executeS1Paper(ctx, req, s1Block, emit, toolRuntime)
+	}
+	// Retail operating working paper (the product main line): a 底稿 request
+	// with valid retail filters routes to the engine-backed paper tool.
+	if retailPaperRequested(req) {
+		return h.executeRetailPaper(ctx, req, emit, toolRuntime)
 	}
 	var sources []Source
 	var contextData strings.Builder

@@ -18,6 +18,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 	"github.com/lease-management-system/core-service/internal/services/retailscenario"
 	"github.com/lease-management-system/core-service/internal/services/retailstore360"
+	"github.com/lease-management-system/core-service/internal/workingpaper"
 )
 
 // RetailOperationsData is the stable, structured context consumed by the Web
@@ -1171,4 +1172,104 @@ func (h *Agent) retailSourceScope(req Request) map[string]string {
 		}
 	}
 	return result
+}
+
+// retailPaperRequested routes a 底稿 request to the retail paper tool when
+// the message asks for one AND valid retail filters are present (as_of +
+// classification + window_days). No LLM involved — deterministic intent.
+func retailPaperRequested(req Request) bool {
+	lower := strings.ToLower(req.Message)
+	asksPaper := strings.Contains(lower, "底稿") || strings.Contains(lower, "经营底稿") || strings.Contains(lower, "出个底稿")
+	if !asksPaper {
+		return false
+	}
+	filters := retailFilters(req)
+	return filters.AsOf != "" && filters.Classification != "" && filters.WindowProvided &&
+		filters.WindowDays >= 7 && filters.WindowDays <= 28
+}
+
+// executeRetailPaper runs the retail working-paper tool for a validated
+// filters set and shapes the review-gated response. The paper is engine
+// output only; gaps are the engines' honesty signals, recorded not hidden.
+func (h *Agent) executeRetailPaper(ctx context.Context, req Request, emit func(context.Context, string, any) error, toolRuntime *agenttools.Runtime) (Response, error) {
+	filters := retailFilters(req)
+	if filters.AsOf == "" || filters.Classification == "" || !filters.WindowProvided {
+		return retailNeedsInput("paper", filters, "请提供 as_of、window_days、data_classification 后生成经营底稿。"), nil
+	}
+	if filters.WindowDays != 7 && filters.WindowDays != 14 && filters.WindowDays != 28 {
+		return retailNeedsInput("paper", filters, "window_days 只支持 7、14 或 28。"), nil
+	}
+	if (filters.Classification == "simulated") != (filters.DatasetVersion != "") {
+		return retailNeedsInput("paper", filters, "simulated 需要 dataset_version；production 不应携带 dataset_version。"), nil
+	}
+
+	execution, err := agenttools.RequireExecutionContext(ctx)
+	if err != nil {
+		return Response{Answer: "agent execution context missing", Model: "runtime"}, err
+	}
+	arguments := map[string]any{
+		"as_of": filters.AsOf, "window_days": filters.WindowDays,
+		"data_classification": filters.Classification, "dataset_version": filters.DatasetVersion,
+		"source_system": filters.SourceSystem, "store_ids": filters.StoreIDs,
+	}
+	if filters.StoreID != "" {
+		arguments["store_id"] = filters.StoreID
+		if filters.HorizonProvided {
+			arguments["horizon_months"] = filters.HorizonMonths
+		}
+		if filters.Assumptions != (retailscenario.Assumptions{}) {
+			arguments["assumptions"] = filters.Assumptions
+		}
+	}
+
+	if err := emitAgentEvent(ctx, emit, "tool_start", map[string]interface{}{
+		"tool": "retail.working_paper.store.generate", "status": "running",
+	}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+	idempotencyKey := "tool:retail-paper:" + execution.RunID
+	result, durationMs, err := h.executeToolCall(ctx, toolRuntime, "retail.working_paper.store.generate", arguments, idempotencyKey)
+	if err != nil {
+		_ = emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+			"tool": "retail.working_paper.store.generate", "status": "failed",
+			"output_summary": err.Error(), "requires_review": false,
+		}})
+		return Response{
+			Answer:     fmt.Sprintf("零售经营底稿生成失败：%s。请检查筛选条件（as_of、window_days、data_classification）。", err.Error()),
+			Model:      retailDeterministicModel,
+			Confidence: 0.4,
+		}, nil
+	}
+	summary := ""
+	if result.Error != nil {
+		summary = result.Error.Message
+	}
+	if err := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+		"tool": "retail.working_paper.store.generate", "status": string(result.Status),
+		"input_summary": "零售经营底稿", "output_summary": summary,
+		"requires_review": result.Review.Required, "duration_ms": durationMs,
+	}}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		return Response{Answer: "零售经营底稿生成失败：工具结果格式无效", Model: retailDeterministicModel}, nil
+	}
+	paper, ok := data["paper"].(workingpaper.Paper)
+	if !ok {
+		return Response{Answer: "零售经营底稿生成失败：底稿格式无效", Model: retailDeterministicModel}, nil
+	}
+
+	return Response{
+		Answer:       "零售经营底稿已生成。所有数字来自确定性零售引擎（retail-kpi-v1 / store-diagnostics / store-scenario），缺失与降级已在缺口清单中如实列出；请复核后确认。",
+		Model:        retailDeterministicModel,
+		Confidence:   0.9,
+		WorkingPaper: &paper,
+		ReviewPrompts: []AgentReviewPrompt{{
+			ID: "retail_paper_review", Title: "复核零售经营底稿",
+			Description: "复核数据边界（覆盖率/币种/模拟标识）与情景假设后确认。底稿数字均可下钻至引擎版本与审计调用。",
+			Severity:    "critical", Action: "review_confirm",
+		}},
+	}, nil
 }

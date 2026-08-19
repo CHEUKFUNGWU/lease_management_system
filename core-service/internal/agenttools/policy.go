@@ -67,12 +67,33 @@ func Evaluate(ctx context.Context, descriptor ToolDescriptor, call ToolCall, pol
 	}
 
 	decision := PolicyDecision{Allowed: true}
-	if descriptor.Review.Required || (descriptor.Level == LevelDraft && policy.RequireDraftReview) {
+	if RequiresReviewDecision(descriptor, policy) {
 		decision.RequiresReview = true
-		decision.Reasons = append(decision.Reasons, descriptor.Review.Reasons...)
-		if len(decision.Reasons) == 0 {
-			decision.Reasons = []string{"tool policy requires human review"}
-		}
+		decision.Reasons = reviewReasons(descriptor)
 	}
 	return decision, nil
+}
+
+// RequiresReviewDecision is the review half of Evaluate, factored out so the
+// governance chain (agentcore/hooks ReviewGate) and the runtime's
+// post-execution forcing share the same rule.
+func RequiresReviewDecision(descriptor ToolDescriptor, policy Policy) bool {
+	return descriptor.Review.Required || (descriptor.Level == LevelDraft && policy.RequireDraftReview)
+}
+
+// ReviewDecision returns the review decision for a descriptor without the
+// gate checks — used by the runtime after the governance chain has passed.
+func ReviewDecision(descriptor ToolDescriptor, policy Policy) PolicyDecision {
+	if !RequiresReviewDecision(descriptor, policy) {
+		return PolicyDecision{Allowed: true}
+	}
+	return PolicyDecision{Allowed: true, RequiresReview: true, Reasons: reviewReasons(descriptor)}
+}
+
+func reviewReasons(descriptor ToolDescriptor) []string {
+	reasons := append([]string(nil), descriptor.Review.Reasons...)
+	if len(reasons) == 0 {
+		reasons = []string{"tool policy requires human review"}
+	}
+	return reasons
 }

@@ -3,6 +3,7 @@ package agentcore
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/lease-management-system/core-service/internal/errcontract"
@@ -199,7 +200,9 @@ func runToolCall(ctx context.Context, s *State, d Deps, call agenttools.ToolCall
 	onUpdate := func(partial any) {
 		emit(ToolExecutionUpdate{CallID: call.CallID, ToolName: call.ToolName, Partial: partial})
 	}
+	startedAt := time.Now()
 	result, execErr := tool.Execute(ctx, call, onUpdate)
+	completedAt := time.Now()
 	if execErr != nil {
 		res := agenttools.ToolResult{
 			CallID: call.CallID,
@@ -211,7 +214,10 @@ func runToolCall(ctx context.Context, s *State, d Deps, call agenttools.ToolCall
 	}
 
 	if d.After != nil {
-		if _, err := d.After(ctx, AfterContext{Call: call, Descriptor: desc, Result: &result, Err: nil, State: s, Principal: d.Principal}); err != nil {
+		if _, err := d.After(ctx, AfterContext{
+			Call: call, Descriptor: desc, Result: &result, Err: nil, State: s, Principal: d.Principal,
+			StartedAt: startedAt, CompletedAt: completedAt,
+		}); err != nil {
 			result.Status = agenttools.StatusFailed
 			if result.Error == nil {
 				result.Error = errcontract.New(errcontract.CodeSystemFailure, err.Error())

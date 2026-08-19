@@ -10,12 +10,33 @@ import (
 
 const defaultToolTimeout = 30 * time.Second
 
+// GuardResult is the outcome of a before-guard: block the call with a reason,
+// or replace execution with a short-circuit result.
+type GuardResult struct {
+	Block  bool
+	Reason string
+	Short  *ToolResult
+}
+
+// ExecutionGuard is the seam the governance middleware chain (W2) crosses.
+// Before runs after registry resolution and parameter validation; After runs
+// after the handler returned. The runtime keeps this interface free of any
+// agentcore dependency — the chain adapter lives in agentcore/hooks.
+type ExecutionGuard interface {
+	Before(ctx context.Context, call ToolCall, descriptor ToolDescriptor, principal Principal) (GuardResult, error)
+	After(ctx context.Context, call ToolCall, descriptor ToolDescriptor, result *ToolResult, principal Principal) error
+}
+
 type RuntimeOptions struct {
 	Policy  Policy
 	Timeout time.Duration
 	Audit   AuditRecorder
 	Now     func() time.Time
 	Metrics *RuntimeMetrics
+	// Guard replaces the inline policy evaluation with the ordered governance
+	// chain when set. Behaviour is equivalent; the chain is the W2 mount
+	// point for future controls.
+	Guard ExecutionGuard
 }
 
 type Runtime struct {
@@ -25,6 +46,7 @@ type Runtime struct {
 	audit    AuditRecorder
 	now      func() time.Time
 	metrics  *RuntimeMetrics
+	guard    ExecutionGuard
 }
 
 func NewRuntime(registry *Registry, options RuntimeOptions) *Runtime {
@@ -44,7 +66,7 @@ func NewRuntime(registry *Registry, options RuntimeOptions) *Runtime {
 	if metrics == nil {
 		metrics = NewRuntimeMetrics()
 	}
-	return &Runtime{registry: registry, policy: policy, timeout: timeout, audit: options.Audit, now: now, metrics: metrics}
+	return &Runtime{registry: registry, policy: policy, timeout: timeout, audit: options.Audit, now: now, metrics: metrics, guard: options.Guard}
 }
 
 // Metrics returns the shared process metrics sink. WithAudit keeps this sink
@@ -128,9 +150,33 @@ func (r *Runtime) execute(ctx context.Context, call ToolCall) (ToolResult, error
 	if !found {
 		return rejectedResult(call.CallID, ErrorNotFound, "tool is not registered", false), nil
 	}
-	decision, err := Evaluate(ctx, definition.Descriptor, call, r.policy)
-	if err != nil {
-		return rejectedResult(call.CallID, policyErrorCode(err), publicPolicyError(err), false), nil
+
+	var execution ExecutionContext
+	decision := PolicyDecision{Allowed: true}
+	var err error
+	if r.guard != nil {
+		execution, _ = ExecutionContextFromContext(ctx)
+		out, err := r.guard.Before(ctx, call, definition.Descriptor, execution.Principal)
+		if err != nil {
+			return rejectedResult(call.CallID, policyErrorCode(err), publicPolicyError(err), false), nil
+		}
+		if out.Block {
+			return rejectedResult(call.CallID, ErrorScopeDenied, out.Reason, false), nil
+		}
+		if out.Short != nil {
+			short := *out.Short
+			if short.CallID == "" {
+				short.CallID = call.CallID
+			}
+			return short, nil
+		}
+		decision = ReviewDecision(definition.Descriptor, r.policy)
+	} else {
+		var err error
+		decision, err = Evaluate(ctx, definition.Descriptor, call, r.policy)
+		if err != nil {
+			return rejectedResult(call.CallID, policyErrorCode(err), publicPolicyError(err), false), nil
+		}
 	}
 	result.Review = ReviewResult{
 		Required: decision.RequiresReview,
@@ -161,6 +207,15 @@ func (r *Runtime) execute(ctx context.Context, call ToolCall) (ToolResult, error
 	result.CallID = call.CallID
 	if result.Status == "" {
 		result.Status = StatusCompleted
+	}
+	if r.guard != nil {
+		if err := r.guard.After(ctx, call, definition.Descriptor, &result, execution.Principal); err != nil {
+			result.Status = StatusFailed
+			if result.Error == nil {
+				result.Error = &ToolError{Code: ErrorSystemFailure, Message: "post-execution guard failed", Retryable: true}
+			}
+			return result, err
+		}
 	}
 	if decision.RequiresReview {
 		result.Status = StatusNeedsReview

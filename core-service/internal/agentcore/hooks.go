@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/lease-management-system/core-service/internal/agenttools"
 )
@@ -32,12 +33,14 @@ type BeforeToolCall func(ctx context.Context, bc BeforeContext) (BeforeResult, e
 // AfterContext is what an after-hook may inspect after a tool finished.
 // Result and Err are the raw outcome; both may be nil.
 type AfterContext struct {
-	Call       agenttools.ToolCall
-	Descriptor agenttools.ToolDescriptor
-	Result     *agenttools.ToolResult
-	Err        error
-	State      *State
-	Principal  agenttools.Principal
+	Call        agenttools.ToolCall
+	Descriptor  agenttools.ToolDescriptor
+	Result      *agenttools.ToolResult
+	Err         error
+	State       *State
+	Principal   agenttools.Principal
+	StartedAt   time.Time
+	CompletedAt time.Time
 }
 
 // AfterResult is reserved for future after-hook mutations.

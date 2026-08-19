@@ -149,6 +149,23 @@ export function applyRuntimeEvent(message: Message, event: RuntimeEvent): Runtim
       };
       startsTyping = true;
       break;
+    case "tool_start":
+      {
+        // Backend emits tool_start before each tool executes; surface the
+        // running state instead of dropping it (the reducer used to ignore
+        // this event, leaving tools invisible until tool_end).
+        const running: AgentToolCall = {
+          tool: payload.tool,
+          skill: payload.skill || "",
+          status: payload.status || "running",
+          input_summary: payload.file_name || "",
+          output_summary: "",
+          requires_review: false,
+        };
+        const others = (message.toolCalls || []).filter((call) => call.tool !== running.tool);
+        patch = { toolCalls: [running, ...others] };
+      }
+      break;
     case "tool_end":
       patch = { toolCalls: Array.isArray(payload) ? (payload as AgentToolCall[]) : undefined };
       break;

@@ -247,6 +247,30 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
     }
   };
 
+  const downloadWorkingPaperExport = async (artifactId: string, format: "xlsx" | "docx") => {
+    if (!token) return;
+    try {
+      const response = await fetch(`/api/v1/ai/chat/artifacts/${artifactId}/export?format=${format}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || `export failed (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${artifactId}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      message.error(`${t("ai.working_paper.download_failed", language)}: ${error.message}`);
+    }
+  };
+
   return (
     <div className="sty-4a94ec25">
       {genericArtifacts.map((artifact) => (
@@ -263,6 +287,14 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
           {artifact.review_reasons && artifact.review_reasons.length > 0 && (
             <div className="sty-2c2c74e0">
               复核项：{artifact.review_reasons.join("、")}
+            </div>
+          )}
+          {artifact.artifact_type === "working_paper" && artifact.data && (
+            <div className="sty-f82c4a7a">
+              <WorkingPaperSummary
+                data={artifact.data}
+                onExport={(format) => downloadWorkingPaperExport(artifact.id, format)}
+              />
             </div>
           )}
           {artifact.artifact_type === "retail_action_proposal" && artifact.data && (
@@ -288,6 +320,33 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
           </details>
         </div>
       ))}
+    </div>
+  );
+}
+
+function WorkingPaperSummary({ data, onExport }: { data: any; onExport: (format: "xlsx" | "docx") => void }) {
+  const { language } = useLanguage();
+  const cover = data.cover || {};
+  const dataGaps: unknown[] = Array.isArray(data.data_gaps) ? data.data_gaps : [];
+  return (
+    <div>
+      <div className="sty-2c2c74e0">
+        {t("ai.working_paper.cover_stats", language, {
+          certified: String(cover.certified_count || 0),
+          exploratory: String(cover.exploratory_count || 0),
+          fact: String(cover.system_fact_count || 0),
+          human: String(cover.human_input_count || 0),
+        })}
+      </div>
+      {dataGaps.length > 0 && (
+        <div className="sty-2c2c74e0">
+          {t("ai.working_paper.data_gaps", language, { count: String(dataGaps.length) })}
+        </div>
+      )}
+      <Space>
+        <Button size="small" onClick={() => onExport("xlsx")}>{t("ai.working_paper.export_xlsx", language)}</Button>
+        <Button size="small" onClick={() => onExport("docx")}>{t("ai.working_paper.export_docx", language)}</Button>
+      </Space>
     </div>
   );
 }
@@ -1699,34 +1758,12 @@ function AIChatPageContent() {
     return <FileTextOutlined />;
   };
 
-  const inferUploadTaskType = (prompt: string) => {
-    const normalized = prompt.toLowerCase();
-    if (
-      normalized.includes("租金表") ||
-      normalized.includes("付款计划") ||
-      normalized.includes("付款表") ||
-      normalized.includes("rent schedule") ||
-      normalized.includes("payment schedule")
-    ) {
-      return "payment_schedule";
-    }
-    if (
-      normalized.includes("事件") ||
-      normalized.includes("变更") ||
-      normalized.includes("modification") ||
-      normalized.includes("reassessment")
-    ) {
-      return "event";
-    }
-    return "contract";
-  };
-
   const handleFileUpload = async (options: any) => {
     const { file, onSuccess, onError } = options;
     const formData = new FormData();
-    const taskType = inferUploadTaskType(input);
+    // No task_type guessing here: the backend doc.triage classifies the file
+    // from metadata and the user message, and refuses honestly when unsure.
     formData.append("file", file);
-    formData.append("task_type", taskType);
 
     try {
       const response = await fetch(`${window.location.origin}/api/ai/files/upload`, {

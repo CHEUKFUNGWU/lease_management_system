@@ -2065,6 +2065,31 @@ const dict: TranslationDict = {
     "zh-HK": "已拒絕該提議",
     en: "Proposal rejected",
   },
+  "ai.working_paper.cover_stats": {
+    "zh-CN": "Certified {certified} · Exploratory {exploratory} · 系统事实 {fact} · 人工确认 {human}",
+    "zh-HK": "Certified {certified} · Exploratory {exploratory} · 系統事實 {fact} · 人工確認 {human}",
+    en: "Certified {certified} · Exploratory {exploratory} · System facts {fact} · Human inputs {human}",
+  },
+  "ai.working_paper.data_gaps": {
+    "zh-CN": "数据缺口 {count} 项（详见封面页缺口清单）",
+    "zh-HK": "數據缺口 {count} 項（詳見封面頁缺口清單）",
+    en: "{count} data gap(s) — see the cover page gap list",
+  },
+  "ai.working_paper.export_xlsx": {
+    "zh-CN": "导出 xlsx 底稿",
+    "zh-HK": "導出 xlsx 底稿",
+    en: "Export xlsx",
+  },
+  "ai.working_paper.export_docx": {
+    "zh-CN": "导出 docx 底稿",
+    "zh-HK": "導出 docx 底稿",
+    en: "Export docx",
+  },
+  "ai.working_paper.download_failed": {
+    "zh-CN": "底稿导出失败",
+    "zh-HK": "底稿導出失敗",
+    en: "Working paper export failed",
+  },
 
   // ENV-002 DataTrustBar — DESIGN.md §10 数据可信度展示
   "trust.classification_production": {

@@ -2470,6 +2470,8 @@ const dict: TranslationDict = {
   "storepnl.components": { "zh-CN": "构成下钻", "zh-HK": "構成下鑽", en: "Components" },
   "storepnl.peer_col": { "zh-CN": "同群中位数", "zh-HK": "同群中位數", en: "Peer median" },
   "storepnl.ungoverned": { "zh-CN": "模型内自定义，未经指标治理", "zh-HK": "模型內自訂，未經指標治理", en: "custom formula row, not metric-governed" },
+  "storepnl.scale_thousand": { "zh-CN": "千", "zh-HK": "千", en: "K" },
+  "storepnl.scale_ten_thousand": { "zh-CN": "万", "zh-HK": "萬", en: "10K" },
   "storepnl.select_store": { "zh-CN": "选择门店", "zh-HK": "選擇門店", en: "Select a store" },
   "storepnl.select_hint": { "zh-CN": "从右上角选择门店后查看其利润表。Actual 列来自 store-day 事实聚合（retail-kpi-v1 语义），对比列来自计划版本；缺失行显示为「—」而非 0。", "zh-HK": "從右上角選擇門店後查看其利潤表。", en: "Select a store above to render its P&L. Actual comes from the store-day semantic layer, the comparison column from plan versions; missing rows stay dashed, never zero." },
   "storepnl.failed": { "zh-CN": "利润表加载失败", "zh-HK": "利潤表加載失敗", en: "P&L failed to load" },

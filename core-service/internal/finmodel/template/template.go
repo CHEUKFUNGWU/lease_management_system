@@ -15,6 +15,44 @@ import (
 	"strings"
 )
 
+// Format is the per-row display contract (S3-7). It travels inside the
+// frozen template version and is applied at render/export — storage never
+// scales (金额单位缩放是显示层).
+type Format struct {
+	Scale    string `json:"scale,omitempty"`     // yuan | thousand | ten_thousand | million
+	NegStyle string `json:"neg_style,omitempty"` // minus | parens | red
+	Bold     bool   `json:"bold,omitempty"`
+	Indent   int    `json:"indent,omitempty"` // 0..8
+}
+
+const (
+	ScaleYuan        = "yuan"
+	ScaleThousand    = "thousand"
+	ScaleTenThousand = "ten_thousand"
+	ScaleMillion     = "million"
+
+	NegMinus  = "minus"
+	NegParens = "parens"
+	NegRed    = "red"
+)
+
+func validFormat(f Format) bool {
+	switch f.Scale {
+	case "", ScaleYuan, ScaleThousand, ScaleTenThousand, ScaleMillion:
+	default:
+		return false
+	}
+	if f.Scale == "" {
+		f.Scale = ScaleYuan
+	}
+	switch f.NegStyle {
+	case "", NegMinus, NegParens, NegRed:
+	default:
+		return false
+	}
+	return f.Indent >= 0 && f.Indent <= 8
+}
+
 // RowKind classifies a template row.
 type RowKind string
 
@@ -55,6 +93,8 @@ type RowDef struct {
 	// positive-storage convention: 门店贡献 = 毛利 − 费用, stored values all
 	// positive, direction decided here in the template).
 	Subtract []string `json:"subtract,omitempty"`
+	// Format is the S3-7 display contract (scale/negative/bold/indent).
+	Format Format `json:"format,omitempty"`
 }
 
 // TemplateDef is the declared form consumed by Parse.
@@ -74,6 +114,7 @@ type Row struct {
 	Children []string
 	Subtract []string // ⊆ Children; subtotal = Σ Children − Σ Subtract
 	Formula  *Expr    // nil unless kind is formula or check
+	Format   Format   // S3-7 display contract, defaults to yuan/minus
 }
 
 // ChildSign reports whether a child is added (+1) or subtracted (−1) in a
@@ -190,9 +231,18 @@ func Parse(def TemplateDef) (*Template, error) {
 		if rd.Basis != BasisOperating && rd.Basis != BasisIFRS16 && rd.Basis != BasisShared {
 			return nil, fmt.Errorf("template: row %q has invalid basis %q", key, rd.Basis)
 		}
+		if !validFormat(rd.Format) {
+			return nil, fmt.Errorf("template: row %q has invalid format %+v (scale in yuan|thousand|ten_thousand|million, neg_style in minus|parens|red, indent 0-8)", key, rd.Format)
+		}
+		if rd.Format.Scale == "" {
+			rd.Format.Scale = ScaleYuan
+		}
+		if rd.Format.NegStyle == "" {
+			rd.Format.NegStyle = NegMinus
+		}
 		rows[i] = Row{
 			Key: key, Label: rd.Label, Kind: rd.Kind, Basis: rd.Basis,
-			Source: strings.TrimSpace(rd.Source),
+			Source: strings.TrimSpace(rd.Source), Format: rd.Format,
 		}
 	}
 

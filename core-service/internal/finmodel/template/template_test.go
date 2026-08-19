@@ -224,3 +224,44 @@ func basisOf(tmpl *Template, key string) Basis {
 	}
 	return Basis("")
 }
+
+func TestFormatValidationAndDefaults(t *testing.T) {
+	base := func(format Format) TemplateDef {
+		return TemplateDef{Name: "f", Version: 1, Rows: []RowDef{
+			{Key: "a", Label: "A", Kind: RowLink, Basis: BasisShared, Source: "fact.revenue", Format: format},
+		}}
+	}
+	good := Format{Scale: ScaleTenThousand, NegStyle: NegParens, Bold: true, Indent: 2}
+	tmpl, err := Parse(base(good))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tmpl.Rows[0].Format.Scale != ScaleTenThousand || tmpl.Rows[0].Format.NegStyle != NegParens || !tmpl.Rows[0].Format.Bold || tmpl.Rows[0].Format.Indent != 2 {
+		t.Fatalf("format lost in parse: %+v", tmpl.Rows[0].Format)
+	}
+	// 空格式 → 默认 yuan/minus。
+	tmpl, err = Parse(base(Format{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tmpl.Rows[0].Format.Scale != ScaleYuan || tmpl.Rows[0].Format.NegStyle != NegMinus {
+		t.Fatalf("empty format must default to yuan/minus, got %+v", tmpl.Rows[0].Format)
+	}
+	for _, bad := range []Format{{Scale: "cents"}, {NegStyle: "blue"}, {Indent: 9}, {Indent: -1}} {
+		if _, err := Parse(base(bad)); err == nil {
+			t.Fatalf("illegal format %+v must be rejected", bad)
+		}
+	}
+}
+
+func TestDefaultTemplatesCarrySubtotalStyle(t *testing.T) {
+	tmpl, err := DefaultStorePnlTemplate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range tmpl.Rows {
+		if row.Kind == RowSubtotal && !row.Format.Bold {
+			t.Fatalf("factory p&l subtotal %q must default to bold (S3-7 合计行样式)", row.Key)
+		}
+	}
+}

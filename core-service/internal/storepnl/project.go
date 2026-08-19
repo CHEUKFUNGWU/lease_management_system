@@ -124,18 +124,19 @@ type Period struct {
 
 // RowValue is one rendered template row: per-column values plus variance.
 type RowValue struct {
-	Key        string      `json:"key"`
-	Label      string      `json:"label"`
-	Kind       string      `json:"kind"`
-	Basis      string      `json:"basis"`
-	Actual     *float64    `json:"actual,omitempty"`
-	Other      *float64    `json:"other,omitempty"`    // the second selected column
-	Variance   *float64    `json:"variance,omitempty"` // actual − other
-	Pct        *float64    `json:"pct,omitempty"`      // variance ÷ |other|
-	Peer       *float64    `json:"peer,omitempty"`
-	PeerStatus string      `json:"peer_status,omitempty"` // empty = no peer column for this row
-	Ungoverned bool        `json:"ungoverned,omitempty"`  // S3-6: template-custom formula row
-	Components []Component `json:"components,omitempty"`  // drilldown (occupancy)
+	Key        string          `json:"key"`
+	Label      string          `json:"label"`
+	Kind       string          `json:"kind"`
+	Basis      string          `json:"basis"`
+	Actual     *float64        `json:"actual,omitempty"`
+	Other      *float64        `json:"other,omitempty"`    // the second selected column
+	Variance   *float64        `json:"variance,omitempty"` // actual − other
+	Pct        *float64        `json:"pct,omitempty"`      // variance ÷ |other|
+	Peer       *float64        `json:"peer,omitempty"`
+	PeerStatus string          `json:"peer_status,omitempty"` // empty = no peer column for this row
+	Format     template.Format `json:"format"`                // S3-7 display contract from the template
+	Ungoverned bool            `json:"ungoverned,omitempty"`  // S3-6: template-custom formula row
+	Components []Component     `json:"components,omitempty"`  // drilldown (occupancy)
 	// Subtotal wiring for live-formula exports: children ± subtracted rows.
 	Children   []string `json:"children,omitempty"`
 	Subtracted []string `json:"subtracted,omitempty"`
@@ -288,7 +289,7 @@ func aggregatePeerStatus(peers map[string]peerProbe) string {
 }
 
 func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease LeaseMonthValues, pair [2]ColumnRef, readers Readers, ref StoreRef, peer peerProbe) RowValue {
-	rv := RowValue{Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis), Children: row.Children, Subtracted: row.Subtract}
+	rv := RowValue{Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis), Children: row.Children, Subtracted: row.Subtract, Format: row.Format}
 	if (row.Kind == template.RowFormula || row.Kind == template.RowCheck) && !readers.Governed[row.Key] {
 		// S3-6: 模板内自定义公式行，未经指标治理 —— fail-closed：登记集为空
 		// 时所有公式行都带标识。

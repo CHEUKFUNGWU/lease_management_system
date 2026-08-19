@@ -20,6 +20,7 @@ type RowValue = {
   actual?: number | null; other?: number | null;
   variance?: number | null; pct?: number | null;
   peer?: number | null; peer_status?: string; ungoverned?: boolean;
+  format?: { scale?: string; neg_style?: string; bold?: boolean; indent?: number };
   components?: { label: string; value?: number | null }[];
 };
 type Block = { basis: string; rows: RowValue[] };
@@ -87,6 +88,25 @@ export default function StorePnlPage() {
     })();
   }, [token, storeId]);
 
+  // S3-7: 金额单位缩放与负数显示是显示层约定 — 存储值不缩放，只有
+  // 渲染值除以缩放因子；负数括号/红色随模板格式走。
+  const scaleFactor: Record<string, number> = { yuan: 1, thousand: 1e3, ten_thousand: 1e4, million: 1e6 };
+  const scaleSuffix: Record<string, string> = { yuan: "", thousand: t("storepnl.scale_thousand", language), ten_thousand: t("storepnl.scale_ten_thousand", language), million: "M" };
+  const renderMoney = (value: number | null, format?: RowValue["format"]): React.ReactNode => {
+    if (value == null) return "—";
+    const factor = format?.scale ? (scaleFactor[format.scale] ?? 1) : 1;
+    const suffix = format?.scale ? (scaleSuffix[format.scale] ?? "") : "";
+    const negative = value < 0;
+    // 仅显示层缩放：存储值除以缩放因子后分段展示（ramp-up 不动数据）。
+    const scaled = `${((negative ? Math.abs(value) : value) / factor).toLocaleString()}${suffix}`;
+    const rendered = negative
+      ? format?.neg_style === "parens" ? `(${scaled})` : format?.neg_style === "red"
+        ? <Typography.Text type="danger">{scaled}</Typography.Text>
+        : `${scaled}`
+      : scaled;
+    return format?.bold ? <Typography.Text strong>{rendered}</Typography.Text> : rendered;
+  };
+
   const rowsFor = (block?: Block, withComponent = false): any[] => (block?.rows || []).map((row) => ({
     key: row.key,
     label: row.ungoverned ? `${row.label}（${t("storepnl.ungoverned", language)}）` : row.label,
@@ -97,6 +117,7 @@ export default function StorePnlPage() {
     pct: row.pct == null ? null : (row.pct * 100),
     peer: row.peer ?? null,
     peer_status: row.peer_status,
+    format: row.format,
     comps: withComponent && row.components
       ? row.components.map((c) => `${c.label}: ${c.value ?? "—"}`).join("；")
       : undefined,
@@ -107,11 +128,11 @@ export default function StorePnlPage() {
   const columns = useMemo(() => [
     { title: t("storepnl.row", language), dataIndex: "label", key: "label" },
     { title: t("storepnl.col_actual", language), dataIndex: "actual", key: "actual", align: "right" as const,
-      render: (v: number | null) => (v == null ? "—" : v.toLocaleString()) },
+      render: (v: number | null, row: any) => renderMoney(v, row.format) },
     { title: pnl?.columns?.[1] || t("storepnl.col_other", language), dataIndex: "other", key: "other", align: "right" as const,
-      render: (v: number | null) => (v == null ? "—" : v.toLocaleString()) },
+      render: (v: number | null, row: any) => renderMoney(v, row.format) },
     { title: t("storepnl.variance", language), dataIndex: "variance", key: "variance", align: "right" as const,
-      render: (v: number | null) => (v == null ? "—" : v.toLocaleString()) },
+      render: (v: number | null, row: any) => renderMoney(v, row.format) },
     { title: t("storepnl.variance_pct", language), dataIndex: "pct", key: "pct", align: "right" as const,
       render: (v: number | null) => (v == null ? "—" : `${v.toFixed(2)}%`) },
     ...(hasPeer ? [{ title: t("storepnl.peer_col", language), dataIndex: "peer", key: "peer", align: "right" as const,

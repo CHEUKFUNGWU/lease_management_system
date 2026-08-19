@@ -1,6 +1,9 @@
 package storepnl
 
 import (
+	"fmt"
+
+	"github.com/lease-management-system/core-service/internal/finmodel/template"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -60,6 +63,26 @@ func writeBlock(f *excelize.File, sheet string, block *Block) error {
 	for i, row := range block.Rows {
 		rowIdx[row.Key] = i + 2
 	}
+	styleCache := map[string]int{}
+	styleFor := func(format template.Format) (int, error) {
+		key := fmt.Sprintf("%s|%s|%t|%d", format.Scale, format.NegStyle, format.Bold, format.Indent)
+		if style, ok := styleCache[key]; ok {
+			return style, nil
+		}
+		// S3-7: scale is display-only (trailing commas divide by 1000); the
+		// negative style switches the negative number-format section.
+		style, err := f.NewStyle(&excelize.Style{
+			Font:         &excelize.Font{Bold: format.Bold},
+			Alignment:    &excelize.Alignment{Indent: format.Indent},
+			CustomNumFmt: moneyNumberFormat(format),
+		})
+		if err != nil {
+			return 0, err
+		}
+		styleCache[key] = style
+		return style, nil
+	}
+
 	for i, row := range block.Rows {
 		r := i + 2
 		labelCell, _ := excelize.CoordinatesToCellName(1, r)
@@ -85,6 +108,12 @@ func writeBlock(f *excelize.File, sheet string, block *Block) error {
 		}
 		_ = f.SetCellFormula(sheet, varCell, formulaCol(3, 4, r))
 		_ = f.SetCellFormula(sheet, pctCell, pctFormula(3, 4, r))
+
+		if style, err := styleFor(row.Format); err == nil {
+			for _, cell := range []string{actualCell, otherCell, varCell} {
+				_ = f.SetCellStyle(sheet, cell, cell, style)
+			}
+		}
 	}
 	return nil
 }
@@ -95,6 +124,28 @@ func writeNumeric(f *excelize.File, sheet, cell string, value *float64) {
 		return
 	}
 	_ = f.SetCellValue(sheet, cell, *value)
+}
+
+// moneyNumberFormat composes the excel number format for one row's display
+// contract. Storage is never scaled: only the format divides.
+func moneyNumberFormat(format template.Format) *string {
+	pattern := "#,##0.00"
+	switch format.Scale {
+	case template.ScaleThousand:
+		pattern = "#,##0.00,"
+	case template.ScaleTenThousand:
+		pattern = `#,##0.00,,"万"`
+	case template.ScaleMillion:
+		pattern = `#,##0.00,,,"M"`
+	}
+	full := pattern
+	switch format.NegStyle {
+	case template.NegParens:
+		full = pattern + ";(" + pattern + ")"
+	case template.NegRed:
+		full = pattern + ";[Red]" + pattern
+	}
+	return &full
 }
 
 func formulaCol(a, b, r int) string {

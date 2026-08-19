@@ -88,3 +88,39 @@ func TestRenderXLSXCarriesUngovernedMarker(t *testing.T) {
 		t.Fatalf("governed link row must not carry the marker, got %q err=%v", plain, err)
 	}
 }
+
+func TestRenderXLSXAppliesRowFormats(t *testing.T) {
+	pnl := &StorePnl{
+		StoreID: "S1", BasisMode: BasisOperating,
+		Operating: &Block{Basis: "operating_basis", Rows: []RowValue{
+			{Key: "margin", Label: "毛利率", Kind: "formula", Basis: "operating_basis",
+				Actual: pf(1234567.89),
+				Format: template.Format{Scale: template.ScaleTenThousand, NegStyle: template.NegParens, Bold: true, Indent: 2}},
+		}},
+	}
+	out, err := RenderXLSX(pnl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	styleID, err := f.GetCellStyle("operating_basis", "C2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	style, err := f.GetStyle(styleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if style.CustomNumFmt == nil || !strings.Contains(*style.CustomNumFmt, "万") || !strings.Contains(*style.CustomNumFmt, ";(") {
+		t.Fatalf("scaled + parens number format must land in the workbook, got %v", style.CustomNumFmt)
+	}
+	if style.Font == nil || !style.Font.Bold {
+		t.Fatal("bold must land in the row style")
+	}
+	if style.Alignment == nil || style.Alignment.Indent != 2 {
+		t.Fatalf("indent must land in the row style, got %+v", style.Alignment)
+	}
+}

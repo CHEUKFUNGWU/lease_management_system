@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"fmt"
 	"strings"
 	"time"
 
@@ -18,15 +19,17 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
+	"github.com/lease-management-system/core-service/internal/services/currencytranslation"
 )
 
-// FinModelHandler is the /financial-model backend (PRD S2/S3): templates
+// FinModelHandler is the /financial-model backend (PRD S2/S3/S5): templates
 // with the S3-4 governance flow, definitions, assumption-driven runs with
-// the publish gate, the opening three-gate validation and result/tie-out
-// reads.
+// the publish gate, the opening three-gate validation, result/tie-out reads
+// and the SM8 group view with its S5-2 translated second view.
 type FinModelHandler struct {
 	repo  *repository.FinModelRepository
 	audit *audit.Logger
+	fx    *repository.ExchangeRateRepository
 }
 
 // NewFinModelHandler builds the handler without an audit sink.
@@ -38,6 +41,13 @@ func NewFinModelHandler(repo *repository.FinModelRepository) *FinModelHandler {
 // for the governance transitions (关键动作: 复核 / 审批).
 func NewFinModelHandlerWithAudit(repo *repository.FinModelRepository, auditLogger *audit.Logger) *FinModelHandler {
 	return &FinModelHandler{repo: repo, audit: auditLogger}
+}
+
+// WithExchangeRates attaches the exchange-rate version reader the group
+// view's translated second view translates through (S5-2).
+func (h *FinModelHandler) WithExchangeRates(fx *repository.ExchangeRateRepository) *FinModelHandler {
+	h.fx = fx
+	return h
 }
 
 // CreateTemplate saves a parsed template (illegal templates never persist).
@@ -241,18 +251,23 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 	c.JSON(http.StatusOK, payload)
 }
 
-// GroupRuns is GET /financial-model/group?run_ids=a,b&exchange_rate_version=. It
-// renders the SM8 aggregate: explicit unauthorized members, currency
-// discipline and ties-out with the member details.
+// GroupRuns renders the SM8 aggregate: GET /financial-model/group with
+// run_ids and an optional exchange_rate_version. The default response is
+// the original-currency partition view; a translated second view is built
+// only when exchange_rate_version is explicit, carries the rate version and
+// its closing/average type, and omits every cross-currency total that the
+// rates cannot back (T14 fail-closed).
 func (h *FinModelHandler) GroupRuns(c *gin.Context) {
 	runIDs := strings.Split(c.Query("run_ids"), ",")
 	exchangeRateVersion := strings.TrimSpace(c.Query("exchange_rate_version"))
+	rateType := strings.TrimSpace(c.Query("rate_type"))
 	if len(runIDs) == 0 || (len(runIDs) == 1 && strings.TrimSpace(runIDs[0]) == "") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "run_ids is required"})
 		return
 	}
 	tenant := middleware.GetTenantID(c)
 	var members []finmodel.GroupRunInput
+	authCurrencies := []string{}
 	for _, id := range runIDs {
 		id = strings.TrimSpace(id)
 		if id == "" {
@@ -283,18 +298,94 @@ func (h *FinModelHandler) GroupRuns(c *gin.Context) {
 			periods = append(periods, period)
 		}
 		sortStrings(periods)
-		members = append(members, finmodel.GroupRunInput{
+		authorized := run.LegalEntityID == tenant || tenant == ""
+		member := finmodel.GroupRunInput{
 			RunID: id, LegalEntityID: run.LegalEntityID,
-			Authorized: run.LegalEntityID == tenant || tenant == "",
-			Currency:   "CNY", Periods: periods, Lines: values,
-		})
+			Authorized: authorized,
+			Currency:   runCurrency(run), Periods: periods, Lines: values,
+		}
+		if authorized {
+			authCurrencies = append(authCurrencies, member.Currency)
+		}
+		members = append(members, member)
 	}
+
+	targetCurrency := strings.ToUpper(strings.TrimSpace(c.Query("target_currency")))
+	if targetCurrency == "" {
+		targetCurrency = strings.ToUpper(strings.TrimSpace(c.Query("reporting_currency")))
+	}
+	if targetCurrency == "" && len(authCurrencies) > 0 {
+		targetCurrency = authCurrencies[0]
+	}
+
+	// The translated second view (S5-2): translation happens BEFORE
+	// Summarize so the aggregate is built exclusively from translated
+	// values; an unresolvable pair degrades the whole translated view.
+	exchangeRateType := ""
+	if exchangeRateVersion != "" {
+		if h.fx == nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "exchange_rate_version requested but the rate version reader is unavailable"})
+			return
+		}
+		basis, err := currencytranslation.NewBasis(c.Request.Context(), exchangeRateVersion, &repoRateReader{repo: h.fx})
+		if err != nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": fmt.Sprintf("failed to load exchange rate version %q: %v", exchangeRateVersion, err)})
+			return
+		}
+		if rateType != "" && !strings.EqualFold(rateType, basis.Version().VersionType) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": fmt.Sprintf("rate_type %q conflicts with version type %q", rateType, basis.Version().VersionType)})
+			return
+		}
+		exchangeRateType = basis.Version().VersionType
+		for i := range members {
+			if !members[i].Authorized {
+				continue
+			}
+			members[i].ExchangeRateVersion = exchangeRateVersion
+			rate, ok := basis.Rate(members[i].Currency, targetCurrency)
+			if !ok {
+				// 缺汇率：保留原币明细，但折算视图整体降级（fail-closed）。
+				members[i].Note = "missing_exchange_rate"
+				continue
+			}
+			translated := make(map[string]*float64, len(members[i].Lines))
+			for key, v := range members[i].Lines {
+				if v == nil {
+					translated[key] = nil
+					continue
+				}
+				tv := *v * rate
+				translated[key] = &tv
+			}
+			members[i].TranslatedLines = translated
+			members[i].TranslatedCurrency = targetCurrency
+		}
+	}
+
 	summary, err := finmodel.Summarize(members, exchangeRateVersion)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
+	summary.ExchangeRateType = exchangeRateType
 	c.JSON(http.StatusOK, gin.H{"group": summary})
+}
+
+// runCurrency derives a run's currency from its input snapshot (the engine
+// writes it); when the snapshot is absent or unreadable the CNY default
+// keeps old runs legible instead of making the group view unusable.
+func runCurrency(run *repository.FinModelRun) string {
+	var snap struct {
+		Currency string `json:"currency"`
+	}
+	if len(run.InputSnapshot) > 0 {
+		if err := json.Unmarshal(run.InputSnapshot, &snap); err == nil {
+			if cur := strings.ToUpper(strings.TrimSpace(snap.Currency)); cur != "" {
+				return cur
+			}
+		}
+	}
+	return "CNY"
 }
 
 func (h *FinModelHandler) ListDefinitions(c *gin.Context) {

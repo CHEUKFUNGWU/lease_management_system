@@ -2,6 +2,7 @@ package currencytranslation
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 )
@@ -132,5 +133,38 @@ func TestCurrencyTranslationMissingRateRejection(t *testing.T) {
 	_, err = basis.Translate(rawSet, "CNY")
 	if err == nil {
 		t.Error("expected error for unmapped JPY currency, got nil")
+	}
+}
+
+func TestTranslationBasisRateAccessor(t *testing.T) {
+	basis, err := NewBasis(context.Background(), "v-test", &fakeRateReader{
+		versions: map[string]*RateVersion{
+			"v-test": {ID: "v-id", Name: "v-test", VersionType: "closing"},
+		},
+		rates: map[string][]ExchangeRate{
+			"v-id": {
+				{FromCurrency: "USD", ToCurrency: "CNY", Rate: 7.1},
+				{FromCurrency: "HKD", ToCurrency: "USD", Rate: 0.128},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rate, ok := basis.Rate("USD", "CNY"); !ok || rate != 7.1 {
+		t.Fatalf("USD→CNY = %v/%v, want 7.1/true", rate, ok)
+	}
+	// 倒数自动注册：HKD→USD 存在 ⇒ USD→HKD 可算。
+	if rate, ok := basis.Rate("usd", "hkd"); !ok || math.Abs(rate-1/0.128) > 1e-9 {
+		t.Fatalf("USD→HKD = %v/%v, want reciprocal", rate, ok)
+	}
+	if rate, ok := basis.Rate("CNY", "CNY"); !ok || rate != 1 {
+		t.Fatalf("identity = %v/%v, want 1/true", rate, ok)
+	}
+	if _, ok := basis.Rate("CNY", "JPY"); ok {
+		t.Fatal("uncovered pair must report ok=false — callers fail closed on it")
+	}
+	if basis.Version().Name != "v-test" || basis.Version().VersionType != "closing" {
+		t.Fatalf("Version() = %+v", basis.Version())
 	}
 }

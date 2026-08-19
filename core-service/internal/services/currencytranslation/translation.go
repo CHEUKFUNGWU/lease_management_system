@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -151,6 +152,28 @@ func NewBasis(ctx context.Context, versionRef string, reader RateVersionReader) 
 		ratesMap: ratesMap,
 	}, nil
 }
+
+// Rate reports the units of toCurrency per one fromCurrency in this basis,
+// 1.0 when the pair is the same currency. ok=false means the pair is not
+// covered by the version: callers must fail closed rather than guess.
+func (b *TranslationBasis) Rate(fromCurrency, toCurrency string) (float64, bool) {
+	if strings.EqualFold(fromCurrency, toCurrency) {
+		return 1, true
+	}
+	from := strings.ToUpper(fromCurrency)
+	to := strings.ToUpper(toCurrency)
+	if m, ok := b.ratesMap[from]; ok {
+		if r, ok := m[to]; ok && r > 0 {
+			return r, true
+		}
+	}
+	return 0, false
+}
+
+// Version exposes the loaded rate version so callers can echo its identity
+// and type (closing / average) — the translated view carries the version
+// banner everywhere (S5-2).
+func (b *TranslationBasis) Version() RateVersion { return b.version }
 
 // Translate converts multi-currency plan lines into a TranslatedPlanSet.
 func (b *TranslationBasis) Translate(set MultiCurrencyPlanSet, targetCurrency string) (TranslatedPlanSet, error) {

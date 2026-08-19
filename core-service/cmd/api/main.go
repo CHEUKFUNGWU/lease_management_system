@@ -132,7 +132,7 @@ func main() {
 	retailStoreDayFactsHandler := handlers.NewRetailStoreDayFactsHandler(operatingFactsRepo, auditLogger)
 	storePnlHandler := handlers.NewStorePnlHandler(handlers.NewStorePnlKPIAdapter(retailKPIRepo), nil, fpnaGovernanceRepo)
 	finModelRepo := repository.NewFinModelRepository(database.Pool)
-	finModelHandler := handlers.NewFinModelHandlerWithAudit(finModelRepo, auditLogger)
+	finModelHandler := handlers.NewFinModelHandlerWithAudit(finModelRepo, auditLogger).WithExchangeRates(exchangeRateRepo)
 	savedViewHandler := handlers.NewSavedViewHandler(finModelRepo)
 	retailIngestHandler := handlers.NewRetailIngestHandler(retailKPIRepo, operatingFactsRepo, auditLogger)
 	retailExportHandler := handlers.NewRetailExportHandler()

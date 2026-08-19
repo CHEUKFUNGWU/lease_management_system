@@ -21,13 +21,13 @@ type EvidenceRef struct {
 
 // SuggestionDraft is one AI-drafted assumption value.
 type SuggestionDraft struct {
-	AssumptionKey string        `json:"assumption_key"`
-	Category      string        `json:"category"`
+	AssumptionKey string          `json:"assumption_key"`
+	Category      string          `json:"category"`
 	Value         json.RawMessage `json:"value"`
-	Unit          string        `json:"unit,omitempty"`
-	Basis         []EvidenceRef `json:"basis"`
-	Confidence    float64       `json:"confidence"`
-	SourceTag     string        `json:"source_tag"` // always "ai_suggestion"
+	Unit          string          `json:"unit,omitempty"`
+	Basis         []EvidenceRef   `json:"basis"`
+	Confidence    float64         `json:"confidence"`
+	SourceTag     string          `json:"source_tag"` // always "ai_suggestion"
 }
 
 // ErrMissingBasis is the structural refusal: no evidence, no draft.

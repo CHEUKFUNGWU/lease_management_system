@@ -122,6 +122,9 @@ type RowValue struct {
 	Pct        *float64    `json:"pct,omitempty"`      // variance ÷ |other|
 	Peer       *float64    `json:"peer,omitempty"`
 	Components []Component `json:"components,omitempty"` // drilldown (occupancy)
+	// Subtotal wiring for live-formula exports: children ± subtracted rows.
+	Children   []string `json:"children,omitempty"`
+	Subtracted []string `json:"subtracted,omitempty"`
 }
 
 // Component is one drilldown constituent of a row.
@@ -162,8 +165,8 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 	if tmpl == nil {
 		return nil, errors.New("storepnl: a parsed template is required")
 	}
-	if readers.KPI == nil || readers.Plan == nil {
-		return nil, errors.New("storepnl: KPI and Plan readers are required")
+	if readers.KPI == nil {
+		return nil, errors.New("storepnl: KPI reader is required")
 	}
 	if basis == "" {
 		basis = BasisOperating
@@ -229,7 +232,7 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 }
 
 func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease LeaseMonthValues, pair [2]ColumnRef, readers Readers, ref StoreRef) RowValue {
-	rv := RowValue{Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis)}
+	rv := RowValue{Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis), Children: row.Children, Subtracted: row.Subtract}
 	actual := columnValue(ctx, row, facts, lease, readers, ref, pair[0])
 	other := columnValue(ctx, row, facts, lease, readers, ref, pair[1])
 	rv.Actual = actual

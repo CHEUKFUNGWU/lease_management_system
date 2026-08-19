@@ -36,6 +36,8 @@ func (r *AccessPolicyRepository) GetApprovalParticipants(ctx context.Context, re
 		query = `SELECT COALESCE(created_by::text, ''), '' FROM monthly_closing_batches WHERE id = $1`
 	case "statement_template":
 		query = `SELECT COALESCE(created_by::text, ''), COALESCE(reviewed_by::text, '') FROM fin_statement_templates WHERE id = $1`
+	case "fin_model_run":
+		query = `SELECT COALESCE(created_by::text, ''), '' FROM fin_model_runs WHERE id = $1`
 	default:
 		return access.ApprovalParticipants{}, false, fmt.Errorf("unsupported approval record type %q", recordType)
 	}

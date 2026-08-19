@@ -250,6 +250,20 @@ func (r *FPnAGovernanceRepository) CreatePlanVersion(ctx context.Context, item *
 	return item, nil
 }
 
+func (r *FPnAGovernanceRepository) FindPlanVersionBySource(ctx context.Context, source string) (*FPnAPlanVersion, error) {
+	item := &FPnAPlanVersion{}
+	err := r.db.QueryRow(ctx, `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at
+		FROM fpna_plan_versions WHERE source=$1 ORDER BY created_at DESC LIMIT 1`, source).
+		Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find plan version by source: %w", err)
+	}
+	return item, nil
+}
+
 func (r *FPnAGovernanceRepository) FindDraftForecastByPeriod(ctx context.Context, legalEntityID *string, asOfPeriod string) (*FPnAPlanVersion, error) {
 	item := &FPnAPlanVersion{}
 	args := []any{asOfPeriod}

@@ -30,6 +30,7 @@ type FinModelHandler struct {
 	repo  *repository.FinModelRepository
 	audit *audit.Logger
 	fx    *repository.ExchangeRateRepository
+	plans *repository.FPnAGovernanceRepository
 }
 
 // NewFinModelHandler builds the handler without an audit sink.
@@ -47,6 +48,13 @@ func NewFinModelHandlerWithAudit(repo *repository.FinModelRepository, auditLogge
 // view's translated second view translates through (S5-2).
 func (h *FinModelHandler) WithExchangeRates(fx *repository.ExchangeRateRepository) *FinModelHandler {
 	h.fx = fx
+	return h
+}
+
+// WithPlanGovernance attaches the FP&A version repository the run-publish
+// path writes its plan_version lineage into (S2-7).
+func (h *FinModelHandler) WithPlanGovernance(plans *repository.FPnAGovernanceRepository) *FinModelHandler {
+	h.plans = plans
 	return h
 }
 
@@ -130,6 +138,44 @@ func (h *FinModelHandler) ApproveTemplate(c *gin.Context) {
 		_ = h.audit.Log(c.Request.Context(), "fin_statement_templates", id, "approve", nil, nil, userID, c)
 	}
 	c.JSON(http.StatusOK, gin.H{"template_id": id, "status": "approved"})
+}
+
+// PublishRun is the S2-7 publish action: one tie-out-passed run becomes a
+// forecast plan_version with group-grain lines and prior_version_id lineage.
+// Re-publishing the same run is idempotent (same version id, no second row).
+func (h *FinModelHandler) PublishRun(c *gin.Context) {
+	userID, ok := userID(c)
+	if !ok {
+		return
+	}
+	id := c.Param("id")
+	if h.repo == nil || h.plans == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "publish repositories unavailable"})
+		return
+	}
+	run, err := h.repo.GetModelRun(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		return
+	}
+	tenant := middleware.GetTenantID(c)
+	if tenant != "" && run.LegalEntityID != tenant {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		return
+	}
+	published, err := persist.NewPublishWriter(h.repo, h.plans).Publish(c.Request.Context(), id, &userID)
+	if err != nil {
+		if errors.Is(err, persist.ErrPublishGate) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if h.audit != nil {
+		_ = h.audit.Log(c.Request.Context(), "fin_model_runs", id, "publish", nil, published, userID, c)
+	}
+	c.JSON(http.StatusCreated, gin.H{"published": published})
 }
 
 // requireScopedTemplate loads the target template and answers 404 unless it

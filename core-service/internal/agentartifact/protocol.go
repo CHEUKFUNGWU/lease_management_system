@@ -23,7 +23,8 @@ const (
 	ArtifactReportExplanation    ArtifactType = "report_explanation"
 	ArtifactMonthlyCloseBlockers ArtifactType = "monthly_close_blockers"
 	ArtifactRetailActionProposal ArtifactType = "retail_action_proposal"
-	ArtifactGeneric              ArtifactType = "generic"
+	ArtifactWorkingPaper          ArtifactType = "working_paper"
+	ArtifactGeneric               ArtifactType = "generic"
 )
 
 type EvidenceLocator struct {
@@ -112,7 +113,8 @@ func knownArtifactType(artifactType ArtifactType) bool {
 	switch artifactType {
 	case ArtifactContractDraft, ArtifactPaymentScheduleDraft, ArtifactEventDraft,
 		ArtifactAuditPack, ArtifactDataQualityIssues, ArtifactReportExplanation,
-		ArtifactMonthlyCloseBlockers, ArtifactRetailActionProposal, ArtifactGeneric:
+		ArtifactMonthlyCloseBlockers, ArtifactRetailActionProposal, ArtifactWorkingPaper,
+		ArtifactGeneric:
 		return true
 	default:
 		return false

@@ -16,6 +16,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/dealcompare"
 	"github.com/lease-management-system/core-service/internal/services/predeal"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
+	finpaper "github.com/lease-management-system/core-service/internal/workingpaper/finmodel"
 	retailpaper "github.com/lease-management-system/core-service/internal/workingpaper/retail"
 	s1 "github.com/lease-management-system/core-service/internal/workingpaper/s1"
 )
@@ -46,6 +47,11 @@ type InvariantCase struct {
 	// values 1:1, skip nil values, name its gaps, pass the lint and carry no
 	// exploratory cells.
 	RetailPaper *retailpaper.Input `json:"retail_paper,omitempty"`
+
+	// finmodel_paper category: the model working paper passes values 1:1,
+	// skips nil lines, flags failed tie-outs, passes the lint with its
+	// anchored call and carries zero exploratory cells.
+	FinPaper *finpaper.Input `json:"finmodel_paper,omitempty"`
 }
 
 // TriageInput is the deterministic triage request of a case.
@@ -96,6 +102,8 @@ func EvaluateInvariantCases(cases []InvariantCase) InvariantReport {
 			result.Passed, result.Detail = evaluateS1Consistency(c)
 		case "retail_paper":
 			result.Passed, result.Detail = evaluateRetailPaper(c)
+		case "finmodel_paper":
+			result.Passed, result.Detail = evaluateFinModelPaper(c)
 		default:
 			result.Passed = false
 			result.Detail = fmt.Sprintf("unknown category %q", c.Category)
@@ -270,6 +278,54 @@ func evaluateRetailPaper(c InvariantCase) (bool, string) {
 		if !strings.Contains(joined, want) {
 			return false, fmt.Sprintf("gap %q missing; gaps=%v", want, built.DataGaps)
 		}
+	}
+	return true, ""
+}
+
+// evaluateFinModelPaper runs the finmodel paper builder on a fixture: values
+// preserved 1:1, nil lines skipped, tie-out failures flagged, lint green with
+// the anchored audited call, zero exploratory cells.
+func evaluateFinModelPaper(c InvariantCase) (bool, string) {
+	if c.FinPaper == nil {
+		return false, "finmodel_paper is required for finmodel_paper cases"
+	}
+	in := *c.FinPaper
+	if in.ToolCallID == "" {
+		in.ToolCallID = "eval-finpaper-call"
+	}
+	paper, err := finpaper.Build(in)
+	if err != nil {
+		return false, fmt.Sprintf("finmodel paper build failed: %v", err)
+	}
+	built := workingpaper.Build(paper, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	rep := workingpaper.Lint(built, makeAuditSet([]string{in.ToolCallID}))
+	if !rep.OK {
+		return false, fmt.Sprintf("finmodel paper failed lint: %+v", rep.Violations)
+	}
+	if refs := built.ExploratoryRefs(); len(refs) != 0 {
+		return false, fmt.Sprintf("finmodel paper must have no exploratory cells, got %v", refs)
+	}
+	byRef := map[string]workingpaper.Cell{}
+	for _, cc := range built.AllCells() {
+		if cc.Value == nil {
+			return false, fmt.Sprintf("cell %s must never carry a nil value", cc.Ref)
+		}
+		byRef[cc.Ref] = cc
+	}
+	if got := byRef["rev@2026-01"].Value.(float64); got != 987654.32 {
+		return false, fmt.Sprintf("cell rev@2026-01 = %v, run says 987654.32 (1:1 保值)", got)
+	}
+	if _, present := byRef["labor@2026-01"]; present {
+		return false, "nil line labor@2026-01 must be skipped, never zero-filled"
+	}
+	flagged := false
+	for _, sec := range built.Sections {
+		if sec.ID == "tie_outs" && strings.Contains(sec.Narrative, "T1") {
+			flagged = true
+		}
+	}
+	if !flagged {
+		return false, "failed tie-outs must be flagged in the check section"
 	}
 	return true, ""
 }

@@ -241,4 +241,34 @@
     },
     "completed_tool_calls": ["call-retail-eval"]
   }
+,
+  {
+    "id": "finmodel_paper_sanctity",
+    "category": "finmodel_paper",
+    "description": "model working paper: 1:1 values, nil-skip, tie-out failure flagged, lint green, zero exploratory.",
+    "finmodel_paper": {
+      "title": "月度三表底稿",
+      "legal_entity_id": "LE-1",
+      "currency": "CNY",
+      "data_classification": "production",
+      "model_definition_version": "v3",
+      "data_version": "ds-1",
+      "assumption_version": "as-1",
+      "exchange_rate_version": "fx-1",
+      "metric_definition_version": "md-1",
+      "periods": ["2026-01"],
+      "lines": [
+        {"row_key": "rev", "label": "营业收入", "period": "2026-01", "value": 987654.32, "source_type": "fact_aggregate", "classification": "production"},
+        {"row_key": "net_income", "label": "净利润", "period": "2026-01", "value": 7.5, "source_type": "formula", "classification": "production"},
+        {"row_key": "labor", "label": "人工成本", "period": "2026-01", "value": null, "source_type": "fact_aggregate", "classification": "production"}
+      ],
+      "tie_outs": [
+        {"check_code": "T1", "period": "2026-01", "expected": 2160, "actual": 2167, "diff": 7, "status": "failed"}
+      ],
+      "gap_details": ["预测期收入以 SSSG 驱动"],
+      "tool_call_id": "call-finmodel-eval",
+      "generated_by": "fpna.working_paper.finmodel.generate"
+    },
+    "completed_tool_calls": ["call-finmodel-eval"]
+  }
 ]

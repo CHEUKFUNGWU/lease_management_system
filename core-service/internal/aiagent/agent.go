@@ -97,6 +97,17 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 	if err := registry.Register(agenttooldefs.NewRetailIngestPreviewDefinition(fillReader)); err == nil {
 		registered = true
 	}
+	// SM7：三表模型工具注册。端口工厂当前为空——工具诚实拒绝
+	// （unavailable），生产接线随 /financial-model 工作台落地。
+	if err := registry.Register(agenttooldefs.NewStatementModelReadDefinition(nil)); err == nil {
+		registered = true
+	}
+	if err := registry.Register(agenttooldefs.NewStatementModelEvaluateDefinition(nil)); err == nil {
+		registered = true
+	}
+	if err := registry.Register(agenttooldefs.NewFinModelPaperDefinition(nil)); err == nil {
+		registered = true
+	}
 	if len(draftServices) > 0 && draftServices[0] != nil {
 		if err := registry.Register(agenttooldefs.NewContractDraftDefinition(draftServices[0])); err == nil {
 			registered = true

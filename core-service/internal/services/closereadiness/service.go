@@ -262,7 +262,23 @@ func renderReason(template string, args ...any) string {
 	if template == "" {
 		return ""
 	}
-	return fmt.Sprintf(template, args...)
+	// Interpolate %s/%v verbs without fmt.Sprintf: templates are rule data,
+	// not code, so a variable format string must not be passed to a printf
+	// family call (go vet, Go 1.24+).
+	out := template
+	for _, arg := range args {
+		repl := fmt.Sprint(arg)
+		if idx := strings.Index(out, "%s"); idx >= 0 {
+			out = out[:idx] + repl + out[idx+2:]
+			continue
+		}
+		if idx := strings.Index(out, "%v"); idx >= 0 {
+			out = out[:idx] + repl + out[idx+2:]
+			continue
+		}
+		break
+	}
+	return out
 }
 
 func hasDiscountRate(contractRate *float64, globalRate float64) bool {

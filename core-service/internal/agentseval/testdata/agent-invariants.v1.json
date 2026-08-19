@@ -1,0 +1,149 @@
+[
+  {
+    "id": "provenance_clean_paper_passes",
+    "category": "provenance",
+    "description": "I1/I2/I3/I6: a fully traced paper passes the lint",
+    "working_paper": {
+      "title": "S1 签约前决策底稿",
+      "period": "2026-08",
+      "legal_entity_scope": "LE-1",
+      "review_state": "draft",
+      "sections": [
+        {
+          "id": "overview",
+          "title": "概览",
+          "kind": "table",
+          "cells": [
+            {
+              "ref": "A1",
+              "label": "年租金",
+              "value": 1200000,
+              "currency": "CNY",
+              "provenance": {"basis": "SystemFact", "source_table": "contracts", "source_record_id": "C-1"}
+            },
+            {
+              "ref": "A2",
+              "label": "租赁负债",
+              "measure_id": "lease_liability",
+              "value": 3255676.79,
+              "currency": "CNY",
+              "provenance": {"basis": "Certified", "tool_call_id": "call-1", "engine_version": "ifrs16@v2"}
+            }
+          ]
+        }
+      ]
+    },
+    "completed_tool_calls": ["call-1"]
+  },
+  {
+    "id": "provenance_missing_basis_rejected",
+    "category": "provenance",
+    "description": "I1: a cell without provenance fails the lint (fail-closed)",
+    "working_paper": {
+      "title": "broken",
+      "sections": [
+        {
+          "id": "s1",
+          "title": "S",
+          "kind": "table",
+          "cells": [
+            {"ref": "A1", "label": "年租金", "value": 100, "provenance": {}}
+          ]
+        }
+      ]
+    },
+    "expected_violations": ["provenance_missing"]
+  },
+  {
+    "id": "provenance_certified_without_call_rejected",
+    "category": "provenance",
+    "description": "I2: a certified cell without tool_call_id fails the lint",
+    "working_paper": {
+      "title": "broken",
+      "sections": [
+        {
+          "id": "s1",
+          "title": "S",
+          "kind": "table",
+          "cells": [
+            {"ref": "A2", "label": "租赁负债", "measure_id": "lease_liability", "value": 100, "provenance": {"basis": "Certified", "engine_version": "v2"}}
+          ]
+        }
+      ]
+    },
+    "expected_violations": ["certified_missing_tool_call"]
+  },
+  {
+    "id": "provenance_protected_measure_exploratory_rejected",
+    "category": "provenance",
+    "description": "I3: a protected measure with exploratory basis is refused",
+    "working_paper": {
+      "title": "broken",
+      "sections": [
+        {
+          "id": "s1",
+          "title": "S",
+          "kind": "table",
+          "cells": [
+            {"ref": "A2", "label": "期末租赁负债", "measure_id": "lease_liability", "value": 100, "provenance": {"basis": "Exploratory", "sandbox_run_id": "r9"}}
+          ]
+        }
+      ]
+    },
+    "expected_violations": ["protected_measure_exploratory"]
+  },
+  {
+    "id": "provenance_lexical_probe_catches_unlabelled_cell",
+    "category": "provenance",
+    "description": "lexical probe: a cell without measure_id whose label mentions a protected measure is refused",
+    "working_paper": {
+      "title": "broken",
+      "sections": [
+        {
+          "id": "s1",
+          "title": "S",
+          "kind": "table",
+          "cells": [
+            {"ref": "B1", "label": "使用权资产余额", "value": 100, "provenance": {"basis": "Exploratory", "sandbox_run_id": "r9"}}
+          ]
+        }
+      ]
+    },
+    "expected_violations": ["lexical_probe_exploratory"]
+  },
+  {
+    "id": "triage_invoice_not_contract",
+    "category": "triage_refusal",
+    "description": "an invoice must classify as invoice, never as a lease contract",
+    "triage": {"object_name": "增值税发票_202607.pdf", "content_type": "application/pdf"},
+    "expected_doc_class": "invoice"
+  },
+  {
+    "id": "triage_labor_contract_unknown",
+    "category": "triage_refusal",
+    "description": "a labor contract is out of domain and must resolve to unknown",
+    "triage": {"object_name": "劳动合同-张三.pdf", "content_type": "application/pdf"},
+    "expected_doc_class": "unknown"
+  },
+  {
+    "id": "triage_brochure_unknown",
+    "category": "triage_refusal",
+    "description": "a brochure must resolve to unknown",
+    "triage": {"object_name": "商场宣传册.pdf", "content_type": "application/pdf"},
+    "expected_doc_class": "unknown"
+  },
+  {
+    "id": "triage_rent_schedule",
+    "category": "triage_refusal",
+    "description": "a rent schedule classifies as rent_schedule",
+    "triage": {"object_name": "2026-07租金表.xlsx", "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    "expected_doc_class": "rent_schedule"
+  },
+  {
+    "id": "triage_operating_data",
+    "category": "triage_refusal",
+    "description": "store sales data classifies as operating_data",
+    "triage": {"object_name": "门店销售数据_202607.xlsx", "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    "expected_doc_class": "operating_data"
+  }
+]

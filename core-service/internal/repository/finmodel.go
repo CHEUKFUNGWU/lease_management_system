@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 )
+
+func uuidNew() string { return uuid.NewString() }
 
 // FinStatementTemplate is one versioned, frozen statement template row. Rows
 // is the template def's rows JSONB payload.
@@ -254,6 +257,65 @@ func (r *FinModelRepository) ListTieOuts(ctx context.Context, runID string) ([]*
 			return nil, err
 		}
 		out = append(out, &t)
+	}
+	return out, rows.Err()
+}
+
+// SaveAssumptionDrafts persists AI suggestion drafts (status=draft,
+// source=ai_suggestion), evidence and derived confidence included. The
+// engine's AssumptionReader reads only approved rows (LatestApproved...),
+// so these drafts can never leak into a formal run until a human approves.
+func (r *FinModelRepository) SaveAssumptionDrafts(ctx context.Context, legalEntityID string, rows []AssumptionDraftRow, idempotencyKey string) ([]string, error) {
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		id := uuidNew()
+		_, err := r.db.Exec(ctx, `INSERT INTO fpna_assumption_versions
+			(id, legal_entity_id, assumption_key, category, value, unit, source, owner_name, effective_from, effective_to, version, status, evidence, confidence)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+			id, legalEntityID, row.Key, row.Category, row.Value, row.Unit, row.Source, row.Owner,
+			row.EffectiveFrom, nil, 1, "draft", row.Evidence, row.Confidence)
+		if err != nil {
+			return nil, fmt.Errorf("save assumption drafts(%s): %w", idempotencyKey, err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// AssumptionDraftRow is one draft insert.
+type AssumptionDraftRow struct {
+	Key           string
+	Category      string
+	Value         json.RawMessage
+	Unit          string
+	Source        string
+	Owner         string
+	EffectiveFrom time.Time
+	Evidence      json.RawMessage
+	Confidence    *float64
+}
+
+// LatestApprovedAssumptions reads the newest approved value per key — the
+// production AssumptionReader for the model engine reads ONLY this path, so
+// a status other than approved has no route into a run.
+func (r *FinModelRepository) LatestApprovedAssumptions(ctx context.Context, legalEntityID string, keys []string, period string) (map[string]json.RawMessage, error) {
+	out := map[string]json.RawMessage{}
+	rows, err := r.db.Query(ctx, `SELECT DISTINCT ON (assumption_key) assumption_key, value
+		FROM fpna_assumption_versions
+		WHERE legal_entity_id=$1 AND assumption_key = ANY($2::varchar[]) AND status='approved'
+		  AND effective_from <= $3::date AND (effective_to IS NULL OR effective_to >= $3::date)
+		ORDER BY assumption_key, version DESC, effective_from DESC`, legalEntityID, keys, period+"-01")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		var value json.RawMessage
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		out[key] = value
 	}
 	return out, rows.Err()
 }

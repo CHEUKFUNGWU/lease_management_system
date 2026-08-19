@@ -2179,6 +2179,12 @@ CREATE TABLE IF NOT EXISTS fin_model_tie_outs (
 CREATE INDEX IF NOT EXISTS idx_fin_model_tie_outs_lookup
     ON fin_model_tie_outs(run_id, status);
 
+-- ── 054_assumption_suggestion — SM5 AI 假设建议 ─────────────────────────
+ALTER TABLE fpna_assumption_versions
+    ADD COLUMN IF NOT EXISTS evidence JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE fpna_assumption_versions
+    ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION;
+
 -- an existing volume tracks its own progress in this same table. Keep this list
 -- in sync whenever a new migration is added to db/migrations/.
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -2208,5 +2214,5 @@ INSERT INTO schema_migrations (version) VALUES
 ('047_capex_and_exchange_rates'), ('048_category_facts_and_reconciliation'),
 ('049_promotions_and_roi'), ('050_machine_credentials_and_source_feeds'),
 ('051_inventory_masterdata_and_competitors'), ('052_env_envelope_and_dedup_keys'),
-('053_statement_models')
+('053_statement_models'), ('054_assumption_suggestion')
 ON CONFLICT (version) DO NOTHING;

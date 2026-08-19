@@ -108,6 +108,9 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 	if err := registry.Register(agenttooldefs.NewFinModelPaperDefinition(nil)); err == nil {
 		registered = true
 	}
+	if err := registry.Register(agenttooldefs.NewAssumptionSuggestionDefinition(nil)); err == nil {
+		registered = true
+	}
 	if len(draftServices) > 0 && draftServices[0] != nil {
 		if err := registry.Register(agenttooldefs.NewContractDraftDefinition(draftServices[0])); err == nil {
 			registered = true

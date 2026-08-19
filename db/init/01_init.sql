@@ -2109,6 +2109,7 @@ CREATE INDEX IF NOT EXISTS idx_fin_statement_templates_copied_from
     ON fin_statement_templates(copied_from);
 
 
+
 CREATE TABLE IF NOT EXISTS fin_model_definitions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     legal_entity_id UUID NOT NULL REFERENCES legal_entities(id),
@@ -2243,6 +2244,9 @@ INSERT INTO permissions (role_id, resource, action) VALUES
     ('66666666-6666-6666-6666-666666666666', 'fin_views', 'read')
 ON CONFLICT (role_id, resource, action) DO NOTHING;
 
+-- ── 057_async_run_progress — PRD S2-5 异步 Run ────────────────────────────
+ALTER TABLE fin_model_runs ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+
 -- an existing volume tracks its own progress in this same table. Keep this list
 -- in sync whenever a new migration is added to db/migrations/.
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -2273,5 +2277,6 @@ INSERT INTO schema_migrations (version) VALUES
 ('049_promotions_and_roi'), ('050_machine_credentials_and_source_feeds'),
 ('051_inventory_masterdata_and_competitors'), ('052_env_envelope_and_dedup_keys'),
 ('053_statement_models'), ('054_assumption_suggestion'),
-('055_saved_views_and_template_governance'), ('056_template_copy_lineage')
+('055_saved_views_and_template_governance'), ('056_template_copy_lineage'),
+('057_async_run_progress')
 ON CONFLICT (version) DO NOTHING;

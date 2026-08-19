@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,9 @@ type FinModelHandler struct {
 	audit *audit.Logger
 	fx    *repository.ExchangeRateRepository
 	plans *repository.FPnAGovernanceRepository
+	// cancels maps an async run id to its cancel func; entries disappear
+	// when the goroutine exits.
+	cancels sync.Map
 }
 
 // NewFinModelHandler builds the handler without an audit sink.
@@ -388,6 +392,9 @@ type RunDefinitionRequest struct {
 	DataClassification string                     `json:"data_classification,omitempty"`
 	Versions           finmodel.VersionSet        `json:"versions"`
 	IdempotencyKey     string                     `json:"idempotency_key,omitempty"`
+	// Async dispatches the S2-5 async path: the run row is created queued
+	// and the engine executes in the background; poll GET /runs/:id.
+	Async bool `json:"async"`
 }
 
 // RunDefinition executes the pure engine on the definition template plus
@@ -437,6 +444,12 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 		// 事实与租赁端口的生产适配器随 GL/计量投影接线落地——缺失时诚实降级为缺口。
 		Facts: nil, Lease: nil, Schedules: nil, Opening: nil,
 	}
+
+	if req.Async {
+		h.dispatchAsyncRun(c, defRow, def, inputs, req, &userID)
+		return
+	}
+
 	result, err := finmodel.Run(c.Request.Context(), def, inputs)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
@@ -459,6 +472,160 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 		payload["persisted"] = true
 	}
 	c.JSON(http.StatusOK, payload)
+}
+
+// asyncRunHook is nil in production; tests set it to hold a run between
+// the engine and the persist so cancellation can race it deterministically.
+var asyncRunHook func(runID string)
+
+// dispatchAsyncRun is the S2-5 async path: the queued run row exists
+// before the response (replays return the existing run), then the engine
+// executes in the background and flips queued → running → completed /
+// failed / cancelled. Status writes use a background context so a
+// cancellation never races its own status update.
+func (h *FinModelHandler) dispatchAsyncRun(c *gin.Context, defRow *repository.FinModelDefinition, def finmodel.ModelDef, inputs finmodel.ModelInputs, req RunDefinitionRequest, userID *string) {
+	idem := req.IdempotencyKey
+	if idem == "" {
+		idem = "run-" + uuid.NewString()
+	}
+	if existing, err := h.repo.FindModelRunByIdempotency(c.Request.Context(), defRow.ID, idem); err == nil && existing != nil {
+		c.JSON(http.StatusOK, gin.H{"run_id": existing.ID, "status": existing.Status, "replayed": true})
+		return
+	}
+	snapshot, err := persist.Snapshot(def)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	runID := uuid.NewString()
+	created := &repository.FinModelRun{
+		ID: runID, LegalEntityID: defRow.LegalEntityID, ModelDefinitionID: defRow.ID,
+		ModelDefinitionVersion: 1,
+		DataVersion:            strPtr(req.Versions.Data), AssumptionVersion: strPtr(req.Versions.Assumption),
+		ExchangeRateVersion: strPtr(req.Versions.ExchangeRate), MetricDefinitionVersion: strPtr(req.Versions.MetricDefinition),
+		DataClassification: inputs.DataClassification,
+		Status:             "queued", TieOutStatus: "pending",
+		InputSnapshot: snapshot, IdempotencyKey: idem, CreatedBy: userID,
+	}
+	if err := h.repo.CreateModelRun(c.Request.Context(), created); err != nil {
+		if errors.Is(err, repository.ErrFinModelRunReplay) {
+			if existing, ferr := h.repo.FindModelRunByIdempotency(c.Request.Context(), defRow.ID, idem); ferr == nil && existing != nil {
+				c.JSON(http.StatusOK, gin.H{"run_id": existing.ID, "status": existing.Status, "replayed": true})
+				return
+			}
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	h.cancels.Store(runID, cancel)
+	go func() {
+		defer h.cancels.Delete(runID)
+		defer cancel()
+		// A panic inside the engine must land as a failed run with a reason —
+		// never a zombie "running" row and never a crashed worker.
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				_ = h.repo.FailModelRun(context.Background(), runID, fmt.Sprintf("worker panic: %v", recovered))
+			}
+		}()
+		_ = h.repo.UpdateModelRunStatus(context.Background(), runID, "running", "pending", nil)
+		result, err := finmodel.Run(ctx, def, inputs)
+		if err != nil {
+			_ = h.repo.FailModelRun(context.Background(), runID, err.Error())
+			return
+		}
+		if asyncRunHook != nil {
+			asyncRunHook(runID)
+		}
+		select {
+		case <-ctx.Done():
+			_ = h.repo.CancelModelRun(context.Background(), runID)
+			return
+		default:
+		}
+		if err := persist.NewRunWriter(h.repo).PersistInto(ctx, runID, result); err != nil {
+			_ = h.repo.FailModelRun(context.Background(), runID, err.Error())
+			return
+		}
+	}()
+	c.JSON(http.StatusAccepted, gin.H{"run_id": runID, "status": "queued"})
+}
+
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// GetRun is the async progress read: GET /financial-model/runs/:id returns
+// the run state and, once completed, the number of persisted lines.
+func (h *FinModelHandler) GetRun(c *gin.Context) {
+	run, ok := h.scopedRun(c)
+	if !ok {
+		return
+	}
+	lineCount := 0
+	if run.Status == "completed" {
+		if lines, err := h.repo.ListRunLines(c.Request.Context(), run.ID); err == nil {
+			lineCount = len(lines)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"run": run, "line_count": lineCount})
+}
+
+// CancelRun stops a queued/running async run: the in-memory cancel func
+// interrupts the worker, and the SQL guard handles runs whose worker lives
+// elsewhere (or already finished).
+func (h *FinModelHandler) CancelRun(c *gin.Context) {
+	run, ok := h.scopedRun(c)
+	if !ok {
+		return
+	}
+	if cancel, found := h.cancels.Load(run.ID); found {
+		cancel.(context.CancelFunc)()
+	}
+	if err := h.repo.CancelModelRun(c.Request.Context(), run.ID); err != nil {
+		if errors.Is(err, repository.ErrInvalidWorkflowTransition) {
+			c.JSON(http.StatusConflict, gin.H{"error": "run 已结束，无法取消"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if h.audit != nil {
+		_ = h.audit.Log(c.Request.Context(), "fin_model_runs", run.ID, "cancel", nil, nil, userIDOf(c), c)
+	}
+	c.JSON(http.StatusOK, gin.H{"run_id": run.ID, "status": "cancelled"})
+}
+
+// scopedRun loads the target run and 404s unless it belongs to the caller's
+// tenant (bottom line 1).
+func (h *FinModelHandler) scopedRun(c *gin.Context) (*repository.FinModelRun, bool) {
+	id := c.Param("id")
+	if h.repo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		return nil, false
+	}
+	run, err := h.repo.GetModelRun(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		return nil, false
+	}
+	tenant := middleware.GetTenantID(c)
+	if tenant != "" && run.LegalEntityID != tenant {
+		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		return nil, false
+	}
+	return run, true
+}
+
+func userIDOf(c *gin.Context) string {
+	value, _ := c.Get("user_id")
+	id, _ := value.(string)
+	return id
 }
 
 // GroupRuns renders the SM8 aggregate: GET /financial-model/group with

@@ -508,7 +508,7 @@
 | S2-2 三表内置结构 | ⚠ | `DefaultStatementTemplate` 三表+附表行结构在手；租赁附表行依赖 LeaseRollforwardReader（生产中为空 → 诚实缺失） |
 | S2-3 输入带版本与溯源 | ⚠ | 五条版本线随 run 持久化；事实/租赁/付款计划/期初四个生产适配器仍为空（缺口有注释与诚实降级路径） |
 | S2-4 预测驱动 | ⚠ | 期初余额法计息/SSSG/growth/比率驱动在引擎内；新店爬坡组合驱动未做 |
-| S2-5 模型运行 | ⚠ | Run 为同步纯函数（可重放、确定性测试锁定）；异步队列/进度/取消未做 |
+| S2-5 模型运行 | ✅ | `async=true` 走异步路径：run 先行落库 queued（幂等重放返回同一 run），后台 worker 执行并流转 running→completed/failed/cancelled；`GET /runs/:id` 查进度与行数，`POST /runs/:id/cancel` 取消（内存 cancel + SQL 状态守卫双保险，worker panic 落 failed 而非僵尸 running）；引擎对四个未接线端口诚实降级为缺口而非崩溃 |
 | S2-6 勾稽门禁 | ✅ | T1–T16 为值；persist 拒绝失败发布；每题有反向测试 |
 | S2-7 版本与情景 | ⚠ | `/financial-model/runs/:id/publish` → forecast `fpna_plan_versions` 带 prior 谱系、幂等；upside/downside/custom 情景化发布与贡献桥 UI 未做 |
 | S2-8 循环引用政策 | ✅ | 期初余额法默认，模式为 ModelPolicy 显式开关并进入快照 |
@@ -548,7 +548,7 @@
 
 ### 代码侧总评
 
-- **S1-5 合同级拆分、S2-3 四个生产适配器、S2-5 异步 Run、S3-4 可见性维度、S4-1/S4-2 生产接线为剩余部分落地项**，缺口在上表逐一列名（S1-7/S1-9 页面消费/S2-9 折叠导出已于 2026-08-19 补齐 ✅）。
+- **S1-5 合同级拆分、S2-3 四个生产适配器、S3-4 可见性维度、S4-1/S4-2 生产接线为剩余部分落地项**，缺口在上表逐一列名（S1-7/S1-9/S2-5/S2-9 与 S3-4 复制删除已于 2026-08-19 补齐 ✅）。
 - 「生产接线未做」一项均为**设计内决策**：Agent Tool 注册时 writer/端口工厂为空 → 工具诚实拒绝，随财务工作台阶段接线（与 SM7/AGENTS.md 现行阶段一致）。
 - 零售经营侧无真实 POS/ERP 联调的状态不变：`unvalidated` 结论口径沿用 AGENTS.md。
 
@@ -564,5 +564,6 @@
 | 2026-08-19 | S1-5 补齐行级 Source Envelope（QryFacts 透出 import_batch_id，逐 KPI 折叠来源系统/批次/版本/as-of），页面增信封卡与行溯源列 |
 | 2026-08-19 | S1-9/S3-5 页面消费落地：store-pnl 页行显隐、分组合并、存视图/读视图（rows_hidden/rows_fold 入 config） |
 | 2026-08-19 | S2-9 三表折叠导出落地：run 行值月/季/年折叠（finmodel.FoldBuckets/FoldMonthValues）+ 活公式工作簿导出端点 |
+| 2026-08-19 | S2-5 异步 Run 落地：queued→running→completed/failed/cancelled、进度查询、取消与幂等重放；引擎端口未接线一律降级为缺口（修掉 nil 端口 panic） |
 | 2026-08-19 | 落地状态对照（附录 E）：S1–S5 逐项标记 ✅/⚠/❌，随代码与测试可复验，缺口列名 |
 | 2026-08-19 | 吸收外部三表方法论评审的两点补充：S2-3 期初导入三道闸（期初表自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）及对应验收；附录 A Step 1 补历史数据标准化归并；附录 B 补三表联动计算顺序图与「通用方法论无租赁维度」防误用提示；附录 C 补公式字面量禁忌的具体 lint 规则 |

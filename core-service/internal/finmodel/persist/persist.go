@@ -41,12 +41,7 @@ func (w *RunWriter) Persist(ctx context.Context, def finmodel.ModelDef, result *
 	if w.repo == nil {
 		return errors.New("finmodel persist: repository unavailable")
 	}
-	snapshot := map[string]any{
-		"model_name": def.Name, "currency": def.Currency, "period_start": def.PeriodStart,
-		"historical_months": def.HistoricalMonths, "forecast_months": def.ForecastMonths,
-		"actual_cutoff_period": def.ActualCutoffPeriod, "policy": def.Policy,
-	}
-	rawSnapshot, err := json.Marshal(snapshot)
+	rawSnapshot, err := Snapshot(def)
 	if err != nil {
 		return err
 	}
@@ -71,6 +66,39 @@ func (w *RunWriter) Persist(ctx context.Context, def finmodel.ModelDef, result *
 	if err := w.repo.CreateModelRun(ctx, run); err != nil {
 		return fmt.Errorf("persist finmodel run: %w", err)
 	}
+	return w.persistResult(ctx, runID, result, now)
+}
+
+// Snapshot renders the input snapshot a run row stores — the same shape the
+// sync and async paths both persist, so replays compare like for like.
+func Snapshot(def finmodel.ModelDef) (json.RawMessage, error) {
+	snapshot := map[string]any{
+		"model_name": def.Name, "currency": def.Currency, "period_start": def.PeriodStart,
+		"historical_months": def.HistoricalMonths, "forecast_months": def.ForecastMonths,
+		"actual_cutoff_period": def.ActualCutoffPeriod, "policy": def.Policy,
+	}
+	return json.Marshal(snapshot)
+}
+
+// PersistInto is the async sibling (S2-5): the run row already exists in
+// queued state, so only the result lines, tie-outs and the completion
+// status are written. The same tie-out gate applies — an async run whose
+// tie-outs fail completes as failed, never as a publishable result.
+func (w *RunWriter) PersistInto(ctx context.Context, runID string, result *finmodel.RunResult) error {
+	if result.TieOutStatus == "failed" {
+		return ErrTieOutFailed
+	}
+	if w.repo == nil {
+		return errors.New("finmodel persist: repository unavailable")
+	}
+	now := w.now()
+	if err := w.persistResult(ctx, runID, result, now); err != nil {
+		return err
+	}
+	return w.repo.UpdateModelRunStatus(ctx, runID, "completed", result.TieOutStatus, &now)
+}
+
+func (w *RunWriter) persistResult(ctx context.Context, runID string, result *finmodel.RunResult, now time.Time) error {
 	lines := make([]repository.FinModelRunLine, 0, len(result.Lines))
 	for _, line := range result.Lines {
 		prov, err := json.Marshal(line.Provenance)

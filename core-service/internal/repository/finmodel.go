@@ -71,6 +71,9 @@ type FinModelRun struct {
 	CreatedBy               *string         `json:"created_by,omitempty"`
 	CreatedAt               time.Time       `json:"created_at"`
 	CompletedAt             *time.Time      `json:"completed_at,omitempty"`
+	// FailureReason holds why an async run failed — honest progress, not a
+	// bare status flip (S2-5).
+	FailureReason *string `json:"failure_reason,omitempty"`
 }
 
 // FinModelRunLine is one (row × period) result cell with provenance. Value is
@@ -248,20 +251,59 @@ func (r *FinModelRepository) CreateModelRun(ctx context.Context, run *FinModelRu
 	return nil
 }
 
-func (r *FinModelRepository) GetModelRun(ctx context.Context, id string) (*FinModelRun, error) {
+const finRunCols = "id, legal_entity_id, model_definition_id, model_definition_version, data_version, assumption_version, exchange_rate_version, metric_definition_version, data_classification, status, tie_out_status, input_snapshot, idempotency_key, created_by, created_at, completed_at, failure_reason"
+
+func scanModelRun(s rowScanner) (*FinModelRun, error) {
 	var run FinModelRun
-	err := r.db.QueryRow(ctx, `SELECT id, legal_entity_id, model_definition_id, model_definition_version, data_version, assumption_version, exchange_rate_version, metric_definition_version, data_classification, status, tie_out_status, input_snapshot, idempotency_key, created_by, created_at, completed_at
-		FROM fin_model_runs WHERE id=$1`, id).
-		Scan(&run.ID, &run.LegalEntityID, &run.ModelDefinitionID, &run.ModelDefinitionVersion,
-			&run.DataVersion, &run.AssumptionVersion, &run.ExchangeRateVersion, &run.MetricDefinitionVersion,
-			&run.DataClassification, &run.Status, &run.TieOutStatus, &run.InputSnapshot, &run.IdempotencyKey,
-			&run.CreatedBy, &run.CreatedAt, &run.CompletedAt)
+	err := s.Scan(&run.ID, &run.LegalEntityID, &run.ModelDefinitionID, &run.ModelDefinitionVersion,
+		&run.DataVersion, &run.AssumptionVersion, &run.ExchangeRateVersion, &run.MetricDefinitionVersion,
+		&run.DataClassification, &run.Status, &run.TieOutStatus, &run.InputSnapshot, &run.IdempotencyKey,
+		&run.CreatedBy, &run.CreatedAt, &run.CompletedAt, &run.FailureReason)
 	return &run, err
+}
+
+func (r *FinModelRepository) GetModelRun(ctx context.Context, id string) (*FinModelRun, error) {
+	return scanModelRun(r.db.QueryRow(ctx, `SELECT `+finRunCols+` FROM fin_model_runs WHERE id=$1`, id))
+}
+
+// FindModelRunByIdempotency locates the run a replayed request already
+// created — replays return the existing run's progress instead of a second
+// record.
+func (r *FinModelRepository) FindModelRunByIdempotency(ctx context.Context, definitionID, key string) (*FinModelRun, error) {
+	run, err := scanModelRun(r.db.QueryRow(ctx, `SELECT id, legal_entity_id, model_definition_id, model_definition_version, data_version, assumption_version, exchange_rate_version, metric_definition_version, data_classification, status, tie_out_status, input_snapshot, idempotency_key, created_by, created_at, completed_at, failure_reason
+		FROM fin_model_runs WHERE model_definition_id=$1 AND idempotency_key=$2
+		ORDER BY created_at DESC LIMIT 1`, definitionID, key))
+	if err != nil {
+		return nil, err
+	}
+	return run, nil
 }
 
 func (r *FinModelRepository) UpdateModelRunStatus(ctx context.Context, id, status, tieOutStatus string, completedAt *time.Time) error {
 	_, err := r.db.Exec(ctx, `UPDATE fin_model_runs SET status=$2, tie_out_status=$3, completed_at=$4 WHERE id=$1`,
 		id, status, tieOutStatus, completedAt)
+	return err
+}
+
+// CancelModelRun stops a queued/running run: the state guard is the WHERE
+// so a completed run cannot be retro-cancelled and a cancelled run cannot
+// be revived.
+func (r *FinModelRepository) CancelModelRun(ctx context.Context, id string) error {
+	tag, err := r.db.Exec(ctx, `UPDATE fin_model_runs SET status='cancelled', completed_at=NOW()
+		WHERE id=$1 AND status IN ('queued','running')`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrInvalidWorkflowTransition
+	}
+	return nil
+}
+
+// FailModelRun records an async failure with its reason.
+func (r *FinModelRepository) FailModelRun(ctx context.Context, id, reason string) error {
+	_, err := r.db.Exec(ctx, `UPDATE fin_model_runs SET status='failed', failure_reason=$2, completed_at=NOW()
+		WHERE id=$1 AND status IN ('queued','running')`, id, reason)
 	return err
 }
 

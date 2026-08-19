@@ -327,6 +327,11 @@ func (s *runState) loadLink(ctx context.Context, row template.Row, period string
 			s.forecastFact(ctx, row, period)
 			return
 		}
+		if s.in.Facts == nil {
+			s.gaps = append(s.gaps, DataGap{Kind: "fact_port_unavailable", Period: period, Detail: "事实端口未接线，行 " + row.Key + " 缺失而非 0"})
+			s.setValue(row.Key, period, nil, prov)
+			return
+		}
 		facts, err := s.in.Facts.Operating(ctx, s.def.LegalEntityID, period)
 		if err != nil {
 			s.setValue(row.Key, period, nil, prov)
@@ -345,6 +350,11 @@ func (s *runState) loadLink(ctx context.Context, row template.Row, period string
 			s.gaps = append(s.gaps, DataGap{Kind: "fact_missing", Period: period, Detail: row.Key + " 缺事实，缺失不显示为 0"})
 		}
 	case strings.HasPrefix(row.Source, "ifrs16."):
+		if s.in.Lease == nil {
+			s.gaps = append(s.gaps, DataGap{Kind: "lease_port_unavailable", Period: period, Detail: "租赁投影端口未接线，行 " + row.Key + " 缺失而非 0"})
+			s.setValue(row.Key, period, nil, prov)
+			return
+		}
 		lease, err := s.in.Lease.Monthly(ctx, s.def.LegalEntityID, period)
 		if err != nil {
 			s.setValue(row.Key, period, nil, prov)
@@ -354,6 +364,11 @@ func (s *runState) loadLink(ctx context.Context, row template.Row, period string
 		value, prov.Ref = leaseField(lease, row.Source)
 		prov.SourceType = "ifrs16_engine"
 	case strings.HasPrefix(row.Source, "sched."):
+		if s.in.Schedules == nil {
+			s.gaps = append(s.gaps, DataGap{Kind: "schedule_port_unavailable", Period: period, Detail: "付款计划端口未接线，行 " + row.Key + " 缺失而非 0"})
+			s.setValue(row.Key, period, nil, prov)
+			return
+		}
 		sched, err := s.in.Schedules.Monthly(ctx, s.def.LegalEntityID, period)
 		if err != nil {
 			s.setValue(row.Key, period, nil, prov)
@@ -365,6 +380,10 @@ func (s *runState) loadLink(ctx context.Context, row template.Row, period string
 		// cf.* handled by resolvetCfAliases after computation; contract.* and
 		// assumption.* resolve through the assumption reader.
 		if strings.HasPrefix(row.Source, "assumption.") || strings.HasPrefix(row.Source, "contract.") {
+			if s.in.Assumptions == nil {
+				s.gaps = append(s.gaps, DataGap{Kind: "assumption_port_unavailable", Period: period, Detail: "假设端口未接线，行 " + row.Key + " 缺失而非 0"})
+				return
+			}
 			raw, err := s.in.Assumptions.Value(ctx, s.def.LegalEntityID, sourceAssumptionKey(row.Source), period)
 			if err == nil && raw != nil {
 				if v, ok := jsonNumber(raw); ok {
@@ -414,9 +433,11 @@ func (s *runState) forecastFact(ctx context.Context, row template.Row, period st
 		return
 	}
 	rate := 0.0
-	if raw, err := s.in.Assumptions.Value(ctx, s.def.LegalEntityID, key, period); err == nil && raw != nil {
-		if v, ok := jsonNumber(raw); ok {
-			rate = v
+	if s.in.Assumptions != nil {
+		if raw, err := s.in.Assumptions.Value(ctx, s.def.LegalEntityID, key, period); err == nil && raw != nil {
+			if v, ok := jsonNumber(raw); ok {
+				rate = v
+			}
 		}
 	}
 	value := *prev * (1 + rate)
@@ -436,8 +457,12 @@ func (s *runState) idxOf(period string) int {
 }
 
 func (s *runState) loadInput(ctx context.Context, row template.Row, period string) {
-	raw, err := s.in.Assumptions.Value(ctx, s.def.LegalEntityID, row.Key, period)
 	prov := Provenance{SourceType: "assumption", Ref: row.Key, DataClassification: s.in.DataClassification}
+	if s.in.Assumptions == nil {
+		s.setValue(row.Key, period, nil, prov)
+		return
+	}
+	raw, err := s.in.Assumptions.Value(ctx, s.def.LegalEntityID, row.Key, period)
 	var value *float64
 	if err == nil && raw != nil {
 		if v, ok := jsonNumber(raw); ok {

@@ -46,6 +46,10 @@ func TestInvariantCaseShape(t *testing.T) {
 			if c.S1Input == nil {
 				t.Fatalf("case %s: s1_input required", c.ID)
 			}
+		case "retail_paper":
+			if c.RetailPaper == nil {
+				t.Fatalf("case %s: retail_paper required", c.ID)
+			}
 		default:
 			t.Fatalf("case %s: unknown category %q", c.ID, c.Category)
 		}

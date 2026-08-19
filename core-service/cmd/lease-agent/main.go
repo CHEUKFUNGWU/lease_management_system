@@ -391,11 +391,15 @@ func runAgentRunEvents(args []string) int {
 	runID := flags.String("run-id", "", "Agent run ID")
 	after := flags.Int("after", 0, "return events after this sequence")
 	limit := flags.Int("limit", 200, "maximum event count")
+	format := flags.String("format", "json", "json, table or ndjson")
 	if err := flags.Parse(args); err != nil {
 		return exitUsage
 	}
 	if strings.TrimSpace(*token) == "" || strings.TrimSpace(*runID) == "" || *after < 0 || *limit < 0 {
 		return printCLIError("--token and --run-id are required; --after/--limit must be non-negative", exitUsage)
+	}
+	if *format != "json" && *format != "table" && *format != "ndjson" {
+		return printCLIError("--format must be json, table or ndjson", exitUsage)
 	}
 	endpoint := joinURL(*baseURL, "/api/v1/agent/runs/"+url.PathEscape(strings.TrimSpace(*runID))+"/events")
 	endpoint = addQuery(endpoint, "after_sequence", fmt.Sprintf("%d", *after))
@@ -404,9 +408,25 @@ func runAgentRunEvents(args []string) int {
 	if err != nil {
 		return printCLIError(err.Error(), exitTransport)
 	}
-	printJSON(body)
 	if status < 200 || status >= 300 {
+		printJSON(body)
 		return printHTTPError(body, status)
+	}
+	switch *format {
+	case "ndjson":
+		formatted, err := formatEventsNDJSON(body)
+		if err != nil {
+			return printCLIError(err.Error(), exitFailed)
+		}
+		fmt.Print(formatted)
+	case "table":
+		formatted, err := formatEventsTable(body)
+		if err != nil {
+			return printCLIError(err.Error(), exitFailed)
+		}
+		fmt.Print(formatted)
+	default:
+		printJSON(body)
 	}
 	return exitOK
 }

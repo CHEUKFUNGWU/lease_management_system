@@ -197,5 +197,48 @@
       "tool_call_id": "call-demo-community"
     },
     "completed_tool_calls": ["call-demo-community"]
+  },
+  {
+    "id": "retail_paper_sanctity",
+    "category": "retail_paper",
+    "description": "retail paper: engine values preserved, nil KPIs skipped, honesty gaps named, lint passes, zero exploratory cells.",
+    "retail_paper": {
+      "pulse": {
+        "pulse_version": "retail-pulse-v1",
+        "formula_version": "retail-kpi-v1",
+        "data_classification": "simulated",
+        "dataset_version": "ds-9",
+        "simulation_dataset_versions": ["ds-9"],
+        "requested_scope": {"legal_entity_id": "LE-1"},
+        "currency": "CNY",
+        "currency_status": "known",
+        "multi_currency": true,
+        "mixed_currency_stores": 3,
+        "fact_version_min": 1,
+        "fact_version_max": 5,
+        "source_systems": ["retail_simulator"],
+        "current_coverage": {"observed_store_days": 9, "expected_store_days": 10, "missing_fields": ["footfall"]},
+        "comparison_coverage": {"observed_store_days": 10, "expected_store_days": 10},
+        "decision_ready": false,
+        "decision_ready_reason": "incomplete_store_day_coverage",
+        "summary": {
+          "revenue": {
+            "current": {"value": 9876543.21, "unit": "currency", "status": "complete"},
+            "comparison": {"value": 9000000, "unit": "currency", "status": "complete"},
+            "change_value": 876543.21,
+            "change_type": "percent"
+          },
+          "footfall": {
+            "current": {"value": null, "unit": "count", "status": "unavailable"},
+            "status": "unavailable"
+          }
+        },
+        "suppressed_attention": [
+          {"store_id": "S-2", "store_name": "新开店", "reasons": ["no_facts_in_requested_range"]}
+        ]
+      },
+      "tool_call_id": "call-retail-eval"
+    },
+    "completed_tool_calls": ["call-retail-eval"]
   }
 ]

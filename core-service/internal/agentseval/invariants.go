@@ -9,12 +9,14 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/services/dealcompare"
 	"github.com/lease-management-system/core-service/internal/services/predeal"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
+	retailpaper "github.com/lease-management-system/core-service/internal/workingpaper/retail"
 	s1 "github.com/lease-management-system/core-service/internal/workingpaper/s1"
 )
 
@@ -39,6 +41,11 @@ type InvariantCase struct {
 	// s1_engine_consistency category (CORR-1 deterministic half): the paper
 	// builder's cells must equal direct engine outputs.
 	S1Input *s1.Input `json:"s1_input,omitempty"`
+
+	// retail_paper category: the retail paper builder must preserve engine
+	// values 1:1, skip nil values, name its gaps, pass the lint and carry no
+	// exploratory cells.
+	RetailPaper *retailpaper.Input `json:"retail_paper,omitempty"`
 }
 
 // TriageInput is the deterministic triage request of a case.
@@ -87,6 +94,8 @@ func EvaluateInvariantCases(cases []InvariantCase) InvariantReport {
 			result.Passed, result.Detail = evaluateTriage(c)
 		case "s1_engine_consistency":
 			result.Passed, result.Detail = evaluateS1Consistency(c)
+		case "retail_paper":
+			result.Passed, result.Detail = evaluateRetailPaper(c)
 		default:
 			result.Passed = false
 			result.Detail = fmt.Sprintf("unknown category %q", c.Category)
@@ -208,6 +217,58 @@ func evaluateS1Consistency(c InvariantCase) (bool, string) {
 		got, ok := byRef["SE-"+fmt.Sprint(shock)+"-liability"]
 		if !ok || got.Value != shocked.BalanceSheet.InitialLiability {
 			return false, fmt.Sprintf("shock %v cell diverges: paper=%v engine=%v", shock, got.Value, shocked.BalanceSheet.InitialLiability)
+		}
+	}
+	return true, ""
+}
+
+// evaluateRetailPaper runs the retail paper builder on a fixture and asserts
+// the retail-paper sanctity rules: engine values preserved verbatim, nil
+// values produce no cells, honesty gaps are named, the fail-closed lint
+// passes with the anchored audited call, and zero exploratory cells exist.
+func evaluateRetailPaper(c InvariantCase) (bool, string) {
+	if c.RetailPaper == nil {
+		return false, "retail_paper is required for retail_paper cases"
+	}
+	in := *c.RetailPaper
+	if in.ToolCallID == "" {
+		in.ToolCallID = "eval-retail-call"
+	}
+	paper, err := retailpaper.Build(in)
+	if err != nil {
+		return false, fmt.Sprintf("retail paper build failed: %v", err)
+	}
+	built := workingpaper.Build(paper, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	rep := workingpaper.Lint(built, makeAuditSet([]string{in.ToolCallID}))
+	if !rep.OK {
+		return false, fmt.Sprintf("retail paper failed lint: %+v", rep.Violations)
+	}
+	if refs := built.ExploratoryRefs(); len(refs) != 0 {
+		return false, fmt.Sprintf("retail paper must have no exploratory cells, got %v", refs)
+	}
+	byRef := map[string]workingpaper.Cell{}
+	for _, cc := range built.AllCells() {
+		if cc.Value == nil {
+			return false, fmt.Sprintf("cell %s must never carry a nil value (missing must be skipped)", cc.Ref)
+		}
+		byRef[cc.Ref] = cc
+	}
+	// The deliberately nil KPI in the fixture must not appear as a cell.
+	if _, present := byRef["P-footfall-current"]; present {
+		return false, "nil KPI footfall must be skipped, not zero-filled"
+	}
+	// Engine value preserved verbatim.
+	if got := byRef["P-revenue-current"].Value.(float64); got != 9876543.21 {
+		return false, fmt.Sprintf("cell P-revenue-current = %v, engine says 9876543.21", got)
+	}
+	// Honesty gaps must be named.
+	joined := ""
+	for _, g := range built.DataGaps {
+		joined += g + "|"
+	}
+	for _, want := range []string{"多币种", "模拟（SIMULATED）", "被抑制"} {
+		if !strings.Contains(joined, want) {
+			return false, fmt.Sprintf("gap %q missing; gaps=%v", want, built.DataGaps)
 		}
 	}
 	return true, ""

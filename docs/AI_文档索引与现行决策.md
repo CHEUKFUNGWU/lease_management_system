@@ -44,6 +44,8 @@ FP&A 版本治理与滚动预测
 | [CodebaseDesign：AI 阶段 0 与 W1 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) | **Current** | **实施级设计**。W1（agentcore）+ 阶段 0（workingpaper / docparse / triage / CLI / Web / 评测）的深模块接口、seam、决策留痕 D-A~G、验收映射 |
 | [CodebaseDesign：AI 阶段 1 与 W2 模块深化](CodebaseDesign_AI阶段1与W2_模块深化.md) | **Current** | **实施级设计**。W2（治理中间件链 + ACORE-2 变异测试）+ 阶段 1（sensitivity 工具、S1 签约前底稿构建器与工具、aiagent 接线、CORR-1 评测）的接口与决策留痕 D-B1~B5 |
 | [CodebaseDesign：AI 阶段 3 零售经营底稿模块深化](CodebaseDesign_AI阶段3零售经营底稿_模块深化.md) | **Current** | **实施级设计**。零售经营底稿（收尾底稿主线的产品决策 D-C1~C5）：retailpulse/store360/scenario 引擎 → 全 Certified 经营底稿 |
+| [CodebaseDesign：AI 阶段 4 PageFill 填表缝模块深化](CodebaseDesign_AI阶段4_PageFill填表缝_模块深化.md) | **Current** | page_fill 协议（Exploratory 结构性不入 payload，I5/ACORE-12）、`retail.store_days.import.preview` 工具、导入页 `?fill=` 消费；D-D1~D3 |
+| [CodebaseDesign：AI 阶段 5 MinIO 接线与三入口汇流模块深化](CodebaseDesign_AI阶段5_MinIO接线与三入口汇流_模块深化.md) | **Current** | MinIO 读取接线（page_fill 点亮）、三入口统一、G1 两平面汇流；D-E1~E4。**M1 已交付，M2/M3 进行中** |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current | 业务需求有效。**§9 制造功能已标注为不在当前范围**；§12 的工具勾选表已移除，实现状态以代码为准 |
 | ~~PRD：租赁经营决策与 AI Copilot 平台~~ | **已归档** `archive/superseded-prds-2026-08/` | 编于零售转型前，标题与内容以「租赁」为主体；产品边界已由零售 PRD (P0–P5) 与财务BP/FP&A PRD (F0–F9) 取代 |
 | ~~AI Agent 填表升级（tau + anydoc）实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | tau 作废（ADR-0022）；anydoc 与填表缝**已迁入** Agent Core 设计 §8.2 与附录 A |

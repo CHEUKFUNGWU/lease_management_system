@@ -506,7 +506,7 @@
 |---|---|---|
 | S2-1 模型范围与冻结线 | ✅ | `fin_model_definitions`（实体/期间/actual_cutoff）；快照留痕 |
 | S2-2 三表内置结构 | ⚠ | `DefaultStatementTemplate` 三表+附表行结构在手；租赁附表行依赖 LeaseRollforwardReader（生产中为空 → 诚实缺失） |
-| S2-3 输入带版本与溯源 | ⚠ | 五条版本线随 run 持久化；事实/租赁/付款计划/期初四个生产适配器仍为空（缺口有注释与诚实降级路径） |
+| S2-3 输入带版本与溯源 | ⚠ | 五条版本线随 run 持久化；**FactReader 已接生产**（store-day 事实折叠为实体-月营口径，覆盖不足/混币降级），租赁/付款计划/期初三个生产适配器仍诚实降级（有注释与降级路径） |
 | S2-4 预测驱动 | ⚠ | 期初余额法计息/SSSG/growth/比率驱动在引擎内；新店爬坡组合驱动未做 |
 | S2-5 模型运行 | ✅ | `async=true` 走异步路径：run 先行落库 queued（幂等重放返回同一 run），后台 worker 执行并流转 running→completed/failed/cancelled；`GET /runs/:id` 查进度与行数，`POST /runs/:id/cancel` 取消（内存 cancel + SQL 状态守卫双保险，worker panic 落 failed 而非僵尸 running）；引擎对四个未接线端口诚实降级为缺口而非崩溃 |
 | S2-6 勾稽门禁 | ✅ | T1–T16 为值；persist 拒绝失败发布；每题有反向测试 |
@@ -532,11 +532,11 @@
 
 | 项 | 状态 | 落地物 / 缺口 |
 |---|---|---|
-| S4-1 读取与试算工具 | ⚠ | `fpna.statement_model.read/evaluate` 已注册；生产端口工厂为空 → 诚实拒绝 |
-| S4-2 假设建议 | ⚠ | `fpna.assumptions.suggest` 完整（含依据强制）；AGENT 注册处 writer 为空 → 诚实拒绝 |
+| S4-1 读取与试算工具 | ✅ | `fpna.statement_model.read/evaluate` 已接生产端口（StatementReader 读 run/定义/模板；PortsBuilder 加载定义+模板+FactReader+approved 假设叠加请求覆盖，走同一确定性引擎）；轻量测试适配器仍诚实拒绝 |
+| S4-2 假设建议 | ✅ | `fpna.assumptions.suggest` 接生产 DraftWriter：draft 行落 `fpna_assumption_versions`（source=ai_suggestion、evidence、confidence），approved-only 读取永不回采 draft（测试锁定） |
 | S4-3 批量初稿 + 无法建议项 | ✅ | `suggestion.PlanBatch` 纯引擎（分块/置信度/不编造）+ 工具 + 测试 |
-| S4-4 差异解释四层备忘录 | ✅ | `memo.Bridge/Compose` 残差显式 + `fpna.memos.model_diff.draft` + 测试 |
-| S4-5 finmodel 底稿 | ✅ | 构建器 + xlsx/docx + 五版本封面；注册处 writer 为空 → 诚实拒绝 |
+| S4-4 差异解释四层备忘录 | ✅ | `memo.Bridge/Compose` 残差显式 + `fpna.memos.model_diff.draft` 接生产 writer（CreateMemo 落 `fpna_decision_memos`）+ 测试 |
+| S4-5 finmodel 底稿 | ✅ | 构建器 + xlsx/docx + 五版本封面；`fpna.working_paper.finmodel.generate` 接生产端口（PortsBuilder），未接线环境仍诚实拒绝 |
 
 ### S5 集团合并视图
 
@@ -548,7 +548,7 @@
 
 ### 代码侧总评
 
-- **S1-5 合同级拆分、S2-3 四个生产适配器、S4-1/S4-2 生产接线为剩余部分落地项**，缺口在上表逐一列名（S3-4 全量已于 2026-08-19 补齐 ✅）。
+- **S1-5 合同级拆分、S2-3 三个生产适配器（租赁/付款计划/期初）为剩余部分落地项**（依 AGENTS.md：真实 POS/ERP/GL 联调是试点第一阻塞项，接线后即失效）；S4 工具全部接生产 writer/端口 ✅。
 - 「生产接线未做」一项均为**设计内决策**：Agent Tool 注册时 writer/端口工厂为空 → 工具诚实拒绝，随财务工作台阶段接线（与 SM7/AGENTS.md 现行阶段一致）。
 - 零售经营侧无真实 POS/ERP 联调的状态不变：`unvalidated` 结论口径沿用 AGENTS.md。
 
@@ -566,5 +566,6 @@
 | 2026-08-19 | S2-9 三表折叠导出落地：run 行值月/季/年折叠（finmodel.FoldBuckets/FoldMonthValues）+ 活公式工作簿导出端点 |
 | 2026-08-19 | S2-5 异步 Run 落地：queued→running→completed/failed/cancelled、进度查询、取消与幂等重放；引擎端口未接线一律降级为缺口（修掉 nil 端口 panic） |
 | 2026-08-19 | S3-4 收尾：模板 shared/personal 可见性 + 列表端点 + 个人草稿 owner 守卫，复制/删除/复核/批准全量落地 |
+| 2026-08-19 | S2-3 FactReader 接生产（store-day 事实折叠实体-月事实）；S4 工具全部接生产（read/evaluate/paper 端口 + suggest/batch 写口 + model_diff 备忘录写口） |
 | 2026-08-19 | 落地状态对照（附录 E）：S1–S5 逐项标记 ✅/⚠/❌，随代码与测试可复验，缺口列名 |
 | 2026-08-19 | 吸收外部三表方法论评审的两点补充：S2-3 期初导入三道闸（期初表自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）及对应验收；附录 A Step 1 补历史数据标准化归并；附录 B 补三表联动计算顺序图与「通用方法论无租赁维度」防误用提示；附录 C 补公式字面量禁忌的具体 lint 规则 |

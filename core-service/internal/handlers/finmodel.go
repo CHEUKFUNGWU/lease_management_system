@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/lease-management-system/core-service/internal/finmodel"
+	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/finmodel/opening"
 	"github.com/lease-management-system/core-service/internal/finmodel/persist"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
@@ -32,6 +33,7 @@ type FinModelHandler struct {
 	audit *audit.Logger
 	fx    *repository.ExchangeRateRepository
 	plans *repository.FPnAGovernanceRepository
+	facts finadapter.FactsSource
 	// cancels maps an async run id to its cancel func; entries disappear
 	// when the goroutine exits.
 	cancels sync.Map
@@ -59,6 +61,14 @@ func (h *FinModelHandler) WithExchangeRates(fx *repository.ExchangeRateRepositor
 // path writes its plan_version lineage into (S2-7).
 func (h *FinModelHandler) WithPlanGovernance(plans *repository.FPnAGovernanceRepository) *FinModelHandler {
 	h.plans = plans
+	return h
+}
+
+// WithFacts attaches the S2-3 production fact reader: entity-month
+// operating aggregates folded from store-day facts feed the engine's
+// Actual window instead of the honest-gap degradation.
+func (h *FinModelHandler) WithFacts(facts finadapter.FactsSource) *FinModelHandler {
+	h.facts = facts
 	return h
 }
 
@@ -497,12 +507,17 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 	if def.Currency == "" {
 		def.Currency = "CNY"
 	}
+	var factsReader finmodel.FactReader
+	if h.facts != nil {
+		factsReader = finadapter.NewFactReader(h.facts)
+	}
 	inputs := finmodel.ModelInputs{
 		Assumptions:        assumptionOverlay{repo: h.repo, legalEntityID: defRow.LegalEntityID, base: req.Assumptions, period: def.PeriodStart},
 		Versions:           req.Versions,
 		DataClassification: orDefault(req.DataClassification, "production"),
-		// 事实与租赁端口的生产适配器随 GL/计量投影接线落地——缺失时诚实降级为缺口。
-		Facts: nil, Lease: nil, Schedules: nil, Opening: nil,
+		// Facts 已接 store-day 事实折叠（S2-3）；租赁/付款计划/期初三个
+		// 生产适配器接线前：诚实降级为缺口。
+		Facts: factsReader, Lease: nil, Schedules: nil, Opening: nil,
 	}
 
 	if req.Async {

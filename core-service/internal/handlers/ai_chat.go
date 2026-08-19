@@ -15,6 +15,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/aiagent"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/errcontract"
+	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/agentguard"
@@ -136,9 +137,12 @@ func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
 	retail agenttooldefs.RetailOperationsReader,
 	sensitivity agenttooldefs.SensitivityReader,
 	fillReader agenttooldefs.IngestFileReader,
+	finModelRepo *repository.FinModelRepository,
+	facts finadapter.FactsSource,
+	plans *repository.FPnAGovernanceRepository,
 	draftServices ...*draftapp.Service,
 ) *AIChatHandler {
-	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, draftServices...)
+	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, finModelRepo, facts, plans, draftServices...)
 	handler := &AIChatHandler{runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
 	handler.agentRuntime = aichat.NewRuntime(runtimeRepo, agent, agent, aiagent.ProjectResult, aichat.Options{ReviewCommit: handler.commitReviewTransaction})
 	return handler

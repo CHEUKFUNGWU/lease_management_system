@@ -22,6 +22,7 @@ import (
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/aiintake"
+	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/pagefill"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
@@ -57,11 +58,11 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 // NewWithOperationalReadersAndGovernanceAndRetail is the production
 // constructor: it wires the operating-facts / close-readiness / control /
 // governance / retail seams into the same governed Agent Tool Runtime.
-func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, draftServices...)
+func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, finModelRepo, facts, plans, draftServices...)
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, draftServices ...*draftapp.Service) *Agent {
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
@@ -108,16 +109,40 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 	if err := registry.Register(agenttooldefs.NewFinModelPaperDefinition(nil)); err == nil {
 		registered = true
 	}
-	if err := registry.Register(agenttooldefs.NewAssumptionSuggestionDefinition(nil)); err == nil {
-		registered = true
-	}
-	// S4-3 / S4-4：批量假设初稿（按区块）与模型差异四层备忘录。与 SM7 同一
-	// 策略：写入端口当前为空，工具诚实拒绝；生产接线随工作台阶段落地。
-	if err := registry.Register(agenttooldefs.NewAssumptionSuggestionBatchDefinition(nil)); err == nil {
-		registered = true
-	}
-	if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(nil)); err == nil {
-		registered = true
+	// S4 / SM7 工具：生产接线真实可用时直接绑定写端口与读取端口；未接线
+	// （如轻量测试适配器）保持诚实拒绝。写入路径全部 draft-only。
+	if finModelRepo == nil {
+		if err := registry.Register(agenttooldefs.NewAssumptionSuggestionDefinition(nil)); err == nil {
+			registered = true
+		}
+		if err := registry.Register(agenttooldefs.NewAssumptionSuggestionBatchDefinition(nil)); err == nil {
+			registered = true
+		}
+		if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(nil)); err == nil {
+			registered = true
+		}
+	} else {
+		writer := finadapter.NewDraftWriter(finModelRepo)
+		ports := finadapter.NewPortsBuilder(finModelRepo, facts)
+		reader := finadapter.NewStatementReader(finModelRepo)
+		for _, definition := range []agenttools.ToolDefinition{
+			agenttooldefs.NewStatementModelReadDefinition(reader),
+			agenttooldefs.NewStatementModelEvaluateDefinition(ports),
+			agenttooldefs.NewFinModelPaperDefinition(ports),
+			agenttooldefs.NewAssumptionSuggestionDefinition(writer),
+			agenttooldefs.NewAssumptionSuggestionBatchDefinition(writer),
+		} {
+			if err := registry.Register(definition); err == nil {
+				registered = true
+			}
+		}
+		if plans != nil {
+			if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(plans)); err == nil {
+				registered = true
+			}
+		} else if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(nil)); err == nil {
+			registered = true
+		}
 	}
 	if len(draftServices) > 0 && draftServices[0] != nil {
 		if err := registry.Register(agenttooldefs.NewContractDraftDefinition(draftServices[0])); err == nil {

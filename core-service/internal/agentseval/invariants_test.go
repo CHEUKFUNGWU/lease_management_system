@@ -42,6 +42,10 @@ func TestInvariantCaseShape(t *testing.T) {
 			if c.Triage == nil || c.ExpectedDocClass == "" {
 				t.Fatalf("case %s: triage + expected_doc_class required", c.ID)
 			}
+		case "s1_engine_consistency":
+			if c.S1Input == nil {
+				t.Fatalf("case %s: s1_input required", c.ID)
+			}
 		default:
 			t.Fatalf("case %s: unknown category %q", c.ID, c.Category)
 		}

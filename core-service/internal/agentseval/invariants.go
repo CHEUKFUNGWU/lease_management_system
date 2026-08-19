@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/agenttools/tools"
+	"github.com/lease-management-system/core-service/internal/services/dealcompare"
+	"github.com/lease-management-system/core-service/internal/services/predeal"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
+	s1 "github.com/lease-management-system/core-service/internal/workingpaper/s1"
 )
 
 //go:embed testdata/agent-invariants.v1.json
@@ -21,7 +24,7 @@ var casesJSON []byte
 // InvariantCase is one deterministic L1 case.
 type InvariantCase struct {
 	ID          string `json:"id"`
-	Category    string `json:"category"` // provenance | triage_refusal
+	Category    string `json:"category"` // provenance | triage_refusal | s1_engine_consistency
 	Description string `json:"description,omitempty"`
 
 	// provenance category
@@ -32,6 +35,10 @@ type InvariantCase struct {
 	// triage_refusal category
 	Triage           *TriageInput `json:"triage,omitempty"`
 	ExpectedDocClass string       `json:"expected_doc_class,omitempty"`
+
+	// s1_engine_consistency category (CORR-1 deterministic half): the paper
+	// builder's cells must equal direct engine outputs.
+	S1Input *s1.Input `json:"s1_input,omitempty"`
 }
 
 // TriageInput is the deterministic triage request of a case.
@@ -78,6 +85,8 @@ func EvaluateInvariantCases(cases []InvariantCase) InvariantReport {
 			result.Passed, result.Detail = evaluateProvenance(c)
 		case "triage_refusal":
 			result.Passed, result.Detail = evaluateTriage(c)
+		case "s1_engine_consistency":
+			result.Passed, result.Detail = evaluateS1Consistency(c)
 		default:
 			result.Passed = false
 			result.Detail = fmt.Sprintf("unknown category %q", c.Category)
@@ -117,6 +126,88 @@ func evaluateProvenance(c InvariantCase) (bool, string) {
 	for code := range want {
 		if !got[code] {
 			return false, fmt.Sprintf("missing expected violation %q", code)
+		}
+	}
+	return true, ""
+}
+
+// evaluateS1Consistency is CORR-1's deterministic half: every engine-derived
+// paper cell must equal the engine's direct output, the paper must pass the
+// fail-closed lint with its own audited call, and no cell may be exploratory.
+func evaluateS1Consistency(c InvariantCase) (bool, string) {
+	if c.S1Input == nil {
+		return false, "s1_input is required for s1_engine_consistency cases"
+	}
+	in := *c.S1Input
+	if in.ToolCallID == "" {
+		in.ToolCallID = "eval-s1-call"
+	}
+	paper, err := s1.Build(in)
+	if err != nil {
+		return false, fmt.Sprintf("s1.Build failed: %v", err)
+	}
+	built := workingpaper.Build(paper, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	rep := workingpaper.Lint(built, makeAuditSet([]string{in.ToolCallID}))
+	if !rep.OK {
+		return false, fmt.Sprintf("paper failed lint: %+v", rep.Violations)
+	}
+	if refs := built.ExploratoryRefs(); len(refs) != 0 {
+		return false, fmt.Sprintf("S1 paper must have no exploratory cells, got %v", refs)
+	}
+
+	direct, err := predeal.Build(in.Draft)
+	if err != nil {
+		return false, fmt.Sprintf("direct predeal build failed: %v", err)
+	}
+	byRef := map[string]workingpaper.Cell{}
+	for _, cc := range built.AllCells() {
+		byRef[cc.Ref] = cc
+	}
+	checks := []struct {
+		ref  string
+		want any
+	}{
+		{"IF-1", direct.BalanceSheet.InitialLiability},
+		{"IF-2", direct.BalanceSheet.InitialROU},
+		{"IF-3", direct.DiscountRate},
+	}
+	for _, chk := range checks {
+		got, ok := byRef[chk.ref]
+		if !ok {
+			return false, fmt.Sprintf("missing cell %s", chk.ref)
+		}
+		if got.Value != chk.want {
+			return false, fmt.Sprintf("cell %s = %v, engine says %v", chk.ref, got.Value, chk.want)
+		}
+	}
+	for _, y := range direct.Yearly {
+		got, ok := byRef["IF-"+fmt.Sprint(y.Year)+"-interest"]
+		if !ok || got.Value != y.Interest {
+			return false, fmt.Sprintf("yearly interest cell for year %d diverges: paper=%v engine=%v", y.Year, got.Value, y.Interest)
+		}
+	}
+	if len(in.Offers) >= 2 {
+		comparison, err := dealcompare.Compare(dealcompare.Input{DiscountRate: in.Draft.DiscountRate, Currency: in.Draft.Currency, Offers: in.Offers})
+		if err != nil {
+			return false, fmt.Sprintf("direct compare failed: %v", err)
+		}
+		for _, o := range comparison.Offers {
+			got, ok := byRef["DC-"+o.Name+"-pv"]
+			if !ok || got.Value != o.PresentValue {
+				return false, fmt.Sprintf("compare cell for %s diverges: paper=%v engine=%v", o.Name, got.Value, o.PresentValue)
+			}
+		}
+	}
+	for _, shock := range in.ShocksPercent {
+		variant := in.Draft
+		variant.DiscountRate = in.Draft.DiscountRate * (1 + shock)
+		shocked, err := predeal.Build(variant)
+		if err != nil {
+			return false, fmt.Sprintf("shock build failed: %v", err)
+		}
+		got, ok := byRef["SE-"+fmt.Sprint(shock)+"-liability"]
+		if !ok || got.Value != shocked.BalanceSheet.InitialLiability {
+			return false, fmt.Sprintf("shock %v cell diverges: paper=%v engine=%v", shock, got.Value, shocked.BalanceSheet.InitialLiability)
 		}
 	}
 	return true, ""

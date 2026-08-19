@@ -145,5 +145,57 @@
     "description": "store sales data classifies as operating_data",
     "triage": {"object_name": "门店销售数据_202607.xlsx", "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
     "expected_doc_class": "operating_data"
+  },
+  {
+    "id": "s1_engine_consistency_core_district",
+    "category": "s1_engine_consistency",
+    "description": "simulated quote: a core-district store. Paper cells must equal predeal/dealcompare direct outputs, pass lint, carry zero exploratory cells (CORR-1).",
+    "s1_input": {
+      "draft": {
+        "name": "仿真报价：核心商圈 A 店",
+        "commencement_date": "2027-01-01T00:00:00Z",
+        "term_months": 36,
+        "monthly_rent": 58000,
+        "rent_free_months": 2,
+        "annual_escalation_percent": 3,
+        "discount_rate": 0.0485,
+        "currency": "CNY",
+        "initial_direct_cost": 90000,
+        "early_exit_penalty_months": 3
+      },
+      "offers": [
+        {"name": "核心商圈 A 店", "term_months": 36, "base_monthly_rent": 58000, "rent_free_months": 2, "annual_escalation_percent": 3, "area_sqm": 135},
+        {"name": "次级商圈 B 店", "term_months": 36, "base_monthly_rent": 46000, "rent_free_months": 1, "annual_escalation_percent": 4, "area_sqm": 150}
+      ],
+      "shocks_percent": [-0.02, -0.01, 0.01, 0.02],
+      "confirmed_by": "bp-demo",
+      "confirmed_at": "2026-08-19T10:00:00Z",
+      "tool_call_id": "call-demo-core"
+    },
+    "completed_tool_calls": ["call-demo-core"]
+  },
+  {
+    "id": "s1_engine_consistency_community_store",
+    "category": "s1_engine_consistency",
+    "description": "simulated quote: a community store with a longer free-rent period. Same CORR-1 assertions.",
+    "s1_input": {
+      "draft": {
+        "name": "仿真报价：社区店 C",
+        "commencement_date": "2027-03-01T00:00:00Z",
+        "term_months": 24,
+        "monthly_rent": 32000,
+        "rent_free_months": 3,
+        "annual_escalation_percent": 2,
+        "discount_rate": 0.052,
+        "currency": "CNY",
+        "initial_direct_cost": 40000,
+        "early_exit_penalty_months": 2
+      },
+      "shocks_percent": [-0.01, 0.01],
+      "confirmed_by": "bp-demo",
+      "confirmed_at": "2026-08-19T10:00:00Z",
+      "tool_call_id": "call-demo-community"
+    },
+    "completed_tool_calls": ["call-demo-community"]
   }
 ]

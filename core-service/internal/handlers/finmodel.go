@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -150,6 +151,62 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 	c.JSON(http.StatusOK, payload)
 }
 
+// GroupRuns is GET /financial-model/group?run_ids=a,b&exchange_rate_version=. It
+// renders the SM8 aggregate: explicit unauthorized members, currency
+// discipline and ties-out with the member details.
+func (h *FinModelHandler) GroupRuns(c *gin.Context) {
+	runIDs := strings.Split(c.Query("run_ids"), ",")
+	exchangeRateVersion := strings.TrimSpace(c.Query("exchange_rate_version"))
+	if len(runIDs) == 0 || (len(runIDs) == 1 && strings.TrimSpace(runIDs[0]) == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "run_ids is required"})
+		return
+	}
+	tenant := middleware.GetTenantID(c)
+	var members []finmodel.GroupRunInput
+	for _, id := range runIDs {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if h.repo == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+			return
+		}
+		run, err := h.repo.GetModelRun(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "run not found: " + id})
+			return
+		}
+		lines, err := h.repo.ListRunLines(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		values := map[string]*float64{}
+		periodMap := map[string]bool{}
+		for _, line := range lines {
+			values[line.RowKey+"@"+line.Period] = line.Value
+			periodMap[line.Period] = true
+		}
+		periods := make([]string, 0, len(periodMap))
+		for period := range periodMap {
+			periods = append(periods, period)
+		}
+		sortStrings(periods)
+		members = append(members, finmodel.GroupRunInput{
+			RunID: id, LegalEntityID: run.LegalEntityID,
+			Authorized: run.LegalEntityID == tenant || tenant == "",
+			Currency:   "CNY", Periods: periods, Lines: values,
+		})
+	}
+	summary, err := finmodel.Summarize(members, exchangeRateVersion)
+	if err != nil {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"group": summary})
+}
+
 func (h *FinModelHandler) ListDefinitions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"definitions": []any{}}) // 列表 UI 逐步填充；创建与运行已是真实路径
 }
@@ -201,6 +258,8 @@ func orDefault(s, fallback string) string {
 	}
 	return s
 }
+
+func sortStrings(values []string) { sort.Strings(values) }
 
 func periodStartOf(cutoff *string) string {
 	if cutoff == nil {

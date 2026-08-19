@@ -320,6 +320,7 @@ func main() {
 		protected.Handle(http.MethodPost, "/financial-model/opening/validate", permission("fin_models", "write"), finModelHandler.ValidateOpening)
 		protected.Handle(http.MethodPost, "/financial-model/definitions/:id/runs", permission("fin_models", "write"), finModelHandler.RunDefinition)
 		protected.Handle(http.MethodGet, "/financial-model/definitions", permission("fin_models", "write"), finModelHandler.ListDefinitions)
+		protected.Handle(http.MethodGet, "/financial-model/group", permission("reports", "read"), finModelHandler.GroupRuns)
 		protected.Handle(http.MethodGet, "/retail/kpis/definitions", permission("reports", "read"), retailKPIHandler.Definitions)
 		protected.Handle(http.MethodGet, "/retail/exports/descriptors", permission("reports", "read"), retailExportHandler.Descriptors)
 		protected.Handle(http.MethodGet, "/retail/kpis/store-days", permission("reports", "read"), retailKPIHandler.StoreDays)

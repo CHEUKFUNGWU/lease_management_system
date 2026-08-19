@@ -61,6 +61,7 @@ export const PALETTE_PAGES: PalettePageDef[] = [
   // 零售经营主线（admin / readonly / auditor）
   { path: "/operating-pulse", labelKey: "nav.operating_pulse", group: "analysis", visible: byGroup("analysis") },
   { path: "/store-360", labelKey: "nav.store_360", group: "analysis", visible: byGroup("analysis") },
+  { path: "/store-pnl", labelKey: "nav.store_pnl", group: "analysis", visible: byGroup("analysis") },
   { path: "/scenario-workbench", labelKey: "nav.scenario_workbench", group: "analysis", visible: byGroup("analysis") },
   { path: "/fpna-workbench", labelKey: "nav.fpna_workbench", group: "analysis", visible: byGroup("analysis") },
   { path: "/performance", labelKey: "nav.performance", group: "analysis", visible: byGroup("analysis") },

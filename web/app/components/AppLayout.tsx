@@ -99,6 +99,7 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
           children: [
             item("/operating-pulse", "/operating-pulse", <LineChartOutlined />, t("nav.operating_pulse", language as any)),
             item("/store-360", "/store-360", <LineChartOutlined />, t("nav.store_360", language as any)),
+            item("/store-pnl", "/store-pnl", <FileTextOutlined />, t("nav.store_pnl", language as any)),
             item("/scenario-workbench", "/scenario-workbench", <LineChartOutlined />, t("nav.scenario_workbench", language as any)),
             item("/fpna-workbench", "/fpna-workbench", <CalculatorOutlined />, t("nav.fpna_workbench", language as any)),
             item("/performance", "/performance", <DashboardOutlined />, t("nav.performance", language as any)),

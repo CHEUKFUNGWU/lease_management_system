@@ -322,6 +322,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/stores/:id/pnl", permission("reports", "read"), storePnlHandler.Projection)
 		protected.Handle(http.MethodGet, "/store-pnl/aggregate", permission("reports", "read"), storePnlHandler.AggregateProjection)
 		protected.Handle(http.MethodPost, "/financial-model/templates", permission("statement_templates", "write"), finModelHandler.CreateTemplate)
+		protected.Handle(http.MethodGet, "/financial-model/templates", permission("statement_templates", "read"), finModelHandler.ListTemplates)
 		protected.Handle(http.MethodPost, "/financial-model/templates/:id/review", permission("statement_templates", "review"), finModelHandler.ReviewTemplate)
 		protected.Handle(http.MethodPost, "/financial-model/templates/:id/approve", permission("statement_templates", "approve"), templateApprovalSeparation, finModelHandler.ApproveTemplate)
 		protected.Handle(http.MethodPost, "/financial-model/templates/:id/copy", permission("statement_templates", "write"), finModelHandler.CopyTemplate)

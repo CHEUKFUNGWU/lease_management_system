@@ -62,27 +62,76 @@ func (h *FinModelHandler) WithPlanGovernance(plans *repository.FPnAGovernanceRep
 	return h
 }
 
-// CreateTemplate saves a parsed template (illegal templates never persist).
+// CreateTemplate saves a parsed template (illegal templates never
+// persist). Visibility is the S3-4 dimension: shared (the default, bound
+// to the caller's legal entity) vs personal (creator-owned draft,
+// legal_entity_id NULL — visible to its creator only).
 func (h *FinModelHandler) CreateTemplate(c *gin.Context) {
 	userID, ok := userID(c)
 	if !ok {
 		return
 	}
-	var def template.TemplateDef
-	if err := decodeStrictJSON(c, &def); err != nil {
+	var req struct {
+		template.TemplateDef
+		Visibility string `json:"visibility,omitempty"`
+	}
+	if err := decodeStrictJSON(c, &req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	legalEntityID := middleware.GetTenantID(c)
 	var entityPtr *string
-	if legalEntityID != "" {
+	switch strings.TrimSpace(req.Visibility) {
+	case "", "shared":
+		if legalEntityID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "a shared template requires a legal entity scope"})
+			return
+		}
 		entityPtr = &legalEntityID
+	case "personal":
+		entityPtr = nil // 个人草稿：仅创建者可见
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "visibility must be shared or personal"})
+		return
 	}
-	if _, err := h.repo.SaveStatementTemplate(c.Request.Context(), def, entityPtr, &userID, uuid.NewString()); err != nil {
+	if _, err := h.repo.SaveStatementTemplate(c.Request.Context(), req.TemplateDef, entityPtr, &userID, uuid.NewString()); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"saved": true, "name": def.Name, "version": def.Version})
+	c.JSON(http.StatusCreated, gin.H{"saved": true, "name": req.Name, "version": req.Version, "visibility": deref2(entityPtr)})
+}
+
+// ListTemplates serves the S3-4 visibility surface: entity-shared
+// templates plus the caller's personal drafts; optional status and
+// visibility filters.
+func (h *FinModelHandler) ListTemplates(c *gin.Context) {
+	userID, ok := userID(c)
+	if !ok {
+		return
+	}
+	if h.repo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		return
+	}
+	tenant := middleware.GetTenantID(c)
+	var tenantPtr *string
+	if tenant != "" {
+		tenantPtr = &tenant
+	}
+	rows, err := h.repo.ListStatementTemplates(c.Request.Context(), tenantPtr, userID,
+		strings.TrimSpace(c.Query("status")), strings.TrimSpace(c.Query("visibility")))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"templates": rows})
+}
+
+func deref2(s *string) string {
+	if s == nil {
+		return "personal"
+	}
+	return "shared"
 }
 
 // ReviewTemplate is the reviewer hop of the S3-4 three-state flow.
@@ -364,6 +413,17 @@ func (h *FinModelHandler) requireScopedTemplate(c *gin.Context, id string) error
 	if tenant != "" && row.LegalEntityID != nil && *row.LegalEntityID != tenant {
 		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
 		return errors.New("template outside caller scope")
+	}
+	// 个人草稿（legal_entity_id NULL）：仅创建者（或全局 admin）可操作。
+	if row.LegalEntityID == nil {
+		userID, ok := userID(c)
+		if !ok {
+			return errors.New("missing user context")
+		}
+		if tenant != "" && (row.CreatedBy == nil || *row.CreatedBy != userID) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+			return errors.New("personal template outside caller ownership")
+		}
 	}
 	return nil
 }

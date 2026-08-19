@@ -218,6 +218,39 @@ func (r *FinModelRepository) DeleteStatementTemplate(ctx context.Context, id str
 	return nil
 }
 
+// ListStatementTemplates serves the S3-4 visibility model: a caller sees
+// the templates shared inside their legal entity plus their own personal
+// drafts (legal_entity_id IS NULL + created_by = caller); a global admin
+// sees everything. The visibility filter narrows the result to one class.
+func (r *FinModelRepository) ListStatementTemplates(ctx context.Context, tenantID *string, userID, status, visibility string) ([]*FinStatementTemplate, error) {
+	query := `SELECT ` + finTemplateCols + ` FROM fin_statement_templates
+		WHERE ($1::uuid IS NULL OR legal_entity_id=$1
+		       OR (legal_entity_id IS NULL AND created_by=NULLIF($2,'')::uuid))
+		  AND ($3='' OR status=$3)`
+	args := []any{tenantID, userID, status}
+	switch visibility {
+	case "personal":
+		query += ` AND legal_entity_id IS NULL`
+	case "shared":
+		query += ` AND legal_entity_id IS NOT NULL`
+	}
+	query += ` ORDER BY created_at DESC LIMIT 200`
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*FinStatementTemplate
+	for rows.Next() {
+		row, err := scanStatementTemplate(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func (r *FinModelRepository) CreateModelDefinition(ctx context.Context, d *FinModelDefinition) error {
 	_, err := r.db.Exec(ctx, `INSERT INTO fin_model_definitions
 		(id, legal_entity_id, name, version, template_id, actual_cutoff_period, policy, source_bindings, status, created_by)

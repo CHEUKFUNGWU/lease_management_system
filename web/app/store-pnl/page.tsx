@@ -19,6 +19,7 @@ type RowValue = {
   key: string; label: string; kind: string; basis: string;
   actual?: number | null; other?: number | null;
   variance?: number | null; pct?: number | null;
+  peer?: number | null; peer_status?: string; ungoverned?: boolean;
   components?: { label: string; value?: number | null }[];
 };
 type Block = { basis: string; rows: RowValue[] };
@@ -31,6 +32,7 @@ type PnlResponse = {
   data_classification: string;
   dataset_version?: string;
   currency?: string;
+  period_label?: string; period_kind?: string; peer_status?: string;
   gaps?: string[];
 };
 
@@ -87,16 +89,20 @@ export default function StorePnlPage() {
 
   const rowsFor = (block?: Block, withComponent = false): any[] => (block?.rows || []).map((row) => ({
     key: row.key,
-    label: row.label,
+    label: row.ungoverned ? `${row.label}（${t("storepnl.ungoverned", language)}）` : row.label,
     kind: row.kind,
     actual: row.actual,
     other: row.other,
     variance: row.variance,
     pct: row.pct == null ? null : (row.pct * 100),
+    peer: row.peer ?? null,
+    peer_status: row.peer_status,
     comps: withComponent && row.components
       ? row.components.map((c) => `${c.label}: ${c.value ?? "—"}`).join("；")
       : undefined,
   }));
+
+  const hasPeer = !!pnl?.peer_status || !!(pnl?.operating?.rows || []).concat(pnl?.ifrs16?.rows || []).some((row) => row.peer != null || !!row.peer_status);
 
   const columns = useMemo(() => [
     { title: t("storepnl.row", language), dataIndex: "label", key: "label" },
@@ -108,8 +114,10 @@ export default function StorePnlPage() {
       render: (v: number | null) => (v == null ? "—" : v.toLocaleString()) },
     { title: t("storepnl.variance_pct", language), dataIndex: "pct", key: "pct", align: "right" as const,
       render: (v: number | null) => (v == null ? "—" : `${v.toFixed(2)}%`) },
+    ...(hasPeer ? [{ title: t("storepnl.peer_col", language), dataIndex: "peer", key: "peer", align: "right" as const,
+      render: (v: number | null, row: any) => (v == null ? (row.peer_status || "—") : v.toLocaleString()) }] : []),
     { title: t("storepnl.components", language), dataIndex: "comps", key: "comps" },
-  ], [language, pnl]);
+  ], [language, pnl, hasPeer]);
 
   const downloadCSV = () => {
     if (!pnl) return;
@@ -169,6 +177,10 @@ export default function StorePnlPage() {
               </StatusTag>
               {pnl.dataset_version && <Typography.Text type="secondary">{pnl.dataset_version}</Typography.Text>}
               {pnl.currency && <Typography.Text type="secondary">{pnl.currency}</Typography.Text>}
+              {pnl.period_label && <StatusTag kind="neutral">{pnl.period_label}</StatusTag>}
+              {pnl.peer_status && pnl.peer_status !== "complete" && (
+                <StatusTag kind="warning">{`${t("storepnl.peer_col", language)}: ${pnl.peer_status}`}</StatusTag>
+              )}
               {pnl.decision_ready_reason && (
                 <Typography.Text type="warning">{pnl.decision_ready_reason}</Typography.Text>
               )}

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/access"
@@ -16,17 +18,41 @@ type StoreFactsSource interface {
 	QueryFacts(ctx context.Context, legalEntityID, dateFrom, dateTo, classification, datasetVersion, sourceSystem string, storeIDs []string) (*repository.RetailKPIFactSet, error)
 }
 
-// storePnlKPIAdapter is the production KPI port: the retailkpi semantic
-// layer runs (store-360 Build) and the projection only reads its summary —
-// no KPI is ever recomputed here.
-type storePnlKPIAdapter struct{ facts StoreFactsSource }
+// storePnlKPIAdapter is the production KPI + peer port: the retailkpi
+// semantic layer runs (store-360 Build) and the projection only reads its
+// summary and peer benchmarks — no KPI is ever recomputed here. One Build
+// serves both ports per (store, window) through a single-slot cache, so
+// the KPI pass and the per-row peer pass see the same semantic layer.
+type storePnlKPIAdapter struct {
+	facts StoreFactsSource
 
-// NewStorePnlKPIAdapter builds the production KPI adapter.
-func NewStorePnlKPIAdapter(facts StoreFactsSource) storepnl.KPIReader {
-	return storePnlKPIAdapter{facts: facts}
+	mu           sync.Mutex
+	lastKey      string
+	lastResponse *retailstore360.Response
 }
 
-func (a storePnlKPIAdapter) Operating(ctx context.Context, ref storepnl.StoreRef) (storepnl.KPIAggregates, error) {
+// NewStorePnlKPIAdapter builds the production adapter; the same instance
+// satisfies storepnl.KPIReader and storepnl.PeerReader.
+func NewStorePnlKPIAdapter(facts StoreFactsSource) *storePnlKPIAdapter {
+	return &storePnlKPIAdapter{facts: facts}
+}
+
+func refKey(ref storepnl.StoreRef) string {
+	return fmt.Sprintf("%s|%s|%s|%s|%d|%s|%s|%s", ref.LegalEntityID, ref.StoreID, ref.DateFrom, ref.DateTo, ref.WindowDays, ref.Classification, ref.DatasetVersion, ref.SourceSystem)
+}
+
+// build runs the semantic layer once per distinct ref; the response value
+// is immutable after Build, so a cached pointer is safe to share.
+func (a *storePnlKPIAdapter) build(ctx context.Context, ref storepnl.StoreRef) (*retailstore360.Response, error) {
+	key := refKey(ref)
+	a.mu.Lock()
+	if a.lastKey == key && a.lastResponse != nil {
+		response := a.lastResponse
+		a.mu.Unlock()
+		return response, nil
+	}
+	a.mu.Unlock()
+
 	query := retailstore360.Query{
 		LegalEntityID: ref.LegalEntityID, StoreID: ref.StoreID,
 		Classification: ref.Classification, DatasetVersion: ref.DatasetVersion,
@@ -37,23 +63,56 @@ func (a storePnlKPIAdapter) Operating(ctx context.Context, ref storepnl.StoreRef
 	if ref.DateFrom != "" && ref.DateTo != "" {
 		from, err := time.Parse("2006-01-02", ref.DateFrom)
 		if err != nil {
-			return storepnl.KPIAggregates{}, err
+			return nil, err
 		}
 		to, err := time.Parse("2006-01-02", ref.DateTo)
 		if err != nil {
-			return storepnl.KPIAggregates{}, err
+			return nil, err
 		}
 		query.DateFrom, query.DateTo = from, to
 		query.AsOf = to
 	} else {
 		asOf, err := time.Parse("2006-01-02", ref.AsOf)
 		if err != nil {
-			return storepnl.KPIAggregates{}, err
+			return nil, err
 		}
 		query.AsOf = asOf
 		query.WindowDays = ref.WindowDays
 	}
 	response, err := retailstore360.NewService(a.facts).Build(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	a.mu.Lock()
+	a.lastKey, a.lastResponse = key, response
+	a.mu.Unlock()
+	return response, nil
+}
+
+// Median serves the S1-6 peer column from the same semantic layer's
+// peer benchmarks: insufficient peers or mixed currencies arrive as the
+// benchmark's own status, which the projection surfaces instead of a
+// number (从不编造同群数字).
+func (a *storePnlKPIAdapter) Median(ctx context.Context, ref storepnl.StoreRef, kpi string) (*float64, string, bool) {
+	response, err := a.build(ctx, ref)
+	if err != nil {
+		return nil, "unavailable", false
+	}
+	for _, b := range response.PeerBenchmark {
+		if b.Code != kpi {
+			continue
+		}
+		status := b.Status
+		if status == "" {
+			status = "complete"
+		}
+		return b.Median, status, b.Median != nil
+	}
+	return nil, "unavailable", false
+}
+
+func (a *storePnlKPIAdapter) Operating(ctx context.Context, ref storepnl.StoreRef) (storepnl.KPIAggregates, error) {
+	response, err := a.build(ctx, ref)
 	if err != nil {
 		return storepnl.KPIAggregates{}, err
 	}

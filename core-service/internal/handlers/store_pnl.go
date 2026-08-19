@@ -22,6 +22,7 @@ type StorePnlHandler struct {
 	kpi      storepnl.KPIReader
 	plan     storepnl.PlanReader // default comparison reader (tests/reuse)
 	planRepo *repository.FPnAGovernanceRepository
+	peer     storepnl.PeerReader
 	lease    storepnl.LeasePort
 	tmpl     *template.Template
 }
@@ -35,6 +36,12 @@ func NewStorePnlHandler(kpi storepnl.KPIReader, plan storepnl.PlanReader, planRe
 		panic(err) // 出厂模板受包内测试锁定，失败即装配缺陷
 	}
 	return &StorePnlHandler{kpi: kpi, plan: plan, planRepo: planRepo, tmpl: tmpl, lease: unavailableLease{}}
+}
+
+// WithPeer attaches the cohort-benchmark port (S1-6).
+func (h *StorePnlHandler) WithPeer(peer storepnl.PeerReader) *StorePnlHandler {
+	h.peer = peer
+	return h
 }
 
 type unavailableLease struct{}
@@ -90,7 +97,7 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 		planReader = SetStorePnlPlanReader(h.planRepo, versionID)
 	}
 	pnl, err := storepnl.Project(c.Request.Context(), h.tmpl, ref, period, [2]storepnl.ColumnRef{primary, secondary}, basis, storepnl.Readers{
-		KPI: h.kpi, Plan: planReader, Lease: h.lease,
+		KPI: h.kpi, Plan: planReader, Lease: h.lease, Peer: h.peer, Governed: h.governedRows(c),
 	})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -115,4 +122,25 @@ func monthOf(asOf string) string {
 		return asOf[:7]
 	}
 	return asOf
+}
+
+// governedRows lists the row keys with an approved fpna_metric_definitions
+// entry — the only way a template formula row escapes the 未经指标治理
+// marker (S3-6). A nil repo yields an empty set: every formula row is
+// marked, which is the fail-closed presumption.
+func (h *StorePnlHandler) governedRows(c *gin.Context) map[string]bool {
+	set := map[string]bool{}
+	if h.planRepo == nil {
+		return set
+	}
+	defs, err := h.planRepo.ListMetricDefinitions(c.Request.Context(), "")
+	if err != nil {
+		return set
+	}
+	for _, def := range defs {
+		if def.Status == "approved" && strings.TrimSpace(def.MetricKey) != "" {
+			set[def.MetricKey] = true
+		}
+	}
+	return set
 }

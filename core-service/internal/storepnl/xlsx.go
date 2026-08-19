@@ -64,7 +64,11 @@ func writeBlock(f *excelize.File, sheet string, block *Block) error {
 		r := i + 2
 		labelCell, _ := excelize.CoordinatesToCellName(1, r)
 		basisCell, _ := excelize.CoordinatesToCellName(2, r)
-		_ = f.SetCellStr(sheet, labelCell, row.Label)
+		label := row.Label
+		if row.Ungoverned {
+			label += " (模型内自定义，未经指标治理)"
+		}
+		_ = f.SetCellStr(sheet, labelCell, label)
 		_ = f.SetCellStr(sheet, basisCell, block.Basis)
 
 		actualCell, _ := excelize.CoordinatesToCellName(3, r)

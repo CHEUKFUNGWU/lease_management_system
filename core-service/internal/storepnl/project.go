@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 )
@@ -103,12 +104,16 @@ type PeerReader interface {
 	Median(ctx context.Context, ref StoreRef, kpi string) (*float64, string, bool)
 }
 
-// Readers bundles every port the projection consumes.
+// Readers bundles every port the projection consumes. Governed lists the
+// row keys registered in fpna_metric_definitions (approved) — a
+// formula/check row not on the list is a template-custom row and must be
+// marked 未经指标治理 (S3-6); an empty map marks every formula row.
 type Readers struct {
-	KPI   KPIReader
-	Plan  PlanReader
-	Lease LeasePort
-	Peer  PeerReader
+	KPI      KPIReader
+	Plan     PlanReader
+	Lease    LeasePort
+	Peer     PeerReader
+	Governed map[string]bool
 }
 
 // Period identifies the projected period (YYYY-MM).
@@ -128,7 +133,9 @@ type RowValue struct {
 	Variance   *float64    `json:"variance,omitempty"` // actual − other
 	Pct        *float64    `json:"pct,omitempty"`      // variance ÷ |other|
 	Peer       *float64    `json:"peer,omitempty"`
-	Components []Component `json:"components,omitempty"` // drilldown (occupancy)
+	PeerStatus string      `json:"peer_status,omitempty"` // empty = no peer column for this row
+	Ungoverned bool        `json:"ungoverned,omitempty"`  // S3-6: template-custom formula row
+	Components []Component `json:"components,omitempty"`  // drilldown (occupancy)
 	// Subtotal wiring for live-formula exports: children ± subtracted rows.
 	Children   []string `json:"children,omitempty"`
 	Subtracted []string `json:"subtracted,omitempty"`
@@ -215,13 +222,27 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 		bases = append(bases, "ifrs16_basis")
 	}
 
+	// Peer column (S1-6): probe once per peerable row, ahead of rendering;
+	// degraded rows stay empty and the status is aggregated to the header.
+	peers := map[string]peerProbe{}
+	if readers.Peer != nil && pair[0] == ColActual {
+		for _, row := range tmpl.Rows {
+			code := kpiCode(row.Source)
+			if code == "" {
+				continue
+			}
+			value, status, ok := readers.Peer.Median(ctx, ref, code)
+			peers[row.Key] = peerProbe{value: value, status: status, ok: ok}
+		}
+	}
+
 	for _, blockBasis := range bases {
 		block := &Block{Basis: blockBasis}
 		for _, row := range tmpl.Rows {
 			if row.Basis != template.Basis(blockBasis) && row.Basis != template.BasisShared {
 				continue
 			}
-			rowValue := renderRow(ctx, row, facts, lease, pair, readers, ref)
+			rowValue := renderRow(ctx, row, facts, lease, pair, readers, ref, peers[row.Key])
 			if blockBasis == "ifrs16_basis" && rowValue.Key == "store_contribution" {
 				continue // 经营口径小计不进 IFRS 16 区（T15）
 			}
@@ -235,14 +256,44 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 		}
 	}
 
-	if readers.Peer != nil && pair[0] == ColActual {
-		pnl.PeerStatus = "complete"
-	}
+	pnl.PeerStatus = aggregatePeerStatus(peers)
 	return pnl, nil
 }
 
-func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease LeaseMonthValues, pair [2]ColumnRef, readers Readers, ref StoreRef) RowValue {
+// peerProbe is one resolved peer datum for a row.
+type peerProbe struct {
+	value  *float64
+	status string
+	ok     bool
+}
+
+// aggregatePeerStatus collapses the per-row probes into the header status:
+// complete only when every probed row delivered a peer number; any
+// degradation names itself (样本不足/混币种/不可用显式降级，不出数字).
+func aggregatePeerStatus(peers map[string]peerProbe) string {
+	if len(peers) == 0 {
+		return ""
+	}
+	probed := false
+	for _, probe := range peers {
+		probed = true
+		if !probe.ok || probe.value == nil || probe.status != "complete" {
+			return probe.status
+		}
+	}
+	if !probed {
+		return ""
+	}
+	return "complete"
+}
+
+func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease LeaseMonthValues, pair [2]ColumnRef, readers Readers, ref StoreRef, peer peerProbe) RowValue {
 	rv := RowValue{Key: row.Key, Label: row.Label, Kind: string(row.Kind), Basis: string(row.Basis), Children: row.Children, Subtracted: row.Subtract}
+	if (row.Kind == template.RowFormula || row.Kind == template.RowCheck) && !readers.Governed[row.Key] {
+		// S3-6: 模板内自定义公式行，未经指标治理 —— fail-closed：登记集为空
+		// 时所有公式行都带标识。
+		rv.Ungoverned = true
+	}
 	actual := columnValue(ctx, row, facts, lease, readers, ref, pair[0])
 	other := columnValue(ctx, row, facts, lease, readers, ref, pair[1])
 	rv.Actual = actual
@@ -253,6 +304,12 @@ func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease
 		p := v / *other
 		rv.Pct = &p
 	}
+	if peer.ok && peer.value != nil {
+		rv.Peer = peer.value
+		rv.PeerStatus = "complete"
+	} else if peer.status != "" {
+		rv.PeerStatus = peer.status
+	}
 	if row.Key == "occupancy_cost" {
 		rv.Components = []Component{
 			{Label: "固定租金", Value: facts.FixedRent},
@@ -261,6 +318,16 @@ func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease
 		}
 	}
 	return rv
+}
+
+// kpiCode strips the source-binding prefix (fact. / contract. /
+// assumption.) to the KPI code the peer benchmarks are keyed by.
+func kpiCode(source string) string {
+	dot := strings.Index(source, ".")
+	if dot < 0 || dot == len(source)-1 {
+		return ""
+	}
+	return source[dot+1:]
 }
 
 func columnValue(ctx context.Context, row template.Row, facts KPIAggregates, lease LeaseMonthValues, readers Readers, ref StoreRef, column ColumnRef) *float64 {

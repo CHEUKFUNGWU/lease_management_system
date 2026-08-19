@@ -62,3 +62,29 @@ func TestRenderXLSXLiveFormulas(t *testing.T) {
 		t.Fatal("ifrs16 block must render on its own sheet")
 	}
 }
+
+func TestRenderXLSXCarriesUngovernedMarker(t *testing.T) {
+	pnl := &StorePnl{
+		StoreID: "S1", BasisMode: BasisOperating,
+		Operating: &Block{Basis: "operating_basis", Rows: []RowValue{
+			{Key: "custom_ratio", Label: "其他费用率", Kind: "formula", Basis: "operating_basis", Ungoverned: true, Actual: pf(0.1)},
+			{Key: "revenue", Label: "营业收入", Kind: "link", Basis: "operating_basis", Actual: pf(100)},
+		}},
+	}
+	out, err := RenderXLSX(pnl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := excelize.OpenReader(bytes.NewReader(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	label, err := f.GetCellValue("operating_basis", "A2")
+	if err != nil || !strings.Contains(label, "未经指标治理") {
+		t.Fatalf("ungoverned row must carry the marker in its label cell, got %q err=%v", label, err)
+	}
+	plain, err := f.GetCellValue("operating_basis", "A3")
+	if err != nil || strings.Contains(plain, "未经指标治理") {
+		t.Fatalf("governed link row must not carry the marker, got %q err=%v", plain, err)
+	}
+}

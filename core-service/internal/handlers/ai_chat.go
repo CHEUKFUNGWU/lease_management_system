@@ -135,9 +135,10 @@ func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
 	governance agenttooldefs.DecisionMemoDraftWriter,
 	retail agenttooldefs.RetailOperationsReader,
 	sensitivity agenttooldefs.SensitivityReader,
+	fillReader agenttooldefs.IngestFileReader,
 	draftServices ...*draftapp.Service,
 ) *AIChatHandler {
-	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, draftServices...)
+	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, draftServices...)
 	handler := &AIChatHandler{runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
 	handler.agentRuntime = aichat.NewRuntime(runtimeRepo, agent, agent, aiagent.ProjectResult, aichat.Options{ReviewCommit: handler.commitReviewTransaction})
 	return handler
@@ -244,6 +245,23 @@ func (h *AIChatHandler) GetDraftBatch(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"batch": batch})
+}
+
+// GetArtifact returns one artifact with its data — the consumption seam for
+// page_fill deep links (the import page reads the fill and renders it).
+func (h *AIChatHandler) GetArtifact(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user context"})
+		return
+	}
+	userIDStr, _ := userID.(string)
+	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), c.Param("id"), userIDStr)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "artifact not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"artifact": artifact})
 }
 
 type PageContext = aichat.PageContext

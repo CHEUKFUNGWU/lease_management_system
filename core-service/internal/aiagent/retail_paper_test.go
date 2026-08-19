@@ -30,7 +30,7 @@ func TestRetailPaperRequested(t *testing.T) {
 
 func TestExecuteRetailPaperEndToEnd(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil)
 	if agent.ToolRuntime() == nil {
 		t.Fatal("agent runtime must be registered with the retail paper tool")
 	}
@@ -72,7 +72,7 @@ func TestExecuteRetailPaperEndToEnd(t *testing.T) {
 
 func TestExecuteRetailPaperMissingFiltersNeedsInput(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil)
 	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
 		Principal: agenttools.Principal{UserID: "bp-zhang", Permissions: []string{"*:*"}, Scope: access.Scope{LegalEntityID: "entity-a"}},
 		RunID:     "run-retail-paper-2",

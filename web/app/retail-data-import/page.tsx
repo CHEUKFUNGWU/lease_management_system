@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Card, DatePicker, Descriptions, Flex, Input, Row, Col, Space, Spin, Steps, Table, Tag, Tooltip, Typography, Upload, message } from "antd";
 import { CheckCircleOutlined, InfoCircleOutlined, ArrowRightOutlined } from "@ant-design/icons";
@@ -48,6 +48,38 @@ export default function RetailDataImportPage() {
   const [commitResult, setCommitResult] = useState<RetailIngestCommitResponse | null>(null);
   const [templateDownloading, setTemplateDownloading] = useState(false);
   const commitKeyRef = useRef<string>("");
+
+  // page_fill deep link (appendix A): an Agent-produced import prefill
+  // loads into the form. Payload fields prefill directly; the mapping is a
+  // SUGGESTION the human confirms — commit stays human-driven (I5).
+  useEffect(() => {
+    const fillId = new URLSearchParams(window.location.search).get("fill");
+    if (!fillId || !token) return;
+    (async () => {
+      try {
+        const response = await fetch(`/api/v1/ai/chat/artifacts/${encodeURIComponent(fillId)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const body = await response.json();
+        const data = body?.artifact?.data || {};
+        const payload = data.payload || {};
+        if (typeof payload.source_system?.value === "string" && payload.source_system.value) {
+          setSourceSystem(payload.source_system.value);
+        }
+        if (typeof payload.as_of?.value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(payload.as_of.value)) {
+          setAsOf(payload.as_of.value);
+        }
+        if (data.suggestions?.mapping?.value) {
+          setMapping(data.suggestions.mapping.value as Record<string, string>);
+        }
+        message.info(t("retail_import.fill_loaded", language));
+      } catch {
+        // Best-effort prefill: a failed load must never block the human path.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const downloadStoreTemplate = async () => {
     if (!token) return;

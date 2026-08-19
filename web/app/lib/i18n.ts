@@ -2654,6 +2654,11 @@ const dict: TranslationDict = {
     "zh-HK": "上傳 POS / 財務導出的 CSV 或 XLSX，生成 production 的 store-day 經營事實；導入後直接進入經營脈搏查看覆蓋情況",
     en: "Upload a POS / finance CSV or XLSX export to create production store-day facts, then review coverage in the operating pulse",
   },
+  "retail_import.fill_loaded": {
+    "zh-CN": "已从 AI 预填载入导入参数与映射建议；请核对后提交，入库由你完成",
+    "zh-HK": "已從 AI 預填充載入導入參數與映射建議；請核對後提交，入庫由你完成",
+    en: "Agent prefill loaded — verify the mapping and commit yourself; the import is yours to confirm",
+  },
   "retail_import.upload_hint": {
     "zh-CN": "受控模板：第一行为表头；支持 .csv 与 .xlsx，单文件 ≤10MB；重复上传同一内容将以新事实版本取代旧行",
     "zh-HK": "受控模板：第一行為表頭；支持 .csv 與 .xlsx，單文件 ≤10MB；重複上傳同一內容將以新事實版本取代舊行",

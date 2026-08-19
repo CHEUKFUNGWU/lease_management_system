@@ -17,6 +17,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/db"
 	"github.com/lease-management-system/core-service/internal/handlers"
 	"github.com/lease-management-system/core-service/internal/middleware"
+	"github.com/lease-management-system/core-service/internal/miniostore"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/agentguard"
 	"github.com/lease-management-system/core-service/internal/services/audit"
@@ -111,7 +112,14 @@ func main() {
 		Renewal:  agentreaders.NewRenewalDecisionReader(contractRepo, renewalDecisionRepo),
 	}
 	sensitivityReader := agenttooldefs.NewReportingSensitivityReader(reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo, mcRepo).WithStores(masterDataRepo))
-	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
+	minioClient, minioErr := miniostore.New(miniostore.Config{
+		Endpoint: cfg.MinIOEndpoint, AccessKey: cfg.MinIOAccessKey, SecretKey: cfg.MinIOSecretKey, Bucket: cfg.MinIOBucket,
+	})
+	if minioErr != nil {
+		log.Fatalf("Failed to build MinIO client: %v", minioErr)
+	}
+	var fillReader agenttooldefs.IngestFileReader = miniostore.NewIngestReader(minioClient)
+	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
@@ -450,6 +458,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/trace", permission("ai_chat", "use"), aiChatHandler.GetAgentRunTrace)
 		protected.Handle(http.MethodGet, "/ai/chat/runs/:id/stream", permission("ai_chat", "use"), aiChatHandler.StreamRunEvents)
 		protected.Handle(http.MethodPost, "/ai/chat/artifacts/:id/actions", permission("ai_chat", "use"), aiChatHandler.CreateReviewAction)
+		protected.Handle(http.MethodGet, "/ai/chat/artifacts/:id", permission("ai_chat", "use"), aiChatHandler.GetArtifact)
 		protected.Handle(http.MethodGet, "/ai/chat/artifacts/:id/export", permission("ai_chat", "use"), aiChatHandler.ExportArtifact)
 
 		// Agent Gateway: individual Tools enforce their own permissions. Do not

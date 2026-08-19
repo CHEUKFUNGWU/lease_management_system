@@ -22,6 +22,7 @@ import (
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/aiintake"
+	"github.com/lease-management-system/core-service/internal/pagefill"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
@@ -56,11 +57,11 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 // NewWithOperationalReadersAndGovernanceAndRetail is the production
 // constructor: it wires the operating-facts / close-readiness / control /
 // governance / retail seams into the same governed Agent Tool Runtime.
-func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, draftServices...)
+func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, draftServices...)
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, draftServices ...*draftapp.Service) *Agent {
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
@@ -89,6 +90,11 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		registered = true
 	}
 	if err := registry.Register(agenttooldefs.NewS1GenerateDefinition()); err == nil {
+		registered = true
+	}
+	// The fill seam registers without a file reader for now (D-D2): the tool
+	// refuses honestly until W5 wires minio-go into core-service.
+	if err := registry.Register(agenttooldefs.NewRetailIngestPreviewDefinition(fillReader)); err == nil {
 		registered = true
 	}
 	if len(draftServices) > 0 && draftServices[0] != nil {
@@ -452,6 +458,18 @@ func ProjectResult(response Response) aichat.Result {
 			Data: map[string]any{"event": response.EventDraft},
 		})
 	}
+	if response.PageFill != nil {
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type: string(agentartifact.ArtifactPageFill), Title: "零售导入预填",
+			ReviewRequired:   true,
+			SchemaVersion:    agentartifact.SchemaVersion,
+			EvidenceComplete: true,
+			ReviewReasons:    []string{"import_mapping_review"},
+			ModelVersion:     response.Model,
+			RuleVersion:      "page-fill-rule.v1",
+			Data:             response.PageFill,
+		})
+	}
 	if response.WorkingPaper != nil {
 		paper := *response.WorkingPaper
 		paper = workingpaper.Build(paper, time.Now())
@@ -595,6 +613,7 @@ type Response struct {
 	RetailActionProposal   *RetailActionProposal             `json:"retail_action_proposal,omitempty"`
 	FileTriage             *agenttooldefs.TriageResult       `json:"file_triage,omitempty"`
 	WorkingPaper           *workingpaper.Paper               `json:"working_paper,omitempty"`
+	PageFill               *pagefill.Fill                    `json:"page_fill,omitempty"`
 }
 
 type AuditPackData struct {
@@ -792,7 +811,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 		if selectedTool == "" {
 			// R3: no silent fallback. Unknown or unsupported files stop the
-			// pipeline and ask the user.
+			// pipeline and ask the user — with one upgrade: operating data
+			// files route to the import-page prefill seam (appendix A).
+			if triage.DocClass == agenttooldefs.DocOperatingData {
+				return h.executeRetailIngestFill(ctx, req, triage, emit, toolRuntime)
+			}
 			return fileTriageRefusal(req, triage), nil
 		}
 
@@ -2699,6 +2722,116 @@ func (h *Agent) executeS1Paper(ctx context.Context, req Request, s1Block json.Ra
 			Severity:    "critical", Action: "review_confirm",
 		}},
 	}, nil
+}
+
+// executeRetailIngestFill handles an operating-data upload by asking the
+// import-preview tool to prefill the retail import page. When the file
+// reader is not wired (D-D2) or the call fails, the response stays honest:
+// guidance to the import page, no fabricated preview.
+func (h *Agent) executeRetailIngestFill(ctx context.Context, req Request, triage agenttooldefs.TriageResult, emit func(context.Context, string, any) error, toolRuntime *agenttools.Runtime) (Response, error) {
+	sourceSystem := extractSourceSystem(req.Message)
+	// The tool demands a human-provided source system; without one the fill
+	// cannot be built and we guide instead.
+	if sourceSystem == "" {
+		return fileTriageRefusalWithHint(req, triage, "生成预填需要你提供来源系统（例如「来源系统 pos-a」）。也可以直接前往「零售数据导入」页上传。"), nil
+	}
+
+	if err := emitAgentEvent(ctx, emit, "tool_start", map[string]interface{}{
+		"tool": "retail.store_days.import.preview", "status": "running",
+	}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+	args := map[string]any{
+		"file_id": req.FileID, "object_name": req.ObjectName,
+		"content_type": req.ContentType, "source_system": sourceSystem,
+	}
+	result, durationMs, err := h.executeToolCall(ctx, toolRuntime, "retail.store_days.import.preview", args, "tool:ingest-fill:"+req.FileID)
+	if err != nil || result.Data == nil {
+		_ = emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+			"tool": "retail.store_days.import.preview", "status": "failed",
+			"output_summary": errorSummary(err, result), "requires_review": false,
+		}})
+		return fileTriageRefusalWithHint(req, triage, "文件预填暂不可用（文件读取通道尚未接通）。请直接前往「零售数据导入」页上传并确认映射。"), nil
+	}
+	summary := ""
+	if result.Error != nil {
+		summary = result.Error.Message
+	}
+	if err := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+		"tool": "retail.store_days.import.preview", "status": string(result.Status),
+		"input_summary": "零售导入预填", "output_summary": summary,
+		"requires_review": result.Review.Required, "duration_ms": durationMs,
+	}}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页上传。"), nil
+	}
+	fill, ok := data["page_fill"].(*pagefill.Fill)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页上传。"), nil
+	}
+	return Response{
+		Answer:     "已在「零售数据导入」页为你预填（来源系统、as-of）。列映射以建议形式呈现，请确认后入库——导入动作由你在页面上完成。",
+		Model:      "deterministic-router",
+		Confidence: 0.8,
+		PageFill:   fill,
+		FileTriage: &triage,
+		ReviewPrompts: []AgentReviewPrompt{{
+			ID: "import_mapping_review", Title: "确认导入映射",
+			Description: "预填页的列映射尚未确认；请核对后提交。Agent 无权 commit，入库由你完成。",
+			Severity:    "warning", Action: "review_confirm",
+		}},
+	}, nil
+}
+
+func fileTriageRefusalWithHint(req Request, triage agenttooldefs.TriageResult, hint string) Response {
+	resp := fileTriageRefusal(req, triage)
+	resp.Answer = hint
+	return resp
+}
+
+func errorSummary(err error, result agenttools.ToolResult) string {
+	if err != nil {
+		return err.Error()
+	}
+	if result.Error != nil {
+		return result.Error.Message
+	}
+	return ""
+}
+
+// extractSourceSystem picks a human-stated source system out of the message.
+func extractSourceSystem(message string) string {
+	lower := strings.ToLower(message)
+	for _, marker := range []string{"来源系统 ", "来源系统：", "source system ", "source_system "} {
+		if idx := strings.Index(lower, marker); idx >= 0 {
+			// Byte-length arithmetic is safe here: CJK markers match
+			// verbatim and ASCII case folding is 1:1 in bytes.
+			rest := strings.TrimSpace(message[idx+len(marker):])
+			field := strings.Fields(rest)
+			if len(field) > 0 {
+				return cutAtPunctuation(field[0])
+			}
+		}
+	}
+	return ""
+}
+
+// cutAtPunctuation truncates a token at the first CJK/ASCII separator so a
+// trailing 「，谢谢」 never rides along with the value.
+func cutAtPunctuation(token string) string {
+	for i, r := range token {
+		if strings.ContainsRune("，,。.；;、 ", r) {
+			if i == 0 {
+				return ""
+			}
+			return token[:i]
+		}
+	}
+	return token
 }
 
 // triageToParseTool maps a triage result to the file-parse tool selector. No

@@ -46,6 +46,8 @@ func main() {
 		exit = runAgentSession(os.Args[2:])
 	case "contract", "measurement", "journal", "event", "payment-schedule":
 		exit = runBusiness(os.Args[1:])
+	case "retail":
+		exit = runRetail(os.Args[2:])
 	case "help", "-h", "--help":
 		usage(os.Stdout)
 		return
@@ -937,6 +939,13 @@ Usage:
   lease-agent event list --contract-id CONTRACT_ID [flags]
   lease-agent contract draft-create --input contract-draft.json [flags]
   lease-agent payment-schedule draft-create --input payment-draft.json [flags]
+  lease-agent retail import preview FILE --source-system NAME [flags]
+  lease-agent retail import commit FILE --source-system NAME --as-of-at TIME --idempotency-key KEY --confirm [flags]
+  lease-agent retail scenario evaluate --store-id ID [--horizon N] [--input assumptions.json] [flags]
+  lease-agent retail scenario save --store-id ID --input action.json --idempotency-key KEY --confirm [flags]
+
+Commit and save commands are the human path: agent capability tokens are
+refused, and --confirm is required.
 
 Examples:
   lease-agent tools --token "$LEASE_AGENT_TOKEN" --level read

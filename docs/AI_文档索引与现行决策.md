@@ -41,6 +41,7 @@ FP&A 版本治理与滚动预测
 |---|---|---|
 | [Agent Core（Go）设计 —— 对齐 pi 架构](Agent_Core_Go设计_对齐pi架构.md) | **Current** | **内核层现行依据**。纯循环 + 中间件链 + 订阅者；ai-service 退役映射 |
 | [AI 底稿与 Paperwork Agent 设计方案](AI_底稿与Paperwork_Agent设计方案.md) | **Current** | **能力层现行依据**。双轨执行、WorkingPaper、不变量、分阶段与验收 |
+| [CodebaseDesign：AI 阶段 0 与 W1 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) | **Current** | **实施级设计**。W1（agentcore）+ 阶段 0（workingpaper / docparse / triage / CLI / Web / 评测）的深模块接口、seam、决策留痕 D-A~G、验收映射 |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current | 业务需求有效。**§9 制造功能已标注为不在当前范围**；§12 的工具勾选表已移除，实现状态以代码为准 |
 | ~~PRD：租赁经营决策与 AI Copilot 平台~~ | **已归档** `archive/superseded-prds-2026-08/` | 编于零售转型前，标题与内容以「租赁」为主体；产品边界已由零售 PRD (P0–P5) 与财务BP/FP&A PRD (F0–F9) 取代 |
 | ~~AI Agent 填表升级（tau + anydoc）实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | tau 作废（ADR-0022）；anydoc 与填表缝**已迁入** Agent Core 设计 §8.2 与附录 A |
@@ -125,16 +126,18 @@ FP&A 版本治理与滚动预测
 
 ---
 
-## 3. 当前缺口（对代码的核查结论，2026-08-18）
+## 3. 当前缺口（对代码的核查结论，2026-08-18，2026-08-19 更新）
 
 | 缺口 | 状态 | 归属 |
 |---|---|---|
 | G1 两个 Agent 平面未汇流（23 处 `Status: "pending"` 静态卡片） | **未解决** | ADR-0022 / W1–W6 |
-| G2 无文件分诊，兜底 `return "contract"` | **未解决** | 底稿方案 §6.1，阶段 0 |
+| G2 无文件分诊，兜底 `return "contract"` | 🟡 **部分解决**：`lease.file.triage` 确定性分诊落地、`return "contract"` 兜底已删除、域外文件（发票/劳动合同/宣传册）显式拒绝并问用户；LLM 分类器与 ≥50 份语料的 CORR-6 完整判据待 L2 语料建设 | 底稿方案 §6.1，阶段 0 |
 | G3 经营数据语义映射 | ✅ **已解决**（Profile 复用与漂移检测未做） | — / 阶段 3 |
 | G4 无代码执行能力 | 未解决（**刻意后置**） | ADR-0025 §5，阶段 4 |
-| G5 无 xlsx/docx 产出（导出仍是 CSV） | **未解决** | 随 excelize 落地，阶段 0 |
+| G5 无 xlsx/docx 产出（导出仍是 CSV） | 🟡 **部分解决**：`workingpaper` xlsx/docx 确定性渲染器 + lint 门 + `GET /ai/chat/artifacts/:id/export` 端点已落地；端到端 WorkingPaper 生成链路（S1 底稿）未接线 | 阶段 0 → 阶段 1 |
 | **G6 PyMuPDF 的 AGPL 风险** | **未解决，与部署形态无关，建议单独立项** | ADR-0024 |
+
+> W1 + 阶段 0 已按 [CodebaseDesign 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) 交付：`internal/agentcore`（纯循环内核 + ACORE-1/5/6/8 测试）、`protected_measures`（10 项 + 词法探针）、`internal/workingpaper`（I1/I2/I3/I6 lint + 封面 + 渲染）、`internal/docparse`（CSV/anydoc/PaddleOCR）、`internal/agentseval`（不变量与 triage 用例，harness 第三段 `invariants`）、CLI 三层命令（commit 只对人）、Web（去关键词猜测、tool_start 消费、working_paper 渲染）。core-service `go test ./...` + `go vet ./...`、web type-check/build/test 全绿。
 
 ---
 

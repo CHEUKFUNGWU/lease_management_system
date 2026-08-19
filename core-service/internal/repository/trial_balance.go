@@ -25,12 +25,12 @@ type TrialBalanceVersion struct {
 
 // TrialBalanceLine is one account row of a trial balance.
 type TrialBalanceLine struct {
-	ID                      string  `json:"id"`
-	TrialBalanceVersionID   string  `json:"trial_balance_version_id"`
-	AccountCode             string  `json:"account_code"`
-	AccountName             string  `json:"account_name,omitempty"`
-	Debit                   float64 `json:"debit"`
-	Credit                  float64 `json:"credit"`
+	ID                    string  `json:"id"`
+	TrialBalanceVersionID string  `json:"trial_balance_version_id"`
+	AccountCode           string  `json:"account_code"`
+	AccountName           string  `json:"account_name,omitempty"`
+	Debit                 float64 `json:"debit"`
+	Credit                float64 `json:"credit"`
 }
 
 // CreateTrialBalanceVersion inserts a version idempotently on the content
@@ -109,6 +109,53 @@ func (r *OperatingFactsRepository) ListTrialBalanceVersions(ctx context.Context,
 		result = append(result, item)
 	}
 	return result, rows.Err()
+}
+
+// LatestTrialBalanceByPeriod returns, per accounting period, the newest TB
+// version's lines plus that version's functional currency — the source the
+// finmodel OpeningBalanceReader folds into standardized opening balances.
+// Each version row already identifies the period; lines join by version id.
+func (r *OperatingFactsRepository) LatestTrialBalanceByPeriod(ctx context.Context, legalEntityID string) (map[string][]TrialBalanceLine, string, error) {
+	versions, err := r.ListTrialBalanceVersions(ctx, access.GlobalEntityFilter(), "")
+	if err != nil {
+		return nil, "", err
+	}
+	out := map[string][]TrialBalanceLine{}
+	currency := ""
+	picked := map[string]bool{}
+	for _, version := range versions {
+		if version.LegalEntityID == nil || *version.LegalEntityID != legalEntityID {
+			continue
+		}
+		if picked[version.Period] {
+			continue // 列表按 created_at DESC — 每个期间取最新版本
+		}
+		picked[version.Period] = true
+		if currency == "" {
+			currency = version.FunctionalCurrency
+		}
+		rows, err := r.db.Query(ctx, `SELECT id, trial_balance_version_id, account_code, account_name, debit, credit
+			FROM gl_trial_balance_lines WHERE trial_balance_version_id=$1 ORDER BY account_code`, version.ID)
+		if err != nil {
+			return nil, "", fmt.Errorf("list trial balance lines: %w", err)
+		}
+		var lines []TrialBalanceLine
+		for rows.Next() {
+			line := TrialBalanceLine{}
+			if err := rows.Scan(&line.ID, &line.TrialBalanceVersionID, &line.AccountCode, &line.AccountName, &line.Debit, &line.Credit); err != nil {
+				rows.Close()
+				return nil, "", fmt.Errorf("scan trial balance line: %w", err)
+			}
+			lines = append(lines, line)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return nil, "", err
+		}
+		rows.Close()
+		out[version.Period] = lines
+	}
+	return out, currency, nil
 }
 
 // DeleteTrialBalanceVersion compensates a failed import: removing the

@@ -154,10 +154,18 @@ func (s *runState) t7(period string, i int) TieOutResult {
 	}
 	expected := opening
 	for _, term := range []*float64{cur.Additions, cur.Interest, cur.Remeasurements} {
-		expected = *add(&expected, term)
+		updated := add(&expected, term)
+		if updated == nil {
+			return tieOut("T7", period, nil, nil, 0, true, "lease roll-forward term missing (additions/interest/remeasurements)")
+		}
+		expected = *updated
 	}
 	for _, term := range []*float64{cur.Payments, cur.Terminations} {
-		expected = *add(&expected, neg(term))
+		updated := add(&expected, neg(term))
+		if updated == nil {
+			return tieOut("T7", period, nil, nil, 0, true, "lease roll-forward term missing (payments/terminations)")
+		}
+		expected = *updated
 	}
 	return tieOut("T7", period, &expected, cur.LeaseLiability, 0, false, "lease liability roll-forward (engine-only)")
 }
@@ -182,9 +190,13 @@ func (s *runState) t8(period string, i int) TieOutResult {
 		opening = *prev.ROUAsset
 	}
 	expected := opening
-	expected = *add(&expected, cur.Additions)
-	expected = *add(&expected, neg(cur.Depreciation))
-	expected = *add(&expected, neg(cur.Terminations))
+	for _, term := range []*float64{cur.Additions, neg(cur.Depreciation), neg(cur.Terminations)} {
+		updated := add(&expected, term)
+		if updated == nil {
+			return tieOut("T8", period, nil, nil, 0, true, "ROU roll-forward term missing")
+		}
+		expected = *updated
+	}
 	return tieOut("T8", period, &expected, cur.ROUAsset, 0, false, "ROU roll-forward (engine-only)")
 }
 

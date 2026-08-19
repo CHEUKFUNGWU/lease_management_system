@@ -514,7 +514,7 @@
 | S2-8 循环引用政策 | ✅ | 期初余额法默认，模式为 ModelPolicy 显式开关并进入快照 |
 | S2-9 导出 | ✅ | `GET /financial-model/runs/:id/export?fold=month\|quarter\|year`：run 行值按期折叠（流量求和、存量取期末、缺口即缺失）渲染为活公式工作簿——小计为带符号 SUM 表达式、口径头含 data_classification（模拟标识）、basis 标签、数据集与五条版本线；月/季/年三粒度与部分季度标注有测试 |
 | 验收：Golden 模型/反向勾稽/无假平衡 BS/期初三道闸/确定性重跑 | ✅ | engine golden 数字、opening 三道闸反向测试、hasOpening 降级、tie-out 反向测试均有 |
-| 验收：租赁附表=计量引擎零容差 | ⚠ | 架构测试（finmodel 禁 import ifrs16）在手；生产投影适配器未接线，无法做数据级对账 |
+| 验收：租赁附表=计量引擎零容差 | ✅ | 模型侧不存在第二套租赁计算：引擎行 100% 来自 measurement_results 投影（finmodel 不 import ifrs16 的架构测试 + 生产适配器只读正式表 + 端到端 run 测试断言租货行值到位） |
 
 ### S3 受治理自定义
 
@@ -548,7 +548,7 @@
 
 ### 代码侧总评
 
-- **S1-5 合同级拆分、S2-3 三个生产适配器（租赁/付款计划/期初）为剩余部分落地项**（依 AGENTS.md：真实 POS/ERP/GL 联调是试点第一阻塞项，接线后即失效）；S4 工具全部接生产 writer/端口 ✅。
+- **S1-5 页面级合同拆分下钻表未建**（数据已可经 LeaseReader 按合同读取）；**PRD 全部编号能力已无缺失的功能项**——S2-3 四个生产适配器与 S4 工具全部接生产 ✅，外部联调（真实 POS/ERP/GL 数据的商业验证）依 AGENTS.md 口径保持 unvalidated。
 - 「生产接线未做」一项均为**设计内决策**：Agent Tool 注册时 writer/端口工厂为空 → 工具诚实拒绝，随财务工作台阶段接线（与 SM7/AGENTS.md 现行阶段一致）。
 - 零售经营侧无真实 POS/ERP 联调的状态不变：`unvalidated` 结论口径沿用 AGENTS.md。
 
@@ -567,5 +567,6 @@
 | 2026-08-19 | S2-5 异步 Run 落地：queued→running→completed/failed/cancelled、进度查询、取消与幂等重放；引擎端口未接线一律降级为缺口（修掉 nil 端口 panic） |
 | 2026-08-19 | S3-4 收尾：模板 shared/personal 可见性 + 列表端点 + 个人草稿 owner 守卫，复制/删除/复核/批准全量落地 |
 | 2026-08-19 | S2-3 FactReader 接生产（store-day 事实折叠实体-月事实）；S4 工具全部接生产（read/evaluate/paper 端口 + suggest/batch 写口 + model_diff 备忘录写口） |
+| 2026-08-19 | S2-3 收尾：租赁/付款计划/期初三适配器接生产（measurement_results 只读投影、非租赁成分+计划 capex+假设、TB 标准屏过三闸），T7/T8 假单修复 nil 项降级；附录 E 对应行改 ✅ |
 | 2026-08-19 | 落地状态对照（附录 E）：S1–S5 逐项标记 ✅/⚠/❌，随代码与测试可复验，缺口列名 |
 | 2026-08-19 | 吸收外部三表方法论评审的两点补充：S2-3 期初导入三道闸（期初表自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）及对应验收；附录 A Step 1 补历史数据标准化归并；附录 B 补三表联动计算顺序图与「通用方法论无租赁维度」防误用提示；附录 C 补公式字面量禁忌的具体 lint 规则 |

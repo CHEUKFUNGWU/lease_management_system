@@ -133,7 +133,7 @@ func main() {
 	retailStoreDayFactsHandler := handlers.NewRetailStoreDayFactsHandler(operatingFactsRepo, auditLogger)
 	storePnlKPIAdapter := handlers.NewStorePnlKPIAdapter(retailKPIRepo)
 	storePnlHandler := handlers.NewStorePnlHandler(storePnlKPIAdapter, nil, fpnaGovernanceRepo).WithPeer(storePnlKPIAdapter).WithMasterData(masterDataRepo)
-	finModelHandler := handlers.NewFinModelHandlerWithAudit(finModelRepo, auditLogger).WithExchangeRates(exchangeRateRepo).WithPlanGovernance(fpnaGovernanceRepo).WithFacts(retailKPIRepo)
+	finModelHandler := handlers.NewFinModelHandlerWithAudit(finModelRepo, auditLogger).WithExchangeRates(exchangeRateRepo).WithPlanGovernance(fpnaGovernanceRepo).WithFacts(retailKPIRepo).WithProductionSources(mcRepo, operatingFactsRepo)
 	savedViewHandler := handlers.NewSavedViewHandler(finModelRepo)
 	retailIngestHandler := handlers.NewRetailIngestHandler(retailKPIRepo, operatingFactsRepo, auditLogger)
 	retailExportHandler := handlers.NewRetailExportHandler()

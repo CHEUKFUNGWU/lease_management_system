@@ -27,6 +27,24 @@ var assetLines = []string{LineCash, LineReceivables, LineInventory, LineOtherCur
 var liabilityLines = []string{LinePayables, LineLeaseLiability, LineOtherCurrentLiabs, LineBorrowings}
 var equityLines = []string{LineShareCapital, LineRetainedEarnings}
 
+// LineSign is the storage convention of a standard line: assets store
+// debit-positive (=+1), liabilities and equity store credit-positive
+// (=−1 relative to debit-minus-credit). Importers use it to fold raw
+// debit/credit rows into gate-1-consistent standard lines.
+func LineSign(line string) float64 {
+	for _, candidate := range liabilityLines {
+		if candidate == line {
+			return -1
+		}
+	}
+	for _, candidate := range equityLines {
+		if candidate == line {
+			return -1
+		}
+	}
+	return 1
+}
+
 // PeriodBalance is one historical period's standardized opening balance with
 // its merge mapping snapshot (the mapping applied to external accounts).
 type PeriodBalance struct {

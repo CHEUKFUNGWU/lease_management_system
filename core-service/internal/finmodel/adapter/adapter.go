@@ -278,13 +278,23 @@ func (o assumptionOverlay) Value(ctx context.Context, entity, key, period string
 // production adapters land (D-S2 discipline: the engine refuses nothing,
 // it reports gaps).
 type PortsBuilder struct {
-	repo  *repository.FinModelRepository
-	facts FactsSource
+	repo         *repository.FinModelRepository
+	facts        FactsSource
+	measurements MeasurementSource
+	trial        TrialBalanceSource
+	plans        CapexSource
 }
 
 // NewPortsBuilder builds the port factory.
 func NewPortsBuilder(repo *repository.FinModelRepository, facts FactsSource) *PortsBuilder {
 	return &PortsBuilder{repo: repo, facts: facts}
+}
+
+// WithSources attaches the lease / schedule / opening production sources
+// (S2-3); nil sources keep the corresponding port degraded honestly.
+func (b *PortsBuilder) WithSources(measurements MeasurementSource, trial TrialBalanceSource, plans CapexSource) *PortsBuilder {
+	b.measurements, b.trial, b.plans = measurements, trial, plans
+	return b
 }
 
 type portsRequest struct {
@@ -345,13 +355,21 @@ func (b *PortsBuilder) Build(ctx context.Context, principal agenttools.Principal
 	if b.facts != nil {
 		facts = NewFactReader(b.facts)
 	}
+	var lease finmodel.LeaseRollforwardReader
+	var sched finmodel.ScheduleReader
+	var openingReader finmodel.OpeningBalanceReader
+	if b.measurements != nil {
+		lease = NewLeaseReader(b.measurements)
+		sched = NewScheduleReader(b.measurements, NewApprovedAssumptions(b.repo), b.plans)
+	}
+	if b.trial != nil {
+		openingReader = NewOpeningReader(b.trial, b.measurements)
+	}
 	inputs := finmodel.ModelInputs{
 		Assumptions:        assumptionOverlay{base: req.Assumptions, approved: NewApprovedAssumptions(b.repo)},
 		Versions:           req.Versions,
 		DataClassification: classification,
-		Facts:              facts,
-		// 租赁/付款计划/期初三个生产适配器接线前：诚实降级为缺口。
-		Lease: nil, Schedules: nil, Opening: nil,
+		Facts:              facts, Lease: lease, Schedules: sched, Opening: openingReader,
 	}
 	return def, inputs, nil
 }

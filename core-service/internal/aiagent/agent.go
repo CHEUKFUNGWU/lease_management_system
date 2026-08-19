@@ -123,7 +123,11 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		}
 	} else {
 		writer := finadapter.NewDraftWriter(finModelRepo)
-		ports := finadapter.NewPortsBuilder(finModelRepo, facts)
+		var plansCapex finadapter.CapexSource
+		if plans != nil {
+			plansCapex = plans
+		}
+		ports := finadapter.NewPortsBuilder(finModelRepo, facts).WithSources(mcRepo, nil, plansCapex)
 		reader := finadapter.NewStatementReader(finModelRepo)
 		for _, definition := range []agenttools.ToolDefinition{
 			agenttooldefs.NewStatementModelReadDefinition(reader),

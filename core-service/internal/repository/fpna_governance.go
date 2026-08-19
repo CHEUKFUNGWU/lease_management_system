@@ -250,6 +250,26 @@ func (r *FPnAGovernanceRepository) CreatePlanVersion(ctx context.Context, item *
 	return item, nil
 }
 
+// LatestForecastCapex reads the newest forecast plan version's group-grain
+// capex for one period — the S2-3 ScheduleReader's capex source ("CAPEX 计划
+// 来自 fpna_plan_lines.capex"). No version in range → nil, never a guess.
+func (r *FPnAGovernanceRepository) LatestForecastCapex(ctx context.Context, legalEntityID, period string) (*float64, error) {
+	var value *float64
+	err := r.db.QueryRow(ctx, `SELECT SUM(pl.capex)
+		FROM fpna_plan_lines pl
+		JOIN (SELECT id FROM fpna_plan_versions
+		      WHERE legal_entity_id=$1 AND version_type='forecast'
+		      ORDER BY created_at DESC LIMIT 1) v ON v.id = pl.plan_version_id
+		WHERE pl.period=$2 AND pl.grain='group'`, legalEntityID, period).Scan(&value)
+	if err == pgx.ErrNoRows || value == nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("latest forecast capex: %w", err)
+	}
+	return value, nil
+}
+
 func (r *FPnAGovernanceRepository) FindPlanVersionBySource(ctx context.Context, source string) (*FPnAPlanVersion, error) {
 	item := &FPnAPlanVersion{}
 	err := r.db.QueryRow(ctx, `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at

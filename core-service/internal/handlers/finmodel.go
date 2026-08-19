@@ -34,6 +34,10 @@ type FinModelHandler struct {
 	fx    *repository.ExchangeRateRepository
 	plans *repository.FPnAGovernanceRepository
 	facts finadapter.FactsSource
+	// S2-3 生产端口：租赁投影 / 付款计划 / 期初余额。
+	lease   finmodel.LeaseRollforwardReader
+	sched   finmodel.ScheduleReader
+	opening finmodel.OpeningBalanceReader
 	// cancels maps an async run id to its cancel func; entries disappear
 	// when the goroutine exits.
 	cancels sync.Map
@@ -69,6 +73,21 @@ func (h *FinModelHandler) WithPlanGovernance(plans *repository.FPnAGovernanceRep
 // Actual window instead of the honest-gap degradation.
 func (h *FinModelHandler) WithFacts(facts finadapter.FactsSource) *FinModelHandler {
 	h.facts = facts
+	return h
+}
+
+// WithProductionSources attaches the three remaining S2-3 adapters: lease
+// roll-forward from the engine's persisted measurement rows, the schedule
+// fanout (non-lease expense + plan capex + registered assumptions) and the
+// trial-balance opening reader with the engine-side gate-3 balances.
+func (h *FinModelHandler) WithProductionSources(measurements finadapter.MeasurementSource, trial finadapter.TrialBalanceSource) *FinModelHandler {
+	h.lease = finadapter.NewLeaseReader(measurements)
+	var capex finadapter.CapexSource
+	if h.plans != nil {
+		capex = h.plans
+	}
+	h.sched = finadapter.NewScheduleReader(measurements, finadapter.NewApprovedAssumptions(h.repo), capex)
+	h.opening = finadapter.NewOpeningReader(trial, measurements)
 	return h
 }
 
@@ -515,9 +534,8 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 		Assumptions:        assumptionOverlay{repo: h.repo, legalEntityID: defRow.LegalEntityID, base: req.Assumptions, period: def.PeriodStart},
 		Versions:           req.Versions,
 		DataClassification: orDefault(req.DataClassification, "production"),
-		// Facts 已接 store-day 事实折叠（S2-3）；租赁/付款计划/期初三个
-		// 生产适配器接线前：诚实降级为缺口。
-		Facts: factsReader, Lease: nil, Schedules: nil, Opening: nil,
+		// S2-3 四个端口全部生产适配器；任一未接线时引擎诚实降级为缺口。
+		Facts: factsReader, Lease: h.lease, Schedules: h.sched, Opening: h.opening,
 	}
 
 	if req.Async {

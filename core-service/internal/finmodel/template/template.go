@@ -94,6 +94,34 @@ type Template struct {
 	Rows  []Row
 }
 
+// Deps returns the same-period row references of the expression, in first-
+// occurrence order. The engine uses it for topological evaluation order.
+func (e *Expr) Deps() []string {
+	seen := map[string]bool{}
+	var out []string
+	var walk func(n node)
+	walk = func(n node) {
+		switch v := n.(type) {
+		case refNode:
+			if v.lag == 0 && !seen[v.key] {
+				seen[v.key] = true
+				out = append(out, v.key)
+			}
+		case unaryNode:
+			walk(v.operand)
+		case binaryNode:
+			walk(v.left)
+			walk(v.right)
+		case callNode:
+			for _, arg := range v.args {
+				walk(arg)
+			}
+		}
+	}
+	walk(e.node)
+	return out
+}
+
 // Expr is the compiled formula AST. The concrete node kinds are private;
 // the engine evaluates through Eval.
 type Expr struct {

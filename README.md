@@ -39,7 +39,7 @@ The transformation is **additive**. Retail operations analytics was layered on t
 | IFRS 16 计量回归<br>IFRS 16 measurement regression | ⚠️ 22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，正式审计背书需第三方会计师复核<br>22 cases / 148 assertions pass, but the golden answers remain `pending_third_party_review`; formal audit endorsement requires a third-party accountant |
 | 三表财务模型与单店利润表<br>Three-statement model & store P&L | ✅ S1–S5 全部编号功能项落地并有测试锁定（2026-08-20）；19 项评审修复已合并<br>Every numbered S1–S5 requirement is implemented and test-locked (2026-08-20); the 19 review fixes are merged |
 | 三表模型的真实 GL / 试算平衡表联调<br>Live GL / trial-balance integration | ⚠️ 未完成。引擎与四个生产适配器已接线，但只跑过构造数据；端口缺数据时诚实降级为缺口，不产出数字<br>Not done. The engine and its four production adapters are wired, but only exercised against constructed data; a port with no data degrades to an explicit gap rather than a number |
-| Python `ai-service` 退役（ADR-0023/0024）<br>Retiring the Python AI service | ✅ **已退役并删除（W6，2026-08-20）**。LLM/解析/上传/planner 全部迁入 Go（`internal/llm`、`internal/docparse`、`internal/aiintake` 生产侧、`miniostore`、`agentrunner.PlannerLLM`）；`pymupdf` AGPL 依赖已随 ai-service 一起删除<br>**Retired and removed.** All LLM / parsing / upload / planner paths now run in Go; the `pymupdf` AGPL dependency is gone with the ai-service directory |
+| Python `ai-service` 退役（ADR-0023/0024）<br>Retiring the Python AI service | ✅ **已退役并删除（W6，2026-08-20）**。LLM/解析/上传/planner 全部迁入 Go（`internal/llm`、`internal/docparse`、`internal/aiintake` 生产侧、`miniostore`、`agentrunner.PlannerLLM`）；AGPL 版 PDF 依赖已随 ai-service 一起删除<br>**Retired and removed.** All LLM / parsing / upload / planner paths now run in Go; the `pymupdf` AGPL dependency is gone with the ai-service directory |
 
 **关于命名 / On naming:** 仓库、容器、数据库和 JWT 仍使用 `lease_*` 命名。产品定位已经调整，但底层大规模物理重命名要等内部技术门槛通过后再决定 —— 2026-05 已经改过一次名，不再频繁变更。
 The repository, containers, database and JWT still use the `lease_*` namespace. Positioning has moved; a second large physical rename is deliberately deferred until the internal validation gate is passed (the project was already renamed once in 2026-05).
@@ -162,7 +162,7 @@ No change made during the retail transformation may weaken these five. Each was 
 | 数据访问 / Data access | pgx（手写 SQL / hand-written SQL） |
 | 数据库 / Database | PostgreSQL 16 |
 | AI 服务 / AI service | ~~Python 3.11 + FastAPI~~（**已退役并删除 / retired and removed**，ADR-0023/0024，W6）；模型调用 `internal/llm`，文档解析 `internal/docparse` + `internal/aiintake` |
-| OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）+ anydoc（`internal/docparse`，ADR-0024 分流）；PyMuPDF 已删除 |
+| OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）+ anydoc（`internal/docparse`，ADR-0024 分流）；AGPL 版 PDF 依赖已删除 |
 | 报表产出 / Report output | excelize（xlsx，含活公式）+ 确定性 docx 渲染器 |
 | 大模型 / LLM | DeepSeek API（默认 / default）、OpenAI API（备用 / fallback） |
 | 对象存储 / Object storage | MinIO |

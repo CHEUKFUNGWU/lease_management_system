@@ -45,7 +45,8 @@ func TestStorePnlProjectionResolvesPeriodGrains(t *testing.T) {
 		t.Run(tc.spec, func(t *testing.T) {
 			gin.SetMode(gin.TestMode)
 			kpi := &recordingPnlKPI{}
-			handler := NewStorePnlHandler(kpi, nil, nil)
+			handler := NewStorePnlHandler(kpi, nil, nil).
+				WithMasterData(memStoreLookup{storeID: "S1", legalEntityID: "LE-1"})
 			router := gin.New()
 			router.GET("/stores/:id/pnl", func(c *gin.Context) {
 				c.Set("legal_entity_id", "LE-1")
@@ -72,7 +73,8 @@ func TestStorePnlProjectionResolvesPeriodGrains(t *testing.T) {
 
 func TestStorePnlProjectionRejectsIllegalPeriod(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewStorePnlHandler(&recordingPnlKPI{}, nil, nil)
+	handler := NewStorePnlHandler(&recordingPnlKPI{}, nil, nil).
+		WithMasterData(memStoreLookup{storeID: "S1", legalEntityID: "LE-1"})
 	router := gin.New()
 	router.GET("/stores/:id/pnl", func(c *gin.Context) {
 		c.Set("legal_entity_id", "LE-1")

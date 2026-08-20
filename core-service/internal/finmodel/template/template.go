@@ -95,6 +95,12 @@ type RowDef struct {
 	Subtract []string `json:"subtract,omitempty"`
 	// Format is the S3-7 display contract (scale/negative/bold/indent).
 	Format Format `json:"format,omitempty"`
+	// ActualSource binds a formula row to a fact for the Actual window (PRD
+	// C7): on the actual-cutoff left of the freeze line the row reads its fact
+	// aggregate (retail-kpi-v1) instead of applying the driver formula — the
+	// Actual 区永不来自假设. Empty on link rows (their Source already is the
+	// fact binding).
+	ActualSource string `json:"actual_source,omitempty"`
 }
 
 // TemplateDef is the declared form consumed by Parse.
@@ -119,6 +125,9 @@ type Row struct {
 	// must survive Parse (S1-9).
 	FormulaText string
 	Format      Format // S3-7 display contract, defaults to yuan/minus
+	// ActualSource is the fact binding a formula row reads inside the Actual
+	// window (PRD C7); empty means the formula applies in every period.
+	ActualSource string
 }
 
 // ChildSign reports whether a child is added (+1) or subtracted (−1) in a
@@ -247,6 +256,7 @@ func Parse(def TemplateDef) (*Template, error) {
 		rows[i] = Row{
 			Key: key, Label: rd.Label, Kind: rd.Kind, Basis: rd.Basis,
 			Source: strings.TrimSpace(rd.Source), Format: rd.Format,
+			ActualSource: strings.TrimSpace(rd.ActualSource),
 		}
 	}
 
@@ -273,28 +283,38 @@ func Parse(def TemplateDef) (*Template, error) {
 		if rows[i].Kind != RowSubtotal && len(rd.Children) > 0 {
 			return nil, fmt.Errorf("template: row %q declares children but is %s, not subtotal", rd.Key, rows[i].Kind)
 		}
-		switch rows[i].Kind {
-		case RowFormula, RowCheck:
-			if strings.TrimSpace(rd.Formula) == "" {
-				return nil, fmt.Errorf("template: row %q is %s but has no formula", rd.Key, rows[i].Kind)
-			}
-			expr, err := compile(rd.Formula, byKey, rd.Key)
-			if err != nil {
-				return nil, fmt.Errorf("template: row %q: %w", rd.Key, err)
-			}
-			rows[i].Formula = &Expr{node: expr}
-		case RowLink:
-			if rows[i].Source == "" {
-				return nil, fmt.Errorf("template: link row %q must declare a source", rd.Key)
-			}
-		case RowInput:
-		case RowSubtotal:
-			if len(rd.Children) == 0 {
-				return nil, fmt.Errorf("template: subtotal row %q must declare children", rd.Key)
-			}
-		default:
-			return nil, fmt.Errorf("template: row %q has invalid kind %q", rd.Key, rd.Kind)
+	switch rows[i].Kind {
+	case RowFormula, RowCheck:
+		if strings.TrimSpace(rd.Formula) == "" {
+			return nil, fmt.Errorf("template: row %q is %s but has no formula", rd.Key, rows[i].Kind)
 		}
+		expr, err := compile(rd.Formula, byKey, rd.Key)
+		if err != nil {
+			return nil, fmt.Errorf("template: row %q: %w", rd.Key, err)
+		}
+		rows[i].Formula = &Expr{node: expr}
+	case RowLink:
+		if rows[i].Source == "" {
+			return nil, fmt.Errorf("template: link row %q must declare a source", rd.Key)
+		}
+	case RowInput:
+	case RowSubtotal:
+		if len(rd.Children) == 0 {
+			return nil, fmt.Errorf("template: subtotal row %q must declare children", rd.Key)
+		}
+	default:
+		return nil, fmt.Errorf("template: row %q has invalid kind %q", rd.Key, rd.Kind)
+	}
+	// actual_source 只能落在公式/校验行，且必须绑定事实源（PRD C7：Actual
+	// 冻结线左侧的行只读事实聚合，不得从假设推导）。
+	if rows[i].ActualSource != "" {
+		if rows[i].Kind != RowFormula && rows[i].Kind != RowCheck {
+			return nil, fmt.Errorf("template: row %q declares actual_source but is %s, not formula", rd.Key, rows[i].Kind)
+		}
+		if !strings.HasPrefix(rows[i].ActualSource, "fact.") {
+			return nil, fmt.Errorf("template: row %q actual_source must bind a fact.* source, got %q", rd.Key, rows[i].ActualSource)
+		}
+	}
 	}
 
 	if err := validateBasisMixing(def, byKey); err != nil {

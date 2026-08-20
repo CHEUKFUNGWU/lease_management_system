@@ -157,6 +157,41 @@ func TestAsyncRunCompletesAndReplaysPostgres(t *testing.T) {
 	}
 }
 
+// TestRunDefinitionRejectsCrossEntityDefinitionPostgres locks P0-1 (底线 1):
+// a tenant-A caller presenting tenant-B's definition id must be refused with
+// the unsoftened reason, while the same-entity caller passes the scope gate.
+func TestRunDefinitionRejectsCrossEntityDefinitionPostgres(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("connect to Postgres: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	entity, defID, userID, handler := asyncFixture(t, pool)
+
+	// 跨法人：以另一法人身份请求本法人的 definition。
+	otherEntity := uuid.NewString()
+	denied := ginServe(handler, otherEntity, userID, http.MethodPost, "/financial-model/definitions/"+defID+"/runs",
+		`{"definition_id":"`+defID+`","assumptions":{"gross_margin_rate":0.4}}`)
+	if denied.Code != http.StatusNotFound {
+		t.Fatalf("cross-entity run must be refused, got %d: %s", denied.Code, denied.Body.String())
+	}
+	if !strings.Contains(denied.Body.String(), "model definition not found") {
+		t.Fatalf("cross-entity refusal must keep the reason, got %s", denied.Body.String())
+	}
+
+	// 法人内：同法人请求通过权限门（引擎跑通，不是 404）。
+	own := ginServe(handler, entity, userID, http.MethodPost, "/financial-model/definitions/"+defID+"/runs",
+		`{"definition_id":"`+defID+`","assumptions":{"gross_margin_rate":0.4}}`)
+	if own.Code == http.StatusNotFound {
+		t.Fatalf("same-entity run must pass the scope gate: %s", own.Body.String())
+	}
+}
+
 // TestAsyncRunCancelPostgres holds a worker at the persist boundary through
 // the test hook and proves cancellation lands as cancelled with zero lines.
 func TestAsyncRunCancelPostgres(t *testing.T) {

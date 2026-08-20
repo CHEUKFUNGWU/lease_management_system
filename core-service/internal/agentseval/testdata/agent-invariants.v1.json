@@ -19,7 +19,11 @@
               "label": "年租金",
               "value": 1200000,
               "currency": "CNY",
-              "provenance": {"basis": "SystemFact", "source_table": "contracts", "source_record_id": "C-1"}
+              "provenance": {
+                "basis": "SystemFact",
+                "source_table": "contracts",
+                "source_record_id": "C-1"
+              }
             },
             {
               "ref": "A2",
@@ -27,13 +31,19 @@
               "measure_id": "lease_liability",
               "value": 3255676.79,
               "currency": "CNY",
-              "provenance": {"basis": "Certified", "tool_call_id": "call-1", "engine_version": "ifrs16@v2"}
+              "provenance": {
+                "basis": "Certified",
+                "tool_call_id": "call-1",
+                "engine_version": "ifrs16@v2"
+              }
             }
           ]
         }
       ]
     },
-    "completed_tool_calls": ["call-1"]
+    "completed_tool_calls": [
+      "call-1"
+    ]
   },
   {
     "id": "provenance_missing_basis_rejected",
@@ -47,12 +57,19 @@
           "title": "S",
           "kind": "table",
           "cells": [
-            {"ref": "A1", "label": "年租金", "value": 100, "provenance": {}}
+            {
+              "ref": "A1",
+              "label": "年租金",
+              "value": 100,
+              "provenance": {}
+            }
           ]
         }
       ]
     },
-    "expected_violations": ["provenance_missing"]
+    "expected_violations": [
+      "provenance_missing"
+    ]
   },
   {
     "id": "provenance_certified_without_call_rejected",
@@ -66,12 +83,23 @@
           "title": "S",
           "kind": "table",
           "cells": [
-            {"ref": "A2", "label": "租赁负债", "measure_id": "lease_liability", "value": 100, "provenance": {"basis": "Certified", "engine_version": "v2"}}
+            {
+              "ref": "A2",
+              "label": "租赁负债",
+              "measure_id": "lease_liability",
+              "value": 100,
+              "provenance": {
+                "basis": "Certified",
+                "engine_version": "v2"
+              }
+            }
           ]
         }
       ]
     },
-    "expected_violations": ["certified_missing_tool_call"]
+    "expected_violations": [
+      "certified_missing_tool_call"
+    ]
   },
   {
     "id": "provenance_protected_measure_exploratory_rejected",
@@ -85,12 +113,23 @@
           "title": "S",
           "kind": "table",
           "cells": [
-            {"ref": "A2", "label": "期末租赁负债", "measure_id": "lease_liability", "value": 100, "provenance": {"basis": "Exploratory", "sandbox_run_id": "r9"}}
+            {
+              "ref": "A2",
+              "label": "期末租赁负债",
+              "measure_id": "lease_liability",
+              "value": 100,
+              "provenance": {
+                "basis": "Exploratory",
+                "sandbox_run_id": "r9"
+              }
+            }
           ]
         }
       ]
     },
-    "expected_violations": ["protected_measure_exploratory"]
+    "expected_violations": [
+      "protected_measure_exploratory"
+    ]
   },
   {
     "id": "provenance_lexical_probe_catches_unlabelled_cell",
@@ -104,46 +143,71 @@
           "title": "S",
           "kind": "table",
           "cells": [
-            {"ref": "B1", "label": "使用权资产余额", "value": 100, "provenance": {"basis": "Exploratory", "sandbox_run_id": "r9"}}
+            {
+              "ref": "B1",
+              "label": "使用权资产余额",
+              "value": 100,
+              "provenance": {
+                "basis": "Exploratory",
+                "sandbox_run_id": "r9"
+              }
+            }
           ]
         }
       ]
     },
-    "expected_violations": ["lexical_probe_exploratory"]
+    "expected_violations": [
+      "lexical_probe_exploratory"
+    ]
   },
   {
     "id": "triage_invoice_not_contract",
     "category": "triage_refusal",
     "description": "an invoice must classify as invoice, never as a lease contract",
-    "triage": {"object_name": "增值税发票_202607.pdf", "content_type": "application/pdf"},
+    "triage": {
+      "object_name": "增值税发票_202607.pdf",
+      "content_type": "application/pdf"
+    },
     "expected_doc_class": "invoice"
   },
   {
     "id": "triage_labor_contract_unknown",
     "category": "triage_refusal",
     "description": "a labor contract is out of domain and must resolve to unknown",
-    "triage": {"object_name": "劳动合同-张三.pdf", "content_type": "application/pdf"},
+    "triage": {
+      "object_name": "劳动合同-张三.pdf",
+      "content_type": "application/pdf"
+    },
     "expected_doc_class": "unknown"
   },
   {
     "id": "triage_brochure_unknown",
     "category": "triage_refusal",
     "description": "a brochure must resolve to unknown",
-    "triage": {"object_name": "商场宣传册.pdf", "content_type": "application/pdf"},
+    "triage": {
+      "object_name": "商场宣传册.pdf",
+      "content_type": "application/pdf"
+    },
     "expected_doc_class": "unknown"
   },
   {
     "id": "triage_rent_schedule",
     "category": "triage_refusal",
     "description": "a rent schedule classifies as rent_schedule",
-    "triage": {"object_name": "2026-07租金表.xlsx", "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    "triage": {
+      "object_name": "2026-07租金表.xlsx",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
     "expected_doc_class": "rent_schedule"
   },
   {
     "id": "triage_operating_data",
     "category": "triage_refusal",
     "description": "store sales data classifies as operating_data",
-    "triage": {"object_name": "门店销售数据_202607.xlsx", "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    "triage": {
+      "object_name": "门店销售数据_202607.xlsx",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
     "expected_doc_class": "operating_data"
   },
   {
@@ -164,15 +228,36 @@
         "early_exit_penalty_months": 3
       },
       "offers": [
-        {"name": "核心商圈 A 店", "term_months": 36, "base_monthly_rent": 58000, "rent_free_months": 2, "annual_escalation_percent": 3, "area_sqm": 135},
-        {"name": "次级商圈 B 店", "term_months": 36, "base_monthly_rent": 46000, "rent_free_months": 1, "annual_escalation_percent": 4, "area_sqm": 150}
+        {
+          "name": "核心商圈 A 店",
+          "term_months": 36,
+          "base_monthly_rent": 58000,
+          "rent_free_months": 2,
+          "annual_escalation_percent": 3,
+          "area_sqm": 135
+        },
+        {
+          "name": "次级商圈 B 店",
+          "term_months": 36,
+          "base_monthly_rent": 46000,
+          "rent_free_months": 1,
+          "annual_escalation_percent": 4,
+          "area_sqm": 150
+        }
       ],
-      "shocks_percent": [-0.02, -0.01, 0.01, 0.02],
+      "shocks_percent": [
+        -0.02,
+        -0.01,
+        0.01,
+        0.02
+      ],
       "confirmed_by": "bp-demo",
       "confirmed_at": "2026-08-19T10:00:00Z",
       "tool_call_id": "call-demo-core"
     },
-    "completed_tool_calls": ["call-demo-core"]
+    "completed_tool_calls": [
+      "call-demo-core"
+    ]
   },
   {
     "id": "s1_engine_consistency_community_store",
@@ -191,12 +276,17 @@
         "initial_direct_cost": 40000,
         "early_exit_penalty_months": 2
       },
-      "shocks_percent": [-0.01, 0.01],
+      "shocks_percent": [
+        -0.01,
+        0.01
+      ],
       "confirmed_by": "bp-demo",
       "confirmed_at": "2026-08-19T10:00:00Z",
       "tool_call_id": "call-demo-community"
     },
-    "completed_tool_calls": ["call-demo-community"]
+    "completed_tool_calls": [
+      "call-demo-community"
+    ]
   },
   {
     "id": "retail_paper_sanctity",
@@ -208,44 +298,78 @@
         "formula_version": "retail-kpi-v1",
         "data_classification": "simulated",
         "dataset_version": "ds-9",
-        "simulation_dataset_versions": ["ds-9"],
-        "requested_scope": {"legal_entity_id": "LE-1"},
+        "simulation_dataset_versions": [
+          "ds-9"
+        ],
+        "requested_scope": {
+          "legal_entity_id": "LE-1"
+        },
         "currency": "CNY",
         "currency_status": "known",
         "multi_currency": true,
         "mixed_currency_stores": 3,
         "fact_version_min": 1,
         "fact_version_max": 5,
-        "source_systems": ["retail_simulator"],
-        "current_coverage": {"observed_store_days": 9, "expected_store_days": 10, "missing_fields": ["footfall"]},
-        "comparison_coverage": {"observed_store_days": 10, "expected_store_days": 10},
+        "source_systems": [
+          "retail_simulator"
+        ],
+        "current_coverage": {
+          "observed_store_days": 9,
+          "expected_store_days": 10,
+          "missing_fields": [
+            "footfall"
+          ]
+        },
+        "comparison_coverage": {
+          "observed_store_days": 10,
+          "expected_store_days": 10
+        },
         "decision_ready": false,
         "decision_ready_reason": "incomplete_store_day_coverage",
         "summary": {
           "revenue": {
-            "current": {"value": 9876543.21, "unit": "currency", "status": "complete"},
-            "comparison": {"value": 9000000, "unit": "currency", "status": "complete"},
+            "current": {
+              "value": 9876543.21,
+              "unit": "currency",
+              "status": "complete"
+            },
+            "comparison": {
+              "value": 9000000,
+              "unit": "currency",
+              "status": "complete"
+            },
             "change_value": 876543.21,
             "change_type": "percent"
           },
           "footfall": {
-            "current": {"value": null, "unit": "count", "status": "unavailable"},
+            "current": {
+              "value": null,
+              "unit": "count",
+              "status": "unavailable"
+            },
             "status": "unavailable"
           }
         },
         "suppressed_attention": [
-          {"store_id": "S-2", "store_name": "新开店", "reasons": ["no_facts_in_requested_range"]}
+          {
+            "store_id": "S-2",
+            "store_name": "新开店",
+            "reasons": [
+              "no_facts_in_requested_range"
+            ]
+          }
         ]
       },
       "tool_call_id": "call-retail-eval"
     },
-    "completed_tool_calls": ["call-retail-eval"]
-  }
-,
+    "completed_tool_calls": [
+      "call-retail-eval"
+    ]
+  },
   {
     "id": "finmodel_paper_sanctity",
     "category": "finmodel_paper",
-    "description": "model working paper: 1:1 values, nil-skip, tie-out failure flagged, lint green, zero exploratory.",
+    "description": "model working paper: 1:1 values, nil-skip, tie-out failure flagged AND lint-refused (D-S5 fail-closed), zero exploratory.",
     "finmodel_paper": {
       "title": "月度三表底稿",
       "legal_entity_id": "LE-1",
@@ -256,19 +380,53 @@
       "assumption_version": "as-1",
       "exchange_rate_version": "fx-1",
       "metric_definition_version": "md-1",
-      "periods": ["2026-01"],
+      "periods": [
+        "2026-01"
+      ],
       "lines": [
-        {"row_key": "rev", "label": "营业收入", "period": "2026-01", "value": 987654.32, "source_type": "fact_aggregate", "classification": "production"},
-        {"row_key": "net_income", "label": "净利润", "period": "2026-01", "value": 7.5, "source_type": "formula", "classification": "production"},
-        {"row_key": "labor", "label": "人工成本", "period": "2026-01", "value": null, "source_type": "fact_aggregate", "classification": "production"}
+        {
+          "row_key": "rev",
+          "label": "营业收入",
+          "period": "2026-01",
+          "value": 987654.32,
+          "source_type": "fact_aggregate",
+          "classification": "production"
+        },
+        {
+          "row_key": "net_income",
+          "label": "净利润",
+          "period": "2026-01",
+          "value": 7.5,
+          "source_type": "formula",
+          "classification": "production"
+        },
+        {
+          "row_key": "labor",
+          "label": "人工成本",
+          "period": "2026-01",
+          "value": null,
+          "source_type": "fact_aggregate",
+          "classification": "production"
+        }
       ],
       "tie_outs": [
-        {"check_code": "T1", "period": "2026-01", "expected": 2160, "actual": 2167, "diff": 7, "status": "failed"}
+        {
+          "check_code": "T1",
+          "period": "2026-01",
+          "expected": 2160,
+          "actual": 2167,
+          "diff": 7,
+          "status": "failed"
+        }
       ],
-      "gap_details": ["预测期收入以 SSSG 驱动"],
+      "gap_details": [
+        "预测期收入以 SSSG 驱动"
+      ],
       "tool_call_id": "call-finmodel-eval",
       "generated_by": "fpna.working_paper.finmodel.generate"
     },
-    "completed_tool_calls": ["call-finmodel-eval"]
+    "completed_tool_calls": [
+      "call-finmodel-eval"
+    ]
   }
 ]

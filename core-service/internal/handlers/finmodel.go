@@ -325,9 +325,8 @@ func (h *FinModelHandler) ExportRun(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
 		return
 	}
-	def, err := h.repo.GetModelDefinition(c.Request.Context(), run.ModelDefinitionID)
+	def, err := h.requireScopedDefinition(c, run.ModelDefinitionID)
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "model definition not found"})
 		return
 	}
 	tmpl, err := h.repo.LoadStatementTemplate(c.Request.Context(), def.TemplateID)
@@ -421,7 +420,7 @@ func (h *FinModelHandler) PublishRun(c *gin.Context) {
 	}
 	published, err := persist.NewPublishWriter(h.repo, h.plans).Publish(c.Request.Context(), id, &userID, strings.TrimSpace(req.ScenarioType))
 	if err != nil {
-		if errors.Is(err, persist.ErrPublishGate) {
+		if errors.Is(err, persist.ErrPublishGate) || errors.Is(err, persist.ErrSimulatedPublish) {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 			return
 		}
@@ -432,6 +431,40 @@ func (h *FinModelHandler) PublishRun(c *gin.Context) {
 		_ = h.audit.Log(c.Request.Context(), "fin_model_runs", id, "publish", nil, published, userID, c)
 	}
 	c.JSON(http.StatusCreated, gin.H{"published": published})
+}
+
+// requireScopedDefinition loads the target model definition and 404s unless it
+// belongs to the caller's tenant — the definition-side sibling of scopedRun.
+// Every handler that enters by definition id (run / export / publish) goes
+// through here so a tenant-A caller can never execute or read a tenant-B
+// definition (bottom line 1).
+func (h *FinModelHandler) requireScopedDefinition(c *gin.Context, id string) (*repository.FinModelDefinition, error) {
+	if h.repo == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		return nil, errors.New("repository unavailable")
+	}
+	row, err := h.repo.GetModelDefinition(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "model definition not found"})
+		return nil, err
+	}
+	tenant := middleware.GetTenantID(c)
+	if !definitionScopeAuthorized(row.LegalEntityID, tenant) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "model definition not found"})
+		return nil, errors.New("model definition outside caller scope")
+	}
+	return row, nil
+}
+
+// definitionScopeAuthorized is the pure cross-entity decision behind
+// requireScopedDefinition (and the run/export/publish read paths): a tenant-A
+// caller may only touch tenant-A definitions; an empty tenant (global admin)
+// is unrestricted. Bottom line 1. Unit-testable without a database.
+func definitionScopeAuthorized(defLegalEntityID, tenant string) bool {
+	if tenant == "" {
+		return true
+	}
+	return defLegalEntityID == tenant
 }
 
 // requireScopedTemplate loads the target template and answers 404 unless it
@@ -509,9 +542,8 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	defRow, err := h.repo.GetModelDefinition(c.Request.Context(), req.DefinitionID)
+	defRow, err := h.requireScopedDefinition(c, req.DefinitionID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "model definition not found"})
 		return
 	}
 	tmpl, err := h.repo.LoadStatementTemplate(c.Request.Context(), defRow.TemplateID)
@@ -555,9 +587,26 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 
 	result, err := finmodel.Run(c.Request.Context(), def, inputs)
 	if err != nil {
+		if errors.Is(err, finmodel.ErrOpeningRejected) {
+			// S2-3 期初三道闸失败：阻止运行，不落库，错误具名（P0-5）；
+			// 闸失败（含闸③ 租赁余额不符）进数据质量队列（P1-1）。
+			var orErr *finmodel.OpeningRejectedError
+			if errors.As(err, &orErr) {
+				_ = persist.RecordOpeningGateIssues(c.Request.Context(), h.repo, def.LegalEntityID, req.IdempotencyKey, orErr.Failures)
+			}
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "code": "opening_rejected"})
+			return
+		}
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 		return
 	}
+	// T13 Actual 失配 → 数据质量队列（即使整个 run 因勾稽不绿无法发布，
+	// 失配也必须可见，P1-1）。trace 用幂等键或生成的 run 占位。
+	traceID := req.IdempotencyKey
+	if traceID == "" {
+		traceID = "run-" + uuid.NewString()
+	}
+	_ = persist.RecordReconciliationIssues(c.Request.Context(), h.repo, def.LegalEntityID, traceID, req.Versions.Data, result.TieOuts)
 	payload := map[string]any{"run": result}
 	if result.TieOutStatus != "failed" && h.repo != nil {
 		idem := req.IdempotencyKey
@@ -591,6 +640,7 @@ func (h *FinModelHandler) dispatchAsyncRun(c *gin.Context, defRow *repository.Fi
 	if idem == "" {
 		idem = "run-" + uuid.NewString()
 	}
+	writer := persist.NewRunWriter(h.repo)
 	if existing, err := h.repo.FindModelRunByIdempotency(c.Request.Context(), defRow.ID, idem); err == nil && existing != nil {
 		c.JSON(http.StatusOK, gin.H{"run_id": existing.ID, "status": existing.Status, "replayed": true})
 		return
@@ -610,14 +660,13 @@ func (h *FinModelHandler) dispatchAsyncRun(c *gin.Context, defRow *repository.Fi
 		Status:             "queued", TieOutStatus: "pending",
 		InputSnapshot: snapshot, IdempotencyKey: idem, CreatedBy: userID,
 	}
-	if err := h.repo.CreateModelRun(c.Request.Context(), created); err != nil {
-		if errors.Is(err, repository.ErrFinModelRunReplay) {
-			if existing, ferr := h.repo.FindModelRunByIdempotency(c.Request.Context(), defRow.ID, idem); ferr == nil && existing != nil {
-				c.JSON(http.StatusOK, gin.H{"run_id": existing.ID, "status": existing.Status, "replayed": true})
-				return
-			}
-		}
+	// S2-5 async 写入口：queued 行由 persist 包创建（D-S2 唯一写入口），
+	// 重放键返回既有 run。
+	if existing, err := writer.CreateQueued(c.Request.Context(), created); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	} else if existing != nil && existing.ID != runID {
+		c.JSON(http.StatusOK, gin.H{"run_id": existing.ID, "status": existing.Status, "replayed": true})
 		return
 	}
 
@@ -630,26 +679,34 @@ func (h *FinModelHandler) dispatchAsyncRun(c *gin.Context, defRow *repository.Fi
 		// never a zombie "running" row and never a crashed worker.
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				_ = h.repo.FailModelRun(context.Background(), runID, fmt.Sprintf("worker panic: %v", recovered))
+				_ = writer.Fail(context.Background(), runID, fmt.Sprintf("worker panic: %v", recovered))
 			}
 		}()
-		_ = h.repo.UpdateModelRunStatus(context.Background(), runID, "running", "pending", nil)
+		_ = writer.MarkRunning(context.Background(), runID)
 		result, err := finmodel.Run(ctx, def, inputs)
 		if err != nil {
-			_ = h.repo.FailModelRun(context.Background(), runID, err.Error())
+			if errors.Is(err, finmodel.ErrOpeningRejected) {
+				var orErr *finmodel.OpeningRejectedError
+				if errors.As(err, &orErr) {
+					_ = persist.RecordOpeningGateIssues(context.Background(), h.repo, def.LegalEntityID, runID, orErr.Failures)
+				}
+			}
+			_ = writer.Fail(context.Background(), runID, err.Error())
 			return
 		}
+		// T13 Actual 失配进数据质量队列（P1-1）——异步 run 也有 runID 可溯源。
+		_ = persist.RecordReconciliationIssues(context.Background(), h.repo, def.LegalEntityID, runID, req.Versions.Data, result.TieOuts)
 		if asyncRunHook != nil {
 			asyncRunHook(runID)
 		}
 		select {
 		case <-ctx.Done():
-			_ = h.repo.CancelModelRun(context.Background(), runID)
+			_ = writer.Cancel(context.Background(), runID)
 			return
 		default:
 		}
-		if err := persist.NewRunWriter(h.repo).PersistInto(ctx, runID, result); err != nil {
-			_ = h.repo.FailModelRun(context.Background(), runID, err.Error())
+		if err := writer.PersistInto(ctx, runID, result); err != nil {
+			_ = writer.Fail(context.Background(), runID, err.Error())
 			return
 		}
 	}()
@@ -690,7 +747,7 @@ func (h *FinModelHandler) CancelRun(c *gin.Context) {
 	if cancel, found := h.cancels.Load(run.ID); found {
 		cancel.(context.CancelFunc)()
 	}
-	if err := h.repo.CancelModelRun(c.Request.Context(), run.ID); err != nil {
+	if err := persist.NewRunWriter(h.repo).Cancel(c.Request.Context(), run.ID); err != nil {
 		if errors.Is(err, repository.ErrInvalidWorkflowTransition) {
 			c.JSON(http.StatusConflict, gin.H{"error": "run 已结束，无法取消"})
 			return

@@ -3,6 +3,7 @@ package finmodel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"testing"
 
@@ -204,13 +205,16 @@ func TestWithoutOpeningBalanceDegradesHonestly(t *testing.T) {
 	if got := lineValue(t, result, "gp", "2026-01"); got == nil || !closeTo(*got, 400, 0.01) {
 		t.Fatalf("IS must be unaffected, gp@01 = %v", got)
 	}
-	foundGap := false
+	// 缺期初的诚实降级必须留下原因说明（不是无声返回空）。
+	foundOpeningGap := false
 	for _, g := range result.Gaps {
-		if g.Detail != "" && len(g.Detail) > 0 && result.TieOutStatus != "passed" {
-			foundGap = true
+		if g.Kind == "opening_missing" {
+			foundOpeningGap = true
 		}
 	}
-	_ = foundGap
+	if !foundOpeningGap {
+		t.Fatalf("缺期初必须以 gap 说明降级原因，got gaps=%+v", result.Gaps)
+	}
 	// 无期初时首期留存收益/营运资本/长期资产滚动必须 not_applicable，不允许假平衡。
 	for _, out := range result.TieOuts {
 		if out.CheckCode == "T3" || out.CheckCode == "T6" || out.CheckCode == "T10" {
@@ -307,6 +311,15 @@ func TestTieOutReverseT13ActualSource(t *testing.T) {
 	requireRed(t, s, "T13", "2026-01")
 }
 
+// P1-1：T13 的占用成本对照——固定或变量租金一侧被改，对照必红。
+func TestTieOutReverseT13OccupancyRow(t *testing.T) {
+	s := prepareState(t, func(s *runState) {})
+	requireGreen(t, s, "T13", "2026-01")
+	// 事实侧不变、模型侧固定租金被改 → 占用成本两条路径不一致。
+	s = prepareState(t, func(s *runState) { *s.values["fixed_rent"]["2026-01"] += 33 })
+	requireRed(t, s, "T13", "2026-01")
+}
+
 func TestTieOutReverseT14Currency(t *testing.T) {
 	def := goldenDef(t)
 	in := goldenInputs()
@@ -331,6 +344,106 @@ func TestTieOutReverseT16Classification(t *testing.T) {
 	if got := statusOf(t, s.evaluateTieOuts(), "T16", "2026-01"); got != "failed" {
 		t.Fatalf("T16 must fail without classification, got %s", got)
 	}
+}
+
+// ── 反向测试补齐（P0-4）：T2 / T4 / T6 / T8 / T11 / T15 ───────────────────
+
+func TestTieOutReverseT2Cash(t *testing.T) {
+	s := prepareState(t, func(s *runState) {})
+	requireGreen(t, s, "T2", "2026-01")
+	// 现金净变动被改 → 滚动恒等式破裂。
+	s = prepareState(t, func(s *runState) { *s.values["net_cash_flow"]["2026-01"] += 30 })
+	requireRed(t, s, "T2", "2026-01")
+	// BS 现金行与 CF 脱钩（被改成独立值）→ 构造断言破裂。
+	s = prepareState(t, func(s *runState) { *s.values["cash"]["2026-01"] = *s.values["cash"]["2026-01"] - 99 })
+	requireRed(t, s, "T2", "2026-01")
+}
+
+func TestTieOutReverseT4NetIncomeSource(t *testing.T) {
+	s := prepareState(t, func(s *runState) {})
+	requireGreen(t, s, "T4", "2026-01")
+	// 数值侧：CF 起点行（cfo）被私改 → 加回利息还原后 ≠ 净利润，T4 红。
+	s = prepareState(t, func(s *runState) { *s.values["cfo"]["2026-01"] += 7 })
+	requireRed(t, s, "T4", "2026-01")
+}
+
+// cfAnchorIsNetIncome 的结构断言直接测试：CF 起点引用单独的“净利润副本行”
+// （数值上可能与 IS 净利润相同）也必须被判为结构违约。
+func TestT4StructureRejectsSeparateCFIncomeRow(t *testing.T) {
+	defRows := func(cfoFormula string) *template.Template {
+		tmpl, err := template.Parse(template.TemplateDef{Name: "t4-structure", Version: 1, Rows: []template.RowDef{
+			{Key: "net_income", Label: "IS 净利润", Kind: template.RowInput, Basis: template.BasisShared},
+			{Key: "cf_ni", Label: "CF 起点行（副本）", Kind: template.RowInput, Basis: template.BasisShared},
+			{Key: "dna", Label: "D&A", Kind: template.RowInput, Basis: template.BasisShared},
+			{Key: "delta_nwc", Label: "ΔNWC", Kind: template.RowInput, Basis: template.BasisShared},
+			{Key: "cfo", Label: "CFO", Kind: template.RowFormula, Basis: template.BasisShared, Formula: cfoFormula},
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tmpl
+	}
+	base := func(key string) ModelDef {
+		return ModelDef{Name: "t4", LegalEntityID: "LE-1", Currency: "CNY",
+			Template: defRows(key), PeriodStart: "2026-01", HistoricalMonths: 1, ForecastMonths: 1,
+			ActualCutoffPeriod: "2026-01",
+			Policy:             ModelPolicy{Version: "p1", InterestCashFlowPresentation: "operating"}}
+	}
+	good, err := newRunState(base("rows.net_income + rows.dna + rows.delta_nwc"), ModelInputs{DataClassification: "production"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !good.cfAnchorIsNetIncome() {
+		t.Fatal("CF 引用 IS net_income 行必须通过结构断言")
+	}
+	bad, err := newRunState(base("rows.cf_ni + rows.dna + rows.delta_nwc"), ModelInputs{DataClassification: "production"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bad.cfAnchorIsNetIncome() {
+		t.Fatal("CF 引用独立净利润副本行必须被判结构违约（同一 run 同一行源）")
+	}
+}
+
+func TestTieOutReverseT6NWC(t *testing.T) {
+	s := prepareState(t, func(s *runState) {})
+	requireGreen(t, s, "T6", "2026-01")
+	s = prepareState(t, func(s *runState) { *s.values["delta_nwc"]["2026-01"] += 5 })
+	requireRed(t, s, "T6", "2026-01")
+}
+
+func TestTieOutReverseT8ROURoll(t *testing.T) {
+	s := prepareState(t, func(s *runState) {})
+	requireGreen(t, s, "T8", "2026-01")
+	s = prepareState(t, func(s *runState) {
+		m := s.leaseByPeriod["2026-01"]
+		m.ROUAsset = f(9999)
+		s.leaseByPeriod["2026-01"] = m
+	})
+	requireRed(t, s, "T8", "2026-01")
+}
+
+func TestTieOutReverseT11OpeningContinuity(t *testing.T) {
+	s := prepareState(t, func(s *runState) {})
+	requireGreen(t, s, "T11", "2026-02")
+	// 上一个期间的期末值被事后改动（版本切换/私改前值）→ 本期 carry 基值
+	// 与新物化的前值不一致，T11 必须红。
+	s = prepareState(t, func(s *runState) { *s.values["ppe"]["2026-01"] += 9 })
+	requireRed(t, s, "T11", "2026-02")
+}
+
+func TestTieOutReverseT15BasisIsolation(t *testing.T) {
+	s := prepareState(t, func(s *runState) {})
+	requireGreen(t, s, "T15", "2026-01")
+	// 把一个 shared 子行改成 IFRS 16 口径 → 经营口径小计路径混行，T15 红。
+	s = prepareState(t, func(s *runState) {
+		for i := range s.def.Template.Rows {
+			if s.def.Template.Rows[i].Key == "labor" {
+				s.def.Template.Rows[i].Basis = template.BasisIFRS16
+			}
+		}
+	})
+	requireRed(t, s, "T15", "2026-01")
 }
 
 // 政策开关缺失：run 拒绝启动（T9）。
@@ -408,4 +521,114 @@ func TestForecastCombinedDriversAreNeutralWhenUnregistered(t *testing.T) {
 		}
 	}
 	t.Fatal("forecast revenue row missing")
+}
+
+// ── P0-3：Actual 冻结线左侧只读事实，右侧才用驱动公式 ─────────────────────
+
+func TestActualWindowReadsFactsNotAssumptions(t *testing.T) {
+	def := goldenDef(t)
+	in := goldenInputs()
+	// 事实毛利 350 ≠ 收入 1000 × 假设毛利率 0.4：Actual 期必须输出事实值，
+	// 不允许用假设推导出 400。
+	facts := memFacts{byPeriod: map[string]OperatingFacts{
+		"2026-01": {Revenue: f(1000), GrossProfit: f(350), LaborCost: f(200), FixedRent: f(150), VariableRent: f(50), NonLeaseCost: f(60), OtherControllableCost: f(40), DecisionReady: true, DataClassification: "production"},
+		"2026-02": {Revenue: f(1100), GrossProfit: f(385), LaborCost: f(220), FixedRent: f(165), VariableRent: f(55), NonLeaseCost: f(66), OtherControllableCost: f(44), DecisionReady: true, DataClassification: "production"},
+	}}
+	in.Facts = facts
+	result, err := Run(context.Background(), def, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lineValue(t, result, "gp", "2026-01"); got == nil || *got != 350 {
+		t.Fatalf("Actual 毛利必须等于事实 350，而非假设推导 400，got %v", got)
+	}
+	if got := lineValue(t, result, "gp", "2026-02"); got == nil || *got != 385 {
+		t.Fatalf("Actual 毛利必须等于事实 385，而非假设推导，got %v", got)
+	}
+	// 预测期仍由毛利率假设驱动：rev@03 = 1100×1.02 = 1122，gp@03 = 1122×0.4。
+	rev03 := lineValue(t, result, "rev", "2026-03")
+	gp03 := lineValue(t, result, "gp", "2026-03")
+	if rev03 == nil || gp03 == nil || *gp03-*rev03*0.4 > 0.001 {
+		t.Fatalf("预测期毛利由假设驱动：rev@03=%v gp@03=%v", rev03, gp03)
+	}
+	// T13 在 Actual 期对真实事实聚合通过。
+	s, err := newRunState(def, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.loadOpening(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	s.loadPeriods(context.Background())
+	requireGreen(t, s, "T13", "2026-01")
+}
+
+// ── P0-5：期初三道闸失败阻止运行（已提供但带病的期初 ≠ 未提供）─────────
+
+func TestRunRejectsSickOpeningGateFail(t *testing.T) {
+	def := goldenDef(t)
+	in := goldenInputs()
+	// 破坏闸 1：期初自身不平（把现金减成让资产 ≠ 负债+权益）。
+	broken := *in.Opening.(memOpening).bal
+	broken.Periods = []opening.PeriodBalance{{
+		Period: "2026-01",
+		Lines:  map[string]float64{"cash": 0, "ar": 100, "inventory": 60, "ap": 40, "ppe": 300, "rou_asset": 1200, "lease_liability": 1000, "borrowings": 200, "share_capital": 500, "retained_earnings": 420},
+	}}
+	in.Opening = memOpening{bal: &broken, ref: goldenInputs().Opening.(memOpening).ref, engine: goldenInputs().Opening.(memOpening).engine, policy: opening.MergePolicy{Version: "v1"}}
+	_, err := Run(context.Background(), def, in)
+	if err == nil {
+		t.Fatal("a sick (gate-failing) opening must reject the run, not degrade")
+	}
+	if !errors.Is(err, ErrOpeningRejected) {
+		t.Fatalf("rejection must carry ErrOpeningRejected, got %v", err)
+	}
+	// 对照：未提供期初仍走降级而非拒绝。
+	in2 := goldenInputs()
+	in2.Opening = nil
+	if _, err := Run(context.Background(), goldenDef(t), in2); err != nil {
+		t.Fatalf("absent opening must degrade, not error: %v", err)
+	}
+}
+
+// ── P0-6：利息列报政策两个分支都让 CFO/CFE 生效且现金守恒 ────────────────
+
+func TestInterestPresentationBranchesConserveCash(t *testing.T) {
+	defF := goldenDef(t) // financing（CAS 实务）
+	defF.Policy.InterestCashFlowPresentation = "financing"
+	defO := goldenDef(t) // operating（IAS 7 选项）
+	defO.Policy.InterestCashFlowPresentation = "operating"
+
+	runF, err := Run(context.Background(), defF, goldenInputs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runO, err := Run(context.Background(), defO, goldenInputs())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// financing 下利息从 CFO 移出（备筹资列报）：两分支 CFO/CFE 必须不同。
+	cfoF, cfoO := lineValue(t, runF, "cfo", "2026-01"), lineValue(t, runO, "cfo", "2026-01")
+	cfeF, cfeO := lineValue(t, runF, "cfe", "2026-01"), lineValue(t, runO, "cfe", "2026-01")
+	if cfoF == nil || cfoO == nil || cfeF == nil || cfeO == nil {
+		t.Fatalf("cfo/cfe must compute in both branches: F=%v/%v O=%v/%v", cfoF, cfeF, cfoO, cfeO)
+	}
+	if *cfoF == *cfoO || *cfeF == *cfeO {
+		t.Fatalf("the policy switch must change CFO/CFE: F cfo=%v cfe=%v, O cfo=%v cfe=%v", *cfoF, *cfeF, *cfoO, *cfeO)
+	}
+	// 利息总额不变 → 期末现金两分支一致（T2 现金守恒在两个分支下都成立）。
+	if gotF, gotO := lineValue(t, runF, "ending_cash", "2026-01"), lineValue(t, runO, "ending_cash", "2026-01"); gotF == nil || gotO == nil || *gotF != *gotO {
+		t.Fatalf("ending cash must be policy-invariant: F=%v O=%v", gotF, gotO)
+	}
+	// T1/T2 双双通过。
+	sF, _ := newRunState(defF, goldenInputs())
+	_ = sF.loadOpening(context.Background())
+	sF.loadPeriods(context.Background())
+	requireGreen(t, sF, "T1", "2026-01")
+	requireGreen(t, sF, "T2", "2026-01")
+	sO, _ := newRunState(defO, goldenInputs())
+	_ = sO.loadOpening(context.Background())
+	sO.loadPeriods(context.Background())
+	requireGreen(t, sO, "T1", "2026-01")
+	requireGreen(t, sO, "T2", "2026-01")
 }

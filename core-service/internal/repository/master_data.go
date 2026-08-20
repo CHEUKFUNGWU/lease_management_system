@@ -148,6 +148,21 @@ func (r *MasterDataRepository) ListStores(ctx context.Context, tenantID, legalEn
 	return stores, rows.Err()
 }
 
+// GetStoreByID loads one active store with its scope dimensions. The store
+// P&L projection entry checks the caller's entity against this row (bottom
+// line 1) — a guessed store id must not tunnel across entities. A missing or
+// inactive store returns an empty option, which the caller renders as 404.
+func (r *MasterDataRepository) GetStoreByID(ctx context.Context, storeID string) (StoreOption, error) {
+	var store StoreOption
+	err := r.db.QueryRow(ctx, `SELECT id, code, name, legal_entity_id, brand, region, address
+		FROM stores WHERE id=$1 AND is_active=true`, storeID).
+		Scan(&store.ID, &store.Code, &store.Name, &store.LegalEntityID, &store.Brand, &store.Region, &store.Address)
+	if err == pgx.ErrNoRows {
+		return StoreOption{}, nil
+	}
+	return store, err
+}
+
 func (r *MasterDataRepository) ListLandlords(ctx context.Context) ([]LandlordOption, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, code, name, address

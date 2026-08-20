@@ -38,3 +38,18 @@ func TestPlanColumnsCoverTheStatementRows(t *testing.T) {
 		}
 	}
 }
+
+// P0-7（底线 2）: 模拟/混合 run 永不发布为 plan version，未标记老 run 由
+// production 语义放行。这是发布闸的纯判定，可脱离数据库测试。
+func TestPublishClassificationAllowed(t *testing.T) {
+	for _, classification := range []string{"production", ""} {
+		if !publishClassificationAllowed(classification) {
+			t.Fatalf("classification %q must be publishable", classification)
+		}
+	}
+	for _, classification := range []string{"simulated", "mixed"} {
+		if publishClassificationAllowed(classification) {
+			t.Fatalf("classification %q must never publish (底线 2)", classification)
+		}
+	}
+}

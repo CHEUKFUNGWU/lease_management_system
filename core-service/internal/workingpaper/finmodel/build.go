@@ -129,6 +129,14 @@ func Build(in Input) (workingpaper.Paper, error) {
 	if in.DataClassification == "simulated" {
 		gaps = append(gaps, "数据标记为模拟（SIMULATED）：模型结果不得用作正式结论")
 	}
+	// 勾稽失败是构造性阻塞（D-S5 第二处 fail-closed）：以结构化 entry 进
+	// DataGaps，lint 的 I8 据此拒绝导出——失败的 run 有底稿可看（诊断），
+	// 但永远不能出 artifact。
+	for _, out := range in.TieOuts {
+		if out.Status == "failed" {
+			gaps = append(gaps, "tie_out_failed:"+out.CheckCode+"@"+out.Period)
+		}
+	}
 
 	review := workingpaper.ReviewNeedsReview
 	for _, out := range in.TieOuts {
@@ -160,19 +168,18 @@ func tieOutCells(in Input) ([]workingpaper.Cell, []string) {
 	var cells []workingpaper.Cell
 	var failed []string
 	for _, out := range in.TieOuts {
-		value := out.Diff
-		status := workingpaper.BasisSystemFact
-		label := fmt.Sprintf("%s @ %s（%s）", out.CheckCode, out.Period, out.Status)
-		if value == nil {
-			status = workingpaper.BasisSystemFact
-		}
-		v := 0.0
-		if value != nil {
-			v = *value
+		// 缺失 Diff（not_applicable / 未判 / 缺值）不留单元格——与金额行同一
+		// nil 跳格纪律（D-S4：不用 0 填补缺失）。失败的定位由 DataGap 的
+		// tie_out_failed: 与区块 narrative 承载，不靠捏造的 0.0。
+		if out.Diff == nil {
+			if out.Status == "failed" {
+				failed = append(failed, out.CheckCode+"@"+out.Period)
+			}
+			continue
 		}
 		cells = append(cells, workingpaper.Cell{
-			Ref: out.CheckCode + "@" + out.Period, Label: label,
-			Value: v, Provenance: workingpaper.Provenance{Basis: status, SourceTable: "fin_model_tie_outs", DataVersion: in.DataVersion},
+			Ref: out.CheckCode + "@" + out.Period, Label: fmt.Sprintf("%s @ %s（%s）", out.CheckCode, out.Period, out.Status),
+			Value: *out.Diff, Provenance: workingpaper.Provenance{Basis: workingpaper.BasisSystemFact, SourceTable: "fin_model_tie_outs", DataVersion: in.DataVersion},
 		})
 		if out.Status == "failed" {
 			failed = append(failed, out.CheckCode+"@"+out.Period)

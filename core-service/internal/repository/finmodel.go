@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 )
@@ -421,24 +422,105 @@ func (r *FinModelRepository) ListTieOuts(ctx context.Context, runID string) ([]*
 }
 
 // SaveAssumptionDrafts persists AI suggestion drafts (status=draft,
-// source=ai_suggestion), evidence and derived confidence included. The
-// engine's AssumptionReader reads only approved rows (LatestApproved...),
-// so these drafts can never leak into a formal run until a human approves.
+// source=ai_suggestion), evidence and derived confidence included — one batch,
+// one transaction (a mid-batch failure leaves no partial batch). A replayed
+// idempotency key returns the already-persisted batch instead of a second
+// record (bottom line 4), backed by the (legal_entity_id, idempotency_key)
+// unique index. The engine's AssumptionReader reads only approved rows, so
+// these drafts can never leak into a formal run until a human approves.
 func (r *FinModelRepository) SaveAssumptionDrafts(ctx context.Context, legalEntityID string, rows []AssumptionDraftRow, idempotencyKey string) ([]string, error) {
-	ids := make([]string, 0, len(rows))
-	for _, row := range rows {
-		id := uuidNew()
-		_, err := r.db.Exec(ctx, `INSERT INTO fpna_assumption_versions
-			(id, legal_entity_id, assumption_key, category, value, unit, source, owner_name, effective_from, effective_to, version, status, evidence, confidence)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
-			id, legalEntityID, row.Key, row.Category, row.Value, row.Unit, row.Source, row.Owner,
-			row.EffectiveFrom, nil, 1, "draft", row.Evidence, row.Confidence)
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	// 幂等：同一键只落一批，重放返回既有批次。
+	if idempotencyKey != "" {
+		if ids, err := r.FindAssumptionDraftBatch(ctx, legalEntityID, idempotencyKey); err == nil && len(ids) > 0 {
+			return ids, nil
+		}
+	}
+	insert := func(db DBTX) ([]string, error) {
+		ids := make([]string, 0, len(rows))
+		for _, row := range rows {
+			id := uuidNew()
+			_, err := db.Exec(ctx, `INSERT INTO fpna_assumption_versions
+				(id, legal_entity_id, assumption_key, category, value, unit, source, owner_name, effective_from, effective_to, version, status, evidence, confidence, idempotency_key)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+				id, legalEntityID, row.Key, row.Category, row.Value, row.Unit, row.Source, row.Owner,
+				row.EffectiveFrom, nil, 1, "draft", row.Evidence, row.Confidence, idempotencyKeyOrNil(idempotencyKey))
+			if err != nil {
+				var pgErr *pgconn.PgError
+				if errors.As(err, &pgErr) && pgErr.Code == "23505" && idempotencyKey != "" {
+					// 并发重放：另一条路径刚落库，返回既有批次而非报错。
+					if existing, ferr := r.FindAssumptionDraftBatch(ctx, legalEntityID, idempotencyKey); ferr == nil && len(existing) > 0 {
+						return existing, nil
+					}
+				}
+				return nil, fmt.Errorf("save assumption drafts(%s): %w", idempotencyKey, err)
+			}
+			ids = append(ids, id)
+		}
+		return ids, nil
+	}
+	if beginner, ok := r.db.(interface{ Begin(ctx context.Context) (pgx.Tx, error) }); ok {
+		tx, err := beginner.Begin(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("save assumption drafts(%s): %w", idempotencyKey, err)
+			return nil, fmt.Errorf("save assumption drafts: begin: %w", err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		ids, err := insert(tx)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("save assumption drafts: commit: %w", err)
+		}
+		return ids, nil
+	}
+	return insert(r.db)
+}
+
+// FindAssumptionDraftBatch returns the draft ids a previous save with the same
+// idempotency key produced — the replay side of the idempotency contract.
+func (r *FinModelRepository) FindAssumptionDraftBatch(ctx context.Context, legalEntityID, idempotencyKey string) ([]string, error) {
+	rows, err := r.db.Query(ctx, `SELECT id FROM fpna_assumption_versions
+		WHERE legal_entity_id=$1 AND idempotency_key=$2
+		ORDER BY created_at, id`, legalEntityID, idempotencyKey)
+	if err != nil {
+		return nil, fmt.Errorf("find assumption draft batch: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
 		}
 		ids = append(ids, id)
 	}
-	return ids, nil
+	return ids, rows.Err()
+}
+
+func idempotencyKeyOrNil(key string) *string {
+	if key == "" {
+		return nil
+	}
+	return &key
+}
+
+// InsertReconciliationIssue records one reconciliation-class data-quality row
+// (category=reconciliation): an Actual-vs-fact mismatch (T13) or an opening
+// gate③ failure that must stay visible in the data-quality queue even though
+// the run itself never publishes. Non-transactional by design — the queue is
+// an append-only ledger for mismatches, not part of the run's own write.
+func (r *FinModelRepository) InsertReconciliationIssue(ctx context.Context, legalEntityID, sourceTable, sourceRecordID, period, dataVersion, description string) error {
+	_, err := r.db.Exec(ctx, `INSERT INTO fpna_data_quality_items
+		(legal_entity_id, dimension, category, severity, source_table, source_record_id, data_version, description)
+		VALUES ($1,'model_reconciliation','reconciliation','high',$2,$3,$4,$5)`,
+		legalEntityID, sourceTable, sourceRecordID, dataVersion, description)
+	if err != nil {
+		return fmt.Errorf("insert reconciliation issue: %w", err)
+	}
+	return nil
 }
 
 // AssumptionDraftRow is one draft insert.

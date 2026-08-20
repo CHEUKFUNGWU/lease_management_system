@@ -10,6 +10,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/finmodel"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
+	"github.com/lease-management-system/core-service/internal/storepnl"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -79,55 +80,28 @@ func RenderModelRunXLSX(tmpl *template.Template, rows []modelExportRow, buckets 
 		}
 		_ = f.SetCellStr(sheet, labelCell, label)
 		_ = f.SetCellStr(sheet, basisCell, row.Basis)
-		for j, bucket := range buckets {
-			cell, _ := excelize.CoordinatesToCellName(3+j, r)
-			if row.Kind == "subtotal" && len(row.Children) > 0 {
-				_ = f.SetCellFormula(sheet, cell, runSubtotalFormula(row, 3+j, rowNumber))
-				continue
-			}
-			if value, ok := row.Values[bucket.Label]; ok && value != nil {
-				_ = f.SetCellValue(sheet, cell, *value)
-			} else {
-				_ = f.SetCellStr(sheet, cell, "—")
+			for j, bucket := range buckets {
+				cell, _ := excelize.CoordinatesToCellName(3+j, r)
+				if row.Kind == "subtotal" && len(row.Children) > 0 {
+					_ = f.SetCellFormula(sheet, cell, storepnl.SubtotalFormula(row.Children, row.Subtracted, 3+j, rowNumber))
+					continue
+				}
+				if value, ok := row.Values[bucket.Label]; ok && value != nil {
+					_ = f.SetCellValue(sheet, cell, *value)
+				} else {
+					_ = f.SetCellStr(sheet, cell, "—")
+				}
 			}
 		}
+		buffer, err := f.WriteToBuffer()
+		if err != nil {
+			return nil, err
+		}
+		return buffer.Bytes(), nil
 	}
-	buffer, err := f.WriteToBuffer()
-	if err != nil {
-		return nil, err
-	}
-	return buffer.Bytes(), nil
-}
 
-// runSubtotalFormula is the same signed-children formula contract as the
-// store P&L export: subtotal = Σ children − Σ subtracted, referencing the
-// children's cells in the same column.
-func runSubtotalFormula(row modelExportRow, col int, rowNumber map[string]int) string {
-	expr := ""
-	for _, child := range row.Children {
-		idx, ok := rowNumber[child]
-		if !ok {
-			continue
-		}
-		cell, _ := excelize.CoordinatesToCellName(col, idx)
-		sign := "+"
-		for _, sub := range row.Subtracted {
-			if sub == child {
-				sign = "-"
-			}
-		}
-		if expr == "" && sign == "-" {
-			expr = "-" + cell
-		} else {
-			expr += sign + cell
-		}
-	}
-	if expr == "" {
-		return ""
-	}
-	return "=" + expr
-}
 
+// orEmpty renders a missing version line as an em-dash in the 口径头.
 func orEmpty(value string) string {
 	if value == "" {
 		return "—"

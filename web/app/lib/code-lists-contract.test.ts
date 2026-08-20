@@ -9,6 +9,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { PULSE_KPI_CODES } from "../operating-pulse/logic";
 import { STORE360_CODES } from "../store-360/logic";
+import { STORE_PNL_SECONDARY_COLUMNS } from "../store-pnl/options";
+import {
+  FIN_MODEL_RUN_STATUSES,
+  FIN_MODEL_RUN_TIE_OUT_STATUSES,
+  FIN_SAVED_VIEW_KINDS,
+} from "../financial-model/enums";
 import {
   VERSION_TYPES,
   SCENARIO_TYPES,
@@ -24,6 +30,7 @@ const plFlowBackend = readFileSync(path.join(repoRoot, "core-service/internal/se
 const plFlowPanel = readFileSync(path.join(import.meta.dirname, "../store-360/ProfitFlowPanel.tsx"), "utf8");
 const ingestBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailingest/retailingest.go"), "utf8");
 const ingestPage = readFileSync(path.join(import.meta.dirname, "../retail-data-import/page.tsx"), "utf8");
+const storepnlBackend = readFileSync(path.join(repoRoot, "core-service/internal/storepnl/project.go"), "utf8");
 const sqlInit = readFileSync(path.join(repoRoot, "db/init/01_init.sql"), "utf8");
 
 function quotedTokens(source: string, pattern: RegExp): string[] {
@@ -46,6 +53,39 @@ describe("CONTRACT-001 code-list contracts", () => {
     for (const code of STORE360_CODES) {
       expect(definitions, `retailkpi defines ${code}`).toContain(code);
     }
+  });
+
+  it("store-pnl 对比列选项 ⊆ storepnl.ColumnRef 白名单", () => {
+    const columnRefs = quotedTokens(storepnlBackend, /ColumnRef = "([^"]+)"/g);
+    expect(columnRefs, "storepnl ColumnRef whitelist found").toContain("actual");
+    for (const column of STORE_PNL_SECONDARY_COLUMNS) {
+      expect(columnRefs, `backend ColumnRef covers ${column}`).toContain(column);
+    }
+  });
+
+  it("fin_model_runs 状态/勾稽与 fin_saved_views.kind = DB CHECK 约束（单一来源）", () => {
+    const statusMatch = /fin_model_runs[\s\S]*?CHECK\s*\(\s*status\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(statusMatch, "fin_model_runs status CHECK constraint found").not.toBeNull();
+    const dbStatuses = quotedTokens(statusMatch![1], /'([^']+)'/g).sort();
+    expect([...FIN_MODEL_RUN_STATUSES].sort()).toEqual(dbStatuses);
+
+    const tieOutMatch = /fin_model_runs[\s\S]*?CHECK\s*\(\s*tie_out_status\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(tieOutMatch, "fin_model_runs tie_out_status CHECK constraint found").not.toBeNull();
+    const dbTieOuts = quotedTokens(tieOutMatch![1], /'([^']+)'/g).sort();
+    expect([...FIN_MODEL_RUN_TIE_OUT_STATUSES].sort()).toEqual(dbTieOuts);
+
+    const dcMatch = /fin_model_runs[\s\S]*?CHECK\s*\(\s*data_classification\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(dcMatch, "fin_model_runs data_classification CHECK constraint found").not.toBeNull();
+    const dbClassifications = quotedTokens(dcMatch![1], /'([^']+)'/g).sort();
+    // 前端 run 分类下拉只有 production/simulated 两档，后端多一个 mixed —— 断言子集
+    for (const value of ["production", "simulated"]) {
+      expect(dbClassifications, `data_classification covers ${value}`).toContain(value);
+    }
+
+    const kindMatch = /fin_saved_views[\s\S]*?CHECK\s*\(\s*kind\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(kindMatch, "fin_saved_views kind CHECK constraint found").not.toBeNull();
+    const dbKinds = quotedTokens(kindMatch![1], /'([^']+)'/g).sort();
+    expect([...FIN_SAVED_VIEW_KINDS].sort()).toEqual(dbKinds);
   });
 
   it("桑基节点单一来源：前端不持有节点 key 清单", () => {

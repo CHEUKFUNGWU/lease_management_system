@@ -50,7 +50,10 @@ func statementRows() []RowDef {
 		// — 利润表 IS（shared 行双口径共用于收入侧；IFRS 16 口径行另列）—
 		{Key: "rev", Label: "营业收入", Kind: RowLink, Basis: BasisShared, Source: "fact.revenue"},
 		{Key: "gross_margin_rate", Label: "毛利率假设", Kind: RowInput, Basis: BasisShared},
-		{Key: "gp", Label: "毛利", Kind: RowFormula, Basis: BasisShared, Formula: "rows.rev * rows.gross_margin_rate"},
+		// 毛利在 Actual 冻结线左侧只读事实层（PRD C7）：actual_source 让引擎
+		// 在该期间跳过公式、直接取 store-day 聚合毛利——真实 Actual 的 T13
+		// 才能通过；预测期才用毛利率假设驱动。
+		{Key: "gp", Label: "毛利", Kind: RowFormula, Basis: BasisShared, Formula: "rows.rev * rows.gross_margin_rate", ActualSource: "fact.gross_profit"},
 		{Key: "labor", Label: "人工成本", Kind: RowLink, Basis: BasisShared, Source: "fact.labor_cost"},
 		{Key: "fixed_rent", Label: "固定租金", Kind: RowLink, Basis: BasisOperating, Source: "fact.fixed_rent"},
 		{Key: "variable_rent", Label: "变量租金", Kind: RowLink, Basis: BasisOperating, Source: "fact.variable_rent"},

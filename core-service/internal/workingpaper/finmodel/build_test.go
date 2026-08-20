@@ -135,3 +135,64 @@ func TestCoverCarriesAllFiveVersionLines(t *testing.T) {
 		t.Fatalf("cover must carry all five version lines + engine version, got %+v", paper)
 	}
 }
+
+// P1-3 (D-S5 第二处 fail-closed): 勾稽失败的 run 构建的底稿必须被 lint 拒绝
+// — 底稿可看（诊断），但永远不能导出为 artifact。
+func TestLintRejectsFailedTieOutRun(t *testing.T) {
+	in := sampleInput()
+	in.TieOuts = append(in.TieOuts, TieOutValue{CheckCode: "T13", Period: "2026-02", Expected: pf(200), Actual: pf(233), Diff: pf(33), Status: "failed"})
+	paper, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	built := workingpaper.Build(paper, time.Date(2026, 8, 19, 10, 0, 0, 0, time.UTC))
+	rep := workingpaper.Lint(built, auditSet{"call-finmodel-1": true})
+	if rep.OK {
+		t.Fatal("a failed-tie-out run's paper must be refused by lint (no artifact export)")
+	}
+	found := false
+	for _, v := range rep.Violations {
+		if v.Code == "tie_out_unpassed" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("lint must name the tie_out_unpassed violation, got %+v", rep.Violations)
+	}
+
+	// 对照：全绿的同一底稿通过 lint。
+	paperOK, _ := Build(sampleInput())
+	repOK := workingpaper.Lint(workingpaper.Build(paperOK, time.Time{}), auditSet{"call-finmodel-1": true})
+	if !repOK.OK {
+		t.Fatalf("an all-green run's paper must pass lint, got %+v", repOK.Violations)
+	}
+}
+
+// P1-4: 勾稽区同金额行的 nil 跳格纪律——Diff 缺失（not_applicable / 未判）
+// 不留数值单元格，绝不用 0.0 填。
+func TestBuildSkipsNilTieOutDiffs(t *testing.T) {
+	in := sampleInput()
+	in.TieOuts = append(in.TieOuts,
+		TieOutValue{CheckCode: "T9", Period: "2026-02", Status: "not_applicable", Diff: nil},
+		TieOutValue{CheckCode: "T14", Period: "2026-02", Status: "not_applicable", Diff: nil},
+	)
+	paper, err := Build(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range paper.AllCells() {
+		if c.Ref == "T9@2026-02" || c.Ref == "T14@2026-02" {
+			t.Fatalf("nil Diff must not produce a numeric cell (no 0.0), got %+v", c)
+		}
+	}
+	// 有 Diff 的勾稽行仍照常入底稿。
+	found := false
+	for _, c := range paper.AllCells() {
+		if c.Ref == "T1@2026-01" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("tie-outs with a Diff must still render as cells")
+	}
+}

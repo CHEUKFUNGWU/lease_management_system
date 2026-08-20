@@ -60,16 +60,18 @@ type OccupancyScheduleRow struct {
 // ListOccupancySchedulesByStore reads the store's contracts' payment rows
 // whose coverage intersects the window — the read-only seam behind the
 // occupancy contract split (基本租金 = 租赁成分固定（含指数），变量租金 =
-// 变量成分，服务费 = 非租赁成分).
-func (r *PaymentScheduleRepository) ListOccupancySchedulesByStore(ctx context.Context, storeID, from, to string) ([]OccupancyScheduleRow, error) {
+// 变量成分，服务费 = 非租赁成分). The caller's legal entity is part of the
+// filter so a tenant-A caller can never read tenant-B contract rows through a
+// guessed store id (bottom line 1).
+func (r *PaymentScheduleRepository) ListOccupancySchedulesByStore(ctx context.Context, storeID, legalEntityID, from, to string) ([]OccupancyScheduleRow, error) {
 	rows, err := r.db.Query(ctx, `SELECT c.id, c.contract_number, ps.coverage_start_date, ps.coverage_end_date,
 			ps.amount, ps.currency, ps.is_variable, ps.is_non_lease_component
 		FROM lease_payment_schedules ps
 		JOIN lease_contracts c ON c.id = ps.contract_id
-		WHERE c.store_id=$1
-		  AND ps.coverage_end_date >= $2::date AND ps.coverage_start_date <= $3::date
-		  AND c.lease_start_date <= $3::date AND c.lease_end_date >= $2::date
-		ORDER BY c.id, ps.coverage_start_date`, storeID, from, to)
+		WHERE c.legal_entity_id=$1 AND c.store_id=$2
+		  AND ps.coverage_end_date >= $3::date AND ps.coverage_start_date <= $4::date
+		  AND c.lease_start_date <= $4::date AND c.lease_end_date >= $3::date
+		ORDER BY c.id, ps.coverage_start_date`, legalEntityID, storeID, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("list occupancy schedules by store: %w", err)
 	}

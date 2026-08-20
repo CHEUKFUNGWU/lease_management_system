@@ -109,9 +109,11 @@ type PlanReader interface {
 }
 
 // LeasePort is the shared lease projection port (same shape as SM2's), here
-// store-scoped by the caller adapter.
+// store-scoped by the caller adapter. legalEntityID rides alongside the store
+// id so the adapter can enforce the caller's entity on the engine rows it
+// reads (bottom line 1: the port cannot be an entity-blind tunnel).
 type LeasePort interface {
-	Monthly(ctx context.Context, storeID string, period string) (LeaseMonthValues, error)
+	Monthly(ctx context.Context, storeID, legalEntityID string, period string) (LeaseMonthValues, error)
 }
 
 // LeaseMonthValues holds the IFRS 16 block's engine outputs.
@@ -255,7 +257,7 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 		if leasePeriod == "" {
 			leasePeriod = monthOf(ref.AsOf)
 		}
-		if lease, err = readers.Lease.Monthly(ctx, ref.StoreID, leasePeriod); err != nil {
+		if lease, err = readers.Lease.Monthly(ctx, ref.StoreID, ref.LegalEntityID, leasePeriod); err != nil {
 			pnl.Gaps = append(pnl.Gaps, "IFRS 16 口径降级："+err.Error())
 		}
 	}
@@ -515,7 +517,7 @@ func renderRow(ctx context.Context, row template.Row, facts KPIAggregates, lease
 		// 两级永远一致；端口未接或无合同则保留事实层聚合。
 		if readers.Occupancy != nil {
 			from, to := windowSpan(ref)
-			if splits, err := readers.Occupancy.Contracts(ctx, ref.StoreID, from, to); err == nil && len(splits) > 0 {
+			if splits, err := readers.Occupancy.Contracts(ctx, ref.StoreID, ref.LegalEntityID, from, to); err == nil && len(splits) > 0 {
 				basic, service, variable := ComponentSum(splits)
 				if basic != nil && service != nil && variable != nil {
 					rv.Components = []Component{

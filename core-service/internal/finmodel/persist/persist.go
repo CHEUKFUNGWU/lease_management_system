@@ -98,6 +98,50 @@ func (w *RunWriter) PersistInto(ctx context.Context, runID string, result *finmo
 	return w.repo.UpdateModelRunStatus(ctx, runID, "completed", result.TieOutStatus, &now)
 }
 
+// CreateQueued is the S2-5 async entry: the queued run row exists before the
+// worker runs. A replayed (definition, idempotency_key) returns the existing
+// run instead of a second record (bottom line 4). Every fin_model_runs write
+// lives under this package (D-S2) — the handler never calls the repo's write
+// methods directly.
+func (w *RunWriter) CreateQueued(ctx context.Context, run *repository.FinModelRun) (*repository.FinModelRun, error) {
+	if w.repo == nil {
+		return nil, errors.New("finmodel persist: repository unavailable")
+	}
+	err := w.repo.CreateModelRun(ctx, run)
+	if errors.Is(err, repository.ErrFinModelRunReplay) {
+		existing, ferr := w.repo.FindModelRunByIdempotency(ctx, run.ModelDefinitionID, run.IdempotencyKey)
+		if ferr == nil && existing != nil {
+			return existing, nil
+		}
+	}
+	return run, err
+}
+
+// MarkRunning flips queued → running before the worker executes (S2-5).
+func (w *RunWriter) MarkRunning(ctx context.Context, runID string) error {
+	if w.repo == nil {
+		return errors.New("finmodel persist: repository unavailable")
+	}
+	return w.repo.UpdateModelRunStatus(ctx, runID, "running", "pending", nil)
+}
+
+// Fail records an async failure with its reason (S2-5).
+func (w *RunWriter) Fail(ctx context.Context, runID, reason string) error {
+	if w.repo == nil {
+		return errors.New("finmodel persist: repository unavailable")
+	}
+	return w.repo.FailModelRun(ctx, runID, reason)
+}
+
+// Cancel stops a queued/running run; the SQL guard rejects retro-cancelling a
+// completed run (S2-5).
+func (w *RunWriter) Cancel(ctx context.Context, runID string) error {
+	if w.repo == nil {
+		return errors.New("finmodel persist: repository unavailable")
+	}
+	return w.repo.CancelModelRun(ctx, runID)
+}
+
 func (w *RunWriter) persistResult(ctx context.Context, runID string, result *finmodel.RunResult, now time.Time) error {
 	lines := make([]repository.FinModelRunLine, 0, len(result.Lines))
 	for _, line := range result.Lines {

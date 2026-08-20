@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/storepnl"
 )
 
@@ -20,13 +21,44 @@ func (memStorePnlKPI) Operating(_ context.Context, _ storepnl.StoreRef) (storepn
 	}, nil
 }
 
+// memStoreLookup is the unit-test StoreLookup: a single store mapping
+// storeID → legal entity, missing anything else. Lets the projection tests
+// run without a database while still exercising the scope gate.
+type memStoreLookup struct {
+	storeID, legalEntityID string
+	region, brand          string
+}
+
+func (m memStoreLookup) GetStoreByID(_ context.Context, storeID string) (repository.StoreOption, error) {
+	if storeID != m.storeID {
+		return repository.StoreOption{}, nil
+	}
+	var region, brand *string
+	if m.region != "" {
+		region = &m.region
+	}
+	if m.brand != "" {
+		brand = &m.brand
+	}
+	return repository.StoreOption{ID: storeID, LegalEntityID: m.legalEntityID, Region: region, Brand: brand}, nil
+}
+
+func (m memStoreLookup) ListStores(_ context.Context, _ string, _ string) ([]repository.StoreOption, error) {
+	return nil, nil
+}
+
 func TestStorePnlHandlerProjection(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewStorePnlHandler(memStorePnlKPI{}, nil, nil)
+	storeID := "11111111-1111-4111-8111-111111111111"
+	handler := NewStorePnlHandler(memStorePnlKPI{}, nil, nil).
+		WithMasterData(memStoreLookup{storeID: storeID, legalEntityID: "LE-1"})
 	router := gin.New()
-	router.GET("/stores/:id/pnl", handler.Projection)
+	router.GET("/stores/:id/pnl", func(c *gin.Context) {
+		c.Set("legal_entity_id", "LE-1")
+		handler.Projection(c)
+	})
 
-	req := httptest.NewRequest(http.MethodGet, "/stores/11111111-1111-4111-8111-111111111111/pnl?as_of=2026-08-18&window_days=7&basis=side_by_side", nil)
+	req := httptest.NewRequest(http.MethodGet, "/stores/"+storeID+"/pnl?as_of=2026-08-18&window_days=7&basis=side_by_side", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 

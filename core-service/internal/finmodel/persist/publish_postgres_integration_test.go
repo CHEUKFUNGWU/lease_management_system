@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -44,11 +45,11 @@ func TestPublishLineageAndReplayPostgres(t *testing.T) {
 	exec(`INSERT INTO fin_model_definitions (id, legal_entity_id, name, version, template_id, policy, source_bindings)
 		VALUES ($1,$2,$3,1,$4,'{}'::jsonb,'{}'::jsonb)`, defID, entity, "PUB-DEF-"+suffix, tmplID)
 
-	makeRun := func(tieOut string) string {
+	makeRun := func(tieOut, classification string) string {
 		id := uuid.NewString()
-		exec(`INSERT INTO fin_model_runs (id, legal_entity_id, model_definition_id, model_definition_version, status, tie_out_status, input_snapshot, idempotency_key)
-			VALUES ($1,$2,$3,1,'completed',$4,'{"currency":"CNY"}'::jsonb,$5)`,
-			id, entity, defID, tieOut, "pub-run-"+id[:8])
+		exec(`INSERT INTO fin_model_runs (id, legal_entity_id, model_definition_id, model_definition_version, status, tie_out_status, data_classification, input_snapshot, idempotency_key)
+			VALUES ($1,$2,$3,1,'completed',$4,$5,'{"currency":"CNY"}'::jsonb,$6)`,
+			id, entity, defID, tieOut, classification, "pub-run-"+id[:8])
 		exec(`INSERT INTO fin_model_run_lines (run_id, row_key, period, value, provenance) VALUES
 			($1,'rev','2026-07',100,'{}'::jsonb),
 			($1,'gp','2026-07',40,'{}'::jsonb),
@@ -63,13 +64,20 @@ func TestPublishLineageAndReplayPostgres(t *testing.T) {
 	writer := NewPublishWriter(runs, plans)
 
 	// 门：未通过勾稽的 run 不得发布。
-	failedRun := makeRun("failed")
+	failedRun := makeRun("failed", "production")
 	if _, err := writer.Publish(ctx, failedRun, nil, ""); err == nil {
 		t.Fatal("unpassed tie-outs must refuse publish (S2-6 gate)")
 	}
 
+	// 底线 2：模拟 / 混合 run 即使勾稽通过也不得发布为 plan version。
+	for _, simulated := range []string{"simulated", "mixed"} {
+		if _, err := writer.Publish(ctx, makeRun("passed", simulated), nil, ""); !errors.Is(err, ErrSimulatedPublish) {
+			t.Fatalf("classification %q must be refused at publish, got %v", simulated, err)
+		}
+	}
+
 	// 发布 1：谱系为空。
-	runA := makeRun("passed")
+	runA := makeRun("passed", "production")
 	first, err := writer.Publish(ctx, runA, nil, "")
 	if err != nil {
 		t.Fatalf("publish runA: %v", err)
@@ -96,7 +104,7 @@ func TestPublishLineageAndReplayPostgres(t *testing.T) {
 	}
 
 	// 发布 2：prior 指向发布 1。
-	runB := makeRun("passed")
+	runB := makeRun("passed", "production")
 	if _, err := writer.Publish(ctx, runB, nil, "upside"); err != nil {
 		t.Fatalf("publish runB: %v", err)
 	}
@@ -112,7 +120,7 @@ func TestPublishLineageAndReplayPostgres(t *testing.T) {
 	}
 
 	// 非法情景拒绝，不静默归为 baseline。
-	if _, err := writer.Publish(ctx, makeRun("passed"), nil, "optimistic"); err == nil {
+	if _, err := writer.Publish(ctx, makeRun("passed", "production"), nil, "optimistic"); err == nil {
 		t.Fatal("an unknown scenario_type must be refused")
 	}
 

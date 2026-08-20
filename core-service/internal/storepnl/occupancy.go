@@ -32,8 +32,10 @@ type ContractSplit struct {
 }
 
 // OccupancyReader supplies the store's contract-level split (S1-5).
+// legalEntityID rides alongside the store id so the adapter filters the
+// payment rows by the caller's entity (bottom line 1).
 type OccupancyReader interface {
-	Contracts(ctx context.Context, storeID, from, to string) ([]ContractSplit, error)
+	Contracts(ctx context.Context, storeID, legalEntityID, from, to string) ([]ContractSplit, error)
 }
 
 // FoldContractOccupancy projects the schedule rows onto the [from,to]

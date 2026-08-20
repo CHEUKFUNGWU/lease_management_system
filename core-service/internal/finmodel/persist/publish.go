@@ -33,6 +33,16 @@ func NewPublishWriter(runs *repository.FinModelRepository, plans *repository.FPn
 // ErrPublishGate is the S2-6 gate: only a tie-out-passed run may publish.
 var ErrPublishGate = errors.New("finmodel publish: run refused — tie-outs must pass before publishing")
 
+// ErrSimulatedPublish is the bottom-line-2 gate: a simulated/mixed run must
+// never publish as a plan version — 模拟标识永不进入 Formal/Official 链路。
+var ErrSimulatedPublish = errors.New("finmodel publish: run refused — simulated/mixed runs never publish as plan versions (模拟标识不进入正式链路)")
+
+// publishClassificationAllowed is the pure bottom-line-2 decision behind the
+// publish gate: only production (or an unlabeled legacy run) may publish.
+func publishClassificationAllowed(dataClassification string) bool {
+	return dataClassification == "" || dataClassification == "production"
+}
+
 // PublishedRun reports what a publish produced.
 type PublishedRun struct {
 	VersionID    string   `json:"version_id"`
@@ -111,6 +121,10 @@ func (w *PublishWriter) Publish(ctx context.Context, runID string, createdBy *st
 	}
 	if run.TieOutStatus != "passed" {
 		return nil, ErrPublishGate
+	}
+	// 底线 2：模拟 / 混合 run 永远不发布为 plan version（谱系里也不带标识）。
+	if !publishClassificationAllowed(run.DataClassification) {
+		return nil, ErrSimulatedPublish
 	}
 	source := publishSourcePrefix + runID
 	if existing, err := w.plans.FindPlanVersionBySource(ctx, source); err == nil && existing != nil {
@@ -202,17 +216,21 @@ func (w *PublishWriter) Publish(ctx context.Context, runID string, createdBy *st
 }
 
 // latestPrior returns the most recent existing version of the same entity
-// and version_type — the lineage anchor.
+// and version_type — the lineage anchor. The entity filter is pushed into the
+// query rather than filtering rows in memory (P2-4).
 func (w *PublishWriter) latestPrior(ctx context.Context, entity *string) *repository.FPnAPlanVersion {
-	versions, err := w.plans.ListPlanVersions(ctx, access.GlobalEntityFilter(), "forecast", "", "")
+	filter := access.GlobalEntityFilter()
+	if entity != nil && strings.TrimSpace(*entity) != "" {
+		if f, err := access.EntityFilterFor(*entity); err == nil {
+			filter = f
+		}
+	}
+	versions, err := w.plans.ListPlanVersions(ctx, filter, "forecast", "", "")
 	if err != nil || len(versions) == 0 {
 		return nil
 	}
 	var best *repository.FPnAPlanVersion
 	for _, v := range versions {
-		if entity != nil && v.LegalEntityID != nil && *v.LegalEntityID != *entity {
-			continue
-		}
 		if best == nil || v.CreatedAt.After(best.CreatedAt) {
 			if v.ID != "" {
 				best = v

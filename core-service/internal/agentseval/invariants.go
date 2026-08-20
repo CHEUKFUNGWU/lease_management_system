@@ -283,8 +283,9 @@ func evaluateRetailPaper(c InvariantCase) (bool, string) {
 }
 
 // evaluateFinModelPaper runs the finmodel paper builder on a fixture: values
-// preserved 1:1, nil lines skipped, tie-out failures flagged, lint green with
-// the anchored audited call, zero exploratory cells.
+// preserved 1:1, nil lines skipped, tie-out failures flagged — and, under the
+// P1-3 fail-closed contract (D-S5 second point), a fixture carrying a failed
+// tie-out must be REFUSED by lint (tie_out_unpassed), never exported.
 func evaluateFinModelPaper(c InvariantCase) (bool, string) {
 	if c.FinPaper == nil {
 		return false, "finmodel_paper is required for finmodel_paper cases"
@@ -299,9 +300,6 @@ func evaluateFinModelPaper(c InvariantCase) (bool, string) {
 	}
 	built := workingpaper.Build(paper, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
 	rep := workingpaper.Lint(built, makeAuditSet([]string{in.ToolCallID}))
-	if !rep.OK {
-		return false, fmt.Sprintf("finmodel paper failed lint: %+v", rep.Violations)
-	}
 	if refs := built.ExploratoryRefs(); len(refs) != 0 {
 		return false, fmt.Sprintf("finmodel paper must have no exploratory cells, got %v", refs)
 	}
@@ -326,6 +324,29 @@ func evaluateFinModelPaper(c InvariantCase) (bool, string) {
 	}
 	if !flagged {
 		return false, "failed tie-outs must be flagged in the check section"
+	}
+	// P1-3: 失败 run 的底稿必须被 lint 拒绝（fail-closed），不得导出。
+	// 有一处 failed tie-out → lint 必须非 OK 且带 tie_out_unpassed。
+	hasFailed := false
+	lintRefused := false
+	for _, out := range in.TieOuts {
+		if out.Status == "failed" {
+			hasFailed = true
+		}
+	}
+	for _, v := range rep.Violations {
+		if v.Code == "tie_out_unpassed" {
+			lintRefused = true
+		}
+	}
+	if hasFailed {
+		if rep.OK || !lintRefused {
+			return false, "a failed-tie-out run's paper must be refused by lint (tie_out_unpassed, D-S5 fail-closed)"
+		}
+		return true, ""
+	}
+	if !rep.OK {
+		return false, fmt.Sprintf("an all-green run's paper must pass lint, got %+v", rep.Violations)
 	}
 	return true, ""
 }

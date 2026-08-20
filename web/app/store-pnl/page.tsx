@@ -2,17 +2,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Card, Checkbox, Input, Modal, Popover, Select, Space, Spin, Table, Tooltip, Typography } from "antd";
+import dayjs from "dayjs";
+import { Alert, Button, Card, Checkbox, DatePicker, Input, Modal, Popover, Select, Space, Spin, Table, Tooltip, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 
+import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
-import { apiErrorMessage } from "../lib/api";
+import { apiErrorMessage, financialModelApi, operatingFactsApi, storePnlApi } from "../lib/api";
 import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useRetailQuery } from "../retail/useRetailQuery";
+import { STORE_PNL_SECONDARY_COLUMNS, type StorePnlSecondaryColumn } from "./options";
 
 type StoreRef = { id: string; code: string; name: string };
 type RowValue = {
@@ -61,8 +65,8 @@ export default function StorePnlPage() {
   const { language } = useLanguage();
   const [stores, setStores] = useState<StoreRef[]>([]);
   const [storeId, setStoreId] = useState<string>("");
-  const [pnl, setPnl] = useState<PnlResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  // S1-3/P2-3：as_of 不再是硬编码日期，用户可在表头选；默认今天。
+  const [asOf, setAsOf] = useState<string>(dayjs().format("YYYY-MM-DD"));
   const [error, setError] = useState<string | null>(null);
   // S1-9/S3-5：行显隐、分组合并与个人视图。视图只改呈现，不改数据。
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
@@ -71,7 +75,7 @@ export default function StorePnlPage() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [viewName, setViewName] = useState("");
   // S1-3：第二对比列；S1-9：自定义公式行编辑（后端 DSL 求值）。
-  const [secondary, setSecondary] = useState<string>("budget");
+  const [secondary, setSecondary] = useState<StorePnlSecondaryColumn>("budget");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorName, setEditorName] = useState("");
@@ -82,62 +86,48 @@ export default function StorePnlPage() {
 
   useEffect(() => {
     if (!token) return;
-    (async () => {
-      try {
-        const response = await fetch("/api/v1/operating-facts/stores", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) return;
-        const body = await response.json();
-        const list: StoreRef[] = (body.stores || body || []).map((item: any) => ({
+    let active = true;
+    // store list is advisory; the projection fetch reports its own errors
+    operatingFactsApi
+      .listStores({}, token)
+      .then((body) => {
+        if (!active) return;
+        const payload = (body as { stores?: unknown }).stores || body;
+        const list: StoreRef[] = (Array.isArray(payload) ? payload : []).map((item: any) => ({
           id: item.id, code: item.store_code || item.code, name: item.store_name || item.name,
         }));
         setStores(list);
-      } catch {
-        // store list is advisory; the projection fetch reports its own errors
-      }
-    })();
+      })
+      .catch(() => {});
+    return () => { active = false; };
   }, [token]);
 
   useEffect(() => {
     if (!token) return;
-    (async () => {
-      try {
-        const response = await fetch("/api/v1/financial-model/saved-views?kind=store_pnl", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) return;
-        const body = await response.json();
-        setViews((body.views || []) as SavedViewRef[]);
-      } catch {
-        // 视图列表是增强能力；加载失败不阻断主表
-      }
-    })();
+    let active = true;
+    // 视图列表是增强能力；加载失败不阻断主表
+    financialModelApi
+      .listSavedViews("store_pnl", token)
+      .then((body) => { if (active) setViews((body.views || []) as SavedViewRef[]); })
+      .catch(() => {});
+    return () => { active = false; };
   }, [token]);
 
-  useEffect(() => {
-    if (!token || !storeId) return;
-    setLoading(true);
-    setError(null);
-    (async () => {
-      try {
-        const params = new URLSearchParams({ as_of: "2026-08-18", window_days: "7", basis: "side_by_side", secondary });
-        if (templateId) params.set("template_id", templateId);
-        const response = await fetch(
-          `/api/v1/stores/${encodeURIComponent(storeId)}/pnl?${params.toString()}`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        const body = await response.json();
-        if (!response.ok) throw new Error(body?.error || "pnl projection failed");
-        setPnl(body.pnl as PnlResponse);
-      } catch (err: any) {
-        setError(apiErrorMessage(err));
-        setPnl(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [token, storeId, secondary, templateId]);
+  // P2-3 主取数接缝：走 useRetailQuery（loading / 竞态 / token 注入统一），
+  // 错误态由 StateBlock 呈现（failed / scope_denied / empty）。as_of 从所选
+  // 日期取，不再硬编码。
+  const pnlParams = storeId
+    ? { store_id: storeId, as_of: asOf, window_days: 7, basis: "side_by_side", secondary, template_id: templateId ?? undefined }
+    : null;
+  const pnlKey = `${storeId}|${asOf}|7|side_by_side|${secondary}|${templateId ?? ""}`;
+  const { loading, state: pnlState, retry } = useRetailQuery({
+    token,
+    params: pnlParams,
+    paramsKey: pnlKey,
+    fetcher: (params, token) => storePnlApi.getPnl(params, token).then((body) => body.pnl as PnlResponse),
+    isEmpty: (data) => !data || (!data.operating?.rows?.length && !data.ifrs16?.rows?.length),
+  });
+  const pnl = pnlState.kind === "ready" ? (pnlState.data ?? null) : null;
 
   const allRows = useMemo(() => (pnl?.operating?.rows || []).concat(pnl?.ifrs16?.rows || []), [pnl]);
   const subtotalRows = useMemo(() => allRows.filter((row) => row.kind === "subtotal"), [allRows]);
@@ -161,20 +151,14 @@ export default function StorePnlPage() {
   const saveView = async () => {
     if (!token || !viewName.trim()) return;
     try {
-      const response = await fetch("/api/v1/financial-model/saved-views", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ kind: "store_pnl", name: viewName.trim(), config: currentViewConfig() }),
-      });
-      if (!response.ok) return;
+      await financialModelApi.saveView({ kind: "store_pnl", name: viewName.trim(), config: currentViewConfig() }, token);
       setSaveOpen(false);
       setViewName("");
-      const list = await fetch("/api/v1/financial-model/saved-views?kind=store_pnl", {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((r) => r.json());
-      setViews((list.views || []) as SavedViewRef[]);
-    } catch {
-      // 保存失败静默由服务端 4xx 表达；前端保持当前呈现
+      const body = await financialModelApi.listSavedViews("store_pnl", token);
+      setViews((body.views || []) as SavedViewRef[]);
+    } catch (err: any) {
+      // 保存失败以服务端错误码为准（scope_denied 等保持原因）
+      setError(apiErrorMessage(err));
     }
   };
 
@@ -203,13 +187,10 @@ export default function StorePnlPage() {
         format: row.format || undefined,
       }));
       rows.push({ key: editorKey.trim(), label: editorLabel.trim(), kind: "formula", basis: "shared", formula: editorFormula.trim() } as typeof rows[number]);
-      const response = await fetch("/api/v1/financial-model/templates", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editorName.trim(), version: 1, visibility: "personal", rows }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.error || "template save failed");
+      const body = await financialModelApi.saveTemplate(
+        { name: editorName.trim(), version: 1, visibility: "personal", rows },
+        token,
+      );
       setTemplateId(body.id || null);
       setEditorOpen(false);
       setEditorLabel(""); setEditorKey(""); setEditorFormula("");
@@ -255,7 +236,7 @@ export default function StorePnlPage() {
       ? [
           ...(row.components || []).map((c) => `${c.label}: ${c.value ?? "—"}`),
           ...(row.contract_split || []).map((cs) =>
-            `【${cs.contract_number || cs.contract_id.slice(0, 8)}】${t("storepnl.basic_rent", language)} ${cs.basic_rent ?? "—"} · ${t("storepnl.service_fee", language)} ${cs.service_fee ?? "—"} · ${t("storepnl.variable_rent", language)} ${cs.variable_rent ?? "—"}`),
+            `[${cs.contract_number || cs.contract_id.slice(0, 8)}] ${t("storepnl.basic_rent", language)} ${cs.basic_rent ?? "—"} · ${t("storepnl.service_fee", language)} ${cs.service_fee ?? "—"} · ${t("storepnl.variable_rent", language)} ${cs.variable_rent ?? "—"}`),
         ].join("；") || undefined
       : undefined,
   }));
@@ -290,9 +271,21 @@ export default function StorePnlPage() {
     { title: t("storepnl.components", language), dataIndex: "comps", key: "comps" },
   ], [language, pnl, hasPeer]);
 
+  // P2-3：CSV 与后端 xlsx 对称带口径头标识（data_classification /
+  // dataset_version / as_of），对比列表头从 secondary 实际列名取，不再恒写
+  // "budget"。
   const downloadCSV = () => {
     if (!pnl) return;
-    const lines: string[] = ["row label,actual,budget,variance,pct,basis"];
+    const comparisonLabel =
+      secondary === "budget" ? t("storepnl.col_budget", language)
+      : secondary === "forecast" ? t("storepnl.col_forecast", language)
+      : secondary === "prior_year" ? t("storepnl.col_prior_year", language)
+      : pnl.columns?.[1] || t("storepnl.col_other", language);
+    const lines: string[] = [
+      "data_classification,dataset_version,as_of",
+      `${pnl.data_classification},${pnl.dataset_version ?? ""},${asOf}`,
+      `row label,actual,${comparisonLabel},variance,pct,basis`,
+    ];
     for (const block of [pnl.operating, pnl.ifrs16]) {
       for (const row of block?.rows || []) {
         lines.push(`${row.label},${row.actual ?? ""},${row.other ?? ""},${row.variance ?? ""},${row.pct ?? ""},${block?.basis}`);
@@ -326,13 +319,18 @@ export default function StorePnlPage() {
               />
               <Select
                 value={secondary}
-                onChange={setSecondary}
+                onChange={(value) => setSecondary(value)}
                 className="storepnl-view-select"
-                options={[
-                  { value: "budget", label: t("storepnl.col_budget", language) },
-                  { value: "forecast", label: t("storepnl.col_forecast", language) },
-                  { value: "prior_year", label: t("storepnl.col_prior_year", language) },
-                ]}
+                options={STORE_PNL_SECONDARY_COLUMNS.map((column) => ({
+                  value: column,
+                  label: t(`storepnl.col_${column}`, language),
+                }))}
+              />
+              <DatePicker
+                allowClear={false}
+                value={dayjs(asOf)}
+                onChange={(date) => setAsOf(date ? date.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"))}
+                placeholder={t("storepnl.as_of", language)}
               />
               <Button disabled={!pnl} onClick={() => setEditorOpen(true)}>
                 {t("storepnl.custom_formula", language)}
@@ -382,7 +380,8 @@ export default function StorePnlPage() {
         )}
         {error && <Alert type="error" message={t("storepnl.failed", language)} description={error} showIcon />}
         {loading && <Card><Spin tip={t("storepnl.loading", language)} /></Card>}
-        {pnl && !loading && !error && (
+        {storeId && !loading && <StateBlock state={pnlState} language={language} onRetry={retry} />}
+        {pnl && !loading && (
           <Space direction="vertical" size="middle">
             <Space wrap>
               <StatusTag kind={pnl.decision_ready ? "success" : "warning"}>
@@ -417,7 +416,7 @@ export default function StorePnlPage() {
             )}
             {pnl.operating && (
               <Card title={`${t("storepnl.block", language)} · ${t("storepnl.operating_basis", language)}`} size="small">
-                <Table size="small" bordered pagination={false} dataSource={visibleRowsFor(pnl.operating)} columns={columns.filter((c) => c.key !== "comps" || true)} />
+                <Table size="small" bordered pagination={false} dataSource={visibleRowsFor(pnl.operating)} columns={columns.filter((c) => c.key !== "comps")} />
               </Card>
             )}
             {pnl.ifrs16 && (

@@ -72,6 +72,87 @@ func TestFactReaderPostgres(t *testing.T) {
 	}
 }
 
+// TestAssumptionDraftsIdempotentAndAtomicPostgres locks P0-9 (底线 4): the
+// assumption suggestion batch is one transaction keyed by idempotency_key —
+// a replayed key returns the SAME batch ids with no second row, and a
+// mid-batch constraint failure rolls the whole batch back (no partial batch).
+func TestAssumptionDraftsIdempotentAndAtomicPostgres(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("connect to Postgres: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("fixture exec: %v", err)
+		}
+	}
+	suffix := uuid.NewString()[:8]
+	entity := uuid.NewString()
+	exec(`INSERT INTO legal_entities (id, code, name, country, currency) VALUES ($1,$2,$3,'CN','CNY')`,
+		entity, "IDM-E-"+suffix, "Idempotency "+suffix)
+	evd := func(call string) []suggestion.EvidenceRef {
+		return []suggestion.EvidenceRef{{ToolCallID: call, Scope: entity, Period: "2026-07"}}
+	}
+	countForKey := func(key string) int {
+		var n int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM fpna_assumption_versions WHERE legal_entity_id=$1 AND idempotency_key=$2`, entity, key).Scan(&n); err != nil {
+			t.Fatalf("count: %v", err)
+		}
+		return n
+	}
+	total := func() int {
+		var n int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM fpna_assumption_versions WHERE legal_entity_id=$1`, entity).Scan(&n); err != nil {
+			t.Fatalf("total: %v", err)
+		}
+		return n
+	}
+
+	writer := NewDraftWriter(repository.NewFinModelRepository(pool))
+	rows := []suggestion.SuggestionDraft{
+		{AssumptionKey: "sssg", Category: "revenue", Value: []byte("0.03"), Unit: "rate", SourceTag: "ai_suggestion", Confidence: 0.7, Basis: evd("t1")},
+		{AssumptionKey: "labor_cost_growth", Category: "expense", Value: []byte("0.01"), SourceTag: "ai_suggestion", Confidence: 0.6, Basis: evd("t1")},
+	}
+	first, err := writer.SaveDrafts(ctx, entity, rows, "idem-k-1")
+	if err != nil || len(first) != 2 {
+		t.Fatalf("first save = %v / %v", first, err)
+	}
+	if countForKey("idem-k-1") != 2 {
+		t.Fatal("first batch must write exactly two draft rows")
+	}
+	// 重放：返回既有批次，不再落第二条。
+	replay, err := writer.SaveDrafts(ctx, entity, rows, "idem-k-1")
+	if err != nil || len(replay) != 2 {
+		t.Fatalf("replay = %v / %v", replay, err)
+	}
+	if replay[0] != first[0] || replay[1] != first[1] {
+		t.Fatalf("replay must return the same batch ids: %v vs %v", replay, first)
+	}
+	if countForKey("idem-k-1") != 2 {
+		t.Fatal("replay must not create a second batch row")
+	}
+
+	// 批量中途失败（同批两条同 assumption_key 撞 version=1 唯一约束）→ 整批回滚。
+	before := total()
+	failing := []suggestion.SuggestionDraft{
+		{AssumptionKey: "dso", Category: "nwc", Value: []byte("10"), SourceTag: "ai_suggestion", Confidence: 0.5, Basis: evd("t2")},
+		{AssumptionKey: "dso", Category: "nwc", Value: []byte("20"), SourceTag: "ai_suggestion", Confidence: 0.5, Basis: evd("t2")},
+	}
+	if _, err := writer.SaveDrafts(ctx, entity, failing, "idem-k-2"); err == nil {
+		t.Fatal("a duplicate assumption_key in one batch must fail")
+	}
+	if after := total(); after != before {
+		t.Fatalf("batch must be atomic (no partial commit): %d before, %d after", before, after)
+	}
+}
+
 // TestDraftWriterPostgres locks the S4-2 contract against real rows: AI
 // suggestions persist as draft rows with ai_suggestion source, evidence
 // and confidence — and the approved-only reader never sees them.

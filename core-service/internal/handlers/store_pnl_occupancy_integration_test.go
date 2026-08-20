@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -77,7 +78,8 @@ func TestStorePnlOccupancyContractSplitPostgres(t *testing.T) {
 	revenue := 10000.0
 	kpi := occupancyFakeKPI{storeID: {Revenue: &revenue, DecisionReady: true, Classification: "production", Currency: "CNY"}}
 	pnlHandler := NewStorePnlHandler(kpi, nil, nil).
-		WithOccupancy(NewStorePnlOccupancyAdapter(repository.NewPaymentScheduleRepository(pool)))
+		WithOccupancy(NewStorePnlOccupancyAdapter(repository.NewPaymentScheduleRepository(pool))).
+		WithMasterData(repository.NewMasterDataRepository(pool))
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -203,7 +205,8 @@ func TestStorePnlLeaseBlockFromEngineRowsPostgres(t *testing.T) {
 
 	revenue := 10000.0
 	handler := NewStorePnlHandler(occupancyFakeKPI{storeID: {Revenue: &revenue, DecisionReady: true, Classification: "production", Currency: "CNY"}}, nil, nil).
-		WithLease(NewStorePnlLeaseAdapter(repository.NewMonthlyClosingRepository(pool)))
+		WithLease(NewStorePnlLeaseAdapter(repository.NewMonthlyClosingRepository(pool))).
+		WithMasterData(repository.NewMasterDataRepository(pool))
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -236,6 +239,69 @@ func TestStorePnlLeaseBlockFromEngineRowsPostgres(t *testing.T) {
 	}
 	if byKey["rou_depreciation"] == nil || *byKey["rou_depreciation"] != 25 || byKey["lease_interest"] == nil || *byKey["lease_interest"] != 12 {
 		t.Fatalf("IFRS 16 block must show engine numbers: %+v", byKey)
+	}
+}
+
+// TestStorePnlCrossEntityProjectionDeniedPostgres locks P0-2 (底线 1): the
+// single-store projection refuses a store id that belongs to another legal
+// entity (404, no existence leak), while the same-entity caller passes the
+// scope gate.
+func TestStorePnlCrossEntityProjectionDeniedPostgres(t *testing.T) {
+	databaseURL := os.Getenv("TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("TEST_DATABASE_URL is not set")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatalf("connect to Postgres: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("fixture exec: %v (%s)", err, sql)
+		}
+	}
+	suffix := uuid.NewString()[:8]
+	entityA := uuid.NewString()
+	exec(`INSERT INTO legal_entities (id, code, name, country, currency) VALUES ($1,$2,$3,'CN','CNY')`,
+		entityA, "CRS-A-"+suffix, "Cross A "+suffix)
+	storeID := uuid.NewString()
+	exec(`INSERT INTO stores (id, code, name, legal_entity_id, region, brand, is_active) VALUES ($1,$2,$3,$4,'east','b1',true)`,
+		storeID, "CRS-S-"+suffix, "Store", entityA)
+
+	revenue := 1000.0
+	handler := NewStorePnlHandler(occupancyFakeKPI{storeID: {Revenue: &revenue, DecisionReady: true, Classification: "production", Currency: "CNY"}}, nil, nil).
+		WithMasterData(repository.NewMasterDataRepository(pool))
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/stores/:id/pnl", func(c *gin.Context) {
+		// 注入 tenant B，访问 tenant A 的门店。
+		c.Set("legal_entity_id", uuid.NewString())
+		handler.Projection(c)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/stores/"+storeID+"/pnl?as_of=2026-08-19&period=2026-07&basis=operating", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("cross-entity store projection must 404, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "store not found") {
+		t.Fatalf("cross-entity refusal must keep the reason, got %s", w.Body.String())
+	}
+
+	// 同法人：通过权限门（KPI 桩返回完整的经营块）。
+	router2 := gin.New()
+	router2.GET("/stores/:id/pnl", func(c *gin.Context) {
+		c.Set("legal_entity_id", entityA)
+		handler.Projection(c)
+	})
+	own := httptest.NewRecorder()
+	router2.ServeHTTP(own, httptest.NewRequest(http.MethodGet, "/stores/"+storeID+"/pnl?as_of=2026-08-19&period=2026-07&basis=operating", nil))
+	if own.Code != http.StatusOK {
+		t.Fatalf("same-entity store projection must pass the scope gate, got %d: %s", own.Code, own.Body.String())
 	}
 }
 
@@ -282,7 +348,8 @@ func TestStorePnlCustomTemplateRowsPostgres(t *testing.T) {
 	revenue, labor := 1000.0, 200.0
 	handler := NewStorePnlHandler(occupancyFakeKPI{storeID: {
 		Revenue: &revenue, LaborCost: &labor, DecisionReady: true, Classification: "production", Currency: "CNY",
-	}}, nil, nil).WithTemplates(repository.NewFinModelRepository(pool))
+	}}, nil, nil).WithTemplates(repository.NewFinModelRepository(pool)).
+		WithMasterData(repository.NewMasterDataRepository(pool))
 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

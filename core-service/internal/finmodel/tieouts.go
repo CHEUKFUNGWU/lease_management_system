@@ -13,7 +13,7 @@ func (s *runState) evaluateTieOuts() []TieOutResult {
 	var outs []TieOutResult
 	for i, period := range s.periods {
 		outs = append(outs,
-			s.t1(period), s.t2(period), s.t3(period, i), s.t4(period), s.t5(period),
+			s.t1(period), s.t2(period, i), s.t3(period, i), s.t4(period), s.t5(period),
 			s.t6(period, i), s.t7(period, i), s.t8(period, i), s.t9(period),
 			s.t10(period, i), s.t11(period, i), s.t12(period),
 			s.t13(period), s.t14(period), s.t15(period), s.t16(period),
@@ -71,10 +71,29 @@ func (s *runState) t1(period string) TieOutResult {
 		!s.hasOpening(), "balance sheet identity")
 }
 
-// T2 现金勾稽：BS 现金＝CF 期末现金（±0.01）。
-func (s *runState) t2(period string) TieOutResult {
-	return tieOut("T2", period, s.at("ending_cash", period), s.at("cash", period), 0.01,
-		s.openingMissing, "cash tie-out")
+// T2 现金勾稽/构造：BS 货币资金必须由 CF 期末现金回填（D-S5，无 plug），
+// 且期末现金按滚动恒等式成立 ending_cash_t = 期初现金_t + 现金净变动_t。
+// 现金由 CF 回填是构造保证（PRD 附录 B 已表述为构造断言）——检查的作用是
+// 抓住“值表里出现一个与 CF 脱钩的现金行 / 现金净变动被改”这类破坏。
+func (s *runState) t2(period string, i int) TieOutResult {
+	cash := s.at("cash", period)
+	ending := s.at("ending_cash", period)
+	// 第一重：BS 现金 = CF 期末现金（构造断言：现金由 CF 回填，无 plug）。
+	if out := tieOut("T2", period, ending, cash, 0.01, false, "BS cash returns CF ending cash (D-S5)"); out.Status != "passed" {
+		return out
+	}
+	// 第二重：滚动恒等式。期初现金_t = 期初导入（首期）或上期现金值。
+	var prior *float64
+	if i == 0 {
+		if s.openingMissing {
+			return tieOut("T2", period, nil, nil, 0, true, "opening balance not provided")
+		}
+		prior = s.openingValues["cash"]
+	} else {
+		prior = s.at("cash", s.periods[i-1])
+	}
+	expected := add(prior, s.at("net_cash_flow", period))
+	return tieOut("T2", period, ending, expected, 0.01, false, "ending cash rolls from prior cash + net flow")
 }
 
 // T3 留存收益滚动：RE_t＝RE_{t-1}＋NI_t−股利_t（±0.01）。
@@ -102,12 +121,52 @@ func neg(v *float64) *float64 {
 	return &out
 }
 
-// T4 净利润同源：CFO 撇开 D&A 与营运资本变动后必须精确等于 IS 净利润（0）。
+// T4 净利润同源：CF 的起点行必须引用 IS 净利润行本身（行源引用断言，同一
+// run 同一行源），且数值上 CFO 撇开 D&A、营运资本变动并把按列报政策移出
+// 的利息加回后必须精确等于 IS 净利润（0）。financing 列报下 CFO 已扣除利息，
+// 加回正是把它还原到净利润的“起点”位置。
 func (s *runState) t4(period string) TieOutResult {
+	if !s.cfAnchorIsNetIncome() {
+		return tieOut("T4", period, nil, nil, 0, false, "CF anchor row must reference the IS net_income row (same row source)")
+	}
+	if s.openingMissing {
+		// 无期初时间接法 CF 的 ΔNWC/起点不可判定：保持降级，不判 failed。
+		return tieOut("T4", period, nil, nil, 0, true, "opening balance not provided")
+	}
 	expected := sub(sub(s.at("cfo", period), s.at("dna", period)), s.at("delta_nwc", period))
+	expected = add(expected, s.interestPresented(period))
 	return tieOut("T4", period, s.at("net_income", period), expected, 0.0001,
-		s.openingMissing, "net income single source")
+		false, "net income single source (CF anchor ≡ IS net_income)")
 }
+
+// cfAnchorIsNetIncome is T4's 行源引用断言: the CF starting row (cfo) must
+// reference the exact IS net-income row key — a template where CF starts from
+// a separately-computed income row fails here, whatever the numbers say.
+func (s *runState) cfAnchorIsNetIncome() bool {
+	for _, row := range s.def.Template.Rows {
+		if row.Key != "cfo" || row.Formula == nil {
+			continue
+		}
+		for _, dep := range row.Formula.Deps() {
+			if dep == "net_income" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// interestPresented returns the cash interest the financing policy moved out
+// of CFO (zero under operating) — the add-back T4 needs to reconcile the CF
+// anchor to IS net income.
+func (s *runState) interestPresented(period string) *float64 {
+	if s.def.Policy.InterestCashFlowPresentation != "financing" {
+		return &zero
+	}
+	return add(s.at("lease_interest", period), s.at("borrow_interest", period))
+}
+
+var zero = 0.0
 
 // T5 折旧摊销同源：D&A＝其他折旧摊销＋ROU 折旧（±0.01）。
 func (s *runState) t5(period string) TieOutResult {
@@ -224,16 +283,38 @@ func (s *runState) t10(period string, i int) TieOutResult {
 	return tieOut("T10", period, expected, s.at("ppe", period), 0.01, false, "PP&E roll")
 }
 
-// T11 期初连续性：首期期初来自导入，后续期初＝上期末值（容差 0）。
+// T11 期初连续性：逐存量行的 opening_t = closing_{t−1}（容差 0）。这里比较
+// 的是「本次 run 实际用作 carry 基值的 lag 输入」与「上期间已物化的期末值」
+// ——如果一个上期末值在 run 后被改（版本切换 / 私改前值），本期的 carry 基值
+// 与新物化的前值不再一致，T11 立即红。首期（Opening = 期初导入版本）验证
+// 每根滚动行都从导入取得了基值。
 func (s *runState) t11(period string, i int) TieOutResult {
 	if s.openingMissing {
 		return tieOut("T11", period, nil, nil, 0, true, "opening balance not provided")
 	}
 	if i == 0 {
-		return tieOut("T11", period, nil, nil, 0, true, "first period opening comes from import")
+		// 首期：期初导入必须为每根实际滚动的行提供基值。
+		for ref := range s.lagUsed[period] {
+			if s.openingValues[ref] == nil {
+				return tieOut("T11", period, nil, nil, 0, false, "opening import missing carry basis for "+ref)
+			}
+		}
+		return TieOutResult{CheckCode: "T11", Period: period, Status: "passed"}
 	}
-	expected := s.at("total_assets", s.periods[i-1])
-	return tieOut("T11", period, expected, s.at("total_assets", period), 0, true, "opening continuity (delta-based, see T10/T3/T7/T8 for the carrying lines)")
+	priorPeriod := s.periods[i-1]
+	for ref, basis := range s.lagBasis[period] {
+		if basis == nil {
+			continue
+		}
+		prior := s.at(ref, priorPeriod)
+		if prior == nil {
+			return tieOut("T11", period, prior, basis, 0, false, "prior closing missing for "+ref)
+		}
+		if out := tieOut("T11", period, prior, basis, 0, false, "opening "+ref+" = closing "+ref+" prior"); out.Status != "passed" {
+			return out
+		}
+	}
+	return TieOutResult{CheckCode: "T11", Period: period, Status: "passed"}
 }
 
 // T12 科目树合计守恒：每个 subtotal＝Σ(符号×子行)。
@@ -267,29 +348,45 @@ func (s *runState) t12(period string) TieOutResult {
 	return TieOutResult{CheckCode: "T12", Period: period, Status: "passed"}
 }
 
-// T13 Actual 来源勾稽：事实行与事实层聚合一致（±0.05）。
+// T13 Actual 来源勾稽：事实行与事实层聚合一致（±0.05）。覆盖收入 / 毛利 /
+// 人工 / 占用成本（固定租金＋变量租金——经营口径的租金费用，PRD T13）。
 func (s *runState) t13(period string) TieOutResult {
 	fact, ok := s.factByPeriod[period]
 	if !ok || period > s.def.ActualCutoffPeriod {
 		return tieOut("T13", period, nil, nil, 0, true, "no actual window facts")
 	}
-	for _, pair := range []struct {
+	// 「占用成本 = 固定租金 + 变量租金」：事实侧是两个事实字段之和，模型侧
+	// 是两行租金行之和——两条独立路径，任何一侧被改都必红。
+	occWant := add(fact.FixedRent, fact.VariableRent)
+	occGot := add(s.at("fixed_rent", period), s.at("variable_rent", period))
+	pairs := []struct {
 		row  string
 		want *float64
+		got  *float64
 	}{
-		{"rev", fact.Revenue},
-		{"gp", fact.GrossProfit},
-		{"labor", fact.LaborCost},
-	} {
-		got := s.at(pair.row, period)
-		if pair.want == nil || got == nil {
+		{"rev", fact.Revenue, s.at("rev", period)},
+		{"gp", fact.GrossProfit, s.at("gp", period)},
+		{"labor", fact.LaborCost, s.at("labor", period)},
+		{"occupancy_cost", occWant, occGot},
+	}
+	for _, pair := range pairs {
+		if pair.want == nil || pair.got == nil {
 			continue
 		}
-		if out := tieOut("T13", period, pair.want, got, 0.05, false, pair.row); out.Status != "passed" {
+		if out := tieOut("T13", period, pair.want, pair.got, 0.05, false, rowLabelFor(s.def.Template, pair.row)); out.Status != "passed" {
 			return out
 		}
 	}
 	return TieOutResult{CheckCode: "T13", Period: period, Status: "passed"}
+}
+
+func rowLabelFor(tmpl *template.Template, key string) string {
+	for _, row := range tmpl.Rows {
+		if row.Key == key {
+			return row.Label
+		}
+	}
+	return key
 }
 
 func rowForSource(tmpl *template.Template, source string) string {

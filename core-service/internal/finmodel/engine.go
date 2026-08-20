@@ -157,6 +157,8 @@ func newRunState(def ModelDef, in ModelInputs) (*runState, error) {
 		leaseByPeriod: map[string]LeaseMonth{},
 		factByPeriod:  map[string]OperatingFacts{},
 		openingValues: map[string]*float64{},
+		lagBasis:      map[string]map[string]*float64{},
+		lagUsed:       map[string]map[string]bool{},
 	}
 	for _, row := range def.Template.Rows {
 		state.values[row.Key] = map[string]*float64{}
@@ -176,7 +178,9 @@ type runState struct {
 	gaps           []DataGap
 	opening        *opening.OpeningBalance
 	openingMissing bool
-	openingValues  map[string]*float64       // synthetic prior period for lag across the model start
+	openingValues  map[string]*float64             // synthetic prior period for lag across the model start
+	lagBasis       map[string]map[string]*float64  // period → row → the lag-1 carry basis the engine used (T11)
+	lagUsed        map[string]map[string]bool      // period → row → whether a lag-1 reference was resolved (T11, incl. nil)
 	leaseByPeriod  map[string]LeaseMonth     // engine projection cache (T7/T8/T9)
 	factByPeriod   map[string]OperatingFacts // fact cache (T13)
 }
@@ -205,9 +209,27 @@ func (s *runState) setValue(rowKey, period string, value *float64, provenance Pr
 	s.prov[rowKey+"\x00"+period] = provenance
 }
 
+// ErrOpeningRejected is the S2-3 fail-closed: an opening balance that was
+// PROVIDED but fails the three gates must stop the run — a sick opening makes
+// every later period wrong. It is distinct from "no opening provided", which
+// degrades BS/CF honestly instead of stopping (D-S7 / PRD S2-3).
+var ErrOpeningRejected = errors.New("finmodel: opening balance rejected by the three gates — BS/CF refused (期初带病，阻止运行)")
+
+// OpeningRejectedError carries the structured gate failures behind
+// ErrOpeningRejected so a caller can render or queue them (P1-1: 期初三道闸
+// 不符进 fpna_data_quality_items).
+type OpeningRejectedError struct {
+	Failures []opening.GateFailure
+	wrapped  error
+}
+
+func (e *OpeningRejectedError) Error() string { return e.wrapped.Error() }
+func (e *OpeningRejectedError) Unwrap() error { return e.wrapped }
+
 func (s *runState) loadOpening(ctx context.Context) error {
 	if s.in.Opening == nil {
 		s.openingMissing = true
+		s.gaps = append(s.gaps, DataGap{Kind: "opening_missing", Detail: "未提供期初 BS：BS 与间接法 CF 整体降级为不可判定（PRD S2-3），IS 不受影响"})
 		return nil
 	}
 	balance, ref, engine, policy, err := s.in.Opening.Get(ctx, s.def.LegalEntityID)
@@ -216,16 +238,21 @@ func (s *runState) loadOpening(ctx context.Context) error {
 	}
 	if balance == nil {
 		s.openingMissing = true
+		s.gaps = append(s.gaps, DataGap{Kind: "opening_missing", Detail: "期初端口返回空：未提供期初 BS（PRD S2-3 降级，不编造平衡表）"})
 		return nil
 	}
 	failures := opening.Validate(opening.ValidateInput{Balance: *balance, LeaseRef: ref, Engine: engine, Policy: policy})
 	if len(failures) > 0 {
+		// 期初带病：闸失败 ≠ 未提供期初。前者阻止运行（每期都会错），
+		// 后者才允许 BS/CF 降级。失败明细结构化携带，供渲染与数据质量队列。
+		details := make([]string, 0, len(failures))
 		for _, f := range failures {
-			s.gaps = append(s.gaps, DataGap{Kind: "opening_gate_" + f.Gate, Period: f.Period, Detail: f.Detail})
+			details = append(details, fmt.Sprintf("gate %s%s: %s", f.Gate, periodSuffix(f.Period), f.Detail))
 		}
-		// 期初带病：BS 与间接法 CF 整体降级为不可判定（PRD S2-3），阻止行为记录在 gap 中。
-		s.openingMissing = true
-		return nil
+		return &OpeningRejectedError{
+			Failures: failures,
+			wrapped:  fmt.Errorf("%w (%s)", ErrOpeningRejected, strings.Join(details, "; ")),
+		}
 	}
 	s.opening = balance
 	// 期初余额法的机械落点：首个 lag 跨界时，先看向导入的期初值。
@@ -250,6 +277,33 @@ func (s *runState) loadOpening(ctx context.Context) error {
 }
 
 func ptr(v float64) *float64 { return &v }
+
+func periodSuffix(period string) string {
+	if period == "" {
+		return ""
+	}
+	return " @" + period
+}
+
+// recordLagBasis marks that a stock row resolved a lag-1 reference for the
+// period and copies the carry basis actually used — the "opening" of that row.
+// T11 compares the recorded basis against the materialized prior closing to
+// catch post-computation drift in the carry chain. The value is copied, never
+// aliased, so a later value-table mutation cannot hide from the check.
+func (s *runState) recordLagBasis(period, ref string, v *float64) {
+	if s.lagUsed[period] == nil {
+		s.lagUsed[period] = map[string]bool{}
+	}
+	s.lagUsed[period][ref] = true
+	if v == nil {
+		return
+	}
+	copied := *v
+	if s.lagBasis[period] == nil {
+		s.lagBasis[period] = map[string]*float64{}
+	}
+	s.lagBasis[period][ref] = &copied
+}
 
 // loadPeriods evaluates every row for every period in order.
 func (s *runState) loadPeriods(ctx context.Context) {
@@ -287,19 +341,35 @@ func (s *runState) loadPeriods(ctx context.Context) {
 			if row.Formula == nil {
 				continue
 			}
+			// PRD C7 / T13: a formula row declaring an actual_source reads the
+			// fact on the Actual side of the freeze line — the Actual 区永不来自
+			// 假设推导. The driver formula applies only from the forecast side.
+			if row.ActualSource != "" && s.cutoffIdx >= 0 && period <= s.def.ActualCutoffPeriod {
+				s.loadActualOverride(ctx, row, period)
+				continue
+			}
 			value := row.Formula.Eval(
 				func(ref string) *float64 { return s.values[ref][period] },
 				func(ref string, n int) *float64 {
 					if i-n >= 0 {
-						return s.values[ref][s.periods[i-n]]
+						v := s.values[ref][s.periods[i-n]]
+						if n == 1 {
+							s.recordLagBasis(period, ref, v)
+						}
+						return v
 					}
 					// 首期 lag 跨界：期初余额法下看导入的期初值；无期初即缺失。
 					if n == 1 && !s.openingMissing {
-						return s.openingValues[ref]
+						v := s.openingValues[ref]
+						if v != nil {
+							s.recordLagBasis(period, ref, v)
+						}
+						return v
 					}
 					return nil
 				},
 			)
+			value = s.applyInterestPresentation(row.Key, period, value)
 			s.setValue(row.Key, period, value, Provenance{SourceType: "formula", DataClassification: s.in.DataClassification})
 		}
 		// Subtotals.
@@ -339,6 +409,12 @@ func (s *runState) loadLink(ctx context.Context, row template.Row, period string
 		}
 		s.factByPeriod[period] = facts
 		value, prov.SourceType = factField(facts, row.Source)
+		// 值表写入前复制事实：值表与事实缓存不得共享同一底层地址，否则
+		// 值表被改（勾稽反向测试即这样破坏）会连带改掉事实缓存，T13 恒真。
+		if value != nil {
+			copied := *value
+			value = &copied
+		}
 		if value != nil {
 			prov.Ref = row.Source
 			prov.DataVersion = facts.DatasetVersion
@@ -494,6 +570,80 @@ func (s *runState) loadInput(ctx context.Context, row template.Row, period strin
 		return
 	}
 	s.setValue(row.Key, period, value, prov)
+}
+
+// loadActualOverride resolves a formula row's Actual-window value from the
+// FactReader instead of the driver formula (PRD C7 / T13). The Actual 冻结线
+// 左侧永不来自假设推导——同一输入的 run，真实 Actual 的毛利就是事实毛利。
+func (s *runState) loadActualOverride(ctx context.Context, row template.Row, period string) {
+	prov := Provenance{DataClassification: s.in.DataClassification}
+	if s.in.Facts == nil {
+		s.gaps = append(s.gaps, DataGap{Kind: "fact_port_unavailable", Period: period, Detail: "事实端口未接线，行 " + row.Key + " 的 Actual 来源缺失而非 0"})
+		s.setValue(row.Key, period, nil, prov)
+		return
+	}
+	facts, err := s.in.Facts.Operating(ctx, s.def.LegalEntityID, period)
+	if err != nil {
+		s.setValue(row.Key, period, nil, prov)
+		return
+	}
+	s.factByPeriod[period] = facts
+	value, src := factField(facts, row.ActualSource)
+	// 值表写入前复制事实：与 loadLink 同一条纪律——值表与事实缓存不得
+	// 共享底层地址，否则勾稽反向测试对值表的破坏会反向改写事实缓存。
+	if value != nil {
+		copied := *value
+		value = &copied
+	}
+	if value != nil {
+		prov.SourceType = "fact_aggregate"
+		prov.Ref = src
+		prov.DataVersion = facts.DatasetVersion
+		prov.DataClassification = facts.DataClassification
+		if !facts.DecisionReady {
+			s.gaps = append(s.gaps, DataGap{Kind: "fact_coverage", Period: period, Detail: facts.DecisionReadyReason})
+		}
+	} else {
+		s.gaps = append(s.gaps, DataGap{Kind: "fact_missing", Period: period, Detail: row.Key + " 的 Actual 来源 " + row.ActualSource + " 缺事实，缺失不显示为 0"})
+	}
+	s.setValue(row.Key, period, value, prov)
+}
+
+// applyInterestPresentation is the T9 policy switch made real (PRD S2-3
+// Step 3 / appendix B T9). Under "financing" (CAS practice) the cash interest
+// is moved out of CFO and shown separately inside CFE「分配股利、利润或偿付
+// 利息支付的现金」; under "operating" (IAS 7 option) interest stays inside
+// CFO. The two branches conserve total cash (net_cash_flow is unchanged), so
+// T1/T2 hold under both. Applied at the cfo/cfe rows so every dependent row
+// (net_cash_flow, ending_cash) sees the presented numbers.
+func (s *runState) applyInterestPresentation(rowKey, period string, value *float64) *float64 {
+	if s.def.Policy.InterestCashFlowPresentation != "financing" || value == nil {
+		return value
+	}
+	if rowKey != "cfo" && rowKey != "cfe" {
+		return value
+	}
+	// 现金支付的利息 = 租赁利息 + 借款利息（管理口径按费用近似现金支付）。
+	lease := s.at("lease_interest", period)
+	borrow := s.at("borrow_interest", period)
+	if lease == nil && borrow == nil {
+		s.gaps = append(s.gaps, DataGap{Kind: "interest_presentation_missing", Period: period, Detail: "financing 列报要求把利息移出 CFO，但本期利息行缺失，无法调整"})
+		return value
+	}
+	interest := 0.0
+	if lease != nil {
+		interest += *lease
+	}
+	if borrow != nil {
+		interest += *borrow
+	}
+	out := *value
+	if rowKey == "cfo" {
+		out -= interest
+	} else {
+		out += interest
+	}
+	return &out
 }
 
 func (s *runState) evalSubtotal(row template.Row, period string) {

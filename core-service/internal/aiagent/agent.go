@@ -98,20 +98,20 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 	if err := registry.Register(agenttooldefs.NewRetailIngestPreviewDefinition(fillReader)); err == nil {
 		registered = true
 	}
-	// SM7：三表模型工具注册。端口工厂当前为空——工具诚实拒绝
-	// （unavailable），生产接线随 /financial-model 工作台落地。
-	if err := registry.Register(agenttooldefs.NewStatementModelReadDefinition(nil)); err == nil {
-		registered = true
-	}
-	if err := registry.Register(agenttooldefs.NewStatementModelEvaluateDefinition(nil)); err == nil {
-		registered = true
-	}
-	if err := registry.Register(agenttooldefs.NewFinModelPaperDefinition(nil)); err == nil {
-		registered = true
-	}
-	// S4 / SM7 工具：生产接线真实可用时直接绑定写端口与读取端口；未接线
-	// （如轻量测试适配器）保持诚实拒绝。写入路径全部 draft-only。
+	// SM7：三表模型工具注册。生产接线在下面 finModelRepo 的 else 分支注册
+	// 真实端口；无仓库（测试/轻量适配器）时才注册 nil 版（工具诚实拒绝，
+	// 绝不让 nil 注册挡住生产端口——P0-8）。
 	if finModelRepo == nil {
+		if err := registry.Register(agenttooldefs.NewStatementModelReadDefinition(nil)); err == nil {
+			registered = true
+		}
+		if err := registry.Register(agenttooldefs.NewStatementModelEvaluateDefinition(nil)); err == nil {
+			registered = true
+		}
+		if err := registry.Register(agenttooldefs.NewFinModelPaperDefinition(nil)); err == nil {
+			registered = true
+		}
+		// 假设建议等写口（S4）：未接线保持诚实拒绝。写入路径全部 draft-only。
 		if err := registry.Register(agenttooldefs.NewAssumptionSuggestionDefinition(nil)); err == nil {
 			registered = true
 		}

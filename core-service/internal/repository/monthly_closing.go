@@ -395,8 +395,10 @@ func (r *MonthlyClosingRepository) SaveMeasurementResult(ctx context.Context, mr
 // ListMeasurementResultsByStorePeriod is the store-level sibling: the
 // engine rows of every contract of one store for one period — the source
 // behind the store P&L's IFRS 16 block (S1-1: ROU depreciation and lease
-// interest per store, identical numbers to the entity fold).
-func (r *MonthlyClosingRepository) ListMeasurementResultsByStorePeriod(ctx context.Context, storeID, period string) ([]*MeasurementResult, error) {
+// interest per store, identical numbers to the entity fold). The caller's
+// legal entity is part of the filter so a tenant-A caller can never read
+// tenant-B store rows through a guessed store id (bottom line 1).
+func (r *MonthlyClosingRepository) ListMeasurementResultsByStorePeriod(ctx context.Context, storeID, legalEntityID, period string) ([]*MeasurementResult, error) {
 	rows, err := r.db.Query(ctx, `SELECT mr.id, mr.contract_id, mr.accounting_period, mr.period_start_date, mr.period_end_date,
 			mr.opening_liability, mr.interest_expense, mr.principal_repayment, mr.total_payment,
 			mr.closing_liability, mr.opening_rou_asset, mr.depreciation, mr.closing_rou_asset,
@@ -404,8 +406,8 @@ func (r *MonthlyClosingRepository) ListMeasurementResultsByStorePeriod(ctx conte
 			mr.is_calculated, mr.calculation_batch_id, mr.calculated_at, mr.created_at, mr.updated_at
 		FROM measurement_results mr
 		JOIN lease_contracts c ON c.id = mr.contract_id
-		WHERE c.store_id=$1 AND mr.accounting_period=$2
-		ORDER BY mr.contract_id`, storeID, period)
+		WHERE c.legal_entity_id=$1 AND c.store_id=$2 AND mr.accounting_period=$3
+		ORDER BY mr.contract_id`, legalEntityID, storeID, period)
 	if err != nil {
 		return nil, fmt.Errorf("list measurement results by store period: %w", err)
 	}

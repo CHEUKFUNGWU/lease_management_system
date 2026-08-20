@@ -2000,6 +2000,54 @@ export const operatingFactsApi = {
     apiRequest(`/api/v1/operating-facts/equipment-facts`, { method: "POST", body: JSON.stringify(data), token }),
 };
 
+// SM3 store P&L projection: dual-basis P&L with per-version columns and
+// drilldown components. Actual cells come from the retail-kpi semantic layer,
+// comparison cells from plan lines; both travel in one response.
+export interface StorePnlQueryParams {
+  store_id: string;
+  as_of: string;
+  window_days: number;
+  basis: string;
+  secondary?: string;
+  template_id?: string;
+}
+
+export const storePnlApi = {
+  getPnl: (params: StorePnlQueryParams, token: string) => {
+    const query = new URLSearchParams({
+      as_of: params.as_of,
+      window_days: String(params.window_days),
+      basis: params.basis,
+    });
+    if (params.secondary) query.set("secondary", params.secondary);
+    if (params.template_id) query.set("template_id", params.template_id);
+    return apiRequest(`/api/v1/stores/${encodeURIComponent(params.store_id)}/pnl?${query.toString()}`, { token }) as Promise<{ pnl: unknown }>;
+  },
+};
+
+// Financial model definition runs, saved views and statement templates.
+// Runs are persist-by-default (idempotency_key dedupes replays on the server).
+export interface FinancialModelRunInput {
+  definition_id: string;
+  assumptions: unknown;
+  data_classification: string;
+  versions: { data_version: string; assumption_version: string; model_definition_version: string };
+  idempotency_key: string;
+}
+
+export const financialModelApi = {
+  listSavedViews: (kind: string, token: string) =>
+    apiRequest(`/api/v1/financial-model/saved-views?kind=${encodeURIComponent(kind)}`, { token }) as Promise<{ views: unknown[] }>,
+  saveView: (data: { kind: string; name: string; config: Record<string, unknown> }, token: string) =>
+    apiRequest("/api/v1/financial-model/saved-views", { method: "POST", body: JSON.stringify(data), token }) as Promise<{ id?: string }>,
+  saveTemplate: (data: Record<string, unknown>, token: string) =>
+    apiRequest("/api/v1/financial-model/templates", { method: "POST", body: JSON.stringify(data), token }) as Promise<{ id: string }>,
+  run: (definitionId: string, input: FinancialModelRunInput, token: string) =>
+    apiRequest(`/api/v1/financial-model/definitions/${encodeURIComponent(definitionId)}/runs`, { method: "POST", body: JSON.stringify(input), token }) as Promise<{ run: unknown; persisted?: boolean }>,
+  validateOpening: (data: unknown, token: string) =>
+    apiRequest("/api/v1/financial-model/opening/validate", { method: "POST", body: JSON.stringify(data), token }) as Promise<Record<string, unknown>>,
+};
+
 export interface ExchangeRateVersion {
   id: string;
   name: string;

@@ -2,6 +2,7 @@ package workingpaper
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/agenttools"
@@ -36,6 +37,8 @@ type AuditLookup interface {
 //	I3  protected measures (by id or lexical probe) never carry an
 //	    exploratory basis
 //	I6  the cover statistics match the actual cell statistics
+//	I8  a run whose tie-outs failed (finmodel records these as "tie_out_failed:"
+//	    data gaps) must not export — D-S5's second fail-closed point
 //
 // Lint is the single gate every export path must pass. It never mutates the
 // paper and never downgrades: violations are reported, not smoothed over.
@@ -44,6 +47,16 @@ func Lint(p Paper, audits AuditLookup) LintReport {
 	for _, sec := range p.Sections {
 		for _, c := range sec.Cells {
 			rep.Violations = append(rep.Violations, lintCell(c, audits)...)
+		}
+	}
+
+	// I8 — 勾稽失败的 run 不得导出（三表模型底稿）。
+	for _, g := range p.DataGaps {
+		if strings.HasPrefix(g, "tie_out_failed:") {
+			rep.Violations = append(rep.Violations, Violation{
+				Code:   "tie_out_unpassed",
+				Detail: "run 勾稽未全绿（" + strings.TrimPrefix(g, "tie_out_failed:") + "）：底稿不得导出（fail-closed，D-S5）",
+			})
 		}
 	}
 

@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
@@ -26,9 +29,18 @@ type StorePnlHandler struct {
 	peer      storepnl.PeerReader
 	lease     storepnl.LeasePort
 	occupancy storepnl.OccupancyReader
-	stores    *repository.MasterDataRepository
+	stores    StoreLookup
 	tmpl      *template.Template
 	templates *repository.FinModelRepository
+}
+
+// StoreLookup resolves store scope dimensions for the projection's
+// entity/scope gate and the S1-7 aggregate's authorized store set (bottom
+// line 1). MasterDataRepository satisfies it; the interface lets unit tests
+// inject a fake without a database.
+type StoreLookup interface {
+	GetStoreByID(ctx context.Context, storeID string) (repository.StoreOption, error)
+	ListStores(ctx context.Context, tenantID, legalEntityID string) ([]repository.StoreOption, error)
 }
 
 // NewStorePnlHandler builds the handler. The lease port arrives honest:
@@ -49,9 +61,9 @@ func (h *StorePnlHandler) WithPeer(peer storepnl.PeerReader) *StorePnlHandler {
 }
 
 // WithMasterData attaches the store master-data reader the S1-7 aggregate
-// uses to resolve the AUTHORIZED store set (scope filtering lives in the
-// repository, not here).
-func (h *StorePnlHandler) WithMasterData(stores *repository.MasterDataRepository) *StorePnlHandler {
+// and the projection's entity/scope gate use (scope filtering lives in the
+// repository / gate, not here).
+func (h *StorePnlHandler) WithMasterData(stores StoreLookup) *StorePnlHandler {
 	h.stores = stores
 	return h
 }
@@ -79,7 +91,7 @@ func (h *StorePnlHandler) WithTemplates(templates *repository.FinModelRepository
 
 type unavailableLease struct{}
 
-func (unavailableLease) Monthly(_ context.Context, _, _ string) (storepnl.LeaseMonthValues, error) {
+func (unavailableLease) Monthly(_ context.Context, _, _, _ string) (storepnl.LeaseMonthValues, error) {
 	return storepnl.LeaseMonthValues{}, errors.New("IFRS 16 口径尚未接通：门店级 ROU/利息投影适配器待接线（诚实降级，不产出数字）")
 }
 
@@ -151,6 +163,9 @@ func (h *StorePnlHandler) planReaderFor(c *gin.Context) storepnl.PlanReader {
 // this-quarter) wins; the legacy window_days/as_of pair stays as fallback.
 func (h *StorePnlHandler) Projection(c *gin.Context) {
 	storeID := c.Param("id")
+	if err := h.requireScopedStore(c, storeID); err != nil {
+		return
+	}
 	params, ok := parseProjectionParams(c, storeID)
 	if !ok {
 		return
@@ -178,6 +193,48 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"pnl": pnl})
+}
+
+// requireScopedStore is the single-store sibling of the aggregate's scoped
+// master-data read (bottom line 1 + Data Scope): the targeted store must
+// belong to the caller's tenant, and when the caller carries an explicit
+// store/region/brand scope the store must sit inside it. A wrong tenant is
+// indistinguishable from a missing store (no existence leak); an out-of-scope
+// store keeps the scope_denied reason (never softened to "no data").
+func (h *StorePnlHandler) requireScopedStore(c *gin.Context, storeID string) error {
+	if h.stores == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "store master data reader unavailable"})
+		return errors.New("store master data reader unavailable")
+	}
+	store, err := h.stores.GetStoreByID(c.Request.Context(), storeID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return err
+	}
+	if store.ID == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		return errors.New("store not found")
+	}
+	tenant := middleware.GetTenantID(c)
+	if tenant != "" && store.LegalEntityID != tenant {
+		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		return errors.New("store outside caller tenant")
+	}
+	if scope, scoped := access.ScopeFromContext(c.Request.Context()); scoped && !scope.Global {
+		if len(scope.StoreIDs) > 0 && !slices.Contains(scope.StoreIDs, storeID) {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied, "scope_denied: store outside caller data scope", nil)
+			return errors.New("store outside caller data scope")
+		}
+		if len(scope.Regions) > 0 && !slices.Contains(scope.Regions, deref(store.Region)) {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied, "scope_denied: store region outside caller data scope", nil)
+			return errors.New("store region outside caller data scope")
+		}
+		if len(scope.Brands) > 0 && !slices.Contains(scope.Brands, deref(store.Brand)) {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied, "scope_denied: store brand outside caller data scope", nil)
+			return errors.New("store brand outside caller data scope")
+		}
+	}
+	return nil
 }
 
 // AggregateProjection is GET /store-pnl/aggregate?group_by=region|brand|

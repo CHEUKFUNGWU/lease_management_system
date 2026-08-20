@@ -53,6 +53,24 @@ func TestValidateOpeningThreeGates(t *testing.T) {
 	}
 }
 
+// P0-1: definition 跨法人校验的纯判定——租户 A 只能碰租户 A 的 definition；
+// 空租户（全局 admin）不受限。机械层面即底线 1 的单点判定。
+func TestDefinitionScopeAuthorized(t *testing.T) {
+	if !definitionScopeAuthorized("LE-A", "LE-A") {
+		t.Fatal("same-entity caller must be authorized")
+	}
+	if definitionScopeAuthorized("LE-B", "LE-A") {
+		t.Fatal("tenant-A caller must be denied on a tenant-B definition")
+	}
+	if !definitionScopeAuthorized("LE-B", "") {
+		t.Fatal("global admin (empty tenant) is unrestricted")
+	}
+	// 无法人绑定的 definition 无法归属，租户调用方必须拒绝（不能凭空声称所有权）。
+	if definitionScopeAuthorized("", "LE-A") {
+		t.Fatal("entity-less definition must be denied to a tenant caller")
+	}
+}
+
 func TestCreateTemplateRejectsIllegalFormula(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	handler := NewFinModelHandler(nil)

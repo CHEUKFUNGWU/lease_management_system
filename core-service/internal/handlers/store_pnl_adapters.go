@@ -295,11 +295,11 @@ func NewStorePnlOccupancyAdapter(repo *repository.PaymentScheduleRepository) sto
 }
 
 // Contracts implements storepnl.OccupancyReader.
-func (a storePnlOccupancyAdapter) Contracts(ctx context.Context, storeID, from, to string) ([]storepnl.ContractSplit, error) {
+func (a storePnlOccupancyAdapter) Contracts(ctx context.Context, storeID, legalEntityID, from, to string) ([]storepnl.ContractSplit, error) {
 	if a.repo == nil {
 		return nil, errors.New("occupancy schedule repository unavailable")
 	}
-	rows, err := a.repo.ListOccupancySchedulesByStore(ctx, storeID, from, to)
+	rows, err := a.repo.ListOccupancySchedulesByStore(ctx, storeID, legalEntityID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -324,9 +324,9 @@ type storePnlLeaseAdapter struct {
 }
 
 // storeMeasurementSource is the narrow seam the adapter reads engine rows
-// through.
+// through (scoped by legal entity, bottom line 1).
 type storeMeasurementSource interface {
-	ListMeasurementResultsByStorePeriod(ctx context.Context, storeID, period string) ([]*repository.MeasurementResult, error)
+	ListMeasurementResultsByStorePeriod(ctx context.Context, storeID, legalEntityID, period string) ([]*repository.MeasurementResult, error)
 }
 
 // NewStorePnlLeaseAdapter builds the adapter.
@@ -336,11 +336,11 @@ func NewStorePnlLeaseAdapter(measurements storeMeasurementSource) storepnl.Lease
 
 // Monthly implements storepnl.LeasePort. Other depreciation has no
 // per-store engine source and stays missing (honest, never zero-filled).
-func (a storePnlLeaseAdapter) Monthly(ctx context.Context, storeID, period string) (storepnl.LeaseMonthValues, error) {
+func (a storePnlLeaseAdapter) Monthly(ctx context.Context, storeID, legalEntityID, period string) (storepnl.LeaseMonthValues, error) {
 	if a.measurements == nil {
 		return storepnl.LeaseMonthValues{}, errors.New("lease measurement source unavailable")
 	}
-	rows, err := a.measurements.ListMeasurementResultsByStorePeriod(ctx, storeID, period)
+	rows, err := a.measurements.ListMeasurementResultsByStorePeriod(ctx, storeID, legalEntityID, period)
 	if err != nil {
 		return storepnl.LeaseMonthValues{}, err
 	}

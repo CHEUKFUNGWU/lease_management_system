@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/lease-management-system/core-service/internal/access"
@@ -115,8 +116,16 @@ func (r *OperatingFactsRepository) ListTrialBalanceVersions(ctx context.Context,
 // version's lines plus that version's functional currency — the source the
 // finmodel OpeningBalanceReader folds into standardized opening balances.
 // Each version row already identifies the period; lines join by version id.
+// The legal-entity filter is pushed into the version query, not applied in
+// memory (P2-4: no cross-entity pull + N+1 filter).
 func (r *OperatingFactsRepository) LatestTrialBalanceByPeriod(ctx context.Context, legalEntityID string) (map[string][]TrialBalanceLine, string, error) {
-	versions, err := r.ListTrialBalanceVersions(ctx, access.GlobalEntityFilter(), "")
+	filter := access.GlobalEntityFilter()
+	if strings.TrimSpace(legalEntityID) != "" {
+		if f, err := access.EntityFilterFor(legalEntityID); err == nil {
+			filter = f
+		}
+	}
+	versions, err := r.ListTrialBalanceVersions(ctx, filter, "")
 	if err != nil {
 		return nil, "", err
 	}
@@ -124,8 +133,8 @@ func (r *OperatingFactsRepository) LatestTrialBalanceByPeriod(ctx context.Contex
 	currency := ""
 	picked := map[string]bool{}
 	for _, version := range versions {
-		if version.LegalEntityID == nil || *version.LegalEntityID != legalEntityID {
-			continue
+		if version.LegalEntityID == nil {
+			continue // SQL 已按法人过滤；空法人行不进结果
 		}
 		if picked[version.Period] {
 			continue // 列表按 created_at DESC — 每个期间取最新版本

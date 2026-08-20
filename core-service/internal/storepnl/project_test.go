@@ -24,7 +24,7 @@ func (m memPlan) StoreValue(_ context.Context, _ StoreRef, column ColumnRef, kpi
 
 type memLease struct{ lease LeaseMonthValues }
 
-func (m memLease) Monthly(_ context.Context, _ string, _ string) (LeaseMonthValues, error) {
+func (m memLease) Monthly(_ context.Context, _ string, _ string, _ string) (LeaseMonthValues, error) {
 	return m.lease, nil
 }
 

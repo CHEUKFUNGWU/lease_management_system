@@ -3,13 +3,13 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/lease-management-system/core-service/internal/finmodel"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
-	"github.com/lease-management-system/core-service/internal/workingpaper"
 )
 
 type stmtModelReader struct{ run, def json.RawMessage }
@@ -103,25 +103,18 @@ func TestStatementModelEvaluateNoSideEffects(t *testing.T) {
 	}
 }
 
-func TestFinModelPaperToolProducesCleanPaper(t *testing.T) {
+// P1-3 契约：stmtPorts 的极简输入无法让出厂三表模板全绿（T2/T5/T10 等
+// 失败），工具必须拒绝产出 artifact——失败的 run 永远不生成底稿。
+func TestFinModelPaperToolRefusesFailedTieOutRun(t *testing.T) {
 	def := NewFinModelPaperDefinition(stmtPorts{})
-	result, err := def.Handler(stmtCtx(), agenttools.ToolCall{
+	_, err := def.Handler(stmtCtx(), agenttools.ToolCall{
 		CallID:    "call-fm-1",
 		Arguments: json.RawMessage(`{"model":{"name":"tiny"},"title":"月度三表底稿"}`),
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("a run whose tie-outs fail must be refused (no artifact)")
 	}
-	paper, ok := result.Data.(map[string]any)["paper"].(workingpaper.Paper)
-	if !ok {
-		t.Fatalf("paper missing: %+v", result.Data)
-	}
-	for _, c := range paper.AllCells() {
-		if c.Provenance.Basis == workingpaper.BasisCertified && c.Provenance.ToolCallID != "call-fm-1" {
-			t.Fatalf("certified cell %s must anchor to the tool call (I2)", c.Ref)
-		}
-		if c.Provenance.Basis == workingpaper.BasisExploratory {
-			t.Fatalf("finmodel paper carries no exploratory cells, cell %s", c.Ref)
-		}
+	if !strings.Contains(err.Error(), "tie_out_unpassed") {
+		t.Fatalf("the refusal must name the tie_out_unpassed gate, got %v", err)
 	}
 }

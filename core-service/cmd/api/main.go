@@ -133,6 +133,7 @@ func main() {
 	aiChatHandler.SetFileBytesReader(func(ctx context.Context, objectName string) ([]byte, error) {
 		return minioClient.GetObject(ctx, objectName)
 	})
+	uploadHandler := handlers.UploadAIFile(minioClient)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
@@ -501,6 +502,12 @@ func main() {
 		protected.Handle(http.MethodPost, "/ai/chat/artifacts/:id/actions", permission("ai_chat", "use"), aiChatHandler.CreateReviewAction)
 		protected.Handle(http.MethodGet, "/ai/chat/artifacts/:id", permission("ai_chat", "use"), aiChatHandler.GetArtifact)
 		protected.Handle(http.MethodGet, "/ai/chat/artifacts/:id/export", permission("ai_chat", "use"), aiChatHandler.ExportArtifact)
+		// W5-5: file upload moved to core-service (MinIO write seam). The
+		// front-end posts /api/ai/files/upload which now lands here.
+		protected.Handle(http.MethodPost, "/ai/files/upload", permission("ai_chat", "use"), uploadHandler)
+		// W5-5: file upload moved to core-service (MinIO write seam). The
+		// front-end posts /api/ai/files/upload which now lands here.
+		protected.Handle(http.MethodPost, "/ai/files/upload", permission("ai_chat", "use"), uploadHandler)
 
 		// Agent Gateway: individual Tools enforce their own permissions. Do not
 		// put a broad ai_chat permission in front of this group, otherwise CLI

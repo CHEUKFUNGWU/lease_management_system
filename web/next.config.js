@@ -25,7 +25,6 @@ const nextConfig = {
     // relative NEXT_PUBLIC_* value is intentionally used by the browser and
     // must never become a self-referential rewrite destination.
     const serverApiUrl = process.env.SERVER_API_URL || "http://core-service:8080";
-    const serverAiUrl = process.env.SERVER_AI_URL || "http://ai-service:8000";
 
     return [
       // Browser-safe same-origin aliases. The in-app browser only permits
@@ -40,8 +39,10 @@ const nextConfig = {
         destination: `${serverApiUrl}/api/:path*`,
       },
       {
+        // W5-5: file upload (and any future AI HTTP seam) now lives in
+        // core-service at /api/v1/ai/*; the ai-service rewrite is retired.
         source: "/api/ai/:path*",
-        destination: `${serverAiUrl}/api/v1/:path*`,
+        destination: `${serverApiUrl}/api/v1/ai/:path*`,
       },
     ];
   },

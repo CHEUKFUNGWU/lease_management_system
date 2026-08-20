@@ -140,7 +140,6 @@ LOG_LEVEL: ${LOG_LEVEL:-info}
     environment:
       # Server-side only: read at startup by next.config.js rewrites().
       SERVER_API_URL: http://core-service:8080
-      SERVER_AI_URL: http://ai-service:8000
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:

@@ -5,6 +5,7 @@
 package miniostore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -66,6 +67,28 @@ func (c *Client) GetObject(ctx context.Context, objectName string) ([]byte, erro
 		return nil, fmt.Errorf("miniostore read %s: object exceeds the 10MB preview limit", objectName)
 	}
 	return data, nil
+}
+
+// PutObject writes an uploaded file (W5-5 write seam). It ensures the bucket
+// exists and returns a stable object URL-shaped path "/{bucket}/{object}".
+func (c *Client) PutObject(ctx context.Context, objectName string, data []byte, contentType string) (string, error) {
+	if c == nil || c.mc == nil {
+		return "", fmt.Errorf("miniostore: client is disabled")
+	}
+	exists, err := c.mc.BucketExists(ctx, c.bucket)
+	if err != nil {
+		return "", fmt.Errorf("miniostore bucket check: %w", err)
+	}
+	if !exists {
+		if err := c.mc.MakeBucket(ctx, c.bucket, minio.MakeBucketOptions{}); err != nil {
+			return "", fmt.Errorf("miniostore make bucket: %w", err)
+		}
+	}
+	_, err = c.mc.PutObject(ctx, c.bucket, objectName, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{ContentType: contentType})
+	if err != nil {
+		return "", fmt.Errorf("miniostore put %s: %w", objectName, err)
+	}
+	return "/" + c.bucket + "/" + objectName, nil
 }
 
 // IngestReader adapts the client to the agenttools IgestFileReader seam.

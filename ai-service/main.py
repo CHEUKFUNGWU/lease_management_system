@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.services.llm import llm_client
-from app.routers import files, parse
+from app.routers import parse
 
 
 @asynccontextmanager
@@ -35,7 +35,6 @@ app.add_middleware(
 )
 
 # 注册路由
-app.include_router(files.router, prefix="/api/v1", tags=["files"])
 app.include_router(parse.router, prefix="/api/v1", tags=["parse"])
 
 

@@ -22,6 +22,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/agentrunner"
 	"github.com/lease-management-system/core-service/internal/agenttools"
+	"github.com/lease-management-system/core-service/internal/llm"
 )
 
 const defaultGatewayURL = "http://localhost:8080"
@@ -44,9 +45,7 @@ func run(args []string) error {
 	title := flags.String("title", "Pi Agent Runner", "new session title")
 	skillID := flags.String("skill", "", "Skill ID")
 	skillVersion := flags.String("skill-version", "v1", "Skill version")
-	planPath := flags.String("plan", "-", "JSON array of ToolCall objects, or - for stdin")
-	plannerURL := flags.String("planner-url", os.Getenv("AGENT_PLANNER_URL"), "AI Service Agent Planner URL; when set, --plan is not required")
-	plannerToken := flags.String("planner-token", os.Getenv("AGENT_PLANNER_TOKEN"), "optional bearer token for the AI Service planner")
+	planPath := flags.String("plan", "", "JSON array of ToolCall objects, or - for stdin; when empty, the in-process LLM planner is used")
 	workerID := flags.String("worker-id", os.Getenv("AGENT_WORKER_ID"), "worker identity; claims a queued Run when --run-id is empty")
 	workerLoop := flags.Bool("worker-loop", false, "keep claiming queued Runs instead of exiting after one Run")
 	pollInterval := flags.Duration("poll-interval", 2*time.Second, "worker queue polling interval")
@@ -72,17 +71,14 @@ func run(args []string) error {
 		if strings.TrimSpace(*runID) != "" || strings.TrimSpace(*sessionID) != "" || strings.TrimSpace(*message) != "" {
 			return errors.New("--worker-loop cannot be combined with --run-id, --session-id or --message")
 		}
-		if strings.TrimSpace(*plannerURL) == "" && (strings.TrimSpace(*planPath) == "" || strings.TrimSpace(*planPath) == "-") {
-			return errors.New("--plan must point to a reusable JSON plan file in --worker-loop mode")
-		}
-		if strings.TrimSpace(*plannerURL) != "" && strings.TrimSpace(*planPath) != "" && strings.TrimSpace(*planPath) != "-" {
-			return errors.New("--planner-url and --plan cannot be combined")
+		if strings.TrimSpace(*planPath) == "-" && strings.TrimSpace(*planPath) != "" {
+			return errors.New("--plan must point to a reusable JSON plan file in --worker-loop mode, or be left empty for the in-process LLM planner")
 		}
 		if *maxRuns < 0 || *pollInterval <= 0 {
 			return errors.New("--max-runs must be non-negative and --poll-interval must be positive")
 		}
 		var plan []agenttools.ToolCall
-		if strings.TrimSpace(*plannerURL) == "" {
+		if strings.TrimSpace(*planPath) != "" {
 			loadedPlan, err := readPlan(*planPath)
 			if err != nil {
 				return err
@@ -90,7 +86,7 @@ func run(args []string) error {
 			plan = loadedPlan
 		}
 		gateway := agentrunner.NewHTTPGateway(*baseURL, *token, &http.Client{Timeout: 30 * time.Second})
-		planner, err := newPlanner(plan, *plannerURL, *plannerToken)
+		planner, err := newPlanner(plan)
 		if err != nil {
 			return err
 		}
@@ -100,7 +96,7 @@ func run(args []string) error {
 		return errors.New("--message is required")
 	}
 	var plan []agenttools.ToolCall
-	if strings.TrimSpace(*plannerURL) == "" {
+	if strings.TrimSpace(*planPath) != "" {
 		loadedPlan, err := readPlan(*planPath)
 		if err != nil {
 			return err
@@ -152,7 +148,7 @@ func run(args []string) error {
 	if strings.TrimSpace(*workerID) != "" && strings.TrimSpace(*leaseToken) != "" && gateway.WorkerID == "" {
 		gateway = gateway.WithWorkerLease(*workerID, *leaseToken)
 	}
-	planner, err := newPlanner(plan, *plannerURL, *plannerToken)
+	planner, err := newPlanner(plan)
 	if err != nil {
 		return err
 	}
@@ -223,25 +219,28 @@ func runWorkerLoop(ctx context.Context, gateway *agentrunner.HTTPGateway, planne
 }
 
 func bindPlannerUsage(planner agentrunner.Planner, gateway *agentrunner.HTTPGateway) agentrunner.Planner {
-	httpPlanner, ok := planner.(*agentrunner.HTTPPlanner)
-	if !ok || httpPlanner == nil || gateway == nil {
-		return planner
-	}
-	return httpPlanner.WithUsageRecorder(func(ctx context.Context, runID string, usage agentrunner.PlannerUsage) error {
-		return gateway.AppendRunEvent(ctx, runID, agentrunner.Event{
-			Type:    "planner_usage",
-			RunID:   runID,
-			Payload: usage,
+	if llmPlanner, ok := planner.(*agentrunner.PlannerLLM); ok && llmPlanner != nil && gateway != nil {
+		return llmPlanner.WithUsageRecorder(func(ctx context.Context, runID string, usage agentrunner.PlannerUsage) error {
+			return gateway.AppendRunEvent(ctx, runID, agentrunner.Event{
+				Type:    "planner_usage",
+				RunID:   runID,
+				Payload: usage,
+			})
 		})
-	})
+	}
+	return planner
 }
 
-func newPlanner(plan []agenttools.ToolCall, plannerURL, plannerToken string) (agentrunner.Planner, error) {
-	if strings.TrimSpace(plannerURL) != "" {
-		return agentrunner.NewHTTPPlanner(plannerURL, plannerToken, &http.Client{Timeout: 120 * time.Second}), nil
-	}
+// newPlanner returns the deterministic file/stdin planner when a plan was
+// supplied, or the in-process LLM planner (W4-3, replacing the retired
+// ai-service agent_plan.py endpoint) when it was not.
+func newPlanner(plan []agenttools.ToolCall) (agentrunner.Planner, error) {
 	if len(plan) == 0 {
-		return nil, errors.New("a Tool plan or --planner-url is required")
+		client, err := llm.NewClient(llm.ConfigFromEnv())
+		if err != nil {
+			return nil, err
+		}
+		return agentrunner.NewLLMPlanner(client), nil
 	}
 	return agentrunner.PlannerFunc(func(_ context.Context, request agentrunner.PlanRequest) ([]agenttools.ToolCall, error) {
 		calls := make([]agenttools.ToolCall, len(plan))

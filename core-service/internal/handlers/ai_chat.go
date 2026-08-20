@@ -13,6 +13,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aiagent"
+	"github.com/lease-management-system/core-service/internal/docparse"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
@@ -112,6 +113,7 @@ type AgentRunAuditLinkReader interface {
 }
 
 type AIChatHandler struct {
+	agent         *aiagent.Agent
 	runtimeRepo   aiChatRuntimeStore
 	contractRepo  *repository.ContractRepository
 	draftService  *draftapp.Service
@@ -121,6 +123,14 @@ type AIChatHandler struct {
 	toolRuntime   *agenttools.Runtime
 	skillRegistry *agentskill.Registry
 	guard         *agentguard.Guard
+}
+
+// SetDocumentParser injects the document parser seam (W5-1) into the inner Agent used by the chat/parse paths.
+func (h *AIChatHandler) SetDocumentParser(p docparse.DocumentParser) {
+	if h == nil || h.agent == nil {
+		return
+	}
+	h.agent.SetDocumentParser(p)
 }
 
 // NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail is the
@@ -143,7 +153,7 @@ func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
 	draftServices ...*draftapp.Service,
 ) *AIChatHandler {
 	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, finModelRepo, facts, plans, draftServices...)
-	handler := &AIChatHandler{runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
+	handler := &AIChatHandler{agent: agent, runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
 	handler.agentRuntime = aichat.NewRuntime(runtimeRepo, agent, agent, aiagent.ProjectResult, aichat.Options{ReviewCommit: handler.commitReviewTransaction})
 	return handler
 }

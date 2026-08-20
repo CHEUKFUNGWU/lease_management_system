@@ -1,0 +1,18 @@
+{
+  "answer": "好的。",
+  "model": "deepseek/deepseek-v4-flash",
+  "tool_calls": null,
+  "usage_metadata": {
+    "schema_version": "llm-usage.v1",
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "input_tokens": 200,
+    "output_tokens": 10,
+    "total_tokens": 210,
+    "pricing_version": "unconfigured",
+    "pricing_source": "provider_usage",
+    "cost_currency": "USD",
+    "cost_status": "measured",
+    "cost_micros": 420
+  }
+}

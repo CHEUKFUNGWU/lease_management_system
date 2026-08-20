@@ -1,0 +1,26 @@
+{
+  "answer": "",
+  "model": "deepseek/deepseek-v4-flash",
+  "tool_calls": [
+    {
+      "id": "call_abc123",
+      "type": "function",
+      "function": {
+        "name": "parse_payment_schedule",
+        "arguments": "{\"file_id\":\"file-001\",\"object_name\":\"rent-schedule.xlsx\",\"content_type\":\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\"}"
+      }
+    }
+  ],
+  "usage_metadata": {
+    "schema_version": "llm-usage.v1",
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "input_tokens": 1200,
+    "output_tokens": 40,
+    "total_tokens": 1240,
+    "pricing_version": "unconfigured",
+    "pricing_source": "configured_settings",
+    "cost_currency": "USD",
+    "cost_status": "unavailable"
+  }
+}

@@ -1,6 +1,6 @@
 # AI 文档索引与现行决策
 
-> 末次统一：2026-08-19
+> 末次统一：2026-08-20
 > 用途：**读任何一份 AI 文档之前先看这里**，确认它是否仍然有效。
 > 维护规则：任何改变下表 §2 决策的变更，必须同时写 ADR 并更新本文；只改方案文档不算数。
 
@@ -11,19 +11,22 @@
 **产品是「线下零售门店经营分析工作站」。主线用户是零售 Finance BP 与集团 FP&A。**
 
 ```
-主线（产品是什么）           次要（value-added 模块）
-─────────────────────    ────────────────────────
-门店 store-day 经营事实   →  IFRS 16 / CAS 21 租赁计量
-四墙损益 · 租售比 · 坪效  →  月结、分录、披露、审计包
-异常下钻 · 情景 · 行动闭环 →  合同台账与关键日期
+主线（产品是什么）              次要（value-added 模块）
+──────────────────────      ────────────────────────
+门店 store-day 经营事实      →  IFRS 16 / CAS 21 租赁计量
+四墙损益 · 租售比 · 坪效     →  月结、分录、披露、审计包
+异常下钻 · 情景 · 行动闭环    →  合同台账与关键日期
+单店利润表 · 法人级三表模型
 FP&A 版本治理与滚动预测
 ```
+
+**2026-08-20 补充：财务建模层已进入主线。** 单店利润表（`/store-pnl`）与法人级三表模型（`/financial-model`）是「四墙损益」那一行的完整形态，服务的是同一批用户（零售 Finance BP + 集团 FP&A）。它**消费**经营事实与租赁计量，**不自产**任何一方——租赁附表只能是计量引擎的只读投影（`finmodel` 禁 import `ifrs16`，有 import guard 锁定）。这条不是风格偏好：模型里一旦长出第二套租赁计算，两个数字必然分叉，而没有人能说清该信哪个。
 
 **IFRS 16 是次要的 value-added 合规能力，不是产品定位。** 它的战略价值在两处：作为合规刚需的销售入口，以及让租约条款、面积、门店主数据先进系统——**这些数据不在客户的湖仓里，任何通用 BI 都分析不了不存在的数据**。
 
 对 AI 工作的三条直接约束：
 
-1. **Agent 的主战场是经营分析**，不是合同录入。技能路由、评测集、底稿场景都以零售经营为第一优先。
+1. **Agent 的主战场是经营分析与财务建模**，不是合同录入。技能路由、评测集、底稿场景以零售经营为第一优先、财务建模（`fpna.*`）为第二优先，合同录入排最后。
 2. **IFRS 16 在 AI 设计中的角色是「被保护对象」**——见 [ADR-0025](adr/0025-separate-certified-engine-output-from-exploratory-analysis.md) 的受保护度量清单。保护它，不是围绕它做产品。
 3. **制造 / 设备 / 工厂维度不在当前范围。** 相关内容在需求清单 §9 保留供将来评估，但不进排期、不作为架构约束。
 
@@ -47,8 +50,8 @@ FP&A 版本治理与滚动预测
 | [CodebaseDesign：AI 阶段 4 PageFill 填表缝模块深化](CodebaseDesign_AI阶段4_PageFill填表缝_模块深化.md) | **Current** | page_fill 协议（Exploratory 结构性不入 payload，I5/ACORE-12）、`retail.store_days.import.preview` 工具、导入页 `?fill=` 消费；D-D1~D3 |
 | [CodebaseDesign：AI 阶段 5 MinIO 接线与三入口汇流模块深化](CodebaseDesign_AI阶段5_MinIO接线与三入口汇流_模块深化.md) | **Current** | MinIO 读取接线（page_fill 点亮）、三入口统一、G1 两平面汇流；D-E1~E4。**M1 已交付，M2/M3 进行中** |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current | 业务需求有效。**§9 制造功能已标注为不在当前范围**；§12 的工具勾选表已移除，实现状态以代码为准 |
-| [PRD：三表财务模型与单店利润表](PRD_三表财务模型与单店利润表.md) | Current | 业务需求（财务经理视角）：S1 单店利润表页、S2 法人级三表模型、S3 受治理模板自定义、S4 AI 填数与报表生成、S5 集团合并视图。AI 相关诉求均声明沿用 ADR-0019/0025 与既有 WorkingPaper 先例，未改动 §2 任何决策。**落地状态逐项对照见其附录 E（2026-08-19），缺口列为 S1-7 未做与若干「生产接线待工作台」** |
-| [CodebaseDesign：三表财务模型与单店利润表模块深化](CodebaseDesign_三表模型与单店利润表_模块深化.md) | Current | **实施级设计**（上述 PRD 的配套；SM1–SM8 已按本设计落地，未落地接线点对应 PRD 附录 E 的 ⚠ 行）：SM1 模板/DSL、SM2 纯函数引擎（Run/Persist）、SM3 门店利润表投影、SM4 期初三道闸、SM5 AI 假设草稿、SM6 finmodel 底稿构建器、SM7 三个 Agent 工具、SM8 集团视图（克制）；决策留痕 D-S1~S9；含 finmodel 不得 import ifrs16 的 import guard 与唯一写入口两条架构测试 |
+| [PRD：三表财务模型与单店利润表](PRD_三表财务模型与单店利润表.md) | **Current** | **业务需求现行依据**（财务经理视角）：S1 单店利润表页、S2 法人级三表模型、S3 受治理模板自定义、S4 AI 填数与报表生成、S5 集团合并视图。AI 相关诉求均声明沿用 ADR-0019/0025 与既有 WorkingPaper 先例，未改动 §2 任何决策。**附录 E（2026-08-20）全部 ✅、无 ⚠/❌ 行**；附录 B 的勾稽表述已随 P0-4 重设计同步修订 |
+| [CodebaseDesign：三表财务模型与单店利润表模块深化](CodebaseDesign_三表模型与单店利润表_模块深化.md) | **Current** | **实施级设计**（上述 PRD 的配套，SM1–SM8 已全量落地）：SM1 模板/DSL、SM2 纯函数引擎（Run/Persist）、SM3 门店利润表投影、SM4 期初三道闸、SM5 AI 假设草稿、SM6 finmodel 底稿构建器、SM7 Agent 工具（现为 `fpna.*` 六个）、SM8 集团视图（克制）；决策留痕 D-S1~S9；三条架构测试：`finmodel` 不得 import `ifrs16`（遍历全部子包）、`fin_model_runs` 唯一写入口、底稿 lint 的 `tie_out_unpassed` fail-closed |
 | ~~PRD：租赁经营决策与 AI Copilot 平台~~ | **已归档** `archive/superseded-prds-2026-08/` | 编于零售转型前，标题与内容以「租赁」为主体；产品边界已由零售 PRD (P0–P5) 与财务BP/FP&A PRD (F0–F9) 取代 |
 | ~~AI Agent 填表升级（tau + anydoc）实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | tau 作废（ADR-0022）；anydoc 与填表缝**已迁入** Agent Core 设计 §8.2 与附录 A |
 | ~~CodebaseDesign：Agent 填表升级模块深化~~ | **已归档** 同上 | 同上（M1 → §8.2，M4 → 附录 A） |
@@ -60,7 +63,7 @@ FP&A 版本治理与滚动预测
 |---|---|---|
 | [AI Agent 与 CLI 架构演进 PRD](AI_Agent_与_CLI_架构演进_PRD.md) | **Historical** | AG-001~035 已交付（`b1532b4`）。Tool Runtime / Gateway / Capability 契约**仍然有效且不变** |
 | ~~AI Agent 与 CLI 架构演进实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | 交付记录，1816 行；对外契约以保留的 PRD 为准 |
-| [AI Agent 运行运维手册](AI_Agent_运行运维手册.md) | Current（**待随 W4/W5 修订**） | ai-service 与 `AGENT_PLANNER_TOKEN` 退役后需重写相关章节 |
+| [AI Agent 运行运维手册](AI_Agent_运行运维手册.md) | Current（**随 W5/W6 修订**） | chat 与 planner 已随 W4 内迁 core-service（`internal/llm` / `agentrunner.PlannerLLM`） |
 | ~~AI Agent 外部验收清单~~ | **已归档** 同上 | 后续验收以 Agent Core 设计 §11 与底稿方案 §12 为准 |
 
 ### 1.3 合规、契约与评测
@@ -98,12 +101,13 @@ FP&A 版本治理与滚动预测
 | `uiux-reviews-2026-08/` | 3 | UIUX 评估报告、零售 UIUX 评审、架构改善方案 |
 | `ifrs16-mvp-2026-05/` | 2 | IFRS16 IT 需求文档、MVP 技术架构方案 |
 | `pre-retail-roadmap/` | 3 | 零售转型前的路线图与任务清单 |
-| `uiux-overhaul-2026-08/` | 3 | 已完结的 UIUX 交付流程工单 |
-| `superseded-lists/` | 3 | 被取代的清单与 AGENTS 历史章节 |
-| `ui-upgrade-2026-05/` | 4 | 2026-05 的 UI 升级 |
-| `project-history/` | 1 | 2026-05 缺陷清单 |
+| `superseded-prds-2026-08/` | 1 | 租赁经营决策与 AI Copilot 平台 PRD |
 
-**2026-08-18 的约定变更**：此前 `docs/archive-local/` 被 gitignore、只存本机，目的是不让过期文档污染协作者上下文。现已全部迁回跟踪式归档——本地归档有三个代价（机器丢失即消失、其他 clone 与 worktree 看不到、git 历史里的删除文件没人会想到去找），而它防的那件事由**横幅 + AGENTS.md 规则 + CI 守卫**替代，效果更好且不丢副本。
+**2026-08-18 的约定**：此前 `docs/archive-local/` 被 gitignore、只存本机。现改为跟踪式归档——本地归档有三个代价（机器丢失即消失、其他 clone 与 worktree 看不到、git 历史里的删除文件没人会想到去找），而它防的那件事由**横幅 + AGENTS.md 规则 + CI 守卫**替代。
+
+**2026-08-20 的收缩（本次）**：归档从 30 份 / 25,025 行减到 17 份 / 7,863 行。删掉的是**已完结的交付流程工单**——`ui-upgrade-2026-05/`（4）、`uiux-overhaul-2026-08/`（3）、`retail-mvp-execution-2026-08/`（含 tasks/，MAX-001~009 工单与演示脚本）、`project-history/`（1）、`superseded-lists/`（3）。理由：跟踪式归档解决的是「副本会丢」，解决不了「语料量本身压垮上下文」；一份已完结、结论已被现行文档吸收的工单，留着只增加 agent 误读的面积。**保留的是「被取代但推理仍有价值」的方案文档**——它们回答「为什么不这么做」，这个问题现行文档答不了。
+
+另删除 `docs/IFRS16_计量回归对数报告.md`（841 行）：它是 `make ifrs16-regression` 的生成产物，现已 gitignore，需要时一条命令重生成。
 
 ---
 
@@ -129,6 +133,11 @@ FP&A 版本治理与滚动预测
 | **D14** | `agent-runner` **收敛为 agentcore 的 driver**，保留 checkpoint 与租约恢复，不删除 | 填表计划「tau 平价后退役 agent-runner」 | ADR-0022 §Consequences |
 | **D15** | 团队为**单人 + AI**，无第二位人类。多人控制项一律「标准不降、执行方式替换、残余风险声明」，并优先改造为 CI 可强制的机器检查 | 各文档中默认多人组织的签字/双评/第三方复核条款 | 本文 §6、ADR-0025 §2/§4、底稿方案 §12.7.4 |
 | **D16** | 产品定位为**线下零售门店经营分析工作站**，主线用户零售 Finance BP + FP&A；**IFRS 16 降为次要 value-added 合规模块**；制造/设备维度移出当前范围 | 多份文档中「租赁管理系统」「租赁及相关经营资产的决策平台」等以租赁为主体的定位表述 | 本文 §0 |
+| **D17** | **财务建模层进主线**：`/store-pnl` 与 `/financial-model` 与零售三页同级。`finmodel` **禁 import `ifrs16`**（import guard 遍历全部子包），租赁附表只能是 `measurement_results` 的只读投影 | 「三表模型自己算一套租赁数」的任何实现路径 | ADR-0025 精神 + 模块深化 D-S3；`finmodel/importguard_test.go` |
+| **D18** | **勾稽不得恒真**。拿别名比自己、拿定义式倒减自己、返回 `not_applicable` 的桩都不算检查；按构造必然成立的关系改写为构造断言并同步改规格。T1–T16 每条必须有先红后绿的反向测试 | 初版 T2/T4/T11 的恒真实现与桩 | PRD 附录 B（已随 P0-4 修订）；`finmodel/tieouts.go` |
+| **D19** | **期初的两种失败走相反路径**：`openingAbsent` 降级、`openingRejected` 阻止 run 落库 | 初版把闸失败一律降级为「未提供期初」 | 模块深化 SM4；`finmodel/engine.go` |
+| **D20** | **AI 写类工具只写 draft 层**，`source=ai_suggestion`；approved-only 读取永不回采 draft。**端口未接线的工具诚实拒绝，但不得用 nil 端口无条件注册**（会让重名注册把真实端口挡在外面） | 「工具注册了就算接线了」的隐含假设（1d67dd6 的声明曾因此落空） | ADR-0025；`aiagent/agent.go` 的 `finModelRepo == nil` 二选一分支 |
+| **D21** | **ADR-0023 的退役只完成到 W3；W4/W5 未执行。** 文档不得再以「ai-service 已退役」为前提描述现状 | 多份设计文档中「ai-service 退役映射」被读成已完成事实 | 本文 §3 缺口 G7 |
 
 ---
 
@@ -141,11 +150,14 @@ FP&A 版本治理与滚动预测
 | G3 经营数据语义映射 | ✅ **已解决**（Profile 复用与漂移检测未做） | — / 阶段 3 |
 | G4 无代码执行能力 | 未解决（**刻意后置**） | ADR-0025 §5，阶段 4 |
 | G5 无 xlsx/docx 产出（导出仍是 CSV） | 🟡 **部分解决**：`workingpaper` xlsx/docx 确定性渲染器 + lint 门 + `GET /ai/chat/artifacts/:id/export` 端点已落地；端到端 WorkingPaper 生成链路（S1 底稿）未接线 | 阶段 0 → 阶段 1 |
-| **G6 PyMuPDF 的 AGPL 风险** | **未解决，与部署形态无关，建议单独立项** | ADR-0024 |
+| **G6 PyMuPDF 的 AGPL 风险** | **未解决。** `ai-service/requirements.txt` 仍钉着 `pymupdf==1.23.0`，`document_extractor.py` 仍 `import fitz`。与部署形态无关，建议单独立项 | ADR-0024 |
+| **G7 ai-service 未退役（新登记，2026-08-20）** | **未解决（W4 已完成、部分收窄）。** W4：chat 两条依赖（`/chat` ×2）与 planner（`/api/v1/agent/plan`）均已迁入 Go（`internal/llm` + `agentrunner.PlannerLLM`），planner 共享密钥已删除。W5 未执行：Go 仍经 `AI_SERVICE_URL` 调用 4 个 Python 端点（`/parse/contract`、`/parse/payment-schedule`、`/parse/contract-batch`、`/parse/event`）+ `handlers/retail_mapping_ai.go` 的 `/suggest-mapping` + `files.py` 的 `/files/upload`。**G6 是它的子集，一起做才划算** | ADR-0023 W5 |
 
 > W1 + 阶段 0 已按 [CodebaseDesign 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) 交付：`internal/agentcore`（纯循环内核 + ACORE-1/5/6/8 测试）、`protected_measures`（10 项 + 词法探针）、`internal/workingpaper`（I1/I2/I3/I6 lint + 封面 + 渲染）、`internal/docparse`（CSV/anydoc/PaddleOCR）、`internal/agentseval`（不变量与 triage 用例，harness 第三段 `invariants`）、CLI 三层命令（commit 只对人）、Web（去关键词猜测、tool_start 消费、working_paper 渲染）。
 >
 > **W2 + 阶段 1 已按 [CodebaseDesign：AI 阶段 1 与 W2](CodebaseDesign_AI阶段1与W2_模块深化.md) 交付（2026-08-19）**：`agentcore/hooks` 六前 + 三后治理中间件与 `Governance` 固定顺序链、ACORE-2 变异测试（9 项全锁）、`agenttools.ExecutionGuard` seam + aiagent 全路径接链（平价门：既有测试保持全绿）、`lease.report.sensitivity` 工具（补 /sensitivity 断链，共用同一 reporting 投影）、`workingpaper/s1` 构建器（predeal/dealcompare/shock 重跑 → 全 Certified 单元格，I2 锚点为工具自身已审计调用）、`lease.working_paper.s1.generate`（LevelDraft + Review Gate）、aiagent 确定性触发（消息带确认假设块 → 底稿 → working_paper artifact）、评测新增 `s1_engine_consistency` category（CORR-1 确定性半边 + 2 份仿真报价 fixtures，harness 12/12）。
+>
+> **三表财务模型与单店利润表已全量交付（2026-08-20）**：SM1–SM8 按 [模块深化](CodebaseDesign_三表模型与单店利润表_模块深化.md) 落地，PRD 附录 E 全部 ✅。随后的**双轴评审 19 项修复**（P0 九项 / P1 五项 / P2 五项）已合并，其中改变结论的五项值得记住：跨法人校验补进 definition 与门店两条入口（底线 1，两处泄露）；出厂模板 Actual 区改为读事实而非假设推导（否则真实数据的 run 永远过不了发布门禁）；T2/T4/T11 三条恒真/桩勾稽重设计 + 十六条反向测试补齐；期初闸失败改为阻止 run 而非降级；`fpna.*` 工具的 nil 注册挡住生产端口（1d67dd6 的接线声明曾因此落空）。修复工单已完成删除，逐条结论已吸收进本表、AGENTS.md 与 PRD 附录 E。
 >
 > **阶段 3（零售经营底稿，产品主线的底稿）已按 [CodebaseDesign：AI 阶段 3](CodebaseDesign_AI阶段3零售经营底稿_模块深化.md) 交付（2026-08-19）**：底稿主线切回零售（D-C1：S4/S3/S2 后移，S1 保留）；`workingpaper/retail` 构建器（pulse/store360/scenario → 全 Certified/SystemFact 单元格，1:1 保值断言锁定、nil 跳格不填 0、覆盖不足/多币种/模拟标识/抑制信号一一进 DataGaps、残差显式保留）；`retail.working_paper.store.generate` 工具（LevelDraft + Review Gate，复用 scopedRetailReader 权限过滤，情景镜像聊天阻断语义 D-C3）；aiagent「底稿 + filters」确定性触发 → working_paper artifact（复用面板与 xlsx/docx 导出）；评测新增 `retail_paper_sanctity` category（harness 13/13）；CLI `run events --format table|ndjson`。core-service `go test ./...` + `go vet ./...`、web 回归全绿。
 

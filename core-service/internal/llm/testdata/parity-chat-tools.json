@@ -1,0 +1,31 @@
+{
+  "id": "chatcmpl-0002",
+  "object": "chat.completion",
+  "created": 1780000001,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+          {
+            "id": "call_abc123",
+            "type": "function",
+            "function": {
+              "name": "parse_payment_schedule",
+              "arguments": "{\"file_id\":\"file-001\",\"object_name\":\"rent-schedule.xlsx\",\"content_type\":\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 1200,
+    "completion_tokens": 40,
+    "total_tokens": 1240
+  }
+}

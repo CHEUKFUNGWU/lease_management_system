@@ -37,6 +37,9 @@ The transformation is **additive**. Retail operations analytics was layered on t
 | 客户与商业验证<br>Customer & commercial validation | ⚠️ **未验证**。当前只完成固定 seed 的内部模拟验证，不能表述为客户采用、真实 ROI 或 PMF<br>**Unvalidated.** Only internal fixed-seed simulation has been done. This must not be presented as customer adoption, realised ROI or product-market fit |
 | 真实 POS / ERP 数据接入<br>Live POS / ERP integration | ⚠️ 未完成，是试点第一阻塞项<br>Not done; the number-one blocker for a pilot |
 | IFRS 16 计量回归<br>IFRS 16 measurement regression | ⚠️ 22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，正式审计背书需第三方会计师复核<br>22 cases / 148 assertions pass, but the golden answers remain `pending_third_party_review`; formal audit endorsement requires a third-party accountant |
+| 三表财务模型与单店利润表<br>Three-statement model & store P&L | ✅ S1–S5 全部编号功能项落地并有测试锁定（2026-08-20）；19 项评审修复已合并<br>Every numbered S1–S5 requirement is implemented and test-locked (2026-08-20); the 19 review fixes are merged |
+| 三表模型的真实 GL / 试算平衡表联调<br>Live GL / trial-balance integration | ⚠️ 未完成。引擎与四个生产适配器已接线，但只跑过构造数据；端口缺数据时诚实降级为缺口，不产出数字<br>Not done. The engine and its four production adapters are wired, but only exercised against constructed data; a port with no data degrades to an explicit gap rather than a number |
+| Python `ai-service` 退役（ADR-0023）<br>Retiring the Python AI service | ⚠️ 只做到 W3。W4/W5 未执行，Go 仍调用 6 个 Python 端点；`pymupdf` 的 AGPL 风险（ADR-0024）仍在<br>Only W1–W3 landed. W4/W5 are outstanding, Go still calls six Python endpoints, and the `pymupdf` AGPL exposure (ADR-0024) remains |
 
 **关于命名 / On naming:** 仓库、容器、数据库和 JWT 仍使用 `lease_*` 命名。产品定位已经调整，但底层大规模物理重命名要等内部技术门槛通过后再决定 —— 2026-05 已经改过一次名，不再频繁变更。
 The repository, containers, database and JWT still use the `lease_*` namespace. Positioning has moved; a second large physical rename is deliberately deferred until the internal validation gate is passed (the project was already renamed once in 2026-05).
@@ -95,11 +98,26 @@ The capabilities added by the transformation. Grain is **store-day**; the metric
 | 多准则对比 `/standards`<br>Multi-standard comparison | IFRS 16 / ASC 842 / 本地准则的管理视角差异。<br>Management-view differences across IFRS 16, ASC 842 and local GAAP. |
 | ROI 测算 `/roi`<br>ROI calculator | 传统 Excel 工时与系统处理工时的差异测算。<br>Estimated effort difference between spreadsheet workflows and the system. |
 
-### 五、AI 录入与 Agent 运行时 / AI Intake & Agent Runtime
+### 五、三表财务模型与单店利润表 / Three-Statement Model & Store P&L
+
+财务经理视角的建模能力：单店层看四墙损益，法人层看 IS / BS / CF 联动。规格见 [PRD](docs/PRD_三表财务模型与单店利润表.md)。
+The finance-manager layer: four-wall economics per store, and a linked income statement / balance sheet / cash-flow model per legal entity.
 
 | 功能 / Feature | 说明 / Description |
 |---|---|
-| AI 录入<br>AI intake | `/ai-chat` 上传合同或台账文件，PaddleOCR 优先、PyMuPDF fallback，LLM 抽取字段并生成结构化草稿卡片。<br>Upload contracts or ledgers at `/ai-chat`; PaddleOCR first with a PyMuPDF fallback, then LLM field extraction into structured draft cards. |
+| **单店利润表**<br>Store P&L<br>`/store-pnl` | 日 / 周 / 月 / 季 / 年期间视图；Actual 与第二列（预算 / 预测 / 去年同期）并排；经营口径与 IFRS 16 口径 side-by-side 且块级带 basis 标签，禁止混算；三级下钻（金额 → 构成 → 合同级占用成本拆分 → 来源事实信封）；同群对比列；多店按区域 / 品牌 / 法人汇总，混币种分区呈现且**不做任何跨币种合计**；CSV 与带活公式的 XLSX 导出。<br>Day/week/month/quarter/year views; Actual beside budget, forecast or prior year; operating and IFRS 16 bases shown side by side with block-level basis labels and no mixing; three-level drill-down down to per-contract occupancy split and the source envelope behind each fact; a peer-cohort column; multi-store roll-up by region/brand/entity with currency partitioning and never a cross-currency total; CSV and live-formula XLSX export. |
+| **三表模型工作台**<br>Statement model workbench<br>`/financial-model` | 法人级 IS/BS/CF 联动模型。冻结线左侧读事实、右侧跑驱动公式（SSSG × 新店爬坡 × 门店增减）；输入带五条版本线与溯源；期初三道闸（自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）不过则拒绝运行；**T1–T16 勾稽全绿才允许发布**；同步与异步（进度、取消、幂等重放）两种运行方式；月 / 季 / 年折叠的活公式导出。<br>A linked IS/BS/CF model per legal entity. Facts left of the freeze line, driver formulas right of it. Inputs carry five version lines and provenance. Three opening-balance gates must pass or the run is refused. Publication requires all sixteen tie-outs green. Runs synchronously or asynchronously with progress, cancellation and idempotent replay. Exports fold to month, quarter or year as a live-formula workbook. |
+| **受治理的模板与视图**<br>Governed templates & saved views | 白名单公式 DSL（字面量、循环引用、跨法人、basis 混行一律在 Parse 期拒绝）；模板版本冻结、复核批准、复制谱系、共享 / 个人可见性；保存视图带 fail-closed 配置 lint；**未登记的自定义公式行在 JSON、XLSX 与页面三处都带「未经指标治理」标识**。<br>A whitelist formula DSL that rejects literals, cycles, cross-entity references and mixed-basis rows at parse time; versioned, frozen, reviewed and approved templates with copy lineage and shared/personal visibility; saved views behind a fail-closed config lint; and ungoverned custom formula rows marked as such in JSON, XLSX and the interface alike. |
+| **AI 填数与差异备忘录**<br>AI assumptions & variance memos | `fpna.*` 六个 Tool：读模型、跑试算、生成底稿、建议假设（单条与批量）、起草四层差异备忘录。**写类工具一律只写 draft 层**，`source=ai_suggestion`，approved-only 的读取路径永不回采 draft；无法建议的项目如实留空而不是编造。<br>Six `fpna.*` tools: read a model, evaluate it, generate a working paper, suggest assumptions (single and batch), and draft a four-layer variance memo. Every writing tool writes only to the draft layer, tagged `source=ai_suggestion`; approved-only reads never pick drafts back up, and an item the model cannot justify is left empty rather than invented. |
+| **集团合并视图**<br>Group view | 按授权集合汇总，未授权成员显式呈现而非静默省略；原币分区为默认视图，折算视图必须指定汇率版本与类型（缺汇率整体降级）；固定声明「未做内部交易抵销」。<br>Aggregates the authorised set and shows unauthorised members explicitly instead of silently dropping them; native-currency partitions are the default view and a translated view demands an explicit rate version and type, degrading wholesale when a rate is missing; carries a standing note that intercompany eliminations are not performed. |
+
+### 六、AI 录入与 Agent 运行时 / AI Intake & Agent Runtime
+
+| 功能 / Feature | 说明 / Description |
+|---|---|
+| AI 录入<br>AI intake | `/ai-chat` 上传合同或台账文件，LLM 抽取字段并生成结构化草稿卡片。解析走两条链路：Go 侧 `internal/docparse`（CSV / anydoc / PaddleOCR，按是否需要证据坐标分流，惰性 OCR）服务分诊与填表；合同 / 租金表 / 事件的抽取仍在 Python `ai-service`（PaddleOCR 优先、PyMuPDF fallback）。**后者按 ADR-0023/0024 应当退役，尚未执行** —— 见「当前状态」。<br>Upload contracts or ledgers at `/ai-chat` for LLM field extraction into structured draft cards. Parsing runs on two paths: Go's `internal/docparse` (CSV / anydoc / PaddleOCR, routed by whether evidence coordinates are needed, with lazy OCR) serves triage and page-fill, while contract, rent-schedule and event extraction still runs in the Python `ai-service` (PaddleOCR first, PyMuPDF fallback). **The latter is slated for retirement under ADR-0023/0024 and has not been retired yet** — see Current Status. |
+| 文件分诊<br>File triage | `lease.file.triage` 做确定性分诊；域外文件（发票、劳动合同、宣传册）**显式拒绝并回问用户**，没有「猜成合同」的兜底。<br>`lease.file.triage` classifies deterministically. Out-of-domain files (invoices, employment contracts, brochures) are refused explicitly and referred back to the user; there is no silent "assume it's a contract" fallback. |
+| 底稿产出<br>Working papers | `workingpaper` 按单元格级 provenance 渲染 xlsx / docx，经 fail-closed lint 才能导出：Certified 单元格必须挂已完成审计的 Tool 调用，勾稽未全绿的 run 不产出底稿，缺失值跳格而不填 0。<br>`workingpaper` renders xlsx/docx with cell-level provenance behind a fail-closed lint: a certified cell must reference a completed, audited tool call, a run with unpassed tie-outs yields no paper at all, and a missing value leaves the cell empty rather than writing zero. |
 | Human-in-the-loop | AI 草稿必须人工确认才能创建合同草稿，正式入库仍走审批。AI 不得猜测折现率，缺失时标记 `discount_rate_missing`。<br>An AI draft only becomes a contract draft after human confirmation, and formal entry still goes through approval. The AI may not guess a discount rate; a missing one is flagged `discount_rate_missing`. |
 | Agent Tool Runtime | Web、CLI 与 Pi-like Runner 共用 Tool Registry、Scope Guard、Review Gate、幂等与审计接缝。<br>Web, CLI and the Pi-like runner share one tool registry, scope guard, review gate, idempotency layer and audit seam. |
 | Skill Registry | 合同台账、合同复核、租金表、审计包与 `retail_operations@v1` 均以版本化描述注册，并按角色过滤。<br>Contract ledger, contract review, rent schedule, audit pack and `retail_operations@v1` are all registered as versioned descriptors and filtered by role. |
@@ -107,7 +125,7 @@ The capabilities added by the transformation. Grain is **store-day**; the metric
 | `agent-runner` | 独立 Worker 进程，只通过 Agent Gateway 执行受控 Tool，不挂载数据库或 MinIO 凭证；Run 按 `worker_id + lease_token` 绑定。<br>A standalone worker that executes controlled tools only through the Agent Gateway, with no database or MinIO credentials mounted; runs are bound by `worker_id + lease_token`. |
 | Agent 可观测性 `/agent-metrics`<br>Agent observability | JSON 与 Prometheus 指标、跨 Run Planner 用量、Token 与成本状态；价格未配置时明确标记 unavailable，不臆造成本。<br>JSON and Prometheus metrics, cross-run planner usage, token and cost status. When pricing is not configured, cost is explicitly marked unavailable rather than invented. |
 
-### 六、平台与治理 / Platform & Governance
+### 七、平台与治理 / Platform & Governance
 
 | 功能 / Feature | 说明 / Description |
 |---|---|
@@ -140,11 +158,12 @@ No change made during the retail transformation may weaken these five. Each was 
 | 层 / Layer | 技术 / Technology |
 |---|---|
 | 前端 / Frontend | Next.js 14 + TypeScript + Ant Design + Recharts |
-| 核心后端 / Core backend | Go 1.23 + Gin |
+| 核心后端 / Core backend | Go 1.25 + Gin |
 | 数据访问 / Data access | pgx（手写 SQL / hand-written SQL） |
 | 数据库 / Database | PostgreSQL 16 |
-| AI 服务 / AI service | Python 3.11 + FastAPI |
-| OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）/ PyMuPDF fallback |
+| AI 服务 / AI service | Python 3.11 + FastAPI（**待退役 / pending retirement**，ADR-0023） |
+| OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）；Go 侧 anydoc 文本层；Python 侧 PyMuPDF fallback（ADR-0024 要求删除，**尚未删除**） |
+| 报表产出 / Report output | excelize（xlsx，含活公式）+ 确定性 docx 渲染器 |
 | 大模型 / LLM | DeepSeek API（默认 / default）、OpenAI API（备用 / fallback） |
 | 对象存储 / Object storage | MinIO |
 | 认证授权 / Auth | 自建 JWT + RBAC + 多租户行级过滤；Agent Gateway 支持短时效、Run 绑定的 Capability Token |
@@ -165,10 +184,22 @@ No change made during the retail transformation may weaken these five. Each was 
 │   ├── cmd/lease-agent/           # 只调用 Agent Gateway 的 CLI Adapter
 │   ├── cmd/agent-runner/          # Pi-like Worker 进程入口（无 DB/MinIO 凭证）
 │   └── internal/
+│       ├── agentcore/             # 纯 Go Agent 循环内核（ADR-0022）
 │       ├── agentartifact/         # Artifact / Evidence 协议
 │       ├── agentskill/            # Skill Registry
-│       ├── agenttools/            # Tool Registry / Runtime / Policy（含 retail_operations）
-│       ├── handlers/              # HTTP handlers（含 retail_* 系列）
+│       ├── agenttools/            # Tool Registry / Runtime / Policy（lease.* / retail.* / fpna.*）
+│       ├── agentseval/            # L1 评测 harness 与不变量用例
+│       ├── docparse/              # CSV / anydoc / PaddleOCR 解析层
+│       ├── workingpaper/          # 单元格级 provenance、fail-closed lint、xlsx/docx 渲染
+│       ├── finmodel/              # 三表模型：纯函数引擎 + 勾稽 T1–T16
+│       │   ├── template/          #   模板值对象与白名单公式 DSL
+│       │   ├── opening/           #   期初三道闸
+│       │   ├── persist/           #   唯一写入口、发布谱系、勾稽落队列
+│       │   ├── adapter/           #   四个生产端口（事实 / 计量 / 付款计划 / TB）
+│       │   ├── suggestion/        #   AI 假设草稿（draft-only）
+│       │   └── memo/              #   四层差异备忘录
+│       ├── storepnl/              # 单店利润表投影、占用成本拆分、活公式 xlsx
+│       ├── handlers/              # HTTP handlers（含 retail_* / finmodel / store_pnl）
 │       ├── middleware/            # JWT、tenant、CORS
 │       ├── repository/            # pgx 数据访问层
 │       └── services/
@@ -178,12 +209,16 @@ No change made during the retail transformation may weaken these five. Each was 
 │           ├── retailscenario/    # 确定性情景计算
 │           ├── retailsimulation/  # 固定 seed 模拟数据生成器
 │           └── ifrs16/            # IFRS 16 计量
-├── ai-service/                    # Python + FastAPI AI 服务
+├── ai-service/                    # Python + FastAPI AI 服务（待退役，ADR-0023）
+├── contracts/ai-intake.v1/        # 抽取契约 JSON Schema（实现方可换，契约不变）
 ├── web/                           # Next.js 前端
 │   └── app/
 │       ├── operating-pulse/       # 经营脉搏 / Operating Pulse
 │       ├── store-360/             # 门店 360 / Store 360
 │       ├── scenario-workbench/    # 情景工作台 / Scenario Workbench
+│       ├── store-pnl/             # 单店利润表 / Store P&L
+│       ├── financial-model/       # 三表模型工作台 / Statement model workbench
+│       ├── fpna-workbench/        # FP&A 版本与差异工作台
 │       ├── ai-chat/               # AI 录入与经营问答
 │       ├── contracts/             # 合同台账与详情
 │       ├── monthly-closing/       # 月结跑批
@@ -206,7 +241,7 @@ No change made during the retail transformation may weaken these five. Each was 
 
 ### 1. 准备环境 / Prerequisites
 
-Docker / Docker Compose、Make、Go 1.23+、Node.js 20+、Python 3.11+
+Docker / Docker Compose、Make、Go 1.25+、Node.js 20+、Python 3.11+
 
 ### 2. 配置环境变量 / Configure environment
 
@@ -293,7 +328,8 @@ To test legal-entity isolation, create a user with a `legal_entity_id` through `
 
 Sign in as an admin and open `/operating-pulse`. If the legal entity has no simulated dataset yet, the page offers **生成固定演示数据**, which creates a reproducible 60-store / 181-day dataset containing six fixed anomalies. Then walk the full chain: **Operating Pulse → Store 360 → Scenario Workbench → action draft**.
 
-演示脚本与 MAX-009 端到端验收证据已随零售 MVP 交付完成而归档，见 `docs/archive/retail-mvp-execution-2026-08/`。
+零售 MVP（MAX-001 → MAX-009）的演示脚本、发布检查清单与端到端验收证据已随交付完成删除 —— 结论见上方「当前状态」，原文在 git 历史里。
+The retail MVP's demo script, release checklist and end-to-end acceptance evidence were deleted once delivered; the conclusions live in Current Status above and the originals in git history.
 
 ### 6. 数据库迁移 / Database migrations
 
@@ -326,6 +362,9 @@ make up
 | 经营脉搏 / Operating Pulse | `/operating-pulse` | 每日经营晨检、KPI、趋势、优先门店与数据可信度 |
 | 门店 360 / Store 360 | `/store-360` | 单店趋势、同群对比、驱动拆解与证据链 |
 | 情景工作台 / Scenario Workbench | `/scenario-workbench` | 七杠杆 What-if、贡献变化桥与行动草稿 |
+| 单店利润表 / Store P&L | `/store-pnl` | 期间视图、双口径并排、三级下钻、同群列、多店汇总与活公式导出 |
+| 三表模型工作台 / Statement model | `/financial-model` | 法人级 IS/BS/CF 联动、期初三道闸、T1–T16 勾稽门禁、异步 Run 与折叠导出 |
+| FP&A 工作台 / FP&A workbench | `/fpna-workbench` | 计划版本、冻结与差异归因 |
 | 经营驾驶舱 / Performance | `/performance` | 四墙利润、租售比与效率指标 |
 | AI 助手 / AI assistant | `/ai-chat` | 文件录入、草稿确认、经营问答与行动建议 |
 | 待办 / To-do | `/todo` | 关键日期、审批与异常待办 |
@@ -419,10 +458,16 @@ English:
 - [DESIGN.md](DESIGN.md) — 设计系统与前端约束（写前端代码前先读这份）
 - [UIUX 改善方案](docs/UIUX改善方案.md) — 当前设计系统诊断、合并排期与分阶段改进计划
 
+**财务模型 / Financial modelling**
+
+- [PRD：三表财务模型与单店利润表](docs/PRD_三表财务模型与单店利润表.md) — 规格基准。附录 B 是勾稽 T1–T16，附录 E 是逐项落地状态
+- [CodebaseDesign：三表模型与单店利润表模块深化](docs/CodebaseDesign_三表模型与单店利润表_模块深化.md) — SM1–SM8 模块接口与 D-S1~S9 决策留痕
+- [PRD：财务 BP 与 FP&A 岗位支撑补齐方案](docs/PRD_财务BP与FPA岗位支撑补齐方案.md)
+
 **租赁与 IFRS 16 / Lease & IFRS 16**
 
-- [IFRS 16 计量回归对数报告](docs/IFRS16_计量回归对数报告.md)
 - [IFRS 16 计量方法与准则映射白皮书](docs/IFRS16_计量方法与准则映射白皮书.md)
+- 计量回归对数报告：**不入库**，跑 `make ifrs16-regression` 生成到 `docs/IFRS16_计量回归对数报告.md`（已 gitignore）
 
 **Agent 与运维 / Agent & Operations**
 

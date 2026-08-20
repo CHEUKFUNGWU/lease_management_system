@@ -22,7 +22,9 @@ import (
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/aiintake"
+	"github.com/lease-management-system/core-service/internal/docparse"
 	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
+	"github.com/lease-management-system/core-service/internal/llm"
 	"github.com/lease-management-system/core-service/internal/pagefill"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
@@ -35,6 +37,50 @@ type Agent struct {
 	eventRepo     *repository.EventRepository
 	toolRuntime   *agenttools.Runtime
 	skillRegistry *agentskill.Registry
+	// llmClient is the in-process LLM client (W4). Nil defers to a lazy client
+	// built from the environment the first time the chat path runs.
+	llmClient *llm.Client
+	// docParser is the document parser seam (W5-1); nil means parser_unavailable
+	// for parse paths that have not been wired a backend.
+	docParser docparse.DocumentParser
+}
+
+// SetLLMClient injects the LLM client used by the chat paths. Tests and the
+// API wiring can pin a mock or a configured client; without injection the
+// agent builds one from LLM_* environment variables on first use.
+func (h *Agent) SetLLMClient(c *llm.Client) {
+	if h == nil {
+		return
+	}
+	h.llmClient = c
+}
+
+// llm returns the injected client or builds one from the environment.
+func (h *Agent) llm() (*llm.Client, error) {
+	if h != nil && h.llmClient != nil {
+		return h.llmClient, nil
+	}
+	return llm.NewClient(llm.ConfigFromEnv())
+}
+
+// SetDocumentParser injects the document parser seam (W5-1). Parse tools and
+// the intake production path resolve their text/OCR needs through this single
+// seam (ADR-0024 routing); without it they degrade to parser_unavailable.
+func (h *Agent) SetDocumentParser(p docparse.DocumentParser) {
+	if h == nil {
+		return
+	}
+	h.docParser = p
+}
+
+// DocumentParser returns the injected parser, or nil when the caller has not
+// wired one. Consumers must treat nil as parser_unavailable — never as a
+// silent success.
+func (h *Agent) DocumentParser() docparse.DocumentParser {
+	if h == nil {
+		return nil
+	}
+	return h.docParser
 }
 
 // ToolRuntime exposes only the stable execution seam to an HTTP/CLI adapter.
@@ -899,7 +945,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 用户消息: %s`, req.ObjectName, req.ContentType, req.Message)
 
-		_, modelName, toolCalls, err := h.callLLMWithTools(ctx, authHeader, fileSystemPrompt, req.Message, req.History, req.Language, fileParseTools)
+		_, modelName, toolCalls, err := h.callLLMWithTools(ctx, fileSystemPrompt, req.Message, req.History, req.Language, fileParseTools)
 		triage := agenttooldefs.DeterministicTriage(agenttooldefs.TriageRequest{
 			FileID:      req.FileID,
 			ObjectName:  req.ObjectName,
@@ -1207,7 +1253,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	}); err != nil {
 		return Response{Answer: "AI agent event persistence failed", Model: "runtime", Sources: sources}, err
 	}
-	answer, modelName, err := h.callLLM(ctx, authHeader, systemPrompt, req.Message, req.History, req.Language)
+	answer, modelName, err := h.callLLM(ctx, systemPrompt, req.Message, req.History, req.Language)
 	if err != nil {
 		// Fallback: return context data without LLM if AI Service is unavailable
 		fallbackAnswer := fmt.Sprintf("（AI 服务暂不可用，以下为系统数据摘要）\n\n%s", contextData.String())
@@ -2041,146 +2087,86 @@ var fileParseTools = []map[string]interface{}{
 	},
 }
 
-// callLLM sends the prompt and message history to the AI Service chat endpoint.
-func (h *Agent) callLLM(ctx context.Context, authHeader, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, error) {
-	aiServiceURL := os.Getenv("AI_SERVICE_URL")
-	if aiServiceURL == "" {
-		aiServiceURL = "http://ai-service:8000"
+// callLLM runs one non-streaming chat round through the in-process LLM client
+// (W4-2). It replaces the former AI_SERVICE_URL /api/v1/chat call. The Python
+// language directive is appended to the system prompt exactly as chat.py did
+// (buildSystemPrompt adds its own directive first, so the doubling the old
+// path produced is preserved).
+func (h *Agent) callLLM(ctx context.Context, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, error) {
+	client, err := h.llm()
+	if err != nil {
+		return "", "", err
 	}
-
-	// Build messages from history + current message
-	messages := []map[string]string{}
-	for _, h := range history {
-		messages = append(messages, map[string]string{"role": h.Role, "content": h.Content})
-	}
-	messages = append(messages, map[string]string{"role": "user", "content": userMessage})
-
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"messages":      messages,
-		"system_prompt": systemPrompt,
-		"temperature":   0.3,
-		"max_tokens":    2000,
-		"language":      language,
+	result, err := client.Chat(ctx, llm.ChatRequest{
+		Messages:  buildLLMMessages(systemPrompt, userMessage, history, language),
+		Temp:      0.3,
+		MaxTokens: 2000,
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", "", err
 	}
-
-	httpReq, err := http.NewRequest("POST", aiServiceURL+"/api/v1/chat", bytes.NewReader(reqBody))
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create request: %w", err)
-	}
-	httpReq = httpReq.WithContext(ctx)
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", authHeader)
-
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return "", "", fmt.Errorf("AI service unreachable: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result Response
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", "", fmt.Errorf("failed to parse response: %w", err)
-	}
-
 	return result.Answer, result.Model, nil
 }
 
-// callLLMWithTools sends the prompt and message history to the AI Service chat endpoint with function calling support.
-// It returns the LLM answer, model name, and any tool_calls if the LLM decided to invoke tools.
-func (h *Agent) callLLMWithTools(ctx context.Context, authHeader, systemPrompt, userMessage string, history []ChatMessage, language string, tools []map[string]interface{}) (string, string, []AgentToolCall, error) {
-	aiServiceURL := os.Getenv("AI_SERVICE_URL")
-	if aiServiceURL == "" {
-		aiServiceURL = "http://ai-service:8000"
+// callLLMWithTools is the function-calling variant of callLLM. It keeps the
+// existing single-tool-call behavior: the caller inspects result.ToolCalls and
+// runs the first one; multi-round looping belongs to the agentcore loop (C
+// wave) and is deliberately not built here.
+func (h *Agent) callLLMWithTools(ctx context.Context, systemPrompt, userMessage string, history []ChatMessage, language string, tools []map[string]interface{}) (string, string, []AgentToolCall, error) {
+	client, err := h.llm()
+	if err != nil {
+		return "", "", nil, err
 	}
-
-	// Build messages from history + current message
-	messages := []map[string]string{}
-	for _, h := range history {
-		messages = append(messages, map[string]string{"role": h.Role, "content": h.Content})
-	}
-	messages = append(messages, map[string]string{"role": "user", "content": userMessage})
-
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"messages":      messages,
-		"system_prompt": systemPrompt,
-		"temperature":   0.1,
-		"max_tokens":    2000,
-		"language":      language,
-		"tools":         tools,
-		"tool_choice":   "auto",
+	result, err := client.Chat(ctx, llm.ChatRequest{
+		Messages:   buildLLMMessages(systemPrompt, userMessage, history, language),
+		Temp:       0.1,
+		MaxTokens:  2000,
+		Tools:      tools,
+		ToolChoice: "auto",
 	})
 	if err != nil {
-		return "", "", nil, fmt.Errorf("failed to marshal request: %w", err)
+		return "", "", nil, err
 	}
 
-	httpReq, err := http.NewRequest("POST", aiServiceURL+"/api/v1/chat", bytes.NewReader(reqBody))
-	if err != nil {
-		return "", "", nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	httpReq = httpReq.WithContext(ctx)
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", authHeader)
-
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return "", "", nil, fmt.Errorf("AI service unreachable: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", "", nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result LLMChatResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", "", nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	// Convert tool_calls to AgentToolCall format
 	var agentToolCalls []AgentToolCall
-	if result.ToolCalls != nil {
-		for _, tc := range result.ToolCalls {
-			funcName := ""
-			funcArgs := ""
-			if tc.Function != nil {
-				if name, ok := tc.Function["name"].(string); ok {
-					funcName = name
-				}
-				if args, ok := tc.Function["arguments"].(string); ok {
-					funcArgs = args
-				}
-			}
-			agentToolCalls = append(agentToolCalls, AgentToolCall{
-				Tool:           funcName,
-				Skill:          "LLM Function Calling",
-				Status:         "completed",
-				InputSummary:   funcArgs,
-				OutputSummary:  "等待执行",
-				RequiresReview: false,
-			})
-		}
+	for _, tc := range result.ToolCalls {
+		agentToolCalls = append(agentToolCalls, AgentToolCall{
+			Tool:           tc.Function.Name,
+			Skill:          "LLM Function Calling",
+			Status:         "completed",
+			InputSummary:   tc.Function.Arguments,
+			OutputSummary:  "等待执行",
+			RequiresReview: false,
+		})
 	}
-
 	return result.Answer, result.Model, agentToolCalls, nil
+}
+
+// buildLLMMessages appends the language directive to the system prompt and
+// folds it into the message list, mirroring ai-service chat.py's /chat handler.
+func buildLLMMessages(systemPrompt, userMessage string, history []ChatMessage, language string) []llm.Message {
+	systemPrompt = applyLanguageDirective(systemPrompt, language)
+	msgs := make([]llm.Message, 0, len(history)+2)
+	if systemPrompt != "" {
+		msgs = append(msgs, llm.Message{Role: "system", Content: systemPrompt})
+	}
+	for _, h := range history {
+		msgs = append(msgs, llm.Message{Role: h.Role, Content: h.Content})
+	}
+	msgs = append(msgs, llm.Message{Role: "user", Content: userMessage})
+	return msgs
+}
+
+// applyLanguageDirective replicates chat.py's per-language suffix.
+func applyLanguageDirective(systemPrompt, language string) string {
+	switch language {
+	case "en":
+		return systemPrompt + "\n\nPlease answer in English."
+	case "zh-TW":
+		return systemPrompt + "\n\n請用繁體中文回答。"
+	default: // "" or "zh-CN"
+		return systemPrompt + "\n\n请用简体中文回答。"
+	}
 }
 
 // extractSourcesFromAnswer parses the LLM answer for source citations and matches them

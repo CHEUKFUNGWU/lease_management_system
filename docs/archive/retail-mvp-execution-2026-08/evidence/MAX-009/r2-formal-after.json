@@ -1,9 +1,0 @@
-{
-  "lease_contracts": {"count": 29, "max_updated_at": "2026-08-11T11:58:45.589432Z"},
-  "lease_events": {"count": 0, "max_updated_at": null},
-  "lease_payment_schedules": {"count": 224, "max_updated_at": "2026-08-11T11:58:45.589432Z"},
-  "measurement_results": {"count": 10, "max_updated_at": "2026-08-11T11:58:36.092807Z"},
-  "journal_entries": {"count": 17, "max_updated_at": "2026-08-11T11:58:36.092807Z"},
-  "monthly_closing_batches": {"count": 5, "max_updated_at": "2026-08-11T11:58:45.589432Z"},
-  "ticket_fixture_after": {"fpna_action_items": 0, "retail_simulation_datasets": 0}
-}

@@ -102,8 +102,10 @@ func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch request.URL.Path {
-		case "/api/v1/chat":
-			_, _ = w.Write([]byte(`{"answer":"","model":"compat-model","tool_calls":[{"type":"function","function":{"name":"parse_payment_schedule","arguments":"{}"}}]}`))
+		case "/chat/completions":
+			// W4-2: the LLM call is now in-process through internal/llm and
+			// hits the provider chat-completions endpoint, not /api/v1/chat.
+			_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"parse_payment_schedule","arguments":"{}"}}]}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
 		case "/api/v1/parse/payment-schedule":
 			_, _ = w.Write(fixture)
 		default:
@@ -113,6 +115,10 @@ func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing
 	}))
 	t.Cleanup(server.Close)
 	t.Setenv("AI_SERVICE_URL", server.URL)
+	t.Setenv("LLM_PROVIDER", "deepseek")
+	t.Setenv("DEEPSEEK_API_KEY", "test-key")
+	t.Setenv("DEEPSEEK_BASE_URL", server.URL)
+	t.Setenv("DEEPSEEK_MODEL", "compat-model")
 
 	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
@@ -127,7 +133,7 @@ func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing
 	if err != nil {
 		t.Fatalf("execute legacy AI Chat file route: %v", err)
 	}
-	if !response.AgentMode || response.Model != "compat-model" || len(response.DraftPaymentSchedules) != 1 {
+	if !response.AgentMode || response.Model != "deepseek/compat-model" || len(response.DraftPaymentSchedules) != 1 {
 		t.Fatalf("compat response = %#v", response)
 	}
 	if response.PaymentScheduleSummary == nil || !response.PaymentScheduleSummary.RequiresHumanConfirm {

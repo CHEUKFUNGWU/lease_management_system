@@ -1,0 +1,16 @@
+{
+  "id": "chatcmpl-0004",
+  "object": "chat.completion",
+  "created": 1780000003,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "无法回答。"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}

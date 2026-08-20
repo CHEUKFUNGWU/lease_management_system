@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-0001",
+  "object": "chat.completion",
+  "created": 1780000000,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "该门店 5 月营收 120 万，环比 +4.2%，主因客单价提升。"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 845,
+    "completion_tokens": 96,
+    "total_tokens": 941
+  }
+}

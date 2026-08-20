@@ -1,0 +1,17 @@
+{
+  "answer": "该门店 5 月营收 120 万，环比 +4.2%，主因客单价提升。",
+  "model": "deepseek/deepseek-v4-flash",
+  "tool_calls": null,
+  "usage_metadata": {
+    "schema_version": "llm-usage.v1",
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "input_tokens": 845,
+    "output_tokens": 96,
+    "total_tokens": 941,
+    "pricing_version": "unconfigured",
+    "pricing_source": "configured_settings",
+    "cost_currency": "USD",
+    "cost_status": "unavailable"
+  }
+}

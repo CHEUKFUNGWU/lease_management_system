@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     
     # Core Service 地址
     core_service_url: str = "http://core-service:8080"
-    agent_planner_token: str = ""
     
     # MinIO 配置
     minio_endpoint: str = "minio:9000"

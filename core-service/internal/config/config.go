@@ -29,6 +29,11 @@ type Config struct {
 	MinIOAccessKey string
 	MinIOSecretKey string
 	MinIOBucket    string
+
+	// AnyDocBinPath is the pinned anydoc CLI binary shipped in the runtime
+	// image (see Dockerfile). Empty disables the office-document parser, which
+	// then degrades to parser_unavailable instead of fabricating a parse.
+	AnyDocBinPath string
 }
 
 func Load() (*Config, error) {
@@ -84,6 +89,8 @@ func Load() (*Config, error) {
 		MinIOAccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
 		MinIOSecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
 		MinIOBucket:    getEnv("MINIO_BUCKET", "lease-uploads"),
+
+		AnyDocBinPath: getEnv("ANYDOC_BIN_PATH", "/usr/local/lib/node_modules/@firecrawl/anydoc/cli.js"),
 	}
 
 	return cfg, nil

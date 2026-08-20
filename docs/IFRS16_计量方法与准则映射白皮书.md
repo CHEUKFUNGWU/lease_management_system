@@ -23,7 +23,7 @@
 
 已建立自动化回归 fixture：`core-service/internal/services/ifrs16/testdata/ifrs16_regression_cases.json`。
 
-可重复生成的对数报告：`docs/IFRS16_计量回归对数报告.md`。
+可重复生成的对数报告：`make ifrs16-regression` 输出到 `docs/IFRS16_计量回归对数报告.md`（**生成产物，已 gitignore，不入库**）。
 
 运行命令：
 

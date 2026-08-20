@@ -47,3 +47,6 @@ tmp/
 temp/
 *.tmp
 
+
+# 由 make ifrs16-regression 生成的对数报告，不入库（跑一条命令即可重生成）
+docs/IFRS16_计量回归对数报告.md

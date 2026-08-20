@@ -16,12 +16,13 @@
 | **改前端代码必须遵守的设计与样式约束** | **[DESIGN.md](DESIGN.md)** |
 | **一个业务词到底是什么意思、该叫什么** | **[CONTEXT.md](CONTEXT.md)** — 领域语言，命名与措辞以它为准 |
 | 为什么做这次转型、边界在哪、ICP 与产品蓝图 | [docs/线下零售经营工作站_转型实施任务清单与验收标准.md](docs/线下零售经营工作站_转型实施任务清单与验收标准.md)、[docs/PRD_零售经营分析工作站_BP日常支撑完善.md](docs/PRD_零售经营分析工作站_BP日常支撑完善.md) |
+| **三表财务模型与单店利润表的规格与模块设计** | [docs/PRD_三表财务模型与单店利润表.md](docs/PRD_三表财务模型与单店利润表.md)（附录 B 勾稽 T1–T16、附录 E 落地状态）、[docs/CodebaseDesign_三表模型与单店利润表_模块深化.md](docs/CodebaseDesign_三表模型与单店利润表_模块深化.md)（SM1–SM8、D-S1~S9） |
 | 进入哪个市场、怎么找到第一批客户 | [docs/GTM_零售经营工作站_中国大陆与香港市场进入策略.md](docs/GTM_零售经营工作站_中国大陆与香港市场进入策略.md) |
 | 还没做的延后治理项（HARD-001~012）与其重新进入条件 | [docs/execution/精简MVP路线与延后治理清单.md](docs/execution/精简MVP路线与延后治理清单.md) |
 | UI/UX 现状诊断与改进计划 | [docs/UIUX改善方案.md](docs/UIUX改善方案.md) |
 | 架构决策记录 | [docs/adr/](docs/adr/) |
 | 现行功能规格 | [docs/specs/](docs/specs/) |
-| IFRS 16 计量口径与回归 | [docs/IFRS16_计量方法与准则映射白皮书.md](docs/IFRS16_计量方法与准则映射白皮书.md)、[docs/IFRS16_计量回归对数报告.md](docs/IFRS16_计量回归对数报告.md) |
+| IFRS 16 计量口径（**模块级参考，不是产品定位**） | [docs/IFRS16_计量方法与准则映射白皮书.md](docs/IFRS16_计量方法与准则映射白皮书.md)；回归对数报告不入库，跑 `make ifrs16-regression` 生成 |
 | Agent 运行时的运维 | [docs/AI_Agent_运行运维手册.md](docs/AI_Agent_运行运维手册.md) |
 | **AI / Agent 的现行设计与决策** | [docs/AI_文档索引与现行决策.md](docs/AI_文档索引与现行决策.md) — **动 AI 相关的东西之前先读这份**，它标着每份文档还算不算数 |
 
@@ -29,13 +30,18 @@
 
 ## 当前工程事实
 
-- `db/init/01_init.sql`：83 张业务表 + `schema_migrations`（空库基线自动标记全部迁移已应用）；增量迁移到 `052_env_envelope_and_dedup_keys.sql`
-- `core-service/internal/services/`：41 个业务包，其中 `retailkpi` / `retailpulse` / `retailstore360` / `retailscenario` / `retailsimulation` 为零售经营分析
-- `web/app/`：29 个页面，零售主线为 `/operating-pulse`、`/store-360`、`/scenario-workbench`
-- Agent Tool：`lease.*` 29 个；零售只读 Tool 3 个（`retail.operating_pulse.read`、`retail.store_diagnostics.read`、`retail.store.scenario.evaluate`）
+> 这一节是**易腐事实**。数字变了就改，不要在别处再抄一份。核对命令见本文末「验证」。
+
+- `db/init/01_init.sql`：90 张业务表 + `schema_migrations`（空库基线自动标记全部迁移已应用）；增量迁移到 `059_assumption_draft_idempotency_batch.sql`
+- `core-service/internal/`：27 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentcore` / `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore`
+- `web/app/`：31 个页面。零售主线 `/operating-pulse`、`/store-360`、`/scenario-workbench`；**财务主线 `/store-pnl`（单店利润表）、`/financial-model`（法人级三表模型工作台）**
+- Agent Tool：`lease.*` 36 个、`retail.*` 5 个（含 `retail.working_paper.store.generate`、`retail.store_days.import.preview`）、**`fpna.*` 6 个**（`statement_model.read` / `statement_model.evaluate` / `working_paper.finmodel.generate` / `assumptions.suggest` / `assumptions.suggest_batch` / `memos.model_diff.draft`）
 - Docker Compose 默认 5 个服务（PostgreSQL、MinIO、Core、AI、Web），`worker` profile 可另起 `agent-runner`
+- Go 1.25（`go.mod` 与两个 Dockerfile 一致）；前端 Next.js 14 + Node 20
 - IFRS 16 回归：22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，未经第三方会计师复核，**不得对外表述为审计背书**
-- 零售 MVP 只完成固定 seed 的内部模拟验证；**无真实 POS/ERP 联调，无客户验证**，相关结论一律保持 `unvalidated`
+- 零售 MVP 与三表模型均只完成固定 seed / 构造数据的内部验证；**无真实 POS/ERP/GL 联调，无客户验证**，相关结论一律保持 `unvalidated`
+
+**ai-service（Python）尚未退役。** ADR-0023 决定退役自研 Python，但只完成到 W3——W4（`internal/llm`）与 W5（`internal/docparse` 接管全部解析）**未执行**。当前 Go 仍通过 `AI_SERVICE_URL` 调用 6 个 Python 端点：`/api/v1/chat`（两处）、`/parse/contract`、`/parse/payment-schedule`、`/parse/contract-batch`、`/parse/event`，另有 `handlers/retail_mapping_ai.go` 的列映射。`internal/docparse` 已存在但只服务 triage / page-fill 链路，不是这六条的替代。**改这些路径前先确认你在哪一侧**，不要按「ai-service 已退役」的旧叙述写代码。连带事实：`ai-service/requirements.txt` 仍钉着 `pymupdf==1.23.0`，ADR-0024 要删的 AGPL 依赖**仍在**（索引文档的缺口 G6）。
 
 **命名现状：** GitHub 仓库已于 2026-08 改名为 `retail_performance_workstation`，**但代码命名空间没有跟着改，也不打算改**：容器、数据库、MinIO bucket、JWT、Go module（`github.com/lease-management-system/core-service`）、CLI 与 Compose 项目名仍是 `lease_*`。
 
@@ -71,9 +77,9 @@
 
 ## 架构分层
 
-- **Web** (Next.js + TypeScript + Ant Design + Recharts)：经营脉搏、门店 360、租金谈判测算、合同台账、AI 录入、月结、报表、组合分析等 29 个页面
-- **Core Service** (Go + Gin)：权限、合同主数据、付款计划、事件、IFRS 16 计量、月结、ERP 导出/回写、审计日志、零售 KPI 语义层与经营分析服务、Agent Gateway
-- **AI Service** (Python + FastAPI)：文件解析、PaddleOCR、LLM 字段抽取、草稿生成、置信度与原文定位
+- **Web** (Next.js + TypeScript + Ant Design + Recharts)：经营脉搏、门店 360、租金谈判测算、单店利润表、三表模型工作台、合同台账、AI 录入、月结、报表、组合分析等 31 个页面
+- **Core Service** (Go + Gin)：权限、合同主数据、付款计划、事件、IFRS 16 计量、月结、ERP 导出/回写、审计日志、零售 KPI 语义层与经营分析服务、**三表财务模型引擎与单店利润表投影**、Agent Gateway、Agent Core（`agentcore` 纯循环内核 + 治理中间件链）
+- **AI Service** (Python + FastAPI)：文件解析、PaddleOCR、LLM 字段抽取、草稿生成、置信度与原文定位。**按 ADR-0023 应退役，实际未退役**——现状见上节
 - **PostgreSQL**：正式业务数据、经营事实、AI 草稿、任务状态、审核记录
 - **MinIO**：原始上传文件、合同附件、OCR 中间产物、解析结果
 
@@ -96,7 +102,24 @@
 - **同群对比样本不足或币种混杂时必须显式降级**，不得给出看似确定的对比结论
 - **经营占用口径 ≠ IFRS 16 口径。** 经营侧算基本租金 + 服务费 + 当期变量租金；IFRS 16 侧算 ROU、负债、利息、折旧。两者并列维护，**不可互相替代**
 
-### 关键会计区分（常见错误点）
+### 财务三表模型与单店利润表约束（`finmodel/` + `storepnl/`）
+
+规格在 [PRD](docs/PRD_三表财务模型与单店利润表.md)（附录 B = 勾稽 T1–T16），模块接口与 D-S1~S9 在 [模块深化](docs/CodebaseDesign_三表模型与单店利润表_模块深化.md)。以下八条是**已由测试锁定的架构约束**，改代码时不得绕开：
+
+- **`finmodel` 不得 import `ifrs16`。** 模型里不存在第二套租赁计算——租赁附表行 100% 来自 `measurement_results` 的只读投影。守卫是 `finmodel/importguard_test.go`，它遍历 `finmodel/...` 全部子包，不只根包
+- **`fin_model_runs` 只有一条写入口。** 同步与异步路径都必须经 `finmodel/persist`；架构测试在 `finmodel/writeguard_test.go`。不要为异步流程再开一条 `CreateModelRun`
+- **引擎是纯函数。** `finmodel/engine.go` 不做 IO；一切外部数据经 Ports（FactReader / LeaseRollforwardReader / 付款计划 + capex / TB）注入。**端口未接线时降级为具名 Gap，不 panic、不填 0、不产出数字**
+- **Actual 冻结线左侧读事实，右侧才跑驱动公式。** `def.ActualCutoffPeriod` 之前的期间，声明了 `actual_source` 的行从 FactReader 取值；用假设推导 Actual 期毛利会让 T13 在真实数据上必然失败（P0-3 教训）
+- **期初有两种失败，方向相反。** `openingAbsent`（未提供期初）→ BS/CF 降级为不可判定、run 继续；`openingRejected`（提供了但三道闸任一不过）→ **Run 报错、不落库**。把后者当成前者等于让带病期初污染后面每一期
+- **勾稽必须是两条独立路径的对照，不能恒真。** 若某条按构造必然成立，就把它改写为构造断言并同步修订 PRD 附录 B——不留「假装在检查」的检查。T1–T16 每条都要有反向测试（先证红再证绿）；T13 与期初闸③不符时写 `fpna_data_quality_items`（category=`reconciliation`）
+- **模拟标识贯穿到底。** `data_classification` 必须出现在 xlsx / CSV 导出口径头；**simulated / mixed 的 run 不得 publish 为计划版本**（底线 2）
+- **底稿对勾稽失败 fail-closed。** tie-out 未全绿的 run 请求底稿 → `workingpaper/lint.go` 的 `tie_out_unpassed` 规则拒绝产出 artifact，不是标红了事
+
+页面侧：`/store-pnl` 与 `/financial-model` 与零售三页同一底座——取数经 `useRetailQuery`，状态呈现经 `classifyDataState`/`StateBlock`，新枚举登记进 `code-lists-contract.test.ts`（CONTRACT-001），容器遵守 DESIGN.md §8.1。**公式行与小计行由后端同一 AST 求值，前端不得重算任何模型行。**
+
+### IFRS 16 模块的关键会计区分（常见错误点）
+
+> 以下三节（会计区分、事件驱动、月结锁账）是 **IFRS 16 合规模块内部**的约束，不是产品主线的描述。写零售经营分析或三表模型代码时它们通常不适用——除非你正在动计量引擎、月结或租赁附表投影。
 
 - **先付 vs 后付租金**：先付租金通常不形成未来融资成本，作为已支付租赁付款额影响使用权资产初始成本；后付租金纳入贴现及后续利息摊销
 - **固定 vs 变量租金**：turnover rent / sales-based rent 必须**当期费用化**，不得资本化计入租赁负债
@@ -120,7 +143,9 @@
 - 必须包含字段级置信度、低置信度人工必审、原文定位高亮、差异留痕
 - **AI 默认运行在 Assist Mode**：只负责识别、建议、草稿生成，正式入库需人工审批。Auto-Post Mode 需另行定义适用范围与阈值
 - AI 问答必须基于权限范围检索，展示引用来源，区分「系统正式数据」与「AI 推断/建议」
-- **零售 Agent 只有三个只读 Tool**，行动建议以 Artifact 产出，**不落任何业务表**
+- **零售与 FP&A 的 Agent Tool 分两类，边界要守住**：读类（`retail.operating_pulse.read`、`retail.store_diagnostics.read`、`retail.store.scenario.evaluate`、`fpna.statement_model.read/evaluate`）只读不写；写类**一律只写 draft 层**（`fpna.assumptions.suggest[_batch]` 落 `fpna_assumption_versions` 且 `source=ai_suggestion`，`fpna.memos.model_diff.draft` 落 `fpna_decision_memos`）。**approved-only 的读取路径永不回采 draft**——这条有测试锁定
+- **底稿类 Tool（`*.working_paper.*.generate`）产出 Artifact，走 LevelDraft + Review Gate**，不落业务表
+- **端口未接线时工具必须诚实拒绝**，返回 unavailable，不得产出数字。反过来：**不要用 nil 端口无条件注册工具**，那会让重名注册把真实端口挡在外面（P0-8 教训，`aiagent/agent.go` 现在按 `finModelRepo == nil` 二选一分支注册）
 - **权限拒绝必须保持原因。** `scope_denied` 不得被改写成「无数据」之类的软化表述 —— 这会掩盖权限问题，触及底线 1
 
 ### 报表双模式
@@ -156,6 +181,8 @@
 
 ## 风险红线（设计时必须规避）
 
+1–7 是 **IFRS 16 模块**的红线；8–11 跨全产品；12–14 是**财务三表模型**的红线。
+
 1. **会计政策未先统一**：续租/终止判断标准、CAM 拆分政策、turnover rent 口径、折现率政策、闭店减值触发口径必须在开发前固化
 2. **合同数据质量不足**：关键日期缺失、付款计划不完整、先付/后付未明确、非租赁成分未拆分
 3. **变更做成手工覆盖**：必须事件驱动，否则历史不可追溯、审计无法复演
@@ -167,6 +194,9 @@
 9. **OCR 精度不足**：需低置信度标识、原文定位高亮、字段级人工修正、人工转录兜底
 10. **AI 问答越权或引用错误**：必须基于权限范围检索、展示引用来源、区分正式数据与 AI 推断
 11. **用模拟数据冒充经营结论**：模拟验证不能替代商业验证，不得表述为客户采用、真实 ROI 或 PMF
+12. **恒真的勾稽**：拿别名比自己、拿定义式倒减自己、返回 `not_applicable` 的桩，都是「假装在检查」。勾稽必须是两条独立路径的对照，否则改写成构造断言并同步改规格
+13. **假设污染 Actual**：Actual 冻结线左侧任何一行用假设推导，都会让真实数据的 run 永远过不了发布门禁
+14. **模型里长出第二套租赁计算**：租赁附表只能是计量引擎结果的只读投影；一旦 `finmodel` 自己算 ROU/利息，两个数字必然分叉且无人知道该信哪个
 
 ## 文档归档规则
 
@@ -189,6 +219,8 @@
 
 **Store-day 经营事实**：法人、门店、日期、币种、营收、毛利、交易数、客流、人工成本、固定租金、变量租金、非租赁成本、其他成本、面积；来源信封按 038/048/052 实际列名写：`data_classification`（production/simulated/mixed）、`source_system`、`import_batch_id`、`as_of_at`、`version`（= fact version）、`simulation_dataset_version`
 
+**三表模型 Run**：模型定义编号（法人 + 期间范围 + `actual_cutoff_period`）、模板版本、假设版本、政策快照（循环引用政策、利息列报政策、计息方法）、状态（`queued`/`running`/`completed`/`failed`/`cancelled`）、进度与行数、`data_classification`、勾稽结论（T1–T16 逐条 status + diff）、缺口清单（具名 Gap，不是 0）、五条版本线（事实版本 / 计量版本 / 汇率版本 / 指标定义版本 / 模板版本）、发布谱系（`fpna_plan_versions` 的 prior + `scenario_type`）
+
 **审计追溯**：数据版本号、合同版本号、利率版本号、计算规则版本号、导入批次号、创建/更新人及时间、审批人、附件索引
 
 **AI 识别与入库**：AI 任务编号、文件编号/类型/哈希、上传人/时间、识别/OCR 状态、文档分类结果、识别出的合同/门店/事件、字段名称、AI 提取值/最终确认值、置信度评分、scope 初判、原文页码/位置坐标、差异原因、审核人/时间、入库结果状态
@@ -210,6 +242,11 @@
 | ERP 集成先做 CSV 导出 + 凭证回写 | 先跑通最小可演示链路，再按客户 ERP 做字段映射 |
 | 模拟数据用固定 seed 生成 | 无设计伙伴时能稳定复演经营场景与异常，且可与正式数据严格区分 |
 | 零售 Agent 只给只读 Tool | 在权限、版本、审批、审计不被破坏的前提下使用 AI |
+| 三表模型引擎写成纯函数 + Ports | 引擎可以在没有库的情况下被 golden 测试逐格锁定；接线缺失退化为具名 Gap 而不是崩溃或假数字 |
+| 租赁附表只做计量引擎的只读投影（`finmodel` 禁 import `ifrs16`） | 一套租赁数字只能有一个来源；用 import guard 而不是 code review 来保证 |
+| 期初「未提供」与「闸未过」走相反路径 | 前者是信息不足（可降级），后者是数据有毒（必须挡住），当成同一件事会让错误期初污染全部后续期间 |
+| 勾稽失败写 `fpna_data_quality_items` 而不只是标红 | 单人团队里「有人会看到红色」不成立；进队列才有人处理 |
+| 假设建议只写 draft，approved-only 读取不回采 | AI 可以提议，不可以自我批准 |
 
 ## 关键集成接口
 
@@ -231,7 +268,16 @@ cd core-service && GOCACHE=$(pwd)/.gocache go test ./... && go vet ./...
 cd ../web && npm run type-check && npm run build && npm test
 ```
 
-真实 PostgreSQL 集成测试需 `TEST_DATABASE_URL`，未设置时正常 skip。IFRS 16 回归用 `make ifrs16-regression`。
+真实 PostgreSQL 集成测试需 `TEST_DATABASE_URL`，未设置时正常 skip —— **跨法人隔离、幂等与勾稽落库的证据大多在集成测试里**，只跑单元测试证明不了底线 1 和底线 4，改这些路径时必须带库跑。IFRS 16 回归用 `make ifrs16-regression`。
+
+核对本文「当前工程事实」用：
+
+```bash
+grep -c '^CREATE TABLE' db/init/01_init.sql        # 表数
+ls db/migrations | tail -1                          # 最新迁移
+ls core-service/internal | wc -l                    # 包数
+find web/app -name page.tsx | wc -l                 # 页面数
+```
 
 **替换类改动的验收规则（GUARD-001，缺失即退回）**：凡是「把 A 换成 B」的改动——内联样式换成类名、组件 A 换成组件 B、手写逻辑换成接缝函数——验收必须证明 **B 真的生效**，只证明 A 消失了不算数。判定「B 生效」的机械手段，按改动类型二选一或并用：
 

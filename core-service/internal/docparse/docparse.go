@@ -48,6 +48,10 @@ type Source struct {
 	Data      []byte
 	Filename  string
 	SizeLimit int64 // <= 0 means no limit
+	// NeedEvidence marks a caller request for OCR evidence (D7 lazy
+	// evidence): a first pass runs anydoc and only opens OCR when a user
+	// actually inspects evidence for this document.
+	NeedEvidence bool
 }
 
 // DocumentParser is the single seam every file path crosses. Adapters differ

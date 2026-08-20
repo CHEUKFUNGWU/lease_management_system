@@ -1,11 +1,14 @@
 # Retail Performance Workstation
 
-This context defines the business language of the workstation. It spans two domains that must not be conflated:
+This context defines the business language of the workstation. It spans three domains that must not be conflated:
 
 - **Retail Operations** — store-day operating facts, the metrics derived from them, and the analysis that turns them into actions.
+- **Financial Modelling** — the store profit and loss statement, the linked three-statement model, and the governance around templates, assumptions and runs.
 - **Lease Accounting** — contract records, IFRS 16 measurement, month-end close control, and general-ledger reconciliation.
 
-The two share stores and contracts but measure different things on different bases. Where a term exists in both, this document defines each meaning separately and says so. `Coverage` is the clearest case: it means three different things depending on the domain (see Evaluation Coverage, Transaction Currency Coverage, and Fact Coverage).
+They share stores and contracts but measure different things on different bases. Where a term exists in more than one, this document defines each meaning separately and says so. `Coverage` is the clearest case: it means three different things depending on the domain (see Evaluation Coverage, Transaction Currency Coverage, and Fact Coverage). `Version` is the second: a Fact Version, a Projection Version, an Assumption Version and a Statement Template version are four unrelated things.
+
+The Financial Modelling domain consumes the other two and originates neither. It reads operating measures through Retail KPI Semantics and lease measures through a read-only projection of the measurement engine; it never computes either for itself.
 
 ## Deep Modules
 
@@ -41,6 +44,24 @@ The module that derives a transparent run-rate from the same facts a diagnosis u
 
 **Retail Simulation**:
 The module that generates a reproducible Simulated Dataset from a fixed seed, together with the Anomaly Manifest describing the operating anomalies it deliberately introduced.
+
+**Statement Model Engine**:
+The pure-function module that turns one Model Definition, one Statement Template, one Assumption Version and one Policy Snapshot into a Model Run's line values and Tie-Out results. It performs no IO: every external measure arrives through a Model Port. An unwired or empty port produces a named Data Gap, never a zero and never a crash.
+
+**Statement Template**:
+The module that owns the row structure of a statement — row kind, basis, format, parent-child subtotal relationships — and the whitelist formula DSL those rows are written in. It rejects literals, cycles, cross-entity references and mixed-basis rows at parse time, so an invalid template cannot exist as data.
+
+**Opening Balance Gate**:
+The module that decides whether a supplied opening balance sheet may be carried into a model at all, by three independent checks: that it balances, that its aggregation basis is consistent with the prior period, and that its lease balances tie to the measurement engine.
+
+**Model Persistence**:
+The single write path for Model Runs, their line values, tie-out conclusions and published plan-version lineage. It also routes reconciliation failures into the Data Quality Queue. No other code writes a model run, in either the synchronous or the asynchronous path.
+
+**Store Profit and Loss Projection**:
+The module that composes Store-Day Facts, an Occupancy Split and a read-only lease measurement projection into one store's profit and loss for a period, on both bases, at any Period Grain. It derives every subtotal from its children so that a drill-down and its parent can never disagree.
+
+**Working Paper**:
+The module that renders a deliverable with Cell Provenance, behind a fail-closed lint. A cell claiming Certified provenance must reference a completed, audited tool call; a run whose tie-outs did not pass yields no deliverable at all; and a missing value leaves the cell empty rather than writing zero.
 
 ## Access Control
 
@@ -181,6 +202,84 @@ _Avoid_: Rent expense, lease cost, lease expense
 **Store Contribution**:
 A store's operating result after the costs attributable to running it, including Occupancy Cost. It is an operating measure and does not tie to a statutory profit subtotal.
 _Avoid_: Profit, EBITDA, margin
+
+## Financial Modelling
+
+**Model Definition**:
+The scope of a three-statement model: one Legal Entity, a period range, an Actual Cutoff Period, and the presentation policies the model runs under. It is what a Model Run is a run *of*.
+_Avoid_: Model, scenario, plan
+
+**Actual Cutoff Period**:
+The freeze line inside a Model Definition. Periods at or before it are read from facts; periods after it are derived from assumptions through driver formulas. A row that takes its actual-period value from an assumption instead of a fact is a defect, not a shortcut — it makes the model's tie-outs fail against any real data.
+_Avoid_: Freeze date, as-of, actual period
+
+**Model Port**:
+A named read-only supply of one class of external measure into the Statement Model Engine — operating facts, lease roll-forward, payment schedule and planned capital expenditure, or trial balance. A port that supplies nothing yields a Data Gap for the rows that depended on it; it never yields zero.
+_Avoid_: Data source, adapter, provider
+
+**Data Gap**:
+A named, located statement that a value could not be produced and why. It is a first-class output of a model run, not an error condition, and it is what the interface, the export and the working paper all render in place of a number.
+_Avoid_: Null, missing, error, zero
+
+**Assumption Version**:
+An immutable, dated set of forecast drivers — same-store sales growth, new-store ramp factor, store-count growth, margin and cost rates — approved for use by a model run. An unregistered driver is neutral, never guessed.
+_Avoid_: Assumption, input, parameter set
+
+**Assumption Draft**:
+A proposed assumption written by an agent, carrying `source = ai_suggestion`, its evidence and its confidence. It lives in the same table as approved assumptions and is invisible to every approved-only read. Promotion to an Assumption Version is a human act.
+_Avoid_: AI assumption, suggestion, auto-fill
+
+**Model Run**:
+One execution of a Model Definition against one Statement Template and one Assumption Version, producing line values, Tie-Out results, Data Gaps, a Policy Snapshot, and the five version lines behind its inputs. Runs are reproducible: the same inputs produce the same numbers.
+_Avoid_: Calculation, model output, forecast
+
+**Policy Snapshot**:
+The presentation and computation choices frozen into a Model Run — the circularity policy, the interest cash-flow presentation, and the interest accrual method. A policy that does not change any number is a false parameter and must not exist.
+_Avoid_: Settings, config, options
+
+**Tie-Out**:
+A check that two *independently derived* paths to the same figure agree. Sixteen are defined. A check that compares a value with an alias of itself, or reverses the definition that produced it, is not a tie-out — where a relationship holds by construction, the specification says so and the check asserts the construction instead of pretending to verify it.
+_Avoid_: Validation, reconciliation, balance check, assertion
+
+**Data Quality Queue**:
+The persistent backlog that receives reconciliation failures — a failed occupancy tie-out, a failed opening lease check — with their source table, source record and data version. Failures go here rather than only being coloured red in an interface, because a single-operator team cannot rely on someone noticing a colour.
+_Avoid_: Error log, warning list, exception
+
+**Plan Version Lineage**:
+The chain recorded when a Model Run is published as a plan version: its prior version, its Scenario Type, and the run it came from. Publication is refused for a run whose tie-outs are not all passed, and for a run whose Data Classification is `simulated` or `mixed`.
+_Avoid_: History, revision, snapshot
+
+**Scenario Type**:
+The declared character of a published plan version — baseline, upside, downside, or custom. It is a fixed vocabulary; an unrecognised value is refused rather than stored.
+_Avoid_: Case, variant, version type
+
+**Basis**:
+Which measurement convention a statement row is expressed on: operating or IFRS 16. Rows on different bases are presented side by side with a block-level label and are never summed together, because the same store cost appears in both under different names.
+_Avoid_: View, mode, standard
+
+**Period Grain**:
+The calendar granularity a store profit and loss is requested at — day, week, month, quarter or year. Flow measures sum across a grain; stock measures take the closing value; a gap stays a gap at every grain.
+_Avoid_: Granularity, period type, frequency
+
+**Occupancy Split**:
+The decomposition of a store's Occupancy Cost into its contributing contracts, each with its base rent, service charge and variable rent, apportioned across the days each schedule actually covers. The aggregate is derived by summing the split, so the drill-down and the total cannot disagree.
+_Avoid_: Rent allocation, cost breakdown
+
+**Currency Partition**:
+The presentation of a multi-currency aggregate as one section per transaction currency, with no total across sections. Translating instead requires an explicitly named exchange-rate version and type, and the absence of a rate degrades the whole view rather than part of it.
+_Avoid_: Currency grouping, multi-currency total
+
+**Governed Metric**:
+A statement row whose definition is registered in the metric governance set. A custom formula row that is not registered is labelled as ungoverned in the response, in the export and in the interface alike — the label travels with the number, not with the screen it was first seen on.
+_Avoid_: Custom metric, user-defined row
+
+**Saved View**:
+A named, shareable configuration of how a statement is displayed — hidden rows, folded groups, selected comparison column. A recipient of a shared view renders the same configuration against their own Data Scope, never the sharer's.
+_Avoid_: Layout, preset, bookmark
+
+**Cell Provenance**:
+The per-cell record of where a working-paper value came from: `Certified` (a measured value from an audited tool call), `SystemFact`, `HumanInput` (with who confirmed it and when), or `Exploratory`. It is recorded per cell rather than per document, because a single deliverable mixes all four.
+_Avoid_: Source, citation, footnote
 
 ## Month-End Close
 

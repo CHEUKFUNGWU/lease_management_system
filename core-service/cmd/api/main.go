@@ -15,6 +15,7 @@ import (
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/config"
 	"github.com/lease-management-system/core-service/internal/db"
+	"github.com/lease-management-system/core-service/internal/docparse"
 	"github.com/lease-management-system/core-service/internal/handlers"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/miniostore"
@@ -121,6 +122,13 @@ func main() {
 	var fillReader agenttooldefs.IngestFileReader = miniostore.NewIngestReader(minioClient)
 	finModelRepo := repository.NewFinModelRepository(database.Pool)
 	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
+	// W5-1: document parser seam (ADR-0024 routing). AnyDoc binary is pinned
+	// in the runtime image (Dockerfile); OCR is enabled when a PaddleOCR token is configured.
+	ocrParser := docparse.NewPaddleOCR(docparse.PaddleOCRConfig{
+		APIURL: os.Getenv("PADDLEOCR_API_URL"), AccessToken: os.Getenv("PADDLEOCR_ACCESS_TOKEN"), Model: os.Getenv("PADDLEOCR_MODEL"),
+	})
+	docParser := docparse.NewRouter(docparse.CSV(), docparse.AnyDoc(cfg.AnyDocBinPath, 60*time.Second), ocrParser, docparse.OCREnabled(ocrParser))
+	aiChatHandler.SetDocumentParser(docParser)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)

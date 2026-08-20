@@ -129,14 +129,14 @@ func parseProjectionParams(c *gin.Context, storeID string) (projectionParams, bo
 		if asOf != "" {
 			parsed, err := time.Parse("2006-01-02", asOf)
 			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "as_of must be YYYY-MM-DD"})
+				writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "as_of must be YYYY-MM-DD", nil)
 				return projectionParams{}, false
 			}
 			anchor = parsed
 		}
 		window, err := retailperiod.Parse(spec, anchor)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 			return projectionParams{}, false
 		}
 		ref.DateFrom = window.From.Format("2006-01-02")
@@ -178,13 +178,13 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 		KPI: h.kpi, Plan: h.planReaderFor(c), Lease: h.lease, Peer: h.peer, Occupancy: h.occupancy, Governed: h.governedRows(c),
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	if strings.EqualFold(c.Query("format"), "xlsx") {
 		out, err := storepnl.RenderXLSX(pnl)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 			return
 		}
 		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -203,21 +203,21 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 // store keeps the scope_denied reason (never softened to "no data").
 func (h *StorePnlHandler) requireScopedStore(c *gin.Context, storeID string) error {
 	if h.stores == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "store master data reader unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "store master data reader unavailable", nil)
 		return errors.New("store master data reader unavailable")
 	}
 	store, err := h.stores.GetStoreByID(c.Request.Context(), storeID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return err
 	}
 	if store.ID == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "store not found", nil)
 		return errors.New("store not found")
 	}
 	tenant := middleware.GetTenantID(c)
 	if tenant != "" && store.LegalEntityID != tenant {
-		c.JSON(http.StatusNotFound, gin.H{"error": "store not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "store not found", nil)
 		return errors.New("store outside caller tenant")
 	}
 	if scope, scoped := access.ScopeFromContext(c.Request.Context()); scoped && !scope.Global {
@@ -248,11 +248,11 @@ func (h *StorePnlHandler) requireScopedStore(c *gin.Context, storeID string) err
 func (h *StorePnlHandler) AggregateProjection(c *gin.Context) {
 	groupBy := storepnl.GroupBy(strings.TrimSpace(c.Query("group_by")))
 	if !storepnl.ValidGroupBy(string(groupBy)) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "group_by is required and must be region, brand or legal_entity"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "group_by is required and must be region, brand or legal_entity", nil)
 		return
 	}
 	if h.stores == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "store master data reader unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "store master data reader unavailable", nil)
 		return
 	}
 	params, ok := parseProjectionParams(c, "")
@@ -261,7 +261,7 @@ func (h *StorePnlHandler) AggregateProjection(c *gin.Context) {
 	}
 	stores, err := h.stores.ListStores(c.Request.Context(), middleware.GetTenantID(c), "")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	planReader := h.planReaderFor(c)
@@ -285,7 +285,7 @@ func (h *StorePnlHandler) AggregateProjection(c *gin.Context) {
 	}
 	result, err := storepnl.Aggregate(groupBy, params.period, params.pair, members, degraded)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"aggregate": result})
@@ -300,31 +300,31 @@ func (h *StorePnlHandler) templateFor(c *gin.Context) (*template.Template, error
 		return h.tmpl, nil
 	}
 	if h.templates == nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "template_id requested but the template repository is unavailable"})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, "template_id requested but the template repository is unavailable", nil)
 		return nil, errors.New("template repository unavailable")
 	}
 	row, err := h.templates.GetStatementTemplate(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "template not found", nil)
 		return nil, err
 	}
 	tenant := middleware.GetTenantID(c)
 	if tenant != "" {
 		if row.LegalEntityID != nil && *row.LegalEntityID != tenant {
-			c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+			writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "template not found", nil)
 			return nil, errors.New("template outside caller scope")
 		}
 		if row.LegalEntityID == nil {
 			userID, ok := userID(c)
 			if !ok || row.CreatedBy == nil || *row.CreatedBy != userID {
-				c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+				writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "template not found", nil)
 				return nil, errors.New("personal template outside caller ownership")
 			}
 		}
 	}
 	tmpl, err := h.templates.LoadStatementTemplate(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 		return nil, err
 	}
 	return tmpl, nil

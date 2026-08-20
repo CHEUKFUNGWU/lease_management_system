@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/finmodel"
 	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/finmodel/opening"
@@ -105,7 +106,7 @@ func (h *FinModelHandler) CreateTemplate(c *gin.Context) {
 		Visibility string `json:"visibility,omitempty"`
 	}
 	if err := decodeStrictJSON(c, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	legalEntityID := middleware.GetTenantID(c)
@@ -113,19 +114,19 @@ func (h *FinModelHandler) CreateTemplate(c *gin.Context) {
 	switch strings.TrimSpace(req.Visibility) {
 	case "", "shared":
 		if legalEntityID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "a shared template requires a legal entity scope"})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "a shared template requires a legal entity scope", nil)
 			return
 		}
 		entityPtr = &legalEntityID
 	case "personal":
 		entityPtr = nil // 个人草稿：仅创建者可见
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "visibility must be shared or personal"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "visibility must be shared or personal", nil)
 		return
 	}
 	templateID := uuid.NewString()
 	if _, err := h.repo.SaveStatementTemplate(c.Request.Context(), req.TemplateDef, entityPtr, &userID, templateID); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"saved": true, "id": templateID, "name": req.Name, "version": req.Version, "visibility": deref2(entityPtr)})
@@ -140,7 +141,7 @@ func (h *FinModelHandler) ListTemplates(c *gin.Context) {
 		return
 	}
 	if h.repo == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
 		return
 	}
 	tenant := middleware.GetTenantID(c)
@@ -151,7 +152,7 @@ func (h *FinModelHandler) ListTemplates(c *gin.Context) {
 	rows, err := h.repo.ListStatementTemplates(c.Request.Context(), tenantPtr, userID,
 		strings.TrimSpace(c.Query("status")), strings.TrimSpace(c.Query("visibility")))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"templates": rows})
@@ -183,7 +184,7 @@ func (h *FinModelHandler) ReviewTemplate(c *gin.Context) {
 		Reason   string `json:"reason,omitempty"`
 	}
 	if err := decodeStrictJSON(c, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	if err := h.repo.ReviewStatementTemplate(c.Request.Context(), id, userID, req.Approved); err != nil {
@@ -241,13 +242,13 @@ func (h *FinModelHandler) CopyTemplate(c *gin.Context) {
 	}
 	if c.Request.ContentLength > 0 {
 		if err := decodeStrictJSON(c, &req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 			return
 		}
 	}
 	source, err := h.repo.GetStatementTemplate(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "template not found", nil)
 		return
 	}
 	name := strings.TrimSpace(req.Name)
@@ -258,12 +259,12 @@ func (h *FinModelHandler) CopyTemplate(c *gin.Context) {
 	}
 	newID := uuid.NewString()
 	if err := h.repo.CopyStatementTemplate(c.Request.Context(), newID, name, version, &id, &userID); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 		return
 	}
 	copied, err := h.repo.GetStatementTemplate(c.Request.Context(), newID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	if h.audit != nil {
@@ -286,10 +287,10 @@ func (h *FinModelHandler) DeleteTemplate(c *gin.Context) {
 	}
 	if err := h.repo.DeleteStatementTemplate(c.Request.Context(), id); err != nil {
 		if errors.Is(err, repository.ErrStatementTemplateInUse) {
-			c.JSON(http.StatusConflict, gin.H{"error": "模板已被模型定义引用，拒绝删除"})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, "模板已被模型定义引用，拒绝删除", nil)
 			return
 		}
-		c.JSON(http.StatusConflict, gin.H{"error": "仅可删除从未被使用的草稿"})
+		writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, "仅可删除从未被使用的草稿", nil)
 		return
 	}
 	if h.audit != nil {
@@ -308,21 +309,21 @@ func (h *FinModelHandler) ExportRun(c *gin.Context) {
 	id := c.Param("id")
 	fold := finmodel.FoldKind(strings.TrimSpace(c.DefaultQuery("fold", "month")))
 	if !finmodel.ValidFoldKind(string(fold)) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "fold must be month, quarter or year"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "fold must be month, quarter or year", nil)
 		return
 	}
 	if h.repo == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
 		return
 	}
 	run, err := h.repo.GetModelRun(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found", nil)
 		return
 	}
 	tenant := middleware.GetTenantID(c)
 	if tenant != "" && run.LegalEntityID != tenant {
-		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found", nil)
 		return
 	}
 	def, err := h.requireScopedDefinition(c, run.ModelDefinitionID)
@@ -331,12 +332,12 @@ func (h *FinModelHandler) ExportRun(c *gin.Context) {
 	}
 	tmpl, err := h.repo.LoadStatementTemplate(c.Request.Context(), def.TemplateID)
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 		return
 	}
 	lines, err := h.repo.ListRunLines(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	byRow := map[string]map[string]*float64{}
@@ -374,7 +375,7 @@ func (h *FinModelHandler) ExportRun(c *gin.Context) {
 	}
 	out, err := RenderModelRunXLSX(tmpl, rows, buckets, meta)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -396,17 +397,17 @@ func (h *FinModelHandler) PublishRun(c *gin.Context) {
 	}
 	id := c.Param("id")
 	if h.repo == nil || h.plans == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "publish repositories unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "publish repositories unavailable", nil)
 		return
 	}
 	run, err := h.repo.GetModelRun(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found", nil)
 		return
 	}
 	tenant := middleware.GetTenantID(c)
 	if tenant != "" && run.LegalEntityID != tenant {
-		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found", nil)
 		return
 	}
 	var req struct {
@@ -414,17 +415,17 @@ func (h *FinModelHandler) PublishRun(c *gin.Context) {
 	}
 	if c.Request.ContentLength > 0 {
 		if err := decodeStrictJSON(c, &req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 			return
 		}
 	}
 	published, err := persist.NewPublishWriter(h.repo, h.plans).Publish(c.Request.Context(), id, &userID, strings.TrimSpace(req.ScenarioType))
 	if err != nil {
 		if errors.Is(err, persist.ErrPublishGate) || errors.Is(err, persist.ErrSimulatedPublish) {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	if h.audit != nil {
@@ -440,17 +441,17 @@ func (h *FinModelHandler) PublishRun(c *gin.Context) {
 // definition (bottom line 1).
 func (h *FinModelHandler) requireScopedDefinition(c *gin.Context, id string) (*repository.FinModelDefinition, error) {
 	if h.repo == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
 		return nil, errors.New("repository unavailable")
 	}
 	row, err := h.repo.GetModelDefinition(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "model definition not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "model definition not found", nil)
 		return nil, err
 	}
 	tenant := middleware.GetTenantID(c)
 	if !definitionScopeAuthorized(row.LegalEntityID, tenant) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "model definition not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "model definition not found", nil)
 		return nil, errors.New("model definition outside caller scope")
 	}
 	return row, nil
@@ -473,17 +474,17 @@ func definitionScopeAuthorized(defLegalEntityID, tenant string) bool {
 // the id.
 func (h *FinModelHandler) requireScopedTemplate(c *gin.Context, id string) error {
 	if h.repo == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
 		return errors.New("repository unavailable")
 	}
 	row, err := h.repo.GetStatementTemplate(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "template not found", nil)
 		return err
 	}
 	tenant := middleware.GetTenantID(c)
 	if tenant != "" && row.LegalEntityID != nil && *row.LegalEntityID != tenant {
-		c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "template not found", nil)
 		return errors.New("template outside caller scope")
 	}
 	// 个人草稿（legal_entity_id NULL）：仅创建者（或全局 admin）可操作。
@@ -493,7 +494,7 @@ func (h *FinModelHandler) requireScopedTemplate(c *gin.Context, id string) error
 			return errors.New("missing user context")
 		}
 		if tenant != "" && (row.CreatedBy == nil || *row.CreatedBy != userID) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "template not found"})
+			writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "template not found", nil)
 			return errors.New("personal template outside caller ownership")
 		}
 	}
@@ -509,7 +510,7 @@ func (h *FinModelHandler) ValidateOpening(c *gin.Context) {
 		Policy   opening.MergePolicy       `json:"policy"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	failures := opening.Validate(opening.ValidateInput{Balance: req.Balance, LeaseRef: req.LeaseRef, Engine: req.Engine, Policy: req.Policy})
@@ -539,7 +540,7 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 	}
 	var req RunDefinitionRequest
 	if err := decodeStrictJSON(c, &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
 		return
 	}
 	defRow, err := h.requireScopedDefinition(c, req.DefinitionID)
@@ -548,7 +549,7 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 	}
 	tmpl, err := h.repo.LoadStatementTemplate(c.Request.Context(), defRow.TemplateID)
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 		return
 	}
 	var policy finmodel.ModelPolicy
@@ -594,10 +595,10 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 			if errors.As(err, &orErr) {
 				_ = persist.RecordOpeningGateIssues(c.Request.Context(), h.repo, def.LegalEntityID, req.IdempotencyKey, orErr.Failures)
 			}
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "code": "opening_rejected"})
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), gin.H{"reason": "opening_rejected"})
 			return
 		}
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 		return
 	}
 	// T13 Actual 失配 → 数据质量队列（即使整个 run 因勾稽不绿无法发布，
@@ -615,10 +616,10 @@ func (h *FinModelHandler) RunDefinition(c *gin.Context) {
 		}
 		if err := persist.NewRunWriter(h.repo).Persist(c.Request.Context(), def, result, defRow.ID, idem, &userID); err != nil {
 			if errors.Is(err, persist.ErrTieOutFailed) {
-				c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error(), "run": result})
+				c.JSON(http.StatusUnprocessableEntity, gin.H{"code": errcontract.CodeBusinessFailure, "error": err.Error(), "run": result})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 			return
 		}
 		payload["persisted"] = true
@@ -647,7 +648,7 @@ func (h *FinModelHandler) dispatchAsyncRun(c *gin.Context, defRow *repository.Fi
 	}
 	snapshot, err := persist.Snapshot(def)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	runID := uuid.NewString()
@@ -663,7 +664,7 @@ func (h *FinModelHandler) dispatchAsyncRun(c *gin.Context, defRow *repository.Fi
 	// S2-5 async 写入口：queued 行由 persist 包创建（D-S2 唯一写入口），
 	// 重放键返回既有 run。
 	if existing, err := writer.CreateQueued(c.Request.Context(), created); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	} else if existing != nil && existing.ID != runID {
 		c.JSON(http.StatusOK, gin.H{"run_id": existing.ID, "status": existing.Status, "replayed": true})
@@ -749,10 +750,10 @@ func (h *FinModelHandler) CancelRun(c *gin.Context) {
 	}
 	if err := persist.NewRunWriter(h.repo).Cancel(c.Request.Context(), run.ID); err != nil {
 		if errors.Is(err, repository.ErrInvalidWorkflowTransition) {
-			c.JSON(http.StatusConflict, gin.H{"error": "run 已结束，无法取消"})
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, "run 已结束，无法取消", nil)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
 	if h.audit != nil {
@@ -766,17 +767,17 @@ func (h *FinModelHandler) CancelRun(c *gin.Context) {
 func (h *FinModelHandler) scopedRun(c *gin.Context) (*repository.FinModelRun, bool) {
 	id := c.Param("id")
 	if h.repo == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
 		return nil, false
 	}
 	run, err := h.repo.GetModelRun(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found", nil)
 		return nil, false
 	}
 	tenant := middleware.GetTenantID(c)
 	if tenant != "" && run.LegalEntityID != tenant {
-		c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
+		writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found", nil)
 		return nil, false
 	}
 	return run, true
@@ -799,7 +800,7 @@ func (h *FinModelHandler) GroupRuns(c *gin.Context) {
 	exchangeRateVersion := strings.TrimSpace(c.Query("exchange_rate_version"))
 	rateType := strings.TrimSpace(c.Query("rate_type"))
 	if len(runIDs) == 0 || (len(runIDs) == 1 && strings.TrimSpace(runIDs[0]) == "") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "run_ids is required"})
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "run_ids is required", nil)
 		return
 	}
 	tenant := middleware.GetTenantID(c)
@@ -811,17 +812,17 @@ func (h *FinModelHandler) GroupRuns(c *gin.Context) {
 			continue
 		}
 		if h.repo == nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "repository unavailable"})
+			writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
 			return
 		}
 		run, err := h.repo.GetModelRun(c.Request.Context(), id)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "run not found: " + id})
+			writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found: " + id, nil)
 			return
 		}
 		lines, err := h.repo.ListRunLines(c.Request.Context(), id)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 			return
 		}
 		values := map[string]*float64{}
@@ -861,16 +862,16 @@ func (h *FinModelHandler) GroupRuns(c *gin.Context) {
 	exchangeRateType := ""
 	if exchangeRateVersion != "" {
 		if h.fx == nil {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "exchange_rate_version requested but the rate version reader is unavailable"})
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, "exchange_rate_version requested but the rate version reader is unavailable", nil)
 			return
 		}
 		basis, err := currencytranslation.NewBasis(c.Request.Context(), exchangeRateVersion, &repoRateReader{repo: h.fx})
 		if err != nil {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": fmt.Sprintf("failed to load exchange rate version %q: %v", exchangeRateVersion, err)})
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, fmt.Sprintf("failed to load exchange rate version %q: %v", exchangeRateVersion, err), nil)
 			return
 		}
 		if rateType != "" && !strings.EqualFold(rateType, basis.Version().VersionType) {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": fmt.Sprintf("rate_type %q conflicts with version type %q", rateType, basis.Version().VersionType)})
+			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, fmt.Sprintf("rate_type %q conflicts with version type %q", rateType, basis.Version().VersionType), nil)
 			return
 		}
 		exchangeRateType = basis.Version().VersionType
@@ -901,7 +902,7 @@ func (h *FinModelHandler) GroupRuns(c *gin.Context) {
 
 	summary, err := finmodel.Summarize(members, exchangeRateVersion)
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeBusinessFailure, err.Error(), nil)
 		return
 	}
 	summary.ExchangeRateType = exchangeRateType

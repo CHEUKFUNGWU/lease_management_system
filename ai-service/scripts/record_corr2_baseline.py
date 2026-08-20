@@ -451,6 +451,16 @@ def main():
             input_payload = {"text": text, "content_type": ct, "contract_id": contract_id, "llm_response": llm_wire}
         else:
             _, xlsx_bytes, ct = source
+            # The xlsx embeds timestamps, so its bytes are not reproducible
+            # across runs. Store it as a committed asset once and reuse the
+            # committed bytes thereafter — the baseline stays byte-identical
+            # and the committed file is the single source of truth.
+            xlsx_asset = BASE / "assets" / f"{name}.xlsx"
+            xlsx_asset.parent.mkdir(parents=True, exist_ok=True)
+            if xlsx_asset.exists():
+                xlsx_bytes = xlsx_asset.read_bytes()
+            else:
+                xlsx_asset.write_bytes(xlsx_bytes)
             source_adapter = FixedExcelSourceAdapter(xlsx_bytes, ct)
             object_name = f"{name}.xlsx"
             input_payload = {"xlsx_base64": __import__("base64").b64encode(xlsx_bytes).decode(),

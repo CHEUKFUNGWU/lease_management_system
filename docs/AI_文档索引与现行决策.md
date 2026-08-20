@@ -63,7 +63,7 @@ FP&A 版本治理与滚动预测
 |---|---|---|
 | [AI Agent 与 CLI 架构演进 PRD](AI_Agent_与_CLI_架构演进_PRD.md) | **Historical** | AG-001~035 已交付（`b1532b4`）。Tool Runtime / Gateway / Capability 契约**仍然有效且不变** |
 | ~~AI Agent 与 CLI 架构演进实施计划~~ | **已归档** `archive/ai-runtime-2026-08/` | 交付记录，1816 行；对外契约以保留的 PRD 为准 |
-| [AI Agent 运行运维手册](AI_Agent_运行运维手册.md) | Current（**随 W5/W6 修订**） | chat 与 planner 已随 W4 内迁 core-service（`internal/llm` / `agentrunner.PlannerLLM`） |
+| [AI Agent 运行运维手册](AI_Agent_运行运维手册.md) | Current | chat / parser / planner / upload 均已内迁 core-service（`internal/llm` / `internal/aiintake` / `agentrunner.PlannerLLM` / `miniostore`），ai-service 已退役 |
 | ~~AI Agent 外部验收清单~~ | **已归档** 同上 | 后续验收以 Agent Core 设计 §11 与底稿方案 §12 为准 |
 
 ### 1.3 合规、契约与评测
@@ -137,7 +137,7 @@ FP&A 版本治理与滚动预测
 | **D18** | **勾稽不得恒真**。拿别名比自己、拿定义式倒减自己、返回 `not_applicable` 的桩都不算检查；按构造必然成立的关系改写为构造断言并同步改规格。T1–T16 每条必须有先红后绿的反向测试 | 初版 T2/T4/T11 的恒真实现与桩 | PRD 附录 B（已随 P0-4 修订）；`finmodel/tieouts.go` |
 | **D19** | **期初的两种失败走相反路径**：`openingAbsent` 降级、`openingRejected` 阻止 run 落库 | 初版把闸失败一律降级为「未提供期初」 | 模块深化 SM4；`finmodel/engine.go` |
 | **D20** | **AI 写类工具只写 draft 层**，`source=ai_suggestion`；approved-only 读取永不回采 draft。**端口未接线的工具诚实拒绝，但不得用 nil 端口无条件注册**（会让重名注册把真实端口挡在外面） | 「工具注册了就算接线了」的隐含假设（1d67dd6 的声明曾因此落空） | ADR-0025；`aiagent/agent.go` 的 `finModelRepo == nil` 二选一分支 |
-| **D21** | **ADR-0023 的退役只完成到 W3；W4/W5 未执行。** 文档不得再以「ai-service 已退役」为前提描述现状 | 多份设计文档中「ai-service 退役映射」被读成已完成事实 | 本文 §3 缺口 G7 |
+| **D21** | **ADR-0023 的退役已全部完成（W4–W6，2026-08-20）。** ai-service 目录已删除，任何代码不得再调用已退役的 Python 端点；现状以 AGENTS.md「当前工程事实」与本文 G6/G7 已解决为准 | 多份设计文档中「ai-service 退役映射」被读成已完成事实（现已成真） | 本文 §3 缺口 G7 → ✅ |
 
 ---
 
@@ -150,8 +150,8 @@ FP&A 版本治理与滚动预测
 | G3 经营数据语义映射 | ✅ **已解决**（Profile 复用与漂移检测未做） | — / 阶段 3 |
 | G4 无代码执行能力 | 未解决（**刻意后置**） | ADR-0025 §5，阶段 4 |
 | G5 无 xlsx/docx 产出（导出仍是 CSV） | 🟡 **部分解决**：`workingpaper` xlsx/docx 确定性渲染器 + lint 门 + `GET /ai/chat/artifacts/:id/export` 端点已落地；端到端 WorkingPaper 生成链路（S1 底稿）未接线 | 阶段 0 → 阶段 1 |
-| **G6 PyMuPDF 的 AGPL 风险** | **未解决。** `ai-service/requirements.txt` 仍钉着 `pymupdf==1.23.0`，`document_extractor.py` 仍 `import fitz`。与部署形态无关，建议单独立项 | ADR-0024 |
-| **G7 ai-service 未退役（新登记，2026-08-20）** | **未解决（W4 已完成、部分收窄）。** W4：chat 两条依赖（`/chat` ×2）与 planner（`/api/v1/agent/plan`）均已迁入 Go（`internal/llm` + `agentrunner.PlannerLLM`），planner 共享密钥已删除。W5 未执行：Go 仍经 `AI_SERVICE_URL` 调用 4 个 Python 端点（`/parse/contract`、`/parse/payment-schedule`、`/parse/contract-batch`、`/parse/event`）+ `handlers/retail_mapping_ai.go` 的 `/suggest-mapping` + `files.py` 的 `/files/upload`。**G6 是它的子集，一起做才划算** | ADR-0023 W5 |
+| **G6 PyMuPDF 的 AGPL 风险** | ✅ **已解决（W6，2026-08-20）。** `ai-service/` 整目录已删除，`pymupdf` 与 `fitz` 不再存在于仓库代码；解析改由 `internal/docparse`（anydoc / PaddleOCR）承担 | ADR-0024 |
+| **G7 ai-service 未退役（新登记，2026-08-20）** | ✅ **已解决（W6，2026-08-20）。** W4+W5 全部落地：chat（`/chat` ×2）与 planner（`/api/v1/agent/plan`）迁入 `internal/llm` / `agentrunner.PlannerLLM`；四个 `/parse/*` 迁入 `internal/aiintake` 生产侧 + `internal/docparse`；`/suggest-mapping` 迁入 `internal/llm`；`/files/upload` 迁入 `miniostore` 写入侧。§0.2 九条依赖点清零，ai-service 整目录删除 | ADR-0023 W4–W6 |
 
 > W1 + 阶段 0 已按 [CodebaseDesign 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) 交付：`internal/agentcore`（纯循环内核 + ACORE-1/5/6/8 测试）、`protected_measures`（10 项 + 词法探针）、`internal/workingpaper`（I1/I2/I3/I6 lint + 封面 + 渲染）、`internal/docparse`（CSV/anydoc/PaddleOCR）、`internal/agentseval`（不变量与 triage 用例，harness 第三段 `invariants`）、CLI 三层命令（commit 只对人）、Web（去关键词猜测、tool_start 消费、working_paper 渲染）。
 >
@@ -185,8 +185,8 @@ FP&A 版本治理与滚动预测
 | 3 | protected_measures 清单首次定稿 | ~~阶段 0~~ **不阻塞**——写一条带日期和理由的决策日志条目即可（D15） | ADR-0025 §2 |
 | 4 | Tier B 产物能否导出给外部审计师 | 阶段 4 | 底稿方案 §15.5 |
 | 5 | ~~固化通道的季度人力承诺~~ → 改为**自动建 issue** | 不阻塞 | ADR-0025 §4 |
-| 6 | anydoc 二进制的供应链管理（版本 + checksum 钉死方式） | W5 | ADR-0024 |
-| 7 | `controlledxlsx` 与 excelize 的去留 | W5 | Agent Core 设计 §12.1 |
+| 6 | anydoc 二进制的供应链管理（版本 + checksum 钉死方式） | ✅ **已定（W5-1）**：`@firecrawl/anydoc@0.2.0` + npm SRI integrity（sha512）钉死进 core-service Dockerfile（`Dockerfile` / `Dockerfile.agent-runner` 的 `anydoc-install` 阶段），`ANYDOC_BIN_PATH` 由 compose 传入 | ADR-0024 |
+| 7 | `controlledxlsx` 与 excelize 的去留 | ✅ **已定（W5-3）**：`controlledxlsx` **保留**——受控模板路径的零依赖优点成立，不与 excelize 合并；intake 的 Excel 确定性读取统一走 `internal/aiintake/excel.go`（excelize），`internal/controlledxlsx` 仅服务受控模板导出 | Agent Core 设计 §12.1 |
 | 8 | 上下文压缩是否进 W1–W6 | W6 | Agent Core 设计 §12.2 |
 
 **当前没有阻塞阶段 0 的未决项。** 阶段 0 + 阶段 1 可以立即开工。

@@ -36,12 +36,12 @@
 - `core-service/internal/`：27 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentcore` / `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore`
 - `web/app/`：31 个页面。零售主线 `/operating-pulse`、`/store-360`、`/scenario-workbench`；**财务主线 `/store-pnl`（单店利润表）、`/financial-model`（法人级三表模型工作台）**
 - Agent Tool：`lease.*` 36 个、`retail.*` 5 个（含 `retail.working_paper.store.generate`、`retail.store_days.import.preview`）、**`fpna.*` 6 个**（`statement_model.read` / `statement_model.evaluate` / `working_paper.finmodel.generate` / `assumptions.suggest` / `assumptions.suggest_batch` / `memos.model_diff.draft`）
-- Docker Compose 默认 5 个服务（PostgreSQL、MinIO、Core、AI、Web），`worker` profile 可另起 `agent-runner`
+- Docker Compose 默认 4 个服务（PostgreSQL、MinIO、Core、Web），`worker` profile 可另起 `agent-runner`
 - Go 1.25（`go.mod` 与两个 Dockerfile 一致）；前端 Next.js 14 + Node 20
 - IFRS 16 回归：22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，未经第三方会计师复核，**不得对外表述为审计背书**
 - 零售 MVP 与三表模型均只完成固定 seed / 构造数据的内部验证；**无真实 POS/ERP/GL 联调，无客户验证**，相关结论一律保持 `unvalidated`
 
-**ai-service（Python）尚未退役。** ADR-0023 决定退役自研 Python，但只完成到 W3——W4（`internal/llm`）与 W5（`internal/docparse` 接管全部解析）**未执行**。当前 Go 仍通过 `AI_SERVICE_URL` 调用 6 个 Python 端点：`/api/v1/chat`（两处）、`/parse/contract`、`/parse/payment-schedule`、`/parse/contract-batch`、`/parse/event`，另有 `handlers/retail_mapping_ai.go` 的列映射。`internal/docparse` 已存在但只服务 triage / page-fill 链路，不是这六条的替代。**改这些路径前先确认你在哪一侧**，不要按「ai-service 已退役」的旧叙述写代码。连带事实：`ai-service/requirements.txt` 仍钉着 `pymupdf==1.23.0`，ADR-0024 要删的 AGPL 依赖**仍在**（索引文档的缺口 G6）。
+**ai-service 已退役（W6，2026-08-20 完成 W4+W5）。** Python 自研已从仓库删除：LLM 走 `internal/llm`、解析走 `internal/docparse` + `internal/aiintake` 生产侧、上传走 `miniostore` 写入侧、planner 走进程内 `agentrunner.PlannerLLM`。ADR-0023/0024 自此为真；CORR-2 基线（门 A + 门 B）已脱离 Python。
 
 **命名现状：** GitHub 仓库已于 2026-08 改名为 `retail_performance_workstation`，**但代码命名空间没有跟着改，也不打算改**：容器、数据库、MinIO bucket、JWT、Go module（`github.com/lease-management-system/core-service`）、CLI 与 Compose 项目名仍是 `lease_*`。
 
@@ -79,7 +79,7 @@
 
 - **Web** (Next.js + TypeScript + Ant Design + Recharts)：经营脉搏、门店 360、租金谈判测算、单店利润表、三表模型工作台、合同台账、AI 录入、月结、报表、组合分析等 31 个页面
 - **Core Service** (Go + Gin)：权限、合同主数据、付款计划、事件、IFRS 16 计量、月结、ERP 导出/回写、审计日志、零售 KPI 语义层与经营分析服务、**三表财务模型引擎与单店利润表投影**、Agent Gateway、Agent Core（`agentcore` 纯循环内核 + 治理中间件链）
-- **AI Service** (Python + FastAPI)：文件解析、PaddleOCR、LLM 字段抽取、草稿生成、置信度与原文定位。**按 ADR-0023 应退役，实际未退役**——现状见上节
+- ~~**AI Service** (Python + FastAPI)~~：**按 ADR-0023/0024 已退役并删除（W6）**。文件解析、PaddleOCR、LLM 字段抽取、草稿生成、置信度与原文定位均已由 Go 侧 `internal/docparse` / `internal/aiintake` / `internal/llm` 承担；任何代码不得再新增对已退役 Python 端点的调用
 - **PostgreSQL**：正式业务数据、经营事实、AI 草稿、任务状态、审核记录
 - **MinIO**：原始上传文件、合同附件、OCR 中间产物、解析结果
 

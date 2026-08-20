@@ -54,36 +54,9 @@ services:
       REFRESH_TOKEN_CLEANUP_SECONDS: ${REFRESH_TOKEN_CLEANUP_SECONDS:-3600}
       AGENT_CAPABILITY_SECRET: ${AGENT_CAPABILITY_SECRET:-lease_agent_capability_secret}
       AGENT_CAPABILITY_TTL_SECONDS: ${AGENT_CAPABILITY_TTL_SECONDS:-300}
-LOG_LEVEL: ${LOG_LEVEL:-info}
-      # LLM 配置（W4：chat 已由 internal/llm 在 core 进程内直连 provider；
-      # ai-service 解析端点暂复用，W6 删服务后这些变量随 core-service 生效）
-      LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
-      LLM_PRICING_VERSION: ${LLM_PRICING_VERSION:-unconfigured}
-      LLM_INPUT_PRICE_USD_PER_MILLION: ${LLM_INPUT_PRICE_USD_PER_MILLION:-0}
-      LLM_OUTPUT_PRICE_USD_PER_MILLION: ${LLM_OUTPUT_PRICE_USD_PER_MILLION:-0}
-      # AnyDoc CLI supply chain (ADR-0024 §3): pinned in the runtime image
-      # Dockerfile; the path below matches the installed CLI.
-      ANYDOC_BIN_PATH: ${ANYDOC_BIN_PATH:-/usr/local/bin/anydoc}
-    ports:
-      - "${CORE_PORT:-8080}:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-
-  ai-service:
-    build:
-      context: ./ai-service
-      dockerfile: Dockerfile
-    container_name: lease-ai
-    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # LLM 配置（W4/W5：chat/parse/upload 均在 core 进程内，经 internal/llm、
+      # aiintake 与 docparse 直连；ai-service 已在 W6 退役）
       LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
@@ -98,15 +71,16 @@ LOG_LEVEL: ${LOG_LEVEL:-info}
       PADDLEOCR_ACCESS_TOKEN: ${PADDLEOCR_ACCESS_TOKEN:-}
       PADDLEOCR_MODEL: ${PADDLEOCR_MODEL:-PaddleOCR-VL-1.5}
       PADDLEOCR_ENABLED: ${PADDLEOCR_ENABLED:-false}
-      CORE_SERVICE_URL: http://core-service:8080
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # AnyDoc CLI supply chain (ADR-0024 §3): pinned in the runtime image
+      # Dockerfile; the path below matches the installed CLI.
+      ANYDOC_BIN_PATH: ${ANYDOC_BIN_PATH:-/usr/local/bin/anydoc}
     ports:
-      - "${AI_PORT:-8081}:8000"
+      - "${CORE_PORT:-8080}:8080"
     depends_on:
-      - core-service
-      - minio
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
 
   # Optional production worker. Keep it behind the worker profile so the
   # normal MVP still starts the original five services. The worker has only a
@@ -144,7 +118,6 @@ LOG_LEVEL: ${LOG_LEVEL:-info}
       - "${WEB_PORT:-3000}:3000"
     depends_on:
       - core-service
-      - ai-service
 
 volumes:
   postgres_data:

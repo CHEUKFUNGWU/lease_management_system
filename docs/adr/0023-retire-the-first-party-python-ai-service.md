@@ -97,3 +97,23 @@ the controlled template is a virtue, not duplication. Whether it merges into the
   calls it.
 - Not a claim that Go is a better language than Python. The claim is narrower:
   this particular service is glue, and glue belongs where the callers are.
+
+## Addendum (2026-08-20)
+
+W4–W6 completed on the `docs/retail-bp-workstation-prd` branch. The
+`ai-service/` directory has been deleted; the nine Python call sites in §0.2
+are zero. Corrections to the original estimate:
+
+- The intake migration was not "~400 lines of glue" — it was 1,973 lines
+  (`producer.py` 1263 + `models.py` 398 + `adapters.py` 312) of business rules
+  (discount-rate/currency/critical-field checks, lease_scope normalization,
+  confidence sanitization, evidence-quote matching, payment validation and a
+  deterministic table fallback). Its migration risk lived exactly where the
+  original ADR underestimated it.
+- The CORR-2 labelled corpus is now a Go-side JSON fixture set
+  (`internal/agentseval/testdata/corr2`) recorded from the old Python producer
+  with fixed LLM responses — door A (48 cases) and door B (4 prompt golden
+  files) — and the Go producer reproduces it byte-for-byte. The baseline is
+  replayable without Python.
+- `controlledxlsx` was kept (per the original decision); the `excelize` Excel
+  reader for intake lives in `internal/aiintake/excel.go`.

@@ -39,7 +39,7 @@ The transformation is **additive**. Retail operations analytics was layered on t
 | IFRS 16 计量回归<br>IFRS 16 measurement regression | ⚠️ 22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，正式审计背书需第三方会计师复核<br>22 cases / 148 assertions pass, but the golden answers remain `pending_third_party_review`; formal audit endorsement requires a third-party accountant |
 | 三表财务模型与单店利润表<br>Three-statement model & store P&L | ✅ S1–S5 全部编号功能项落地并有测试锁定（2026-08-20）；19 项评审修复已合并<br>Every numbered S1–S5 requirement is implemented and test-locked (2026-08-20); the 19 review fixes are merged |
 | 三表模型的真实 GL / 试算平衡表联调<br>Live GL / trial-balance integration | ⚠️ 未完成。引擎与四个生产适配器已接线，但只跑过构造数据；端口缺数据时诚实降级为缺口，不产出数字<br>Not done. The engine and its four production adapters are wired, but only exercised against constructed data; a port with no data degrades to an explicit gap rather than a number |
-| Python `ai-service` 退役（ADR-0023）<br>Retiring the Python AI service | ⚠️ 只做到 W3。W4/W5 未执行，Go 仍调用 6 个 Python 端点；`pymupdf` 的 AGPL 风险（ADR-0024）仍在<br>Only W1–W3 landed. W4/W5 are outstanding, Go still calls six Python endpoints, and the `pymupdf` AGPL exposure (ADR-0024) remains |
+| Python `ai-service` 退役（ADR-0023/0024）<br>Retiring the Python AI service | ✅ **已退役并删除（W6，2026-08-20）**。LLM/解析/上传/planner 全部迁入 Go（`internal/llm`、`internal/docparse`、`internal/aiintake` 生产侧、`miniostore`、`agentrunner.PlannerLLM`）；`pymupdf` AGPL 依赖已随 ai-service 一起删除<br>**Retired and removed.** All LLM / parsing / upload / planner paths now run in Go; the `pymupdf` AGPL dependency is gone with the ai-service directory |
 
 **关于命名 / On naming:** 仓库、容器、数据库和 JWT 仍使用 `lease_*` 命名。产品定位已经调整，但底层大规模物理重命名要等内部技术门槛通过后再决定 —— 2026-05 已经改过一次名，不再频繁变更。
 The repository, containers, database and JWT still use the `lease_*` namespace. Positioning has moved; a second large physical rename is deliberately deferred until the internal validation gate is passed (the project was already renamed once in 2026-05).
@@ -115,7 +115,7 @@ The finance-manager layer: four-wall economics per store, and a linked income st
 
 | 功能 / Feature | 说明 / Description |
 |---|---|
-| AI 录入<br>AI intake | `/ai-chat` 上传合同或台账文件，LLM 抽取字段并生成结构化草稿卡片。解析走两条链路：Go 侧 `internal/docparse`（CSV / anydoc / PaddleOCR，按是否需要证据坐标分流，惰性 OCR）服务分诊与填表；合同 / 租金表 / 事件的抽取仍在 Python `ai-service`（PaddleOCR 优先、PyMuPDF fallback）。**后者按 ADR-0023/0024 应当退役，尚未执行** —— 见「当前状态」。<br>Upload contracts or ledgers at `/ai-chat` for LLM field extraction into structured draft cards. Parsing runs on two paths: Go's `internal/docparse` (CSV / anydoc / PaddleOCR, routed by whether evidence coordinates are needed, with lazy OCR) serves triage and page-fill, while contract, rent-schedule and event extraction still runs in the Python `ai-service` (PaddleOCR first, PyMuPDF fallback). **The latter is slated for retirement under ADR-0023/0024 and has not been retired yet** — see Current Status. |
+| AI 录入<br>AI intake | `/ai-chat` 上传合同或台账文件，LLM 抽取字段并生成结构化草稿卡片。解析统一走 Go 侧 `internal/docparse`（CSV / anydoc / PaddleOCR，按是否需要证据坐标分流，惰性 OCR）+ `internal/aiintake` 生产侧抽取归一化；`ai-service` 已退役（W6）。<br>Upload contracts or ledgers at `/ai-chat` for LLM field extraction into structured draft cards. Parsing runs in Go through `internal/docparse` (CSV / anydoc / PaddleOCR, routed by evidence-coordinate need, lazy OCR) and the `internal/aiintake` producer; the Python `ai-service` is retired (W6). |
 | 文件分诊<br>File triage | `lease.file.triage` 做确定性分诊；域外文件（发票、劳动合同、宣传册）**显式拒绝并回问用户**，没有「猜成合同」的兜底。<br>`lease.file.triage` classifies deterministically. Out-of-domain files (invoices, employment contracts, brochures) are refused explicitly and referred back to the user; there is no silent "assume it's a contract" fallback. |
 | 底稿产出<br>Working papers | `workingpaper` 按单元格级 provenance 渲染 xlsx / docx，经 fail-closed lint 才能导出：Certified 单元格必须挂已完成审计的 Tool 调用，勾稽未全绿的 run 不产出底稿，缺失值跳格而不填 0。<br>`workingpaper` renders xlsx/docx with cell-level provenance behind a fail-closed lint: a certified cell must reference a completed, audited tool call, a run with unpassed tie-outs yields no paper at all, and a missing value leaves the cell empty rather than writing zero. |
 | Human-in-the-loop | AI 草稿必须人工确认才能创建合同草稿，正式入库仍走审批。AI 不得猜测折现率，缺失时标记 `discount_rate_missing`。<br>An AI draft only becomes a contract draft after human confirmation, and formal entry still goes through approval. The AI may not guess a discount rate; a missing one is flagged `discount_rate_missing`. |
@@ -161,8 +161,8 @@ No change made during the retail transformation may weaken these five. Each was 
 | 核心后端 / Core backend | Go 1.25 + Gin |
 | 数据访问 / Data access | pgx（手写 SQL / hand-written SQL） |
 | 数据库 / Database | PostgreSQL 16 |
-| AI 服务 / AI service | Python 3.11 + FastAPI（**待退役 / pending retirement**，ADR-0023） |
-| OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）；Go 侧 anydoc 文本层；Python 侧 PyMuPDF fallback（ADR-0024 要求删除，**尚未删除**） |
+| AI 服务 / AI service | ~~Python 3.11 + FastAPI~~（**已退役并删除 / retired and removed**，ADR-0023/0024，W6）；模型调用 `internal/llm`，文档解析 `internal/docparse` + `internal/aiintake` |
+| OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）+ anydoc（`internal/docparse`，ADR-0024 分流）；PyMuPDF 已删除 |
 | 报表产出 / Report output | excelize（xlsx，含活公式）+ 确定性 docx 渲染器 |
 | 大模型 / LLM | DeepSeek API（默认 / default）、OpenAI API（备用 / fallback） |
 | 对象存储 / Object storage | MinIO |
@@ -209,7 +209,7 @@ No change made during the retail transformation may weaken these five. Each was 
 │           ├── retailscenario/    # 确定性情景计算
 │           ├── retailsimulation/  # 固定 seed 模拟数据生成器
 │           └── ifrs16/            # IFRS 16 计量
-├── ai-service/                    # Python + FastAPI AI 服务（待退役，ADR-0023）
+# ai-service/ 已删除（W6）：解析、LLM、上传全部迁入 core-service（ADR-0023/0024）
 ├── contracts/ai-intake.v1/        # 抽取契约 JSON Schema（实现方可换，契约不变）
 ├── web/                           # Next.js 前端
 │   └── app/
@@ -241,7 +241,7 @@ No change made during the retail transformation may weaken these five. Each was 
 
 ### 1. 准备环境 / Prerequisites
 
-Docker / Docker Compose、Make、Go 1.25+、Node.js 20+、Python 3.11+
+Docker / Docker Compose、Make、Go 1.25+、Node.js 20+（Python 已随 ai-service 退役移出）
 
 ### 2. 配置环境变量 / Configure environment
 
@@ -397,7 +397,6 @@ npm test
 
 cd ..
 make ifrs16-regression
-PYTHONPYCACHEPREFIX=$(pwd)/.pycache python3 -m py_compile ai-service/app/routers/parse.py
 ```
 
 真实 PostgreSQL 集成测试需要设置 `TEST_DATABASE_URL`，未设置时相关用例会正常 skip。

@@ -17,8 +17,11 @@ AI 默认运行在 Assist Mode。合同、付款计划和事件的 AI 结果只�
 ```bash
 docker compose up -d --build
 curl -fsS "${CORE_URL:-http://localhost:8080}/health"
-curl -fsS "${AI_URL:-http://localhost:8081}/health"
 curl -fsS "${WEB_URL:-http://localhost:3000}/login" >/dev/null
+
+# 说明：ai-service 已随 ADR-0023/0024 退役（W6）。LLM/解析/上传/planner 全部在
+# core-service 进程内（internal/llm、internal/docparse、internal/aiintake、
+# miniostore、agentrunner.PlannerLLM），不再有独立的 Python 健康检查端点。
 ```
 
 启动 Worker 前，必须在当前 shell 注入短时效、最小权限的 `AGENT_GATEWAY_TOKEN`。不要把 JWT 写入 `.env`、Compose 文件或 CI 日志。
@@ -29,7 +32,7 @@ docker compose --profile worker up -d --build agent-runner
 docker compose ps
 ```
 
-本地宿主机端口可以通过 `.env` 的 `CORE_PORT`/`AI_PORT` 覆盖；容器内部 Core 与 AI 地址分别固定为 `http://core-service:8080` 和 `http://ai-service:8000`。
+本地宿主机端口可以通过 `.env` 的 `CORE_PORT` 覆盖；容器内部 Core 地址固定为 `http://core-service:8080`。（`AI_PORT` 与 `http://ai-service:8000` 已随 ai-service 退役删除。）
 
 ## 3. 监控接口
 
@@ -57,7 +60,7 @@ curl -fsS "$CORE_URL/api/v1/agent/metrics/prometheus" \
 
 ## 4. LLM 使用量与成本
 
-AI Planner 通过 `llm-usage.v1` 返回输入 token、输出 token、总 token、供应商、模型、价格版本和成本状态，并以 `planner_usage` Run Event 写入 Trace。
+进程内 LLM Planner（`agentrunner.PlannerLLM`）通过 `llm-usage.v1` 返回输入 token、输出 token、总 token、供应商、模型、价格版本和成本状态，并以 `planner_usage` Run Event 写入 Trace。
 
 成本只有在以下条件同时满足时才可计算：
 
@@ -69,7 +72,7 @@ AI Planner 通过 `llm-usage.v1` 返回输入 token、输出 token、总 token�
 
 ## 5. 发布前验收
 
-每次 Core、AI Service 或 Runner 发布至少执行：
+每次 Core 或 Runner 发布至少执行：
 
 ```bash
 cd core-service

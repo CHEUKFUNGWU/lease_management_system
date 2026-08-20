@@ -125,3 +125,12 @@ unknown quality".
 - Not a decision to remove OCR from the product. PaddleOCR remains the primary
   engine; only PyMuPDF is removed.
 - Not an evaluation of anydoc for OCR. It has none, by design.
+
+## Addendum (2026-08-20)
+
+The AGPL dependency is gone: `ai-service/requirements.txt` (and the whole
+`ai-service/` directory) was deleted in W6. The parsing split described above
+is implemented in `internal/docparse` with the anydoc + PaddleOCR adapters, and
+the intake producer consumes it via `internal/aiintake`. The anydoc CLI supply
+chain is pinned in the core-service Dockerfile (`@firecrawl/anydoc@0.2.0` with
+its npm SRI integrity hash).

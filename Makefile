@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart logs migrate migrate-status migrate-baseline web core ai db reset-db ifrs16-regression
+.PHONY: help setup up down restart logs migrate migrate-status migrate-baseline web core db reset-db ifrs16-regression
 
 help: ## 显示帮助信息
 	@echo "零售经营分析工作站 — 常用命令"
@@ -62,9 +62,6 @@ web: ## 进入前端开发容器
 
 core: ## 进入核心服务容器
 	docker-compose exec core-service sh
-
-ai: ## 进入 AI 服务容器
-	docker-compose exec ai-service bash
 
 ifrs16-regression: ## 运行 IFRS 16 计量回归测试并生成对数报告
 	cd core-service && GOCACHE=$$(pwd)/.gocache go test ./internal/services/ifrs16

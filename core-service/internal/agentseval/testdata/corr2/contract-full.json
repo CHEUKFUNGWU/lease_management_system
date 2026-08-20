@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_d20b33a9782444e0b7581733483ba2ce",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-full",
     "file_id": "file-contract-full",
     "mode": "assist",

@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_afde6f070b574b4dba38692b3d7cdf11",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-negative-evidence",
     "file_id": "file-contract-negative-evidence",
     "mode": "assist",

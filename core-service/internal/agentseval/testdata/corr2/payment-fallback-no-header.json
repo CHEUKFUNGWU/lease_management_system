@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_05c6afbe178344259daf8ff93999381b",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-fallback-no-header",
     "file_id": "file-payment-fallback-no-header",
     "mode": "assist",

@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_7a4393cac8c4479386f726d3f37b05e4",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-negative-amount",
     "file_id": "file-payment-negative-amount",
     "mode": "assist",

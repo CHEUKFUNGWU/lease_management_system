@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_a2ab5d0a28b747258adc6a6d5ba5877a",
+    "intake_id": "intake_frozen_4119639092e6",
     "task_id": "task_event_file-event-unstandardized-type",
     "file_id": "file-event-unstandardized-type",
     "mode": "assist",

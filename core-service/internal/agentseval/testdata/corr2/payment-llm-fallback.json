@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_51807ff6969841ccbc47c40d1597fc79",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-llm-fallback",
     "file_id": "file-payment-llm-fallback",
     "mode": "assist",

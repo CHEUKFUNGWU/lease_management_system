@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_61c28ce23a6c4c9693c86b81fd6425f8",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-unsafe-confidence",
     "file_id": "file-contract-unsafe-confidence",
     "mode": "assist",

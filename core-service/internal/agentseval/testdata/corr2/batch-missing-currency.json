@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_92b5839bf9dc4fdf8ef5b2503aa34f0b",
+    "intake_id": "intake_frozen_7b7100529bc0",
     "task_id": "task_batch_file-batch-missing-currency",
     "file_id": "file-batch-missing-currency",
     "mode": "assist",

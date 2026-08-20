@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_ae1d706b13444f80812d54ea4553d431",
+    "intake_id": "intake_frozen_4119639092e6",
     "task_id": "task_event_file-event-index-update",
     "file_id": "file-event-index-update",
     "mode": "assist",

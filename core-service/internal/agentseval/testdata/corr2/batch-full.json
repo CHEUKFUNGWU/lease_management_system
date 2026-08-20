@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_7c77a9cde358401594dbf7dea93c0f3f",
+    "intake_id": "intake_frozen_7b7100529bc0",
     "task_id": "task_batch_file-batch-full",
     "file_id": "file-batch-full",
     "mode": "assist",

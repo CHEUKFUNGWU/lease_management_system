@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_acfa14bd9c7e427b978b5e19ad359fcf",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-full",
     "file_id": "file-payment-full",
     "mode": "assist",

@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_b7e39ffb150d42ef92ba0d15d1e311d5",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-low-confidence",
     "file_id": "file-payment-low-confidence",
     "mode": "assist",

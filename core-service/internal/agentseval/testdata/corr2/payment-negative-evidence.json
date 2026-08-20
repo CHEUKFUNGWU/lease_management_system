@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_e0c51e43c02c4e7aa9a64a461a590b17",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-negative-evidence",
     "file_id": "file-payment-negative-evidence",
     "mode": "assist",

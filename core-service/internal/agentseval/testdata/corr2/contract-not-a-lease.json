@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_963a701c53e94765911f6da64035563d",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-not-a-lease",
     "file_id": "file-contract-not-a-lease",
     "mode": "assist",

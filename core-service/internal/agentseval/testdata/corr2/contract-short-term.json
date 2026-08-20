@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_223ed705f4ac4d3487a82f75a3827bdb",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-short-term",
     "file_id": "file-contract-short-term",
     "mode": "assist",

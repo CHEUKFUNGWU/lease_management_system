@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_e15532e9e71041358c1c9a61a5280d52",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-mixed-timing",
     "file_id": "file-payment-mixed-timing",
     "mode": "assist",

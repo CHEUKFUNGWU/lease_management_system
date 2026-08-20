@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_035e9b5b568145608744ec0327002dc5",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-no-discount-rate",
     "file_id": "file-contract-no-discount-rate",
     "mode": "assist",

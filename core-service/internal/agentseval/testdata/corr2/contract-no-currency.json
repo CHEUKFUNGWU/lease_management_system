@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_c4669ec8b61f4d8a9585b1f315f2428d",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-no-currency",
     "file_id": "file-contract-no-currency",
     "mode": "assist",

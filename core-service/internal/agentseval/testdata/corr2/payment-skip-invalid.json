@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_2a141ee6164a4465b4cd435ec275b4b1",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-skip-invalid",
     "file_id": "file-payment-skip-invalid",
     "mode": "assist",

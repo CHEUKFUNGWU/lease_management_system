@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_945ee1057af64ae68189fce506f8d6f7",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-missing-critical",
     "file_id": "file-contract-missing-critical",
     "mode": "assist",

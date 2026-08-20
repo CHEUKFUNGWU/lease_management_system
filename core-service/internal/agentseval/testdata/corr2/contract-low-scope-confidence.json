@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_d74d2c1496ff4bfabcbf38ec91b02cc6",
+    "intake_id": "intake_frozen_800c327aefb3",
     "task_id": "task_file-contract-low-scope-confidence",
     "file_id": "file-contract-low-scope-confidence",
     "mode": "assist",

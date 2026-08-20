@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_eb1b431a5d25491eb2ac1a1dc0a77a7e",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-missing-timing",
     "file_id": "file-payment-missing-timing",
     "mode": "assist",

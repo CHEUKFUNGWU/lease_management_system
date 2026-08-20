@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_45ccde373d8247429d93314f40cbb5eb",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-turnover-rent",
     "file_id": "file-payment-turnover-rent",
     "mode": "assist",

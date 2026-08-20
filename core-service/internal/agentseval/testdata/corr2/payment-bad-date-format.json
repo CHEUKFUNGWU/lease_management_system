@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_46c812e1497647af8ba76f31aa829aab",
+    "intake_id": "intake_frozen_965b4054749d",
     "task_id": "task_ps_file-payment-bad-date-format",
     "file_id": "file-payment-bad-date-format",
     "mode": "assist",

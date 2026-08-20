@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_6d10605b8daf456d8650b79d005d8ad4",
+    "intake_id": "intake_frozen_4119639092e6",
     "task_id": "task_event_file-event-early-termination",
     "file_id": "file-event-early-termination",
     "mode": "assist",

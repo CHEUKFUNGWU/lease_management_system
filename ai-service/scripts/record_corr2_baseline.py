@@ -108,7 +108,11 @@ def run_producer(command, source, llm_resp):
     llm = FixedLLMAdapter(json.dumps(llm_resp, ensure_ascii=False)
                           if isinstance(llm_resp, (dict, list)) else llm_resp)
     result = asyncio.run(producer.produce(command, source, llm))
-    return json.loads(result.model_dump_json())
+    payload = json.loads(result.model_dump_json())
+    # intake_id is a fresh UUID per run; the baseline must be byte-reproducible,
+    # so freeze it to a deterministic value derived from the case identity.
+    payload["intake_id"] = "intake_frozen_" + __import__("hashlib").md5(command.kind.value.encode()).hexdigest()[:12]
+    return payload
 
 
 def main():

@@ -9,7 +9,7 @@
   },
   "expected": {
     "schema_version": "ai-intake.v1",
-    "intake_id": "intake_a814b3b511644a5ab1053c4777a8ec3e",
+    "intake_id": "intake_frozen_4119639092e6",
     "task_id": "task_event_file-event-no-revision-params",
     "file_id": "file-event-no-revision-params",
     "mode": "assist",

@@ -1,0 +1,115 @@
+{
+  "name": "contract-both-missing",
+  "kind": "contract",
+  "input": {
+    "text": "租赁合同 编号 LEASE-CORR2-001\n承租方：示例零售有限公司（乙方）\n出租方：示例置地有限公司（甲方）\n租赁物业：示例购物中心 1 层 101 铺\n租赁起始日：2026-01-01，租赁结束日：2028-12-31\n固定租金：每月 50,000 元（不含税），每月 5 日前支付\n物业管理费：每月 3,000 元；服务费：每月 2,000 元\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "{\"extracted_fields\": {\"contract_number\": \"LEASE-CORR2-012\", \"lessee\": \"示例零售有限公司\", \"lessor\": \"示例置地有限公司\", \"fixed_rent_amount\": 50000, \"payment_timing\": \"prepaid\"}, \"confidence_scores\": {}, \"overall_confidence\": 0.8, \"missing_fields\": [], \"warnings\": []}"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_94d221e51aa744c3a760f79ec95e7259",
+    "task_id": "task_file-contract-both-missing",
+    "file_id": "file-contract-both-missing",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.8
+    },
+    "missing_fields": [
+      "commencement_date",
+      "currency",
+      "discount_rate",
+      "lease_end_date",
+      "lease_start_date"
+    ],
+    "warnings": [
+      "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+      "建议处理方式：",
+      "1. 检查合同文本中是否明确提到利率",
+      "2. 从系统政策库中查找适用的 IBR",
+      "3. 按法人/租期区间/门店类型匹配利率政策",
+      "4. 如无法唯一确定，请人工输入或选择",
+      "【必须确认】AI 未识别到合同货币。根据 IFRS 16 计量要求，货币直接影响租赁负债现值计算和后续会计分录。",
+      "请在上传后手动选择货币（CNY / USD / EUR 等）。AI 不会猜测货币。",
+      "【关键字段缺失】租赁起始日(commencement_date) 未识别到，必须人工补充",
+      "【关键字段缺失】租赁开始日(lease_start_date) 未识别到，必须人工补充",
+      "【关键字段缺失】租期结束日(lease_end_date) 未识别到，必须人工补充",
+      "【必须确认】租赁范围判定置信度不足，需要人工确认是否资本化、短期/低价值豁免或非租赁。",
+      "AI Assist Mode: 合同草稿需人工确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-contract-both-missing",
+      "object_name": "contract-both-missing.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "field_locators_not_produced_by_document_adapter"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "missing_fields",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "contract_draft",
+    "extracted_data": {
+      "contract_number": "LEASE-CORR2-012",
+      "contract_name": "",
+      "lessee": "示例零售有限公司",
+      "lessor": "示例置地有限公司",
+      "store_name": "",
+      "store_address": "",
+      "commencement_date": "",
+      "lease_start_date": "",
+      "lease_end_date": "",
+      "currency": "",
+      "asset_type": "real_estate",
+      "area_sqm": 0.0,
+      "fixed_rent_amount": 50000.0,
+      "payment_frequency": "",
+      "payment_timing": "prepaid",
+      "renewal_option": false,
+      "termination_option": false,
+      "cam_amount": 0.0,
+      "service_fee": 0.0,
+      "discount_rate_type": "",
+      "discount_rate": 0.0,
+      "is_lease": true,
+      "lease_scope": "in_scope",
+      "suggested_scope": "in_scope",
+      "exemption_reason": "",
+      "scope_source": "ai_suggested",
+      "scope_confidence": 0.0,
+      "confidence": 0.8,
+      "missing_fields": [
+        "commencement_date",
+        "currency",
+        "discount_rate",
+        "lease_end_date",
+        "lease_start_date"
+      ],
+      "warnings": [
+        "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+        "建议处理方式：",
+        "1. 检查合同文本中是否明确提到利率",
+        "2. 从系统政策库中查找适用的 IBR",
+        "3. 按法人/租期区间/门店类型匹配利率政策",
+        "4. 如无法唯一确定，请人工输入或选择",
+        "【必须确认】AI 未识别到合同货币。根据 IFRS 16 计量要求，货币直接影响租赁负债现值计算和后续会计分录。",
+        "请在上传后手动选择货币（CNY / USD / EUR 等）。AI 不会猜测货币。",
+        "【关键字段缺失】租赁起始日(commencement_date) 未识别到，必须人工补充",
+        "【关键字段缺失】租赁开始日(lease_start_date) 未识别到，必须人工补充",
+        "【关键字段缺失】租期结束日(lease_end_date) 未识别到，必须人工补充",
+        "【必须确认】租赁范围判定置信度不足，需要人工确认是否资本化、短期/低价值豁免或非租赁。",
+        "AI Assist Mode: 合同草稿需人工确认后入库"
+      ]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+
+你是一位专业的 IFRS 16 租金表解析专家。请从以下租金表内容中提取付款计划信息。
+
+【重要规则 - 必须遵守】
+1. 每笔付款必须识别：先付(prepaid)还是后付(postpaid)
+   - 先付：在覆盖期间开始前支付（如月初预付当月租金）
+   - 后付：在覆盖期间结束后支付（如月末支付当月租金）
+2. 区分固定租金和变量租金（turnover rent / sales-based rent 必须标记为变量）
+3. 区分租赁成分和非租赁成分（CAM、管理费、服务费等）
+4. 金额必须是数字，不要包含货币符号
+5. 日期格式必须为 YYYY-MM-DD
+6. 如果租金表是月度数据，期间起始日=当月1日，期间结束日=当月最后一日
+7. 如果某期金额为空或为0，跳过该行
+
+租金表内容:
+租赁合同 编号 GOLDEN-001
+承租方：示例公司
+出租方：示例置地
+租赁起始日：2026-01-01
+
+
+请提取每笔付款，以 JSON 数组格式输出。每个元素包含:
+- period_start: 覆盖期间起始日 (YYYY-MM-DD)
+- period_end: 覆盖期间结束日 (YYYY-MM-DD)
+- due_date: 应付日期 (YYYY-MM-DD)
+- amount: 金额 (纯数字)
+- payment_timing: "prepaid" 或 "postpaid"
+- is_fixed: true/false
+- is_lease_component: true/false
+- amount_type: "fixed_rent" | "turnover_rent" | "cam" | "service_fee" | "tax" | "deposit" | "other"
+- currency: "CNY" 或文件中出现的币种。如果文件中未明确提到货币，返回 null 或空字符串，不要猜测
+- confidence: 该笔识别的置信度 (0.0-1.0)
+
+额外输出字段（JSON 对象顶层）:
+- overall_confidence: 总体置信度 (0.0-1.0)
+- missing_fields: 识别中遇到问题的字段列表
+- warnings: 需要人工注意的问题列表（如：日期格式不确定、金额可能有误等）
+- total_schedules: 识别到的付款笔数
+- evidence: 字段级原文定位数组。每项包含 field（如 schedules[0].amount）、page（如有）和 quote；只能引用原文。
+
+请以纯 JSON 格式输出，不要包含任何 markdown 代码块标记。

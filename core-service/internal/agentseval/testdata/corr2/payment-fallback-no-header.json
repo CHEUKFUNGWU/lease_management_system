@@ -1,0 +1,51 @@
+{
+  "name": "payment-fallback-no-header",
+  "kind": "payment_schedule",
+  "input": {
+    "text": "租金明细\n日期/金额\n2026-01-01/50000\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "not json at all"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_05c6afbe178344259daf8ff93999381b",
+    "task_id": "task_ps_file-payment-fallback-no-header",
+    "file_id": "file-payment-fallback-no-header",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.0,
+      "average_item": 0.0
+    },
+    "missing_fields": [
+      "all"
+    ],
+    "warnings": [
+      "无法解析 LLM 输出",
+      "AI Assist Mode: 付款计划草稿需人工确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-payment-fallback-no-header",
+      "object_name": "payment-fallback-no-header.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "field_locators_not_produced_by_document_adapter"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "low_confidence",
+        "missing_fields",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "payment_schedule_draft",
+    "schedules": []
+  }
+}

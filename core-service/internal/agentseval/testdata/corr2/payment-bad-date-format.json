@@ -1,0 +1,71 @@
+{
+  "name": "payment-bad-date-format",
+  "kind": "payment_schedule",
+  "input": {
+    "text": "租金付款计划\n| 期间起始 | 期间结束 | 应付日期 | 金额 | 付款时点 | 金额类型 |\n| 2026-01-01 | 2026-01-31 | 2026-01-01 | 50000 | 先付 | fixed_rent |\n| 2026-02-01 | 2026-02-28 | 2026-02-01 | 50000 | 先付 | fixed_rent |\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "{\"schedules\": [{\"period_start\": \"2026-01-01\", \"period_end\": \"2026-01-31\", \"due_date\": \"2026/01/01\", \"amount\": 50000, \"payment_timing\": \"prepaid\", \"is_fixed\": true, \"is_lease_component\": true, \"amount_type\": \"fixed_rent\", \"currency\": \"CNY\", \"confidence\": 0.95}, {\"period_start\": \"2026-02-01\", \"period_end\": \"2026-02-28\", \"due_date\": \"2026-02-01\", \"amount\": 50000, \"payment_timing\": \"prepaid\", \"is_fixed\": true, \"is_lease_component\": true, \"amount_type\": \"fixed_rent\", \"currency\": \"CNY\", \"confidence\": 0.95}], \"overall_confidence\": 0.95, \"missing_fields\": [], \"warnings\": [], \"total_schedules\": 2}"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_46c812e1497647af8ba76f31aa829aab",
+    "task_id": "task_ps_file-payment-bad-date-format",
+    "file_id": "file-payment-bad-date-format",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.95,
+      "average_item": 0.95
+    },
+    "missing_fields": [],
+    "warnings": [
+      "AI Assist Mode: 付款计划草稿需人工确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-payment-bad-date-format",
+      "object_name": "payment-bad-date-format.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "field_locators_not_produced_by_document_adapter"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "payment_schedule_draft",
+    "schedules": [
+      {
+        "period_start": "2026-01-01",
+        "period_end": "2026-01-31",
+        "due_date": "2026/01/01",
+        "amount": 50000.0,
+        "payment_timing": "prepaid",
+        "is_fixed": true,
+        "is_lease_component": true,
+        "amount_type": "fixed_rent",
+        "currency": "CNY",
+        "confidence": 0.95
+      },
+      {
+        "period_start": "2026-02-01",
+        "period_end": "2026-02-28",
+        "due_date": "2026-02-01",
+        "amount": 50000.0,
+        "payment_timing": "prepaid",
+        "is_fixed": true,
+        "is_lease_component": true,
+        "amount_type": "fixed_rent",
+        "currency": "CNY",
+        "confidence": 0.95
+      }
+    ]
+  }
+}

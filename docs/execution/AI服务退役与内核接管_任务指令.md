@@ -16,17 +16,19 @@
 4. [docs/adr/0023-retire-the-first-party-python-ai-service.md](../adr/0023-retire-the-first-party-python-ai-service.md) 与 [0024](../adr/0024-remove-the-agpl-pdf-dependency.md)
 5. [CONTEXT.md](../../CONTEXT.md) —— 命名与口径纪律
 
-### 0.1 核实过的现状（2026-08-20，与文档叙述有出入，以本表为准）
+### 0.1 核实过的现状（**编制时基线 `045a864`**，与文档叙述有出入，以本表为准）
 
-| 组件 | 文档曾暗示 | 代码实际 |
-|---|---|---|
-| `internal/agentcore` 根包 | W1 已交付、内核在跑 | **零生产调用**。`Agent`/`Loop`/`Queue`/`State` 有测试有 import guard，但没有任何非测试代码 import 它 |
-| `internal/agentcore/hooks` | 同上 | ✅ **真的在跑**。经 `agenttools.ExecutionGuard` 接进 aiagent 全路径（`aiagent/agent.go:250-255`） |
-| `internal/docparse` | 阶段 0 已交付 | **全仓零引用**。846 行生产码 + 327 行测试完全孤立；`anydoc` 二进制也未安装 |
-| `internal/llm`（W4） | ADR-0023 映射表列了它 | **不存在**。Go 每一次 LLM 调用都走 Python `/api/v1/chat`，API key 只配在 ai-service |
-| `intake/` 迁移体量 | ADR-0023 估 ~400 行 | **1,973 行**（`producer.py` 1263 + `models.py` 398 + `adapters.py` 312） |
-| `workingpaper` | 阶段 0 已交付 | ✅ **真的在跑**，13 处生产调用，provenance + fail-closed lint + xlsx/docx 齐全 |
-| `lease.file.triage` | G2 部分解决 | ✅ 在跑，但是**纯元数据分诊**（文件名 + 用户消息），不读文件内容，因此用不上 docparse |
+| 组件 | 文档曾暗示 | 编制时的代码实际 | 现况 |
+|---|---|---|---|
+| `internal/agentcore` 根包 | W1 已交付、内核在跑 | **零生产调用**。`Agent`/`Loop`/`Queue`/`State` 有测试有 import guard，但没有任何非测试代码 import 它 | 未变，待 C 波次 |
+| `internal/agentcore/hooks` | 同上 | ✅ **真的在跑**。经 `agenttools.ExecutionGuard` 接进 aiagent 全路径（`aiagent/agent.go:250-255`） | 未变 |
+| `internal/docparse` | 阶段 0 已交付 | **全仓零引用**。846 行生产码 + 327 行测试完全孤立；`anydoc` 二进制也未安装 | ✅ **W5-1 已接线**（`2e958aa`，3 处生产调用） |
+| `internal/llm`（W4） | ADR-0023 映射表列了它 | **不存在**。Go 每一次 LLM 调用都走 Python `/api/v1/chat`，API key 只配在 ai-service | ✅ **W4 已完成**（`2e958aa`） |
+| `intake/` 迁移体量 | ADR-0023 估 ~400 行 | **1,973 行**（`producer.py` 1263 + `models.py` 398 + `adapters.py` 312） | 未变，待 W5-3 |
+| `workingpaper` | 阶段 0 已交付 | ✅ **真的在跑**，13 处生产调用，provenance + fail-closed lint + xlsx/docx 齐全 | 未变 |
+| `lease.file.triage` | G2 部分解决 | ✅ 在跑，但是**纯元数据分诊**（文件名 + 用户消息），不读文件内容，因此用不上 docparse | 未变 |
+
+> **进度（2026-08-20，`2e958aa`）**：W4-1/2/3 与 W5-1 已交付并核实 —— `internal/llm` 建成、`callLLM`/`callLLMWithTools` 已切进程内、`AGENT_PLANNER_*` 与 `chat.py`/`agent_plan.py` 已删、`docparse` 已装配。**W5-2 进行中**（基线尚未定稿，见该票的三个已知缺口）。§0.2 表里第 1/2/3 条已清零，第 4–9 条按计划待 W5-3/4/5。
 
 **ADR-0023 §Context 那张「九成是 HTTP glue」的表低估了 intake。** 那 1,973 行里不是 glue，是业务规则：折现率缺失判定、币种校验、关键字段检查、`lease_scope` 归一、置信度净化、证据引文比对、付款计划校验与兜底文本解析。**迁移风险全部集中在这里**，W5-3 因此单列并配语料验收。
 
@@ -70,6 +72,8 @@ W6  删 ai-service + PyMuPDF + CI Python job
 - **每个波次结束时 `agent-evaluation.v1` harness 必须全绿**（`internal/agentseval`，当前 14 用例 5 category）
 - 不得顺手重命名 `lease_*` 命名空间；不得破坏既有页面/API
 - 凡动 schema：增量迁移 + `db/init/01_init.sql` 空库版本**双交付**
+- **不写新的 Python**，唯一例外是 W5-2 的一次性录制工装 —— 它的存在条件、入库要求与退场时点在该票里写死了，不适用于任何其他场景。ADR-0023 的承诺是「团队不维护 Python」，工装不是运行时，但**没有生命周期约束的工装就会变成运行时**
+- **不许静默跳过**：脚本、录制器、批处理遇到失败一律 fail-loud（非零退出或显式记为失败），不许 `print + continue` 后让汇总数字看起来正常
 
 ---
 
@@ -128,15 +132,70 @@ W6  删 ai-service + PyMuPDF + CI Python job
   - **惰性证据（D7）**：首轮 anydoc 出文本、点「查看证据」才跑 OCR 并缓存的测试
   - **诚实降级（D8）**：OCR 不可用时降级 anydoc 且证据标 `unavailable`、**不得声称坐标**的反向测试
 
-## W5-2 建立抽取准确率基线（**做 W5-3 之前必须先有这个**）
+## W5-2 建立 CORR-2 基线（**做 W5-3 之前必须先有这个**）
 
 - **背景**：ADR-0023 说得对 ——「W5 不是靠『它编译过了』通过，是靠标注语料」。但基线现在不存在
-- **要做**：
-  - 用现有 Python 路径对一批真实/仿真文件跑一遍，固化为 CORR-2 基线：合同、租金表、事件、批量台账四类各 ≥10 份
-  - 逐字段记录：抽取值、置信度、证据定位、`discount_rate_missing` / `currency_missing` / 关键字段缺失的判定结果
-  - 落进 `internal/agentseval/testdata/`，纳入 harness
-- **验收**：基线可复演（同输入同输出）；harness 新增 category 且全绿
 - **注意**：这一票**不改任何生产代码**，它是 W5-3 的验收标尺。**不做这一票就做 W5-3，等于用「能跑」冒充「对」**
+
+> **本节 2026-08-20 重写。** 初版把两件不同的事混成了一件，并且自相矛盾 —— 既要求「对真实文件跑一遍」（真跑 LLM），又要求「基线可复演（同输入同输出）」（真跑 LLM 就不可复演）。现拆为两个门，各自独立验收。
+
+### 门 A · 确定性规则平价（固定 LLM 响应）
+
+**这是主门。** 用**录制的 LLM 响应**（不是实时调用）驱动旧的 Python producer，把它的归一化输出逐字段固化。它锁的是 W5-3 要迁的那十条业务规则，与模型的不确定性无关。
+
+- **要做**：
+  - 四类各 ≥10 份：合同、租金表、事件、批量台账
+  - 每个 case 的形状：`input{text, content_type, contract_id, llm_response}` + `expected{完整归一化输出}`
+  - 落进 `core-service/internal/agentseval/testdata/corr2/`，纳入 harness
+- **必须覆盖到的规则**（与 W5-3 的十条一一对应，缺一条就是给 W5-3 留了盲区）：
+
+  | 规则 | 正例 | **反例（不可省）** |
+  |---|---|---|
+  | `_check_discount_rate_missing` | 有折现率 | 无折现率 → `missing_fields` 含 `discount_rate` 且 warning 链完整 |
+  | `_check_currency_missing` | 有币种 | 无币种 / `currency="unknown"` |
+  | `_check_critical_fields` | 字段齐全 | 关键字段缺失 |
+  | `_normalize_lease_scope` | `in_scope` | 非法值、`short_term_exempt`、`not_a_lease`、低 `scope_confidence` |
+  | `_sanitize_confidence_scores` | 正常区间 | **超界值（>1、负数）被夹回** |
+  | `_evidence_quote_matches` | 引文命中原文 | **引文对不上原文 → 证据被拒绝**（见下方缺口 ③） |
+  | `_validate_payment_schedules` | 完整行 | 缺 due_date / 缺 timing / 非数字金额 / **负数金额** / 日期格式错 / 混合 timing |
+  | `_fallback_parse_payment_schedule_text` | LLM 返回非 JSON → 兜底解析 | 表头无法识别 |
+  | `_apply_excel_evidence_safety_checks` | — | **必须真的用 xlsx content-type 且走到该分支**（见下方缺口 ②） |
+  | 四个 prompt 模板 | — | **门 A 覆盖不到，见门 B** |
+
+- **验收**：
+  - 同输入同输出，重跑基线文件逐字节一致
+  - harness 新增 category 且全绿
+  - **一条断言 fixture 自足的测试**：Go 侧回放只读 `input` + `expected`，**不执行任何 Python**
+
+#### 已知缺口（2026-08-20 评审实测，修完才算门 A 通过）
+
+① **异常静默吞掉。** 录制脚本对失败场景 `print("FAILED") + continue`，manifest 只记成功数 —— 45 个场景定义、44 个落盘，看起来像预期数字。实测 `batch-negative-amount` 因 pydantic 拒绝负数金额而失败并被跳过，而**这一条恰好就是「负数金额被拒绝」这个断言本身**。
+　**要做**：录制失败必须 fail-loud（非零退出），或在 manifest 里显式记为 `failed` 并让 harness 红。**「少录了一条」不许静默通过。**
+
+② **B11 挂羊头卖狗肉。** `batch-excel-deterministic-fallback` 实测录到 0 条合同、warnings 只有通用 Assist Mode 提示 —— 它没走到 Excel 确定性兜底，录的是空批次路径。后果是 `_apply_excel_evidence_safety_checks` 零覆盖。
+　**要做**：要么喂真实 xlsx 字节让它真的走到该分支，要么删掉这个 case 别用这个名字。**一个名字叫 X 但测的是 Y 的 fixture，比没有还糟。**
+
+③ **证据引文只有正例。** 实测 10 条 evidence 全部命中原文，**0 个反例**。`_evidence_quote_matches` 是防「AI 编造引用」的机制，只测正例意味着 **Go 版本把这个检查整个删掉，基线依然全绿**。这直接触及底线 3（来源追溯）。
+　**要做**：至少 2 个引文与原文对不上的 case，断言证据被拒绝或标记不完整。
+
+### 门 B · prompt 保真（golden-file 对照）
+
+**门 A 覆盖不到 prompt。** 固定 LLM 响应意味着 prompt 根本没被发出去 —— Go 版本改了 prompt 措辞，门 A 不会红。而 prompt 正是抽取准确率的主要变量。
+
+- **要做**：把 `producer.py:508-702` 四个模板在给定输入下**渲染出的完整 prompt 文本**存为 golden file；W5-3 的 Go 版本渲染同一输入，逐字节对照
+- **验收**：Go 与 Python 渲染的 prompt 文本一致；措辞、字段顺序、示例、约束语句任一处改动都必须让测试红
+- **不需要 API key，同样可复演** —— 它比的是发出去之前的字符串
+- **允许的例外**：确实需要改 prompt 时，**改 golden file 并在 PR 里说明为什么**。红了就改 golden 是可以的，红了不看直接覆盖不行
+
+### 录制工装的生命周期（**ADR-0023 的边界在这里**）
+
+ADR-0023 §3 的承诺是「**这个团队不维护 Python**」，不是「部署里不存在 Python」。录制脚本处在这条线的边缘，因此它的存在条件写死如下：
+
+- **为什么无法避免**：要从旧实现录基线，就必须执行旧实现；而「可复演 + 不依赖 API key」要求注入固定 LLM 响应，那个接缝（`MemoryLLMAdapter`）是 Python 内部的，**HTTP 端点上够不着**。用 Go 写录制器不可能——它要跑的就是 Python producer
+- **它是一次性工装，不是运行时**：不进 `docker-compose`、不进 CI、不被任何生产代码 import、不接受功能扩展
+- **必须入库**（`ai-service/scripts/`），不许停留在未跟踪状态。理由有二：基线在定稿前要反复重跑（本节三个缺口就得重跑才能修）；入库后「为什么基线长这样」在 W6 之后仍可从 git 历史回答
+- **交付物是 Go 侧的 JSON，不是脚本**。脚本随 `ai-service/` 在 W6-1 一起删除，**那是它唯一被允许存在的窗口**
+- **W6-1 有前置闸**，见该票
 
 ## W5-3 迁移 intake producer（1,973 行，本指令风险最高的一票）
 
@@ -160,8 +219,10 @@ W6  删 ai-service + PyMuPDF + CI Python job
 - **Excel 读取**：Python 用 `openpyxl`，Go 用 `excelize`（`go.mod` 已有 v2.11.0，`storepnl` / `workingpaper` / `finmodel_export` 三处在用）。**`controlledxlsx` 不默认删除**（ADR-0023 §Consequences），去留在本票结束时给结论并回写索引文档未决项 7
 - **表格送模型的纪律**：决策 D13 —— **送列画像不送原始值**，`RetailMappingAI` 的现有做法是规范，迁移不得放宽
 - **验收**：
-  - **CORR-2 语料不得回归**：W5-2 的基线逐字段对照，准确率不低于 Python 路径。**这一条不通过就不许合并**，「编译过了」「测试绿了」都不算
-  - 上表十条规则各自的单元测试，其中 `discount_rate_missing` 与 `lease_scope` 必须有反向测试
+  - **门 A 不得回归**：W5-2 的 CORR-2 基线逐字段对照，Go 产出必须等于 `expected`。**这一条不通过就不许合并**，「编译过了」「测试绿了」都不算
+  - **门 B 不得回归**：四个 prompt 的 golden-file 对照通过；确需改 prompt 时改 golden 并在 PR 说明理由
+  - 回放路径**不执行任何 Python**（`ai-service/` 整个目录改名后测试仍绿，是最简单的自检手段）
+  - 上表十条规则各自的单元测试，其中 `discount_rate_missing`、`lease_scope`、`_evidence_quote_matches` 必须有反向测试
   - `contracts/ai-intake.v1/*.json` 四份契约 fixture 继续通过（**契约不变，只换实现方** —— 决策登记 §1.3）
   - Assist Mode review gate 未被绕过的测试
 
@@ -209,9 +270,15 @@ W6  删 ai-service + PyMuPDF + CI Python job
 
 ## W6-1 删除 ai-service 与 PyMuPDF
 
-- **前置**：§0.2 九条依赖点全部清零，`grep -rn "AI_SERVICE_URL\|ai-service:8000" core-service web --include="*.go" --include="*.js" --include="*.ts" --include="*.tsx"` 零命中
+- **前置（三条，缺一不许执行本票）**：
+  1. §0.2 九条依赖点全部清零，`grep -rn "AI_SERVICE_URL\|ai-service:8000" core-service web --include="*.go" --include="*.js" --include="*.ts" --include="*.tsx"` 零命中
+  2. **CORR-2 基线已定稿**：W5-2 门 A 的三个已知缺口全部修完，门 B 的 golden file 已建立
+  3. **基线已脱离 Python**：把 `ai-service/` 临时改名，`go test ./internal/agentseval/...` 与 W5-3 的回放测试仍然全绿
+
+  > **为什么要第 2、3 条：** 本票会连同 `ai-service/scripts/record_corr2_baseline.py` 一起删掉 —— 那是唯一能重新生成基线的东西。删掉之后基线就只剩一堆 JSON，**改不动、也无法验证它当初是怎么来的**。所以必须先确认基线定稿且回放不依赖 Python，再动手。顺序反了不可逆。
+
 - **要做**：
-  - 删 `ai-service/` 整个目录（含 `pymupdf==1.23.0` —— **这才是 ADR-0024 / 缺口 G6 真正关闭的时刻**）
+  - 删 `ai-service/` 整个目录（含 `pymupdf==1.23.0` —— **这才是 ADR-0024 / 缺口 G6 真正关闭的时刻**；录制工装随之退场，**ADR-0023「团队不维护 Python」自此为真**）
   - `docker-compose.yml`：删 `ai-service` 服务定义、两处 `depends_on`、`SERVER_AI_URL`、`AGENT_PLANNER_*`；PaddleOCR 与 LLM 的环境变量移到 `core-service`
   - `.github/workflows/ci.yml:116-136`：删 Python job
   - `Makefile:67` 的 `make ai` 删除；`make help` 同步
@@ -246,16 +313,22 @@ W6  删 ai-service + PyMuPDF + CI Python job
 # 完成定义（Definition of Done）
 
 1. §0.2 的**九条 Python 依赖点全部清零**，逐条给出「文件:行号 / 改成了什么 / 测试」
-2. **W5-2 的 CORR-2 基线先于 W5-3 建立**，且 W5-3 的准确率不低于基线 —— 这条是本指令唯一的非机械验收，不通过不合并
-3. 每个波次结束时 `agent-evaluation.v1` harness 全绿；`go test ./... && go vet ./...`、`npm run type-check && npm run build && npm test` 全绿；`make ifrs16-regression` 参考值不变
-4. 五条底线逐项给证据：跨法人正反测试、模拟标识、幂等重放、**IFRS 16 正式表零写入前后计数**、来源追溯（证据坐标在降级路径下不得伪造）
-5. **W6-2 文档回写完成** —— 六份文档逐一更新，缺口表 G6/G7 关闭
-6. 输出交付报告：每票一行「编号 / 文件 / 改了什么 / 测试 / 证据」，贴回本分支
+2. **W5-2 的门 A + 门 B 先于 W5-3 建立**，且 W5-3 两个门都不回归 —— 这条是本指令唯一的非机械验收，不通过不合并。门 A 的三个已知缺口（异常静默、B11 名不副实、证据零反例）必须修完
+3. **最终产物零 Python 依赖**：`ai-service/` 删除后全部测试仍绿；`find . -name "*.py" -not -path "./.git/*"` 零命中
+4. 每个波次结束时 `agent-evaluation.v1` harness 全绿；`go test ./... && go vet ./...`、`npm run type-check && npm run build && npm test` 全绿；`make ifrs16-regression` 参考值不变
+5. 五条底线逐项给证据：跨法人正反测试、模拟标识、幂等重放、**IFRS 16 正式表零写入前后计数**、来源追溯（证据坐标在降级路径下不得伪造）
+6. **W6-2 文档回写完成** —— 六份文档逐一更新，缺口表 G6/G7 关闭
+7. 输出交付报告：每票一行「编号 / 文件 / 改了什么 / 测试 / 证据」，贴回本分支
 
 ## 给评审者（Claude）的提醒
 
-本轮最容易出现的假绿有三种，评审时优先查：
+本轮最容易出现的假绿，评审时优先查（1–3 为初版，4–6 是 2026-08-20 实测出来的，都是真实发生过的形态）：
 
 1. **「迁移完成」但旧路径还在** —— 只加了 Go 实现、没删 Python 调用，两条路径并存且默认走旧的。查 §0.2 九条是否真的零命中，不看声明看 grep
 2. **平价门是空的** —— 对照测试用的 fixture 恰好是新实现产出的，等于自己证自己。查基线是否在改代码**之前**固化
 3. **诚实降级被偷偷改成静默成功** —— OCR 不可用时声称有坐标、置信度缺失时填默认值、模型返回未注册工具时忽略而非拒绝。这三处都要有反向测试，且反向测试要能证红
+4. **基线只有正例** —— 一批 fixture 全是「能通过」的场景，于是把校验逻辑整个删掉基线也全绿。**逐条数反例**：证据引文对不上、金额为负、币种缺失、scope 非法，这些必须各有至少一个。**没有反例的门不是门**
+5. **汇总数字掩盖了跳过** —— 录制器/批处理吞掉异常后继续，manifest 报的数字看起来合理。**对照「定义了多少场景」与「落盘了多少」**，不是只看 manifest 自报的 count
+6. **fixture 名不副实** —— 一个叫 `xxx-excel-fallback` 的 case 实际没走到那条分支，录的是别的路径。**抽查两三个关键 fixture 的实际内容**，别只看文件名和数量。这一条比缺失更危险：它会让人以为某条规则有覆盖
+
+> 5 和 6 都属于同一类：**统计数字对了，内容是空的。** 评审时至少打开三个 fixture 看真实内容，不要停在 `ls | wc -l`。

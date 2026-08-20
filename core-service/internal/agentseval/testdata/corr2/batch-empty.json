@@ -1,0 +1,48 @@
+{
+  "name": "batch-empty",
+  "kind": "contract_batch",
+  "input": {
+    "text": "合同台账\n合同编号 | 承租方 | 出租方 | 租赁起始 | 租赁结束 | 月固定租金 | 币种\nL-B1 | 门店一有限公司 | 置地一号 | 2026-01-01 | 2028-12-31 | 30000 | CNY\nL-B2 | 门店二有限公司 | 置地一号 | 2026-02-01 | 2029-01-31 | 40000 | CNY\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "{\"contracts\": [], \"total_count\": 0, \"overall_confidence\": 0.0, \"missing_fields\": [], \"warnings\": []}"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_8f6a632400a94485ac265dfbd38092ea",
+    "task_id": "task_batch_file-batch-empty",
+    "file_id": "file-batch-empty",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.0,
+      "average_item": 0.0
+    },
+    "missing_fields": [],
+    "warnings": [
+      "AI Assist Mode: 合同台账草稿需人工逐条确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-batch-empty",
+      "object_name": "batch-empty.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "field_locators_not_produced_by_document_adapter"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "low_confidence",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "contract_batch_draft",
+    "contracts": [],
+    "total_count": 0
+  }
+}

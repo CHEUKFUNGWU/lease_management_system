@@ -1,0 +1,66 @@
+{
+  "name": "event-modification",
+  "kind": "event",
+  "input": {
+    "text": "合同变更通知\n合同编号：LEASE-CORR2-EV-001\n鉴于经营调整，自 2026-06-01 起租赁面积由 120 平米调整为 100 平米，月固定租金由 50,000 元调整为 42,000 元。特此通知。\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "{\"event\": {\"contract_id\": \"c-001\", \"contract_number\": \"LEASE-CORR2-EV-001\", \"event_type\": \"area_adjustment\", \"effective_date\": \"2026-06-01\", \"original_value\": \"120\", \"new_value\": \"100\", \"change_reason\": \"经营调整\", \"judgment_basis\": \"通知明确载明面积调整\", \"revision_parameters\": {\"new_area_sqm\": 100, \"new_monthly_rent\": 42000}, \"field_confidence\": {\"event_type\": 0.95, \"effective_date\": 0.95}}, \"overall_confidence\": 0.9, \"missing_fields\": [], \"warnings\": [], \"evidence\": [{\"field\": \"event.event_type\", \"page\": 1, \"quote\": \"面积由 120 平米调整为 100 平米\"}]}"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_b196f80c288c4cac87c0530230c7efb0",
+    "task_id": "task_event_file-event-modification",
+    "file_id": "file-event-modification",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.9,
+      "event_type": 0.95,
+      "effective_date": 0.95
+    },
+    "missing_fields": [],
+    "warnings": [
+      "AI Assist Mode: 事件草稿必须由人工确认后提交复核",
+      "事件解析不会决定最终会计处理，也不会自动触发重算或过账",
+      "扫描件字段定位当前只能回溯到提取文本，需人工核对原文页码/坐标"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-event-modification",
+      "object_name": "event-modification.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "document_adapter_does_not_yet_provide_page_or_coordinate_locators"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "event_draft",
+    "event": {
+      "contract_id": "c-001",
+      "contract_number": "LEASE-CORR2-EV-001",
+      "event_type": "area_adjustment",
+      "effective_date": "2026-06-01",
+      "original_value": "120",
+      "new_value": "100",
+      "change_reason": "经营调整",
+      "judgment_basis": "通知明确载明面积调整",
+      "revision_parameters": {
+        "new_area_sqm": 100,
+        "new_monthly_rent": 42000
+      },
+      "field_confidence": {
+        "event_type": 0.95,
+        "effective_date": 0.95
+      }
+    }
+  }
+}

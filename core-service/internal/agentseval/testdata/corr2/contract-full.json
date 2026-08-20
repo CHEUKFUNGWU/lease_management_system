@@ -1,0 +1,80 @@
+{
+  "name": "contract-full",
+  "kind": "contract",
+  "input": {
+    "text": "租赁合同 编号 LEASE-CORR2-001\n承租方：示例零售有限公司（乙方）\n出租方：示例置地有限公司（甲方）\n租赁物业：示例购物中心 1 层 101 铺\n租赁起始日：2026-01-01，租赁结束日：2028-12-31\n固定租金：每月 50,000 元（不含税），每月 5 日前支付\n物业管理费：每月 3,000 元；服务费：每月 2,000 元\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "{\"extracted_fields\": {\"contract_number\": \"LEASE-CORR2-001\", \"contract_name\": \"示例合同\", \"lessee\": \"示例零售有限公司\", \"lessor\": \"示例置地有限公司\", \"store_name\": \"示例购物中心 1 层 101 铺\", \"store_address\": \"示例市示例路 1 号\", \"commencement_date\": \"2026-01-01\", \"lease_start_date\": \"2026-01-01\", \"lease_end_date\": \"2028-12-31\", \"currency\": \"CNY\", \"asset_type\": \"real_estate\", \"area_sqm\": 120.5, \"fixed_rent_amount\": 50000, \"payment_frequency\": \"monthly\", \"payment_timing\": \"prepaid\", \"renewal_option\": false, \"termination_option\": false, \"cam_amount\": 3000, \"service_fee\": 2000, \"discount_rate_type\": \"incremental_borrowing_rate\", \"discount_rate\": 3.5, \"is_lease\": true, \"suggested_scope\": \"in_scope\", \"exemption_reason\": \"\", \"scope_confidence\": 0.95}, \"confidence_scores\": {\"contract_number\": 0.99, \"fixed_rent_amount\": 0.98}, \"overall_confidence\": 0.95, \"missing_fields\": [], \"warnings\": [], \"evidence\": [{\"field\": \"extracted_data.contract_number\", \"page\": 1, \"quote\": \"LEASE-CORR2-001\"}]}"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_d20b33a9782444e0b7581733483ba2ce",
+    "task_id": "task_file-contract-full",
+    "file_id": "file-contract-full",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "contract_number": 0.99,
+      "fixed_rent_amount": 0.98,
+      "overall": 0.95
+    },
+    "missing_fields": [],
+    "warnings": [
+      "AI Assist Mode: 合同草稿需人工确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-contract-full",
+      "object_name": "contract-full.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "field_locators_not_produced_by_document_adapter"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "contract_draft",
+    "extracted_data": {
+      "contract_number": "LEASE-CORR2-001",
+      "contract_name": "示例合同",
+      "lessee": "示例零售有限公司",
+      "lessor": "示例置地有限公司",
+      "store_name": "示例购物中心 1 层 101 铺",
+      "store_address": "示例市示例路 1 号",
+      "commencement_date": "2026-01-01",
+      "lease_start_date": "2026-01-01",
+      "lease_end_date": "2028-12-31",
+      "currency": "CNY",
+      "asset_type": "real_estate",
+      "area_sqm": 120.5,
+      "fixed_rent_amount": 50000.0,
+      "payment_frequency": "monthly",
+      "payment_timing": "prepaid",
+      "renewal_option": false,
+      "termination_option": false,
+      "cam_amount": 3000.0,
+      "service_fee": 2000.0,
+      "discount_rate_type": "incremental_borrowing_rate",
+      "discount_rate": 3.5,
+      "is_lease": true,
+      "lease_scope": "in_scope",
+      "suggested_scope": "in_scope",
+      "exemption_reason": "",
+      "scope_source": "ai_suggested",
+      "scope_confidence": 0.95,
+      "confidence": 0.95,
+      "missing_fields": [],
+      "warnings": [
+        "AI Assist Mode: 合同草稿需人工确认后入库"
+      ]
+    }
+  }
+}

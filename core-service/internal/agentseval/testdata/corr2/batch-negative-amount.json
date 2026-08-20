@@ -1,0 +1,13 @@
+{
+  "name": "batch-negative-amount",
+  "kind": "contract_batch",
+  "input": {
+    "text": "合同台账\n合同编号 | 承租方 | 出租方 | 租赁起始 | 租赁结束 | 月固定租金 | 币种\nL-B1 | 门店一有限公司 | 置地一号 | 2026-01-01 | 2028-12-31 | 30000 | CNY\nL-B2 | 门店二有限公司 | 置地一号 | 2026-02-01 | 2029-01-31 | 40000 | CNY\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "{\"contracts\": [{\"contract_number\": \"L-B1\", \"lessee\": \"门店一有限公司\", \"lessor\": \"置地一号\", \"commencement_date\": \"2026-01-01\", \"lease_start_date\": \"2026-01-01\", \"lease_end_date\": \"2028-12-31\", \"currency\": \"CNY\", \"fixed_rent_amount\": \"-30000\", \"payment_timing\": \"postpaid\", \"suggested_scope\": \"in_scope\", \"scope_confidence\": 0.95, \"discount_rate_type\": \"incremental_borrowing_rate\", \"discount_rate\": 3.5}], \"total_count\": 3, \"overall_confidence\": 0.93, \"missing_fields\": [], \"warnings\": []}"
+  },
+  "expected": {
+    "error": "ValidationError: 1 validation error for ContractDraftData\nfixed_rent_amount\n  Input should be greater than or equal to 0 [type=greater_than_equal, input_value=-30000.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.13/v/greater_than_equal"
+  }
+}

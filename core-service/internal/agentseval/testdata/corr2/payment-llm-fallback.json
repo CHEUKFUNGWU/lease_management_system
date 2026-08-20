@@ -1,0 +1,51 @@
+{
+  "name": "payment-llm-fallback",
+  "kind": "payment_schedule",
+  "input": {
+    "text": "租金付款计划\n| 期间起始 | 期间结束 | 应付日期 | 金额 | 付款时点 | 金额类型 |\n| 2026-01-01 | 2026-01-31 | 2026-01-01 | 50000 | 先付 | fixed_rent |\n| 2026-02-01 | 2026-02-28 | 2026-02-01 | 50000 | 先付 | fixed_rent |\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "not json at all"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_51807ff6969841ccbc47c40d1597fc79",
+    "task_id": "task_ps_file-payment-llm-fallback",
+    "file_id": "file-payment-llm-fallback",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.0,
+      "average_item": 0.0
+    },
+    "missing_fields": [
+      "all"
+    ],
+    "warnings": [
+      "无法解析 LLM 输出",
+      "AI Assist Mode: 付款计划草稿需人工确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-payment-llm-fallback",
+      "object_name": "payment-llm-fallback.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "field_locators_not_produced_by_document_adapter"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "low_confidence",
+        "missing_fields",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "payment_schedule_draft",
+    "schedules": []
+  }
+}

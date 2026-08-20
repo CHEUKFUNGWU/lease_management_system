@@ -1,0 +1,168 @@
+{
+  "name": "batch-excel-deterministic-fallback",
+  "kind": "contract_batch",
+  "input": {
+    "xlsx_base64": "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",
+    "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "contract_id": "",
+    "llm_response": "{\"contracts\": [], \"total_count\": 0, \"overall_confidence\": 0.0}"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_535577fde0924e979a1242eb83e297ab",
+    "task_id": "task_batch_file-batch-excel-deterministic-fallback",
+    "file_id": "file-batch-excel-deterministic-fallback",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.7,
+      "average_item": 0.7
+    },
+    "missing_fields": [
+      "discount_rate",
+      "payment_timing"
+    ],
+    "warnings": [
+      "LLM 主解析未能从该 Excel 台账稳定提取合同，已启用表格读取兜底；这不是正式入库结果，必须人工逐条确认。",
+      "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+      "建议处理方式：",
+      "1. 检查合同文本中是否明确提到利率",
+      "2. 从系统政策库中查找适用的 IBR",
+      "3. 按法人/租期区间/门店类型匹配利率政策",
+      "4. 如无法唯一确定，请人工输入或选择",
+      "【关键字段缺失】付款时点（先付/后付）(payment_timing) 未识别到，必须人工补充",
+      "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+      "建议处理方式：",
+      "1. 检查合同文本中是否明确提到利率",
+      "2. 从系统政策库中查找适用的 IBR",
+      "3. 按法人/租期区间/门店类型匹配利率政策",
+      "4. 如无法唯一确定，请人工输入或选择",
+      "【关键字段缺失】付款时点（先付/后付）(payment_timing) 未识别到，必须人工补充",
+      "AI Assist Mode: 合同台账草稿需人工逐条确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-batch-excel-deterministic-fallback",
+      "object_name": "batch-excel-deterministic-fallback.xlsx",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "locators": [
+        {
+          "field": "contracts[0]",
+          "source": "合同台账!A2:H2",
+          "page": null,
+          "coordinates": null,
+          "quote": "L-E1"
+        },
+        {
+          "field": "contracts[1]",
+          "source": "合同台账!A3:H3",
+          "page": null,
+          "coordinates": null,
+          "quote": "L-E2"
+        }
+      ],
+      "complete": true,
+      "missing_reason": null
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "low_confidence",
+        "missing_fields",
+        "warnings_present"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "contract_batch_draft",
+    "contracts": [
+      {
+        "contract_number": "L-E1",
+        "contract_name": "L-E1",
+        "lessee": "门店一有限公司",
+        "lessor": "置地一号",
+        "store_name": "",
+        "store_address": "",
+        "commencement_date": "2026-01-01",
+        "lease_start_date": "2026-01-01",
+        "lease_end_date": "2028-12-31",
+        "currency": "CNY",
+        "asset_type": "real_estate",
+        "area_sqm": 0.0,
+        "fixed_rent_amount": 30000.0,
+        "payment_frequency": "monthly",
+        "payment_timing": "",
+        "renewal_option": false,
+        "termination_option": false,
+        "cam_amount": 0.0,
+        "service_fee": 0.0,
+        "discount_rate_type": "",
+        "discount_rate": 0.0,
+        "is_lease": true,
+        "lease_scope": "in_scope",
+        "suggested_scope": "in_scope",
+        "exemption_reason": "",
+        "scope_source": "ledger",
+        "scope_confidence": 0.9,
+        "confidence": 0.7,
+        "missing_fields": [
+          "discount_rate",
+          "payment_timing"
+        ],
+        "warnings": [
+          "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+          "建议处理方式：",
+          "1. 检查合同文本中是否明确提到利率",
+          "2. 从系统政策库中查找适用的 IBR",
+          "3. 按法人/租期区间/门店类型匹配利率政策",
+          "4. 如无法唯一确定，请人工输入或选择",
+          "【关键字段缺失】付款时点（先付/后付）(payment_timing) 未识别到，必须人工补充"
+        ]
+      },
+      {
+        "contract_number": "L-E2",
+        "contract_name": "L-E2",
+        "lessee": "门店二有限公司",
+        "lessor": "置地一号",
+        "store_name": "",
+        "store_address": "",
+        "commencement_date": "2026-02-01",
+        "lease_start_date": "2026-02-01",
+        "lease_end_date": "2029-01-31",
+        "currency": "CNY",
+        "asset_type": "real_estate",
+        "area_sqm": 0.0,
+        "fixed_rent_amount": 40000.0,
+        "payment_frequency": "monthly",
+        "payment_timing": "",
+        "renewal_option": false,
+        "termination_option": false,
+        "cam_amount": 0.0,
+        "service_fee": 0.0,
+        "discount_rate_type": "",
+        "discount_rate": 0.0,
+        "is_lease": true,
+        "lease_scope": "in_scope",
+        "suggested_scope": "in_scope",
+        "exemption_reason": "",
+        "scope_source": "ledger",
+        "scope_confidence": 0.9,
+        "confidence": 0.7,
+        "missing_fields": [
+          "discount_rate",
+          "payment_timing"
+        ],
+        "warnings": [
+          "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+          "建议处理方式：",
+          "1. 检查合同文本中是否明确提到利率",
+          "2. 从系统政策库中查找适用的 IBR",
+          "3. 按法人/租期区间/门店类型匹配利率政策",
+          "4. 如无法唯一确定，请人工输入或选择",
+          "【关键字段缺失】付款时点（先付/后付）(payment_timing) 未识别到，必须人工补充"
+        ]
+      }
+    ],
+    "total_count": 2
+  }
+}

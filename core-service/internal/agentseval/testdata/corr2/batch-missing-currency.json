@@ -1,0 +1,185 @@
+{
+  "name": "batch-missing-currency",
+  "kind": "contract_batch",
+  "input": {
+    "text": "合同台账\n合同编号 | 承租方 | 出租方 | 租赁起始 | 租赁结束 | 月固定租金 | 币种\nL-B1 | 门店一有限公司 | 置地一号 | 2026-01-01 | 2028-12-31 | 30000 | CNY\nL-B2 | 门店二有限公司 | 置地一号 | 2026-02-01 | 2029-01-31 | 40000 | CNY\n",
+    "content_type": "application/pdf",
+    "contract_id": "",
+    "llm_response": "{\"contracts\": [{\"contract_number\": \"L-B1\", \"lessee\": \"门店一有限公司\", \"lessor\": \"置地一号\", \"commencement_date\": \"2026-01-01\", \"lease_start_date\": \"2026-01-01\", \"lease_end_date\": \"2028-12-31\", \"fixed_rent_amount\": 30000, \"payment_timing\": \"postpaid\", \"suggested_scope\": \"in_scope\", \"scope_confidence\": 0.95, \"discount_rate_type\": \"incremental_borrowing_rate\", \"discount_rate\": 3.5}, {\"contract_number\": \"L-B2\", \"lessee\": \"门店二有限公司\", \"lessor\": \"置地一号\", \"commencement_date\": \"2026-02-01\", \"lease_start_date\": \"2026-02-01\", \"lease_end_date\": \"2029-01-31\", \"currency\": \"CNY\", \"fixed_rent_amount\": 40000, \"payment_timing\": \"postpaid\", \"suggested_scope\": \"in_scope\", \"scope_confidence\": 0.95}, {\"contract_number\": \"L-B3\", \"lessee\": \"门店三有限公司\", \"lessor\": \"置地二号\", \"commencement_date\": \"2026-03-01\", \"lease_start_date\": \"2026-03-01\", \"lease_end_date\": \"2026-12-31\", \"currency\": \"CNY\", \"fixed_rent_amount\": 20000, \"payment_timing\": \"postpaid\", \"suggested_scope\": \"short_term_exempt\", \"scope_confidence\": 0.93}], \"total_count\": 3, \"overall_confidence\": 0.93, \"missing_fields\": [], \"warnings\": []}"
+  },
+  "expected": {
+    "schema_version": "ai-intake.v1",
+    "intake_id": "intake_92b5839bf9dc4fdf8ef5b2503aa34f0b",
+    "task_id": "task_batch_file-batch-missing-currency",
+    "file_id": "file-batch-missing-currency",
+    "mode": "assist",
+    "status": "draft_generated",
+    "confidence_scores": {
+      "overall": 0.93,
+      "average_item": 0.6999999999999998
+    },
+    "missing_fields": [
+      "currency",
+      "discount_rate"
+    ],
+    "warnings": [
+      "【必须确认】AI 未识别到合同货币。根据 IFRS 16 计量要求，货币直接影响租赁负债现值计算和后续会计分录。",
+      "请在上传后手动选择货币（CNY / USD / EUR 等）。AI 不会猜测货币。",
+      "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+      "建议处理方式：",
+      "1. 检查合同文本中是否明确提到利率",
+      "2. 从系统政策库中查找适用的 IBR",
+      "3. 按法人/租期区间/门店类型匹配利率政策",
+      "4. 如无法唯一确定，请人工输入或选择",
+      "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+      "建议处理方式：",
+      "1. 检查合同文本中是否明确提到利率",
+      "2. 从系统政策库中查找适用的 IBR",
+      "3. 按法人/租期区间/门店类型匹配利率政策",
+      "4. 如无法唯一确定，请人工输入或选择",
+      "AI Assist Mode: 合同台账草稿需人工逐条确认后入库"
+    ],
+    "requires_human_confirmation": true,
+    "evidence": {
+      "source_file_id": "file-batch-missing-currency",
+      "object_name": "batch-missing-currency.pdf",
+      "content_type": "application/pdf",
+      "locators": [],
+      "complete": false,
+      "missing_reason": "field_locators_not_produced_by_document_adapter"
+    },
+    "review_gate": {
+      "required": true,
+      "reasons": [
+        "assist_mode",
+        "missing_fields",
+        "warnings_present",
+        "evidence_incomplete"
+      ],
+      "confidence_threshold": 0.8
+    },
+    "draft_type": "contract_batch_draft",
+    "contracts": [
+      {
+        "contract_number": "L-B1",
+        "contract_name": "",
+        "lessee": "门店一有限公司",
+        "lessor": "置地一号",
+        "store_name": "",
+        "store_address": "",
+        "commencement_date": "2026-01-01",
+        "lease_start_date": "2026-01-01",
+        "lease_end_date": "2028-12-31",
+        "currency": "",
+        "asset_type": "real_estate",
+        "area_sqm": 0.0,
+        "fixed_rent_amount": 30000.0,
+        "payment_frequency": "monthly",
+        "payment_timing": "postpaid",
+        "renewal_option": false,
+        "termination_option": false,
+        "cam_amount": 0.0,
+        "service_fee": 0.0,
+        "discount_rate_type": "incremental_borrowing_rate",
+        "discount_rate": 3.5,
+        "is_lease": true,
+        "lease_scope": "in_scope",
+        "suggested_scope": "in_scope",
+        "exemption_reason": "",
+        "scope_source": "ai_suggested",
+        "scope_confidence": 0.95,
+        "confidence": 0.7,
+        "missing_fields": [
+          "currency"
+        ],
+        "warnings": [
+          "【必须确认】AI 未识别到合同货币。根据 IFRS 16 计量要求，货币直接影响租赁负债现值计算和后续会计分录。",
+          "请在上传后手动选择货币（CNY / USD / EUR 等）。AI 不会猜测货币。"
+        ]
+      },
+      {
+        "contract_number": "L-B2",
+        "contract_name": "",
+        "lessee": "门店二有限公司",
+        "lessor": "置地一号",
+        "store_name": "",
+        "store_address": "",
+        "commencement_date": "2026-02-01",
+        "lease_start_date": "2026-02-01",
+        "lease_end_date": "2029-01-31",
+        "currency": "CNY",
+        "asset_type": "real_estate",
+        "area_sqm": 0.0,
+        "fixed_rent_amount": 40000.0,
+        "payment_frequency": "monthly",
+        "payment_timing": "postpaid",
+        "renewal_option": false,
+        "termination_option": false,
+        "cam_amount": 0.0,
+        "service_fee": 0.0,
+        "discount_rate_type": "",
+        "discount_rate": 0.0,
+        "is_lease": true,
+        "lease_scope": "in_scope",
+        "suggested_scope": "in_scope",
+        "exemption_reason": "",
+        "scope_source": "ai_suggested",
+        "scope_confidence": 0.95,
+        "confidence": 0.7,
+        "missing_fields": [
+          "discount_rate"
+        ],
+        "warnings": [
+          "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+          "建议处理方式：",
+          "1. 检查合同文本中是否明确提到利率",
+          "2. 从系统政策库中查找适用的 IBR",
+          "3. 按法人/租期区间/门店类型匹配利率政策",
+          "4. 如无法唯一确定，请人工输入或选择"
+        ]
+      },
+      {
+        "contract_number": "L-B3",
+        "contract_name": "",
+        "lessee": "门店三有限公司",
+        "lessor": "置地二号",
+        "store_name": "",
+        "store_address": "",
+        "commencement_date": "2026-03-01",
+        "lease_start_date": "2026-03-01",
+        "lease_end_date": "2026-12-31",
+        "currency": "CNY",
+        "asset_type": "real_estate",
+        "area_sqm": 0.0,
+        "fixed_rent_amount": 20000.0,
+        "payment_frequency": "monthly",
+        "payment_timing": "postpaid",
+        "renewal_option": false,
+        "termination_option": false,
+        "cam_amount": 0.0,
+        "service_fee": 0.0,
+        "discount_rate_type": "",
+        "discount_rate": 0.0,
+        "is_lease": true,
+        "lease_scope": "short_term_exempt",
+        "suggested_scope": "short_term_exempt",
+        "exemption_reason": "",
+        "scope_source": "ai_suggested",
+        "scope_confidence": 0.93,
+        "confidence": 0.7,
+        "missing_fields": [
+          "discount_rate"
+        ],
+        "warnings": [
+          "【关键】合同缺少折现率信息。AI 不得猜测折现率，需要人工确认。",
+          "建议处理方式：",
+          "1. 检查合同文本中是否明确提到利率",
+          "2. 从系统政策库中查找适用的 IBR",
+          "3. 按法人/租期区间/门店类型匹配利率政策",
+          "4. 如无法唯一确定，请人工输入或选择"
+        ]
+      }
+    ],
+    "total_count": 3
+  }
+}

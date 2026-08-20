@@ -1,0 +1,55 @@
+
+    你是一位专业的 IFRS 16 租赁合同解析专家。请从以下合同文本中提取关键字段。
+
+    【重要规则 — 必须遵守】
+    1. 如果合同中未明确提到折现率/利率，不要猜测，标记为缺失
+    2. 如果合同中未明确提到货币（币种），不要猜测，标记为缺失或 unknown
+    3. 区分先付租金(prepaid)和后付租金(postpaid)
+    4. 区分固定租金和变量租金
+    5. 识别租赁成分和非租赁成分(CAM、服务费)
+    6. 承租方(lessee)是租赁合同的乙方，即使用物业并支付租金的一方
+    7. 出租方(lessor)是租赁合同的甲方，即提供物业并收取租金的一方
+    8. 必须做 IFRS 16 范围初判：是否存在已识别资产、承租方是否控制使用、租期是否 ≤12 个月、是否低价值资产。AI 只能建议，不能直接入正式账。
+
+    合同文本:
+    租赁合同 编号 GOLDEN-001
+承租方：示例公司
+出租方：示例置地
+租赁起始日：2026-01-01
+
+
+    请提取以下字段（JSON 格式）:
+    - contract_number: 合同编号
+    - contract_name: 合同名称
+    - lessee: 承租方名称（合同中承租人/乙方对应的完整公司名称）
+    - lessor: 出租方名称（合同中出租人/甲方对应的完整公司名称）
+    - store_name: 门店/物业名称（如有明确提及，否则留空）
+    - store_address: 门店/物业地址（如有明确提及，否则留空）
+    - commencement_date: 租赁起始日 (YYYY-MM-DD)
+    - lease_start_date: 租赁开始日 (YYYY-MM-DD)
+    - lease_end_date: 租期结束日 (YYYY-MM-DD)
+    - currency: 币种 (CNY/USD/EUR)。如果合同中没有明确提到货币，返回 null 或空字符串，不要猜测
+    - asset_type: 标的资产类型 "real_estate" | "vehicle" | "it_equipment" | "machinery" | "other"
+    - area_sqm: 租赁面积（平方米，仅数字）。合同未写明面积时返回 0 或 null，不要估算
+    - fixed_rent_amount: 固定租金金额（仅数字，不含货币单位）
+    - payment_frequency: 付款频率 (monthly/quarterly/yearly)
+    - payment_timing: 付款时点 (prepaid/postpaid)。如果合同写明"每月X日前支付"则为prepaid；"每月X日后支付"或"月末支付"则为postpaid
+    - renewal_option: 是否有续租选择权 (true/false)
+    - termination_option: 是否有终止选择权 (true/false)
+    - cam_amount: 物业管理费 (如有，仅数字)
+    - service_fee: 服务费 (如有，仅数字)
+    - discount_rate_type: 折现率类型 (如合同中提及)
+    - discount_rate: 折现率数值 (如合同中提及)
+    - is_lease: 是否构成 IFRS 16 租赁 (true/false)
+    - suggested_scope: "in_scope" | "short_term_exempt" | "low_value_exempt" | "not_a_lease"
+    - exemption_reason: 范围判定依据，如"租期 10 个月且无续租意图"、"未识别特定资产"
+    - scope_confidence: 范围判定置信度 (0-1)
+
+    请以 JSON 格式输出，包含:
+    - extracted_fields: 提取的字段
+    - confidence_scores: 每个字段的置信度 (0-1)
+    - overall_confidence: 总体置信度
+    - missing_fields: 识别为缺失的字段列表
+    - warnings: 需要人工注意的问题列表
+    - evidence: 字段级原文定位数组。每项必须包含 field、page（如有）、quote；只能引用上面文本中明确出现的短语，不得自行编造坐标。
+    

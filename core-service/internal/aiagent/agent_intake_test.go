@@ -2,165 +2,113 @@ package aiagent
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
+
+	"github.com/lease-management-system/core-service/internal/aiintake"
 )
 
-func TestParsePaymentScheduleUsesVersionedIntakeContract(t *testing.T) {
-	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "payment-schedule.json")
-	fixture, err := os.ReadFile(fixturePath)
+// W5-3: the parse endpoints now run the in-process producer. Each test drives
+// the new path with a CORR-2-recorded input (file bytes + LLM response) and
+// asserts the decoded typed draft — GUARD-001 evidence that the replacement
+// actually works, not just that the Python hop is gone.
+
+func TestParseFileUsesInProcessProducer(t *testing.T) {
+	text, ct, llmR, _ := loadCorr2(t, "contract-full")
+	agent := newIntakeAgent(t, llmR, map[string][]byte{"lease-contract.pdf": []byte(text)})
+
+	draft, err := agent.parseFile(context.Background(), "Bearer test-token", "file-contract-001", "lease-contract.pdf", ct)
 	if err != nil {
-		t.Fatalf("read shared AI intake fixture: %v", err)
+		t.Fatalf("parse contract: %v", err)
 	}
+	if draft.ExtractedData.ContractNumber != "LEASE-CORR2-001" || draft.ExtractedData.Currency != "CNY" {
+		t.Fatalf("in-process producer draft = %#v", draft.ExtractedData)
+	}
+	if draft.Evidence.Complete || !draft.ReviewGate.Required {
+		t.Fatalf("unsafe intake metadata: %#v", draft.IntakeMetadata)
+	}
+	if len(draft.ReviewGate.Reasons) == 0 {
+		t.Fatal("review gate must carry reasons")
+	}
+}
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/api/v1/parse/payment-schedule" {
-			t.Errorf("unexpected AI service path %q", request.URL.Path)
+func TestParseFileNoDiscountRateIsIndependentlyFlagged(t *testing.T) {
+	text, ct, llmR, _ := loadCorr2(t, "contract-no-discount-rate")
+	agent := newIntakeAgent(t, llmR, map[string][]byte{"no-rate.pdf": []byte(text)})
+
+	draft, err := agent.parseFile(context.Background(), "Bearer t", "file-002", "no-rate.pdf", ct)
+	if err != nil {
+		t.Fatalf("parse contract: %v", err)
+	}
+	found := false
+	for _, m := range draft.MissingFields {
+		if m == "discount_rate" {
+			found = true
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(fixture)
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("AI_SERVICE_URL", server.URL)
+	}
+	if !found {
+		t.Fatalf("discount_rate must be flagged as missing: %v", draft.MissingFields)
+	}
+	if draft.ReviewGate.Reasons == nil {
+		t.Fatalf("review gate must be present")
+	}
+	if !draft.RequiresHumanConfirmation {
+		t.Fatal("Assist Mode draft must require human confirmation")
+	}
+}
 
-	agent := &Agent{}
-	result, err := agent.parsePaymentSchedule(
-		context.Background(),
-		"Bearer test-token",
-		"file-001",
-		"rent-schedule.xlsx",
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-		"contract-001",
-	)
+func TestParsePaymentScheduleUsesInProcessProducer(t *testing.T) {
+	text, ct, llmR, _ := loadCorr2(t, "payment-full")
+	agent := newIntakeAgent(t, llmR, map[string][]byte{"rent-schedule.pdf": []byte(text)})
+
+	result, err := agent.parsePaymentSchedule(context.Background(), "Bearer test-token", "file-001", "rent-schedule.pdf", ct, "contract-001")
 	if err != nil {
 		t.Fatalf("parse payment schedule: %v", err)
 	}
-
-	if len(result.Schedules) != 1 || result.Schedules[0].Amount != 1000 {
+	if len(result.Schedules) != 2 || result.Schedules[0].Amount != 50000 {
 		t.Fatalf("unexpected typed schedules: %+v", result.Schedules)
 	}
 	if result.Summary.SchemaVersion != "ai-intake.v1" {
 		t.Fatalf("schema version = %q", result.Summary.SchemaVersion)
 	}
-	if result.Summary.IntakeID != "intake-fixture-001" {
-		t.Fatalf("intake id = %q", result.Summary.IntakeID)
-	}
-	if !result.Summary.EvidenceComplete || !result.Summary.RequiresHumanConfirm {
-		t.Fatalf("expected complete evidence and mandatory review: %+v", result.Summary)
+	if !result.Summary.RequiresHumanConfirm {
+		t.Fatalf("payment draft must require human confirmation: %+v", result.Summary)
 	}
 }
 
-func TestParsePaymentScheduleRejectsMismatchedSourceIdentity(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{
-			"schema_version":"ai-intake.v1",
-			"intake_id":"intake-mismatch",
-			"task_id":"task_ps_other-file",
-			"file_id":"other-file",
-			"mode":"assist",
-			"draft_type":"payment_schedule_draft",
-			"status":"draft_generated",
-			"schedules":[],
-			"confidence_scores":{"overall":0},
-			"missing_fields":["all"],
-			"warnings":[],
-			"requires_human_confirmation":true,
-			"evidence":{"source_file_id":"other-file","object_name":"other.xlsx","content_type":"application/json","locators":[],"complete":false,"missing_reason":"not_available"},
-			"review_gate":{"required":true,"reasons":["assist_mode"],"confidence_threshold":0.8}
-		}`))
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("AI_SERVICE_URL", server.URL)
+func TestParseContractBatchUsesInProcessProducer(t *testing.T) {
+	text, ct, llmR, _ := loadCorr2(t, "batch-full")
+	agent := newIntakeAgent(t, llmR, map[string][]byte{"lease-ledger.pdf": []byte(text)})
 
-	agent := &Agent{}
-	_, err := agent.parsePaymentSchedule(
-		context.Background(),
-		"Bearer test-token",
-		"file-001",
-		"rent-schedule.xlsx",
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-		"contract-001",
-	)
-	if err == nil {
-		t.Fatal("expected mismatched source identity to be rejected")
-	}
-}
-
-func TestParseFileUsesVersionedContractIntake(t *testing.T) {
-	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "contract.json")
-	fixture, err := os.ReadFile(fixturePath)
-	if err != nil {
-		t.Fatalf("read shared contract intake fixture: %v", err)
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/api/v1/parse/contract" {
-			t.Errorf("unexpected AI service path %q", request.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(fixture)
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("AI_SERVICE_URL", server.URL)
-
-	agent := &Agent{}
-	draft, err := agent.parseFile(
-		context.Background(),
-		"Bearer test-token",
-		"file-contract-001",
-		"lease-contract.pdf",
-		"application/pdf",
-	)
-	if err != nil {
-		t.Fatalf("parse contract: %v", err)
-	}
-	if draft.ExtractedData.ContractNumber != "LEASE-001" {
-		t.Fatalf("contract draft = %#v", draft.ExtractedData)
-	}
-	if draft.Evidence.Complete || !draft.ReviewGate.Required {
-		t.Fatalf("unsafe intake metadata: %#v", draft.IntakeMetadata)
-	}
-}
-
-func TestParseContractBatchUsesVersionedIntakeContract(t *testing.T) {
-	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "contract-batch.json")
-	fixture, err := os.ReadFile(fixturePath)
-	if err != nil {
-		t.Fatalf("read shared contract batch fixture: %v", err)
-	}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/api/v1/parse/contract-batch" {
-			t.Errorf("unexpected AI service path %q", request.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(fixture)
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("AI_SERVICE_URL", server.URL)
-
-	agent := &Agent{}
-	result, err := agent.parseContractBatch(
-		context.Background(),
-		"Bearer test-token",
-		"file-batch-001",
-		"lease-ledger.xlsx",
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-	)
+	result, err := agent.parseContractBatch(context.Background(), "Bearer test-token", "file-batch-001", "lease-ledger.pdf", ct)
 	if err != nil {
 		t.Fatalf("parse contract batch: %v", err)
 	}
-	if len(result.Contracts) != 1 || result.Contracts[0].ContractNumber != "LEASE-BATCH-001" {
+	if len(result.Contracts) != 3 || result.Contracts[0].ContractNumber != "L-B1" {
 		t.Fatalf("contracts = %#v", result.Contracts)
 	}
-	if result.Summary.SchemaVersion != "ai-intake.v1" || result.Summary.IntakeID != "intake-batch-fixture-001" {
+	if result.Summary.SchemaVersion != "ai-intake.v1" || result.Summary.IntakeID == "" {
 		t.Fatalf("intake trace = %#v", result.Summary)
 	}
-	if !result.Summary.EvidenceComplete || !result.Summary.RequiresHumanConfirm {
-		t.Fatalf("unsafe batch metadata = %#v", result.Summary)
+	if !result.Summary.RequiresHumanConfirm {
+		t.Fatalf("batch draft must require human confirmation: %#v", result.Summary)
+	}
+}
+
+// The source-identity guard still holds: a draft envelope claiming a different
+// source must be rejected before any draft is surfaced (底1/底3).
+func TestParseRejectsMismatchedSourceIdentity(t *testing.T) {
+	meta := aiintake.IntakeMetadata{
+		FileID:        "file-other",
+		SchemaVersion: aiintake.SchemaVersion,
+		Evidence: aiintake.Evidence{
+			SourceFileID: "file-other", ObjectName: "other.pdf", ContentType: "application/pdf",
+			Locators: []aiintake.EvidenceLocator{}, Complete: false, MissingReason: "x",
+		},
+	}
+	if err := validateAIIntakeSource(meta, "file-001", "mine.pdf", "application/pdf"); err == nil {
+		t.Fatal("mismatched source identity must be rejected")
+	}
+	if err := validateAIIntakeSource(meta, "file-other", "other.pdf", "application/pdf"); err != nil {
+		t.Fatalf("matching identity must pass: %v", err)
 	}
 }

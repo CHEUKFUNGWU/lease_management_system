@@ -129,6 +129,10 @@ func main() {
 	})
 	docParser := docparse.NewRouter(docparse.CSV(), docparse.AnyDoc(cfg.AnyDocBinPath, 60*time.Second), ocrParser, docparse.OCREnabled(ocrParser))
 	aiChatHandler.SetDocumentParser(docParser)
+	// W5-3: the intake parse endpoints read uploaded files through MinIO.
+	aiChatHandler.SetFileBytesReader(func(ctx context.Context, objectName string) ([]byte, error) {
+		return minioClient.GetObject(ctx, objectName)
+	})
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)

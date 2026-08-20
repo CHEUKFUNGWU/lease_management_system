@@ -3,12 +3,7 @@ package aiagent
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"time"
 
 	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/aiintake"
@@ -29,38 +24,13 @@ type EventFileParseResult struct {
 	SchemaVersion string                            `json:"schema_version"`
 }
 
-func (h *Agent) parseEvent(ctx context.Context, authHeader, fileID, objectName, contentType, contractID string) (*EventFileParseResult, error) {
-	aiServiceURL := os.Getenv("AI_SERVICE_URL")
-	if aiServiceURL == "" {
-		aiServiceURL = "http://ai-service:8000"
-	}
-	reqBody, err := json.Marshal(map[string]string{
-		"file_id": fileID, "object_name": objectName, "content_type": contentType,
-		"contract_id": contractID, "mode": "assist",
-	})
+func (h *Agent) parseEvent(ctx context.Context, _ string, fileID, objectName, contentType, contractID string) (*EventFileParseResult, error) {
+	// W5-3: the event parse runs in-process through the producer.
+	envelope, err := h.intakeDraft(ctx, "event", fileID, objectName, contentType, contractID)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", aiServiceURL+"/api/v1/parse/event", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", authHeader)
-	resp, err := (&http.Client{Timeout: 180 * time.Second}).Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, readErr := io.ReadAll(resp.Body)
-		if readErr != nil {
-			return nil, readErr
-		}
-		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
-	}
-	intake, err := aiintake.DecodeEvent(resp.Body)
+	intake, err := aiintake.DecodeEvent(bytes.NewReader(envelope))
 	if err != nil {
 		return nil, err
 	}

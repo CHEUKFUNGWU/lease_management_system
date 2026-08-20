@@ -13,8 +13,8 @@ import (
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aiagent"
-	"github.com/lease-management-system/core-service/internal/docparse"
 	"github.com/lease-management-system/core-service/internal/aichat"
+	"github.com/lease-management-system/core-service/internal/docparse"
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/middleware"
@@ -131,6 +131,15 @@ func (h *AIChatHandler) SetDocumentParser(p docparse.DocumentParser) {
 		return
 	}
 	h.agent.SetDocumentParser(p)
+}
+
+// SetFileBytesReader injects the MinIO read seam (W5-3) into the inner Agent's
+// intake parse endpoints.
+func (h *AIChatHandler) SetFileBytesReader(f aiagent.FileBytesReader) {
+	if h == nil || h.agent == nil {
+		return
+	}
+	h.agent.SetFileBytesReader(f)
 }
 
 // NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail is the

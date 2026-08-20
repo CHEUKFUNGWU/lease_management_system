@@ -224,3 +224,15 @@ func columnLetter(index int) string {
 }
 
 var _ = time.Now
+
+// ReadExcelContracts is the exported seam the Agent's intake path uses to turn
+// an uploaded xlsx into deterministic records, the cell-dump text (evidence)
+// and coordinate locators — the same shape the Python Excel adapter produced.
+func ReadExcelContracts(data []byte) (string, []map[string]any, []EvidenceLocator, error) {
+	return readExcelContracts(data)
+}
+
+// IsExcelContentType reports whether a content type routes to the Excel reader.
+func IsExcelContentType(contentType string) bool {
+	return isExcelContentType(contentType)
+}

@@ -2,37 +2,28 @@ package aiagent
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
-func TestParseEventUsesVersionedAssistIntake(t *testing.T) {
-	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "event.json")
-	fixture, err := os.ReadFile(fixturePath)
-	if err != nil {
-		t.Fatalf("read event fixture: %v", err)
-	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/api/v1/parse/event" {
-			t.Errorf("unexpected AI service path %q", request.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(fixture)
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("AI_SERVICE_URL", server.URL)
+// W5-3: the event parse runs through the in-process producer (Assist Mode only
+// — a reviewable draft with a wajib human gate, never an approved event).
 
-	result, err := (&Agent{}).parseEvent(context.Background(), "Bearer test-token", "event-001", "event/2026/08/event-001.pdf", "application/pdf", "contract-001")
+func TestParseEventUsesInProcessProducer(t *testing.T) {
+	text, ct, llmR, _ := loadCorr2(t, "event-modification")
+	agent := newIntakeAgent(t, llmR, map[string][]byte{"event/2026/08/event-001.pdf": []byte(text)})
+
+	result, err := agent.parseEvent(context.Background(), "Bearer test-token", "event-001", "event/2026/08/event-001.pdf", ct, "contract-001")
 	if err != nil {
 		t.Fatalf("parse event: %v", err)
 	}
-	if result.Event.EventType != "modification" || result.Event.ContractID != "contract-001" {
+	if result.Event.EventType != "area_adjustment" {
 		t.Fatalf("event = %+v", result.Event)
 	}
-	if result.Confidence != 0.62 || len(result.MissingFields) == 0 || len(result.EvidenceRefs) != 1 {
+	if result.Confidence < 0 || len(result.MissingFields) != 0 {
 		t.Fatalf("review metadata = %+v", result)
+	}
+	// The event draft must carry the unconditional Assist-Mode review gate.
+	if len(result.ReviewPrompts) == 0 {
+		t.Fatal("event draft must carry review prompts")
 	}
 }

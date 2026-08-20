@@ -56,11 +56,11 @@ func TestStatementModelToolsWireProductionPorts(t *testing.T) {
 		{"fpna.statement_model.evaluate", `{"model":{"definition_id":"missing-def"}}`},
 	} {
 		_, err := runtime.Execute(ctx, agenttools.ToolCall{
-			CallID:     "call-1",
-			RunID:      "run-1",
-			ToolName:   tc.tool,
+			CallID:      "call-1",
+			RunID:       "run-1",
+			ToolName:    tc.tool,
 			ToolVersion: "v1",
-			Arguments:  []byte(tc.args),
+			Arguments:   []byte(tc.args),
 		})
 		if err == nil {
 			t.Fatalf("%s: a missing run/definition must error, got nil (a nil port would also error, but never 'unavailable')", tc.tool)

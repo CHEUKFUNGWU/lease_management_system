@@ -7,9 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -43,6 +40,9 @@ type Agent struct {
 	// docParser is the document parser seam (W5-1); nil means parser_unavailable
 	// for parse paths that have not been wired a backend.
 	docParser docparse.DocumentParser
+	// fileBytes is the MinIO read seam used by the intake parse endpoints
+	// (W5-3); nil means parse tools refuse honestly.
+	fileBytes FileBytesReader
 }
 
 // SetLLMClient injects the LLM client used by the chat paths. Tests and the
@@ -2221,45 +2221,12 @@ func extractSourcesFromAnswer(answer string, knownSources []Source) []Source {
 }
 
 func (h *Agent) parseFile(ctx context.Context, authHeader, fileID, objectName, contentType string) (*aiintake.ContractDraft, error) {
-	aiServiceURL := os.Getenv("AI_SERVICE_URL")
-	if aiServiceURL == "" {
-		aiServiceURL = "http://ai-service:8000"
-	}
-
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"file_id":      fileID,
-		"object_name":  objectName,
-		"content_type": contentType,
-		"mode":         "assist",
-	})
+	// W5-3: the contract parse runs in-process through the intake producer.
+	envelope, err := h.intakeDraft(ctx, "contract", fileID, objectName, contentType, "")
 	if err != nil {
 		return nil, err
 	}
-
-	req, err := http.NewRequest("POST", aiServiceURL+"/api/v1/parse/contract", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", authHeader)
-
-	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	draft, err := aiintake.DecodeContract(resp.Body)
+	draft, err := aiintake.DecodeContract(bytes.NewReader(envelope))
 	if err != nil {
 		return nil, err
 	}
@@ -2289,45 +2256,16 @@ type PaymentScheduleParseResult struct {
 }
 
 func (h *Agent) parsePaymentSchedule(ctx context.Context, authHeader, fileID, objectName, contentType, contractID string) (*PaymentScheduleParseResult, error) {
-	aiServiceURL := os.Getenv("AI_SERVICE_URL")
-	if aiServiceURL == "" {
-		aiServiceURL = "http://ai-service:8000"
+	if strings.TrimSpace(authHeader) == "" {
+		// authHeader is retained for signature compatibility only; the parse
+		// path no longer delegates the credential to an external service.
 	}
-
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"file_id":      fileID,
-		"object_name":  objectName,
-		"content_type": contentType,
-		"mode":         "assist",
-	})
+	// W5-3: the payment-schedule parse runs in-process through the producer.
+	envelope, err := h.intakeDraft(ctx, "payment_schedule", fileID, objectName, contentType, contractID)
 	if err != nil {
 		return nil, err
 	}
-
-	req, err := http.NewRequest("POST", aiServiceURL+"/api/v1/parse/payment-schedule", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", authHeader)
-
-	client := &http.Client{Timeout: 180 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	intake, err := aiintake.DecodePaymentSchedule(resp.Body)
+	intake, err := aiintake.DecodePaymentSchedule(bytes.NewReader(envelope))
 	if err != nil {
 		return nil, err
 	}
@@ -2445,46 +2383,13 @@ type BatchParseResult struct {
 	EvidenceRefs  []agentartifact.EvidenceReference
 }
 
-func (h *Agent) parseContractBatch(ctx context.Context, authHeader, fileID, objectName, contentType string) (*BatchParseResult, error) {
-	aiServiceURL := os.Getenv("AI_SERVICE_URL")
-	if aiServiceURL == "" {
-		aiServiceURL = "http://ai-service:8000"
-	}
-
-	reqBody, err := json.Marshal(map[string]interface{}{
-		"file_id":      fileID,
-		"object_name":  objectName,
-		"content_type": contentType,
-		"mode":         "assist",
-	})
+func (h *Agent) parseContractBatch(ctx context.Context, _ string, fileID, objectName, contentType string) (*BatchParseResult, error) {
+	// W5-3: the ledger batch parse runs in-process through the producer.
+	envelope, err := h.intakeDraft(ctx, "contract_batch", fileID, objectName, contentType, "")
 	if err != nil {
 		return nil, err
 	}
-
-	req, err := http.NewRequest("POST", aiServiceURL+"/api/v1/parse/contract-batch", bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", authHeader)
-
-	client := &http.Client{Timeout: 180 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("AI service returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	intake, err := aiintake.DecodeContractBatch(resp.Body)
+	intake, err := aiintake.DecodeContractBatch(bytes.NewReader(envelope))
 	if err != nil {
 		return nil, err
 	}

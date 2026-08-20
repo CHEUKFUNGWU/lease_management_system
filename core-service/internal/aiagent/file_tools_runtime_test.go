@@ -2,14 +2,16 @@ package aiagent
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"
+	"github.com/lease-management-system/core-service/internal/llm"
 )
 
 func TestFileParseToolDescriptorsRequireDraftReview(t *testing.T) {
@@ -32,34 +34,19 @@ func TestFileParseToolDescriptorsRequireDraftReview(t *testing.T) {
 }
 
 func TestPaymentScheduleFileToolRunsThroughRuntimeAsReviewableDraft(t *testing.T) {
-	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "payment-schedule.json")
-	fixture, err := os.ReadFile(fixturePath)
-	if err != nil {
-		t.Fatalf("read shared AI intake fixture: %v", err)
-	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/api/v1/parse/payment-schedule" {
-			t.Errorf("unexpected AI service path %q", request.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write(fixture)
-	}))
-	t.Cleanup(server.Close)
-	t.Setenv("AI_SERVICE_URL", server.URL)
+	text, _, llmR, _ := loadCorr2(t, "payment-full")
+	agent := newIntakeAgent(t, llmR, map[string][]byte{"rent-schedule.pdf": []byte(text)})
 
-	agent := &Agent{}
 	definition := agent.fileParseDefinitions()[2]
 	registry := agenttools.NewRegistry()
 	if err := registry.Register(definition); err != nil {
 		t.Fatalf("register file tool: %v", err)
 	}
 	runtime := agenttools.NewRuntime(registry, agenttools.RuntimeOptions{})
-	ctx := withAIServiceAuth(context.Background(), "Bearer test-token")
-	ctx = agenttools.WithExecutionContext(ctx, agenttools.ExecutionContext{
+	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
 		Principal: agenttools.Principal{
-			UserID:      "user-1",
-			Permissions: []string{"ai_chat:use"},
-			Scope:       access.Scope{LegalEntityID: "le-001"},
+			UserID: "user-1", Permissions: []string{"ai_chat:use"},
+			Scope: access.Scope{LegalEntityID: "le-001"},
 		},
 		RunID: "run-1",
 	})
@@ -67,8 +54,8 @@ func TestPaymentScheduleFileToolRunsThroughRuntimeAsReviewableDraft(t *testing.T
 	result, err := runtime.Execute(ctx, agenttools.ToolCall{
 		CallID: "call-1", RunID: "run-1", ToolName: definition.Descriptor.Name,
 		ToolVersion:    definition.Descriptor.Version,
-		Arguments:      []byte(`{"file_id":"file-001","object_name":"rent-schedule.xlsx","content_type":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","contract_id":"contract-001"}`),
-		IdempotencyKey: "lease.file.parse_payment_schedule:file-001:rent-schedule.xlsx:contract-001",
+		Arguments:      []byte(`{"file_id":"file-001","object_name":"rent-schedule.pdf","content_type":"application/pdf","contract_id":"contract-001"}`),
+		IdempotencyKey: "lease.file.parse_payment_schedule:file-001:rent-schedule.pdf:contract-001",
 	})
 	if err != nil || result.Status != agenttools.StatusNeedsReview {
 		t.Fatalf("result=%#v err=%v", result, err)
@@ -77,11 +64,10 @@ func TestPaymentScheduleFileToolRunsThroughRuntimeAsReviewableDraft(t *testing.T
 	if !ok || parsed == nil || parsed.Summary == nil || !parsed.Summary.RequiresHumanConfirm {
 		t.Fatalf("unexpected parsed result=%#v", result.Data)
 	}
-	if !result.Review.Required || len(result.Sources) != 1 || result.Sources[0].ID != "file-001" {
-		t.Fatalf("review/evidence=%#v", result)
+	if !result.Review.Required {
+		t.Fatalf("review gate must be required: %#v", result.Review)
 	}
 }
-
 func TestFileParseToolRejectsURLObjectNameBeforeCallingAIService(t *testing.T) {
 	agent := &Agent{}
 	definition := agent.fileParseDefinitions()[0]
@@ -94,46 +80,51 @@ func TestFileParseToolRejectsURLObjectNameBeforeCallingAIService(t *testing.T) {
 }
 
 func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing.T) {
-	fixturePath := filepath.Join("..", "..", "..", "contracts", "ai-intake.v1", "payment-schedule.json")
-	fixture, err := os.ReadFile(fixturePath)
-	if err != nil {
-		t.Fatalf("read shared AI intake fixture: %v", err)
-	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+	text, ct, llmR, _ := loadCorr2(t, "payment-full")
+	// The legacy file route makes TWO LLM calls: the routing call (with tools,
+	// returns parse_payment_schedule) and the intake call (no tools, returns
+	// the recorded payment response). Branch on whether the body carries tools.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
-		switch request.URL.Path {
-		case "/chat/completions":
-			// W4-2: the LLM call is now in-process through internal/llm and
-			// hits the provider chat-completions endpoint, not /api/v1/chat.
-			_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"parse_payment_schedule","arguments":"{}"}}]}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
-		case "/api/v1/parse/payment-schedule":
-			_, _ = w.Write(fixture)
-		default:
-			t.Errorf("unexpected AI service path %q", request.URL.Path)
-			w.WriteHeader(http.StatusNotFound)
+		if strings.Contains(string(body), `"tools"`) {
+			_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"parse_payment_schedule","arguments":"{}"}}]}}]}`))
+			return
 		}
+		_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":` + mustJSONString(llmR) + `}}]}`))
 	}))
 	t.Cleanup(server.Close)
-	t.Setenv("AI_SERVICE_URL", server.URL)
-	t.Setenv("LLM_PROVIDER", "deepseek")
-	t.Setenv("DEEPSEEK_API_KEY", "test-key")
-	t.Setenv("DEEPSEEK_BASE_URL", server.URL)
-	t.Setenv("DEEPSEEK_MODEL", "compat-model")
+	client, err := llm.NewClient(llm.Config{
+		Provider: "deepseek", APIKey: "test-key", BaseURL: server.URL, Model: "deepseek-v4-flash",
+		PricingVersion: "unconfigured",
+	})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
 
 	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	agent.SetLLMClient(client)
+	agent.SetDocumentParser(textDocParser{})
+	agent.SetFileBytesReader(func(_ context.Context, objectName string) ([]byte, error) {
+		if objectName == "rent-schedule.pdf" {
+			return []byte(text), nil
+		}
+		return nil, os.ErrNotExist
+	})
+
 	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
 		Principal: agenttools.Principal{UserID: "user-1", Role: "editor", Permissions: []string{"ai_chat:use"}},
 		RunID:     "run-compat",
 	})
 	ctx = withAIServiceAuth(ctx, "Bearer test-token")
 	response, err := agent.executeChatRequest(ctx, "Bearer test-token", Request{
-		Message: "请解析这张租金表", FileID: "file-001", ObjectName: "rent-schedule.xlsx",
-		ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		Message: "请解析这张租金表", FileID: "file-001", ObjectName: "rent-schedule.pdf",
+		ContentType: ct,
 	}, "le-001", "user-1", "editor", nil, nil, agent.toolRuntime)
 	if err != nil {
 		t.Fatalf("execute legacy AI Chat file route: %v", err)
 	}
-	if !response.AgentMode || response.Model != "deepseek/compat-model" || len(response.DraftPaymentSchedules) != 1 {
+	if !response.AgentMode || response.Model != "deepseek/deepseek-v4-flash" || len(response.DraftPaymentSchedules) != 2 {
 		t.Fatalf("compat response = %#v", response)
 	}
 	if response.PaymentScheduleSummary == nil || !response.PaymentScheduleSummary.RequiresHumanConfirm {

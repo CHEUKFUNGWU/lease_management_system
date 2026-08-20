@@ -1,6 +1,6 @@
 {
-  "as_of": "2026-08-19",
-  "note": "零售 MVP 在 ADR-0020 落地前写下的 float64 金额字段，MONEY-003 迁移逐笔清偿后下调对应数字。finmodel/opening/readers/storepnl/memo 为三表模型派生值家族（与 currencytranslation 同类投影值），S1-5 占用拆分（occupancy.go/payment_schedule.go 投影行）同族，按 T6b 记入分支级债务。每个键是「文件 → money → 允许数量」，超出即失败。",
+  "as_of": "2026-08-20",
+  "note": "零售 MVP 在 ADR-0020 落地前写下的 float64 金额字段，MONEY-003 迁移逐笔清偿后下调对应数字。finmodel/opening/readers/storepnl/memo 为三表模型派生值家族（与 currencytranslation 同类投影值），S1-5 占用拆分（occupancy.go/payment_schedule.go 投影行）同族，按 T6b 记入分支级债务。每个键是「文件 → money → 允许数量」，超出即失败。2026-08-20 新增 internal/llm/config.go（W4-1）：LLM token 计价（USD/百万 token），与已在册的 agent_usage_budget.go / agentguard.go 同属 Agent 成本可观测性家族——它不进台账、不进分录、不参与勾稽，产出是 /agent-metrics 上明确标注为估算的展示值（未配置价格时显示 unavailable）。ADR-0020 的动因是审计口径与 ERP 对账，此处均不适用，故记为债务而非改用 money.Amount。若将来成本进入计费或对外结算，必须清偿这两笔。",
   "files": {
     "core-service/internal/finmodel/memo/memo.go": {
       "money": 1
@@ -18,6 +18,9 @@
       "money": 2
     },
     "core-service/internal/handlers/promotion.go": {
+      "money": 2
+    },
+    "core-service/internal/llm/config.go": {
       "money": 2
     },
     "core-service/internal/repository/agent_usage_budget.go": {

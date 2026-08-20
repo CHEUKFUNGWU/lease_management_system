@@ -505,9 +505,6 @@ func main() {
 		// W5-5: file upload moved to core-service (MinIO write seam). The
 		// front-end posts /api/ai/files/upload which now lands here.
 		protected.Handle(http.MethodPost, "/ai/files/upload", permission("ai_chat", "use"), uploadHandler)
-		// W5-5: file upload moved to core-service (MinIO write seam). The
-		// front-end posts /api/ai/files/upload which now lands here.
-		protected.Handle(http.MethodPost, "/ai/files/upload", permission("ai_chat", "use"), uploadHandler)
 
 		// Agent Gateway: individual Tools enforce their own permissions. Do not
 		// put a broad ai_chat permission in front of this group, otherwise CLI

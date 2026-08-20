@@ -2250,8 +2250,16 @@ ALTER TABLE fin_model_runs ADD COLUMN IF NOT EXISTS failure_reason TEXT;
 -- ── 058_assumption_draft_idempotency — SM5 假设草稿幂等（底线 4）────────────
 ALTER TABLE fpna_assumption_versions
     ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(255);
+-- 批次幂等的行组合唯一（059 修正形状：058 的 (entity,key) 每行唯一与一批
+-- 共享同一键冲突，新库直接建对）。
 CREATE UNIQUE INDEX IF NOT EXISTS ux_fpna_assumption_versions_idempotency
-    ON fpna_assumption_versions(legal_entity_id, idempotency_key)
+    ON fpna_assumption_versions(legal_entity_id, idempotency_key, assumption_key)
+    WHERE idempotency_key IS NOT NULL;
+
+-- ── 059_assumption_draft_idempotency_batch — 058 索引形状修正（幂等）────────
+DROP INDEX IF EXISTS ux_fpna_assumption_versions_idempotency;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fpna_assumption_versions_idempotency
+    ON fpna_assumption_versions(legal_entity_id, idempotency_key, assumption_key)
     WHERE idempotency_key IS NOT NULL;
 
 -- an existing volume tracks its own progress in this same table. Keep this list
@@ -2285,5 +2293,6 @@ INSERT INTO schema_migrations (version) VALUES
 ('051_inventory_masterdata_and_competitors'), ('052_env_envelope_and_dedup_keys'),
 ('053_statement_models'), ('054_assumption_suggestion'),
 ('055_saved_views_and_template_governance'), ('056_template_copy_lineage'),
-('057_async_run_progress'), ('058_assumption_draft_idempotency')
+('057_async_run_progress'), ('058_assumption_draft_idempotency'),
+('059_assumption_draft_idempotency_batch')
 ON CONFLICT (version) DO NOTHING;

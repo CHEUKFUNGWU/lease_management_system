@@ -3,6 +3,7 @@ package adapter
 import (
 	"context"
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/google/uuid"
@@ -132,6 +133,9 @@ func TestAssumptionDraftsIdempotentAndAtomicPostgres(t *testing.T) {
 	if err != nil || len(replay) != 2 {
 		t.Fatalf("replay = %v / %v", replay, err)
 	}
+	// 同批 id（顺序无关：首次返按插入序、重放返按 (created_at,id) 序）。
+	sort.Strings(first)
+	sort.Strings(replay)
 	if replay[0] != first[0] || replay[1] != first[1] {
 		t.Fatalf("replay must return the same batch ids: %v vs %v", replay, first)
 	}

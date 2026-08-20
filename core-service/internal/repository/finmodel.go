@@ -514,9 +514,9 @@ func idempotencyKeyOrNil(key string) *string {
 // an append-only ledger for mismatches, not part of the run's own write.
 func (r *FinModelRepository) InsertReconciliationIssue(ctx context.Context, legalEntityID, sourceTable, sourceRecordID, period, dataVersion, description string) error {
 	_, err := r.db.Exec(ctx, `INSERT INTO fpna_data_quality_items
-		(legal_entity_id, dimension, category, severity, source_table, source_record_id, data_version, description)
-		VALUES ($1,'model_reconciliation','reconciliation','high',$2,$3,$4,$5)`,
-		legalEntityID, sourceTable, sourceRecordID, dataVersion, description)
+		(legal_entity_id, dimension, category, severity, source_table, source_record_id, data_version, period, description)
+		VALUES ($1,'model_reconciliation','reconciliation','high',$2,$3,$4,$5,$6)`,
+		legalEntityID, sourceTable, sourceRecordID, dataVersion, period, description)
 	if err != nil {
 		return fmt.Errorf("insert reconciliation issue: %w", err)
 	}

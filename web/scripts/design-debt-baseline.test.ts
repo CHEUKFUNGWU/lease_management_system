@@ -51,7 +51,26 @@ describe("design-debt-baseline.json（T6b 存量债务显式记账）", () => {
     const baseline = loadBaseline();
     const { excess, allowed } = applyBaseline(violations, baseline);
     expect(excess).toEqual([]);
-    expect(allowed).toBeGreaterThan(0); // 基线必须真的吸收了存量，而非空转
+
+    // 「基线真的吸收了存量，而非空转」这件事只有在扫描范围非空时才可判定。
+    //
+    // 守卫是 diff 型的：enforce-design.mjs 的 base 是 `origin/main`（CI）或
+    // `main`（本地）。在特性分支上 diff 恒非空，所以原来的
+    // `expect(allowed).toBeGreaterThan(0)` 一直是绿的；但分支合进 main 之后
+    // `HEAD === origin/main`，diff 为空 → 0 个变更文件 → 0 条违规 →
+    // allowed 必然为 0，断言恒红。2026-08-20 把 168 个 commit 快进进 main
+    // 时就是这样炸的，而它在分支上从未红过。
+    //
+    // 不能简单删掉这条断言：它防的是「基线烂掉」——条目还在、却已对不上
+    // 任何真实违规。所以按扫描范围分两种情形，各自断言能断言的那件事。
+    if (violations.length === 0) {
+      const total = Object.values(baseline.files ?? {})
+        .flatMap((rules) => Object.values(rules as Record<string, number>))
+        .reduce((sum, n) => sum + n, 0);
+      expect(total).toBeGreaterThan(0); // 基线本身必须是实质性的，不是空壳
+    } else {
+      expect(allowed).toBeGreaterThan(0); // 有东西可吸收时，必须真的吸收到
+    }
   });
 
   it("同组违规数超过 allowance 时，超出部分进 excess", () => {

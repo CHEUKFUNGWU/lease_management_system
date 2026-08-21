@@ -158,7 +158,7 @@ export function EnterpriseTable<T extends object = any>({
             gap: 12,
             padding: "8px 16px",
             background: "var(--bg-inset)",
-            border: "1px solid var(--border-default)",
+            boxShadow: "var(--shadow-static), 0 0 0 1px var(--border-default)",
             borderRadius: 8,
             fontSize: 13,
           }}
@@ -192,7 +192,7 @@ export function EnterpriseTable<T extends object = any>({
       {/* ─── Enterprise Data Table Body ─── */}
       <div
         style={{
-          border: "1px solid var(--border-default)",
+          boxShadow: "var(--shadow-static), 0 0 0 1px var(--border-default)",
           borderRadius: 8,
           background: "var(--bg-surface)",
           overflow: "auto",
@@ -566,7 +566,16 @@ function EditableCell({
       ) : (
         <Tooltip title={syncState?.error || (syncState?.status === "syncing" ? "同步中..." : "点击可直接行内修改")}>
           <div
+            className="enterprise-inline-edit-cell"
+            role="button"
+            tabIndex={0}
             onClick={() => setEditing(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setEditing(true);
+              }
+            }}
             style={{
               cursor: "pointer",
               padding: "2px 6px",
@@ -578,8 +587,6 @@ function EditableCell({
               justifyContent: "space-between",
               background: "transparent",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             <span>{value !== undefined && value !== null ? String(value) : "—"}</span>
             {syncState?.status === "syncing" && <LoadingOutlined style={{ fontSize: 11, color: "var(--state-info-text)" }} />}

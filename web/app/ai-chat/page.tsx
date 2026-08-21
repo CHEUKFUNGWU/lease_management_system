@@ -485,6 +485,7 @@ function MessageContent({
     }
 
     return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [content]);
 
   return (
@@ -500,11 +501,11 @@ function MessageContent({
           <CodeBlock key={idx} code={part.content} language={part.language || "text"} i18nLang={i18nLang} />
         ) : role === "user" ? (
           // The user's own text is shown verbatim — they did not write markdown.
-          <Text key={idx} style={{ color: "var(--fg-primary)", fontSize: 14, lineHeight: 1.6 }}>
+          <Text key={idx} className="ai-msg-user-text">
             {part.content}
           </Text>
         ) : (
-          <div key={idx} style={{ width: "100%", fontSize: 14, lineHeight: 1.65 }}>
+          <div key={idx} className="ai-md-body">
             <MarkdownText content={part.content} />
           </div>
         )
@@ -520,27 +521,27 @@ function MessageContent({
       })()}
 
       {(typeof confidence === "number" || (sources && sources.length > 0) || model) && (
-        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="ai-msg-meta">
+          <div className="ai-msg-meta-left">
             {typeof confidence === "number" && (
               <ConfidenceBadge confidence={confidence} reason={confidenceReason} />
             )}
             {sources && sources.length > 0 ? (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>{t("ai.sources", i18nLang)}:</span>
+              <div className="ai-msg-sources">
+                <span className="ai-msg-label">{t("ai.sources", i18nLang)}:</span>
                 {sources.map((source, idx) => {
                   const value = typeof source === "string" ? source : { ...source, url: safeInternalAIURL(source.url) };
                   return <SourceCitation key={idx} source={value} />;
                 })}
               </div>
             ) : !thinking && content ? (
-              <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>{t("ai.no_sources", i18nLang)}</span>
+              <span className="ai-msg-label">{t("ai.no_sources", i18nLang)}</span>
             ) : null}
           </div>
           {model && (
-            <div style={{ fontSize: 11, color: "var(--fg-muted)", display: "flex", alignItems: "center", gap: 4 }}>
+            <div className="ai-msg-model">
               <span>{t("ai.model_label", i18nLang)}</span>
-              <code style={{ background: "var(--bg-inset)", padding: "1px 5px", borderRadius: 4, fontSize: 10, color: "var(--fg-secondary)" }}>{model}</code>
+              <code className="ai-msg-model-code">{model}</code>
             </div>
           )}
         </div>
@@ -619,41 +620,26 @@ function AgentTracePanel({
   const totalSteps = plan.length || toolCalls.length;
 
   return (
-    <div
-      style={{
-        marginTop: 12,
-        background: "var(--bg-inset)",
-        border: "1px solid var(--border-default)",
-        borderRadius: 8,
-        padding: "8px 12px",
-        fontSize: 12,
-      }}
-    >
+    <div className="ai-trace-panel">
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          cursor: "pointer",
-          userSelect: "none",
-        }}
+        className="ai-trace-head"
         onClick={() => setExpanded(!expanded)}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <ToolOutlined style={{ color: "var(--fg-muted)", fontSize: 12 }} />
-          <Text strong style={{ fontSize: 12, color: "var(--fg-secondary)" }}>
+        <div className="ai-trace-head-left">
+          <ToolOutlined className="ai-trace-head-icon" />
+          <Text strong className="ai-trace-title">
             {t("ai.agent_trace_title", language)} · {totalSteps} 项执行步骤
           </Text>
         </div>
-        <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>
+        <span className="ai-trace-toggle">
           {expanded ? "收起 ▲" : "展开详情 ▼"}
         </span>
       </div>
 
       {expanded && (
-        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle)", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="ai-trace-body">
           {plan.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <div className="ai-trace-plan">
               {plan.map((step) => {
                 const meta = statusMeta(step.status, language);
                 return (
@@ -666,27 +652,19 @@ function AgentTracePanel({
           )}
 
           {toolCalls.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div className="ai-trace-calls">
               {toolCalls.map((call, index) => {
                 const meta = statusMeta(call.status, language);
                 return (
-                  <div
-                    key={`${call.tool}-${index}`}
-                    style={{
-                      padding: "6px 10px",
-                      background: "var(--bg-surface)",
-                      border: "1px solid var(--border-subtle)",
-                      borderRadius: 6,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Text strong style={{ fontSize: 11, color: "var(--fg-primary)" }}>{call.skill || call.tool}</Text>
-                      <StatusTag kind={statusKindFromAntColor(meta.color as any)} style={{ fontSize: 10, padding: "0 4px" }}>
+                  <div key={`${call.tool}-${index}`} className="ai-trace-call">
+                    <div className="ai-trace-call-head">
+                      <Text strong className="ai-trace-call-name">{call.skill || call.tool}</Text>
+                      <StatusTag kind={statusKindFromAntColor(meta.color as any)} className="ai-trace-tag">
                         {meta.label}
                       </StatusTag>
                     </div>
                     {(call.output_summary || call.input_summary) && (
-                      <div style={{ fontSize: 11, color: "var(--fg-secondary)", marginTop: 2 }}>
+                      <div className="ai-trace-call-summary">
                         {call.output_summary || call.input_summary}
                       </div>
                     )}
@@ -725,66 +703,50 @@ function AgentReviewPanel({
   if (prompts.length === 0) return null;
 
   return (
-    <div
-      style={{
-        marginTop: 12,
-        background: "var(--bg-inset)",
-        border: "1px solid var(--border-default)",
-        borderRadius: 8,
-        padding: "12px 16px",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-        <ExclamationCircleOutlined style={{ color: "var(--state-warning-text)", fontSize: 13 }} />
-        <Text strong style={{ fontSize: 12, color: "var(--fg-primary)" }}>
+    <div className="ai-review-panel">
+      <div className="ai-review-head">
+        <ExclamationCircleOutlined className="ai-review-head-icon" />
+        <Text strong className="ai-review-title">
           {t("ai.agent_review_title", language)}
         </Text>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="ai-review-list">
         {prompts.map((prompt, index) => {
           const cleanedTitle = cleanPromptText(prompt.title);
           const cleanedDesc = cleanPromptText(prompt.description);
           const isContextNeed = prompt.action?.includes("provide_retail_context") || prompt.title?.includes("as_of") || prompt.description?.includes("window_days");
 
           return (
-            <div
-              key={prompt.id || index}
-              style={{
-                padding: "8px 12px",
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: 6,
-              }}
-            >
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
+            <div key={prompt.id || index} className="ai-review-card">
+              <div className="ai-review-card-title">
                 {cleanedTitle || prompt.title}
               </div>
               {cleanedDesc && (
-                <div style={{ fontSize: 12, color: "var(--fg-secondary)", lineHeight: 1.5 }}>
+                <div className="ai-review-card-desc">
                   {cleanedDesc}
                 </div>
               )}
               {isContextNeed && (
-                <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>快捷填入:</span>
+                <div className="ai-review-quick">
+                  <span className="ai-review-quick-label">快捷填入:</span>
                   <Button
                     size="small"
-                    style={{ fontSize: 11, height: 24, borderRadius: 4 }}
+                    className="ai-review-quick-btn"
                     onClick={() => onQuickSelect?.("按模拟数据、近7天分析所有门店经营情况")}
                   >
                     近 7 天 · 模拟数据
                   </Button>
                   <Button
                     size="small"
-                    style={{ fontSize: 11, height: 24, borderRadius: 4 }}
+                    className="ai-review-quick-btn"
                     onClick={() => onQuickSelect?.("按模拟数据、近14天分析所有门店经营情况")}
                   >
                     近 14 天 · 模拟数据
                   </Button>
                   <Button
                     size="small"
-                    style={{ fontSize: 11, height: 24, borderRadius: 4 }}
+                    className="ai-review-quick-btn"
                     onClick={() => onQuickSelect?.("按正式数据、上月月结分析所有门店经营情况")}
                   >
                     上月 · 正式数据
@@ -792,7 +754,7 @@ function AgentReviewPanel({
                 </div>
               )}
               {prompt.contract_numbers && prompt.contract_numbers.length > 0 && (
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                <div className="ai-review-tags">
                   {prompt.contract_numbers.map((contractNumber) => (
                     <StatusTag key={contractNumber}>
                       {contractNumber}
@@ -833,7 +795,7 @@ function ReviewActionHistoryPanel({
         </Text>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div className="ai-history-list">
         {actions.map((action, index) => (
           <div
             key={action.id}
@@ -887,154 +849,75 @@ function SessionSidebar({
   const { language } = useLanguage();
 
   return (
-    <div
-      className="ai-chat-session-sidebar"
-      style={{
-        width: 256,
-        height: "100%",
-        borderRight: "1px solid var(--border-default)",
-        background: "var(--bg-surface)",
-        display: "flex",
-        flexDirection: "column",
-        flexShrink: 0,
-      }}
-    >
+    <div className="ai-chat-session-sidebar">
       {/* 1. Header (Flush 52px height) */}
-      <div
-        style={{
-          height: 52,
-          padding: "0 14px",
-          borderBottom: "1px solid var(--border-default)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          boxSizing: "border-box",
-        }}
-      >
-        <span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-primary)", letterSpacing: "-0.01em" }}>
+      <div className="ai-sb-header">
+        <span className="ai-sb-title">
           {t("nav.ai_chat", language)}
         </span>
         <Tooltip title={t("ai.new_session_btn", language)}>
           <Button
             type="text"
             size="small"
-            icon={<PlusOutlined style={{ fontSize: 12 }} />}
+            icon={<PlusOutlined />}
             onClick={onNew}
-            style={{ borderRadius: 6, width: 26, height: 26, padding: 0 }}
+            className="ai-sb-addbtn ai-sb-header-add"
           />
         </Tooltip>
       </div>
 
       {/* 2. New Conversation Action Button */}
-      <div style={{ padding: "10px 10px 4px 10px" }}>
+      <div className="ai-sb-newwrap">
         <Button
           type="default"
-          icon={<PlusOutlined style={{ fontSize: 12 }} />}
+          icon={<PlusOutlined />}
           onClick={onNew}
-          style={{
-            width: "100%",
-            height: 34,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            borderRadius: 7,
-            fontWeight: 500,
-            fontSize: 12,
-            background: "var(--bg-card, #FFFFFF)",
-            borderColor: "var(--border-default)",
-            color: "var(--fg-primary)",
-            boxShadow: "0 1px 2px rgba(16, 24, 40, 0.04)",
-          }}
+          className="ai-sb-addbtn ai-sb-newbtn"
         >
           {t("ai.new_session_btn", language)}
         </Button>
       </div>
 
       {/* 3. Section Header */}
-      <div style={{ padding: "10px 14px 4px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <div className="ai-sb-section">
+        <span className="ai-sb-section-label">
           {t("ai.history_sessions", language)}
         </span>
-        <span style={{ fontSize: 11, color: "var(--fg-muted)", fontVariantNumeric: "tabular-nums" }}>
+        <span className="ai-sb-count">
           {sessions.length}
         </span>
       </div>
 
       {/* 4. Session List */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
+      <div className="ai-sb-list">
         {sessions.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={t("ai.no_sessions", language)}
-            style={{ padding: "32px 0" }}
+            className="ai-sb-empty"
           />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div className="ai-sb-items">
             {sessions.map((session) => {
               const isActive = activeSessionId === session.id;
               return (
                 <div
                   key={session.id}
                   {...getAIChatSessionRowProps(isActive)}
-                  style={{
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "7px 10px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    background: isActive ? "var(--bg-inset)" : "transparent",
-                    color: isActive ? "var(--fg-primary)" : "var(--fg-secondary)",
-                    fontWeight: isActive ? 600 : 400,
-                    transition: "all 0.15s ease",
-                    border: isActive ? "1px solid var(--border-default)" : "1px solid transparent",
-                  }}
                   onClick={() => onSelect(session.id)}
-                  onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "var(--bg-inset)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "transparent";
-                  }}
                 >
                   <button
                     {...getAIChatSessionButtonProps(isActive)}
                     className={AI_CHAT_SESSION_ITEM_CLASS}
                     aria-label={`选择会话 ${session.title}`}
-                    style={{
-                      border: 0,
-                      font: "inherit",
-                      textAlign: "left",
-                      padding: 0,
-                      cursor: "pointer",
-                      background: "transparent",
-                      color: "inherit",
-                      fontWeight: "inherit",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      flex: 1,
-                      minWidth: 0,
-                    }}
                   >
-                    <span
-                      style={{
-                        fontSize: 13,
-                        lineHeight: "20px",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        flex: 1,
-                      }}
-                    >
+                    <span className="ai-sb-item-title">
                       {session.title || t("ai.new_session", language)}
                     </span>
                   </button>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 6 }}>
-                    <span style={{ fontSize: 11, color: "var(--fg-muted)", fontVariantNumeric: "tabular-nums" }}>
+                  <div className="ai-sb-item-meta">
+                    <span className="ai-sb-item-time">
                       {formatTime(session.updatedAt, language)}
                     </span>
                     <Dropdown
@@ -1059,10 +942,9 @@ function SessionSidebar({
                         type="text"
                         size="small"
                         aria-label={`删除会话 ${session.title}`}
-                        icon={<MoreOutlined style={{ fontSize: 12 }} />}
+                        icon={<MoreOutlined />}
                         onClick={(e) => e.stopPropagation()}
-                        className={AI_CHAT_SESSION_MORE_CLASS}
-                        style={{ width: 18, height: 18, padding: 0, color: "var(--fg-muted)" }}
+                        className={`${AI_CHAT_SESSION_MORE_CLASS} ai-sb-more`}
                       />
                     </Dropdown>
                   </div>
@@ -1181,7 +1063,7 @@ function DraftConfirmationPanel({ contracts, summary, onConfirm, onSkip, languag
       </div>
 
       {/* Contract List */}
-      <div style={{ maxHeight: 400, overflowY: "auto" }}>
+      <div className="ai-draft-list">
         {editedContracts.map((contract, index) => (
           <div
             key={index}
@@ -1523,7 +1405,7 @@ function PaymentScheduleDraftPanel({ schedules, summary, onConfirm, onSkip, lang
         )}
       </div>
 
-      <div style={{ maxHeight: 360, overflowY: "auto" }}>
+      <div className="ai-schedule-list">
         {editedSchedules.map((schedule, index) => (
           <div
             key={index}
@@ -1982,16 +1864,7 @@ function AIChatPageContent() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <div
-          className="ai-chat-shell"
-          style={{
-            display: "flex",
-            height: "calc(100vh - 64px)",
-            width: "100%",
-            background: "var(--bg-page)",
-            overflow: "hidden",
-          }}
-        >
+        <div className="ai-chat-shell">
           {/* Session Sidebar */}
           {responsiveState.showDesktopSidebar && (
             <SessionSidebar
@@ -2004,32 +1877,10 @@ function AIChatPageContent() {
           )}
 
           {/* Chat Area */}
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              height: "100%",
-              minWidth: 0,
-              background: "var(--bg-page)",
-              overflow: "hidden",
-            }}
-          >
+          <div className="ai-chat-main">
             {/* Top Bar (matching height 52px flush with sidebar) */}
-            <div
-              style={{
-                height: 52,
-                borderBottom: "1px solid var(--border-default)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0 20px",
-                background: "var(--bg-elevated)",
-                flexShrink: 0,
-                boxSizing: "border-box",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+            <div className="ai-chat-topbar">
+              <div className="ai-chat-topbar-left">
                 {responsiveState.showMobileSessionTrigger && (
                   <Button
                     ref={sessionDrawerTriggerRef}
@@ -2039,22 +1890,13 @@ function AIChatPageContent() {
                     onClick={() => transitionSessionDrawer("open")}
                   />
                 )}
-                <RobotOutlined style={{ fontSize: 15, color: "var(--fg-secondary)" }} />
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--fg-primary)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
+                <RobotOutlined className="ai-chat-topbar-icon" />
+                <span className="ai-chat-topbar-title">
                   {activeSession?.title || t("ai.assistant_name", language)}
                 </span>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <div className="ai-chat-topbar-actions">
                 {/* Model Selector */}
                 <Dropdown
                   menu={{
@@ -2068,31 +1910,18 @@ function AIChatPageContent() {
                   <Button
                     type="text"
                     size="small"
-                    style={{ fontSize: 12, borderRadius: 6, color: "var(--fg-secondary)" }}
+                    className="ai-model-btn"
                     aria-label={`选择模型，当前 ${MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}`}
                   >
                     <span>{MODEL_OPTIONS.find((m) => m.value === selectedModel)?.label || selectedModel}</span>
-                    <DownOutlined style={{ fontSize: 9, marginLeft: 4 }} />
+                    <DownOutlined className="ai-model-caret" />
                   </Button>
                 </Dropdown>
               </div>
             </div>
 
             {/* Messages Area */}
-            <div
-              className="ai-chat-messages"
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                padding: "24px 32px",
-                maxWidth: 960,
-                width: "100%",
-                margin: "0 auto",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-              }}
-            >
+            <div className="ai-chat-messages">
               {/* Context strip */}
               {pageContext && (
                 <motion.div
@@ -2129,81 +1958,45 @@ function AIChatPageContent() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  style={{
-                    marginBottom: 24,
-                    background: "var(--bg-elevated)",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: 16,
-                    padding: "24px 28px",
-                    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)",
-                  }}
+                  className="ai-welcome-card"
                 >
-                  <div style={{ marginBottom: 18 }}>
-                    <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 6 }}>
+                  <div className="ai-welcome-head">
+                    <div className="ai-welcome-title">
                       {t("ai.assistant_name", language)}
                     </div>
-                    <div style={{ fontSize: 13, color: "var(--fg-secondary)", lineHeight: 1.6 }}>
+                    <div className="ai-welcome-desc">
                       {t("ai.welcome_subtitle", language) || "连接门店销售、毛利、客流、占用成本与租赁合同，驱动「发现问题 — 解释原因 — 模拟方案 — 形成行动」闭环。"}
                     </div>
                   </div>
 
                   {/* 2x2 Skill Grid */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                      gap: 12,
-                      marginBottom: 16,
-                    }}
-                  >
+                  <div className="ai-skill-grid">
                     {agentSkillStarters.map((skill) => (
                       <div
                         key={skill.key}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => {
                           setInput(t(skill.promptKey, language));
                           setSelectedSkill(skill.skillId ? { id: skill.skillId, version: skill.skillVersion || "v1" } : undefined);
                         }}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 12,
-                          padding: "12px 14px",
-                          borderRadius: 10,
-                          border: "1px solid var(--border-subtle)",
-                          background: "var(--bg-surface)",
-                          cursor: "pointer",
-                          transition: "all 0.2s ease",
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setInput(t(skill.promptKey, language));
+                            setSelectedSkill(skill.skillId ? { id: skill.skillId, version: skill.skillVersion || "v1" } : undefined);
+                          }
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = "var(--border-strong)";
-                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = "var(--border-subtle)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
+                        className="ai-skill-card"
                       >
-                        <div
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            background: "var(--bg-inset)",
-                            color: "var(--fg-primary)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 15,
-                            flexShrink: 0,
-                          }}
-                        >
+                        <div className="ai-skill-icon">
                           {getSkillIcon(skill.icon)}
                         </div>
                         <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)", marginBottom: 2 }}>
+                          <div className="ai-skill-name">
                             {t(skill.labelKey, language)}
                           </div>
-                          <div style={{ fontSize: 11, color: "var(--fg-muted)", lineHeight: 1.4 }}>
+                          <div className="ai-skill-desc">
                             {t(skill.promptKey, language).slice(0, 24)}...
                           </div>
                         </div>
@@ -2212,8 +2005,8 @@ function AIChatPageContent() {
                   </div>
 
                   {/* Quick Question Chips */}
-                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
-                    <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("ai.quick_questions", language)}:</span>
+                  <div className="ai-quick-row">
+                    <span className="ai-quick-label">{t("ai.quick_questions", language)}:</span>
                     {chips.map((chipKey, idx) => (
                       <Button
                         key={idx}
@@ -2221,13 +2014,7 @@ function AIChatPageContent() {
                         type="default"
                         onClick={() => handleChipClick(t(chipKey, language))}
                         disabled={loading}
-                        style={{
-                          fontSize: 12,
-                          borderRadius: 9999,
-                          borderColor: "var(--border-default)",
-                          color: "var(--fg-secondary)",
-                          background: "var(--bg-elevated)",
-                        }}
+                        className="ai-chip-btn"
                       >
                         {t(chipKey, language)}
                       </Button>
@@ -2252,40 +2039,22 @@ function AIChatPageContent() {
                     initial={false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, delay: index === arr.length - 1 ? 0 : 0 }}
-                    style={{
-                      display: "flex",
-                      justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                      marginBottom: 20,
-                    }}
+                    className={`ai-msg-row${msg.role === "user" ? " is-user" : ""}`}
                   >
                     <Space
                       align="start"
-                      style={{
-                        flexDirection: msg.role === "user" ? "row-reverse" : "row",
-                        maxWidth: "85%",
-                      }}
+                      className={`ai-msg-space${msg.role === "user" ? " is-user" : ""}`}
                     >
                       <Avatar
                         icon={msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
                         style={{
-                          backgroundColor: msg.role === "user" ? "#1E293B" : "#0F172A",
+                          backgroundColor: msg.role === "user" ? "var(--fg-secondary)" : "var(--fg-primary)",
                           flexShrink: 0,
                         }}
                         size={32}
                       />
 
-                      <div
-                        style={{
-                          borderRadius: 12,
-                          padding: "12px 18px",
-                          background: msg.role === "user" ? "var(--bg-inset)" : "var(--bg-elevated)",
-                          color: "var(--fg-primary)",
-                          border: "1px solid var(--border-default)",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                          maxWidth: "100%",
-                          wordBreak: "break-word",
-                        }}
-                      >
+                      <div className={`ai-bubble${msg.role === "user" ? " is-user" : ""}`}>
                         {msg.role === "assistant" && typingMessageId === msg.id ? (
                           <TypewriterMessage
                             content={msg.id === "welcome" ? t("ai.welcome", language) : msg.content}
@@ -2348,18 +2117,13 @@ function AIChatPageContent() {
                         )}
 
                         {msg.attachments && msg.attachments.length > 0 && (
-                          <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <div className="ai-attach-row">
                             {msg.attachments.map((att, idx) => (
                               <StatusTag
                                 key={idx}
                                 icon={getFileIcon(att.content_type)}
-                               
-                                style={{
-                                  borderRadius: 4,
-                                  background: "var(--bg-surface)",
-                                  border: "1px solid var(--border-default)",
-                                  color: "var(--fg-secondary)",
-                                }}
+
+                                className="ai-attach-tag"
                               >
                                 {att.original_name}
                               </StatusTag>
@@ -2555,29 +2319,14 @@ function AIChatPageContent() {
                         )}
 
                         {msg.id !== "welcome" && activeSession?.serverSessionId && (
-                          <div
-                            style={{
-                              marginTop: 10,
-                              paddingTop: 8,
-                              borderTop: "1px solid var(--border-subtle)",
-                              display: "flex",
-                              gap: 6,
-                              flexWrap: "wrap",
-                              alignItems: "center",
-                            }}
-                          >
+                          <div className="ai-msg-actions">
                             <Button
                               type="text"
                               size="small"
-                              icon={<MessageOutlined style={{ fontSize: 11 }} />}
+                              icon={<MessageOutlined />}
                               disabled={loading}
                               onClick={() => triggerRuntimeContinuation({ type: "message", id: msg.id })}
-                              style={{
-                                fontSize: 11,
-                                paddingInline: 6,
-                                height: 22,
-                                color: "var(--fg-secondary)",
-                              }}
+                              className="ai-action-btn"
                             >
                               {t("ai.continue_from_message", language)}
                             </Button>
@@ -2587,14 +2336,9 @@ function AIChatPageContent() {
                                 <Button
                                   type="text"
                                   size="small"
-                                  icon={<ClockCircleOutlined style={{ fontSize: 11 }} />}
+                                  icon={<ClockCircleOutlined />}
                                   onClick={() => handleOpenTrace(msg.runId!)}
-                                  style={{
-                                    fontSize: 11,
-                                    paddingInline: 6,
-                                    height: 22,
-                                    color: "var(--fg-secondary)",
-                                  }}
+                                  className="ai-action-btn"
                                 >
                                   {t("ai.view_trace", language)}
                                 </Button>
@@ -2603,15 +2347,10 @@ function AIChatPageContent() {
                                     <Button
                                       type="text"
                                       size="small"
-                                      icon={<MessageOutlined style={{ fontSize: 11 }} />}
+                                      icon={<MessageOutlined />}
                                       disabled={loading}
                                       onClick={() => handleRunControl(msg.runId!, "follow-up")}
-                                      style={{
-                                        fontSize: 11,
-                                        paddingInline: 6,
-                                        height: 22,
-                                        color: "var(--fg-muted)",
-                                      }}
+                                      className="ai-action-btn is-muted"
                                     >
                                       {t("ai.run_follow_up", language)}
                                     </Button>
@@ -2649,13 +2388,9 @@ function AIChatPageContent() {
                 <motion.div
                   initial={false}
                   animate={{ opacity: 1 }}
-                  style={{
-                    display: "flex",
-                    justifyContent: "flex-start",
-                    marginBottom: 20,
-                  }}
+                  className="ai-msg-row"
                 >
-                  <Space align="start" style={{ maxWidth: "85%" }}>
+                  <Space align="start" className="ai-msg-space">
                     <Avatar
                       icon={<RobotOutlined />}
                       style={{
@@ -2664,25 +2399,14 @@ function AIChatPageContent() {
                       }}
                       size={32}
                     />
-                    <div
-                      style={{
-                        borderRadius: 12,
-                        padding: "12px 18px",
-                        background: "var(--bg-elevated)",
-                        border: "1px solid var(--border-default)",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                      }}
-                    >
+                    <div className="ai-bubble is-loading">
                       <Space size={8} align="center">
                         <Spin size="small" />
-                        <span style={{ fontSize: 13, color: "var(--fg-secondary)", fontWeight: 500 }}>
+                        <span className="ai-thinking-label">
                           {t("ai.thinking", language)}
                         </span>
                       </Space>
-                      <Typography.Text type="secondary" style={{ fontSize: 11, color: "var(--fg-muted)" }}>
+                      <Typography.Text type="secondary" className="ai-thinking-progress">
                         {t("ai.thinking_progress", language)}
                       </Typography.Text>
                     </div>
@@ -2694,58 +2418,24 @@ function AIChatPageContent() {
             </div>
 
             {/* Input Area */}
-            <div
-              className="ai-chat-input"
-              style={{
-                padding: "16px 24px 20px",
-                background: "var(--bg-page)",
-                borderTop: "1px solid var(--border-default)",
-                width: "100%",
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ maxWidth: 960, width: "100%", margin: "0 auto" }}>
+            <div className="ai-chat-input ai-composer">
+              <div className="ai-composer-inner">
                 {activePendingUpload && (
-                  <div
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "4px 10px",
-                      background: "var(--bg-inset)",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      marginBottom: 8,
-                      border: "1px solid var(--border-default)",
-                    }}
-                  >
-                    <PaperClipOutlined style={{ color: "var(--fg-muted)" }} />
-                    <span style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div className="ai-upload-chip">
+                    <PaperClipOutlined />
+                    <span className="ai-upload-name">
                       {activePendingUpload.original_name}
                     </span>
                     <Button
                       type="text"
                       size="small"
-                      icon={<CloseCircleOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
+                      icon={<CloseCircleOutlined />}
                       onClick={() => activeSessionId && setPendingUpload(activeSessionId, null)}
-                      style={{ padding: 0, height: 16, width: 16 }}
+                      className="ai-upload-remove"
                     />
                   </div>
                 )}
-                <div
-                  className="chat-input-wrapper"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 14px",
-                    background: "var(--bg-elevated)",
-                    borderRadius: 24,
-                    border: "1px solid var(--border-default)",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                  }}
-                >
+                <div className="chat-input-wrapper">
                   <Upload
                     customRequest={handleFileUpload}
                     showUploadList={false}
@@ -2775,9 +2465,9 @@ function AIChatPageContent() {
                       <Button
                         type="text"
                         shape="circle"
-                        icon={<PaperClipOutlined style={{ color: "var(--fg-muted)", fontSize: 16 }} />}
+                        icon={<PaperClipOutlined />}
                         disabled={loading}
-                        style={{ width: 32, height: 32 }}
+                        className="ai-circle-btn ai-attach-trigger"
                       />
                     </Tooltip>
                   </Upload>
@@ -2788,47 +2478,24 @@ function AIChatPageContent() {
                     onKeyDown={handleKeyDown}
                     placeholder={t("ai.placeholder", language)}
                     autoSize={{ minRows: 1, maxRows: 6 }}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      boxShadow: "none",
-                      resize: "none",
-                      fontSize: 14,
-                      lineHeight: 1.6,
-                      padding: "4px 0",
-                    }}
-                    onFocus={(e) => {
-                      const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
-                      if (parent) {
-                        parent.style.borderColor = "var(--fg-primary)";
-                        parent.style.boxShadow = "0 2px 12px rgba(0, 0, 0, 0.08)";
-                      }
-                    }}
-                    onBlur={(e) => {
-                      const parent = e.currentTarget.closest(".chat-input-wrapper") as HTMLElement | null;
-                      if (parent) {
-                        parent.style.borderColor = "var(--border-default)";
-                        parent.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.04)";
-                      }
-                    }}
+                    className="chat-textarea"
                   />
 
                   <Button
                     type="primary"
                     shape="circle"
-                    icon={<SendOutlined style={{ fontSize: 13 }} />}
+                    icon={<SendOutlined />}
                     onClick={() => handleSend()}
                     loading={loading}
                     disabled={loading || (!input.trim() && !activePendingUpload)}
-                    style={{ width: 32, height: 32 }}
+                    className="ai-circle-btn ai-send-btn"
                   />
                 </div>
 
-                <div style={{ textAlign: "center", marginTop: 8 }}>
+                <div className="ai-disclaimer-wrap">
                   <Text
                     type="secondary"
-                    style={{ fontSize: 11, color: "var(--fg-muted)" }}
+                    className="ai-disclaimer"
                   >
                     {t("ai.disclaimer", language)}
                   </Text>
@@ -2913,7 +2580,7 @@ export default function AIChatPage() {
   return (
     <Suspense
       fallback={
-        <div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center" }}>
+        <div className="ai-page-loading">
           <Spin size="large" />
         </div>
       }

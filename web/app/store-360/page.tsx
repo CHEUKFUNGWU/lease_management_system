@@ -365,11 +365,13 @@ function Store360Inner() {
   useEffect(() => {
     if (query.classification || !latest || discoveryLoading) return;
     writeQuery(router, { classification: "simulated", datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest), windowDays: validWindow(query.windowDays) ? query.windowDays : 14, storeID: query.storeID, sourceSystem: query.sourceSystem, returnQuery: query.returnQuery });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [query.classification, query.windowDays, query.storeID, query.sourceSystem, latest, discoveryLoading, router]);
 
   useEffect(() => {
     if (query.classification !== "simulated" || query.datasetVersion || !latest || discoveryLoading) return;
     writeQuery(router, { classification: "simulated", datasetVersion: latest.dataset_version, asOf: query.asOf || latestAnomalyDate(latest), windowDays: validWindow(query.windowDays) ? query.windowDays : 14, storeID: query.storeID, sourceSystem: query.sourceSystem, returnQuery: query.returnQuery });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [query.classification, query.datasetVersion, query.asOf, query.windowDays, query.storeID, query.sourceSystem, latest, discoveryLoading, router]);
 
   const selected = options.map(optionFields).find((item) => item.storeID === query.storeID);

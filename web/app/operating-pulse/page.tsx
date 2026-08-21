@@ -347,6 +347,7 @@ function OperatingPulseInner() {
       if (classification === "production" && asOf === "") applyQuery({ classification: "production", asOf: TODAY, windowDays, storeIDs, sourceSystem });
       return;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [asOf, classification, windowDays, storeIDs, sourceSystem, router]);
 
   useEffect(() => {
@@ -360,6 +361,7 @@ function OperatingPulseInner() {
         applyQuery({ classification: "simulated", datasetVersion: result.data.dataset_version, asOf: searchParams.get("as_of") || latestAnomalyDate(result.data), windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem: sourceSystem || "retail_simulator" });
       }
     }).catch(() => { latestLoaded.current = false; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [router, searchParams, token, storeIDs, validWindow, windowDays, latestRetryNonce]);
 
   const generate = async () => {

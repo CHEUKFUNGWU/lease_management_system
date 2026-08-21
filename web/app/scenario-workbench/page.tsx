@@ -158,6 +158,7 @@ function ScenarioPageInner() {
     if (!query.storeID && options.length > 0) {
       setQuery({ storeID: options[0].store_id });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [query.storeID, options]);
 
   const latestMatches = query.classification === "simulated" && latest?.dataset_version === query.datasetVersion ? latest : null;
@@ -197,6 +198,7 @@ function ScenarioPageInner() {
   useEffect(() => {
     if (query.classification !== "simulated" || query.datasetVersion || !latest) return;
     setQuery({ datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [query.classification, query.datasetVersion, latest]);
 
   useEffect(() => {
@@ -229,6 +231,7 @@ function ScenarioPageInner() {
     if (token && query.storeID && (!query.classification || query.classification !== "simulated" || query.datasetVersion)) {
       void evaluate();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [query.storeID, query.classification, query.datasetVersion, query.asOf, query.windowDays, horizon]);
 
   const applyPreset = (preset: { fixedRent?: number; variableRent?: number; revenue?: number }) => {

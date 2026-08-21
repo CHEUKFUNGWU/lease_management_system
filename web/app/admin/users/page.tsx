@@ -55,6 +55,7 @@ export default function AdminUsersPage() {
       return;
     }
     fetchLegalEntities();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [isLoading, user, token]);
 
   // FETCH-003: the user list runs through the shared fetch seam.

@@ -3683,6 +3683,39 @@ const dict: TranslationDict = {
     "zh-HK": "折現率",
     en: "Discount Rate",
   },
+  // 资产类型（P1-D，UIUX 审查报告 2026-08-21）：contracts/new 表单与
+  // contracts/[id] 详情页原先各自硬编码同一组中文文案。取值枚举与后端
+  // asset_type 字段一一对应，两个页面共用这一组键。
+  "contract.asset_type": {
+    "zh-CN": "资产类型",
+    "zh-HK": "資產類型",
+    en: "Asset Type",
+  },
+  "contract.asset_real_estate": {
+    "zh-CN": "不动产",
+    "zh-HK": "不動產",
+    en: "Real Estate",
+  },
+  "contract.asset_vehicle": {
+    "zh-CN": "车辆",
+    "zh-HK": "車輛",
+    en: "Vehicle",
+  },
+  "contract.asset_it_equipment": {
+    "zh-CN": "IT 设备",
+    "zh-HK": "IT 設備",
+    en: "IT Equipment",
+  },
+  "contract.asset_machinery": {
+    "zh-CN": "机器设备",
+    "zh-HK": "機器設備",
+    en: "Machinery",
+  },
+  "contract.asset_other": {
+    "zh-CN": "其他",
+    "zh-HK": "其他",
+    en: "Other",
+  },
   "contract.commencement_date": {
     "zh-CN": "租赁起始日",
     "zh-HK": "租賃起始日",
@@ -6156,6 +6189,11 @@ const dict: TranslationDict = {
     "zh-CN": "请选择出租方",
     "zh-HK": "請選擇出租方",
     en: "Please select lessor",
+  },
+  "contract_new.please_select_asset_type": {
+    "zh-CN": "请选择资产类型",
+    "zh-HK": "請選擇資產類型",
+    en: "Please select an asset type",
   },
   "contract_new.please_select_date": {
     "zh-CN": "请选择租赁起始日",

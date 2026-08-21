@@ -112,6 +112,7 @@ export default function NotificationBell() {
               <button
                 type="button"
                 key={`${item.record_id || item.contract_id || item.title}-${index}`}
+                className="notification-item"
                 onClick={() => {
                   setOpen(false);
                   router.push(item.contract_id ? `/contracts/${item.contract_id}` : "/todo");
@@ -125,8 +126,6 @@ export default function NotificationBell() {
                   borderBottom: "1px solid var(--bg-surface)",
                   cursor: "pointer",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-surface)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span
@@ -166,6 +165,7 @@ export default function NotificationBell() {
         type="button"
         aria-label={t("notif.title", language)}
         aria-expanded={open}
+        className="notification-bell-trigger"
         style={{
           cursor: "pointer",
           border: 0,
@@ -176,8 +176,6 @@ export default function NotificationBell() {
           color: "var(--fg-tertiary)",
           position: "relative",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-inset)")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
         <Badge count={urgentCount} size="small" offset={[-2, 2]}>
           <BellOutlined style={{ fontSize: 16 }} />

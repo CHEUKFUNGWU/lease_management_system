@@ -136,7 +136,7 @@ function isNewViolation(pattern, line, oldText) {
 // ( 开头的都是字面量）视为动态值，DESIGN.md §13-2 允许，不计数；无
 // 冒号的展开对象也视为动态。既有 2 个静态属性扩写到 5 个，新行计数
 // 5 > 旧行 2，拦截。
-function staticStylePropCount(text) {
+export function staticStylePropCount(text) {
   let total = 0;
   const re = new RegExp(INLINE_STYLE_RE.source, "g");
   let match;
@@ -159,6 +159,80 @@ function staticStylePropCount(text) {
 function isNewStaticStyle(line, oldText) {
   return staticStylePropCount(line) > staticStylePropCount(oldText);
 }
+
+// 多行内联样式盲区修补（UIUX 审查报告 2026-08-21 P0-B）：INLINE_STYLE_RE
+// 要求 `style={{…}}` 同行闭合，而本仓主流写法是 opener 行只写 `style={{`、
+// 属性在后续行——逐行扫描对这类新增全盲（实测 1032 处内联样式中 103 处
+// 属此形态，且 ai-chat 等重灾区恰以这种写法扩张）。对新增的 opener 行，
+// 向前收集到花括号配平再数静态属性；旧行已含 style={{ 视为改写存量
+// （ENF-003：数量未增不算新增），动态属性块为 0 放行。
+const MULTILINE_STYLE_OPENER_RE = /style=\{\{\s*$/;
+const BLOCK_SCAN_LIMIT = 120;
+
+export function styleBlockStaticProps(fileLines, openerIdx) {
+  let depth = 0;
+  const collected = [];
+  for (let i = openerIdx; i < Math.min(fileLines.length, openerIdx + BLOCK_SCAN_LIMIT); i += 1) {
+    const text = fileLines[i];
+    collected.push(text);
+    for (const ch of text) {
+      if (ch === "{") depth += 1;
+      if (ch === "}") depth -= 1;
+    }
+    if (depth <= 0 && i > openerIdx) {
+      break;
+    }
+  }
+  const text = collected.join("\n");
+  const start = text.indexOf("{{") + 2;
+  const end = text.lastIndexOf("}}");
+  if (start < 2 || end <= start) {
+    return 0;
+  }
+  const inner = text.slice(start, end);
+  // 顶层逗号切分属性（嵌套对象/三元里的逗号不计），再逐属性找「深度 0
+  // 的冒号」判定静态性。条件展开 `...(x ? { a: 1 } : {})` 的内部属性不追
+  // ——与旧行为一致（单行正则同样看不见嵌套花括号内层），宁可少计不可误伤。
+  let level = 0;
+  const props = [];
+  let current = "";
+  for (const ch of inner) {
+    if ("{([".includes(ch)) level += 1;
+    if ("})]".includes(ch)) level -= 1;
+    if (ch === "," && level === 0) {
+      props.push(current);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  props.push(current);
+
+  let total = 0;
+  for (const prop of props) {
+    let propLevel = 0;
+    let colonAt = -1;
+    for (let i = 0; i < prop.length; i += 1) {
+      const ch = prop[i];
+      if ("{([".includes(ch)) propLevel += 1;
+      else if ("})]".includes(ch)) propLevel -= 1;
+      else if (ch === ":" && propLevel === 0) {
+        colonAt = i;
+        break;
+      }
+    }
+    if (colonAt === -1) continue;
+    const value = prop.slice(colonAt + 1).trim();
+    if (!value || /^[A-Za-z_$]/.test(value)) continue;
+    total += 1;
+  }
+  return total;
+}
+
+// §13-3 的窄实现（此前整条规则因「纯正则误报率高」暂缓）：只拦「事件处
+// 理器里直接改 .style」这一种形态，即键盘 focus 拿不到同款反馈的那类。
+// onMouseEnter 用于埋点/聚焦等非样式用途不匹配，保持放行。
+export const JS_HOVER_STYLE_RE = /onMouse(?:Enter|Leave)=\{?\(?(?:e|event)\)?\s*=>.*\.style\.[A-Za-z]+\s*=/;
 
 // ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 // ┃ 扫描：收集每条违规为 { file, line, rule, message }                ┃
@@ -183,15 +257,30 @@ export function collectViolations(base = defaultBase) {
     const lines = changedLines(base, file);
 
     if (file.startsWith("web/")) {
+      const fileLines = content.split("\n");
+      // 测试文件里的违规样例是夹具内容，不是 UI（与 §13-4/13-8 豁免
+      // 测试文件同一条理由）；13-2/13-3 同样放行。
+      const isTestFixture = CJK_EXEMPT_SUFFIXES.some((re) => re.test(file));
       for (const { number, text: line, oldText } of lines) {
-        if (isNewViolation(IMPORTANT_RE, line, oldText)) {
+        // 测试文件断言里写出的 !important 是被测内容（如 design-tree-budget
+        // 对 globals.css 的计数），不是 UI 样式，与 §13-4/§13-8 同一豁免理由。
+        if (!isTestFixture && isNewViolation(IMPORTANT_RE, line, oldText)) {
           fail(file, number, "13-1", "新增 !important（DESIGN.md §13-1）：提高特异性或改 token");
         }
         // 「营」徽标只豁免内联样式一条（品牌 mark 的存量写法）；
         // !important 与 fontWeight 检查照常生效（上一批 Review §4）。
-        const styleExempt = BRAND_BADGE_LINE.test(line);
+        const styleExempt = BRAND_BADGE_LINE.test(line) || isTestFixture;
         if (!styleExempt && isNewStaticStyle(line, oldText)) {
           fail(file, number, "13-2", "新增静态内联 style={{}}（DESIGN.md §13-2）：用类名 + CSS 变量");
+        }
+        // 多行 opener：本行只写 `style={{`、属性在后续行，单行正则看不见。
+        if (!styleExempt && MULTILINE_STYLE_OPENER_RE.test(line) && !/style=\{\{/.test(oldText)) {
+          if (styleBlockStaticProps(fileLines, number - 1) > 0) {
+            fail(file, number, "13-2", "新增多行静态内联 style 块（DESIGN.md §13-2）：用类名 + CSS 变量");
+          }
+        }
+        if (!isTestFixture && isNewViolation(JS_HOVER_STYLE_RE, line, oldText)) {
+          fail(file, number, "13-3", "JS hover 改样式（DESIGN.md §13-3）：用 CSS :hover, :focus-visible");
         }
         if (isNewViolation(FONT_WEIGHT_RE, line, oldText)) {
           fail(file, number, "13-6", "新增 fontWeight > 600（DESIGN.md §13-6）：用尺寸和字距做层级");

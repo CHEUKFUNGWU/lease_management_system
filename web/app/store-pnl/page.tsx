@@ -12,6 +12,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
 import { apiErrorMessage, financialModelApi, operatingFactsApi, storePnlApi } from "../lib/api";
+import { fmtNum } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -211,7 +212,9 @@ export default function StorePnlPage() {
     const suffix = format?.scale ? (scaleSuffix[format.scale] ?? "") : "";
     const negative = value < 0;
     // 仅显示层缩放：存储值除以缩放因子后分段展示（ramp-up 不动数据）。
-    const scaled = `${((negative ? Math.abs(value) : value) / factor).toLocaleString()}${suffix}`;
+    // P1-C（UIUX 审查报告 2026-08-21）：缩放后的金额统一走 fmtNum——固定
+    // zh-CN locale 与两位小数，不再依赖宿主 locale（§4.3 统一 formatter）。
+    const scaled = `${fmtNum((negative ? Math.abs(value) : value) / factor)}${suffix}`;
     const rendered = negative
       ? format?.neg_style === "parens" ? `(${scaled})` : format?.neg_style === "red"
         ? <Typography.Text type="danger">{scaled}</Typography.Text>
@@ -254,7 +257,7 @@ export default function StorePnlPage() {
     { title: t("storepnl.variance_pct", language), dataIndex: "pct", key: "pct", align: "right" as const,
       render: (v: number | null) => (v == null ? "—" : `${v.toFixed(2)}%`) },
     ...(hasPeer ? [{ title: t("storepnl.peer_col", language), dataIndex: "peer", key: "peer", align: "right" as const,
-      render: (v: number | null, row: any) => (v == null ? (row.peer_status || "—") : v.toLocaleString()) }] : []),
+      render: (v: number | null, row: any) => (v == null ? (row.peer_status || "—") : fmtNum(v)) }] : []),
     { title: t("storepnl.provenance", language), dataIndex: "provenance", key: "provenance",
       render: (provenance: RowValue["provenance"]) => {
         if (!provenance) return "—";
@@ -269,6 +272,7 @@ export default function StorePnlPage() {
         return <Tooltip title={detail}><Typography.Text type="secondary">{short}</Typography.Text></Tooltip>;
       } },
     { title: t("storepnl.components", language), dataIndex: "comps", key: "comps" },
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   ], [language, pnl, hasPeer]);
 
   // P2-3：CSV 与后端 xlsx 对称带口径头标识（data_classification /

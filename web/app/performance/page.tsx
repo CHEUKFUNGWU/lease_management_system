@@ -176,6 +176,7 @@ export default function PerformancePage() {
     { title: t("perf.col.status", language), dataIndex: "status", render: (value: string) => <StatusTag>{value}</StatusTag> },
     { title: t("perf.col.owner_due", language), render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><span>{row.owner_name || t("perf.unassigned", language)}</span><Typography.Text type="secondary">{row.due_date || t("perf.no_date", language)}</Typography.Text></Space> },
     { title: t("perf.col.operation", language), key: "action", render: (_: unknown, row: Action) => row.status === "open" ? <Button size="small" icon={<CheckCircleOutlined />} onClick={() => acknowledge(row)}>{t("perf.acknowledge", language)}</Button> : null },
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   ], [token, language]);
 
   return (

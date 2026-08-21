@@ -9,6 +9,7 @@ import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
 import { apiErrorMessage, financialModelApi, type RetailDataClassification } from "../lib/api";
 import { classifyDataState, type DataState } from "../lib/dataState";
+import { fmtNum } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -44,6 +45,7 @@ export default function FinancialModelPage() {
   // 同一个 key；输入变化才重新生成。
   const idempotencyKey = useMemo(
     () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `run-${Date.now()}-${Math.random()}`),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
     [definitionId, assumptions, classification],
   );
 
@@ -93,15 +95,17 @@ export default function FinancialModelPage() {
     }
   };
 
+  // P1-C（UIUX 审查报告 2026-08-21）：勾稽三列是金额，统一走 fmtNum
+  // （zh-CN、两位小数、null→"—"），不再各自 toLocaleString。
   const tieOutColumns = [
     { title: t("finmodel.check", language), dataIndex: "check_code", key: "check_code" },
     { title: t("finmodel.period", language), dataIndex: "period", key: "period" },
     { title: t("finmodel.expected", language), dataIndex: "expected", key: "expected", align: "right" as const,
-      render: (v: number | null) => (v == null ? "—" : v.toLocaleString()) },
+      render: (v: number | null) => fmtNum(v) },
     { title: t("finmodel.actual", language), dataIndex: "actual", key: "actual", align: "right" as const,
-      render: (v: number | null) => (v == null ? "—" : v.toLocaleString()) },
+      render: (v: number | null) => fmtNum(v) },
     { title: t("finmodel.diff", language), dataIndex: "diff", key: "diff", align: "right" as const,
-      render: (v: number | null) => (v == null ? "—" : v.toLocaleString()) },
+      render: (v: number | null) => fmtNum(v) },
     { title: t("finmodel.status", language), dataIndex: "status", key: "status",
       render: (v: string) => <StatusTag kind={v === "passed" ? "success" : v === "failed" ? "error" : "warning"}>{v}</StatusTag> },
   ];

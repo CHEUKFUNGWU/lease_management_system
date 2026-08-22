@@ -5234,3 +5234,12 @@ body .app-content.app-content-full-bleed .app-content-inner {
 .storepnl-row-settings-panel {
   max-width: 420px;
 }
+
+/* R2-1: pre-launch breakeven tab */
+.promo-breakeven-body {
+  width: 100%;
+}
+.promo-breakeven-note {
+  font-size: 12px;
+  color: var(--fg-secondary);
+}

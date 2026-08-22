@@ -5297,3 +5297,49 @@ body .app-content.app-content-full-bleed .app-content-inner {
   font-size: 12px;
   color: var(--fg-muted);
 }
+
+/* R2-2: new store feasibility panel */
+.feasibility-body {
+  width: 100%;
+}
+.feasibility-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.feasibility-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.feasibility-inputs label span {
+  font-size: 12px;
+  color: var(--fg-secondary);
+}
+.feasibility-inputs .feasibility-wide {
+  grid-column: span 2;
+}
+.feasibility-no-rate {
+  margin-bottom: 12px;
+}
+.feasibility-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.feasibility-metrics div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.feasibility-metrics span {
+  font-size: 12px;
+  color: var(--fg-secondary);
+}
+.feasibility-notes {
+  font-size: 12px;
+  color: var(--fg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

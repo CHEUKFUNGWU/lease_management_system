@@ -33,6 +33,7 @@ import {
 import { motion } from "framer-motion";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
+import { NewStoreFeasibilityPanel } from "./NewStoreFeasibilityPanel";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
@@ -365,6 +366,12 @@ export default function PreDealPage() {
                   ]}
                 />
               </Card>
+
+              {/* R2-4/RH4: business feasibility - parallel to the lease-commercial blocks above, not a replacement */}
+              <div style={{ marginTop: 16 }}>
+                <NewStoreFeasibilityPanel currency={currency} />
+              </div>
+
             </>
           )}
         </motion.div>

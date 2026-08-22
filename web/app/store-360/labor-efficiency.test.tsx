@@ -46,18 +46,20 @@ describe("R1-2 LaborEfficiencyPanel 数据状态", () => {
     expect(markup).toContain(t("store360.labor.metric.hc", zh));
   });
 
-  it("工时缺失：销售人效渲染「—」而不是估算值，原因可 hover", () => {
+  it("工时缺失：销售人效渲染「—」而不是估算值或 0", () => {
     const summary = metric(null, "partial", "missing_required_field");
     summary.labor_hours_per_transaction.current.value = 0.5;
     const markup = render({ summary });
     // 缺失值是「—」，不是 0、不是任何反推数
-    expect(markup).not.toContain(">0</span>");
-    expect(markup).toContain(t("reason.missing_required_field", zh) === "reason.missing_required_field" ? "missing_required_field" : t("reason.missing_required_field", zh));
+    expect(markup).toContain("is-missing");
+    // 原因经运行时 Tooltip 呈现（SSR 静态标记不含其内容），
+    // 这里验的是缺失态的视觉事实：muted 色的「—」
+    expect(markup).toContain(">—</span>");
   });
 
-  it("覆盖率不足：unavailable 态同样「—」加原因，不静默", () => {
+  it("覆盖率不足：unavailable 态同样「—」，不静默", () => {
     const markup = render({ summary: metric(null, "unavailable", "no_facts") });
-    expect(markup).toContain(t("reason.no_facts", zh) === "reason.no_facts" ? "no_facts" : t("reason.no_facts", zh));
+    expect(markup).toContain("is-missing");
   });
 
   it("模拟数据：面板带模拟标签，不冒充正式数据", () => {

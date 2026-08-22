@@ -2327,6 +2327,23 @@ export const dict: TranslationDict = {
     "zh-HK": "分母為零",
     en: "Zero denominator",
   },
+  // R1-2 复核补充：这三个 reason 值此前落在 translateReason 的兜底路径上，
+  // 财务用户会在 tooltip 里读到机器码。文案为 Planner 定稿。
+  "reason.no_facts": {
+    "zh-CN": "这段时间没有这家店的经营事实",
+    "zh-HK": "這段時間沒有這家店的經營事實",
+    en: "No operating facts for this store in the period",
+  },
+  "reason.missing_required_field": {
+    "zh-CN": "算这个指标要用的字段缺了，没有补，也没有拿别的数顶替",
+    "zh-HK": "算這個指標要用的欄位缺了，沒有補，也沒有拿別的數頂替",
+    en: "A field this metric needs is missing. Nothing was substituted for it",
+  },
+  "reason.peer_count_below_minimum": {
+    "zh-CN": "同群里有这项数据的门店太少，样本不够，不给对比结论",
+    "zh-HK": "同群裡有這項數據的門店太少，樣本不夠，不給對比結論",
+    en: "Too few peer stores have this data. Sample too small to compare",
+  },
   "source.retail_simulator": {
     "zh-CN": "零售模拟引擎",
     "zh-HK": "零售模擬引擎",

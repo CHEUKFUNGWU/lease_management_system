@@ -1,13 +1,13 @@
 "use client";
 
-// R2-3：利润差异归因面板（RH5）。数据全部来自
-// GET /api/v1/retail/store-variance-attribution——前端零计算，瀑布图只是
-// 把后端给的因子贡献画出来。
+// R2-3: profit variance attribution panel (RH5). All numbers come from
+// GET /api/v1/retail/store-variance-attribution - zero client-side math;
+// the waterfall just draws the factor contributions the backend produced.
 //
-// 三条死线的落点：
-//   顺序回显 → order note 常驻（不随数据状态消失），文案即替代顺序本身；
-//   残差不摊 → 残差行单独渲染，residual_material 时追加警示；
-//   缺一不可用 → unavailable 时 StateBlock 列出缺失字段，不出半张图。
+// Three hard rules land here:
+//   order echo        -> the order note is persistent (outside data branches);
+//   residual unspread -> residual renders as its own line, material adds a warning;
+//   all-or-nothing    -> unavailable lists the missing fields, no half chart.
 
 import React, { useEffect } from "react";
 import { Alert, Card, Space, Typography } from "antd";
@@ -76,7 +76,37 @@ export default function VarianceAttributionPanel({ storeId, asOf, windowDays, cl
 
   const result = state.kind === "ready" ? (state.data ?? null) : null;
 
-  // 瀑布图数据：基期柱 → 各因子浮动柱（累计）→ 当期柱。
+  return (
+    <Card
+      size="small"
+      title={<span>{t("store360.attribution.title", language)}</span>}
+      extra={
+        <Space size={8}>
+          {result?.status === "complete" && (
+            <Text type="secondary" className="variance-total-text">
+              {fmtMoney(result.total_variance, currency)}
+            </Text>
+          )}
+          <a onClick={() => retry()} role="button">{t("common.refresh", language)}</a>
+        </Space>
+      }
+    >
+      <AttributionView result={result} loading={loading} currency={currency} />
+    </Card>
+  );
+}
+
+export interface AttributionViewProps {
+  result: VarianceAttributionResult | null;
+  loading?: boolean;
+  currency?: string;
+}
+
+/** Pure presentation: three branches (complete waterfall / material warning / unavailable list). */
+export function AttributionView({ result, loading = false, currency }: AttributionViewProps) {
+  const { language } = useLanguage();
+
+  // Waterfall rows: base column -> floating factor columns (cumulative) -> current column.
   const rows: { name: string; base: number; delta: number; isEndpoint: boolean; negative: boolean }[] = [];
   if (result && result.status === "complete") {
     let running = result.base_profit;
@@ -96,27 +126,14 @@ export default function VarianceAttributionPanel({ storeId, asOf, windowDays, cl
   }
 
   return (
-    <Card size="small" title={<span>{t("store360.attribution.title", language)}</span>}
-      extra={
-        <Space size={8}>
-          {result?.status === "complete" && (
-            <Text type="secondary" className="variance-total-text">
-              {fmtMoney(result.total_variance, currency)}
-            </Text>
-          )}
-          <a onClick={() => retry()} role="button">{t("common.refresh", language)}</a>
-        </Space>
-      }
-    >
-      {/* Order note is persistent: numbers change with order, so it always ships with the chart */}
+    <>
+      {/* Order note is persistent: rendered outside every data branch */}
       <div className="variance-order-note">{t("store360.attribution.order", language)}</div>
 
       {loading ? (
         <div className="variance-chart-frame variance-loading" />
       ) : !result || result.status !== "complete" ? (
-        <>
-          <Alert type="warning" showIcon message={t("store360.attribution.unavailable", language, { fields: (result?.missing_facts ?? []).join(", ") || "—" })} />
-        </>
+        <Alert type="warning" showIcon message={t("store360.attribution.unavailable", language, { fields: (result?.missing_facts ?? []).join(", ") || "—" })} />
       ) : (
         <>
           {result.residual_material && (
@@ -150,6 +167,6 @@ export default function VarianceAttributionPanel({ storeId, asOf, windowDays, cl
           </Space>
         </>
       )}
-    </Card>
+    </>
   );
 }

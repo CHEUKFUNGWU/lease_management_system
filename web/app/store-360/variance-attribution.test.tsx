@@ -12,6 +12,8 @@
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { AttributionView, factorLabel } from "./VarianceAttributionPanel";
 import { LanguageProvider } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -106,8 +108,5 @@ describe("R2-3 源码级结构断言", () => {
 });
 
 function readPanel(): string {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
-  const { join } = require("node:path") as typeof import("node:path");
   return readFileSync(join(import.meta.dirname, "VarianceAttributionPanel.tsx"), "utf8");
 }

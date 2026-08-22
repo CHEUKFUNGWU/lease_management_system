@@ -11,11 +11,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LaborEfficiencyPanel } from "./LaborEfficiencyPanel";
 import { LanguageProvider } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
-import type { RetailPeerBenchmark, RetailStore360SummaryMetric } from "../lib/api";
+import type { RetailKPIStatus, RetailPeerBenchmark, RetailStore360SummaryMetric } from "../lib/api";
 
 const zh = "zh-CN" as Language;
 
-function metric(value: number | null, status: string = "complete", reason?: string): Record<string, RetailStore360SummaryMetric> {
+function metric(value: number | null, status: RetailKPIStatus = "complete", reason?: string): Record<string, RetailStore360SummaryMetric> {
   const mk = () => ({
     current: { value, unit: "currency_per_hour", status, formula_version: "v1", required_fields: [], available_fact_count: 14, fact_count: 14, reason },
     comparison: { value, unit: "currency_per_hour", status, formula_version: "v1", required_fields: [], available_fact_count: 14, fact_count: 14, reason },

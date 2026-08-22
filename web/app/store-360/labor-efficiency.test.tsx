@@ -50,7 +50,8 @@ describe("R1-2 LaborEfficiencyPanel 数据状态", () => {
     const summary = metric(null, "partial", "missing_required_field");
     summary.labor_hours_per_transaction.current.value = 0.5;
     const markup = render({ summary });
-    // 缺失值是「—」，不是 0、不是任何反推数
+    // 缺失值是「—」，不是 0、不是任何反推数——反向断言挡「同时渲染 is-missing 和一个 0」
+    expect(markup).not.toContain(">0</span>");
     expect(markup).toContain("is-missing");
     // 原因经运行时 Tooltip 呈现（SSR 静态标记不含其内容），
     // 这里验的是缺失态的视觉事实：muted 色的「—」

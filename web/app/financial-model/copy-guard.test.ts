@@ -43,8 +43,22 @@ describe("① 文案层：步骤化与人话化", () => {
     for (const handler of ["fillAssumptionExample", "fillOpeningExample"]) {
       expect(page.includes(handler), `${handler} wired`).toBe(true);
     }
-    // 初始值就是示例：打开页面即见合法输入形状
+    // 初始值就是示例：打开页面即见合法输入形状（F3-1 后仍是同一初始文本，
+    // 表单与高级 JSON 共用这一份状态）
     expect(page).toContain("useState(EXAMPLE_ASSUMPTIONS)");
+  });
+
+  it("F3-1：假设区是键值表单，裸 JSON 降级为折叠的高级入口且两入口同源", () => {
+    // 表单消费点：主输入区渲染 AssumptionForm，变更汇入 applyAssumptionFormValues
+    expect(page).toContain("<AssumptionForm");
+    expect(page).toContain("applyAssumptionFormValues(assumptionsText, changes)");
+    // 裸 JSON 文本框降级：只能在 Collapse 的 advanced 子面板内出现
+    const collapseAt = page.indexOf("finmodel.assumptions_advanced");
+    expect(collapseAt).toBeGreaterThan(-1);
+    const textareaAt = page.indexOf("Input.TextArea rows={6} value={assumptionsText}");
+    expect(textareaAt, "assumptions JSON textarea lives inside the advanced collapse").toBeGreaterThan(collapseAt);
+    // 未知键仍诚实标注（表单不展示、但不隐藏）
+    expect(page).toContain("<AssumptionUnknownKeys");
   });
 });
 

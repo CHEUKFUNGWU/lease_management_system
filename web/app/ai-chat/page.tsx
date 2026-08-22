@@ -1945,7 +1945,7 @@ function AIChatPageContent() {
                       {pageContext.period}
                     </StatusTag>
                   )}
-                  {pageContext.filters?.classification && <StatusTag kind={pageContext.filters.classification === "simulated" ? "warning" : "processing"}>{pageContext.filters.classification === "simulated" ? "模拟 · Working" : "正式 · Working"}</StatusTag>}
+                  {pageContext.filters?.classification && <StatusTag kind={pageContext.filters.classification === "simulated" ? "warning" : "processing"}>{t(pageContext.filters.classification === "simulated" ? "trust.classification_simulated" : "trust.classification_production", language)}</StatusTag>}
                   {pageContext.filters?.dataset_version && <StatusTag className="sty-31eb049e">dataset: {pageContext.filters.dataset_version}</StatusTag>}
                   {pageContext.filters?.source_system && <StatusTag className="sty-31eb049e">source: {pageContext.filters.source_system}</StatusTag>}
                   {pageContext.filters?.as_of && <StatusTag className="sty-31eb049e">as of: {pageContext.filters.as_of}</StatusTag>}

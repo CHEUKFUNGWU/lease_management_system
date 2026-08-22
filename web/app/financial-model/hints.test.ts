@@ -14,7 +14,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ASSUMPTION_HINTS, EXAMPLE_ASSUMPTION_VALUES, EXAMPLE_OPENING_FORM } from "./hints";
+import { ASSUMPTION_HINTS, ASSUMPTION_UNITS, EXAMPLE_ASSUMPTION_VALUES, EXAMPLE_OPENING_FORM } from "./hints";
 import { parseAssumptions } from "./workbench";
 
 const repoRoot = path.join(import.meta.dirname, "../../../");
@@ -59,6 +59,15 @@ describe("ASSUMPTION_HINTS ↔ 后端假设键单一来源", () => {
   it("示例假设的键 ⊆ 提示表（填充示例 = 每个键都有中文释义）", () => {
     for (const key of Object.keys(EXAMPLE_ASSUMPTION_VALUES)) {
       expect(ASSUMPTION_HINTS[key], `hint covers example key "${key}"`).toBeTruthy();
+    }
+  });
+
+  it("F3-1：单位登记表与提示表键集一致——登记一个键必须同时有释义与单位", () => {
+    expect(Object.keys(ASSUMPTION_UNITS).sort()).toEqual(Object.keys(ASSUMPTION_HINTS).sort());
+    // 单位取值封闭：percent / days / multiple / amount，无第四种
+    const legal = new Set(["percent", "days", "multiple", "amount"]);
+    for (const [key, unit] of Object.entries(ASSUMPTION_UNITS)) {
+      expect(legal.has(unit), `unit of "${key}" is a registered kind`).toBe(true);
     }
   });
 });

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { Alert, Button, Card, Col, Collapse, Input, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -14,10 +14,26 @@ import { fmtNum } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
-import { FIN_MODEL_RUN_STATUSES, FIN_MODEL_RUN_TIE_OUT_STATUSES, type FinModelRunStatus, type FinModelRunTieOutStatus } from "./enums";
+import {
+  FIN_MODEL_PERIOD_GRAINS,
+  FIN_MODEL_RUN_STATUSES,
+  FIN_MODEL_RUN_TIE_OUT_STATUSES,
+  GAP_KIND_LABEL,
+  PERIOD_GRAIN_LABEL,
+  RUN_STATUS_LABEL,
+  TIE_OUT_LABEL,
+  type FinModelPeriodGrain,
+  type FinModelRunStatus,
+  type FinModelRunTieOutStatus,
+} from "./enums";
+import { ContractRowInputs } from "./contract-rows";
+import { AssumptionForm, AssumptionUnknownKeys } from "./assumption-form";
+import { financialModelHelpContent } from "../components/help-content";
+import { HelpTrigger } from "../components/HelpDrawer";
 import { EXAMPLE_ASSUMPTIONS, EXAMPLE_OPENING_FORM, assumptionHint } from "./hints";
 import {
   addPeriod,
+  applyAssumptionFormValues,
   buildOpeningPayload,
   emptyOpeningForm,
   initialWorkbenchState,
@@ -67,7 +83,7 @@ export default function FinancialModelPage() {
   const [classification, setClassification] = useState<RetailDataClassification>("production");
   const [definitionOptions, setDefinitionOptions] = useState<{ id: string; title?: string }[]>([]);
   const [published, setPublished] = useState(false);
-  const [fold, setFold] = useState<"month" | "quarter" | "year">("quarter");
+  const [fold, setFold] = useState<FinModelPeriodGrain>("quarter");
   const [openingForm, setOpeningForm] = useState(emptyOpeningForm);
   const [periodInput, setPeriodInput] = useState("");
   const [openingResult, setOpeningResult] = useState<{ passed: boolean; failures?: unknown } | null>(null);
@@ -241,7 +257,14 @@ export default function FinancialModelPage() {
       title: t("finmodel.status", language),
       dataIndex: "status",
       key: "status",
-      render: (v: string) => <StatusTag kind={TIE_OUT_TAG[v] ?? "neutral"}>{v}</StatusTag>,
+      render: (v: string) => {
+        const known = (FIN_MODEL_RUN_TIE_OUT_STATUSES as readonly string[]).includes(v);
+        return (
+          <StatusTag kind={TIE_OUT_TAG[v] ?? "neutral"}>
+            {known ? t(TIE_OUT_LABEL[v as FinModelRunTieOutStatus], language) : v}
+          </StatusTag>
+        );
+      },
     },
   ];
 
@@ -261,27 +284,15 @@ export default function FinancialModelPage() {
       ) : (
         <Space direction="vertical" size="small">
           {openingForm[key].map((row, index) => (
-            <Space key={index} wrap>
-              <Input
-                className="fm-input-contract"
-                placeholder={t("finmodel.opening_contract", language)}
-                value={row.contract_id}
-                onChange={(e) => updateRows(key, index, "contract_id", e.target.value)}
-              />
-              <Input
-                className="fm-input-amount"
-                placeholder={t("finmodel.opening_liability", language)}
-                value={row.lease_liability}
-                onChange={(e) => updateRows(key, index, "lease_liability", e.target.value)}
-              />
-              <Input
-                className="fm-input-amount"
-                placeholder={t("finmodel.opening_rou", language)}
-                value={row.rou_asset}
-                onChange={(e) => updateRows(key, index, "rou_asset", e.target.value)}
-              />
-              <Button size="small" type="text" icon={<DeleteOutlined />} aria-label={t("finmodel.remove", language)} onClick={() => removeRow(key, index)} />
-            </Space>
+            <ContractRowInputs
+              key={index}
+              row={row}
+              index={index}
+              idPrefix={`fm-opening-${key}`}
+              language={language}
+              onChange={(field, value) => updateRows(key, index, field, value)}
+              onRemove={() => removeRow(key, index)}
+            />
           ))}
         </Space>
       )}
@@ -308,7 +319,7 @@ export default function FinancialModelPage() {
           <Space direction="vertical">
             <Space>
               <Spin size="small" />
-              <StatusTag kind={RUN_STATUS_TAG[wb.status]}>{wb.status}</StatusTag>
+              <StatusTag kind={RUN_STATUS_TAG[wb.status]}>{t(RUN_STATUS_LABEL[wb.status], language)}</StatusTag>
               <Typography.Text type="secondary">{wb.runId}</Typography.Text>
             </Space>
             <Button onClick={cancelRun}>{t("finmodel.cancel_run", language)}</Button>
@@ -357,7 +368,7 @@ export default function FinancialModelPage() {
             <Alert
               type={tieOutStatus === "passed" ? "success" : tieOutStatus === "failed" ? "error" : "warning"}
               showIcon
-              message={`${t("finmodel.tie_out_status", language)}: ${run.tie_out_status}`}
+              message={`${t("finmodel.tie_out_status", language)}：${t(TIE_OUT_LABEL[tieOutStatus], language)}`}
               description={
                 tieOutStatus === "passed"
                   ? undefined
@@ -367,13 +378,20 @@ export default function FinancialModelPage() {
             {(run.gaps || []).length > 0 && (
               <Card size="small" type="inner" title={t("finmodel.gaps", language)}>
                 <Space direction="vertical" size="small">
-                  {(run.gaps || []).map((gap, i) => (
-                    <Space key={i} wrap>
-                      <StatusTag kind="neutral">{gap.kind}</StatusTag>
-                      {gap.period && <Typography.Text type="secondary">{gap.period}</Typography.Text>}
-                      <span>{gap.detail}</span>
-                    </Space>
-                  ))}
+                  {(run.gaps || []).map((gap, i) => {
+                    const gapLabelKey = GAP_KIND_LABEL[gap.kind];
+                    return (
+                      <Space key={i} wrap>
+                        <StatusTag kind="neutral">
+                          {gapLabelKey
+                            ? t(gapLabelKey, language)
+                            : `${gap.kind} · ${t("finmodel.gap_kind_unknown", language)}`}
+                        </StatusTag>
+                        {gap.period && <Typography.Text type="secondary">{gap.period}</Typography.Text>}
+                        <span>{gap.detail}</span>
+                      </Space>
+                    );
+                  })}
                 </Space>
               </Card>
             )}
@@ -387,11 +405,7 @@ export default function FinancialModelPage() {
             <Button type="primary" disabled={tieOutStatus !== "passed" || published || !run.id} onClick={() => doPublish(run.id || "")}>
               {published ? t("finmodel.published", language) : t("finmodel.publish", language)}
             </Button>
-            <Select value={fold} onChange={setFold} options={[
-              { value: "month", label: "month" },
-              { value: "quarter", label: "quarter" },
-              { value: "year", label: "year" },
-            ]} />
+            <Select value={fold} onChange={(v: FinModelPeriodGrain) => setFold(v)} options={FIN_MODEL_PERIOD_GRAINS.map((grain) => ({ value: grain, label: t(PERIOD_GRAIN_LABEL[grain], language) }))} />
             <Button disabled={!run.id} onClick={() => doExport(run.id || "")}>{t("finmodel.export", language)}</Button>
           </Space>
         </Card>
@@ -404,6 +418,7 @@ export default function FinancialModelPage() {
       <AppLayout>
         <PageHeader
           title={t("nav.financial_model", language)}
+          help={<HelpTrigger content={financialModelHelpContent(language)} language={language} />}
           meta={
             <>
               {t("finmodel.page_intro", language)}
@@ -453,38 +468,68 @@ export default function FinancialModelPage() {
               >
                 <Space direction="vertical" size="small" className="fm-full">
                   <Typography.Text type="secondary">{t("finmodel.classification_label", language)}</Typography.Text>
-                  <Select
-                    className="fm-full"
-                    value={classification}
-                    onChange={(v: RetailDataClassification) => setClassification(v)}
-                    options={[
-                      { value: "production", label: "production · Working" },
-                      { value: "simulated", label: "simulated · Working" },
+                  <Space wrap size={8} className="fm-full">
+                    <Select
+                      value={classification}
+                      onChange={(v: RetailDataClassification) => setClassification(v)}
+                      options={[
+                        { value: "production", label: t("trust.classification_production", language) },
+                        { value: "simulated", label: t("trust.classification_simulated", language) },
+                      ]}
+                    />
+                    <Tooltip title={t("finmodel.version_state_tooltip", language)}>
+                      <StatusTag kind="neutral">{t("trust.basis_working", language)}</StatusTag>
+                    </Tooltip>
+                  </Space>
+                  {/* F3-1: key-value form is the primary entry; JSON demoted
+                      to the advanced collapse. Frozen while JSON invalid. */}
+                  {!assumptionsParse.ok && (
+                    <Alert type="error" showIcon message={`${t("finmodel.bad_assumptions", language)} (${assumptionsParse.error})`} />
+                  )}
+                  <AssumptionForm
+                    values={assumptionsParse.ok ? assumptionsParse.value : {}}
+                    disabled={!assumptionsParse.ok}
+                    language={language}
+                    onChange={(changes) =>
+                      dispatch({ t: "edit_assumptions", text: applyAssumptionFormValues(assumptionsText, changes) })
+                    }
+                  />
+                  {assumptionsParse.ok && <AssumptionUnknownKeys values={assumptionsParse.value} language={language} />}
+                  <Collapse
+                    items={[
+                      {
+                        key: "advanced",
+                        label: t("finmodel.assumptions_advanced", language),
+                        children: (
+                          <Space direction="vertical" size="small" className="fm-full">
+                            <Typography.Text type="secondary">{t("finmodel.assumptions_hint", language)}</Typography.Text>
+                            <Input.TextArea rows={6} value={assumptionsText} onChange={(e) => dispatch({ t: "edit_assumptions", text: e.target.value })} />
+                            {assumptionsParse.ok
+                              ? Object.keys(assumptionsParse.value).length > 0 && (
+                                  <div className="fm-hint-list">
+                                    {Object.keys(assumptionsParse.value).map((key) => {
+                                      const hint = assumptionHint(key, language);
+                                      return (
+                                        <div key={key} className="fm-hint-row">
+                                          <Typography.Text code className="fm-hint-key">{key}</Typography.Text>
+                                          {hint.known ? (
+                                            <Typography.Text type="secondary">{hint.label}</Typography.Text>
+                                          ) : (
+                                            <StatusTag kind="neutral">{t("finmodel.hint_unknown", language)}</StatusTag>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )
+                              : (
+                                  <Alert type="error" showIcon message={`${t("finmodel.bad_assumptions", language)} (${assumptionsParse.error})`} />
+                                )}
+                          </Space>
+                        ),
+                      },
                     ]}
                   />
-                  <Input.TextArea rows={6} value={assumptionsText} onChange={(e) => dispatch({ t: "edit_assumptions", text: e.target.value })} />
-                  {!assumptionsParse.ok ? (
-                    <Alert type="error" showIcon message={`${t("finmodel.bad_assumptions", language)} (${assumptionsParse.error})`} />
-                  ) : (
-                    Object.keys(assumptionsParse.value).length > 0 && (
-                      <div className="fm-hint-list">
-                        {Object.keys(assumptionsParse.value).map((key) => {
-                          const hint = assumptionHint(key, language);
-                          return (
-                            <div key={key} className="fm-hint-row">
-                              <Typography.Text code className="fm-hint-key">{key}</Typography.Text>
-                              {hint.known ? (
-                                <Typography.Text type="secondary">{hint.label}</Typography.Text>
-                              ) : (
-                                <StatusTag kind="neutral">{t("finmodel.hint_unknown", language)}</StatusTag>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )
-                  )}
-                  <Typography.Text type="secondary">{t("finmodel.assumptions_hint", language)}</Typography.Text>
                   <Typography.Text type="secondary">{t("finmodel.run_async_hint", language)}</Typography.Text>
                 </Space>
               </Card>

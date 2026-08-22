@@ -2074,6 +2074,20 @@ body .ant-select:focus-visible {
   min-height: 48px;
 }
 
+.fm-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fm-field-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--fg-tertiary);
+}
+
 .fm-input-contract {
   width: 180px;
 }
@@ -2128,6 +2142,53 @@ body .ant-select:focus-visible {
   flex-direction: column;
   gap: 4px;
   width: 100%;
+}
+
+/* F3-1：假设键值表单 */
+.fm-assumption-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.fm-assumption-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(0, 1.4fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fm-assumption-name {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.fm-assumption-key {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.fm-assumption-input {
+  width: 130px;
+}
+
+.fm-assumption-desc {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fm-assumption-desc-text {
+  font-size: 12px;
+}
+
+.fm-assumption-note {
+  font-size: 12px;
 }
 
 .fm-hint-row {

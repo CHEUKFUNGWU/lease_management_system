@@ -460,3 +460,39 @@ D19 容易被扩大成一次全仓重命名，必须提前划清：
 **阶段零（速修 D17/D18/D19 + 定位 D21）→ 阶段一（样式收敛）→ 阶段二、三（组件层）→ 阶段五（三栏首页，D16/D20 在此闭环）。**
 
 阶段零可以立即开始：全部是文案、路由登记和配置，不碰布局，与后续阶段无冲突，且能顺带验证样式系统的实际腐化程度。
+
+## 9. F 批次：财务视角的 UI/UX 与术语整改（2026-08-22 执行）
+
+按 `docs/execution/财务视角UIUX与术语整改_任务指令.md`（transient 工单，复核后可删）完成的整改。审查方法：ui-ux-pro-max（119 条 UX 准则）+ unslop，站在财务会计 / FP&A 分析师 / Finance BP / 经营分析师四个岗位视角逐页核查。**未改任何计算逻辑与后端契约。**
+
+### F0 输入正确性与信息泄漏
+
+| 票 | 内容 | 机械证据 |
+|---|---|---|
+| F0-1 | 期初合约行三个输入补可视 label（第一行 `<label htmlFor>`、后续行 aria-label），placeholder 降级为填写示例 | `contract-rows.test.tsx`（4 用例：label↔id 配对、placeholder≠语义文案、第二行无重复 label、两张子表 id 互斥） |
+| F0-2 | `/financial-model` 五处机器枚举改经 i18n 映射表（run 状态 / 勾稽总状态 / gap.kind / 导出粒度；勾稽明细行状态列一并修）；`enums.ts` 新增联合类型键的 Record 映射，漏值即编不过 | `page-enums.test.ts` + `gap-kinds.test.ts`（GAP_KIND_LABEL 每键 ↔ engine.go 字面量跨语言断言） |
+| F0-3 | `store-pnl` 同业对标列不再渲染 `insufficient_peers` 等英文枚举（列内 + 头部 StatusTag 两处） | `peer-status.test.ts`（四取值逐一断言中文输出 + 键集锁回 project.go 注释） |
+| F0-4 | 用户文案清除内部路线图编号（「B 阶段」等），保留诚实不可用态 | `i18n-no-roadmap.test.ts` 全字典三语扫描（阶段编号 / Wx / Px-y 形态） |
+| F0-5 | 「枚举不许裸渲染」CI 守卫 `enum-leak.test.ts`（四规则扫全树 tsx） | 已验证修复前红（命中 financial-model:311/372/391-393 + store-pnl:260）、修复后绿；存量两处（monthly-closing `{result.status}`、store-360 `({response.currency_status})`）逐条记账并写明理由 |
+
+### F1 术语与文案（unslop）
+
+译名统一：run→测算、Gap→缺口清单说明、30-day run-rate→30 天日均折算值、observed store-days→实际观测店天数、「白名单 DSL」→「仅支持受限语法」、「不绿/人话」语域收敛。F1-4 拆轴：数据标识（正式数据/模拟数据）与版本态（工作底稿口径 Working/正式过账口径 Official）分离——`trust.classification_*` 去掉复合后缀，financial-model 分类下拉旁挂独立版本态标签+tooltip，ai-chat 上下文标签改走 t()。守卫：`i18n-finance-copy.test.ts`。
+
+### F2 帮助覆盖
+
+`financial-model` / `store-pnl` / `monthly-closing` 三页补 HelpTrigger（help-content.ts 三函数 + i18n 三语）。内容回答真实疑问：三道闸各拦什么、勾稽不过下一步做什么、发布的计划版本谁能看到；经营口径 vs IFRS 16 口径为何不同、Decision Ready 不满足还能不能用；月结动作与总账的关系、哪些动作不可逆。financial-model 的 flow 直接复用页面自身 finmodel.step_* 五步键。测试：`help-content-f0.test.tsx`。
+
+### F3 已拍板项
+
+- **F3-1 假设输入区重做为键值表单**：每行中文名 + 单位后缀数字输入 + 口径说明；裸 JSON 降级为折叠的「高级：粘贴 JSON」，两入口汇合到 `workbench.applyAssumptionFormValues → parseAssumptions` 同一接缝。单位换算只在展示层（界面 2% ↔ payload 0.02），单位登记表 `hints.ts ASSUMPTION_UNITS` 逐键从后端公式推得（percent×11 / days×4 / multiple=ramp_factor（引擎 (1+v)，显示 payload+1）/ amount=allocation、marketing）。未知键原样保留并诚实标注。守卫：copy-guard 更新且全绿、hints.test 后端键集断言仍绿、新增 assumption-form.test.tsx（单位互逆 + SSR 渲染 + 回调→接缝→payload 全链路）。
+- **F3-2 导航拆组**：「分析与决策」13 项按 CONTEXT.md 领域边界拆为「经营分析」（零售经营域 8 项）与「租赁决策」（租赁/交易域 5 项）；导航标签对齐页面标题（租赁组合分析 / FP&A 经营工作台 / 未来现金流与财务预测 / 促销活动与 ROI 闭环）。测试：`nav-grouping.test.ts`。「经营脉搏 / 经营驾驶舱」重叠按工单 §4.1 未动。
+
+### 验证
+
+```
+npm run type-check ✅   npm test ✅（77 文件 / 472 用例）
+npm run build ✅        npm run lint ✅（--max-warnings 0 + enforce-design 无违规）
+```
+
+遗留（下一批次）：monthly-closing 批次状态与 store-360 currency_status 的枚举翻译（后者需后端先固化取值全集）；「经营脉搏/经营驾驶舱」功能重叠待产品票。

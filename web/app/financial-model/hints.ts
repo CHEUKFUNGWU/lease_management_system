@@ -50,6 +50,86 @@ export function assumptionHint(key: string, lang: Language): { known: boolean; l
   return { known: true, label: `${key} · ${t(dictKey, lang)}` };
 }
 
+// ─── F3-1：假设输入区键值表单的单位登记表 ────────────────────
+//
+// 单位不是按键名猜的，是逐键从后端公式推出来的（engine.go / defaults.go）：
+//   - percent：引擎按 (1+v) 或 rev×v 消费，payload 是小数（0.02 = 2%）
+//     —— sssg、五个 *_growth、store_count_growth、gross_margin_rate、
+//     borrow_interest_rate、tax_rate、dividend_payout_rate；
+//   - multiple（倍数）：ramp_factor 按 (1+v) 组合驱动（engine_test.go 锁定
+//     payload 0.05 ⇒ ×1.05），界面显示 payload+1 的倍数（中性 0 ⇒ 1×）；
+//   - days：dso/dio/dpo/days 直接以天数参与 rows.dso × rev ÷ days；
+//   - amount：allocation/marketing 是直接输入行的金额，不做换算。
+// 换算只发生在展示层：用户看见 2%，payload 仍是 0.02。
+export type AssumptionUnit = "percent" | "days" | "multiple" | "amount";
+
+export const ASSUMPTION_UNITS: Record<string, AssumptionUnit> = {
+  sssg: "percent",
+  labor_cost_growth: "percent",
+  fixed_rent_growth: "percent",
+  variable_rent_growth: "percent",
+  non_lease_cost_growth: "percent",
+  other_controllable_cost_growth: "percent",
+  store_count_growth: "percent",
+  gross_margin_rate: "percent",
+  borrow_interest_rate: "percent",
+  tax_rate: "percent",
+  dividend_payout_rate: "percent",
+  ramp_factor: "multiple",
+  dso: "days",
+  dio: "days",
+  dpo: "days",
+  days: "days",
+  allocation: "amount",
+  marketing: "amount",
+};
+
+/** 表单行展示顺序：增长驱动 → 比率 → 营运资本天数 → 金额行。 */
+export const ASSUMPTION_FORM_ORDER: readonly string[] = [
+  "sssg",
+  "store_count_growth",
+  "ramp_factor",
+  "labor_cost_growth",
+  "fixed_rent_growth",
+  "variable_rent_growth",
+  "non_lease_cost_growth",
+  "other_controllable_cost_growth",
+  "gross_margin_rate",
+  "borrow_interest_rate",
+  "tax_rate",
+  "dividend_payout_rate",
+  "dso",
+  "dio",
+  "dpo",
+  "days",
+  "marketing",
+  "allocation",
+];
+
+/** payload → 界面显示值。 */
+export function payloadToDisplay(key: string, value: number): number {
+  switch (ASSUMPTION_UNITS[key]) {
+    case "percent":
+      return value * 100;
+    case "multiple":
+      return value + 1;
+    default:
+      return value;
+  }
+}
+
+/** 界面显示值 → payload（与 payloadToDisplay 严格互逆）。 */
+export function displayToPayload(key: string, display: number): number {
+  switch (ASSUMPTION_UNITS[key]) {
+    case "percent":
+      return display / 100;
+    case "multiple":
+      return display - 1;
+    default:
+      return display;
+  }
+}
+
 /** 示例假设：覆盖默认模板的全部预测驱动 + 主要输入行，数值为演示用合法值。 */
 export const EXAMPLE_ASSUMPTION_VALUES = {
   sssg: 0.02,

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addPeriod,
+  applyAssumptionFormValues,
   buildOpeningPayload,
   emptyOpeningForm,
   initialWorkbenchState,
@@ -183,5 +184,35 @@ describe("假设与期初 payload 组装（锁 handler 契约）", () => {
     expect(isScopeDenied({ code: "scope_denied" })).toBe(true);
     expect(isScopeDenied(new Error("x"))).toBe(false);
     expect(isScopeDenied(null)).toBe(false);
+  });
+
+  describe("F3-1 applyAssumptionFormValues：表单与 JSON 两入口的唯一接缝", () => {
+    it("表单改值 → JSON 更新；再手改 JSON → 表单可读，往返不失真", () => {
+      // 表单改 sssg=2% → payload 0.02 进 JSON
+      const t1 = applyAssumptionFormValues("", { sssg: 0.02, dso: 45 });
+      expect(parseAssumptions(t1)).toEqual({ ok: true, value: { sssg: 0.02, dso: 45 } });
+      // 手改 JSON（高级面板）→ 新值可读
+      const t2 = applyAssumptionFormValues(t1, { sssg: 0.03 });
+      expect(parseAssumptions(t2)).toEqual({ ok: true, value: { sssg: 0.03, dso: 45 } });
+      // 清空一行 = 删除键（未提供 ≠ 0）
+      const t3 = applyAssumptionFormValues(t2, { dso: null });
+      expect(parseAssumptions(t3)).toEqual({ ok: true, value: { sssg: 0.03 } });
+    });
+
+    it("未知键原样保留——表单不认识也不丢用户的 JSON", () => {
+      const base = '{"custom_driver": 7, "dso": 45}';
+      const next = applyAssumptionFormValues(base, { dso: 50 });
+      expect(parseAssumptions(next)).toEqual({ ok: true, value: { custom_driver: 7, dso: 50 } });
+    });
+
+    it("JSON 非法时原样返回（表单冻结，不覆盖用户正在编辑的文本）", () => {
+      expect(applyAssumptionFormValues("{oops", { sssg: 0.02 })).toBe("{oops");
+    });
+
+    it("全部键清空 → 空串 = 空假设集（与 parseAssumptions 空串语义一致）", () => {
+      const next = applyAssumptionFormValues('{"dso": 45}', { dso: null });
+      expect(next).toBe("");
+      expect(parseAssumptions(next)).toEqual({ ok: true, value: {} });
+    });
   });
 });

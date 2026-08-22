@@ -17,7 +17,9 @@ import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useRetailQuery } from "../retail/useRetailQuery";
-import { STORE_PNL_SECONDARY_COLUMNS, type StorePnlSecondaryColumn } from "./options";
+import { HelpTrigger } from "../components/HelpDrawer";
+import { storePnlHelpContent } from "../components/help-content";
+import { STORE_PNL_SECONDARY_COLUMNS, peerStatusLabel, type StorePnlSecondaryColumn } from "./options";
 
 type StoreRef = { id: string; code: string; name: string };
 type RowValue = {
@@ -257,7 +259,8 @@ export default function StorePnlPage() {
     { title: t("storepnl.variance_pct", language), dataIndex: "pct", key: "pct", align: "right" as const,
       render: (v: number | null) => (v == null ? "—" : `${v.toFixed(2)}%`) },
     ...(hasPeer ? [{ title: t("storepnl.peer_col", language), dataIndex: "peer", key: "peer", align: "right" as const,
-      render: (v: number | null, row: any) => (v == null ? (row.peer_status || "—") : fmtNum(v)) }] : []),
+      // F0-3：peer 为空时不再把机器枚举（insufficient_peers 等）渲染进中文报表列
+      render: (v: number | null, row: any) => (v == null ? (row.peer_status ? peerStatusLabel(row.peer_status, language) : "—") : fmtNum(v)) }] : []),
     { title: t("storepnl.provenance", language), dataIndex: "provenance", key: "provenance",
       render: (provenance: RowValue["provenance"]) => {
         if (!provenance) return "—";
@@ -309,6 +312,7 @@ export default function StorePnlPage() {
       <AppLayout>
         <PageHeader
           title={t("nav.store_pnl", language)}
+          help={<HelpTrigger content={storePnlHelpContent(language)} language={language} />}
           meta={t("storepnl.basis_note", language)}
           primaryAction={
             <Space>
@@ -398,7 +402,7 @@ export default function StorePnlPage() {
               {pnl.currency && <Typography.Text type="secondary">{pnl.currency}</Typography.Text>}
               {pnl.period_label && <StatusTag kind="neutral">{pnl.period_label}</StatusTag>}
               {pnl.peer_status && pnl.peer_status !== "complete" && (
-                <StatusTag kind="warning">{`${t("storepnl.peer_col", language)}: ${pnl.peer_status}`}</StatusTag>
+                <StatusTag kind="warning">{`${t("storepnl.peer_col", language)}：${peerStatusLabel(pnl.peer_status, language)}`}</StatusTag>
               )}
               {pnl.decision_ready_reason && (
                 <Typography.Text type="warning">{pnl.decision_ready_reason}</Typography.Text>

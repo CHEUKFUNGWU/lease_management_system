@@ -71,6 +71,29 @@ export function parseAssumptions(text: string): { ok: true; value: Record<string
   }
 }
 
+/**
+ * F3-1：键值表单与「高级：粘贴 JSON」两个入口汇合的唯一接缝。
+ *
+ * 表单只改已知键的数值；JSON 里前端不认识的键原样保留（它们仍会传给
+ * 后端，由引擎决定是否产出 assumption_missing Gap）。value=null 表示删除
+ * 该键——「未提供」≠ 0，缺键由引擎显式降级而不是静默补零。
+ *
+ * 返回新的 JSON 文本，页面仍把它交给 edit_assumptions → parseAssumptions
+ * 走同一条解析/校验路径；文本非法时原样返回（表单冻结，不覆盖用户正在
+ * 编辑的 JSON）。
+ */
+export function applyAssumptionFormValues(text: string, changes: Record<string, number | null>): string {
+  const parsed = parseAssumptions(text);
+  if (!parsed.ok) return text;
+  const next: Record<string, unknown> = { ...parsed.value };
+  for (const [key, value] of Object.entries(changes)) {
+    if (value == null) delete next[key];
+    else next[key] = value;
+  }
+  if (Object.keys(next).length === 0) return "";
+  return JSON.stringify(next, null, 2);
+}
+
 function withAssumptions(state: WbState, text: string): WbState {
   if (state.phase === "dispatching" || state.phase === "polling") return state;
   if (state.phase === "scope_denied") return state;

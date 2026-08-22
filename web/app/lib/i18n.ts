@@ -2848,6 +2848,37 @@ export const dict: TranslationDict = {
     "zh-HK": "這一頁算的是引入本系統能省多少人工，用於內部立項，不是門店經營分析。找門店的投入產出請去「門店 360」或「簽約前決策」。",
     en: "This page estimates how much labour this system saves, for internal project approval. It is not store operating analysis. For store-level ROI go to Store 360 or the Pre-deal decision page.",
   },
+  // R1-2：销售人效与工时面板。grain_note 与四个 basis 为工单定稿，不改写。
+  "store360.labor.panel_title": { "zh-CN": "销售人效与工时", "zh-HK": "銷售人效與工時", en: "Labor efficiency" },
+  "store360.labor.metric.sph": { "zh-CN": "销售人效", "zh-HK": "銷售人效", en: "Sales per labor hour" },
+  "store360.labor.metric.hpt": { "zh-CN": "单均工时", "zh-HK": "單均工時", en: "Hours per transaction" },
+  "store360.labor.metric.rate": { "zh-CN": "人工成本率", "zh-HK": "人工成本率", en: "Labor cost rate" },
+  "store360.labor.metric.hc": { "zh-CN": "期末在岗人数", "zh-HK": "期末在崗人數", en: "On-duty headcount" },
+  "store360.labor.grain_note": {
+    "zh-CN": "这些数按天汇总。系统里没有按小时的销售和排班数据，所以算不了时段排班吻合度，也看不出忙时人手够不够。要做时段分析，需要先接入门店 POS 的分时流水。",
+    "zh-HK": "這些數按天匯總。系統裡沒有按小時的銷售和排班數據，所以算不了時段排班吻合度，也看不出忙時人手夠不夠。要做時段分析，需要先接入門店 POS 的分時流水。",
+    en: "These figures are aggregated by day. The system has no hourly sales or scheduling data, so it cannot measure how well shifts match busy hours, or tell whether peak hours are understaffed. Hour-level analysis requires feeding POS hourly transactions in first.",
+  },
+  "store360.labor.sph_basis": {
+    "zh-CN": "销售额 ÷ 工时。工时来自门店排班或考勤导入，缺一天就整段不算，不按剩余天数折算。",
+    "zh-HK": "銷售額 ÷ 工時。工時來自門店排班或考勤導入，缺一天就整段不算，不按剩餘天數折算。",
+    en: "Sales ÷ labor hours. Hours come from store schedules or attendance imports; any missing day voids the whole window rather than being prorated.",
+  },
+  "store360.labor.hpt_basis": {
+    "zh-CN": "工时 ÷ 交易笔数。数值高说明单笔成交占用人手多，可能是客单结构变了，也可能是流程变慢了。",
+    "zh-HK": "工時 ÷ 交易筆數。數值高說明單筆成交佔用人手多，可能是客單結構變了，也可能是流程變慢了。",
+    en: "Labor hours ÷ transactions. A high value means each sale ties up more staffing — either the basket mix changed or the process slowed down.",
+  },
+  "store360.labor.rate_basis": {
+    "zh-CN": "人工成本 ÷ 销售额。人工成本含工资、社保、外包，不含店长以上的分摊管理费。",
+    "zh-HK": "人工成本 ÷ 銷售額。人工成本含工資、社保、外包，不含店長以上的分攤管理費。",
+    en: "Labor cost ÷ sales. Labor cost includes wages, social insurance and outsourcing; it excludes allocated management overhead above store manager level.",
+  },
+  "store360.labor.hc_basis": {
+    "zh-CN": "期末在岗人数，含兼职按人头计，不折算全职当量。",
+    "zh-HK": "期末在崗人數，含兼職按人頭計，不折算全職當量。",
+    en: "On-duty headcount; part-timers counted per head, never converted to FTE.",
+  },
   "perf.title": { "zh-CN": "经营驾驶舱", "zh-HK": "經營駕駛艙", en: "Operating cockpit" },
   "perf.meta": { "zh-CN": "{period} · 工作底稿口径 · 数据截至 {stamp} · 独立沙盘，不直接覆盖正式台账。", "zh-HK": "{period} · 工作底稿口徑 · 數據截至 {stamp} · 獨立沙盤，不直接覆蓋正式台賬。", en: "{period} · Working basis · as of {stamp} · does not replace Official close." },
   "perf.analysis_period": { "zh-CN": "分析期间", "zh-HK": "分析期間", en: "Period" },

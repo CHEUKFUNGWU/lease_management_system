@@ -13,14 +13,15 @@ import { Card, Space, Tag, Tooltip, Typography } from "antd";
 import { InfoCircleOutlined, TeamOutlined } from "@ant-design/icons";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
-import type { RetailStore360SummaryMetric } from "../lib/api";
-import { formatKPIValue, translateReason } from "../operating-pulse/logic";
+import type { RetailPeerBenchmark, RetailStore360SummaryMetric } from "../lib/api";
+import { formatKPIValue, formatUnitValue, translateReason } from "../operating-pulse/logic";
 import { StateBlock } from "../components/StateBlock";
 
 const { Text } = Typography;
 
 interface Props {
   summary?: Record<string, RetailStore360SummaryMetric>;
+  benchmarks?: RetailPeerBenchmark[];
   currency?: string;
   dataClassification?: string;
 }
@@ -40,9 +41,10 @@ const METRIC_BASIS_KEYS: Record<string, string> = {
   headcount: "store360.labor.hc_basis",
 };
 
-export function LaborEfficiencyPanel({ summary, currency, dataClassification }: Props) {
+export function LaborEfficiencyPanel({ summary, benchmarks, currency, dataClassification }: Props) {
   const { language } = useLanguage();
   const codes = Object.keys(METRIC_LABEL_KEYS);
+  const benchmarkByCode = new Map((benchmarks ?? []).map((b) => [b.code, b]));
 
   return (
     <Card
@@ -79,6 +81,24 @@ export function LaborEfficiencyPanel({ summary, currency, dataClassification }: 
                     </Text>
                   </Tooltip>
                 </div>
+                {/* 同群状态：样本不足显式降级，不空白、不填 0（retail-kpi-v1 纪律） */}
+                {benchmarkByCode.has(code) && (() => {
+                  const peer = benchmarkByCode.get(code)!;
+                  if (peer.status === "complete" && peer.median != null) {
+                    return (
+                      <Text type="secondary" className={`labor-peer-${code}`} style={{ fontSize: 11 }}>
+                        {t("store360.labor.peer_median", language, { value: formatUnitValue(peer.median, peer.unit, currency, language), count: String(peer.peer_count) })}
+                      </Text>
+                    );
+                  }
+                  return (
+                    <Tooltip title={translateReason(peer.reason || undefined, language)}>
+                      <Text type="warning" className={`labor-peer-${code} labor-peer-insufficient`} style={{ fontSize: 11 }}>
+                        {t("store360.labor.peer_insufficient", language)}
+                      </Text>
+                    </Tooltip>
+                  );
+                })()}
               </div>
             );
           })}

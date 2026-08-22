@@ -2854,6 +2854,8 @@ export const dict: TranslationDict = {
   "store360.labor.metric.hpt": { "zh-CN": "单均工时", "zh-HK": "單均工時", en: "Hours per transaction" },
   "store360.labor.metric.rate": { "zh-CN": "人工成本率", "zh-HK": "人工成本率", en: "Labor cost rate" },
   "store360.labor.metric.hc": { "zh-CN": "期末在岗人数", "zh-HK": "期末在崗人數", en: "On-duty headcount" },
+  "store360.labor.peer_median": { "zh-CN": "同群中位 {value} · {count} 家", "zh-HK": "同群中位 {value} · {count} 家", en: "Peer median {value} · {count} stores" },
+  "store360.labor.peer_insufficient": { "zh-CN": "同群样本不足", "zh-HK": "同群樣本不足", en: "Insufficient peers" },
   "store360.labor.grain_note": {
     "zh-CN": "这些数按天汇总。系统里没有按小时的销售和排班数据，所以算不了时段排班吻合度，也看不出忙时人手够不够。要做时段分析，需要先接入门店 POS 的分时流水。",
     "zh-HK": "這些數按天匯總。系統裡沒有按小時的銷售和排班數據，所以算不了時段排班吻合度，也看不出忙時人手夠不夠。要做時段分析，需要先接入門店 POS 的分時流水。",

@@ -782,6 +782,7 @@ function Store360Inner() {
               <div className="store360-block-gap">
                 <LaborEfficiencyPanel
                   summary={response.summary}
+                  benchmarks={response.peer_benchmark}
                   currency={response.currency}
                   dataClassification={query.classification || "production"}
                 />

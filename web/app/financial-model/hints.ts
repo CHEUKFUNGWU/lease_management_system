@@ -106,13 +106,28 @@ export const ASSUMPTION_FORM_ORDER: readonly string[] = [
   "allocation",
 ];
 
+/**
+ * 换算后收敛二进制浮点残渣。
+ *
+ * ×100 / ÷100 / ±1 在 IEEE754 下都会漏残渣，而假设是「有来源、有版本、有
+ * 责任人」的（engine.go:520），存进去的值必须就是责任人填的那个数：
+ *   - 用户在爬坡因子填 1.05 → display-1 = 0.050000000000000044，这串会
+ *     原样写进高级 JSON 文本框、进 payload、进 idempotencyKey；
+ *   - 反向同样漏：payload 0.29 会在表单里显示成 28.999999999999996%。
+ * multiple 尤其严重——1.05/1.1/1.2/1.15 全部中招。
+ *
+ * 对计量的影响约 1e-17（不会动勾稽），这是留痕与呈现问题，不是计量问题。
+ * 10 位小数远超任何假设的有效精度，且不破坏两个方向的严格互逆。
+ */
+const roundUnit = (x: number): number => Number(x.toFixed(10));
+
 /** payload → 界面显示值。 */
 export function payloadToDisplay(key: string, value: number): number {
   switch (ASSUMPTION_UNITS[key]) {
     case "percent":
-      return value * 100;
+      return roundUnit(value * 100);
     case "multiple":
-      return value + 1;
+      return roundUnit(value + 1);
     default:
       return value;
   }
@@ -122,9 +137,9 @@ export function payloadToDisplay(key: string, value: number): number {
 export function displayToPayload(key: string, display: number): number {
   switch (ASSUMPTION_UNITS[key]) {
     case "percent":
-      return display / 100;
+      return roundUnit(display / 100);
     case "multiple":
-      return display - 1;
+      return roundUnit(display - 1);
     default:
       return display;
   }

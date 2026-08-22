@@ -64,6 +64,29 @@ describe("F3-1 单位登记表", () => {
       expect(displayToPayload(key, payloadToDisplay(key, sample))).toBeCloseTo(sample, 10);
     }
   });
+
+  // 复核补票（2026-08-22）：上面那条证的是「互逆」，互逆在有浮点残渣时照样
+  // 成立——toBeCloseTo(…, 10) 对 0.050000000000000044 是绿的。这里证的是另一
+  // 个属性：**存进 payload 的就是责任人填的那个数**。必须用 toBe，换成
+  // toBeCloseTo 这条测试就恒绿、等于没写。
+  it("换算结果无浮点残渣：payload 与界面显示值都是干净数（假设要留痕）", () => {
+    // payload 侧：这四个值在收敛前分别漏出 …044 / …999 / …009 / …996
+    expect(displayToPayload("ramp_factor", 1.05)).toBe(0.05);
+    expect(displayToPayload("ramp_factor", 1.1)).toBe(0.1);
+    expect(displayToPayload("ramp_factor", 1.15)).toBe(0.15);
+    expect(displayToPayload("non_lease_cost_growth", 0.7)).toBe(0.007);
+    // display 侧：payload 0.29 曾显示成 28.999999999999996%
+    expect(payloadToDisplay("tax_rate", 0.29)).toBe(29);
+    expect(payloadToDisplay("ramp_factor", 0.1)).toBe(1.1);
+    // 全键扫描：残渣一律以「小数位数」判定，不用容差
+    for (const key of Object.keys(ASSUMPTION_UNITS)) {
+      for (const display of [0.7, 1.05, 2.3, 12.1, 29]) {
+        const payload = displayToPayload(key, display);
+        expect(String(payload).replace(/^-?\d*\.?/, "").length, `${key} @ ${display} 的 payload ${payload} 无残渣`).toBeLessThanOrEqual(10);
+        expect(payloadToDisplay(key, payload), `${key} @ ${display} 严格互逆`).toBe(display);
+      }
+    }
+  });
 });
 
 describe("F3-1 表单渲染（SSR）", () => {

@@ -2033,6 +2033,8 @@ export interface FinancialModelRunInput {
   data_classification: string;
   versions: { data_version: string; assumption_version: string; model_definition_version: string };
   idempotency_key: string;
+  /** S2-5 异步路径：run 行先落 queued，引擎后台执行，前端轮询 GET /runs/:id。 */
+  async?: boolean;
 }
 
 export const financialModelApi = {
@@ -2043,7 +2045,17 @@ export const financialModelApi = {
   saveTemplate: (data: Record<string, unknown>, token: string) =>
     apiRequest("/api/v1/financial-model/templates", { method: "POST", body: JSON.stringify(data), token }) as Promise<{ id: string }>,
   run: (definitionId: string, input: FinancialModelRunInput, token: string) =>
-    apiRequest(`/api/v1/financial-model/definitions/${encodeURIComponent(definitionId)}/runs`, { method: "POST", body: JSON.stringify(input), token }) as Promise<{ run: unknown; persisted?: boolean }>,
+    apiRequest(`/api/v1/financial-model/definitions/${encodeURIComponent(definitionId)}/runs`, { method: "POST", body: JSON.stringify(input), token }) as Promise<{ run: unknown; persisted?: boolean } | { run_id: string; status: string }>,
+  listDefinitions: (token: string) =>
+    apiRequest("/api/v1/financial-model/definitions", { token }) as Promise<{ definitions: unknown[] }>,
+  getRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}`, { token }) as Promise<{ run: unknown; line_count?: number }>,
+  cancelRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}/cancel`, { method: "POST", body: "{}", token }) as Promise<Record<string, unknown>>,
+  publishRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}/publish`, { method: "POST", body: "{}", token }) as Promise<Record<string, unknown>>,
+  exportRun: (runId: string, fold: "month" | "quarter" | "year", token: string) =>
+    downloadBlob(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}/export?fold=${fold}`, token),
   validateOpening: (data: unknown, token: string) =>
     apiRequest("/api/v1/financial-model/opening/validate", { method: "POST", body: JSON.stringify(data), token }) as Promise<Record<string, unknown>>,
 };

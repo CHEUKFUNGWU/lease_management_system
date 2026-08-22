@@ -2059,6 +2059,41 @@ body .ant-select:focus-visible {
   color: var(--fg-muted);
 }
 
+/* ─── Financial Model Workbench（spec: docs/specs/financial_model_workbench_refactor.md）─── */
+
+.fm-input-stack,
+.fm-result-stack {
+  width: 100%;
+}
+
+.fm-full {
+  width: 100%;
+}
+
+.fm-dispatch-placeholder {
+  min-height: 48px;
+}
+
+.fm-input-contract {
+  width: 180px;
+}
+
+.fm-input-amount {
+  width: 140px;
+}
+
+.fm-opening-entity {
+  width: 200px;
+}
+
+.fm-opening-currency {
+  width: 110px;
+}
+
+.fm-opening-policy {
+  width: 150px;
+}
+
 /* ─── Smooth Scrolling ──────────────────────────────────────── */
 
 html {

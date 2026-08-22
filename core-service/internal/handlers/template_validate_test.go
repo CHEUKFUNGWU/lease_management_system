@@ -85,6 +85,9 @@ func TestValidateTemplateUnknownReferenceHasRowKeyAndKind(t *testing.T) {
 	if e.Kind != "unknown_reference" || e.RowKey != "a" {
 		t.Fatalf("expected unknown_reference on row a, got %+v", e)
 	}
+	if e.RefKey != "nope" {
+		t.Fatalf("ref_key must carry the missing row key structurally, got %q", e.RefKey)
+	}
 }
 
 func TestValidateTemplateSyntaxErrorHasRowKeyAndKind(t *testing.T) {

@@ -995,7 +995,8 @@ func periodStartOf(cutoff *string) string {
 
 type templateValidationError struct {
 	RowKey    string   `json:"row_key,omitempty"`
-	Kind      string   `json:"kind"` // syntax | unknown_reference | invalid_lag | circular_reference | schema
+	RefKey    string   `json:"ref_key,omitempty"` // unknown_reference：被引用且不存在的科目键，前端直接渲染不必解析文本
+	Kind      string   `json:"kind"`              // syntax | unknown_reference | invalid_lag | circular_reference | schema
 	Message   string   `json:"message"`
 	Position  *int     `json:"position,omitempty"`
 	CyclePath []string `json:"cycle_path,omitempty"`
@@ -1034,6 +1035,12 @@ func (h *FinModelHandler) ValidateTemplate(c *gin.Context) {
 				switch {
 				case strings.Contains(msg, "unknown row"):
 					entry.Kind = "unknown_reference"
+					if i := strings.Index(msg, "unknown row \""); i >= 0 {
+						rest := msg[i+len("unknown row \""):]
+						if j := strings.Index(rest, "\""); j >= 0 {
+							entry.RefKey = rest[:j]
+						}
+					}
 				case strings.Contains(msg, "lag"):
 					entry.Kind = "invalid_lag"
 				default:

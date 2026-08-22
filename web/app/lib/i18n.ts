@@ -2844,9 +2844,9 @@ export const dict: TranslationDict = {
     en: "This page shows daily and weekly operating swings, with coverage and Decision Ready verdicts. Monthly four-wall EBITDA ranking and action follow-up live in the Operating cockpit. The two pages read from different backends; the same metric may differ between them.",
   },
   "roi.scope_note": {
-    "zh-CN": "这一页算的是引入本系统能省多少人工，用于内部立项，不是门店经营分析。找门店的投入产出请去「门店 360」或「新店投资评估」。",
-    "zh-HK": "這一頁算的是引入本系統能省多少人工，用於內部立項，不是門店經營分析。找門店的投入產出請去「門店 360」或「新店投資評估」。",
-    en: "This page estimates how much labour this system saves, for internal project approval. It is not store operating analysis. For store-level ROI go to Store 360 or New Store Feasibility.",
+    "zh-CN": "这一页算的是引入本系统能省多少人工，用于内部立项，不是门店经营分析。找门店的投入产出请去「门店 360」或「签约前决策」。",
+    "zh-HK": "這一頁算的是引入本系統能省多少人工，用於內部立項，不是門店經營分析。找門店的投入產出請去「門店 360」或「簽約前決策」。",
+    en: "This page estimates how much labour this system saves, for internal project approval. It is not store operating analysis. For store-level ROI go to Store 360 or the Pre-deal decision page.",
   },
   "perf.title": { "zh-CN": "经营驾驶舱", "zh-HK": "經營駕駛艙", en: "Operating cockpit" },
   "perf.meta": { "zh-CN": "{period} · 工作底稿口径 · 数据截至 {stamp} · 独立沙盘，不直接覆盖正式台账。", "zh-HK": "{period} · 工作底稿口徑 · 數據截至 {stamp} · 獨立沙盤，不直接覆蓋正式台賬。", en: "{period} · Working basis · as of {stamp} · does not replace Official close." },

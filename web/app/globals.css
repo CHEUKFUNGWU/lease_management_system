@@ -5277,3 +5277,23 @@ body .app-content.app-content-full-bleed .app-content-inner {
   font-size: 12px;
   color: var(--fg-secondary);
 }
+
+/* R2-4: formula editor */
+.formula-editor-body {
+  width: 100%;
+}
+.formula-editor-label {
+  font-size: 12px;
+  color: var(--fg-secondary);
+  margin-bottom: 4px;
+}
+.formula-editor-keys-input {
+  max-width: 320px;
+}
+.formula-editor-textarea {
+  font-family: var(--font-mono, monospace);
+}
+.formula-validating {
+  font-size: 12px;
+  color: var(--fg-muted);
+}

@@ -5251,3 +5251,29 @@ body .app-content.app-content-full-bleed .app-content-inner {
 .breakeven-unachievable-alert {
   margin: 0;
 }
+
+/* R2-3: profit variance attribution panel */
+.variance-order-note {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+}
+.variance-total-text {
+  font-size: 11px;
+}
+.variance-chart-frame {
+  width: 100%;
+  height: 260px;
+}
+.variance-loading {
+  background: var(--bg-inset);
+  border-radius: 8px;
+}
+.variance-material-warning {
+  margin-bottom: 12px;
+}
+.variance-residual-block {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+}

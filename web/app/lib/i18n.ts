@@ -2881,6 +2881,22 @@ export const dict: TranslationDict = {
     "zh-HK": "期末在崗人數，含兼職按人頭計，不折算全職當量。",
     en: "On-duty headcount; part-timers counted per head, never converted to FTE.",
   },
+  // R1-3：既有三面板的口径说明。定稿文案，不改写。
+  "store360.category.basis": {
+    "zh-CN": "按商品大类拆解毛利变化。「卖得多了」是销量变化带来的，「结构变了」是各品类占比变化带来的，「毛利率变了」是同一品类自己的毛利率变化带来的。三项加起来等于总变化，对不上的部分单列为残差。",
+    "zh-HK": "按商品大類拆解毛利變化。「賣得多了」是銷量變化帶來的，「結構變了」是各品類佔比變化帶來的，「毛利率變了」是同一品類自己的毛利率變化帶來的。三項加起來等於總變化，對不上的部分單列為殘差。",
+    en: "Breaks gross profit change down by category. \u301cSold more\u301d comes from volume, \u301cmix shifted\u301d from category shares, \u301cmargin moved\u301d from within-category margin. The three parts sum to the total change; whatever does not reconcile is listed separately as residual.",
+  },
+  "store360.inventory.basis": {
+    "zh-CN": "库存周转天数 = 期末库存成本 ÷ 销货成本 × 天数。销货成本为零时不算，显示「—」，不显示无穷大。在途库存单列，不并进期末库存。",
+    "zh-HK": "庫存周轉天數 = 期末庫存成本 ÷ 銷貨成本 × 天數。銷貨成本為零時不算，顯示「—」，不顯示無窮大。在途庫存單列，不併進期末庫存。",
+    en: "Days of inventory = ending stock cost ÷ cost of goods sold × days. Zero COGS yields \u300c—\u300d, never infinity. In-transit stock is listed separately, never merged into ending stock.",
+  },
+  "store360.competitor.basis": {
+    "zh-CN": "和同商圈可比门店对比。可比门店少于门槛数时整块降级并显示实际样本数，不用两三家店的均值冒充商圈水平。币种不同的门店不进同一组对比。",
+    "zh-HK": "和同商圈可比門店對比。可比門店少於門檻數時整塊降級並顯示實際樣本數，不用兩三家店的均值冒充商圈水平。幣種不同的門店不進同一組對比。",
+    en: "Compares against comparable stores in the same area. Below the minimum sample size the whole block degrades and shows the actual sample count; averages of two or three stores are never passed off as the area level. Stores in different currencies never enter the same comparison group.",
+  },
   "perf.title": { "zh-CN": "经营驾驶舱", "zh-HK": "經營駕駛艙", en: "Operating cockpit" },
   "perf.meta": { "zh-CN": "{period} · 工作底稿口径 · 数据截至 {stamp} · 独立沙盘，不直接覆盖正式台账。", "zh-HK": "{period} · 工作底稿口徑 · 數據截至 {stamp} · 獨立沙盤，不直接覆蓋正式台賬。", en: "{period} · Working basis · as of {stamp} · does not replace Official close." },
   "perf.analysis_period": { "zh-CN": "分析期间", "zh-HK": "分析期間", en: "Period" },

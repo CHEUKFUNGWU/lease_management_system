@@ -420,6 +420,8 @@ export function CategoryCompositionPanel({
           </div>
         )}
       </Card>
+      {/* R1-3: basis note - three effects and residual; at Space bottom, rendered in every data state */}
+      <div className="panel-basis-note">{t("store360.category.basis", language)}</div>
     </Space>
   );
 }

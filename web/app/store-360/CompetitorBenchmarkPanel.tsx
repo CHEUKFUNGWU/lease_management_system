@@ -80,6 +80,10 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
         <div style={{ textAlign: "center", padding: "20px 0" }}>
           <Spin />
         </div>
+        {/* R1-3: basis note stays visible in degraded states */}
+        <div className="panel-basis-note">
+          {t("store360.competitor.basis", language)}
+        </div>
       </Card>
     );
   }
@@ -97,6 +101,10 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
         }
       >
         <StateBlock state={{ kind: "empty", reason: t("competitor.empty_reason", language) }} language={language} />
+        {/* R1-3: basis note stays visible in degraded states */}
+        <div className="panel-basis-note">
+          {t("store360.competitor.basis", language)}
+        </div>
       </Card>
     );
   }
@@ -235,6 +243,10 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
           message={summary.benchmark_disclaimer}
           style={{ fontSize: 11 }}
         />
+        {/* R1-3: basis note - sample threshold and currency isolation */}
+        <div className="panel-basis-note">
+          {t("store360.competitor.basis", language)}
+        </div>
       </Space>
     </Card>
   );

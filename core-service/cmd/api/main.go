@@ -439,6 +439,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/retail/promotions/:id/costs", permission("operating_facts", "read"), promotionHandler.ListPromotionCosts)
 		protected.Handle(http.MethodPost, "/retail/promotions/:id/costs", permission("operating_facts", "write"), promotionHandler.AddPromotionCost)
 		protected.Handle(http.MethodGet, "/retail/promotions/:id/roi", permission("operating_facts", "read"), promotionHandler.EvaluateROI)
+		protected.Handle(http.MethodPost, "/retail/promotions/breakeven", permission("operating_facts", "read"), promotionHandler.EvaluateBreakeven)
 		protected.Handle(http.MethodGet, "/retail/inventory/summary", permission("operating_facts", "read"), inventoryMetricsHandler.GetInventorySummary)
 		protected.Handle(http.MethodPost, "/retail/inventory/facts", permission("operating_facts", "write"), inventoryMetricsHandler.UpsertInventoryFact)
 		protected.Handle(http.MethodPost, "/retail/master-data/resolve", permission("master_data", "read"), masterDataResolutionHandler.Resolve)

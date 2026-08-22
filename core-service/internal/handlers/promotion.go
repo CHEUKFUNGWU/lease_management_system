@@ -330,3 +330,106 @@ func (h *PromotionHandler) EvaluateROI(c *gin.Context) {
 
 	c.JSON(http.StatusOK, res)
 }
+
+// ─── RH3 投前保本（R2-1）─────────────────────────────────────────────
+
+type breakevenReq struct {
+	PromoID              string   `json:"promo_id"`               // 可选：给了则基线从活动前 14 天事实算（与投后复盘同一取数路径）
+	Currency             string   `json:"currency"`
+	EventDays            int      `json:"event_days"`             // 手输模式必填；promo 模式从活动日期推导
+	BaselineDailyRevenue *float64 `json:"baseline_daily_revenue"` // 手输模式必填
+	BaselineMarginRate   *float64 `json:"baseline_margin_rate"`   // 两模式都必填（0-1）
+	PromoMarginRate      *float64 `json:"promo_margin_rate"`      // 必填（≤0 合法，走 unachievable）
+	FixedMarketingCost   float64  `json:"fixed_marketing_cost"`
+}
+
+// EvaluateBreakeven POST /api/v1/retail/promotions/breakeven
+// 投前测算：这次活动至少要多卖多少才不亏。纯计算不落库；
+// promo_id 模式经租户隔离的仓库取数（跨法人 promo_id 在 GetPromotion 即 404）。
+func (h *PromotionHandler) EvaluateBreakeven(c *gin.Context) {
+	tenantID := middleware.GetTenantID(c)
+	var req breakevenReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.PromoMarginRate == nil || req.BaselineMarginRate == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "promo_margin_rate 与 baseline_margin_rate 为必填"})
+		return
+	}
+
+	currency := req.Currency
+	if currency == "" {
+		currency = "CNY"
+	}
+
+	in := promotionattribution.BreakevenInput{
+		Currency:           currency,
+		EventDays:          req.EventDays,
+		BaselineMarginRate: *req.BaselineMarginRate,
+		PromoMarginRate:    *req.PromoMarginRate,
+		FixedMarketingCost: req.FixedMarketingCost,
+	}
+
+	if req.PromoID != "" {
+		p, err := h.repo.GetPromotion(c.Request.Context(), tenantID, req.PromoID)
+		if err != nil {
+			// 跨法人或不存在：一律 not found，不区分两种情况。
+			c.JSON(http.StatusNotFound, gin.H{"error": "promotion not found"})
+			return
+		}
+		st, err1 := time.Parse("2006-01-02", p.StartDate)
+		et, err2 := time.Parse("2006-01-02", p.EndDate)
+		if err1 != nil || err2 != nil || et.Before(st) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "promotion dates invalid"})
+			return
+		}
+		in.EventDays = int(et.Sub(st).Hours()/24) + 1
+		currency = p.Currency
+
+		// 基线：与 EvaluateROI 同一窗口、同一取数、同一日均值算式。
+		baseStart := st.AddDate(0, 0, -14).Format("2006-01-02")
+		baseEnd := st.AddDate(0, 0, -1).Format("2006-01-02")
+		baseFacts, err := h.repo.GetPromotionActualFacts(c.Request.Context(), tenantID, baseStart, baseEnd, p.ScopeValues)
+		if err != nil {
+			if errors.Is(err, repository.ErrRetailKPISourceConflict) {
+				writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, err.Error(), gin.H{"reason": "source_conflict"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("query baseline facts: %v", err)})
+			return
+		}
+		if len(baseFacts) == 0 {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "活动前 14 天没有可用经营事实，无法建立基线。请改用手输模式提供基线销售额。"})
+			return
+		}
+		var bRev, bGP float64
+		bDays := make(map[string]struct{})
+		for _, bf := range baseFacts {
+			if bf.Revenue != nil {
+				bRev += *bf.Revenue
+			}
+			if bf.GrossProfit != nil {
+				bGP += *bf.GrossProfit
+			}
+			bDays[bf.BusinessDate] = struct{}{}
+		}
+		dayCount := float64(len(bDays))
+		baseline := promotionattribution.RunRate{DailyRevenue: bRev / dayCount, DailyGrossProfit: bGP / dayCount}
+		in.Baseline = baseline
+		if baseline.DailyRevenue > 0 {
+			rate := baseline.DailyGrossProfit / baseline.DailyRevenue
+			in.BaselineMarginRate = rate
+		}
+	} else {
+		if req.BaselineDailyRevenue == nil || req.EventDays <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "手输模式需要 baseline_daily_revenue 与正数 event_days；已有活动可传 promo_id 自动取基线"})
+			return
+		}
+		in.Baseline = promotionattribution.RunRate{DailyRevenue: *req.BaselineDailyRevenue}
+	}
+
+	res := promotionattribution.Breakeven(in)
+	res.Currency = currency
+	c.JSON(http.StatusOK, res)
+}

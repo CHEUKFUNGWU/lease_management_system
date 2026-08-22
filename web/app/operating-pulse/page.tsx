@@ -486,7 +486,7 @@ function OperatingPulseInner() {
               </Space>
             }
           />
-          {/* R0-3：页面定位说明——与 /performance 的分工与数据源差异 */}
+          {/* R0-3: scope note — how this page differs from /performance */}
           <ScopeNote noteKey="pulse.scope_note" className="pulse-scope-note" language={language} />
           {/* ─── Precision Engineering Filter Bar (Linear/Attio style) ─── */}
           <div className="precision-filter-bar pulse-block-margin">

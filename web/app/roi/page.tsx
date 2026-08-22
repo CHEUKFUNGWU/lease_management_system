@@ -86,7 +86,8 @@ export default function RoiPage() {
           title={<>{t("roi.title", language)}<span className="page-header-count">{t("roi.header_count", language, { count: contracts == null ? "—" : contracts.toLocaleString() })}</span></>}
           meta={t("roi.meta_desc", language)}
         />
-        {/* R0-3：页面定位说明——这是内部立项工具，不是门店经营分析；且本页不在导航里 */}
+        {/* R0-3: scope note — internal project-approval tool, not store
+             operating analysis; this page is intentionally not in the nav. */}
         <ScopeNote noteKey="roi.scope_note" className="roi-scope-note" language={language} />
 
         <Row gutter={[16, 16]}>

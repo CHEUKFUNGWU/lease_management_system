@@ -4986,6 +4986,19 @@ body .app-content.app-content-full-bleed .app-content-inner {
   cursor: help;
 }
 
+/* R0-3: page scope notes (info Alerts under PageHeader) */
+.perf-scope-note,
+.pulse-scope-note,
+.roi-scope-note {
+  margin-bottom: 16px;
+}
+
+/* R0-2: marker shown next to an unrecognized open-set enum value */
+.perf-enum-unrecognized {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
 /* Assistant markdown — see app/ai-chat/MarkdownText.tsx for why this is a
    hand-rolled subset rather than a markdown-to-HTML pipeline. */
 .ai-md-paragraph {

@@ -162,8 +162,8 @@ export default function PerformancePage() {
     { title: t("perf.col.data_status", language), key: "status", render: (_: unknown, row: FourWall) => row.data_ready ? <StatusTag kind="success">{t("perf.status.decision_ready", language)}</StatusTag> : <StatusTag kind="warning">{t("perf.status.gap", language)}：{(row.data_gaps || []).join(", ") || row.reconciliation_status}</StatusTag> },
   ], [language]);
 
-  // R0-1：设备事实块整体下沉到 PeerBenchmarkBlock，三分支（空 / 口径不可用 / 表格）
-  // 由 resolveBasis 判定。页面不再持有 peerColumns。
+          {/* R0-1: equipment block moved into PeerBenchmarkBlock; three branches
+               (empty / basis unavailable / table) decided by resolveBasis. */}
 
   const actionColumns = useMemo(() => [
     { title: t("perf.col.action", language), key: "title", render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><strong>{row.title}</strong><Typography.Text type="secondary"><ActionCategoryText value={row.category} language={language} /></Typography.Text></Space> },
@@ -184,7 +184,7 @@ export default function PerformancePage() {
             meta={t("perf.meta", language).replace("{period}", period).replace("{stamp}", dayjs().format("YYYY-MM-DD HH:mm"))}
             help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
           />
-          {/* R0-3：页面定位说明——与 /operating-pulse 的分工与数据源差异 */}
+          {/* R0-3: scope note — how this page differs from /operating-pulse */}
           <ScopeNote noteKey="perf.scope_note" className="perf-scope-note" language={language} />
           <div className="precision-filter-bar" style={{ marginBottom: 16 }}>
             <Space wrap size={12} align="center">

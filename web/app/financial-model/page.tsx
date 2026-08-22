@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useState } from "react";
-import { Alert, Button, Card, Col, Input, Row, Select, Space, Spin, Table, Typography, message } from "antd";
+import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
+import { Alert, Button, Card, Col, Collapse, Input, Row, Select, Space, Spin, Table, Tag, Tooltip, Typography, message } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -15,15 +15,17 @@ import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { FIN_MODEL_RUN_STATUSES, FIN_MODEL_RUN_TIE_OUT_STATUSES, type FinModelRunStatus, type FinModelRunTieOutStatus } from "./enums";
+import { EXAMPLE_ASSUMPTIONS, EXAMPLE_OPENING_FORM, assumptionHint } from "./hints";
 import {
+  addPeriod,
   buildOpeningPayload,
   emptyOpeningForm,
   initialWorkbenchState,
   isScopeDenied,
   parseAssumptions,
   reduceWorkbench,
+  removePeriod,
   type ModelRun,
-  type OpeningContractRow,
 } from "./workbench";
 
 type RunResultState = DataState<{ run: ModelRun; persisted?: boolean }>;
@@ -43,16 +45,31 @@ const TIE_OUT_TAG: Record<string, "success" | "error" | "warning" | "neutral"> =
   pending: "neutral",
 };
 
+/** buildOpeningPayload 的错误码 → 人话文案。键集由 workbench 的错误联合锁定。 */
+const OPENING_ERROR_KEY: Record<string, string> = {
+  missing_entity: "finmodel.opening_invalid",
+  missing_currency: "finmodel.opening_invalid",
+  row_incomplete: "finmodel.opening_invalid",
+  no_periods: "finmodel.opening_no_periods",
+  bad_balances: "finmodel.opening_bad_balances",
+  missing_balance_for_period: "finmodel.opening_missing_balance",
+};
+
+// 引擎侧自动取数与导入侧上传的后端端点属 B 阶段（spec ③ 地基层）：
+// 页面渲染诚实的不可用态，不造假按钮；手动路径是唯一能真正走到校验的入口。
+
 export default function FinancialModelPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
   const [wb, dispatch] = useReducer(reduceWorkbench, initialWorkbenchState);
-  const [assumptionsText, setAssumptionsText] = useState('{\n  "sssg": 0.02,\n  "gross_margin_rate": 0.4\n}');
+  // 示例即初始值：打开页面就看见「合法输入长什么样」（spec 追加决策①）。
+  const [assumptionsText, setAssumptionsText] = useState(EXAMPLE_ASSUMPTIONS);
   const [classification, setClassification] = useState<RetailDataClassification>("production");
   const [definitionOptions, setDefinitionOptions] = useState<{ id: string; title?: string }[]>([]);
   const [published, setPublished] = useState(false);
   const [fold, setFold] = useState<"month" | "quarter" | "year">("quarter");
   const [openingForm, setOpeningForm] = useState(emptyOpeningForm);
+  const [periodInput, setPeriodInput] = useState("");
   const [openingResult, setOpeningResult] = useState<{ passed: boolean; failures?: unknown } | null>(null);
   const [openingBusy, setOpeningBusy] = useState(false);
 
@@ -172,11 +189,28 @@ export default function FinancialModelPage() {
     }
   };
 
+  const fillAssumptionExample = () => {
+    setAssumptionsText(EXAMPLE_ASSUMPTIONS);
+    dispatch({ t: "edit_assumptions", text: EXAMPLE_ASSUMPTIONS });
+    message.success(t("finmodel.example_filled", language));
+  };
+
+  const fillOpeningExample = () => {
+    setOpeningForm(JSON.parse(JSON.stringify(EXAMPLE_OPENING_FORM)) as typeof emptyOpeningForm);
+    setOpeningResult(null);
+    message.success(t("finmodel.example_filled", language));
+  };
+
+  const submitPeriod = () => {
+    setOpeningForm((f) => ({ ...f, periods: addPeriod(f.periods, periodInput) }));
+    setPeriodInput("");
+  };
+
   const validateOpening = async () => {
     if (!token) return;
     const payload = buildOpeningPayload(openingForm);
     if (!payload.ok) {
-      message.error(t(payload.error === "bad_periods" ? "finmodel.opening_bad_periods" : "finmodel.opening_invalid", language));
+      message.error(t(OPENING_ERROR_KEY[payload.error] ?? "finmodel.opening_invalid", language));
       return;
     }
     setOpeningBusy(true);
@@ -190,7 +224,7 @@ export default function FinancialModelPage() {
     }
   };
 
-  const updateRows = (key: "leaseRef" | "engine", index: number, field: keyof OpeningContractRow, value: string) =>
+  const updateRows = (key: "leaseRef" | "engine", index: number, field: keyof (typeof emptyOpeningForm)["leaseRef"][number], value: string) =>
     setOpeningForm((f) => ({ ...f, [key]: f[key].map((row, i) => (i === index ? { ...row, [field]: value } : row)) }));
   const addRow = (key: "leaseRef" | "engine") =>
     setOpeningForm((f) => ({ ...f, [key]: [...f[key], { contract_id: "", lease_liability: "", rou_asset: "" }] }));
@@ -211,11 +245,11 @@ export default function FinancialModelPage() {
     },
   ];
 
-  const contractTable = (key: "leaseRef" | "engine", labelKey: string) => (
+  const contractTable = (key: "leaseRef" | "engine", title: ReactNode) => (
     <Card
       size="small"
       type="inner"
-      title={t(labelKey, language)}
+      title={title}
       extra={
         <Button size="small" icon={<PlusOutlined />} onClick={() => addRow(key)}>
           {t("finmodel.add_row", language)}
@@ -254,6 +288,13 @@ export default function FinancialModelPage() {
     </Card>
   );
 
+  /** 三道闸图例 chip：hover 出人话解释（spec 追加决策①）。 */
+  const gateChip = (labelKey: string, tooltipKey: string) => (
+    <Tooltip title={t(tooltipKey, language)}>
+      <span className="fm-gate-chip">{t(labelKey, language)}</span>
+    </Tooltip>
+  );
+
   const run = wb.phase === "completed" ? wb.run : null;
   const tieOutStatus: FinModelRunTieOutStatus =
     run && (FIN_MODEL_RUN_TIE_OUT_STATUSES as readonly string[]).includes(run.tie_out_status)
@@ -263,7 +304,7 @@ export default function FinancialModelPage() {
   const rightPanel = (() => {
     if (wb.phase === "polling") {
       return (
-        <Card size="small" title={t("finmodel.result_title", language)}>
+        <Card size="small" title={t("finmodel.step_run", language)}>
           <Space direction="vertical">
             <Space>
               <Spin size="small" />
@@ -277,7 +318,7 @@ export default function FinancialModelPage() {
     }
     if (wb.phase === "dispatching") {
       return (
-        <Card size="small" title={t("finmodel.result_title", language)}>
+        <Card size="small" title={t("finmodel.step_run", language)}>
           <Spin tip={t("finmodel.run_async_hint", language)}>
             <div className="fm-dispatch-placeholder" />
           </Spin>
@@ -286,7 +327,7 @@ export default function FinancialModelPage() {
     }
     if (wb.phase === "cancelled") {
       return (
-        <Card size="small" title={t("finmodel.result_title", language)}>
+        <Card size="small" title={t("finmodel.step_run", language)}>
           <Alert type="info" showIcon message={t("finmodel.cancelled", language)} />
         </Card>
       );
@@ -297,57 +338,63 @@ export default function FinancialModelPage() {
           ? ({ kind: "scope_denied", reason: wb.reason } as RunResultState)
           : ({ kind: "failed", message: wb.message } as RunResultState);
       return (
-        <Card size="small" title={t("finmodel.result_title", language)}>
+        <Card size="small" title={t("finmodel.step_run", language)}>
           <StateBlock state={state} language={language} onRetry={startRun} />
         </Card>
       );
     }
     if (!run) {
       return (
-        <Card size="small" title={t("finmodel.result_title", language)}>
+        <Card size="small" title={t("finmodel.step_run", language)}>
           <StateBlock state={classifyDataState({ error: null, data: null })} language={language} />
         </Card>
       );
     }
     return (
       <Space direction="vertical" size="middle" className="fm-result-stack">
-        <Alert
-          type={tieOutStatus === "passed" ? "success" : tieOutStatus === "failed" ? "error" : "warning"}
-          showIcon
-          message={`${t("finmodel.tie_out_status", language)}: ${run.tie_out_status}`}
-          description={
-            tieOutStatus === "passed"
-              ? undefined
-              : t("finmodel.tie_out_gate_note", language)
-          }
-        />
-        {(run.gaps || []).length > 0 && (
-          <Card size="small" title={t("finmodel.gaps", language)}>
-            <Space direction="vertical" size="small">
-              {(run.gaps || []).map((gap, i) => (
-                <Space key={i} wrap>
-                  <StatusTag kind="neutral">{gap.kind}</StatusTag>
-                  {gap.period && <Typography.Text type="secondary">{gap.period}</Typography.Text>}
-                  <span>{gap.detail}</span>
+        <Card size="small" title={`${t("finmodel.step_run", language)} · ${t("finmodel.result_title", language)}`}>
+          <Space direction="vertical" size="middle" className="fm-full">
+            <Alert
+              type={tieOutStatus === "passed" ? "success" : tieOutStatus === "failed" ? "error" : "warning"}
+              showIcon
+              message={`${t("finmodel.tie_out_status", language)}: ${run.tie_out_status}`}
+              description={
+                tieOutStatus === "passed"
+                  ? undefined
+                  : t("finmodel.tie_out_gate_note", language)
+              }
+            />
+            {(run.gaps || []).length > 0 && (
+              <Card size="small" type="inner" title={t("finmodel.gaps", language)}>
+                <Space direction="vertical" size="small">
+                  {(run.gaps || []).map((gap, i) => (
+                    <Space key={i} wrap>
+                      <StatusTag kind="neutral">{gap.kind}</StatusTag>
+                      {gap.period && <Typography.Text type="secondary">{gap.period}</Typography.Text>}
+                      <span>{gap.detail}</span>
+                    </Space>
+                  ))}
                 </Space>
-              ))}
-            </Space>
-          </Card>
-        )}
-        <Card size="small" title={t("finmodel.tie_outs", language)}>
-          <Table size="small" bordered pagination={false} dataSource={run.tie_outs || []} columns={tieOutColumns} rowKey={(r) => `${r.check_code}-${r.period}`} />
+              </Card>
+            )}
+            <Card size="small" type="inner" title={t("finmodel.tie_outs", language)}>
+              <Table size="small" bordered pagination={false} dataSource={run.tie_outs || []} columns={tieOutColumns} rowKey={(r) => `${r.check_code}-${r.period}`} />
+            </Card>
+          </Space>
         </Card>
-        <Space wrap>
-          <Button type="primary" disabled={tieOutStatus !== "passed" || published || !run.id} onClick={() => doPublish(run.id || "")}>
-            {published ? t("finmodel.published", language) : t("finmodel.publish", language)}
-          </Button>
-          <Select value={fold} onChange={setFold} options={[
-            { value: "month", label: "month" },
-            { value: "quarter", label: "quarter" },
-            { value: "year", label: "year" },
-          ]} />
-          <Button disabled={!run.id} onClick={() => doExport(run.id || "")}>{t("finmodel.export", language)}</Button>
-        </Space>
+        <Card size="small" title={t("finmodel.step_publish_export", language)}>
+          <Space wrap>
+            <Button type="primary" disabled={tieOutStatus !== "passed" || published || !run.id} onClick={() => doPublish(run.id || "")}>
+              {published ? t("finmodel.published", language) : t("finmodel.publish", language)}
+            </Button>
+            <Select value={fold} onChange={setFold} options={[
+              { value: "month", label: "month" },
+              { value: "quarter", label: "quarter" },
+              { value: "year", label: "year" },
+            ]} />
+            <Button disabled={!run.id} onClick={() => doExport(run.id || "")}>{t("finmodel.export", language)}</Button>
+          </Space>
+        </Card>
       </Space>
     );
   })();
@@ -357,7 +404,13 @@ export default function FinancialModelPage() {
       <AppLayout>
         <PageHeader
           title={t("nav.financial_model", language)}
-          meta={t("finmodel.basis_note", language)}
+          meta={
+            <>
+              {t("finmodel.page_intro", language)}
+              {" · "}
+              {t("finmodel.basis_note", language)}
+            </>
+          }
           primaryAction={
             <Button type="primary" loading={wb.phase === "dispatching" || wb.phase === "polling"} disabled={!canRun} onClick={startRun}>
               {t("finmodel.run", language)}
@@ -367,8 +420,9 @@ export default function FinancialModelPage() {
         <Row gutter={[24, 24]}>
           <Col xs={24} lg={10}>
             <Space direction="vertical" size="middle" className="fm-input-stack">
-              <Card size="small" title={t("finmodel.assumptions_title", language)}>
-                <Space direction="vertical" className="fm-full">
+              <Card size="small" title={t("finmodel.step_select_def", language)}>
+                <Space direction="vertical" size="small" className="fm-full">
+                  <Typography.Text type="secondary">{t("finmodel.card_hint_select_def", language)}</Typography.Text>
                   {definitionOptions.length > 0 ? (
                     <Select
                       className="fm-full"
@@ -385,7 +439,22 @@ export default function FinancialModelPage() {
                     value={wb.definitionId}
                     onChange={(e) => dispatch({ t: "select_definition", id: e.target.value })}
                   />
+                </Space>
+              </Card>
+
+              <Card
+                size="small"
+                title={t("finmodel.step_assumptions", language)}
+                extra={
+                  <Button size="small" onClick={fillAssumptionExample}>
+                    {t("finmodel.fill_example", language)}
+                  </Button>
+                }
+              >
+                <Space direction="vertical" size="small" className="fm-full">
+                  <Typography.Text type="secondary">{t("finmodel.classification_label", language)}</Typography.Text>
                   <Select
+                    className="fm-full"
                     value={classification}
                     onChange={(v: RetailDataClassification) => setClassification(v)}
                     options={[
@@ -394,55 +463,150 @@ export default function FinancialModelPage() {
                     ]}
                   />
                   <Input.TextArea rows={6} value={assumptionsText} onChange={(e) => dispatch({ t: "edit_assumptions", text: e.target.value })} />
-                  {!assumptionsParse.ok && (
+                  {!assumptionsParse.ok ? (
                     <Alert type="error" showIcon message={`${t("finmodel.bad_assumptions", language)} (${assumptionsParse.error})`} />
+                  ) : (
+                    Object.keys(assumptionsParse.value).length > 0 && (
+                      <div className="fm-hint-list">
+                        {Object.keys(assumptionsParse.value).map((key) => {
+                          const hint = assumptionHint(key, language);
+                          return (
+                            <div key={key} className="fm-hint-row">
+                              <Typography.Text code className="fm-hint-key">{key}</Typography.Text>
+                              {hint.known ? (
+                                <Typography.Text type="secondary">{hint.label}</Typography.Text>
+                              ) : (
+                                <StatusTag kind="neutral">{t("finmodel.hint_unknown", language)}</StatusTag>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
                   )}
                   <Typography.Text type="secondary">{t("finmodel.assumptions_hint", language)}</Typography.Text>
                   <Typography.Text type="secondary">{t("finmodel.run_async_hint", language)}</Typography.Text>
                 </Space>
               </Card>
 
-              <Card size="small" title={t("finmodel.opening_gate", language)}>
+              <Card
+                size="small"
+                title={t("finmodel.step_opening", language)}
+                extra={
+                  <Button size="small" onClick={fillOpeningExample}>
+                    {t("finmodel.fill_example", language)}
+                  </Button>
+                }
+              >
                 <Space direction="vertical" size="small" className="fm-full">
-                  <Space wrap>
-                    <Input
-                      className="fm-opening-entity"
-                      placeholder={t("finmodel.opening_entity", language)}
-                      value={openingForm.legalEntityId}
-                      onChange={(e) => setOpeningForm((f) => ({ ...f, legalEntityId: e.target.value }))}
-                    />
-                    <Input
-                      className="fm-opening-currency"
-                      placeholder={t("finmodel.opening_currency", language)}
-                      value={openingForm.currency}
-                      onChange={(e) => setOpeningForm((f) => ({ ...f, currency: e.target.value }))}
-                    />
-                    <Input
-                      className="fm-opening-policy"
-                      placeholder={t("finmodel.opening_policy", language)}
-                      value={openingForm.policyVersion}
-                      onChange={(e) => setOpeningForm((f) => ({ ...f, policyVersion: e.target.value }))}
-                    />
+                  <Typography.Text type="secondary">{t("finmodel.card_hint_opening", language)}</Typography.Text>
+                  <Space wrap size={8} className="fm-gate-legend">
+                    {gateChip("finmodel.gate1_label", "finmodel.gate1_tooltip")}
+                    {gateChip("finmodel.gate2_label", "finmodel.gate2_tooltip")}
+                    {gateChip("finmodel.gate3_label", "finmodel.gate3_tooltip")}
                   </Space>
-                  <Input.TextArea
-                    rows={3}
-                    placeholder={t("finmodel.opening_periods", language)}
-                    value={openingForm.periodsJson}
-                    onChange={(e) => setOpeningForm((f) => ({ ...f, periodsJson: e.target.value }))}
+                  <div className="fm-full">
+                    <Typography.Text type="secondary" className="fm-step-label">{t("finmodel.opening_step1", language)}</Typography.Text>
+                    <Space wrap>
+                      <Input
+                        className="fm-opening-period"
+                        placeholder={t("finmodel.opening_period_placeholder", language)}
+                        value={periodInput}
+                        onChange={(e) => setPeriodInput(e.target.value)}
+                        onPressEnter={submitPeriod}
+                      />
+                      <Button onClick={submitPeriod}>{t("finmodel.opening_add_period", language)}</Button>
+                    </Space>
+                    {openingForm.periods.length > 0 && (
+                      <div className="fm-period-tags">
+                        {openingForm.periods.map((p) => (
+                          <Tag
+                            key={p}
+                            closable
+                            onClose={() => setOpeningForm((f) => ({ ...f, periods: removePeriod(f.periods, p) }))}
+                          >
+                            {p}
+                          </Tag>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="fm-full">
+                    <Typography.Text type="secondary" className="fm-step-label">{t("finmodel.opening_step2", language)}</Typography.Text>
+                    <Alert type="info" showIcon message={t("finmodel.opening_auto_unavailable", language)} />
+                  </div>
+                  <div className="fm-full">
+                    <Typography.Text type="secondary" className="fm-step-label">{t("finmodel.opening_step3", language)}</Typography.Text>
+                    <Alert type="info" showIcon message={t("finmodel.opening_import_unavailable", language)} />
+                  </div>
+                  <div className="fm-full">
+                    <Typography.Text type="secondary" className="fm-step-label">{t("finmodel.opening_step4", language)}</Typography.Text>
+                    <Space wrap>
+                      <Button loading={openingBusy} onClick={validateOpening}>
+                        {t("finmodel.validate_opening", language)}
+                      </Button>
+                      {openingResult &&
+                        (openingResult.passed ? (
+                          <Alert type="success" showIcon message={t("finmodel.opening_passed", language)} />
+                        ) : (
+                          <Alert type="warning" showIcon message={JSON.stringify(openingResult.failures ?? {})} />
+                        ))}
+                    </Space>
+                  </div>
+                  <Collapse
+                    items={[
+                      {
+                        key: "advanced",
+                        label: t("finmodel.opening_advanced", language),
+                        children: (
+                          <Space direction="vertical" size="small" className="fm-full">
+                            <Space wrap>
+                              <Input
+                                className="fm-opening-entity"
+                                placeholder={t("finmodel.opening_entity", language)}
+                                value={openingForm.legalEntityId}
+                                onChange={(e) => setOpeningForm((f) => ({ ...f, legalEntityId: e.target.value }))}
+                              />
+                              <Input
+                                className="fm-opening-currency"
+                                placeholder={t("finmodel.opening_currency", language)}
+                                value={openingForm.currency}
+                                onChange={(e) => setOpeningForm((f) => ({ ...f, currency: e.target.value }))}
+                              />
+                              <Input
+                                className="fm-opening-policy"
+                                placeholder={t("finmodel.opening_policy", language)}
+                                value={openingForm.policyVersion}
+                                onChange={(e) => setOpeningForm((f) => ({ ...f, policyVersion: e.target.value }))}
+                              />
+                            </Space>
+                            <Space wrap size={8}>
+                              {gateChip("finmodel.gate1_label", "finmodel.gate1_tooltip")}
+                              {gateChip("finmodel.gate2_label", "finmodel.gate2_tooltip")}
+                            </Space>
+                            <Input.TextArea
+                              rows={6}
+                              placeholder={t("finmodel.balances_json_placeholder", language)}
+                              value={openingForm.balancesJson}
+                              onChange={(e) => setOpeningForm((f) => ({ ...f, balancesJson: e.target.value }))}
+                            />
+                            {contractTable(
+                              "leaseRef",
+                              <Tooltip title={t("finmodel.gate3_tooltip", language)}>
+                                <span>{t("finmodel.opening_lease_ref", language)} · {t("finmodel.gate3_label", language)}</span>
+                              </Tooltip>,
+                            )}
+                            {contractTable(
+                              "engine",
+                              <Tooltip title={t("finmodel.gate3_tooltip", language)}>
+                                <span>{t("finmodel.opening_engine", language)} · {t("finmodel.gate3_label", language)}</span>
+                              </Tooltip>,
+                            )}
+                          </Space>
+                        ),
+                      },
+                    ]}
                   />
-                  {contractTable("leaseRef", "finmodel.opening_lease_ref")}
-                  {contractTable("engine", "finmodel.opening_engine")}
-                  <Space>
-                    <Button loading={openingBusy} onClick={validateOpening}>
-                      {t("finmodel.validate_opening", language)}
-                    </Button>
-                  </Space>
-                  {openingResult &&
-                    (openingResult.passed ? (
-                      <Alert type="success" showIcon message={t("finmodel.opening_passed", language)} />
-                    ) : (
-                      <Alert type="warning" showIcon message={JSON.stringify(openingResult.failures ?? {})} />
-                    ))}
                 </Space>
               </Card>
             </Space>

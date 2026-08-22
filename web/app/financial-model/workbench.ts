@@ -143,6 +143,11 @@ export function reduceWorkbench(state: WbState, event: WbEvent): WbState {
 }
 
 // ─── 期初三道闸：结构化表单 → 后端契约 ──────────────────────────
+//
+// 交互层目标流程（spec 追加决策 ②）：选期间 → 引擎侧自动取数 →
+// 导入侧上传 → 校验；手打合约行降级为高级模式。引擎取数与文件上传
+// 的后端端点属 B 阶段（③ 地基层），未上线前页面渲染诚实的不可用态，
+// 手动路径是唯一能真正走到校验的入口——不造假按钮。
 
 export type OpeningContractRow = { contract_id: string; lease_liability: string; rou_asset: string };
 
@@ -150,8 +155,11 @@ export type OpeningFormState = {
   legalEntityId: string;
   currency: string;
   policyVersion: string;
-  /** 期间余额走紧凑 JSON（Lines 是自由 map，表格化收益低），带解析校验。 */
-  periodsJson: string;
+  /** 第 1 步·选期间：结构化选择，去重、保序。 */
+  periods: string[];
+  /** 高级模式：period → {lines, mapping}。每个已选期间都必须有余额，
+   *  否则三道闸会对缺数期间「空转通过」——恒真勾稽，payload 组装拒绝。 */
+  balancesJson: string;
   leaseRef: OpeningContractRow[];
   engine: OpeningContractRow[];
 };
@@ -160,10 +168,22 @@ export const emptyOpeningForm: OpeningFormState = {
   legalEntityId: "",
   currency: "",
   policyVersion: "v1",
-  periodsJson: "",
+  periods: [],
+  balancesJson: "",
   leaseRef: [],
   engine: [],
 };
+
+/** 添加期间：trim、拒绝空串与重复。返回原数组表示没有变化。 */
+export function addPeriod(periods: string[], raw: string): string[] {
+  const period = raw.trim();
+  if (!period || periods.includes(period)) return periods;
+  return [...periods, period];
+}
+
+export function removePeriod(periods: string[], raw: string): string[] {
+  return periods.filter((p) => p !== raw);
+}
 
 export type OpeningPayload = {
   balance: { legal_entity_id: string; currency: string; periods: unknown[] };
@@ -171,6 +191,50 @@ export type OpeningPayload = {
   engine: { contract_id: string; lease_liability: number; rou_asset: number }[];
   policy: { version: string };
 };
+
+export type RawBalanceEntry = { lines?: Record<string, number>; mapping?: Record<string, string> };
+
+/**
+ * balancesJson 解析：{期间: {lines: 数值map, mapping: 字符串map}}。
+ * lines/mapping 的值类型在这里锁死——放行字符串数值会让后端
+ * ShouldBindJSON 直接 400，前端先诚实报错。
+ */
+export function parseBalances(text: string): { ok: true; value: Record<string, RawBalanceEntry> } | { ok: false; error: "bad_balances" } {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: true, value: {} };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return { ok: false, error: "bad_balances" };
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { ok: false, error: "bad_balances" };
+  const value: Record<string, RawBalanceEntry> = {};
+  for (const [period, rawEntry] of Object.entries(parsed as Record<string, unknown>)) {
+    if (typeof rawEntry !== "object" || rawEntry === null || Array.isArray(rawEntry)) return { ok: false, error: "bad_balances" };
+    const entry = rawEntry as Record<string, unknown>;
+    let lines: Record<string, number> | undefined;
+    if (entry.lines !== undefined) {
+      if (typeof entry.lines !== "object" || entry.lines === null || Array.isArray(entry.lines)) return { ok: false, error: "bad_balances" };
+      lines = {};
+      for (const [line, v] of Object.entries(entry.lines as Record<string, unknown>)) {
+        if (typeof v !== "number" || !Number.isFinite(v)) return { ok: false, error: "bad_balances" };
+        lines[line] = v;
+      }
+    }
+    let mapping: Record<string, string> | undefined;
+    if (entry.mapping !== undefined) {
+      if (typeof entry.mapping !== "object" || entry.mapping === null || Array.isArray(entry.mapping)) return { ok: false, error: "bad_balances" };
+      mapping = {};
+      for (const [account, v] of Object.entries(entry.mapping as Record<string, unknown>)) {
+        if (typeof v !== "string") return { ok: false, error: "bad_balances" };
+        mapping[account] = v;
+      }
+    }
+    value[period] = { lines, mapping };
+  }
+  return { ok: true, value };
+}
 
 function coerceRows(rows: OpeningContractRow[]): { ok: true; value: OpeningPayload["lease_ref"] } | { ok: false; error: "row_incomplete" } {
   const value: OpeningPayload["lease_ref"] = [];
@@ -185,20 +249,30 @@ function coerceRows(rows: OpeningContractRow[]): { ok: true; value: OpeningPaylo
   return { ok: true, value };
 }
 
-export function buildOpeningPayload(
-  form: OpeningFormState,
-): { ok: true; payload: OpeningPayload } | { ok: false; error: "missing_entity" | "missing_currency" | "bad_periods" | "row_incomplete" } {
+export type OpeningPayloadResult =
+  | { ok: true; payload: OpeningPayload }
+  | {
+      ok: false;
+      error:
+        | "missing_entity"
+        | "missing_currency"
+        | "no_periods"
+        | "bad_balances"
+        | "missing_balance_for_period"
+        | "row_incomplete";
+    };
+
+export function buildOpeningPayload(form: OpeningFormState): OpeningPayloadResult {
   if (!form.legalEntityId.trim()) return { ok: false, error: "missing_entity" };
   if (!form.currency.trim()) return { ok: false, error: "missing_currency" };
-  let periods: unknown[] = [];
-  if (form.periodsJson.trim()) {
-    try {
-      const parsed = JSON.parse(form.periodsJson) as unknown;
-      if (!Array.isArray(parsed)) return { ok: false, error: "bad_periods" };
-      periods = parsed;
-    } catch {
-      return { ok: false, error: "bad_periods" };
-    }
+  // 空期间集会让三道闸对零条记录「全部通过」——恒真勾稽，直接拒绝。
+  // 去重 + 保序：UI 层 addPeriod 已拦重复，这里防御性再兜一次。
+  const periods = Array.from(new Set(form.periods.map((p) => p.trim()).filter(Boolean)));
+  if (periods.length === 0) return { ok: false, error: "no_periods" };
+  const balances = parseBalances(form.balancesJson);
+  if (!balances.ok) return balances;
+  for (const period of periods) {
+    if (!(period in balances.value)) return { ok: false, error: "missing_balance_for_period" };
   }
   const leaseRef = coerceRows(form.leaseRef);
   if (!leaseRef.ok) return leaseRef;
@@ -207,7 +281,15 @@ export function buildOpeningPayload(
   return {
     ok: true,
     payload: {
-      balance: { legal_entity_id: form.legalEntityId.trim(), currency: form.currency.trim().toUpperCase(), periods },
+      balance: {
+        legal_entity_id: form.legalEntityId.trim(),
+        currency: form.currency.trim().toUpperCase(),
+        periods: periods.map((period) => ({
+          period,
+          lines: balances.value[period].lines ?? {},
+          mapping: balances.value[period].mapping ?? {},
+        })),
+      },
       lease_ref: leaseRef.value,
       engine: engine.value,
       policy: { version: form.policyVersion.trim() || "v1" },

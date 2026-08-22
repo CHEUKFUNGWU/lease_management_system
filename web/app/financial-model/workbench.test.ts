@@ -4,14 +4,17 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  addPeriod,
   buildOpeningPayload,
   emptyOpeningForm,
   initialWorkbenchState,
   isScopeDenied,
   parseAssumptions,
   reduceWorkbench,
+  removePeriod,
   type WbState,
 } from "./workbench";
+import { EXAMPLE_ASSUMPTIONS, EXAMPLE_OPENING_FORM } from "./hints";
 
 const RUN = { periods: ["2026-01"], tie_out_status: "passed", tie_outs: [] };
 
@@ -105,35 +108,72 @@ describe("假设与期初 payload 组装（锁 handler 契约）", () => {
     expect(parseAssumptions('{"sssg":0.02}')).toEqual({ ok: true, value: { sssg: 0.02 } });
   });
 
+  it("示例假设与示例期初表单都是合法输入（填充示例按钮的契约）", () => {
+    const parsed = parseAssumptions(EXAMPLE_ASSUMPTIONS);
+    expect(parsed.ok).toBe(true);
+    const opening = buildOpeningPayload(EXAMPLE_OPENING_FORM);
+    expect(opening.ok).toBe(true);
+  });
+
+  it("addPeriod 去重保序、拒绝空串；removePeriod 精确移除", () => {
+    expect(addPeriod([], " 2026-01 ")).toEqual(["2026-01"]);
+    expect(addPeriod(["2026-01"], "2026-01")).toEqual(["2026-01"]);
+    expect(addPeriod([], "   ")).toEqual([]);
+    expect(addPeriod(["2025-12", "2026-01"], "2026-02")).toEqual(["2025-12", "2026-01", "2026-02"]);
+    expect(removePeriod(["2026-01", "2026-02"], "2026-01")).toEqual(["2026-02"]);
+  });
+
   it("buildOpeningPayload 组出与 ValidateOpening struct 对齐的形状", () => {
     const form = {
       ...emptyOpeningForm,
       legalEntityId: " le-1 ",
       currency: "cny",
       policyVersion: "",
-      periodsJson: '[{"period":"2026-01","lines":{"cash":100}}]',
+      periods: ["2026-01"],
+      balancesJson: '{"2026-01": {"lines": {"cash": 100}, "mapping": {"1001": "cash"}}}',
       leaseRef: [{ contract_id: "CT-1", lease_liability: "100.5", rou_asset: "90" }],
       engine: [],
     };
     const result = buildOpeningPayload(form);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.payload.balance).toEqual({ legal_entity_id: "le-1", currency: "CNY", periods: [{ period: "2026-01", lines: { cash: 100 } }] });
+      expect(result.payload.balance).toEqual({
+        legal_entity_id: "le-1",
+        currency: "CNY",
+        periods: [{ period: "2026-01", lines: { cash: 100 }, mapping: { "1001": "cash" } }],
+      });
       expect(result.payload.lease_ref).toEqual([{ contract_id: "CT-1", lease_liability: 100.5, rou_asset: 90 }]);
       expect(result.payload.engine).toEqual([]);
       expect(result.payload.policy).toEqual({ version: "v1" }); // 空 → 默认 v1
     }
   });
 
-  it("buildOpeningPayload 拒绝缺主体/缺币种/坏期间/不完整行", () => {
+  it("buildOpeningPayload 拒绝缺主体/缺币种/无期间/坏余额/缺期间余额/不完整行", () => {
     expect(buildOpeningPayload(emptyOpeningForm)).toEqual({ ok: false, error: "missing_entity" });
     expect(buildOpeningPayload({ ...emptyOpeningForm, legalEntityId: "x" })).toEqual({ ok: false, error: "missing_currency" });
-    expect(buildOpeningPayload({ ...emptyOpeningForm, legalEntityId: "x", currency: "CNY", periodsJson: "{" })).toEqual({ ok: false, error: "bad_periods" });
+    // 空期间集 = 三道闸对零条记录空转通过——恒真勾稽，直接拒绝
+    expect(buildOpeningPayload({ ...emptyOpeningForm, legalEntityId: "x", currency: "CNY" })).toEqual({ ok: false, error: "no_periods" });
+    // balancesJson 不是对象 / lines 含字符串数值 / mapping 含数值 → 拒绝
+    expect(
+      buildOpeningPayload({ ...emptyOpeningForm, legalEntityId: "x", currency: "CNY", periods: ["p"], balancesJson: "[1]" }),
+    ).toEqual({ ok: false, error: "bad_balances" });
+    expect(
+      buildOpeningPayload({ ...emptyOpeningForm, legalEntityId: "x", currency: "CNY", periods: ["p"], balancesJson: '{"p":{"lines":{"cash":"100"}}}' }),
+    ).toEqual({ ok: false, error: "bad_balances" });
+    expect(
+      buildOpeningPayload({ ...emptyOpeningForm, legalEntityId: "x", currency: "CNY", periods: ["p"], balancesJson: '{"p":{"mapping":{"1001":1}}}' }),
+    ).toEqual({ ok: false, error: "bad_balances" });
+    // 选了期间但高级余额里没有该期间的记录 → 缺数期间会让闸空转，拒绝
+    expect(
+      buildOpeningPayload({ ...emptyOpeningForm, legalEntityId: "x", currency: "CNY", periods: ["p"], balancesJson: '{}' }),
+    ).toEqual({ ok: false, error: "missing_balance_for_period" });
     expect(
       buildOpeningPayload({
         ...emptyOpeningForm,
         legalEntityId: "x",
         currency: "CNY",
+        periods: ["p"],
+        balancesJson: '{"p":{"lines":{"cash":1}}}',
         leaseRef: [{ contract_id: "", lease_liability: "1", rou_asset: "1" }],
       }),
     ).toEqual({ ok: false, error: "row_incomplete" });

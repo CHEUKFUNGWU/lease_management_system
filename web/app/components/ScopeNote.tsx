@@ -10,7 +10,7 @@
 
 import React from "react";
 import { Alert } from "antd";
-import { t, type Language } from "./i18n";
+import { t, type Language } from "../lib/i18n";
 
 export default function ScopeNote({ noteKey, className, language }: { noteKey: string; className?: string; language: Language }) {
   return <Alert type="info" showIcon className={className} message={t(noteKey, language)} />;

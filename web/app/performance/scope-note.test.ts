@@ -11,7 +11,7 @@ import React from "react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import ScopeNote from "../lib/ScopeNote";
+import ScopeNote from "../components/ScopeNote";
 import { LanguageProvider } from "../context/LanguageContext";
 import { dict, t, type Language } from "../lib/i18n";
 
@@ -58,6 +58,6 @@ describe("R0-3 定位说明", () => {
     expect(page).toContain(`className="${className}"`);
     // 位置：ScopeNote 出现在 PageHeader 之后（R0-3 要求放标题区与内容之间）
     expect(page.indexOf("<ScopeNote")).toBeGreaterThan(page.indexOf("<PageHeader"));
-    expect(page).toContain("../lib/ScopeNote");
+    expect(page).toContain("../components/ScopeNote");
   });
 });

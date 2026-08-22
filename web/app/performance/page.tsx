@@ -19,7 +19,7 @@ import { apiErrorMessage, operatingFactsApi, performanceApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
-import ScopeNote from "../lib/ScopeNote";
+import ScopeNote from "../components/ScopeNote";
 import PeerBenchmarkBlock, { type PeerBenchmarkItem } from "./PeerBenchmarkBlock";
 import { ActionCategoryText, ActionStatusTag, SeverityTag } from "./ActionCells";
 

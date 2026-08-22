@@ -9,7 +9,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { useLanguage } from "../context/LanguageContext";
 import { fmtMoney } from "../lib/format";
 import { t } from "../lib/i18n";
-import ScopeNote from "../lib/ScopeNote";
+import ScopeNote from "../components/ScopeNote";
 
 const { Text } = Typography;
 

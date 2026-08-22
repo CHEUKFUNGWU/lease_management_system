@@ -20,7 +20,7 @@ import ConfidenceBandChart from "../components/charts/ConfidenceBandChart";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
-import ScopeNote from "../lib/ScopeNote";
+import ScopeNote from "../components/ScopeNote";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { pulseHelpContent } from "../components/help-content";

@@ -2398,6 +2398,27 @@ export const promotionApi = {
     }),
 };
 
+export interface VarianceAttributionFactor {
+  factor: string;
+  base: number;
+  current: number;
+  effect: number;
+  intermediate_profit: number;
+}
+
+export interface VarianceAttributionResult {
+  currency?: string;
+  base_profit: number;
+  current_profit: number;
+  total_variance: number;
+  factors: VarianceAttributionFactor[];
+  residual: number;
+  residual_material: boolean;
+  decomposition_order: string[];
+  status: "complete" | "unavailable" | string;
+  missing_facts?: string[];
+}
+
 export interface PromotionBreakevenResult {
   currency: string;
   event_days: number;
@@ -2408,6 +2429,14 @@ export interface PromotionBreakevenResult {
   status: "achievable" | "unachievable" | "invalid_input" | string;
   unachievable_reason?: string;
 }
+
+export const retailVarianceApi = {
+  attribution: (
+    params: { store_id: string; data_classification: string; dataset_version?: string; as_of: string; window_days?: number; source_system?: string },
+    token: string
+  ): Promise<VarianceAttributionResult> =>
+    apiRequest(`/api/v1/retail/store-variance-attribution?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]))}`, { token }),
+};
 
 export const cashPlanApi = {
   compose: (

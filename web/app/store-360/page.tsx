@@ -37,6 +37,7 @@ import { CategoryCompositionPanel } from "./CategoryCompositionPanel";
 import { InventoryTurnoverPanel } from "./InventoryTurnoverPanel";
 import { CompetitorBenchmarkPanel } from "./CompetitorBenchmarkPanel";
 import { LaborEfficiencyPanel } from "./LaborEfficiencyPanel";
+import VarianceAttributionPanel from "./VarianceAttributionPanel";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
 
@@ -787,6 +788,21 @@ function Store360Inner() {
                   dataClassification={query.classification || "production"}
                 />
               </div>
+
+              {/* R2-3: profit variance attribution waterfall - same window params as diagnostics */}
+              {queryReady && !query.period && (
+                <div className="store360-block-gap">
+                  <VarianceAttributionPanel
+                    storeId={query.storeID}
+                    asOf={query.asOf}
+                    windowDays={query.windowDays}
+                    classification={query.classification || "production"}
+                    datasetVersion={query.datasetVersion || undefined}
+                    sourceSystem={query.sourceSystem || undefined}
+                    currency={response.currency}
+                  />
+                </div>
+              )}
 
               <Card title={t("store360.observations", language)} className="store360-block-gap">
                 <Space direction="vertical" className="store360-full-width">

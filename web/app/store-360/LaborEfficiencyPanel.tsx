@@ -4,6 +4,9 @@
 // 期末在岗人数）全部取自门店 360 诊断响应的 summary——R1-1 在后端露出的
 // 那份，本组件不做任何计算；缺失渲染「—」，hover 给原因。
 //
+// 同群行：样本不足显式降级为「同群样本不足」（retail-kpi-v1 纪律），
+// 不空白、不填 0。
+//
 // 底部 grain_note 是硬要求：告诉使用者为什么时段排班分析不在这儿
 // （事实层是 store-day，没有小时数据）、以及需要什么才能有。
 // 它不是免责声明，不随数据状态消失。
@@ -12,7 +15,7 @@ import React from "react";
 import { Card, Space, Tag, Tooltip, Typography } from "antd";
 import { InfoCircleOutlined, TeamOutlined } from "@ant-design/icons";
 import { useLanguage } from "../context/LanguageContext";
-import { t, type Language } from "../lib/i18n";
+import { t } from "../lib/i18n";
 import type { RetailPeerBenchmark, RetailStore360SummaryMetric } from "../lib/api";
 import { formatKPIValue, formatUnitValue, translateReason } from "../operating-pulse/logic";
 import { StateBlock } from "../components/StateBlock";
@@ -26,7 +29,7 @@ interface Props {
   dataClassification?: string;
 }
 
-/** 指标码 → 标签键。值文案用 R1-2 定稿术语；格式化走既有 formatKPIValue。 */
+/** 指标码 → 标签键。值文案用 R1-2 定稿术语；格式化走既有 formatter。 */
 const METRIC_LABEL_KEYS: Record<string, string> = {
   sales_per_labor_hour: "store360.labor.metric.sph",
   labor_hours_per_transaction: "store360.labor.metric.hpt",
@@ -60,40 +63,41 @@ export function LaborEfficiencyPanel({ summary, benchmarks, currency, dataClassi
       }
     >
       {!summary ? (
-        <StateBlock state={{ kind: "empty", reason: t("store360.no_observations", language) }} language={language as Language} />
+        <StateBlock state={{ kind: "empty", reason: t("store360.no_observations", language) }} language={language} />
       ) : (
-        <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+        <div className="labor-grid">
           {codes.map((code) => {
             const metric = summary[code];
-            const basisKey = METRIC_BASIS_KEYS[code];
+            const missing = !metric || metric.current.value == null;
             return (
-              <div key={code} className={`labor-metric-${code} pulse-kpi-card`} style={{ height: "auto", minHeight: 80, padding: "12px 14px" }}>
+              <div key={code} className={`labor-metric-${code} pulse-kpi-card labor-kpi-card`}>
                 <Space size={4}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t(METRIC_LABEL_KEYS[code], language)}</span>
-                  <Tooltip title={t(basisKey, language)}>
-                    <InfoCircleOutlined className="labor-basis-hint" style={{ fontSize: 11, color: "var(--fg-muted)" }} />
+                  <span className="labor-metric-label">{t(METRIC_LABEL_KEYS[code], language)}</span>
+                  <Tooltip title={t(METRIC_BASIS_KEYS[code], language)}>
+                    <InfoCircleOutlined className="labor-basis-hint" />
                   </Tooltip>
                 </Space>
-                <div style={{ margin: "4px 0 2px" }}>
-                  <Tooltip title={metric && metric.current.value == null ? translateReason(metric.current.reason || undefined, language) : ""}>
-                    <Text className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: metric?.current.value == null ? "var(--fg-muted)" : "var(--fg-primary)" }}>
+                <div className="labor-metric-value-wrap">
+                  {/* Hover reason: backend degradation reason via runtime Tooltip */}
+                  <Tooltip title={missing ? translateReason(metric?.current.reason || undefined, language) : ""}>
+                    <Text className={`labor-metric-num font-tabular${missing ? " is-missing" : ""}`}>
                       {formatKPIValue(metric?.current ?? null, currency, language)}
                     </Text>
                   </Tooltip>
                 </div>
-                {/* 同群状态：样本不足显式降级，不空白、不填 0（retail-kpi-v1 纪律） */}
+                {/* Peer status: explicit degradation when sample is insufficient - never blank, never zero */}
                 {benchmarkByCode.has(code) && (() => {
                   const peer = benchmarkByCode.get(code)!;
                   if (peer.status === "complete" && peer.median != null) {
                     return (
-                      <Text type="secondary" className={`labor-peer-${code}`} style={{ fontSize: 11 }}>
+                      <Text type="secondary" className={`labor-peer-${code} labor-peer-line`}>
                         {t("store360.labor.peer_median", language, { value: formatUnitValue(peer.median, peer.unit, currency, language), count: String(peer.peer_count) })}
                       </Text>
                     );
                   }
                   return (
                     <Tooltip title={translateReason(peer.reason || undefined, language)}>
-                      <Text type="warning" className={`labor-peer-${code} labor-peer-insufficient`} style={{ fontSize: 11 }}>
+                      <Text type="warning" className={`labor-peer-${code} labor-peer-line labor-peer-insufficient`}>
                         {t("store360.labor.peer_insufficient", language)}
                       </Text>
                     </Tooltip>
@@ -104,12 +108,8 @@ export function LaborEfficiencyPanel({ summary, benchmarks, currency, dataClassi
           })}
         </div>
       )}
-      {/* 粒度说明常驻：不随数据状态消失 */}
-      <div className="labor-grain-note" style={{ marginTop: 12 }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {t("store360.labor.grain_note", language)}
-        </Text>
-      </div>
+      {/* Grain note is persistent: rendered in every data state */}
+      <div className="labor-grain-note">{t("store360.labor.grain_note", language)}</div>
     </Card>
   );
 }

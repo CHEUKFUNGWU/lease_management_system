@@ -134,9 +134,17 @@ func Evaluate(ctx context.Context, in Input, ports Ports) Result {
 			addGap(GapLeaseProjectionUnwired)
 			leaseMissing = true
 		} else {
-			leaseByMonth = map[string]float64{}
-			for _, r := range rows {
-				leaseByMonth[r.Month] = r.LeaseExpense
+			// 投影行数不足评估期（合同不存在于该租户视角、计量未跑满、
+			// 或租约短于评估期）：与端口未接线同语义——租赁侧整体缺席，
+			// 缺席月份的 LeaseCost 保持 nil，绝不填 0 继续算。
+			if len(rows) < in.Horizon {
+				addGap(GapLeaseProjectionUnwired)
+				leaseMissing = true
+			} else {
+				leaseByMonth = map[string]float64{}
+				for _, r := range rows {
+					leaseByMonth[r.Month] = r.LeaseExpense
+				}
 			}
 		}
 	}
@@ -215,15 +223,18 @@ func Evaluate(ctx context.Context, in Input, ports Ports) Result {
 			res.NPV = &v
 		}
 	}
-	if !leaseMissing && in.Business.GrossMarginRate > 0 && len(res.MonthlyCashFlows) > 0 {
-		totalLease := 0.0
+	if !leaseMissing && in.Business.GrossMarginRate > 0 {
+		totalLease, counted := 0.0, 0
 		for _, r := range res.MonthlyCashFlows {
 			if r.LeaseCost != nil {
 				totalLease += *r.LeaseCost
+				counted++
 			}
 		}
-		be := totalLease / float64(len(res.MonthlyCashFlows)) / in.Business.GrossMarginRate
-		res.BreakEvenSales = roundPtr(be)
+		if counted > 0 {
+			be := totalLease / float64(counted) / in.Business.GrossMarginRate
+			res.BreakEvenSales = roundPtr(be)
+		}
 	}
 
 	for _, k := range sortedKeys(gaps) {

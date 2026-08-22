@@ -990,3 +990,76 @@ func periodStartOf(cutoff *string) string {
 	}
 	return t.AddDate(-11, 0, 0).Format("2006-01")
 }
+
+// ─── RH6 模板校验端点（R2-4）─────────────────────────────────────
+
+type templateValidationError struct {
+	RowKey    string   `json:"row_key,omitempty"`
+	Kind      string   `json:"kind"` // syntax | unknown_reference | invalid_lag | circular_reference | schema
+	Message   string   `json:"message"`
+	Position  *int     `json:"position,omitempty"`
+	CyclePath []string `json:"cycle_path,omitempty"`
+}
+
+type templateValidationResult struct {
+	Valid  bool                      `json:"valid"`
+	Errors []templateValidationError `json:"errors,omitempty"`
+}
+
+// ValidateTemplate POST /api/v1/financial-model/templates/validate
+//
+// Dry-run：与 CreateTemplate 同一条 Parse/Compile 路径，不落库。
+// 前端零本地校验（D-R16）的另一半：这里把错误结构化到字段级——
+// 循环引用带完整链路，行级错误带 RowKey，前端只渲染不解析。
+func (h *FinModelHandler) ValidateTemplate(c *gin.Context) {
+	var def template.TemplateDef
+	if err := decodeStrictJSON(c, &def); err != nil {
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
+		return
+	}
+	if _, err := template.Parse(def); err != nil {
+		errs := make([]templateValidationError, 0, 1)
+		var cycleErr *template.CycleError
+		if errors.As(err, &cycleErr) {
+			errs = append(errs, templateValidationError{
+				Kind:      "circular_reference",
+				Message:   cycleErr.Error(),
+				CyclePath: cycleErr.Path,
+			})
+		} else {
+			entry := templateValidationError{Kind: "schema", Message: err.Error()}
+			if rowKey, ok := extractTemplateRowKey(err.Error()); ok {
+				entry.RowKey = rowKey
+				msg := strings.TrimSpace(strings.TrimPrefix(err.Error(), fmt.Sprintf("template: row %q:", rowKey)))
+				switch {
+				case strings.Contains(msg, "unknown row"):
+					entry.Kind = "unknown_reference"
+				case strings.Contains(msg, "lag"):
+					entry.Kind = "invalid_lag"
+				default:
+					entry.Kind = "syntax"
+				}
+				entry.Message = msg
+			}
+			errs = append(errs, entry)
+		}
+		c.JSON(http.StatusOK, templateValidationResult{Valid: false, Errors: errs})
+		return
+	}
+	c.JSON(http.StatusOK, templateValidationResult{Valid: true})
+}
+
+// extractTemplateRowKey 从 Parse 包装错误里取行键（"template: row \"k\": ..."）。
+func extractTemplateRowKey(msg string) (string, bool) {
+	const marker = "template: row \""
+	i := strings.Index(msg, marker)
+	if i < 0 {
+		return "", false
+	}
+	rest := msg[i+len(marker):]
+	j := strings.Index(rest, "\"")
+	if j < 0 {
+		return "", false
+	}
+	return rest[:j], true
+}

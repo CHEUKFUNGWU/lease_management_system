@@ -2804,6 +2804,13 @@ export const dict: TranslationDict = {
   "tb_import.unbalanced": { "zh-CN": "借贷不平", "zh-HK": "借貸不平", en: "Not balanced" },
   // I18N regression: /performance shipped with every string hardcoded in
   // simplified Chinese, so the language switcher had no effect on the page.
+  // RH2 Display Basis Guard（web/app/lib/displayBasis.ts）：口径不一致时渲染
+  // 具名空态/「—」加原因，原因文案统一指向这一个键。
+  "lib.display_basis.mismatch": {
+    "zh-CN": "这个指标的数据口径与当前页面的展示语境不一致，不能在这里显示。",
+    "zh-HK": "這個指標的數據口徑與當前頁面的展示語境不一致，不能在這裡顯示。",
+    en: "This metric's measurement basis does not match the current page context and cannot be shown here.",
+  },
   "perf.title": { "zh-CN": "经营驾驶舱", "zh-HK": "經營駕駛艙", en: "Operating cockpit" },
   "perf.meta": { "zh-CN": "{period} · 工作底稿口径 · 数据截至 {stamp} · 独立沙盘，不直接覆盖正式台账。", "zh-HK": "{period} · 工作底稿口徑 · 數據截至 {stamp} · 獨立沙盤，不直接覆蓋正式台賬。", en: "{period} · Working basis · as of {stamp} · does not replace Official close." },
   "perf.analysis_period": { "zh-CN": "分析期间", "zh-HK": "分析期間", en: "Period" },

@@ -5343,3 +5343,18 @@ body .app-content.app-content-full-bleed .app-content-inner {
   flex-direction: column;
   gap: 4px;
 }
+.feasibility-panel {
+  border-radius: 10px;
+}
+.feasibility-mount {
+  margin-top: 16px;
+}
+.formula-err {
+  margin-bottom: 0;
+}
+/* kind 钩子类：当前样式由 antd Alert 语义色承担，规则体留空位以便将来按 kind 差异化 */
+.formula-err-cycle,
+.formula-err-unknown,
+.formula-err-syntax {
+  border-left: none;
+}

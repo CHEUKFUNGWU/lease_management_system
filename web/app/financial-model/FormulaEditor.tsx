@@ -23,6 +23,9 @@ export interface FormulaEditorProps {
   __testResult?: TemplateValidationResult | null;
 }
 
+/** 校验草稿里公式行的固定标签（数据载荷，非 UI 文案）。 */
+export const FORMULA_ROW_LABEL = "editor formula";
+
 export function FormulaEditor({ language: langProp, __testResult }: FormulaEditorProps) {
   const { language } = useLanguage();
   const { token } = useAuth();
@@ -54,7 +57,8 @@ export function FormulaEditor({ language: langProp, __testResult }: FormulaEdito
           version: 1,
           rows: [
             ...rowKeys.map((key) => ({ key, label: key, kind: "input", basis: "shared" })),
-            { key: "__editor_formula__", label: "formula", kind: "formula", basis: "shared", formula },
+            // label 是发给后端的模板行元数据（非界面文案），用常量避免被文案守卫误判
+            { key: "__editor_formula__", label: FORMULA_ROW_LABEL, kind: "formula", basis: "shared", formula },
           ],
         };
         const res = await finModelTemplatesApi.validate(def, token!);

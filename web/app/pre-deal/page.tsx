@@ -368,7 +368,7 @@ export default function PreDealPage() {
               </Card>
 
               {/* R2-4/RH4: business feasibility - parallel to the lease-commercial blocks above, not a replacement */}
-              <div style={{ marginTop: 16 }}>
+              <div className="feasibility-mount">
                 <NewStoreFeasibilityPanel currency={currency} />
               </div>
 

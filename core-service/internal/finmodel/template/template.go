@@ -353,6 +353,17 @@ func validateBasisMixing(def TemplateDef, byKey map[string]int) error {
 
 // validateNoCycles rejects circular same-period references over the
 // reference graph built from formula and subtotal rows.
+//
+// RH6（R2-4）：循环错误用 CycleError 携带完整引用链路，调用方（校验端点）
+// 能结构化返回给前端展示，不必 split 错误字符串。
+type CycleError struct {
+	Path []string
+}
+
+func (e *CycleError) Error() string {
+	return fmt.Sprintf("template: circular reference: %s", strings.Join(e.Path, " -> "))
+}
+
 func validateNoCycles(def TemplateDef, byKey map[string]int) error {
 	deps := make(map[string][]string, len(def.Rows))
 	for _, rd := range def.Rows {
@@ -370,7 +381,7 @@ func validateNoCycles(def TemplateDef, byKey map[string]int) error {
 	visit = func(key string, path []string) error {
 		switch state[key] {
 		case 1:
-			return fmt.Errorf("template: circular reference: %s", strings.Join(append(path, key), " -> "))
+			return &CycleError{Path: append(append([]string(nil), path...), key)}
 		case 2:
 			return nil
 		}

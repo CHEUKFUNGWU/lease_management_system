@@ -31,6 +31,7 @@ import { AssumptionForm, AssumptionUnknownKeys } from "./assumption-form";
 import { financialModelHelpContent } from "../components/help-content";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { EXAMPLE_ASSUMPTIONS, EXAMPLE_OPENING_FORM, assumptionHint } from "./hints";
+import { FormulaEditor } from "./FormulaEditor";
 import {
   addPeriod,
   applyAssumptionFormValues,
@@ -532,6 +533,11 @@ export default function FinancialModelPage() {
                   />
                   <Typography.Text type="secondary">{t("finmodel.run_async_hint", language)}</Typography.Text>
                 </Space>
+              </Card>
+
+              {/* R2-4: formula editor (RH6). Validation is backend-only by contract (D-R16). */}
+              <Card size="small" title={t("finmodel.formula.editor_title", language)}>
+                <FormulaEditor language={language} />
               </Card>
 
               <Card

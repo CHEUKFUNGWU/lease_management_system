@@ -2398,6 +2398,20 @@ export const promotionApi = {
     }),
 };
 
+export interface TemplateValidationError {
+  row_key?: string;
+  ref_key?: string;
+  kind: "syntax" | "unknown_reference" | "invalid_lag" | "circular_reference" | "schema" | string;
+  message: string;
+  position?: number | null;
+  cycle_path?: string[];
+}
+
+export interface TemplateValidationResult {
+  valid: boolean;
+  errors?: TemplateValidationError[];
+}
+
 export interface VarianceAttributionFactor {
   factor: string;
   base: number;
@@ -2429,6 +2443,15 @@ export interface PromotionBreakevenResult {
   status: "achievable" | "unachievable" | "invalid_input" | string;
   unachievable_reason?: string;
 }
+
+export const finModelTemplatesApi = {
+  validate: (def: { name: string; version: number; rows: unknown[] }, token: string): Promise<TemplateValidationResult> =>
+    apiRequest(`/api/v1/financial-model/templates/validate`, {
+      method: "POST",
+      body: JSON.stringify(def),
+      token,
+    }),
+};
 
 export const retailVarianceApi = {
   attribution: (

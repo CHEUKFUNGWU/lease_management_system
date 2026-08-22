@@ -42,6 +42,9 @@ FP&A 版本治理与滚动预测
 
 | 文档 | 状态 | 说明 |
 |---|---|---|
+| [UIUX与产品能力全面改善建议书](UIUX与产品能力全面改善建议书.md) | **Partially Superseded** | 缺口清单已按代码实测重写，见 Spec（retail-workstation-honesty-and-capability-r1）；本文保留为需求来源记录。§0.5 复核记录列出六项被代码推翻的判断与三项与既有约束冲突的动作。根目录旧副本已删除，仅存 docs/ 这份 |
+| [Spec：经营工作站的诚实性止血与能力补齐](specs/retail-workstation-honesty-and-capability-r1.md) | **Current** | R 批次口径来源：D-R1~D-R9。诚实性止血（设备口径冒充零售指标）、人效上架、五项真缺口（投前保本/新店可行性/差异归因/滚动滚入/公式编辑器）|
+| [CodebaseDesign：经营工作站诚实性与能力补齐模块深化](CodebaseDesign_经营工作站诚实性与能力补齐_模块深化.md) | **Current** | 实施级设计：RH1~RH8，决策留痕 D-R10~D-R18；Metric Surface 收敛标签表、Display Basis Guard 口径判定、保本与新店可行性纯函数、模板校验端点与编辑器前端零本地校验 |
 | [Agent Core（Go）设计 —— 对齐 pi 架构](Agent_Core_Go设计_对齐pi架构.md) | **Current** | **内核层现行依据**。纯循环 + 中间件链 + 订阅者；ai-service 退役映射 |
 | [AI 底稿与 Paperwork Agent 设计方案](AI_底稿与Paperwork_Agent设计方案.md) | **Current** | **能力层现行依据**。双轨执行、WorkingPaper、不变量、分阶段与验收 |
 | [CodebaseDesign：AI 阶段 0 与 W1 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) | **Current** | **实施级设计**。W1（agentcore）+ 阶段 0（workingpaper / docparse / triage / CLI / Web / 评测）的深模块接口、seam、决策留痕 D-A~G、验收映射 |

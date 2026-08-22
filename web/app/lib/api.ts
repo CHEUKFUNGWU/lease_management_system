@@ -2386,7 +2386,28 @@ export const promotionApi = {
     }),
   evaluateROI: (id: string, token: string): Promise<PromotionROIResult> =>
     apiRequest(`/api/v1/retail/promotions/${encodeURIComponent(id)}/roi`, { token }),
+  // R2-1：投前保本测算（纯计算不落库；promo_id 模式基线与投后同一取数路径）
+  evaluateBreakeven: (
+    data: { promo_id: string; promo_margin_rate: number; fixed_marketing_cost: number },
+    token: string
+  ): Promise<PromotionBreakevenResult> =>
+    apiRequest(`/api/v1/retail/promotions/breakeven`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
 };
+
+export interface PromotionBreakevenResult {
+  currency: string;
+  event_days: number;
+  baseline_revenue: number;
+  required_incremental_revenue?: number | null;
+  required_uplift_rate?: number | null;
+  margin_sacrifice: number;
+  status: "achievable" | "unachievable" | "invalid_input" | string;
+  unachievable_reason?: string;
+}
 
 export const cashPlanApi = {
   compose: (

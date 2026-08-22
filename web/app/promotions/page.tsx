@@ -49,7 +49,9 @@ import {
   type Promotion,
   type PromotionCost,
   type PromotionROIResult,
+  type PromotionBreakevenResult,
 } from "../lib/api";
+import { BreakevenPanel, buildBreakevenRequest } from "./BreakevenPanel";
 
 const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -71,6 +73,33 @@ export default function PromotionsPage() {
   const [roiLoading, setRoiLoading] = useState(false);
   const [roiResult, setRoiResult] = useState<PromotionROIResult | null>(null);
   const [costs, setCosts] = useState<PromotionCost[]>([]);
+
+  // R2-1：投前保本测算状态（promo_id 模式，基线自动取活动前事实）
+  const [breakevenLoading, setBreakevenLoading] = useState(false);
+  const [breakevenRate, setBreakevenRate] = useState<number | null>(null);
+  const [breakevenCost, setBreakevenCost] = useState<number | null>(null);
+  const [breakevenResult, setBreakevenResult] = useState<PromotionBreakevenResult | null>(null);
+
+  const runBreakeven = async () => {
+    if (!token || !selectedPromo) return;
+      const req = buildBreakevenRequest(selectedPromo.id, breakevenRate, breakevenCost);
+      if (!req.valid) {
+        message.warning(t("promotion.breakeven.missing_input", language));
+        return;
+      }
+      setBreakevenLoading(true);
+      try {
+        const res = await promotionApi.evaluateBreakeven(
+          { promo_id: req.promo_id, promo_margin_rate: req.promo_margin_rate, fixed_marketing_cost: req.fixed_marketing_cost },
+          token
+        );
+      setBreakevenResult(res);
+    } catch (err: unknown) {
+      message.error((err as Error)?.message || t("promotion.breakeven.failed", language));
+    } finally {
+      setBreakevenLoading(false);
+    }
+  };
 
   const [form] = Form.useForm();
   const [costForm] = Form.useForm();
@@ -468,6 +497,18 @@ export default function PromotionsPage() {
                   ) : null}
                 </Tabs.TabPane>
 
+                {/* R2-1：投前保本——与投后复盘并列，不替换；渲染下沉到 BreakevenPanel 以便守卫直接打 */}
+                <Tabs.TabPane tab={t("promotion.breakeven.tab", language)} key="breakeven">
+                  <BreakevenPanel
+                    loading={breakevenLoading}
+                    rate={breakevenRate}
+                    cost={breakevenCost}
+                    onRateChange={setBreakevenRate}
+                    onCostChange={setBreakevenCost}
+                    onRun={runBreakeven}
+                    result={breakevenResult}
+                  />
+                </Tabs.TabPane>
                 <Tabs.TabPane tab={t("promotion.tab_budget_review", language)} key="budget">
                   <Card size="small" bordered={false}>
                     <Space direction="vertical" size={12} style={{ width: "100%" }}>

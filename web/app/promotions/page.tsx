@@ -51,6 +51,7 @@ import {
   type PromotionROIResult,
   type PromotionBreakevenResult,
 } from "../lib/api";
+import { BreakevenPanel, buildBreakevenRequest } from "./BreakevenPanel";
 
 const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -81,16 +82,17 @@ export default function PromotionsPage() {
 
   const runBreakeven = async () => {
     if (!token || !selectedPromo) return;
-    if (breakevenRate == null || breakevenCost == null) {
-      message.warning(t("promotion.breakeven.missing_input", language));
-      return;
-    }
-    setBreakevenLoading(true);
-    try {
-      const res = await promotionApi.evaluateBreakeven(
-        { promo_id: selectedPromo.id, promo_margin_rate: breakevenRate / 100, fixed_marketing_cost: breakevenCost },
-        token
-      );
+      const req = buildBreakevenRequest(selectedPromo.id, breakevenRate, breakevenCost);
+      if (!req.valid) {
+        message.warning(t("promotion.breakeven.missing_input", language));
+        return;
+      }
+      setBreakevenLoading(true);
+      try {
+        const res = await promotionApi.evaluateBreakeven(
+          { promo_id: req.promo_id, promo_margin_rate: req.promo_margin_rate, fixed_marketing_cost: req.fixed_marketing_cost },
+          token
+        );
       setBreakevenResult(res);
     } catch (err: unknown) {
       message.error((err as Error)?.message || t("promotion.breakeven.failed", language));
@@ -495,54 +497,17 @@ export default function PromotionsPage() {
                   ) : null}
                 </Tabs.TabPane>
 
-                {/* R2-1：投前保本——与投后复盘并列，不替换 */}
+                {/* R2-1：投前保本——与投后复盘并列，不替换；渲染下沉到 BreakevenPanel 以便守卫直接打 */}
                 <Tabs.TabPane tab={t("promotion.breakeven.tab", language)} key="breakeven">
-                  <Space direction="vertical" size={16} className="promo-breakeven-body">
-                    <Space wrap align="center">
-                      <span>{t("promotion.breakeven.rate_label", language)}</span>
-                      <InputNumber
-                        min={-100}
-                        max={100}
-                        step={0.5}
-                        value={breakevenRate}
-                        onChange={(v) => setBreakevenRate(typeof v === "number" ? v : null)}
-                      />
-                      <span>{t("promotion.breakeven.cost_label", language)}</span>
-                      <InputNumber
-                        min={0}
-                        value={breakevenCost}
-                        onChange={(v) => setBreakevenCost(typeof v === "number" ? v : null)}
-                      />
-                      <Button type="primary" loading={breakevenLoading} onClick={runBreakeven}>
-                        {t("promotion.breakeven.run", language)}
-                      </Button>
-                    </Space>
-                    {breakevenResult && (
-                      <Card size="small">
-                        <Space direction="vertical" size={8} className="promo-breakeven-body">
-                          {breakevenResult.status === "achievable" ? (
-                            <>
-                              <Text strong>{t("promotion.breakeven.title", language)}</Text>
-                              <Text className="font-tabular">
-                                {t("promotion.breakeven.result", language, {
-                                  amount: fmtMoney(breakevenResult.required_incremental_revenue ?? null, breakevenResult.currency),
-                                  pct: breakevenResult.required_uplift_rate != null ? `${(breakevenResult.required_uplift_rate * 100).toFixed(1)}%` : t("promotion.breakeven.uplift_na", language),
-                                })}
-                              </Text>
-                              <Text type="secondary">
-                                {t("promotion.breakeven.sacrifice", language, { amount: fmtMoney(breakevenResult.margin_sacrifice, breakevenResult.currency) })}
-                              </Text>
-                            </>
-                          ) : breakevenResult.status === "unachievable" ? (
-                            <Alert type="warning" showIcon message={t("promotion.breakeven.unachievable", language)} description={breakevenResult.unachievable_reason} />
-                          ) : (
-                            <Alert type="error" showIcon message={breakevenResult.unachievable_reason || t("promotion.breakeven.failed", language)} />
-                          )}
-                          <div className="promo-breakeven-note">{t("promotion.breakeven.basis", language)}</div>
-                        </Space>
-                      </Card>
-                    )}
-                  </Space>
+                  <BreakevenPanel
+                    loading={breakevenLoading}
+                    rate={breakevenRate}
+                    cost={breakevenCost}
+                    onRateChange={setBreakevenRate}
+                    onCostChange={setBreakevenCost}
+                    onRun={runBreakeven}
+                    result={breakevenResult}
+                  />
                 </Tabs.TabPane>
                 <Tabs.TabPane tab={t("promotion.tab_budget_review", language)} key="budget">
                   <Card size="small" bordered={false}>

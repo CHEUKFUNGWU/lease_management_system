@@ -2327,6 +2327,23 @@ export const dict: TranslationDict = {
     "zh-HK": "分母為零",
     en: "Zero denominator",
   },
+  // R1-2 复核补充：这三个 reason 值此前落在 translateReason 的兜底路径上，
+  // 财务用户会在 tooltip 里读到机器码。文案为 Planner 定稿。
+  "reason.no_facts": {
+    "zh-CN": "这段时间没有这家店的经营事实",
+    "zh-HK": "這段時間沒有這家店的經營事實",
+    en: "No operating facts for this store in the period",
+  },
+  "reason.missing_required_field": {
+    "zh-CN": "算这个指标要用的字段缺了，没有补，也没有拿别的数顶替",
+    "zh-HK": "算這個指標要用的欄位缺了，沒有補，也沒有拿別的數頂替",
+    en: "A field this metric needs is missing. Nothing was substituted for it",
+  },
+  "reason.peer_count_below_minimum": {
+    "zh-CN": "同群里有这项数据的门店太少，样本不够，不给对比结论",
+    "zh-HK": "同群裡有這項數據的門店太少，樣本不夠，不給對比結論",
+    en: "Too few peer stores have this data. Sample too small to compare",
+  },
   "source.retail_simulator": {
     "zh-CN": "零售模拟引擎",
     "zh-HK": "零售模擬引擎",
@@ -2847,6 +2864,55 @@ export const dict: TranslationDict = {
     "zh-CN": "这一页算的是引入本系统能省多少人工，用于内部立项，不是门店经营分析。找门店的投入产出请去「门店 360」或「签约前决策」。",
     "zh-HK": "這一頁算的是引入本系統能省多少人工，用於內部立項，不是門店經營分析。找門店的投入產出請去「門店 360」或「簽約前決策」。",
     en: "This page estimates how much labour this system saves, for internal project approval. It is not store operating analysis. For store-level ROI go to Store 360 or the Pre-deal decision page.",
+  },
+  // R1-2：销售人效与工时面板。grain_note 与四个 basis 为工单定稿，不改写。
+  "store360.labor.panel_title": { "zh-CN": "销售人效与工时", "zh-HK": "銷售人效與工時", en: "Labor efficiency" },
+  "store360.labor.metric.sph": { "zh-CN": "销售人效", "zh-HK": "銷售人效", en: "Sales per labor hour" },
+  "store360.labor.metric.hpt": { "zh-CN": "单均工时", "zh-HK": "單均工時", en: "Hours per transaction" },
+  "store360.labor.metric.rate": { "zh-CN": "人工成本率", "zh-HK": "人工成本率", en: "Labor cost rate" },
+  "store360.labor.metric.hc": { "zh-CN": "期末在岗人数", "zh-HK": "期末在崗人數", en: "On-duty headcount" },
+  "store360.labor.peer_median": { "zh-CN": "同群中位 {value} · {count} 家", "zh-HK": "同群中位 {value} · {count} 家", en: "Peer median {value} · {count} stores" },
+  "store360.labor.peer_insufficient": { "zh-CN": "同群样本不足", "zh-HK": "同群樣本不足", en: "Insufficient peers" },
+  "store360.labor.grain_note": {
+    "zh-CN": "这些数按天汇总。系统里没有按小时的销售和排班数据，所以算不了时段排班吻合度，也看不出忙时人手够不够。要做时段分析，需要先接入门店 POS 的分时流水。",
+    "zh-HK": "這些數按天匯總。系統裡沒有按小時的銷售和排班數據，所以算不了時段排班吻合度，也看不出忙時人手夠不夠。要做時段分析，需要先接入門店 POS 的分時流水。",
+    en: "These figures are aggregated by day. The system has no hourly sales or scheduling data, so it cannot measure how well shifts match busy hours, or tell whether peak hours are understaffed. Hour-level analysis requires feeding POS hourly transactions in first.",
+  },
+  "store360.labor.sph_basis": {
+    "zh-CN": "销售额 ÷ 工时。工时来自门店排班或考勤导入，缺一天就整段不算，不按剩余天数折算。",
+    "zh-HK": "銷售額 ÷ 工時。工時來自門店排班或考勤導入，缺一天就整段不算，不按剩餘天數折算。",
+    en: "Sales ÷ labor hours. Hours come from store schedules or attendance imports; any missing day voids the whole window rather than being prorated.",
+  },
+  "store360.labor.hpt_basis": {
+    "zh-CN": "工时 ÷ 交易笔数。数值高说明单笔成交占用人手多，可能是客单结构变了，也可能是流程变慢了。",
+    "zh-HK": "工時 ÷ 交易筆數。數值高說明單筆成交佔用人手多，可能是客單結構變了，也可能是流程變慢了。",
+    en: "Labor hours ÷ transactions. A high value means each sale ties up more staffing — either the basket mix changed or the process slowed down.",
+  },
+  "store360.labor.rate_basis": {
+    "zh-CN": "人工成本 ÷ 销售额。人工成本含工资、社保、外包，不含店长以上的分摊管理费。",
+    "zh-HK": "人工成本 ÷ 銷售額。人工成本含工資、社保、外包，不含店長以上的分攤管理費。",
+    en: "Labor cost ÷ sales. Labor cost includes wages, social insurance and outsourcing; it excludes allocated management overhead above store manager level.",
+  },
+  "store360.labor.hc_basis": {
+    "zh-CN": "期末在岗人数，含兼职按人头计，不折算全职当量。",
+    "zh-HK": "期末在崗人數，含兼職按人頭計，不折算全職當量。",
+    en: "On-duty headcount; part-timers counted per head, never converted to FTE.",
+  },
+  // R1-3：既有三面板的口径说明。定稿文案，不改写。
+  "store360.category.basis": {
+    "zh-CN": "按商品大类拆解毛利变化。「卖得多了」是销量变化带来的，「结构变了」是各品类占比变化带来的，「毛利率变了」是同一品类自己的毛利率变化带来的。三项加起来等于总变化，对不上的部分单列为残差。",
+    "zh-HK": "按商品大類拆解毛利變化。「賣得多了」是銷量變化帶來的，「結構變了」是各品類佔比變化帶來的，「毛利率變了」是同一品類自己的毛利率變化帶來的。三項加起來等於總變化，對不上的部分單列為殘差。",
+    en: "Breaks gross profit change down by category. \u301cSold more\u301d comes from volume, \u301cmix shifted\u301d from category shares, \u301cmargin moved\u301d from within-category margin. The three parts sum to the total change; whatever does not reconcile is listed separately as residual.",
+  },
+  "store360.inventory.basis": {
+    "zh-CN": "库存周转天数 = 期末库存成本 ÷ 销货成本 × 天数。销货成本为零时不算，显示「—」，不显示无穷大。在途库存单列，不并进期末库存。",
+    "zh-HK": "庫存周轉天數 = 期末庫存成本 ÷ 銷貨成本 × 天數。銷貨成本為零時不算，顯示「—」，不顯示無窮大。在途庫存單列，不併進期末庫存。",
+    en: "Days of inventory = ending stock cost ÷ cost of goods sold × days. Zero COGS yields \u300c—\u300d, never infinity. In-transit stock is listed separately, never merged into ending stock.",
+  },
+  "store360.competitor.basis": {
+    "zh-CN": "和同商圈可比门店对比。可比门店少于门槛数时整块降级并显示实际样本数，不用两三家店的均值冒充商圈水平。币种不同的门店不进同一组对比。",
+    "zh-HK": "和同商圈可比門店對比。可比門店少於門檻數時整塊降級並顯示實際樣本數，不用兩三家店的均值冒充商圈水平。幣種不同的門店不進同一組對比。",
+    en: "Compares against comparable stores in the same area. Below the minimum sample size the whole block degrades and shows the actual sample count; averages of two or three stores are never passed off as the area level. Stores in different currencies never enter the same comparison group.",
   },
   "perf.title": { "zh-CN": "经营驾驶舱", "zh-HK": "經營駕駛艙", en: "Operating cockpit" },
   "perf.meta": { "zh-CN": "{period} · 工作底稿口径 · 数据截至 {stamp} · 独立沙盘，不直接覆盖正式台账。", "zh-HK": "{period} · 工作底稿口徑 · 數據截至 {stamp} · 獨立沙盤，不直接覆蓋正式台賬。", en: "{period} · Working basis · as of {stamp} · does not replace Official close." },

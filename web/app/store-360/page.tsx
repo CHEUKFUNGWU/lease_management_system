@@ -36,6 +36,7 @@ import ProfitFlowPanel from "./ProfitFlowPanel";
 import { CategoryCompositionPanel } from "./CategoryCompositionPanel";
 import { InventoryTurnoverPanel } from "./InventoryTurnoverPanel";
 import { CompetitorBenchmarkPanel } from "./CompetitorBenchmarkPanel";
+import { LaborEfficiencyPanel } from "./LaborEfficiencyPanel";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
 
@@ -775,6 +776,15 @@ function Store360Inner() {
               <div className="store360-block-gap">
                 <CompetitorBenchmarkPanel
                   storeId={query.storeID}
+                />
+              </div>
+
+              <div className="store360-block-gap">
+                <LaborEfficiencyPanel
+                  summary={response.summary}
+                  benchmarks={response.peer_benchmark}
+                  currency={response.currency}
+                  dataClassification={query.classification || "production"}
                 />
               </div>
 

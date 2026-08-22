@@ -4999,6 +4999,53 @@ body .app-content.app-content-full-bleed .app-content-inner {
   font-size: 12px;
 }
 
+/* R1-3: per-panel basis footnote (how the numbers are computed, when they degrade) */
+.panel-basis-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+}
+
+/* R1-2: labor efficiency panel */
+.labor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.labor-kpi-card {
+  height: auto;
+  min-height: 80px;
+  padding: 12px 14px;
+}
+.labor-metric-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-secondary);
+}
+.labor-basis-hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+  cursor: help;
+}
+.labor-metric-value-wrap {
+  margin: 4px 0 2px;
+}
+.labor-metric-num {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg-primary);
+}
+.labor-metric-num.is-missing {
+  color: var(--fg-muted);
+}
+.labor-peer-line {
+  font-size: 11px;
+}
+.labor-grain-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--fg-secondary);
+}
+
 /* Assistant markdown — see app/ai-chat/MarkdownText.tsx for why this is a
    hand-rolled subset rather than a markdown-to-HTML pipeline. */
 .ai-md-paragraph {

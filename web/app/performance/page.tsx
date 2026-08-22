@@ -1,6 +1,6 @@
 "use client";
 
-import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+import { StatusTag } from "../components/StatusTag";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, Upload, message } from "antd";
@@ -20,6 +20,7 @@ import { useRetailQuery } from "../retail/useRetailQuery";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
 import PeerBenchmarkBlock, { type PeerBenchmarkItem } from "./PeerBenchmarkBlock";
+import { ActionCategoryText, ActionStatusTag, SeverityTag } from "./ActionCells";
 
 type Overview = { period: string; store_fact_count: number; store_fact_ready_count: number; store_fact_missing_count: number; store_fact_unmapped_count: number; store_fact_unreconciled_count: number; equipment_fact_count: number; equipment_fact_unreconciled_count: number; open_action_count: number; open_action_impact: number; latest_store_as_of?: string; latest_equipment_as_of?: string };
 type FourWall = { store_id: string; store_code: string; store_name: string; brand: string; region: string; currency: string; revenue: number; gross_profit?: number; four_wall_ebitda?: number; rent_to_sales?: number; occupancy_cost_ratio?: number; sales_per_sqm?: number; break_even_sales?: number; data_ready: boolean; data_gaps?: string[]; reconciliation_status: string };
@@ -164,10 +165,10 @@ export default function PerformancePage() {
   // 由 resolveBasis 判定。页面不再持有 peerColumns。
 
   const actionColumns = useMemo(() => [
-    { title: t("perf.col.action", language), key: "title", render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><strong>{row.title}</strong><Typography.Text type="secondary">{row.category}</Typography.Text></Space> },
+    { title: t("perf.col.action", language), key: "title", render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><strong>{row.title}</strong><Typography.Text type="secondary"><ActionCategoryText value={row.category} language={language} /></Typography.Text></Space> },
     { title: t("perf.col.impact", language), render: (_: unknown, row: Action) => money(row.impact_amount, row.currency) },
-    { title: t("perf.col.severity", language), dataIndex: "severity", render: (value: string) => <StatusTag kind={statusKindFromAntColor(value === "critical" || value === "high" ? "error" : "warning")}>{value}</StatusTag> },
-    { title: t("perf.col.status", language), dataIndex: "status", render: (value: string) => <StatusTag>{value}</StatusTag> },
+    { title: t("perf.col.severity", language), dataIndex: "severity", render: (value: string) => <SeverityTag value={value} language={language} /> },
+    { title: t("perf.col.status", language), dataIndex: "status", render: (value: string) => <ActionStatusTag value={value} language={language} /> },
     { title: t("perf.col.owner_due", language), render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><span>{row.owner_name || t("perf.unassigned", language)}</span><Typography.Text type="secondary">{row.due_date || t("perf.no_date", language)}</Typography.Text></Space> },
     { title: t("perf.col.operation", language), key: "action", render: (_: unknown, row: Action) => row.status === "open" ? <Button size="small" icon={<CheckCircleOutlined />} onClick={() => acknowledge(row)}>{t("perf.acknowledge", language)}</Button> : null },
   // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.

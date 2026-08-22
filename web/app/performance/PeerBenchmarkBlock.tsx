@@ -11,8 +11,9 @@
 // 分支 3 今天对这份 equipment 数据源走不到，但必须留着：删掉它 resolveBasis
 // 的 usable:true 半边就没有任何行为差异，守卫的哨兵值断言也无从验起。
 //
-// 本组件不渲染任何「同群平均坪效达成率」列、不含「核心商圈」「标杆同群」
-// 兜底——那两处兜底曾把空工厂代码伪装成商圈词（R0-1 修的正是这个）。
+// 本组件不渲染任何冒充零售指标的列（旧实现曾把 oee_pct 挂上假坪效标题，
+// 该列已整列删除），也没有把空工厂/产线代码兜底成商圈词的逻辑——
+// 空值一律渲染「—」。basis-guard.test.ts 以源码级断言锁住这两点。
 
 import React from "react";
 import { Empty, Space, Table, Typography } from "antd";

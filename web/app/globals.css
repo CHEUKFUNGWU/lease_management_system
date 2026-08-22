@@ -5243,3 +5243,11 @@ body .app-content.app-content-full-bleed .app-content-inner {
   font-size: 12px;
   color: var(--fg-secondary);
 }
+
+/* R2-1 breakeven card hooks (class-coverage) */
+.breakeven-required-amount {
+  font-variant-numeric: tabular-nums;
+}
+.breakeven-unachievable-alert {
+  margin: 0;
+}

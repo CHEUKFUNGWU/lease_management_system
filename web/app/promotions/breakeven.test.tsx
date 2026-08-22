@@ -79,8 +79,8 @@ describe("R2-1 BreakevenPanel 三分支", () => {
 
   it("invalid_input：渲染错误提示而不是数字", () => {
     const markup = render({
-      currency: "CNY", event_days: 7, baseline_revenue: 0,
-      status: "invalid_input", unachievable_reason: "输入无效：天数、金额不能为负，毛利率必须在 0 与 1 之间",
+      currency: "CNY", event_days: 7, baseline_revenue: 0, margin_sacrifice: 0,
+      status: "invalid_input" as const, unachievable_reason: "输入无效：天数、金额不能为负，毛利率必须在 0 与 1 之间",
     });
     expect(markup).toContain("输入无效");
     expect(markup).not.toContain("¥");

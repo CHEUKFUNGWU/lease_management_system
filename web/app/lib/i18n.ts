@@ -2832,6 +2832,22 @@ export const dict: TranslationDict = {
   "store360.currency_status.conflict": { "zh-CN": "币种冲突，不可合计", "zh-HK": "幣種衝突，不可合計", en: "Currency conflict, not summable" },
   "store360.currency_status.unknown": { "zh-CN": "币种未知", "zh-HK": "幣種未知", en: "Currency unknown" },
   "store360.currency_status.unrecognized": { "zh-CN": "未识别状态", "zh-HK": "未識別狀態", en: "Unrecognized status" },
+  // R0-3：页面定位说明（/performance 与 /operating-pulse 重叠互指；/roi 定位澄清）。文案定稿来自工单，不改写。
+  "perf.scope_note": {
+    "zh-CN": "这一页看的是月度口径的经营驾驶舱：四墙 EBITDA 排行、行动项跟进、月度事实导入。日度和周度的经营波动看「经营脉搏」。两页的数取自不同的后端，同一指标可能有差异，做汇报时以其中一页为准，别混着引用。",
+    "zh-HK": "這一頁看的是月度口徑的經營駕駛艙：四牆 EBITDA 排行、行動項跟進、月度事實導入。日度和週度的經營波動看「經營脈搏」。兩頁的數取自不同的後端，同一指標可能有差異，做匯報時以其中一頁為準，別混著引用。",
+    en: "This page is the monthly operating cockpit: four-wall EBITDA ranking, action follow-up and monthly fact import. Daily and weekly swings live in Operating Pulse. The two pages read from different backends; the same metric may differ between them. Pick one page for reporting and do not mix citations.",
+  },
+  "pulse.scope_note": {
+    "zh-CN": "这一页看的是日度和周度的经营波动，带覆盖率与 Decision Ready 判定。月度口径的四墙 EBITDA 排行和行动项跟进在「经营驾驶舱」。两页的数取自不同的后端，同一指标可能有差异。",
+    "zh-HK": "這一頁看的是日度和週度的經營波動，帶覆蓋率與 Decision Ready 判定。月度口徑的四牆 EBITDA 排行和行動項跟進在「經營駕駛艙」。兩頁的數取自不同的後端，同一指標可能有差異。",
+    en: "This page shows daily and weekly operating swings, with coverage and Decision Ready verdicts. Monthly four-wall EBITDA ranking and action follow-up live in the Operating cockpit. The two pages read from different backends; the same metric may differ between them.",
+  },
+  "roi.scope_note": {
+    "zh-CN": "这一页算的是引入本系统能省多少人工，用于内部立项，不是门店经营分析。找门店的投入产出请去「门店 360」或「新店投资评估」。",
+    "zh-HK": "這一頁算的是引入本系統能省多少人工，用於內部立項，不是門店經營分析。找門店的投入產出請去「門店 360」或「新店投資評估」。",
+    en: "This page estimates how much labour this system saves, for internal project approval. It is not store operating analysis. For store-level ROI go to Store 360 or New Store Feasibility.",
+  },
   "perf.title": { "zh-CN": "经营驾驶舱", "zh-HK": "經營駕駛艙", en: "Operating cockpit" },
   "perf.meta": { "zh-CN": "{period} · 工作底稿口径 · 数据截至 {stamp} · 独立沙盘，不直接覆盖正式台账。", "zh-HK": "{period} · 工作底稿口徑 · 數據截至 {stamp} · 獨立沙盤，不直接覆蓋正式台賬。", en: "{period} · Working basis · as of {stamp} · does not replace Official close." },
   "perf.analysis_period": { "zh-CN": "分析期间", "zh-HK": "分析期間", en: "Period" },

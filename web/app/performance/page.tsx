@@ -19,6 +19,7 @@ import { apiErrorMessage, operatingFactsApi, performanceApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
+import ScopeNote from "../lib/ScopeNote";
 import PeerBenchmarkBlock, { type PeerBenchmarkItem } from "./PeerBenchmarkBlock";
 import { ActionCategoryText, ActionStatusTag, SeverityTag } from "./ActionCells";
 
@@ -183,6 +184,8 @@ export default function PerformancePage() {
             meta={t("perf.meta", language).replace("{period}", period).replace("{stamp}", dayjs().format("YYYY-MM-DD HH:mm"))}
             help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
           />
+          {/* R0-3：页面定位说明——与 /operating-pulse 的分工与数据源差异 */}
+          <ScopeNote noteKey="perf.scope_note" className="perf-scope-note" language={language} />
           <div className="precision-filter-bar" style={{ marginBottom: 16 }}>
             <Space wrap size={12} align="center">
               <div className="precision-filter-group">

@@ -20,6 +20,7 @@ import ConfidenceBandChart from "../components/charts/ConfidenceBandChart";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
+import ScopeNote from "../lib/ScopeNote";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { pulseHelpContent } from "../components/help-content";
@@ -485,6 +486,8 @@ function OperatingPulseInner() {
               </Space>
             }
           />
+          {/* R0-3：页面定位说明——与 /performance 的分工与数据源差异 */}
+          <ScopeNote noteKey="pulse.scope_note" className="pulse-scope-note" language={language} />
           {/* ─── Precision Engineering Filter Bar (Linear/Attio style) ─── */}
           <div className="precision-filter-bar pulse-block-margin">
             {/* Primary Business Dimension & Time Filters */}

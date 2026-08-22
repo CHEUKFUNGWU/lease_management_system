@@ -70,7 +70,7 @@ func retailToolFactSet() *repository.RetailKPIFactSet {
 	for i := 0; i < 14; i++ {
 		date := time.Date(2026, 6, 1+i, 0, 0, 0, 0, time.UTC)
 		value := float64(100 + i)
-		facts = append(facts, retailkpi.DailyFact{StoreID: storeID, StoreCode: "Store001", StoreName: "One", Brand: "BrandA", Region: "East", BusinessDate: date, AsOfAt: date.Add(time.Hour), Currency: "CNY", SourceSystem: "retail_simulator", DataClassification: "simulated", SimulationDatasetVersion: &version, Version: 1, Revenue: &value, GrossProfit: &value, Transactions: &value, Footfall: &value, AreaSqm: &value, LaborCost: &value, FixedRent: &value, VariableRent: &value, NonLeaseCost: &value, OtherControllableCost: &value, MappingStatus: "mapped", DataQualityStatus: "valid"})
+		facts = append(facts, retailkpi.DailyFact{StoreID: storeID, StoreCode: "Store001", StoreName: "One", Brand: "BrandA", Region: "East", BusinessDate: date, AsOfAt: date.Add(time.Hour), Currency: "CNY", SourceSystem: "retail_simulator", DataClassification: "simulated", SimulationDatasetVersion: &version, Version: 1, Revenue: &value, GrossProfit: &value, Transactions: &value, Footfall: &value, AreaSqm: &value, LaborCost: &value, FixedRent: &value, VariableRent: &value, NonLeaseCost: &value, OtherControllableCost: &value, MappingStatus: "mapped", DataQualityStatus: "valid", LaborHours: &value})
 	}
 	return &repository.RetailKPIFactSet{Facts: facts, ExpectedStoreCount: 1, ExpectedStores: []retailkpi.StorePopulation{{StoreID: storeID, StoreCode: "Store001", StoreName: "One", Brand: "BrandA", Region: "East"}}, SourceSystems: []string{"retail_simulator"}, DatasetVersions: []string{version}, MinFactVersion: 1, MaxFactVersion: 1}
 }
@@ -297,7 +297,7 @@ func retailToolFactSetWithPeers() (*repository.RetailKPIFactSet, string, string)
 		for dayIndex := 0; dayIndex < 14; dayIndex++ {
 			date := time.Date(2026, 6, 1+dayIndex, 0, 0, 0, 0, time.UTC)
 			value := float64(120 + peerIndex*5 + dayIndex)
-			set.Facts = append(set.Facts, retailkpi.DailyFact{StoreID: store.StoreID, StoreCode: store.StoreCode, StoreName: store.StoreName, Brand: store.Brand, Region: store.Region, BusinessDate: date, AsOfAt: date.Add(time.Hour), Currency: "CNY", SourceSystem: "retail_simulator", DataClassification: "simulated", SimulationDatasetVersion: &version, Version: 1, Revenue: &value, GrossProfit: &value, Transactions: &value, Footfall: &value, AreaSqm: &value, LaborCost: &value, FixedRent: &value, VariableRent: &value, NonLeaseCost: &value, OtherControllableCost: &value, MappingStatus: "mapped", DataQualityStatus: "valid"})
+			set.Facts = append(set.Facts, retailkpi.DailyFact{StoreID: store.StoreID, StoreCode: store.StoreCode, StoreName: store.StoreName, Brand: store.Brand, Region: store.Region, BusinessDate: date, AsOfAt: date.Add(time.Hour), Currency: "CNY", SourceSystem: "retail_simulator", DataClassification: "simulated", SimulationDatasetVersion: &version, Version: 1, Revenue: &value, GrossProfit: &value, Transactions: &value, Footfall: &value, AreaSqm: &value, LaborCost: &value, FixedRent: &value, VariableRent: &value, NonLeaseCost: &value, OtherControllableCost: &value, MappingStatus: "mapped", DataQualityStatus: "valid", LaborHours: &value})
 		}
 	}
 	set.ExpectedStoreCount = len(set.ExpectedStores)

@@ -1,6 +1,6 @@
 "use client";
 
-import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+import { StatusTag } from "../components/StatusTag";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, Upload, message } from "antd";
@@ -19,10 +19,12 @@ import { apiErrorMessage, operatingFactsApi, performanceApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
+import ScopeNote from "../components/ScopeNote";
+import PeerBenchmarkBlock, { type PeerBenchmarkItem } from "./PeerBenchmarkBlock";
+import { ActionCategoryText, ActionStatusTag, SeverityTag } from "./ActionCells";
 
 type Overview = { period: string; store_fact_count: number; store_fact_ready_count: number; store_fact_missing_count: number; store_fact_unmapped_count: number; store_fact_unreconciled_count: number; equipment_fact_count: number; equipment_fact_unreconciled_count: number; open_action_count: number; open_action_impact: number; latest_store_as_of?: string; latest_equipment_as_of?: string };
 type FourWall = { store_id: string; store_code: string; store_name: string; brand: string; region: string; currency: string; revenue: number; gross_profit?: number; four_wall_ebitda?: number; rent_to_sales?: number; occupancy_cost_ratio?: number; sales_per_sqm?: number; break_even_sales?: number; data_ready: boolean; data_gaps?: string[]; reconciliation_status: string };
-type PeerBenchmarkItem = { fact: { equipment_id: string; equipment_code: string; equipment_name: string; plant_code: string; production_line_code: string; currency: string; period: string; oee_pct?: number; utilization_pct?: number; actual_cost?: number; standard_cost?: number; reconciliation_status: string }; bridge?: { variance: number; residual: number; ties_out: boolean }; missing?: string[] };
 type Action = { id: string; category: string; severity: string; status: string; title: string; description: string; impact_amount?: number; currency?: string; owner_name?: string; due_date?: string; expected_benefit?: number; verification_status: string; human_root_cause?: string; planned_action?: string; source_table: string; source_record_id: string };
 
 const money = (value?: number, currency?: string) => value == null ? "—" : `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ""}`;
@@ -160,20 +162,14 @@ export default function PerformancePage() {
     { title: t("perf.col.data_status", language), key: "status", render: (_: unknown, row: FourWall) => row.data_ready ? <StatusTag kind="success">{t("perf.status.decision_ready", language)}</StatusTag> : <StatusTag kind="warning">{t("perf.status.gap", language)}：{(row.data_gaps || []).join(", ") || row.reconciliation_status}</StatusTag> },
   ], [language]);
 
-  const peerColumns = useMemo(() => [
-    { title: t("perf.col.equipment", language), key: "equipment", render: (_: unknown, row: PeerBenchmarkItem) => <Space direction="vertical" size={0}><strong>{row.fact.equipment_code || row.fact.equipment_name}</strong><Typography.Text type="secondary">{row.fact.plant_code || "核心商圈"} · {row.fact.production_line_code || "标杆同群"}</Typography.Text></Space> },
-    { title: "同群平均坪效达成率", render: (_: unknown, row: PeerBenchmarkItem) => pct(row.fact.oee_pct || row.fact.utilization_pct) },
-    { title: t("perf.col.utilization", language), render: (_: unknown, row: PeerBenchmarkItem) => pct(row.fact.utilization_pct) },
-    { title: t("perf.col.cost_variance", language), render: (_: unknown, row: PeerBenchmarkItem) => row.bridge ? money(row.bridge.variance, row.fact.currency) : "—" },
-    { title: t("perf.col.residual", language), render: (_: unknown, row: PeerBenchmarkItem) => row.bridge ? money(row.bridge.residual, row.fact.currency) : "—" },
-    { title: t("perf.col.data_status", language), render: (_: unknown, row: PeerBenchmarkItem) => row.bridge?.ties_out ? <StatusTag kind="success">{t("perf.status.bridge_balanced", language)}</StatusTag> : <StatusTag kind="warning">{t("perf.status.insufficient_evidence", language)}</StatusTag> },
-  ], [language]);
+          {/* R0-1: equipment block moved into PeerBenchmarkBlock; three branches
+               (empty / basis unavailable / table) decided by resolveBasis. */}
 
   const actionColumns = useMemo(() => [
-    { title: t("perf.col.action", language), key: "title", render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><strong>{row.title}</strong><Typography.Text type="secondary">{row.category}</Typography.Text></Space> },
+    { title: t("perf.col.action", language), key: "title", render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><strong>{row.title}</strong><Typography.Text type="secondary"><ActionCategoryText value={row.category} language={language} /></Typography.Text></Space> },
     { title: t("perf.col.impact", language), render: (_: unknown, row: Action) => money(row.impact_amount, row.currency) },
-    { title: t("perf.col.severity", language), dataIndex: "severity", render: (value: string) => <StatusTag kind={statusKindFromAntColor(value === "critical" || value === "high" ? "error" : "warning")}>{value}</StatusTag> },
-    { title: t("perf.col.status", language), dataIndex: "status", render: (value: string) => <StatusTag>{value}</StatusTag> },
+    { title: t("perf.col.severity", language), dataIndex: "severity", render: (value: string) => <SeverityTag value={value} language={language} /> },
+    { title: t("perf.col.status", language), dataIndex: "status", render: (value: string) => <ActionStatusTag value={value} language={language} /> },
     { title: t("perf.col.owner_due", language), render: (_: unknown, row: Action) => <Space direction="vertical" size={0}><span>{row.owner_name || t("perf.unassigned", language)}</span><Typography.Text type="secondary">{row.due_date || t("perf.no_date", language)}</Typography.Text></Space> },
     { title: t("perf.col.operation", language), key: "action", render: (_: unknown, row: Action) => row.status === "open" ? <Button size="small" icon={<CheckCircleOutlined />} onClick={() => acknowledge(row)}>{t("perf.acknowledge", language)}</Button> : null },
   // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
@@ -188,6 +184,8 @@ export default function PerformancePage() {
             meta={t("perf.meta", language).replace("{period}", period).replace("{stamp}", dayjs().format("YYYY-MM-DD HH:mm"))}
             help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
           />
+          {/* R0-3: scope note — how this page differs from /operating-pulse */}
+          <ScopeNote noteKey="perf.scope_note" className="perf-scope-note" language={language} />
           <div className="precision-filter-bar" style={{ marginBottom: 16 }}>
             <Space wrap size={12} align="center">
               <div className="precision-filter-group">
@@ -342,18 +340,7 @@ export default function PerformancePage() {
               {
                 key: "equipment",
                 label: `${t("perf.tab.equipment", language)} (${peerBenchmarks.length})`,
-                children: peerBenchmarks.length ? (
-                  <Table
-                    rowKey={(row: PeerBenchmarkItem) => row.fact.equipment_id}
-                    size="small"
-                    columns={peerColumns}
-                    dataSource={peerBenchmarks}
-                    pagination={{ pageSize: 8 }}
-                    scroll={tableScrollX(peerBenchmarks.length, 900)}
-                  />
-                ) : (
-                  <Empty description={t("perf.empty.equipment", language)} />
-                ),
+                children: <PeerBenchmarkBlock items={peerBenchmarks} language={language} />,
               },
               {
                 key: "scenario",

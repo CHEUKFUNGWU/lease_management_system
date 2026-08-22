@@ -67,15 +67,9 @@ const ALLOWED: Allowance[] = [
       "与 F0-2/F0-3 同类错误，但修复需要为 close 批次状态建立独立 i18n 键组与契约测试，" +
       "属下一个批次；已在交付报告中登记。",
   },
-  {
-    file: "app/store-360/page.tsx",
-    rule: "paren_bare_enum",
-    count: 1,
-    reason:
-      "存量泄漏（非本批次范围）：门店 360 头部渲染 ({response.currency_status}) 原始枚举。" +
-      "后端 currency_status 取值集未封闭（conflict/unknown/…），修复需先在后端固化清单，" +
-      "已在交付报告中登记为跨端前置项。",
-  },
+  // store-360 的 paren_bare_enum 记账（原 1 处：({response.currency_status})）
+  // 已由 R0-2 偿清——currency_status 经 store360/enums.ts 的
+  // currencyStatusLabel 映射渲染，记账按「不许挂虚账」规则删除。
 ];
 
 type Finding = { file: string; rule: string; line: number; snippet: string };

@@ -21,6 +21,7 @@ import { BentoGrid, BentoTile } from "../components/bento/BentoGrid";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
+import { currencyStatusLabel } from "./enums";
 import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailPlFlowResponse, type RetailSimulationDatasetData, type RetailStore360Option, type RetailStoreDiagnosticsResponse, type RetailSummaryMetric } from "../lib/api";
 import { ApiError } from "../lib/api";
 import { classifyDataState } from "../lib/dataState";
@@ -635,7 +636,7 @@ function Store360Inner() {
                         </Space>
                         <Space size={16}>
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            {t("store360.field.currency", language)}: <strong>{response.currency || "—"}</strong> ({response.currency_status})
+                            {t("store360.field.currency", language)}: <strong>{response.currency || "—"}</strong> ({currencyStatusLabel(response.currency_status, language)})
                           </Typography.Text>
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                             {t("store360.field.fact_version", language)}: <strong>v{response.fact_version_min}–v{response.fact_version_max}</strong>

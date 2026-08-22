@@ -65,3 +65,50 @@ describe("F3-2 导航分组", () => {
     expect(t("nav.fpna_workbench", "zh-CN")).toBe("FP&A 经营工作台");
   });
 });
+
+/**
+ * R0-3：导航不变性守卫，两个方向都要断言——
+ *  1. 防删：下面每个路由都必须仍以 item("/x") 形式出现在 AppLayout；
+ *     有人删掉任何一个导航项即红。
+ *  2. 防加：/roi 是孤儿路由（内部立项测算工具，定位说明见页面内 Alert），
+ *     现状不在导航里；有人顺手把它加回导航即红。
+ * 不在清单里的路由（/upload、/contracts/new、/contracts/[id]、登录页等）
+ * 是「按设计不在导航」的既有事实，本守卫不锁它们的增减。
+ */
+const NAV_INVARIANCE_ROUTES = [
+  "/operating-pulse",
+  "/store-360",
+  "/store-pnl",
+  "/financial-model",
+  "/scenario-workbench",
+  "/fpna-workbench",
+  "/performance",
+  "/promotions",
+  "/portfolio",
+  "/pre-deal",
+  "/deal-compare",
+  "/sensitivity",
+  "/cashflow-forecast",
+  "/todo",
+  "/contracts",
+  "/ai-chat",
+  "/reports",
+  "/retail-data-import",
+  "/monthly-closing",
+  "/standards",
+  "/audit-logs",
+];
+// 条件渲染的导航项（角色门控），同样不许被删
+const NAV_CONDITIONAL_ROUTES = ["/agent-metrics", "/settings"];
+
+describe("R0-3 导航不变性", () => {
+  it("全部既有导航项仍在（防删）", () => {
+    for (const route of [...NAV_INVARIANCE_ROUTES, ...NAV_CONDITIONAL_ROUTES]) {
+      expect(layout, `${route} must remain a nav item`).toContain(`item("${route}"`);
+    }
+  });
+
+  it("/roi 仍不在导航里（防加）", () => {
+    expect(layout).not.toContain('item("/roi"');
+  });
+});

@@ -2864,6 +2864,17 @@ export const dict: TranslationDict = {
   "perf.empty.actions": { "zh-CN": "当前期间没有待处理行动", "zh-HK": "當前期間沒有待處理行動", en: "No open actions this period" },
   "perf.empty.stores": { "zh-CN": "暂无门店经营事实；请先在导入中心上载经营数据", "zh-HK": "暫無門店經營事實；請先在導入中心上載經營數據", en: "No store facts yet. Please import operating facts first" },
   "perf.empty.equipment": { "zh-CN": "本期没有导入设备事实", "zh-HK": "本期沒有導入設備事實", en: "No equipment facts imported this period" },
+  // R0-1：口径不可用（有设备事实行但不是门店口径）时的具名空态。文案定稿来自工单，不改写。
+  "perf.peer.unavailable_title": {
+    "zh-CN": "本期没有门店同群对标数据",
+    "zh-HK": "本期沒有門店同群對標數據",
+    en: "No store peer benchmark data for this period",
+  },
+  "perf.peer.unavailable_body": {
+    "zh-CN": "这个数据源当前只包含设备口径的事实（工厂、产线、设备），不能换算成门店的坪效或同群水平。门店口径的同群对标在「门店 360」的同群区间图里。",
+    "zh-HK": "這個數據源當前只包含設備口徑的事實（工廠、產線、設備），不能換算成門店的坪效或同群水平。門店口徑的同群對標在「門店 360」的同群區間圖裡。",
+    en: "This data source currently contains equipment-basis facts only (plants, production lines, equipment). They cannot be converted into store sales-per-sqm or peer levels. Store-basis peer benchmarks live in the peer range chart of Store 360.",
+  },
   "perf.scenario.draft_title": { "zh-CN": "方案试算底稿", "zh-HK": "方案試算底稿", en: "Scenario sandbox" },
   "perf.scenario.draft_note": { "zh-CN": "此处的假设在独立安全沙盘内推演，不会覆盖正式预算、修改正式合同或触发会计重算；正式决策需人工审批入库。", "zh-HK": "此處的假設在獨立安全沙盤內推演，不會覆蓋正式預算、修改正式合同或觸發會計重算；正式決策需人工審批入庫。", en: "Assumptions run in an isolated sandbox. They never overwrite budgets, modify contracts or trigger accounting recalculations." },
   "perf.scenario.monthly_sales": { "zh-CN": "月营收", "zh-HK": "月營收", en: "Monthly sales" },

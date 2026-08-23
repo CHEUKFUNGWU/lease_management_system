@@ -14,8 +14,8 @@ func TestRunnerIntentToolDetection(t *testing.T) {
 	}{
 		{"帮我算一下这个续租方案", "lease.renewal.simulate"},
 		{"两家报价对比一下", "lease.deal.simulate"},
-		{"做个现金流情景", "lease.cashflow.scenario"},
-		{"出一份决策摘要", "lease.decision.summary"},
+		{"做个现金流情景", "fpna.cashflow.scenario"},
+		{"出一份决策摘要", "fpna.decision.summary"},
 		{"今天门店表现怎么样", ""},
 		{"查看经营脉搏", ""},
 	}

@@ -49,7 +49,7 @@ type RenewalDecisionArguments struct {
 
 func NewBudgetVarianceDefinition(reader BudgetVarianceReader) agenttools.ToolDefinition {
 	return controlReadDefinition(
-		"lease.budget.variance", "读取预算差异桥", "读取 Actual 与 Budget/Forecast 版本的确定性差异桥；未解释金额保留为 residual，不由 AI 分摊。",
+		"fpna.budget.variance.read", "读取预算差异桥", "读取 Actual 与 Budget/Forecast 版本的确定性差异桥；未解释金额保留为 residual，不由 AI 分摊。",
 		json.RawMessage(`{"type":"object","additionalProperties":false,"required":["version_id","period"],"properties":{"version_id":{"type":"string"},"period":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}$"}}}`),
 		[]string{"fpna_copilot"},
 		func(ctx context.Context, call agenttools.ToolCall, execution agenttools.ExecutionContext, args BudgetVarianceArguments) (any, []agenttools.ToolSource, error) {
@@ -68,7 +68,7 @@ func NewBudgetVarianceDefinition(reader BudgetVarianceReader) agenttools.ToolDef
 
 func NewCashflowScenarioDefinition(reader CashflowScenarioReader) agenttools.ToolDefinition {
 	return controlReadDefinition(
-		"lease.cashflow.scenario", "模拟租赁现金流方案", "调用现有现金流确定性服务比较续租/关店比例和租金假设；只返回 Scenario，不改变 Forecast 或合同。",
+		"fpna.cashflow.scenario", "模拟租赁现金流方案", "调用现有现金流确定性服务比较续租/关店比例和租金假设；只返回 Scenario，不改变 Forecast 或合同。",
 		json.RawMessage(`{"type":"object","additionalProperties":false,"required":["as_of","horizon_months","scenarios"],"properties":{"as_of":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},"horizon_months":{"type":"integer","minimum":1},"scenarios":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["name"],"properties":{"name":{"type":"string"},"renewal_rate":{"type":"number","minimum":0,"maximum":1},"renewal_term_months":{"type":"integer","minimum":0},"renewal_uplift_percent":{"type":"number"},"closure_rate":{"type":"number","minimum":0,"maximum":1},"closure_cost_months":{"type":"number","minimum":0}}}}}}`),
 		[]string{"fpna_copilot"},
 		func(ctx context.Context, call agenttools.ToolCall, execution agenttools.ExecutionContext, args CashflowScenarioArguments) (any, []agenttools.ToolSource, error) {

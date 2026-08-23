@@ -49,23 +49,23 @@ func NewPortfolioSummaryDefinition(reader PerformanceReader) agenttools.ToolDefi
 }
 
 func NewManagementPreReadDefinition(reader PerformanceReader) agenttools.ToolDefinition {
-	return readPerformanceDefinition("lease.management.pre_read", "生成管理层会前材料", "基于权限范围内经营事实和行动生成会前摘要、问题清单和数据缺口", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"}}}`), reader, managementPreReadHandler)
+	return readPerformanceDefinition("fpna.management.pre_read", "生成管理层会前材料", "基于权限范围内经营事实和行动生成会前摘要、问题清单和数据缺口", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"}}}`), reader, managementPreReadHandler)
 }
 
 func NewStorePerformanceDefinition(reader PerformanceReader) agenttools.ToolDefinition {
-	return readPerformanceDefinition("lease.store.performance", "读取门店四墙表现", "读取权限范围内门店四墙损益、租售比、坪效及数据缺口", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"},"store_id":{"type":"string"}}}`), reader, storePerformanceHandler)
+	return readPerformanceDefinition("retail.store.performance.read", "读取门店四墙表现", "读取权限范围内门店四墙损益、租售比、坪效及数据缺口", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"},"store_id":{"type":"string"}}}`), reader, storePerformanceHandler)
 }
 
 func NewRentToSalesDefinition(reader PerformanceReader) agenttools.ToolDefinition {
-	return readPerformanceDefinition("lease.rent_to_sales", "读取租售比", "读取权限范围内门店固定租金、变量租金与销售额的租售比及缺口", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"},"store_id":{"type":"string"}}}`), reader, rentToSalesHandler)
+	return readPerformanceDefinition("retail.rent_to_sales.read", "读取租售比", "读取权限范围内门店固定租金、变量租金与销售额的租售比及缺口", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"},"store_id":{"type":"string"}}}`), reader, rentToSalesHandler)
 }
 
 func NewEquipmentPerformanceDefinition(reader PerformanceReader) agenttools.ToolDefinition {
-	return readPerformanceDefinition("lease.equipment.performance", "读取设备经营表现", "读取权限范围内产线设备经营事实和制造成本桥", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"},"plant":{"type":"string"},"line":{"type":"string"}}}`), reader, equipmentPerformanceHandler)
+	return readPerformanceDefinition("retail.equipment.performance.read", "读取设备经营表现", "读取权限范围内产线设备经营事实和制造成本桥", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["period"],"properties":{"period":{"type":"string"},"plant":{"type":"string"},"line":{"type":"string"}}}`), reader, equipmentPerformanceHandler)
 }
 
 func NewActionListDefinition(reader PerformanceReader) agenttools.ToolDefinition {
-	return readPerformanceDefinition("lease.fpna.actions", "读取经营行动与异常", "读取权限范围内待处理经营异常、数据问题和行动兑现状态", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"period":{"type":"string"},"status":{"type":"string"},"category":{"type":"string"}}}`), reader, actionListHandler)
+	return readPerformanceDefinition("fpna.actions.read", "读取经营行动与异常", "读取权限范围内待处理经营异常、数据问题和行动兑现状态", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"period":{"type":"string"},"status":{"type":"string"},"category":{"type":"string"}}}`), reader, actionListHandler)
 }
 
 type StoreScenarioArguments struct {
@@ -76,11 +76,11 @@ type EquipmentScenarioArguments struct {
 }
 
 func NewStoreScenarioDefinition() agenttools.ToolDefinition {
-	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "lease.store.scenario.simulate", Version: "v1", DisplayName: "模拟门店经营方案", Description: "对续租、议价、缩店、搬迁和关店方案进行无副作用确定性测算", Level: agenttools.LevelRead, ReadOnly: true, Permissions: []agenttools.Permission{{Resource: "reports", Action: "read"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["scenarios"],"properties":{"scenarios":{"type":"array","minItems":2}}}`), SupportsDryRun: true, MaxRows: 20, TimeoutSeconds: 15}, SkillIDs: []string{"fpna_copilot", "retail_performance"}, Handler: storeScenarioHandler}
+	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "retail.store.scenario.simulate", Version: "v1", DisplayName: "模拟门店经营方案", Description: "对续租、议价、缩店、搬迁和关店方案进行无副作用确定性测算", Level: agenttools.LevelRead, ReadOnly: true, Permissions: []agenttools.Permission{{Resource: "reports", Action: "read"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["scenarios"],"properties":{"scenarios":{"type":"array","minItems":2}}}`), SupportsDryRun: true, MaxRows: 20, TimeoutSeconds: 15}, SkillIDs: []string{"fpna_copilot", "retail_performance"}, Handler: storeScenarioHandler}
 }
 
 func NewEquipmentScenarioDefinition() agenttools.ToolDefinition {
-	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "lease.equipment.scenario.simulate", Version: "v1", DisplayName: "模拟设备经济方案", Description: "对 Buy、Lease、Renew、Replace 和 Outsource 方案进行无副作用确定性测算", Level: agenttools.LevelRead, ReadOnly: true, Permissions: []agenttools.Permission{{Resource: "reports", Action: "read"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["scenarios"],"properties":{"scenarios":{"type":"array","minItems":2}}}`), SupportsDryRun: true, MaxRows: 20, TimeoutSeconds: 15}, SkillIDs: []string{"fpna_copilot", "manufacturing_performance"}, Handler: equipmentScenarioHandler}
+	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "retail.equipment.scenario.simulate", Version: "v1", DisplayName: "模拟设备经济方案", Description: "对 Buy、Lease、Renew、Replace 和 Outsource 方案进行无副作用确定性测算", Level: agenttools.LevelRead, ReadOnly: true, Permissions: []agenttools.Permission{{Resource: "reports", Action: "read"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["scenarios"],"properties":{"scenarios":{"type":"array","minItems":2}}}`), SupportsDryRun: true, MaxRows: 20, TimeoutSeconds: 15}, SkillIDs: []string{"fpna_copilot", "manufacturing_performance"}, Handler: equipmentScenarioHandler}
 }
 
 type ActionDraftArguments struct {
@@ -100,12 +100,12 @@ type ActionDraftArguments struct {
 }
 
 func NewActionDraftDefinition(writer ActionDraftWriter) agenttools.ToolDefinition {
-	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "lease.fpna.action.draft.create", Version: "v1", DisplayName: "创建经营行动草稿", Description: "创建待人工确认的经营异常解释/行动草稿，不会直接改变 Forecast、合同或会计记录", Level: agenttools.LevelDraft, ReadOnly: false, Permissions: []agenttools.Permission{{Resource: "fpna_actions", Action: "write"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["category","title","rule_code","source_table","source_record_id"],"properties":{"period":{"type":"string"},"category":{"type":"string"},"severity":{"type":"string"},"title":{"type":"string"},"description":{"type":"string"},"rule_code":{"type":"string"},"source_table":{"type":"string"},"source_record_id":{"type":"string"},"data_version":{"type":"string"},"impact_amount":{"type":"number"},"currency":{"type":"string"},"expected_benefit":{"type":"number"},"planned_action":{"type":"string"}}}`), SupportsDryRun: true, SupportsIdempotency: true, MaxRows: 1, TimeoutSeconds: 15, Review: agenttools.ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "human_action_confirmation"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_action_draft"}, Retry: agenttools.RetryPolicy{Retryable: true, MaxAttempts: 2}}, SkillIDs: []string{"fpna_copilot"}, Handler: actionDraftHandler(writer)}
+	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "fpna.actions.draft.create", Version: "v1", DisplayName: "创建经营行动草稿", Description: "创建待人工确认的经营异常解释/行动草稿，不会直接改变 Forecast、合同或会计记录", Level: agenttools.LevelDraft, ReadOnly: false, Permissions: []agenttools.Permission{{Resource: "fpna_actions", Action: "write"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["category","title","rule_code","source_table","source_record_id"],"properties":{"period":{"type":"string"},"category":{"type":"string"},"severity":{"type":"string"},"title":{"type":"string"},"description":{"type":"string"},"rule_code":{"type":"string"},"source_table":{"type":"string"},"source_record_id":{"type":"string"},"data_version":{"type":"string"},"impact_amount":{"type":"number"},"currency":{"type":"string"},"expected_benefit":{"type":"number"},"planned_action":{"type":"string"}}}`), SupportsDryRun: true, SupportsIdempotency: true, MaxRows: 1, TimeoutSeconds: 15, Review: agenttools.ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "human_action_confirmation"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_action_draft"}, Retry: agenttools.RetryPolicy{Retryable: true, MaxAttempts: 2}}, SkillIDs: []string{"fpna_copilot"}, Handler: actionDraftHandler(writer)}
 }
 
 func NewMeetingActionDraftDefinition(writer ActionDraftWriter) agenttools.ToolDefinition {
 	definition := NewActionDraftDefinition(writer)
-	definition.Descriptor.Name = "lease.meeting.action.draft.create"
+	definition.Descriptor.Name = "fpna.meeting_actions.draft.create"
 	definition.Descriptor.DisplayName = "创建会议行动草稿"
 	definition.Descriptor.Description = "将会议纪要中的承诺、负责人、截止日期保存为待确认行动草稿"
 	definition.Descriptor.Review.ConfirmAction = "confirm_meeting_action"
@@ -121,7 +121,7 @@ type ScenarioDraftArguments struct {
 }
 
 func NewScenarioDraftDefinition(writer ScenarioDraftWriter) agenttools.ToolDefinition {
-	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "lease.fpna.scenario.draft.create", Version: "v1", DisplayName: "保存经营情景草稿", Description: "保存经确定性服务计算后的 Scenario 草稿；不会覆盖 Budget/Forecast 或产生正式会计记录", Level: agenttools.LevelDraft, ReadOnly: false, Permissions: []agenttools.Permission{{Resource: "fpna_actions", Action: "write"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["scenario_type","name","assumptions"],"properties":{"scenario_type":{"type":"string"},"name":{"type":"string"},"assumptions":{"type":"object"},"result":{"type":"object"},"data_version":{"type":"string"}}}`), SupportsDryRun: true, SupportsIdempotency: true, MaxRows: 1, TimeoutSeconds: 15, Review: agenttools.ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "scenario_confirmation"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_scenario_draft"}, Retry: agenttools.RetryPolicy{Retryable: true, MaxAttempts: 2}}, SkillIDs: []string{"fpna_copilot"}, Handler: scenarioDraftHandler(writer)}
+	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "fpna.scenarios.draft.create", Version: "v1", DisplayName: "保存经营情景草稿", Description: "保存经确定性服务计算后的 Scenario 草稿；不会覆盖 Budget/Forecast 或产生正式会计记录", Level: agenttools.LevelDraft, ReadOnly: false, Permissions: []agenttools.Permission{{Resource: "fpna_actions", Action: "write"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["scenario_type","name","assumptions"],"properties":{"scenario_type":{"type":"string"},"name":{"type":"string"},"assumptions":{"type":"object"},"result":{"type":"object"},"data_version":{"type":"string"}}}`), SupportsDryRun: true, SupportsIdempotency: true, MaxRows: 1, TimeoutSeconds: 15, Review: agenttools.ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "scenario_confirmation"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_scenario_draft"}, Retry: agenttools.RetryPolicy{Retryable: true, MaxAttempts: 2}}, SkillIDs: []string{"fpna_copilot"}, Handler: scenarioDraftHandler(writer)}
 }
 
 type DecisionMemoArguments struct {
@@ -140,7 +140,7 @@ type DecisionMemoArguments struct {
 }
 
 func NewDecisionMemoDraftDefinition(writer DecisionMemoDraftWriter) agenttools.ToolDefinition {
-	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "lease.decision.memo.draft.create", Version: "v1", DisplayName: "创建决策备忘录草稿", Description: "将系统事实、确定性计算、人类输入和 AI 叙事分层保存为需复核的决策备忘录草稿", Level: agenttools.LevelDraft, ReadOnly: false, Permissions: []agenttools.Permission{{Resource: "fpna_memos", Action: "write"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["memo_type","title","system_facts","deterministic_calculations"],"properties":{"memo_type":{"type":"string"},"title":{"type":"string"},"basis":{"type":"string"},"scenario_draft_id":{"type":"string"},"system_facts":{"type":"object"},"deterministic_calculations":{"type":"object"},"human_inputs":{"type":"object"},"ai_narrative":{"type":"object"},"source_references":{"type":"array"},"data_version":{"type":"string"},"assumption_version":{"type":"string"},"metric_definition_version":{"type":"string"}}}`), SupportsDryRun: true, SupportsIdempotency: true, MaxRows: 1, TimeoutSeconds: 15, Review: agenttools.ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "decision_memo_review"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_decision_memo"}, Retry: agenttools.RetryPolicy{Retryable: true, MaxAttempts: 2}}, SkillIDs: []string{"fpna_copilot", "retail_performance", "manufacturing_performance"}, Handler: decisionMemoDraftHandler(writer)}
+	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "fpna.memos.decision.draft.create", Version: "v1", DisplayName: "创建决策备忘录草稿", Description: "将系统事实、确定性计算、人类输入和 AI 叙事分层保存为需复核的决策备忘录草稿", Level: agenttools.LevelDraft, ReadOnly: false, Permissions: []agenttools.Permission{{Resource: "fpna_memos", Action: "write"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["memo_type","title","system_facts","deterministic_calculations"],"properties":{"memo_type":{"type":"string"},"title":{"type":"string"},"basis":{"type":"string"},"scenario_draft_id":{"type":"string"},"system_facts":{"type":"object"},"deterministic_calculations":{"type":"object"},"human_inputs":{"type":"object"},"ai_narrative":{"type":"object"},"source_references":{"type":"array"},"data_version":{"type":"string"},"assumption_version":{"type":"string"},"metric_definition_version":{"type":"string"}}}`), SupportsDryRun: true, SupportsIdempotency: true, MaxRows: 1, TimeoutSeconds: 15, Review: agenttools.ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "decision_memo_review"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_decision_memo"}, Retry: agenttools.RetryPolicy{Retryable: true, MaxAttempts: 2}}, SkillIDs: []string{"fpna_copilot", "retail_performance", "manufacturing_performance"}, Handler: decisionMemoDraftHandler(writer)}
 }
 
 func decisionMemoDraftHandler(writer DecisionMemoDraftWriter) agenttools.ToolHandler {

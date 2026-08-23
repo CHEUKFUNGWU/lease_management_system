@@ -38,7 +38,7 @@ type DecisionSummaryArguments struct {
 }
 
 func NewDecisionSummaryDefinition() agenttools.ToolDefinition {
-	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "lease.decision.summary", Version: "v1", DisplayName: "生成一页决策摘要", Description: "把已提供的系统事实、确定性计算、假设、数据缺口、反方论点和待问问题组织为一页摘要；不写入正式记录", Level: agenttools.LevelRead, ReadOnly: true, Permissions: []agenttools.Permission{{Resource: "reports", Action: "read"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["title","facts","calculations"],"properties":{"title":{"type":"string"},"facts":{"type":"object"},"calculations":{"type":"object"},"assumptions":{"type":"object"},"data_gaps":{"type":"array","items":{"type":"string"}},"counterarguments":{"type":"array","items":{"type":"string"}},"questions":{"type":"array","items":{"type":"string"}}}}`), SupportsDryRun: true, MaxRows: 1, TimeoutSeconds: 15}, SkillIDs: []string{"fpna_copilot", "retail_performance", "manufacturing_performance"}, Handler: decisionSummaryHandler}
+	return agenttools.ToolDefinition{Descriptor: agenttools.ToolDescriptor{Name: "fpna.decision.summary", Version: "v1", DisplayName: "生成一页决策摘要", Description: "把已提供的系统事实、确定性计算、假设、数据缺口、反方论点和待问问题组织为一页摘要；不写入正式记录", Level: agenttools.LevelRead, ReadOnly: true, Permissions: []agenttools.Permission{{Resource: "reports", Action: "read"}}, InputSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["title","facts","calculations"],"properties":{"title":{"type":"string"},"facts":{"type":"object"},"calculations":{"type":"object"},"assumptions":{"type":"object"},"data_gaps":{"type":"array","items":{"type":"string"}},"counterarguments":{"type":"array","items":{"type":"string"}},"questions":{"type":"array","items":{"type":"string"}}}}`), SupportsDryRun: true, MaxRows: 1, TimeoutSeconds: 15}, SkillIDs: []string{"fpna_copilot", "retail_performance", "manufacturing_performance"}, Handler: decisionSummaryHandler}
 }
 
 func decisionSummaryHandler(ctx context.Context, call agenttools.ToolCall) (agenttools.ToolResult, error) {
@@ -143,7 +143,7 @@ type ActionExplanationDraftWriter interface {
 func NewExplanationDraftDefinition(writer ActionExplanationDraftWriter) agenttools.ToolDefinition {
 	return agenttools.ToolDefinition{
 		Descriptor: agenttools.ToolDescriptor{
-			Name: "lease.explanation.draft.create", Version: "v1", DisplayName: "创建差异解释草稿",
+			Name: "fpna.explanations.draft.create", Version: "v1", DisplayName: "创建差异解释草稿",
 			Description: "保存确定性差异桥、人工解释和 AI 建议的分层草稿，不形成正式控制结论",
 			Level:       agenttools.LevelDraft, ReadOnly: false,
 			Permissions:    []agenttools.Permission{{Resource: "fpna_actions", Action: "write"}},

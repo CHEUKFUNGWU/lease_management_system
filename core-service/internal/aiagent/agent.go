@@ -404,13 +404,13 @@ var runnerIntentFamilies = []struct {
 	{"lease.renewal.simulate", []string{"续租方案", "退租", "关店测算", "搬迁", "议价空间", "renewal scenario"}},
 	{"lease.deal.simulate", []string{"对比报价", "报价对比", "compare offers", "deal simulate"}},
 	{"lease.predeal.simulate", []string{"签约前测算", "签约前方案", "pre-deal"}},
-	{"lease.cashflow.scenario", []string{"现金流情景", "cashflow scenario", "现金流测算"}},
-	{"lease.store.scenario.simulate", []string{"门店情景测算", "门店搬迁测算", "门店关店测算"}},
-	{"lease.equipment.scenario.simulate", []string{"设备 buy/lease", "设备情景"}},
-	{"lease.decision.summary", []string{"决策摘要", "决策备忘", "decision summary"}},
-	{"lease.fpna.action.draft.create", []string{"行动草稿", "action draft"}},
-	{"lease.decision.memo.draft.create", []string{"决策备忘录草稿"}},
-	{"lease.meeting.action.draft.create", []string{"会议行动草稿"}},
+	{"fpna.cashflow.scenario", []string{"现金流情景", "cashflow scenario", "现金流测算"}},
+	{"retail.store.scenario.simulate", []string{"门店情景测算", "门店搬迁测算", "门店关店测算"}},
+	{"retail.equipment.scenario.simulate", []string{"设备 buy/lease", "设备情景"}},
+	{"fpna.decision.summary", []string{"决策摘要", "决策备忘", "decision summary"}},
+	{"fpna.actions.draft.create", []string{"行动草稿", "action draft"}},
+	{"fpna.memos.decision.draft.create", []string{"决策备忘录草稿"}},
+	{"fpna.meeting_actions.draft.create", []string{"会议行动草稿"}},
 }
 
 // runnerIntentTool returns the runner tool a message asks for, if any.
@@ -478,25 +478,25 @@ func buildPerformanceRunbook(skillID string, req Request) *AgentRunbook {
 		},
 		ToolCalls: []AgentToolCall{
 			{Tool: "lease.portfolio.summary", Skill: "FP&A Copilot", Status: "completed", InputSummary: "读取经营组合摘要", OutputSummary: "返回事实覆盖、数据准备度和行动影响", RequiresReview: false},
-			{Tool: "lease.management.pre_read", Skill: "Management Reporting", Status: "pending", InputSummary: "等待期间和权限范围", OutputSummary: "生成会前摘要、优先行动和问题清单", RequiresReview: true},
-			{Tool: "lease.store.performance", Skill: "Retail Finance BP", Status: "completed", InputSummary: "读取门店四墙表现", OutputSummary: "返回四墙 EBITDA、租售比、坪效和数据缺口", RequiresReview: false},
-			{Tool: "lease.rent_to_sales", Skill: "Retail Finance BP", Status: "completed", InputSummary: "读取门店租售比", OutputSummary: "返回固定/变量租金与销售额的租售比及证据缺口", RequiresReview: false},
-			{Tool: "lease.equipment.performance", Skill: "Manufacturing Finance BP", Status: "completed", InputSummary: "读取设备经营事实", OutputSummary: "返回成本桥和未解释残差", RequiresReview: false},
-			{Tool: "lease.fpna.actions", Skill: "FP&A Action Center", Status: "needs_review", InputSummary: "读取异常和行动兑现状态", OutputSummary: "仅生成带来源的行动草稿，正式动作需人工确认", RequiresReview: true},
+			{Tool: "fpna.management.pre_read", Skill: "Management Reporting", Status: "pending", InputSummary: "等待期间和权限范围", OutputSummary: "生成会前摘要、优先行动和问题清单", RequiresReview: true},
+			{Tool: "retail.store.performance.read", Skill: "Retail Finance BP", Status: "completed", InputSummary: "读取门店四墙表现", OutputSummary: "返回四墙 EBITDA、租售比、坪效和数据缺口", RequiresReview: false},
+			{Tool: "retail.rent_to_sales.read", Skill: "Retail Finance BP", Status: "completed", InputSummary: "读取门店租售比", OutputSummary: "返回固定/变量租金与销售额的租售比及证据缺口", RequiresReview: false},
+			{Tool: "retail.equipment.performance.read", Skill: "Manufacturing Finance BP", Status: "completed", InputSummary: "读取设备经营事实", OutputSummary: "返回成本桥和未解释残差", RequiresReview: false},
+			{Tool: "fpna.actions.read", Skill: "FP&A Action Center", Status: "needs_review", InputSummary: "读取异常和行动兑现状态", OutputSummary: "仅生成带来源的行动草稿，正式动作需人工确认", RequiresReview: true},
 			{Tool: "lease.close.readiness", Skill: "FP&A Close Readiness", Status: "needs_review", InputSummary: "读取期间关账准备度和证据缺口", OutputSummary: "返回阻塞项与证据缺口，不会自动关账或过账", RequiresReview: true},
-			{Tool: "lease.budget.variance", Skill: "FP&A Driver Bridge", Status: "pending", InputSummary: "等待预算/Forecast 版本和期间", OutputSummary: "返回确定性差异桥与 residual", RequiresReview: false},
-			{Tool: "lease.cashflow.scenario", Skill: "FP&A Cash Planning", Status: "pending", InputSummary: "等待现金流情景结构化假设", OutputSummary: "返回无副作用租赁现金流 Scenario", RequiresReview: true},
+			{Tool: "fpna.budget.variance.read", Skill: "FP&A Driver Bridge", Status: "pending", InputSummary: "等待预算/Forecast 版本和期间", OutputSummary: "返回确定性差异桥与 residual", RequiresReview: false},
+			{Tool: "fpna.cashflow.scenario", Skill: "FP&A Cash Planning", Status: "pending", InputSummary: "等待现金流情景结构化假设", OutputSummary: "返回无副作用租赁现金流 Scenario", RequiresReview: true},
 			{Tool: "lease.renewal.decisions", Skill: "Retail Finance BP", Status: "pending", InputSummary: "等待合同范围内续租决策快照", OutputSummary: "读取既有 Scenario 证据，不会创建续租事件", RequiresReview: false},
-			{Tool: "lease.fpna.action.draft.create", Skill: "FP&A Action Center", Status: "pending", InputSummary: "等待用户确认解释、负责人和预期收益", OutputSummary: "创建 Assist Mode 行动草稿，需 Review Gate", RequiresReview: true},
-			{Tool: "lease.store.scenario.simulate", Skill: "Retail Finance BP", Status: "pending", InputSummary: "等待门店续租/议价/搬迁/关店结构化假设", OutputSummary: "返回无副作用 Scenario 结果，不写入合同", RequiresReview: true},
-			{Tool: "lease.equipment.scenario.simulate", Skill: "Manufacturing Finance BP", Status: "pending", InputSummary: "等待设备 Buy/Lease/Replace/Outsource 假设", OutputSummary: "返回经营 NPV 与 IFRS 16 分开展示", RequiresReview: true},
+			{Tool: "fpna.actions.draft.create", Skill: "FP&A Action Center", Status: "pending", InputSummary: "等待用户确认解释、负责人和预期收益", OutputSummary: "创建 Assist Mode 行动草稿，需 Review Gate", RequiresReview: true},
+			{Tool: "retail.store.scenario.simulate", Skill: "Retail Finance BP", Status: "pending", InputSummary: "等待门店续租/议价/搬迁/关店结构化假设", OutputSummary: "返回无副作用 Scenario 结果，不写入合同", RequiresReview: true},
+			{Tool: "retail.equipment.scenario.simulate", Skill: "Manufacturing Finance BP", Status: "pending", InputSummary: "等待设备 Buy/Lease/Replace/Outsource 假设", OutputSummary: "返回经营 NPV 与 IFRS 16 分开展示", RequiresReview: true},
 			{Tool: "lease.deal.simulate", Skill: "Deal / Pre-deal Finance", Status: "pending", InputSummary: "等待候选报价和已确认折现率", OutputSummary: "返回有效租金、现值和现金比较；无副作用", RequiresReview: true},
 			{Tool: "lease.predeal.simulate", Skill: "Deal / Pre-deal Finance", Status: "pending", InputSummary: "等待签约前结构化条款", OutputSummary: "返回费用曲线、EBITDA 桥和退出曲线", RequiresReview: true},
 			{Tool: "lease.renewal.simulate", Skill: "Retail Finance BP", Status: "pending", InputSummary: "等待续租/退出情景及已确认折现率", OutputSummary: "返回现金、损益和 IFRS 16 影响；无副作用", RequiresReview: true},
-			{Tool: "lease.decision.summary", Skill: "Decision Memo", Status: "pending", InputSummary: "等待事实、计算、假设和反方论点", OutputSummary: "生成一页决策摘要，保留数据缺口和待问问题", RequiresReview: true},
-			{Tool: "lease.fpna.scenario.draft.create", Skill: "FP&A Scenario Governance", Status: "pending", InputSummary: "等待用户确认假设和确定性计算结果", OutputSummary: "保存 Scenario 草稿，需 Review Gate，不覆盖 Budget/Forecast", RequiresReview: true},
-			{Tool: "lease.decision.memo.draft.create", Skill: "Decision Memo", Status: "pending", InputSummary: "等待系统事实、确定性计算和人类输入确认", OutputSummary: "保存分层决策备忘录草稿，需 Review Gate", RequiresReview: true},
-			{Tool: "lease.meeting.action.draft.create", Skill: "Meeting Follow-up", Status: "pending", InputSummary: "等待会议纪要、负责人和截止日期确认", OutputSummary: "保存会议行动草稿，后续用 Actual 验证兑现", RequiresReview: true},
+			{Tool: "fpna.decision.summary", Skill: "Decision Memo", Status: "pending", InputSummary: "等待事实、计算、假设和反方论点", OutputSummary: "生成一页决策摘要，保留数据缺口和待问问题", RequiresReview: true},
+			{Tool: "fpna.scenarios.draft.create", Skill: "FP&A Scenario Governance", Status: "pending", InputSummary: "等待用户确认假设和确定性计算结果", OutputSummary: "保存 Scenario 草稿，需 Review Gate，不覆盖 Budget/Forecast", RequiresReview: true},
+			{Tool: "fpna.memos.decision.draft.create", Skill: "Decision Memo", Status: "pending", InputSummary: "等待系统事实、确定性计算和人类输入确认", OutputSummary: "保存分层决策备忘录草稿，需 Review Gate", RequiresReview: true},
+			{Tool: "fpna.meeting_actions.draft.create", Skill: "Meeting Follow-up", Status: "pending", InputSummary: "等待会议纪要、负责人和截止日期确认", OutputSummary: "保存会议行动草稿，后续用 Actual 验证兑现", RequiresReview: true},
 		},
 		ReviewPrompts: []AgentReviewPrompt{{ID: "fpna_explanation_review", Title: "确认经营解释和行动", Description: "请确认系统事实、数据覆盖、驱动解释与行动负责人；AI 建议不会自动成为正式结论。", Severity: "warning", Action: "复核来源和残差后确认解释或创建行动草稿。"}},
 	}
@@ -1396,7 +1396,7 @@ func (h *Agent) appendPerformanceContext(ctx context.Context, toolRuntime *agent
 		contextData.WriteString("\n")
 		*sources = append(*sources, Source{Type: "performance_overview", ID: period, Title: "经营组合摘要", Snippet: "期间=" + period})
 	}
-	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.store.performance", agenttooldefs.PerformanceArguments{Period: period}); ok {
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "retail.store.performance.read", agenttooldefs.PerformanceArguments{Period: period}); ok {
 		encoded, _ := json.Marshal(result.Data)
 		contextData.WriteString("\n## 门店四墙表现（系统正式事实，Working）\n")
 		contextData.Write(encoded)
@@ -1405,7 +1405,7 @@ func (h *Agent) appendPerformanceContext(ctx context.Context, toolRuntime *agent
 			*sources = append(*sources, Source{Type: source.Type, ID: source.ID, Title: source.Title, Snippet: source.Locator})
 		}
 	}
-	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.equipment.performance", agenttooldefs.PerformanceArguments{Period: period}); ok {
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "retail.equipment.performance.read", agenttooldefs.PerformanceArguments{Period: period}); ok {
 		encoded, _ := json.Marshal(result.Data)
 		contextData.WriteString("\n## 制造设备表现（系统正式事实，Working）\n")
 		contextData.Write(encoded)
@@ -1414,7 +1414,7 @@ func (h *Agent) appendPerformanceContext(ctx context.Context, toolRuntime *agent
 			*sources = append(*sources, Source{Type: source.Type, ID: source.ID, Title: source.Title, Snippet: source.Locator})
 		}
 	}
-	if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.fpna.actions", agenttooldefs.PerformanceArguments{Period: period}); ok {
+	if result, ok := h.executeReadTool(ctx, toolRuntime, "fpna.actions.read", agenttooldefs.PerformanceArguments{Period: period}); ok {
 		encoded, _ := json.Marshal(result.Data)
 		contextData.WriteString("\n## 经营行动与异常（系统正式事实，待人工处理）\n")
 		contextData.Write(encoded)
@@ -1438,7 +1438,7 @@ func (h *Agent) appendPerformanceContext(ctx context.Context, toolRuntime *agent
 			versionID = strings.TrimSpace(page.Filters["budget_version_id"])
 		}
 		if versionID != "" {
-			if result, ok := h.executeReadTool(ctx, toolRuntime, "lease.budget.variance", agenttooldefs.BudgetVarianceArguments{VersionID: versionID, Period: period}); ok {
+			if result, ok := h.executeReadTool(ctx, toolRuntime, "fpna.budget.variance.read", agenttooldefs.BudgetVarianceArguments{VersionID: versionID, Period: period}); ok {
 				encoded, _ := json.Marshal(result.Data)
 				contextData.WriteString("\n## 预算差异桥（系统确定性服务，Working）\n")
 				contextData.Write(encoded)

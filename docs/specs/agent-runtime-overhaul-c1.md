@@ -340,7 +340,11 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 - **开放扩展生态**：MCP 接入不等于开放生态，工具注册仍受控（ADR-0022 Non-goals）
 - **表结构变更**：本批次不改表
 - **Auto-Post Mode**：AI 仍只在 Assist Mode 运行
-- **`fpna.coa.suggest_template`**（AI 生成行业专属科目树）：架构蓝图 §四.1 点名但全仓零实现。它属于 **Tool 覆盖率（Batch B）** 而非 runtime 升级，B-4 之后另排一组，勿在 C1 内实现
+- **FP&A 科目树的灵活性（两项，均不属 runtime 升级，B-4 之后优先于 C1）**。2026-08-23 复核发现：引擎**已经支持**逐科目选取数来源（行类型 `RowInput` 自填 / `RowLink` 挂系统事实 / `RowFormula` 推导，外加 `ActualSource` 让同一行在 Actual 冻结线左侧读事实、右侧跑公式），**但界面不支持**。`FormulaEditor.tsx` 只把一条公式送后端校验，构造临时模板时把所有行写成 `kind:"input"` 仅为让公式可解析；`page.tsx` 的 `addRow` 只接受 `"leaseRef" | "engine"` 两个固定分区。用户建不了自定义科目，也选不了某科目取系统数还是自己填。
+  - **科目树编辑器（前端）+ 逐科目取数来源选择**：完全缺失。没有它，AI 生成的科目树用户改不了
+  - **`fpna.coa.suggest_template`**（AI 生成行业专属科目树）：架构蓝图 §四.1 点名但全仓零实现
+  - 两者缺一不可：只做前者是全手工，只做后者是 AI 一次性生成后锁死
+- **`lease.fpna.*` 三个工具的改名**：`lease.fpna.action.draft.create`、`lease.fpna.scenario.draft.create`、`lease.fpna.actions` 把 FP&A 能力挂在 `lease.` 命名空间下，违反 AGENTS.md 的三命名空间规范。归入词表收敛专项
 
 ## Further Notes
 

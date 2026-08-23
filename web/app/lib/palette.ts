@@ -55,6 +55,7 @@ export const PALETTE_PAGES: PalettePageDef[] = [
   // 日常作业（所有登录用户）
   { path: "/todo", labelKey: "nav.todo", group: "daily", visible: byGroup("daily") },
   { path: "/contracts", labelKey: "nav.contracts", group: "daily", visible: byGroup("daily") },
+  { path: "/contracts/drafts", labelKey: "nav.contract_drafts", group: "daily", visible: byGroup("daily") },
   { path: "/ai-chat", labelKey: "nav.ai_chat", group: "daily", visible: byGroup("daily") },
   { path: "/upload", labelKey: "nav.upload", group: "daily", visible: byGroup("daily") },
 

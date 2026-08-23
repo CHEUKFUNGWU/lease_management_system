@@ -9968,6 +9968,259 @@ export const dict: TranslationDict = {
   "fpna.label_actual_to_compare": { "zh-CN": "比对实际版本", "zh-HK": "比對實際版本", en: "Actual Version to Compare" },
   "fpna.msg_name_required": { "zh-CN": "请为该预测版本指定名称", "zh-HK": "請為該預測版本指定名称", en: "Please provide a name for this forecast version" },
   "fpna.msg_select_both_versions": { "zh-CN": "请同时选择预测版本与实际版本", "zh-HK": "請同時選擇預測版本與實際版本", en: "Please select both forecast and actual versions" },
+
+  // ── Ch2 草稿复核工作台（/contracts/drafts）──
+  "nav.contract_drafts": {
+    "zh-CN": "草稿复核",
+    "zh-HK": "草稿復核",
+    en: "Draft review",
+  },
+  "common.yes": { "zh-CN": "是", "zh-HK": "是", en: "Yes" },
+  "common.no": { "zh-CN": "否", "zh-HK": "否", en: "No" },
+  "draftreview.title": {
+    "zh-CN": "草稿复核工作台",
+    "zh-HK": "草稿復核工作臺",
+    en: "Draft review workbench",
+  },
+  "draftreview.meta": {
+    "zh-CN": "AI 提取值与人工终值并列展示，互不覆盖；批准仅推进草稿状态，正式合同仍走既有审批流。",
+    "zh-HK": "AI 提取值與人工終值並列展示，互不覆蓋；批准僅推進草稿狀態，正式合同仍走既有審批流。",
+    en: "AI-extracted and human-final values are shown side by side, neither overwrites the other; approval only advances the draft, formal contracts still follow the existing approval flow.",
+  },
+  "draftreview.col_draft": {
+    "zh-CN": "草稿",
+    "zh-HK": "草稿",
+    en: "Draft",
+  },
+  "draftreview.col_status": {
+    "zh-CN": "状态",
+    "zh-HK": "狀態",
+    en: "Status",
+  },
+  "draftreview.col_classification": {
+    "zh-CN": "数据分类",
+    "zh-HK": "數據分類",
+    en: "Data class",
+  },
+  "draftreview.col_created": {
+    "zh-CN": "创建时间",
+    "zh-HK": "創建時間",
+    en: "Created",
+  },
+  "draftreview.status_pending": {
+    "zh-CN": "待复核",
+    "zh-HK": "待復核",
+    en: "Pending",
+  },
+  "draftreview.status_prepared": {
+    "zh-CN": "已修订",
+    "zh-HK": "已修訂",
+    en: "Prepared",
+  },
+  "draftreview.status_approved": {
+    "zh-CN": "已批准",
+    "zh-HK": "已批准",
+    en: "Approved",
+  },
+  "draftreview.status_rejected": {
+    "zh-CN": "已退回",
+    "zh-HK": "已退回",
+    en: "Rejected",
+  },
+  "draftreview.selected_count": {
+    "zh-CN": "已选 {count} 份",
+    "zh-HK": "已選 {count} 份",
+    en: "{count} selected",
+  },
+  "draftreview.batch_approve": {
+    "zh-CN": "批量批准",
+    "zh-HK": "批量批准",
+    en: "Batch approve",
+  },
+  "draftreview.list_aria": {
+    "zh-CN": "待审草稿列表",
+    "zh-HK": "待審草稿列表",
+    en: "Draft list",
+  },
+  "draftreview.detail_aria": {
+    "zh-CN": "草稿复核面板",
+    "zh-HK": "草稿復核面板",
+    en: "Review pane",
+  },
+  "draftreview.select_hint": {
+    "zh-CN": "从左侧选择一份草稿开始复核",
+    "zh-HK": "從左側選擇一份草稿開始復核",
+    en: "Pick a draft on the left to start reviewing",
+  },
+  "draftreview.original_title": {
+    "zh-CN": "合同原件",
+    "zh-HK": "合同原件",
+    en: "Original document",
+  },
+  "draftreview.original_placeholder": {
+    "zh-CN": "原件预览待接入：草稿表尚未保存原件路径，接入后在此展示并支持字段定位高亮。",
+    "zh-HK": "原件預覽待接入：草稿表尚未保存原件路徑，接入後在此展示並支持字段定位高亮。",
+    en: "Original preview pending: the draft table does not yet store a source-file path; once linked it renders here with field-level highlighting.",
+  },
+  "draftreview.original_task": {
+    "zh-CN": "识别任务",
+    "zh-HK": "識別任務",
+    en: "Extraction task",
+  },
+  "draftreview.field_name": {
+    "zh-CN": "字段",
+    "zh-HK": "欄位",
+    en: "Field",
+  },
+  "draftreview.field_ai_value": {
+    "zh-CN": "AI 提取值",
+    "zh-HK": "AI 提取值",
+    en: "AI value",
+  },
+  "draftreview.field_human_value": {
+    "zh-CN": "人工终值",
+    "zh-HK": "人工終值",
+    en: "Human final",
+  },
+  "draftreview.field_confidence": {
+    "zh-CN": "置信度",
+    "zh-HK": "置信度",
+    en: "Confidence",
+  },
+  "draftreview.field_confirmed": {
+    "zh-CN": "已确认",
+    "zh-HK": "已確認",
+    en: "Confirmed",
+  },
+  "draftreview.save_revisions": {
+    "zh-CN": "保存修订",
+    "zh-HK": "保存修訂",
+    en: "Save revisions",
+  },
+  "draftreview.save_failed": {
+    "zh-CN": "修订保存失败",
+    "zh-HK": "修訂保存失敗",
+    en: "Failed to save revisions",
+  },
+  "draftreview.approve_one": {
+    "zh-CN": "批准入库",
+    "zh-HK": "批准入庫",
+    en: "Approve",
+  },
+  "draftreview.reject_one": {
+    "zh-CN": "退回",
+    "zh-HK": "退回",
+    en: "Reject",
+  },
+  "draftreview.blocked_tooltip": {
+    "zh-CN": "以下低置信度字段未经逐个确认：{fields}",
+    "zh-HK": "以下低置信度欄位未經逐個確認：{fields}",
+    en: "Low-confidence fields not individually confirmed: {fields}",
+  },
+  "draftreview.blocked_separator": {
+    "zh-CN": "、",
+    "zh-HK": "、",
+    en: ", ",
+  },
+  "draftreview.reject_modal_title": {
+    "zh-CN": "退回这份草稿",
+    "zh-HK": "退回這份草稿",
+    en: "Reject this draft",
+  },
+  "draftreview.reject_reason_placeholder": {
+    "zh-CN": "写明退回原因，录入员据此修改（必填）",
+    "zh-HK": "寫明退回原因，錄入員據此修改（必填）",
+    en: "State why this draft is rejected so the editor can fix it (required)",
+  },
+  "draftreview.reject_reason_required": {
+    "zh-CN": "退回必须填写原因",
+    "zh-HK": "退回必須填寫原因",
+    en: "A reason is required to reject",
+  },
+  "draftreview.outcome_title": {
+    "zh-CN": "逐条结果",
+    "zh-HK": "逐條結果",
+    en: "Per-item results",
+  },
+  "draftreview.verdict_approved": {
+    "zh-CN": "已批准入库",
+    "zh-HK": "已批准入庫",
+    en: "Approved",
+  },
+  "draftreview.verdict_rejected": {
+    "zh-CN": "已退回",
+    "zh-HK": "已退回",
+    en: "Rejected",
+  },
+  "draftreview.verdict_failed": {
+    "zh-CN": "失败",
+    "zh-HK": "失敗",
+    en: "Failed",
+  },
+  "draftreview.verdict_replayed": {
+    "zh-CN": "重复请求，未重复入库",
+    "zh-HK": "重複請求，未重複入庫",
+    en: "Replayed, no duplicate record",
+  },
+  "draftreview.decide_failed": {
+    "zh-CN": "决定提交失败",
+    "zh-HK": "決定提交失敗",
+    en: "Failed to submit decision",
+  },
+  "draftreview.field_contract_number": {
+    "zh-CN": "合同编号", "zh-HK": "合同編號", en: "Contract no.",
+  },
+  "draftreview.field_contract_name": {
+    "zh-CN": "合同名称", "zh-HK": "合同名稱", en: "Contract name",
+  },
+  "draftreview.field_lessee_name": {
+    "zh-CN": "承租方", "zh-HK": "承租方", en: "Lessee",
+  },
+  "draftreview.field_lessor_name": {
+    "zh-CN": "出租方", "zh-HK": "出租方", en: "Lessor",
+  },
+  "draftreview.field_store_name": {
+    "zh-CN": "门店名称", "zh-HK": "門店名稱", en: "Store name",
+  },
+  "draftreview.field_store_address": {
+    "zh-CN": "门店地址", "zh-HK": "門店地址", en: "Store address",
+  },
+  "draftreview.field_area_sqm": {
+    "zh-CN": "面积（㎡）", "zh-HK": "面積（㎡）", en: "Area (sqm)",
+  },
+  "draftreview.field_asset_type": {
+    "zh-CN": "资产类别", "zh-HK": "資產類別", en: "Asset type",
+  },
+  "draftreview.field_lease_scope": {
+    "zh-CN": "租赁范围", "zh-HK": "租賃範圍", en: "Lease scope",
+  },
+  "draftreview.field_currency": {
+    "zh-CN": "币种", "zh-HK": "幣種", en: "Currency",
+  },
+  "draftreview.field_commencement_date": {
+    "zh-CN": "起租日", "zh-HK": "起租日", en: "Commencement date",
+  },
+  "draftreview.field_lease_start_date": {
+    "zh-CN": "租赁开始日", "zh-HK": "租賃開始日", en: "Lease start",
+  },
+  "draftreview.field_lease_end_date": {
+    "zh-CN": "租赁结束日", "zh-HK": "租賃結束日", en: "Lease end",
+  },
+  "draftreview.field_original_non_cancellable_period": {
+    "zh-CN": "原始不可撤销期", "zh-HK": "原始不可撤銷期", en: "Non-cancellable period",
+  },
+  "draftreview.field_renewal_option_description": {
+    "zh-CN": "续租选择权", "zh-HK": "續租選擇權", en: "Renewal option",
+  },
+  "draftreview.field_termination_option_description": {
+    "zh-CN": "终止选择权", "zh-HK": "終止選擇權", en: "Termination option",
+  },
+  "draftreview.field_discount_rate_type": {
+    "zh-CN": "折现率类型", "zh-HK": "折現率類型", en: "Discount rate type",
+  },
+  "draftreview.field_discount_rate_value": {
+    "zh-CN": "折现率", "zh-HK": "折現率", en: "Discount rate",
+  },
 };
 
 export function t(key: string, lang: Language, replacements?: Record<string, string>): string {

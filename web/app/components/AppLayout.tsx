@@ -68,6 +68,7 @@ function getBreadcrumbMap(language: string): Record<string, string> {
     admin: t("nav.admin", language as any),
     users: t("nav.users", language as any),
     new: t("nav.new", language as any),
+    drafts: t("nav.contract_drafts", language as any),
     "retail-data-import": t("nav.retail_data_import", language as any),
   };
 }
@@ -130,6 +131,7 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
           children: [
             item("/todo", "/todo", <CheckSquareOutlined />, t("nav.todo", language as any)),
             item("/contracts", "/contracts", <FileTextOutlined />, t("nav.contracts", language as any)),
+            item("/contracts/drafts", "/contracts/drafts", <AuditOutlined />, t("nav.contract_drafts", language as any)),
             item("/ai-chat", "/ai-chat", <RobotOutlined />, t("nav.ai_chat", language as any)),
           ],
       });
@@ -246,12 +248,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     },
   ];
 
-  // Find active menu key (handle nested routes like /contracts/:id)
+  // Find active menu key. Longest-prefix match over registered keys so nested
+  // routes light their own entry (/contracts/drafts) instead of the parent
+  // (/contracts); /contracts/:id still falls back to /contracts.
   const activeMenuKey = useMemo(() => {
     if (pathname === "/") return "/";
-    const basePath = "/" + pathname.split("/")[1];
-    return basePath;
-  }, [pathname]);
+    const candidates = new Set<string>();
+    const walk = (nodes: any[]) => {
+      nodes.forEach((node) => {
+        if (node?.key) candidates.add(String(node.key));
+        if (Array.isArray(node?.children)) walk(node.children);
+      });
+    };
+    walk(menuItems);
+    const matches = Array.from(candidates).filter((key) => pathname === key || pathname.startsWith(`${key}/`));
+    if (matches.length > 0) return matches.sort((a, b) => b.length - a.length)[0];
+    return "/" + pathname.split("/")[1];
+  }, [pathname, menuItems]);
 
   return (
     <Layout className="app-root">

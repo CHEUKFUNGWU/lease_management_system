@@ -22,6 +22,7 @@ import {
   DQ_CATEGORIES,
   DQ_STATUSES,
 } from "../fpna-workbench/types";
+import { DRAFT_REVIEW_STATUSES, DRAFT_DATA_CLASSIFICATIONS } from "../contracts/drafts/enums";
 
 const repoRoot = path.join(import.meta.dirname, "../../../");
 const pulseBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailpulse/retail_pulse.go"), "utf8");
@@ -32,6 +33,7 @@ const ingestBackend = readFileSync(path.join(repoRoot, "core-service/internal/se
 const ingestPage = readFileSync(path.join(import.meta.dirname, "../retail-data-import/page.tsx"), "utf8");
 const storepnlBackend = readFileSync(path.join(repoRoot, "core-service/internal/storepnl/project.go"), "utf8");
 const sqlInit = readFileSync(path.join(repoRoot, "db/init/01_init.sql"), "utf8");
+const draftReviewBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/draftreview/service.go"), "utf8");
 
 function quotedTokens(source: string, pattern: RegExp): string[] {
   return Array.from(source.matchAll(pattern), (m) => m[1]);
@@ -158,5 +160,29 @@ describe("CONTRACT-001 code-list contracts", () => {
     expect(dqStatusMatch, "fpna_data_quality_items status CHECK constraint found").not.toBeNull();
     const dbDqStatuses = quotedTokens(dqStatusMatch![1], /'([^']+)'/g).sort();
     expect([...DQ_STATUSES].sort()).toEqual(dbDqStatuses);
+  });
+
+  it("草稿复核：数据分类 = ai_contract_drafts 分类 CHECK 约束（双向相等）", () => {
+    const match = /ai_contract_drafts_classification_check[\s\S]*?CHECK\s*\([^)]*IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(match, "ai_contract_drafts_classification_check found").not.toBeNull();
+    const dbClassifications = quotedTokens(match![1], /'([^']+)'/g).sort();
+    expect([...DRAFT_DATA_CLASSIFICATIONS].sort()).toEqual(dbClassifications);
+  });
+
+  it("草稿复核状态 ⊆ 后端 draftreview 服务与库默认值（pending 来自 DB default）", () => {
+    // ai_contract_drafts.status 无 CHECK 约束；单一来源拆两半：
+    //   pending   ← db/init 的 DEFAULT 'pending'
+    //   其余      ← draftreview 服务里的状态字面量
+    // 后端删掉某个状态的流转，对应断言即红。
+    for (const status of DRAFT_REVIEW_STATUSES) {
+      if (status === "pending") {
+        expect(
+          /ai_contract_drafts \([\s\S]*?status VARCHAR\(50\) NOT NULL DEFAULT 'pending'/.test(sqlInit),
+          "01_init.sql pins ai_contract_drafts.status DEFAULT 'pending'",
+        ).toBe(true);
+      } else {
+        expect(draftReviewBackend, `draftreview service references status '${status}'`).toContain(`"${status}"`);
+      }
+    }
   });
 });

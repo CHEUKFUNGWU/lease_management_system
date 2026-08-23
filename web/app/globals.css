@@ -5359,3 +5359,175 @@ body .app-content.app-content-full-bleed .app-content-inner {
 .formula-err-syntax {
   border-left: none;
 }
+
+/* ── Ch2 draft review workbench (/contracts/drafts) ────────────────────
+   All colors, spacing and radii come from tokens; separators use inset
+   box-shadow rings instead of literal borders (DESIGN.md §13-8). */
+.drafts-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drafts-columns {
+  display: grid;
+  grid-template-columns: minmax(320px, 5fr) minmax(0, 7fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .drafts-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.drafts-list-pane,
+.drafts-detail-pane {
+  background: var(--bg-surface, #ffffff);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  padding: 12px;
+  min-width: 0;
+}
+
+.drafts-row {
+  cursor: pointer;
+}
+
+.drafts-row:hover,
+.drafts-row:focus-visible,
+.drafts-row-active {
+  background: var(--bg-inset, #f8fafc);
+}
+
+.drafts-number {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-primary, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.drafts-name {
+  font-size: 12px;
+}
+
+.drafts-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drafts-detail-body {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) minmax(0, 3fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .drafts-detail-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 左栏原件：后端尚无原件路径列，先做占位（不发明接口）。 */
+.drafts-original-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 16px;
+  border-radius: 10px;
+  background: var(--bg-inset, #f8fafc);
+  box-shadow: inset 0 0 0 1px var(--border-default, #e2e8f0);
+  text-align: center;
+}
+
+.drafts-original-icon {
+  font-size: 28px;
+  color: var(--fg-muted);
+}
+
+.drafts-original-note,
+.drafts-original-task {
+  font-size: 12px;
+}
+
+.drafts-fields-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.drafts-field-head,
+.drafts-field-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.2fr) minmax(0, 1.4fr) minmax(120px, 1.4fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 2px;
+  box-shadow: inset 0 -1px 0 var(--border-default, #e2e8f0);
+}
+
+.drafts-field-head {
+  font-size: 12px;
+  color: var(--fg-tertiary);
+  box-shadow: none;
+}
+
+.drafts-field-name {
+  font-size: 13px;
+  color: var(--fg-secondary);
+  overflow-wrap: anywhere;
+}
+
+.drafts-field-value {
+  font-size: 13px;
+  color: var(--fg-primary, #0f172a);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.drafts-confidence-missing {
+  color: var(--fg-muted);
+  padding-inline-start: 4px;
+}
+
+.drafts-actions-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.drafts-outcome-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drafts-outcome-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 6px 0;
+  box-shadow: inset 0 -1px 0 var(--border-default, #e2e8f0);
+}
+
+.drafts-outcome-item:last-child {
+  box-shadow: none;
+}
+
+.drafts-outcome-id {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.drafts-outcome-error {
+  grid-column: 1 / -1;
+  font-size: 12px;
+}

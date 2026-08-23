@@ -702,6 +702,70 @@ export const contractApi = {
     apiRequest(`/api/v1/contracts/${id}/discount-rate-status`, { token }),
 };
 
+// ── Ch2 草稿复核工作台（/contracts/drafts）───────────────────────────────
+// 形状与 core-service/internal/services/draftreview 的 DraftDetail / Outcome
+// 一一对应；ai_values 是 AI 提取值，human_values 是人工终值，互不覆盖
+// （D-B9 差异留痕）。verdict 取值 approved | rejected | failed | replayed。
+export interface DraftReviewDetail {
+  id: string;
+  task_id: string;
+  legal_entity_id?: string;
+  data_classification?: string;
+  status: string;
+  ai_values: Record<string, unknown>;
+  human_values?: Record<string, unknown>;
+  confirmed_fields: string[];
+  confidence_scores: Record<string, number>;
+  created_at: string;
+}
+
+export interface DraftReviewOutcomeItem {
+  draft_id: string;
+  verdict: "approved" | "rejected" | "failed" | "replayed";
+  error?: string;
+}
+
+export interface DraftReviewOutcome {
+  items: DraftReviewOutcomeItem[];
+  approved_all: boolean;
+}
+
+export const draftReviewApi = {
+  list: (params: { status?: string; limit?: number }, token: string) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.limit) query.set("limit", String(params.limit));
+    const queryString = query.toString();
+    return apiRequest(`/api/v1/contracts/drafts${queryString ? `?${queryString}` : ""}`, { token }) as Promise<{
+      data: DraftReviewDetail[];
+    }>;
+  },
+
+  get: (id: string, token: string) =>
+    apiRequest(`/api/v1/contracts/drafts/${id}`, { token }) as Promise<{ data: DraftReviewDetail }>,
+
+  revise: (
+    id: string,
+    edits: Array<{ field: string; value: string; confirmed: boolean }>,
+    token: string,
+  ) =>
+    apiRequest(`/api/v1/contracts/drafts/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ edits }),
+      token,
+    }) as Promise<{ data: DraftReviewDetail }>,
+
+  decide: (
+    decisions: Array<{ draft_id: string; approve: boolean; reason?: string }>,
+    token: string,
+  ) =>
+    apiRequest(`/api/v1/contracts/drafts/decide`, {
+      method: "POST",
+      body: JSON.stringify({ decisions }),
+      token,
+    }) as Promise<DraftReviewOutcome>,
+};
+
 // Payment Schedule APIs
 export const paymentScheduleApi = {
   create: (contractId: string, data: any, token: string) =>

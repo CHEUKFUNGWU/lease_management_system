@@ -272,13 +272,17 @@ export default function NewContractPage() {
               <Input placeholder="CNY" />
             </Form.Item>
 
-            <Form.Item label="资产类型" name="asset_type" rules={[{ required: true, message: "请选择资产类型" }]}>
+            <Form.Item
+              label={t("contract.asset_type", language)}
+              name="asset_type"
+              rules={[{ required: true, message: t("contract_new.please_select_asset_type", language) }]}
+            >
               <Select>
-                <Select.Option value="real_estate">不动产</Select.Option>
-                <Select.Option value="vehicle">车辆</Select.Option>
-                <Select.Option value="it_equipment">IT 设备</Select.Option>
-                <Select.Option value="machinery">机器设备</Select.Option>
-                <Select.Option value="other">其他</Select.Option>
+                <Select.Option value="real_estate">{t("contract.asset_real_estate", language)}</Select.Option>
+                <Select.Option value="vehicle">{t("contract.asset_vehicle", language)}</Select.Option>
+                <Select.Option value="it_equipment">{t("contract.asset_it_equipment", language)}</Select.Option>
+                <Select.Option value="machinery">{t("contract.asset_machinery", language)}</Select.Option>
+                <Select.Option value="other">{t("contract.asset_other", language)}</Select.Option>
               </Select>
             </Form.Item>
 

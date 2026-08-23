@@ -204,3 +204,104 @@ export function fpnaWorkbenchHelpContent(language: Language): HelpContent {
   };
 }
 
+/**
+ * F2-1（任务指令）：三表财务模型页帮助。flow 直接复用页面卡片自身的
+ * ①–⑤ 步骤键（finmodel.step_*），不另造一套编号；sections 回答财务用户
+ * 的三个真实疑问：三道闸各拦什么、勾稽不过下一步做什么、发布的计划版本
+ * 谁能看到。
+ */
+export function financialModelHelpContent(language: Language): HelpContent {
+  return {
+    title: t("help.finmodel.title", language),
+    flow: [
+      { key: "select_def", label: t("finmodel.step_select_def", language) },
+      { key: "assumptions", label: t("finmodel.step_assumptions", language) },
+      { key: "opening", label: t("finmodel.step_opening", language) },
+      { key: "run", label: t("finmodel.step_run", language) },
+      { key: "publish", label: t("finmodel.step_publish_export", language) },
+    ],
+    sections: [
+      {
+        key: "gates",
+        heading: t("help.finmodel.s1.heading", language),
+        body: t("help.finmodel.s1.body", language),
+      },
+      {
+        key: "tie_out_next",
+        heading: t("help.finmodel.s2.heading", language),
+        body: t("help.finmodel.s2.body", language),
+      },
+      {
+        key: "publish_audience",
+        heading: t("help.finmodel.s3.heading", language),
+        body: t("help.finmodel.s3.body", language),
+      },
+    ],
+  };
+}
+
+/**
+ * F2-1：单店利润表页帮助。回答两个口径为什么不一样、以及 Decision Ready
+ * 不满足时这张表还能不能用。
+ */
+export function storePnlHelpContent(language: Language): HelpContent {
+  return {
+    title: t("help.storepnl.title", language),
+    flow: [
+      { key: "pick_store", label: t("help.storepnl.flow.pick_store", language) },
+      { key: "pick_compare", label: t("help.storepnl.flow.pick_compare", language) },
+      { key: "read_bases", label: t("help.storepnl.flow.read_bases", language) },
+      { key: "drill", label: t("help.storepnl.flow.drill", language) },
+    ],
+    sections: [
+      {
+        key: "two_bases",
+        heading: t("help.storepnl.s1.heading", language),
+        body: t("help.storepnl.s1.body", language),
+      },
+      {
+        key: "decision_ready",
+        heading: t("help.storepnl.s2.heading", language),
+        body: t("help.storepnl.s2.body", language),
+      },
+      {
+        key: "provenance",
+        heading: t("help.storepnl.s3.heading", language),
+        body: t("help.storepnl.s3.body", language),
+      },
+    ],
+  };
+}
+
+/**
+ * F2-1：月结中心帮助。回答本页动作与总账的关系、哪些动作不可逆。
+ */
+export function monthlyClosingHelpContent(language: Language): HelpContent {
+  return {
+    title: t("help.monthly.title", language),
+    flow: [
+      { key: "period", label: t("help.monthly.flow.period", language) },
+      { key: "entries", label: t("help.monthly.flow.entries", language) },
+      { key: "review", label: t("help.monthly.flow.review", language) },
+      { key: "post_lock", label: t("help.monthly.flow.post_lock", language) },
+    ],
+    sections: [
+      {
+        key: "gl_relation",
+        heading: t("help.monthly.s1.heading", language),
+        body: t("help.monthly.s1.body", language),
+      },
+      {
+        key: "irreversible",
+        heading: t("help.monthly.s2.heading", language),
+        body: t("help.monthly.s2.body", language),
+      },
+      {
+        key: "scope",
+        heading: t("help.monthly.s3.heading", language),
+        body: t("help.monthly.s3.body", language),
+      },
+    ],
+  };
+}
+

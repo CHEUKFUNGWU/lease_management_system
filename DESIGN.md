@@ -453,7 +453,7 @@ DataTrustBar      分类 · 口径 · 覆盖率 · decision-ready · 展开全�
 
 | 执行机制 | 状态 | 位置 |
 |---|---|---|
-| §13 止血条款自动拦截 | ✅ **CI 强制** | `web/scripts/enforce-design.mjs`（ENF-001），经 `npm run lint` 在 CI 跑。**已实现 9 条中的 6 条**：§13-1 `!important`、§13-2 内联样式、§13-4 硬编码颜色（T5）、§13-6 字重、§13-7 硬编码 CJK、§13-8 `border: 1px solid`（T5）。**未覆盖**：§13-3 JS hover（依赖事件处理器的语义分析，纯正则误报率太高，暂缓）、§13-5 `<Tag color="red">`（AntD 预设色名，与 §13-4 的 token 规则重叠，可在下一轮并入）、§13-9 用 0 填补缺失数据（需要数据流语义，不在文本扫描范畴） |
+| §13 止血条款自动拦截 | ✅ **CI 强制** | `web/scripts/enforce-design.mjs`（ENF-001），经 `npm run lint` 在 CI 跑。**已实现 9 条中的 7 条**：§13-1 `!important`、§13-2 内联样式（2026-08-22 起含**多行展开块**——此前逐行正则对 opener 换行的写法全盲，946→1032 的回潮由此漏入；新增 `styleBlockStaticProps` 块级计数）、§13-3 JS hover 改样式（2026-08-22 起窄规则：只拦事件处理器里直接改 `.style` 的形态，埋点等非样式用途放行；规则体测试在 `scripts/enforce-design.test.ts`）、§13-4 硬编码颜色（T5）、§13-6 字重、§13-7 硬编码 CJK、§13-8 `border: 1px solid`（T5）。**未覆盖**：§13-5 `<Tag color="red">`（AntD 预设色名，与 §13-4 的 token 规则重叠，可在下一轮并入）、§13-9 用 0 填补缺失数据（需要数据流语义，不在文本扫描范畴） |
 | §13 存量债务基线 | ✅ **测试守护** | `web/scripts/design-debt-baseline.json`（按「文件 × 规则」记允许数量，带日期）+ `web/scripts/design-debt-baseline.test.ts`；超出基线即 CI 失败（T6b） |
 | §1 `tokens.ts` ↔ `:root` 对齐 | ✅ 测试守护 | `app/design-system/tokens-alignment.test.ts` |
 | 暗色令牌完整性 | ✅ 测试守护 | `app/design-system/theme-dark.test.ts` |

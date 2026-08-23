@@ -203,6 +203,38 @@ _Avoid_: Rent expense, lease cost, lease expense
 A store's operating result after the costs attributable to running it, including Occupancy Cost. It is an operating measure and does not tie to a statutory profit subtotal.
 _Avoid_: Profit, EBITDA, margin
 
+**Display Basis**:
+Which population a number describes: `retail_store` or `equipment`. A number may only be shown under a heading of its own basis. When the basis of the source and the basis of the surrounding context differ, the number is unavailable and renders as an em dash with a reason — **there is no conversion between bases**, and offering one invites relabelling. Named `resolveBasis` in code.
+_Avoid_: Unit, dimension, scope, context
+
+**Sales per Labour Hour** (销售人效):
+Revenue divided by labour hours worked, at Store-Day grain. Null when labour hours are absent or zero; **never derived backwards from labour cost and an assumed wage rate**, because that produces a value that is a fact by type and a guess by meaning.
+_Avoid_: Productivity, efficiency, labour ROI
+
+**Labour Hours per Transaction** (单均工时):
+Labour hours divided by transaction count. A high value means each sale ties up more staffing; it does not by itself say whether the cause is basket mix or process speed.
+_Avoid_: Service time, handling time
+
+**Metric Surface**:
+The validated list of metric codes a page or block exposes. Every code on a Surface must exist in the metric definitions, checked at startup. Chinese metric names have exactly one source of truth; a consumer package must not keep a second label map.
+_Avoid_: Metric list, KPI set, column config
+
+**Profit Variance Attribution** (利润差异归因):
+The decomposition of a store's profit change into ordered factor contributions by chained substitution: footfall, conversion rate, average transaction value, gross margin rate, then each cost line. The substitution order changes the numbers, so the order is part of the answer and is always echoed back. **This is not DuPont analysis** — DuPont decomposes return on equity into margin, turnover, and leverage, and calling this DuPont misleads the readers who know the difference.
+_Avoid_: DuPont, driver analysis, bridge
+
+**Residual** (in Profit Variance Attribution):
+The difference between the total variance and the sum of factor contributions. Under exact chained substitution the contributions telescope, so the residual is structurally zero and carries only floating-point noise. It is reported rather than absorbed into the last factor, and it is a constructive property, **not a check** — the checks are the intermediate value sequence and order sensitivity.
+_Avoid_: Error, unexplained, other
+
+**Required Incremental Revenue** (保本增量销售额):
+How much extra a promotion must sell to cover its fixed marketing spend plus the margin given up on the volume that would have sold anyway. Undefined when the discounted margin rate is at or below zero, because then no amount of extra volume breaks even; that case reports `unachievable` rather than a very large number.
+_Avoid_: Break-even sales, target uplift
+
+**Static vs Dynamic Payback**:
+Static payback counts months until cumulative undiscounted cash flow turns positive; dynamic payback discounts first. Static payback and break-even sales do not depend on a discount rate and are still reported when the rate is undetermined; IRR, NPV, and dynamic payback are withheld as named Gaps. **No default discount rate is ever substituted.**
+_Avoid_: Payback, break-even period
+
 ## Financial Modelling
 
 **Model Definition**:

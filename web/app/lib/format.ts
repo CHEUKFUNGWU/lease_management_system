@@ -42,3 +42,8 @@ export const fmtMoney = (v: number | undefined | null, currency: string | undefi
     return negative ? `(${formatted})` : formatted;
   }
 };
+
+// R2-1：收敛单位换算的浮点残渣。33.3 / 100 === 0.33299999999999996，
+// payload 里不能带这种尾数（先例：financial-model/hints.ts roundUnit，
+// commit 6009f86 修过同一个坑）。
+export const cleanFloat = (x: number): number => Number(x.toFixed(10));

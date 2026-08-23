@@ -33,9 +33,10 @@
 > 这一节是**易腐事实**。数字变了就改，不要在别处再抄一份。核对命令见本文末「验证」。
 
 - `db/init/01_init.sql`：90 张业务表 + `schema_migrations`（空库基线自动标记全部迁移已应用）；增量迁移到 `059_assumption_draft_idempotency_batch.sql`
-- `core-service/internal/`：27 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentcore` / `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore`
+- `core-service/internal/`：28 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentcore` / `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore`
+- R 批次（2026-08-23）新增两个纯函数服务包：`services/varianceattribution`（利润差异归因，连环替代）、`services/newstorefeasibility`（新店可行性，纯函数 + Ports，**禁 import `ifrs16`**）；`services/promotionattribution` 增投前保本（同包，与投后共用 `RunRate`）
 - `web/app/`：31 个页面。零售主线 `/operating-pulse`、`/store-360`、`/scenario-workbench`；**财务主线 `/store-pnl`（单店利润表）、`/financial-model`（法人级三表模型工作台）**
-- Agent Tool：`lease.*` 36 个、`retail.*` 5 个（含 `retail.working_paper.store.generate`、`retail.store_days.import.preview`）、**`fpna.*` 6 个**（`statement_model.read` / `statement_model.evaluate` / `working_paper.finmodel.generate` / `assumptions.suggest` / `assumptions.suggest_batch` / `memos.model_diff.draft`）
+- Agent Tool：`retail.*` 5 个（含 `retail.working_paper.store.generate`、`retail.store_days.import.preview`）、**`fpna.*` 6 个**（`statement_model.read` / `statement_model.evaluate` / `working_paper.finmodel.generate` / `assumptions.suggest` / `assumptions.suggest_batch` / `memos.model_diff.draft`）。**`lease.*` 的数量没有可靠的静态核对方式**——工具有多种定义写法，三种 grep 口径分别给出 31 / 21 / 19，此前记的「36 个」无从复核。要准确数字请在运行时枚举 `agenttools.Registry`，不要引用一个记在文档里的数
 - Docker Compose 默认 4 个服务（PostgreSQL、MinIO、Core、Web），`worker` profile 可另起 `agent-runner`
 - Go 1.25（`go.mod` 与两个 Dockerfile 一致）；前端 Next.js 14 + Node 20
 - IFRS 16 回归：22 用例 / 148 断言通过，但标准答案仍为 `pending_third_party_review`，未经第三方会计师复核，**不得对外表述为审计背书**
@@ -97,6 +98,13 @@
 ### 零售经营分析约束
 
 - **粒度是 store-day。** 月粒度的 `store_operating_facts` 无法支撑日/周经营分析，新增经营指标一律走 store-day 事实
+- **口径冲突只降级不换算。** 一个数值在某展示语境下要么可用、要么显示「—」加原因，**没有第三条路**。设备口径的数不得贴零售标题，判定点只有 `web/app/lib/displayBasis.ts` 的 `resolveBasis`。给估算/近似/改名留口子就会有人走——`/performance` 曾用 `oee_pct` 渲染「同群平均坪效达成率」、把 `plant_code` 空值兜底成「核心商圈」，i18n 层六个键被整体零售化改名（连英文一起改）
+- **指标露出走受校验清单。** 「哪些指标露出到哪个页面」用 `retailkpi.Surface`，清单里的 code 必须在 `Definitions` 里存在，否则启动即失败。**中文名只有 `retailkpi` 一个真相源**，不得在消费包里再建第二张 labels map
+- **不得反推事实。** 缺 `labor_hours` 就是 nil，不许用 `labor_cost ÷ 假定时薪` 倒推。反推会造出类型上是事实、语义上是猜测的值，绕过整套覆盖率门槛与 `decision_ready` 判定
+- **连环替代法与「有意义的残差」互斥。** 精确连环替代下各步贡献是望远镜和，求和恒等于总差异、残差恒为浮点噪声；残差只在隔离替代法下非零，而那种方法与顺序无关。选了连环替代，守恒等式就是**构造性质不是检查对象**（风险红线 12），真正的检查是中间值序列逐格锁定 + 顺序敏感性，且 `DecompositionOrder` 必须回显
+- **新店测算不得长出第二套租赁计算。** `services/newstorefeasibility` 禁 import `ifrs16`，租赁与 ROU 只经 `LeaseProjectionReader` 从 `measurement_results` 只读投影取；import guard **遍历全部子包**（风险红线 14 的第二个落点，第一个是 `finmodel`）
+- **折现率缺失是部分降级不是整体拒绝。** IRR / NPV / 动态回本期返回具名 Gap，静态回本期与盈亏平衡销售额照常返回——后两者不依赖折现率。**任何情况下不得使用默认折现率**
+- **前端不复刻后端的 DSL 解析器，一次本地校验也不做**（含括号配对这类「显然安全」的检查）。公式校验一律走 `POST /api/v1/financial-model/templates/validate`，复用 `template.Compile` 同一条路径。开了本地校验的口子它会长大，然后与后端分叉
 - **指标语义走 `retail-kpi-v1`。** 严格 null / 零分母语义、覆盖率门槛、最高事实版本选择、来源冲突返回 409、多币种分区。**指标在后端计算，前端不得重算评分或排序**
 - **不用 0 填补缺失。** 覆盖不足时降级为 `decision_ready = false` 并说明原因，不得编造数据点
 - **同群对比样本不足或币种混杂时必须显式降级**，不得给出看似确定的对比结论
@@ -283,6 +291,13 @@ find web/app -name page.tsx | wc -l                 # 页面数
 
 1. **运行时实测**：报告给出 `getComputedStyle` / `getBoundingClientRect` 的改动前后对照（例如 Modal 标题 line-height 修复前 768px → 修复后 32px；卡片高度 82px → 41px）。FIX-019 / FIX-005 是已落地的先例。
 2. **精确规则体断言**：测试用 `ruleBody()` 一类的辅助函数取目标选择器的规则体做断言，禁止 `expect(css).toMatch(/A[\s\S]*?B/)` 全文跨规则正则（FIX-021 教训：懒惰通配会跨行命中无关规则，断言恒真）。先例：`web/app/home/chatLayout.test.ts`、`web/app/lib/kpi-card-height.test.ts`。
+
+**构建期守卫要单独验，它们会被 Docker layer cache 掩盖（2026-08-23 教训）。** `Dockerfile` 里那段 anydoc SRI 校验把 `$ANYDOC_INTEGRITY` 无引号插进 JS，生成 `if(got!=sha512-…==)`，node 每次都 SyntaxError——**从引入起就没比较过任何东西**，因为那一层一直命中缓存、从不重跑。基础镜像 digest 变了才暴露。单元测试碰不到构建期守卫，CI 若也命中缓存就同样看不见。加或改这类守卫时，用错误输入实跑一次证明它拦得住：
+
+```bash
+docker build --build-arg ANYDOC_INTEGRITY=sha512-WRONG== --target anydoc-install -t probe -f core-service/Dockerfile core-service
+# 应中止并打印 anydoc integrity mismatch: got … want …
+```
 
 样式重构类改动（内联样式 → 类名）尤其如此：`class-coverage.test.ts` 只能证明「类有规则」，不能证明「规则挂在了正确的元素上、值正确」（STY-005 教训：31 个类补上规则时 44 处替换点必须逐个核对同元素同值，报告给「文件/行号/原内联值/现类名/规则值/是否同元素」表）。自检句：**把 B 的规则删掉或改错，这条测试会不会红？不会红就是没写对。**
 

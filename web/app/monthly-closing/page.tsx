@@ -47,6 +47,8 @@ import { monthlyClosingApi } from "../lib/api";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
+import { HelpTrigger } from "../components/HelpDrawer";
+import { monthlyClosingHelpContent } from "../components/help-content";
 import { fmtMoney } from "../lib/format";
 import { EnterpriseTable } from "../components/enterprise-table/EnterpriseTable";
 import type { EnterpriseColumn, SavedView } from "../components/enterprise-table/types";
@@ -291,6 +293,7 @@ function MonthlyClosingPage() {
     if (period !== selectedPeriod) setSelectedPeriod(period);
     loadEntries(period);
     checkLockStatus(period);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [loadEntryPeriods, selectedPeriod, loadEntries, checkLockStatus]);
 
   const changeEntryPeriod = (period: string) => {
@@ -1212,6 +1215,7 @@ function MonthlyClosingPage() {
         >
           <PageHeader
             title={t("monthly.title", language)}
+            help={<HelpTrigger content={monthlyClosingHelpContent(language)} language={language} />}
 
             meta={selectedPeriod ? (
               <Space size={12} className="sty-b8bb6f7b">

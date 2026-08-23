@@ -75,6 +75,13 @@ describe("tokens.ts 与 globals.css :root 对齐（DESIGN.md §1）", () => {
     expect(cssVarResolved("state-info-text")).toBe(colors.state.info);
   });
 
+  it("焦点环强调色与 state.info 同源（D13，focus-ring.test.ts 锁规则体）", () => {
+    // --accent-interactive 不另立新值：亮色 = colors.state.info，
+    // 暗色 = darkColors.state.info。改 tokens 不同步 CSS 时这里红。
+    expect(cssVarResolved("accent-interactive")).toBe(colors.state.info);
+    expect(darkCssVar("accent-interactive")).toBe(darkColors.state.info);
+  });
+
   it("页面主标题字号与字重一致（.page-header-title ↔ display）", () => {
     const title = pageHeaderTitle();
     expect(title.size).toBe(`${typography.sizes.display.size}px`);

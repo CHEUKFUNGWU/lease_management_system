@@ -93,6 +93,7 @@ export default function LoginPage() {
             requiredMark={false}
           >
             <Form.Item
+              label={t("login.username", language)}
               name="username"
               rules={[{ required: true, message: t("login.username_required", language) }]}
             >
@@ -105,6 +106,7 @@ export default function LoginPage() {
             </Form.Item>
 
             <Form.Item
+              label={t("login.password", language)}
               name="password"
               rules={[{ required: true, message: t("login.password_required", language) }]}
             >

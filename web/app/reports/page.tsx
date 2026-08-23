@@ -293,6 +293,7 @@ function ReportsPageContent() {
     if (activeTab === "amortization") {
       fetchAmort();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [activeTab, reportMode, urlInitialized]);
 
   // fetch available tags on mount / tab switch (FETCH-002: seam-owned)

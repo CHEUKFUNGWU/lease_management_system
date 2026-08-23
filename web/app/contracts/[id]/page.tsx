@@ -177,12 +177,14 @@ export default function ContractDetailPage() {
     not_a_lease: "default",
   };
 
+  // P1-D（UIUX 审查报告 2026-08-21）：原为硬编码中文映射，与录入表单共用
+  // contract.asset_* 键组；值是 i18n key，渲染时经 t() 解析。
   const assetTypeLabels: Record<string, string> = {
-    real_estate: "不动产",
-    vehicle: "车辆",
-    it_equipment: "IT 设备",
-    machinery: "机器设备",
-    other: "其他",
+    real_estate: "contract.asset_real_estate",
+    vehicle: "contract.asset_vehicle",
+    it_equipment: "contract.asset_it_equipment",
+    machinery: "contract.asset_machinery",
+    other: "contract.asset_other",
   };
 
   const criticalDateKeys: Record<string, string> = {
@@ -489,8 +491,8 @@ export default function ContractDetailPage() {
                       <Descriptions.Item label={t("contract.currency", language)}>
                         {contract.currency}
                       </Descriptions.Item>
-                      <Descriptions.Item label="资产类型">
-                        <StatusTag>{assetTypeLabels[contract.asset_type || "real_estate"]}</StatusTag>
+                      <Descriptions.Item label={t("contract.asset_type", language)}>
+                        <StatusTag>{t(assetTypeLabels[contract.asset_type || "real_estate"], language)}</StatusTag>
                       </Descriptions.Item>
                       <Descriptions.Item label={t("contract_detail.area_sqm", language)}>
                         {contract.area_sqm != null ? `${Number(contract.area_sqm).toLocaleString()} ㎡` : "-"}

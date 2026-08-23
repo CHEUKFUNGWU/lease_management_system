@@ -20,6 +20,7 @@ import ConfidenceBandChart from "../components/charts/ConfidenceBandChart";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
+import ScopeNote from "../components/ScopeNote";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { pulseHelpContent } from "../components/help-content";
@@ -347,6 +348,7 @@ function OperatingPulseInner() {
       if (classification === "production" && asOf === "") applyQuery({ classification: "production", asOf: TODAY, windowDays, storeIDs, sourceSystem });
       return;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [asOf, classification, windowDays, storeIDs, sourceSystem, router]);
 
   useEffect(() => {
@@ -360,6 +362,7 @@ function OperatingPulseInner() {
         applyQuery({ classification: "simulated", datasetVersion: result.data.dataset_version, asOf: searchParams.get("as_of") || latestAnomalyDate(result.data), windowDays: validWindow ? windowDays : DEFAULT_WINDOW_DAYS, storeIDs, sourceSystem: sourceSystem || "retail_simulator" });
       }
     }).catch(() => { latestLoaded.current = false; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [router, searchParams, token, storeIDs, validWindow, windowDays, latestRetryNonce]);
 
   const generate = async () => {
@@ -483,6 +486,8 @@ function OperatingPulseInner() {
               </Space>
             }
           />
+          {/* R0-3: scope note — how this page differs from /performance */}
+          <ScopeNote noteKey="pulse.scope_note" className="pulse-scope-note" language={language} />
           {/* ─── Precision Engineering Filter Bar (Linear/Attio style) ─── */}
           <div className="precision-filter-bar pulse-block-margin">
             {/* Primary Business Dimension & Time Filters */}

@@ -2033,6 +2033,8 @@ export interface FinancialModelRunInput {
   data_classification: string;
   versions: { data_version: string; assumption_version: string; model_definition_version: string };
   idempotency_key: string;
+  /** S2-5 异步路径：run 行先落 queued，引擎后台执行，前端轮询 GET /runs/:id。 */
+  async?: boolean;
 }
 
 export const financialModelApi = {
@@ -2043,7 +2045,17 @@ export const financialModelApi = {
   saveTemplate: (data: Record<string, unknown>, token: string) =>
     apiRequest("/api/v1/financial-model/templates", { method: "POST", body: JSON.stringify(data), token }) as Promise<{ id: string }>,
   run: (definitionId: string, input: FinancialModelRunInput, token: string) =>
-    apiRequest(`/api/v1/financial-model/definitions/${encodeURIComponent(definitionId)}/runs`, { method: "POST", body: JSON.stringify(input), token }) as Promise<{ run: unknown; persisted?: boolean }>,
+    apiRequest(`/api/v1/financial-model/definitions/${encodeURIComponent(definitionId)}/runs`, { method: "POST", body: JSON.stringify(input), token }) as Promise<{ run: unknown; persisted?: boolean } | { run_id: string; status: string }>,
+  listDefinitions: (token: string) =>
+    apiRequest("/api/v1/financial-model/definitions", { token }) as Promise<{ definitions: unknown[] }>,
+  getRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}`, { token }) as Promise<{ run: unknown; line_count?: number }>,
+  cancelRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}/cancel`, { method: "POST", body: "{}", token }) as Promise<Record<string, unknown>>,
+  publishRun: (runId: string, token: string) =>
+    apiRequest(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}/publish`, { method: "POST", body: "{}", token }) as Promise<Record<string, unknown>>,
+  exportRun: (runId: string, fold: "month" | "quarter" | "year", token: string) =>
+    downloadBlob(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}/export?fold=${fold}`, token),
   validateOpening: (data: unknown, token: string) =>
     apiRequest("/api/v1/financial-model/opening/validate", { method: "POST", body: JSON.stringify(data), token }) as Promise<Record<string, unknown>>,
 };
@@ -2374,6 +2386,79 @@ export const promotionApi = {
     }),
   evaluateROI: (id: string, token: string): Promise<PromotionROIResult> =>
     apiRequest(`/api/v1/retail/promotions/${encodeURIComponent(id)}/roi`, { token }),
+  // R2-1：投前保本测算（纯计算不落库；promo_id 模式基线与投后同一取数路径）
+  evaluateBreakeven: (
+    data: { promo_id: string; promo_margin_rate: number; fixed_marketing_cost: number },
+    token: string
+  ): Promise<PromotionBreakevenResult> =>
+    apiRequest(`/api/v1/retail/promotions/breakeven`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+    }),
+};
+
+export interface TemplateValidationError {
+  row_key?: string;
+  ref_key?: string;
+  kind: "syntax" | "unknown_reference" | "invalid_lag" | "circular_reference" | "schema" | string;
+  message: string;
+  position?: number | null;
+  cycle_path?: string[];
+}
+
+export interface TemplateValidationResult {
+  valid: boolean;
+  errors?: TemplateValidationError[];
+}
+
+export interface VarianceAttributionFactor {
+  factor: string;
+  base: number;
+  current: number;
+  effect: number;
+  intermediate_profit: number;
+}
+
+export interface VarianceAttributionResult {
+  currency?: string;
+  base_profit: number;
+  current_profit: number;
+  total_variance: number;
+  factors: VarianceAttributionFactor[];
+  residual: number;
+  residual_material: boolean;
+  decomposition_order: string[];
+  status: "complete" | "unavailable" | string;
+  missing_facts?: string[];
+}
+
+export interface PromotionBreakevenResult {
+  currency: string;
+  event_days: number;
+  baseline_revenue: number;
+  required_incremental_revenue?: number | null;
+  required_uplift_rate?: number | null;
+  margin_sacrifice: number;
+  status: "achievable" | "unachievable" | "invalid_input" | string;
+  unachievable_reason?: string;
+}
+
+export const finModelTemplatesApi = {
+  validate: (def: { name: string; version: number; rows: unknown[] }, token: string): Promise<TemplateValidationResult> =>
+    apiRequest(`/api/v1/financial-model/templates/validate`, {
+      method: "POST",
+      body: JSON.stringify(def),
+      token,
+    }),
+};
+
+export const retailVarianceApi = {
+  attribution: (
+    params: { store_id: string; data_classification: string; dataset_version?: string; as_of: string; window_days?: number; source_system?: string },
+    token: string
+  ): Promise<VarianceAttributionResult> =>
+    apiRequest(`/api/v1/retail/store-variance-attribution?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]))}`, { token }),
 };
 
 export const cashPlanApi = {

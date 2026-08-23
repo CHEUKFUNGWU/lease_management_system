@@ -122,7 +122,12 @@ function PortfolioPage() {
   });
   const loading = summaryQuery.loading;
   const unitPriceLoading = unitPriceQuery.loading;
-  const rows: PortfolioRow[] = summaryQuery.state.kind === "ready" ? (summaryQuery.state.data ?? []) : [];
+  // P2-C：rows 原为每次渲染新建的条件数组，作为下游 useMemo 的依赖会使
+  // 其缓存永远失效——包一层 useMemo 让引用随数据稳定。
+  const rows: PortfolioRow[] = useMemo(
+    () => (summaryQuery.state.kind === "ready" ? summaryQuery.state.data ?? [] : []),
+    [summaryQuery.state]
+  );
   const unitPriceRows: UnitPriceRow[] = unitPriceQuery.state.kind === "ready" ? (unitPriceQuery.state.data?.rows ?? []) : [];
   const contractsWithoutArea = unitPriceQuery.state.kind === "ready" ? (unitPriceQuery.state.data?.contractsWithoutArea ?? 0) : 0;
   useEffect(() => {

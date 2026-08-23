@@ -6,7 +6,7 @@ FROM node:20-alpine AS anydoc-install
 ARG ANYDOC_VERSION=0.2.0
 ARG ANYDOC_INTEGRITY=sha512-Hm4xkqioU12jrt18asY1WKX22ATR4mFHQ4HOFsWEwCMFZWaf9nDj2rbApZPPcNZPGKYB4mrLLJTK91XwLNZkFA==
 RUN npm install -g @firecrawl/anydoc@${ANYDOC_VERSION} --registry=https://registry.npmjs.org
-RUN node -e "const {createHash}=require('crypto');const fs=require('fs');const p=require('child_process').execSync('npm pack @firecrawl/anydoc@${ANYDOC_VERSION}').toString().trim();const s=fs.readFileSync(p);const got='sha512-'+createHash('sha512').update(s).digest('base64');if(got!=$ANYDOC_INTEGRITY){console.error('anydoc integrity mismatch: got '+got+' want '+$ANYDOC_INTEGRITY);process.exit(1)};console.log('anydoc integrity verified: '+p)"
+RUN node -e "const {createHash}=require('crypto');const fs=require('fs');const p=require('child_process').execSync('npm pack @firecrawl/anydoc@${ANYDOC_VERSION}').toString().trim();const s=fs.readFileSync(p);const got='sha512-'+createHash('sha512').update(s).digest('base64');const want='$ANYDOC_INTEGRITY';if(got!==want){console.error('anydoc integrity mismatch: got '+got+' want '+want);process.exit(1)};console.log('anydoc integrity verified: '+p)"
 
 FROM golang:1.25-alpine AS builder
 WORKDIR /app

@@ -104,6 +104,9 @@ var definitions = []Definition{
 	{Code: "revenue_per_store_day", Name: "Revenue per store-day", Unit: "currency", Formula: "revenue / observed_store_days", MeasureKind: MeasureKindFlow, IsCore: true, RequiredFields: []string{"revenue"}, NullRule: "no observed store-days => unavailable/null", DenominatorRule: "zero observed store-days => null, reason zero_denominator", Description: "Revenue divided by observed store-day rows."},
 	{Code: "sales_per_labor_hour", Name: "Sales per labor hour", Unit: "currency_per_hour", Formula: "revenue / labor_hours", MeasureKind: MeasureKindFlow, IsCore: false, RequiredFields: []string{"revenue", "labor_hours"}, NullRule: "missing labor facts yield partial/null", DenominatorRule: "zero labor hours => null, reason zero_denominator", Description: "Revenue generated per labor hour worked."},
 	{Code: "labor_hours_per_transaction", Name: "Labor hours per transaction", Unit: "hours_per_transaction", Formula: "labor_hours / transactions", MeasureKind: MeasureKindFlow, IsCore: false, RequiredFields: []string{"labor_hours", "transactions"}, NullRule: "missing labor facts yield partial/null", DenominatorRule: "zero transactions => null, reason zero_denominator", Description: "Average labor hours spent per transaction."},
+	// RH1 (R1-1): registration only — values["headcount"] is already summed in
+	// the aggregate loop; this entry exposes it to surfaces. No new math.
+	{Code: "headcount", Name: "Headcount on duty", Unit: "count", Formula: "SUM(headcount)", MeasureKind: MeasureKindFlow, IsCore: false, RequiredFields: []string{"headcount"}, NullRule: "missing headcount facts yield partial/null", DenominatorRule: "not applicable", Description: "On-duty headcount recorded per store-day; part-timers counted per head, never converted to FTE."},
 }
 
 func Definitions() []Definition {
@@ -135,6 +138,7 @@ var chineseNames = map[string]string{
 	"rent_to_sales_rate": "租金销售比", "occupancy_cash_cost_rate": "经营占用成本率", "store_contribution_margin": "门店经营利润率",
 	"average_daily_area_sqm": "平均日经营面积", "sales_per_sqm": "期间坪效", "revenue_per_store_day": "单店日均销售",
 	"sales_per_labor_hour": "销售人效", "labor_hours_per_transaction": "单均工时",
+	"headcount": "期末在岗人数",
 }
 
 type Coverage struct {

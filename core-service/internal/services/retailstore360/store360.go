@@ -200,9 +200,23 @@ func (s *Service) WithPlanReader(reader retailkpi.PlanReader) *Service {
 	return s
 }
 
-var benchmarkCodes = []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"}
+// RH1 (R1-1)：指标露出清单收敛为 retailkpi.Surface，中文名唯一真相源在
+// retailkpi（原 store360 包内 labels map 已删除并入）。清单闭包由包初始化时
+// ValidateSurface 校验：出现未定义 code 启动即失败，不靠"记得四处都改"。
+var (
+	benchmarkSurface = retailkpi.Surface{Codes: []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm", "sales_per_labor_hour"}}
 
-var summaryCodes = []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost", "occupancy_cash_cost", "other_controllable_cost", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm"}
+	summarySurface = retailkpi.Surface{Codes: []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost", "occupancy_cash_cost", "other_controllable_cost", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm", "sales_per_labor_hour", "labor_hours_per_transaction", "headcount"}}
+)
+
+func init() {
+	if err := retailkpi.ValidateSurface(summarySurface); err != nil {
+		panic("retailstore360 summary surface: " + err.Error())
+	}
+	if err := retailkpi.ValidateSurface(benchmarkSurface); err != nil {
+		panic("retailstore360 benchmark surface: " + err.Error())
+	}
+}
 
 func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 	if s.reader == nil || strings.TrimSpace(q.LegalEntityID) == "" || strings.TrimSpace(q.StoreID) == "" || q.AsOf.IsZero() || func() bool { _, err := retailperiod.ParseRollingDays(q.WindowDays); return err != nil }() || (q.Classification != "production" && q.Classification != "simulated") {
@@ -485,7 +499,7 @@ func allCodes() []string {
 }
 func makeSummary(current, comparison *retailkpi.Aggregate) map[string]SummaryMetric {
 	out := map[string]SummaryMetric{}
-	for _, code := range summaryCodes {
+	for _, code := range summarySurface.Codes {
 		c, p := kpis(current)[code], kpis(comparison)[code]
 		var change *float64
 		typ := "percent"
@@ -543,8 +557,8 @@ func eligiblePeers(pop []retailkpi.StorePopulation, target retailkpi.StorePopula
 	return out
 }
 func buildBenchmarks(summary map[string]SummaryMetric, peers []retailkpi.Aggregate) []PeerBenchmark {
-	out := make([]PeerBenchmark, 0, len(benchmarkCodes))
-	for _, code := range benchmarkCodes {
+	out := make([]PeerBenchmark, 0, len(benchmarkSurface.Codes))
+	for _, code := range benchmarkSurface.Codes {
 		values := make([]float64, 0, len(peers))
 		for _, p := range peers {
 			if v := p.KPIs[code].Value; v != nil && p.KPIs[code].Status == retailkpi.StatusComplete {
@@ -595,7 +609,7 @@ func buildDailyTrend(allFacts []retailkpi.DailyFact, targetID string, peers []re
 		ta, _ := aggregateOne(tf, d, d, 1, nil)
 		row := DailyTrend{Date: d.Format("2006-01-02"), TargetKPIs: kpis(ta), PeerMedian: map[string]*float64{}, PeerCount: map[string]int{}}
 		row.Gap = len(tf) == 0
-		for _, code := range benchmarkCodes {
+		for _, code := range benchmarkSurface.Codes {
 			vals := []float64{}
 			for _, p := range peers {
 				pf := filterPeriod(filterStore(allFacts, p.StoreID), d, d, currency)
@@ -689,7 +703,15 @@ func shapleyBridge2(b Bridge, old, new []float64, formula func([]float64) float6
 	return finalizeBridge(b, total)
 }
 func contributionBridge(s map[string]SummaryMetric) Bridge {
-	b := Bridge{Code: "store_contribution", Method: "store_contribution_additive_v1", Version: DiagnosticsVersion, Items: []BridgeItem{{Code: "gross_profit", Label: "毛利额", Unit: "currency"}, {Code: "labor_cost", Label: "人工成本", Unit: "currency"}, {Code: "occupancy_cash_cost", Label: "经营占用现金成本", Unit: "currency"}, {Code: "other_controllable_cost", Label: "其他可控成本", Unit: "currency"}}}
+	// RH1 (R1-1)：标签经 retailkpi.Label 取，不在本包硬编码中文名。
+	bridgeLabel := func(code string) string {
+		name, ok := retailkpi.Label(code)
+		if !ok {
+			return code + "（未识别指标）"
+		}
+		return name
+	}
+	b := Bridge{Code: "store_contribution", Method: "store_contribution_additive_v1", Version: DiagnosticsVersion, Items: []BridgeItem{{Code: "gross_profit", Label: bridgeLabel("gross_profit"), Unit: "currency"}, {Code: "labor_cost", Label: bridgeLabel("labor_cost"), Unit: "currency"}, {Code: "occupancy_cash_cost", Label: bridgeLabel("occupancy_cash_cost"), Unit: "currency"}, {Code: "other_controllable_cost", Label: bridgeLabel("other_controllable_cost"), Unit: "currency"}}}
 	if !completeMetric(s, "store_contribution", "gross_profit", "labor_cost", "occupancy_cash_cost", "other_controllable_cost") {
 		return unavailableBridge(b, "required_metric_unavailable")
 	}
@@ -744,12 +766,7 @@ func buildObservations(s map[string]SummaryMetric, b []PeerBenchmark, bridges []
 		}
 		return out
 	}
-	labels := map[string]string{
-		"revenue": "销售额", "gross_profit": "毛利额", "footfall": "客流", "conversion_rate": "转化率",
-		"average_transaction_value": "客单价", "labor_cost": "人工成本", "occupancy_cash_cost": "经营占用现金成本",
-		"other_controllable_cost": "其他可控成本", "labor_cost_rate": "人工成本率", "occupancy_cash_cost_rate": "经营占用成本率",
-		"store_contribution": "门店经营利润", "store_contribution_margin": "门店经营利润率", "sales_per_sqm": "期间坪效",
-	}
+	// RH1 (R1-1)：中文名唯一真相源在 retailkpi（原包内 labels map 已删除）。
 	for code, metric := range s {
 		if metric.ChangeValue == nil {
 			continue
@@ -758,8 +775,12 @@ func buildObservations(s map[string]SummaryMetric, b []PeerBenchmark, bridges []
 		if metric.ChangeType == "percentage_point" {
 			unit = "pp"
 		}
+		name, ok := retailkpi.Label(code)
+		if !ok {
+			name = code + "（未识别指标）"
+		}
 		candidates = append(candidates, candidate{observation: Observation{
-			Code: code, Label: labels[code], Statement: fmt.Sprintf("%s本期较对比期变化 %.2f%s；这是期间差异的事实描述。", labels[code], *metric.ChangeValue, unit),
+			Code: code, Label: name, Statement: fmt.Sprintf("%s本期较对比期变化 %.2f%s；这是期间差异的事实描述。", name, *metric.ChangeValue, unit),
 			Reference: "summary:" + code, Status: metric.Status, EvidenceIDs: []string{"evidence", "summary:" + code},
 		}, magnitude: math.Abs(*metric.ChangeValue)})
 	}
@@ -767,7 +788,10 @@ func buildObservations(s map[string]SummaryMetric, b []PeerBenchmark, bridges []
 		if benchmark.Status != "complete" || benchmark.TargetMinusMedian == nil {
 			continue
 		}
-		label := labels[benchmark.Code]
+		label, ok := retailkpi.Label(benchmark.Code)
+		if !ok {
+			label = benchmark.Code + "（未识别指标）"
+		}
 		candidates = append(candidates, candidate{observation: Observation{
 			Code: benchmark.Code, Label: label, Statement: fmt.Sprintf("%s目标值与同群中位数差异 %.2f；这是同群位置的观察信号。", label, *benchmark.TargetMinusMedian),
 			Reference: "benchmark:" + benchmark.Code, Status: "complete", EvidenceIDs: []string{"evidence", "benchmark:" + benchmark.Code},

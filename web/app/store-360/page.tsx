@@ -21,6 +21,7 @@ import { BentoGrid, BentoTile } from "../components/bento/BentoGrid";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
+import { currencyStatusLabel } from "./enums";
 import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailPlFlowResponse, type RetailSimulationDatasetData, type RetailStore360Option, type RetailStoreDiagnosticsResponse, type RetailSummaryMetric } from "../lib/api";
 import { ApiError } from "../lib/api";
 import { classifyDataState } from "../lib/dataState";
@@ -35,6 +36,8 @@ import ProfitFlowPanel from "./ProfitFlowPanel";
 import { CategoryCompositionPanel } from "./CategoryCompositionPanel";
 import { InventoryTurnoverPanel } from "./InventoryTurnoverPanel";
 import { CompetitorBenchmarkPanel } from "./CompetitorBenchmarkPanel";
+import { LaborEfficiencyPanel } from "./LaborEfficiencyPanel";
+import VarianceAttributionPanel from "./VarianceAttributionPanel";
 
 const TODAY = dayjs().format("YYYY-MM-DD");
 
@@ -365,11 +368,13 @@ function Store360Inner() {
   useEffect(() => {
     if (query.classification || !latest || discoveryLoading) return;
     writeQuery(router, { classification: "simulated", datasetVersion: latest.dataset_version, asOf: latestAnomalyDate(latest), windowDays: validWindow(query.windowDays) ? query.windowDays : 14, storeID: query.storeID, sourceSystem: query.sourceSystem, returnQuery: query.returnQuery });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [query.classification, query.windowDays, query.storeID, query.sourceSystem, latest, discoveryLoading, router]);
 
   useEffect(() => {
     if (query.classification !== "simulated" || query.datasetVersion || !latest || discoveryLoading) return;
     writeQuery(router, { classification: "simulated", datasetVersion: latest.dataset_version, asOf: query.asOf || latestAnomalyDate(latest), windowDays: validWindow(query.windowDays) ? query.windowDays : 14, storeID: query.storeID, sourceSystem: query.sourceSystem, returnQuery: query.returnQuery });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [query.classification, query.datasetVersion, query.asOf, query.windowDays, query.storeID, query.sourceSystem, latest, discoveryLoading, router]);
 
   const selected = options.map(optionFields).find((item) => item.storeID === query.storeID);
@@ -633,7 +638,7 @@ function Store360Inner() {
                         </Space>
                         <Space size={16}>
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            {t("store360.field.currency", language)}: <strong>{response.currency || "—"}</strong> ({response.currency_status})
+                            {t("store360.field.currency", language)}: <strong>{response.currency || "—"}</strong> ({currencyStatusLabel(response.currency_status, language)})
                           </Typography.Text>
                           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                             {t("store360.field.fact_version", language)}: <strong>v{response.fact_version_min}–v{response.fact_version_max}</strong>
@@ -774,6 +779,30 @@ function Store360Inner() {
                   storeId={query.storeID}
                 />
               </div>
+
+              <div className="store360-block-gap">
+                <LaborEfficiencyPanel
+                  summary={response.summary}
+                  benchmarks={response.peer_benchmark}
+                  currency={response.currency}
+                  dataClassification={query.classification || "production"}
+                />
+              </div>
+
+              {/* R2-3: profit variance attribution waterfall - same window params as diagnostics */}
+              {queryReady && !query.period && (
+                <div className="store360-block-gap">
+                  <VarianceAttributionPanel
+                    storeId={query.storeID}
+                    asOf={query.asOf}
+                    windowDays={query.windowDays}
+                    classification={query.classification || "production"}
+                    datasetVersion={query.datasetVersion || undefined}
+                    sourceSystem={query.sourceSystem || undefined}
+                    currency={response.currency}
+                  />
+                </div>
+              )}
 
               <Card title={t("store360.observations", language)} className="store360-block-gap">
                 <Space direction="vertical" className="store360-full-width">

@@ -7,7 +7,7 @@ ARG ANYDOC_VERSION=0.2.0
 ARG ANYDOC_INTEGRITY=sha512-Hm4xkqioU12jrt18asY1WKX22ATR4mFHQ4HOFsWEwCMFZWaf9nDj2rbApZPPcNZPGKYB4mrLLJTK91XwLNZkFA==
 RUN npm install -g @firecrawl/anydoc@${ANYDOC_VERSION} --registry=https://registry.npmjs.org \
     && printf '%s  %s\n' "$ANYDOC_INTEGRITY" "$(npm pack @firecrawl/anydoc@${ANYDOC_VERSION})" > /tmp/anydoc.integrity
-RUN node -e "const {createHash}=require('crypto');const fs=require('fs');const s=fs.readFileSync('/tmp/anydoc.integrity').toString().trim();const [want,file]=s.split(/\s+/);const got='sha512-'+createHash('sha512').update(fs.readFileSync(file)).digest('base64');if(got!==want){console.error('anydoc integrity mismatch: got '+got+' want '+helping);process.exit(1)};console.log('anydoc integrity verified: '+file)"
+RUN node -e "const {createHash}=require('crypto');const fs=require('fs');const s=fs.readFileSync('/tmp/anydoc.integrity').toString().trim();const [want,file]=s.split(/\s+/);const got='sha512-'+createHash('sha512').update(fs.readFileSync(file)).digest('base64');if(got!==want){console.error('anydoc integrity mismatch: got '+got+' want '+want);process.exit(1)};console.log('anydoc integrity verified: '+file)"
 
 FROM golang:1.25-alpine AS builder
 WORKDIR /app

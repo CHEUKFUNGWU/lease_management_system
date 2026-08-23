@@ -1,0 +1,11 @@
+{
+  "as_of": "2026-08-22",
+  "purpose": "DESIGN.md §14 全树级债务预算（P0-B 结构性缺口收口）。design-debt-baseline.json 只记分支级新增，本文件记全树总量：任何来源（含已合入 main 的提交）使计数超过预算即红。清理债务后应把对应数字下调——只升不降的预算会变成橡皮图章。口径注意：计数用与 design-tree-budget.test.ts 相同的出现次数正则，不是 grep 行数；历史台账里「边框 53 / 字重 2」为宽松匹配的虚高值，严格口径实为 17 / 0。",
+  "budgets": {
+    "inline_style_openers": 917,
+    "tsx_border_1px_solid": 17,
+    "js_hover_handlers": 4,
+    "font_weight_over_600": 0,
+    "globals_css_important": 5
+  }
+}

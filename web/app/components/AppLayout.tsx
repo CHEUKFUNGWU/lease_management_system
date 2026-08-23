@@ -92,10 +92,13 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
     () => {
       const groups: any[] = [];
       if (canViewAnalysis) {
+        // F3-2：按 CONTEXT.md 的领域边界拆组——「经营分析」是零售经营域
+        // （store-day 事实与指标），「租赁决策」是租赁/交易域（合同台账与
+        // 谈判测算）。分界线照 CONTEXT.md，不自创分类法。
         groups.push({
           type: "group",
-          key: "analysis",
-          label: t("nav.group_analysis", language as any),
+          key: "operating-analysis",
+          label: t("nav.group_operating_analysis", language as any),
           children: [
             item("/operating-pulse", "/operating-pulse", <LineChartOutlined />, t("nav.operating_pulse", language as any)),
             item("/store-360", "/store-360", <LineChartOutlined />, t("nav.store_360", language as any)),
@@ -104,12 +107,19 @@ function useMenuItems(language: string, user: ReturnType<typeof useAuth>["user"]
             item("/scenario-workbench", "/scenario-workbench", <LineChartOutlined />, t("nav.scenario_workbench", language as any)),
             item("/fpna-workbench", "/fpna-workbench", <CalculatorOutlined />, t("nav.fpna_workbench", language as any)),
             item("/performance", "/performance", <DashboardOutlined />, t("nav.performance", language as any)),
+            item("/promotions", "/promotions", <AuditOutlined />, t("nav.promotions", language as any)),
+          ],
+        });
+        groups.push({
+          type: "group",
+          key: "lease-decision",
+          label: t("nav.group_lease_decision", language as any),
+          children: [
             item("/portfolio", "/portfolio", <PieChartOutlined />, t("nav.portfolio", language as any)),
             item("/pre-deal", "/pre-deal", <FileSearchOutlined />, t("nav.pre_deal", language as any)),
             item("/deal-compare", "/deal-compare", <SwapOutlined />, t("nav.deal_compare", language as any)),
             item("/sensitivity", "/sensitivity", <LineChartOutlined />, t("nav.sensitivity", language as any)),
             item("/cashflow-forecast", "/cashflow-forecast", <DollarOutlined />, t("nav.cashflow", language as any)),
-            item("/promotions", "/promotions", <AuditOutlined />, t("nav.promotions", language as any)),
           ],
         });
       }

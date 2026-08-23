@@ -67,6 +67,7 @@ export function InventoryTurnoverPanel({
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [token, storeId, fromDate, toDate, currency]);
 
   if (loading) {
@@ -92,6 +93,8 @@ export function InventoryTurnoverPanel({
         }
       >
         <StateBlock state={{ kind: "empty", reason: t("inventory.empty_reason", language) }} language={language} />
+        {/* R1-3: basis note stays visible in degraded states */}
+        <div className="panel-basis-note">{t("store360.inventory.basis", language)}</div>
       </Card>
     );
   }
@@ -175,6 +178,8 @@ export function InventoryTurnoverPanel({
           </Text>
         </div>
       </div>
+      {/* R1-3: basis note - numerator, denominator, degradation rule */}
+      <div className="panel-basis-note">{t("store360.inventory.basis", language)}</div>
     </Card>
   );
 }

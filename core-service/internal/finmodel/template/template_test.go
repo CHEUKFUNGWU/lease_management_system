@@ -1,6 +1,8 @@
 package template
 
 import (
+	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -83,6 +85,14 @@ func TestParseRejectsCycle(t *testing.T) {
 	}})
 	if err == nil || !strings.Contains(err.Error(), "circular") {
 		t.Fatalf("cycle must be rejected, got %v", err)
+	}
+	// RH6（R2-4）：链路可结构化提取，调用方不必 split 错误字符串。
+	var cycleErr *CycleError
+	if !errors.As(err, &cycleErr) {
+		t.Fatalf("cycle error must be *CycleError, got %T", err)
+	}
+	if !reflect.DeepEqual(cycleErr.Path, []string{"a", "b", "a"}) {
+		t.Fatalf("cycle path = %v, want [a b a]", cycleErr.Path)
 	}
 	// lag breaks same-period cycles: b referencing lag(a) is legal.
 	_, err = Parse(TemplateDef{Name: "t", Version: 1, Rows: []RowDef{

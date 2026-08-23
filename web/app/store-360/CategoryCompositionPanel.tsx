@@ -161,6 +161,7 @@ export function CategoryCompositionPanel({
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- P2-C gate close-out: legacy dep semantics kept as-is; loaders are rebuilt every render so adding them would loop refetches. useCallback refactor tracked separately; do not add new exemptions.
   }, [token, storeId, fromDate, toDate, baseFromDate, baseToDate, dataClassification, currency]);
 
   // Aggregate category rows for display
@@ -419,6 +420,8 @@ export function CategoryCompositionPanel({
           </div>
         )}
       </Card>
+      {/* R1-3: basis note - three effects and residual; at Space bottom, rendered in every data state */}
+      <div className="panel-basis-note">{t("store360.category.basis", language)}</div>
     </Space>
   );
 }

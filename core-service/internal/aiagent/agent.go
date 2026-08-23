@@ -43,6 +43,10 @@ type Agent struct {
 	// fileBytes is the MinIO read seam used by the intake parse endpoints
 	// (W5-3); nil means parse tools refuse honestly.
 	fileBytes FileBytesReader
+	// storePnl is the single-store P&L projection seam (B-1). Nil means the
+	// fpna.store_pnl.read tool is not registered at all (P0-8: never register a
+	// nil-port version over a real one).
+	storePnl agenttooldefs.StorePnlReader
 	// registrationAttempted / registrationFailed record construction-time
 	// registration accounting. They exist for the completeness guard
 	// (registration_completeness_test.go): every attempted registration must
@@ -111,8 +115,8 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 // NewWithOperationalReadersAndGovernanceAndRetail is the production
 // constructor: it wires the operating-facts / close-readiness / control /
 // governance / retail seams into the same governed Agent Tool Runtime.
-func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, finModelRepo, facts, plans, draftServices...)
+func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, draftServices...)
 }
 
 // registerCollector is the single implementation of “attempt a tool
@@ -160,10 +164,11 @@ func (c *registerCollector) fail() error {
 		len(c.failed), c.attempted, strings.Join(lines, "\n"))
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
+		storePnl:      storePnl,
 	}
 	registry := agenttools.NewRegistry()
 	collector := &registerCollector{registry: registry}
@@ -268,6 +273,11 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 	}
 	if sensitivity != nil {
 		collector.add(agenttooldefs.NewSensitivityDefinition(sensitivity))
+	}
+	// B-1：单店利润表投影。P0-8：storePnl 未接线时不注册（诚实缺席，
+	// 绝不注册 nil 端口版挡住真实端口）；接线后只有读工具，零写入。
+	if storePnl != nil {
+		collector.add(agenttooldefs.NewStorePnlReadDefinition(storePnl))
 	}
 	agent.registrationAttempted = collector.attempted
 	agent.registrationFailed = len(collector.failed)

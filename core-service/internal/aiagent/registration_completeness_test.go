@@ -28,6 +28,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/closereadiness"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
+	"github.com/lease-management-system/core-service/internal/storepnl"
 )
 
 // --- 生产端口桩：镜像 cmd/api/main.go 的全接线，只是仓库换成零值指针、其余接口换成桩。
@@ -121,11 +122,20 @@ func productionWire() *Agent {
 		registrationRetailStub{},
 		registrationSensStub{},
 		registrationFillStub{},
+		registrationStorePnlStub{},
 		repository.NewFinModelRepository(nil),
 		registrationRetailStub{}, // facts
 		repository.NewFPnAGovernanceRepository(nil),
 		draftapp.NewService(nil, nil),
 	)
+}
+
+// registrationStorePnlStub satisfies agenttooldefs.StorePnlReader so the full
+// production surface exercises the fpna.store_pnl.read registration.
+type registrationStorePnlStub struct{}
+
+func (registrationStorePnlStub) Project(context.Context, agenttooldefs.StorePnlQuery) (*storepnl.StorePnl, error) {
+	return &storepnl.StorePnl{}, nil
 }
 
 func TestAgentToolRegistrationCompleteness(t *testing.T) {

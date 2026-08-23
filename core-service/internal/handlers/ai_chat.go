@@ -156,12 +156,13 @@ func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
 	retail agenttooldefs.RetailOperationsReader,
 	sensitivity agenttooldefs.SensitivityReader,
 	fillReader agenttooldefs.IngestFileReader,
+	storePnl agenttooldefs.StorePnlReader,
 	finModelRepo *repository.FinModelRepository,
 	facts finadapter.FactsSource,
 	plans *repository.FPnAGovernanceRepository,
 	draftServices ...*draftapp.Service,
 ) *AIChatHandler {
-	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, finModelRepo, facts, plans, draftServices...)
+	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, draftServices...)
 	handler := &AIChatHandler{agent: agent, runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
 	handler.agentRuntime = aichat.NewRuntime(runtimeRepo, agent, agent, aiagent.ProjectResult, aichat.Options{ReviewCommit: handler.commitReviewTransaction})
 	return handler

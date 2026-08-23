@@ -155,6 +155,9 @@
 - **底稿类 Tool（`*.working_paper.*.generate`）产出 Artifact，走 LevelDraft + Review Gate**，不落业务表
 - **端口未接线时工具必须诚实拒绝**，返回 unavailable，不得产出数字。反过来：**不要用 nil 端口无条件注册工具**，那会让重名注册把真实端口挡在外面（P0-8 教训，`aiagent/agent.go` 现在按 `finModelRepo == nil` 二选一分支注册）
 - **权限拒绝必须保持原因。** `scope_denied` 不得被改写成「无数据」之类的软化表述 —— 这会掩盖权限问题，触及底线 1
+- **Tool 名只有三个顶层命名空间**：`lease.*`（合同、计量、月结、事件、文件解析）、`fpna.*`（三表模型、单店利润表、假设、备忘录）、`retail.*`（经营脉搏、门店诊断、情景、经营事实）。**新增工具必须归入其一，不得开第四个根。** 新领域用二级段表达（`fpna.store_pnl.read` 而不是 `store_pnl.read`）。理由：命名空间的作用是让模型可预测地找到工具，每个新领域自立门户会让根的数量随功能线性增长，检索价值归零
+- **每个 Descriptor 必须声明 `Permissions`。** 缺失会被 `Descriptor.Validate` 以 `at least one permission is required` 拒绝，而注册失败一度是静默的——`lease.file.triage` 就这样从未进过 registry。取值按**工具自身的读写性质**，不是按它下游对象的权限：`lease.file.triage` 只读零写入用 `ai_chat:use`，而非 `lease.file.parse_*` 的 `contracts:create`，否则「还不知道是不是合同」的分诊会被挡在合同创建权之后
+- **工具数只能运行时枚举，不能 grep。** 三种 grep 口径给出三个不同答案。构造 registry 后调 `Runtime.Describe`，守卫在 `aiagent/registration_completeness_test.go`
 
 ### 报表双模式
 

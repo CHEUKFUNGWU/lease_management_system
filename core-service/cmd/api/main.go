@@ -121,7 +121,13 @@ func main() {
 	}
 	var fillReader agenttooldefs.IngestFileReader = miniostore.NewIngestReader(minioClient)
 	finModelRepo := repository.NewFinModelRepository(database.Pool)
-	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
+	// B-1: the Agent Tool seam rides the same S1 adapters as /stores/:id/pnl;
+	// built here (before the Agent handler) so fpna.store_pnl.read is registered in
+	// the production runtime exactly when the HTTP projection is wired.
+	storePnlKPIAdapter := handlers.NewStorePnlKPIAdapter(retailKPIRepo)
+	storePnlHandler := handlers.NewStorePnlHandler(storePnlKPIAdapter, nil, fpnaGovernanceRepo).WithPeer(storePnlKPIAdapter).WithMasterData(masterDataRepo).WithOccupancy(handlers.NewStorePnlOccupancyAdapter(psRepo)).WithLease(handlers.NewStorePnlLeaseAdapter(mcRepo)).WithTemplates(finModelRepo)
+	storePnlAgentReader := handlers.NewStorePnlAgentReader(storePnlHandler)
+	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, storePnlAgentReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
 	// W5-1: document parser seam (ADR-0024 routing). AnyDoc binary is pinned
 	// in the runtime image (Dockerfile); OCR is enabled when a PaddleOCR token is configured.
 	ocrParser := docparse.NewPaddleOCR(docparse.PaddleOCRConfig{
@@ -144,8 +150,6 @@ func main() {
 	storeMetricsHandler := handlers.NewStoreMetricsHandler(storeMetricsRepo, auditLogger, systemSettingRepo)
 	operatingFactsHandler := handlers.NewOperatingFactsHandler(operatingFactsRepo, auditLogger, fpnaGovernanceRepo)
 	retailStoreDayFactsHandler := handlers.NewRetailStoreDayFactsHandler(operatingFactsRepo, auditLogger)
-	storePnlKPIAdapter := handlers.NewStorePnlKPIAdapter(retailKPIRepo)
-	storePnlHandler := handlers.NewStorePnlHandler(storePnlKPIAdapter, nil, fpnaGovernanceRepo).WithPeer(storePnlKPIAdapter).WithMasterData(masterDataRepo).WithOccupancy(handlers.NewStorePnlOccupancyAdapter(psRepo)).WithLease(handlers.NewStorePnlLeaseAdapter(mcRepo)).WithTemplates(finModelRepo)
 	finModelHandler := handlers.NewFinModelHandlerWithAudit(finModelRepo, auditLogger).WithExchangeRates(exchangeRateRepo).WithPlanGovernance(fpnaGovernanceRepo).WithFacts(retailKPIRepo).WithProductionSources(mcRepo, operatingFactsRepo)
 	savedViewHandler := handlers.NewSavedViewHandler(finModelRepo)
 	retailIngestHandler := handlers.NewRetailIngestHandler(retailKPIRepo, operatingFactsRepo, auditLogger)

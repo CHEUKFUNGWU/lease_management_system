@@ -107,6 +107,18 @@
 
 ## Implementation Decisions
 
+### D-B0：渲染器是纯函数，不是 Agent 工具（2026-08-23 修订）
+
+原规格把渲染做成两个工具 `render_waterfall_svg` / `render_flowchart_svg`。**推翻**，三个理由：
+
+1. **违反命名空间规范。** 无前缀的顶层名不允许（AGENTS.md）。而改名也解决不了根本矛盾：同一个瀑布图渲染器既要服务 `varianceattribution`（retail 域）又要服务 finmodel 版本差异（fpna 域），「看读写的数据属于哪个域」这条判定规则给不出唯一答案。**规则给不出答案，通常说明形状错了。**
+2. **模型不该编排渲染。** 做成工具意味着模型要先取数、再决定调渲染工具、再把数据传过去。多一次往返、多一处可能传错，而且模型可能拿旧数据渲染新图。
+3. **图与数可能不一致。** 分两步就有窗口期。
+
+改为：**渲染器是纯 Go 函数，由已经持有数据的工具在返回时附带产出 `chart_svg` artifact。** 模型不选择渲染，有数据的工具自己渲染，图与数在同一次调用里产生，构造上不可能不一致。
+
+本批次的具体落点是差异归因（`retail.store_diagnostics.read` 那条链）。**流程图不做**——Story 7 目前没有具体消费方，等有了再说。
+
 ### D-B1：SVG 走 artifact 通道，不引入 markdown 渲染层
 
 蓝图 §五描述的是「SSE 吐出 ```svg 代码块 → ReactMarkdown 拦截器」。**否决**，两个理由：`web/` 目前没有任何 markdown 渲染库，引入它意味着前端开始渲染任意 LLM 文本，攻击面远超本功能；且代码块是弱类型的，SVG 是否合法、属于哪张图、基于哪个 run，全靠字符串约定。
@@ -211,8 +223,8 @@ WebSocket 模式下没有「签名验证失败」这个类别——原 spec 基�
 
 | 类型 | 变更 |
 |---|---|
-| 新增 Tool | `render_waterfall_svg`、`render_flowchart_svg`（读类，不写业务表） |
-| 新增 artifact kind | SVG 图形类，含 `data_classification` 与 `decomposition_order` |
+| 新增 Tool | **无**（D-B0：渲染器是纯函数，不是工具） |
+| 新增 artifact type | `chart_svg`，含 `data_classification` 与 `decomposition_order`。加进 `agentartifact` 既有的 9 个类型 |
 | 新增 REST | 草稿列表 / 详情 / 字段修改 / 批准 / 退回 / 批量批准（合同域下） |
 | 新增页面 | `/contracts/drafts`（第 32 个页面） |
 | 新增包 | `internal/gateway`（第 29 个内部包），含 `internal/gateway/vendor/picoclaw/` |

@@ -185,9 +185,11 @@
 
 > **已知词表分叉（2026-08-23 盘点，未收敛）**：`working` / `official` 仍活在以下位置，收敛需要一个带迁移的专项，**未排期**。在此之前：**新代码一律用 Draft / Pending / Approved，既有位置不要顺手改**——下面前三项改动会破坏对外契约或既有数据。
 >
+> 规格见 [docs/specs/vocabulary-convergence-v1.md](docs/specs/vocabulary-convergence-v1.md)。
+>
 > | 位置 | 形态 | 改动代价 |
 > |---|---|---|
-> | `handlers/fpna_governance.go` 的 `?official=true` | **公开 API 查询参数** | 破坏性变更，需前端同步 |
+> | ~~`handlers/fpna_governance.go` 的 `?official=true`~~ | **不在范围**（2026-08-24 订正） | 它表达的是**版本地位**不是报表口径，是 CONTEXT.md 的保留概念。初次盘点把两个 `official` 混为一谈。判定方法：问这个词说的是「包含什么」还是「哪一版权威」 |
 > | `finmodel/view` 的 `basis_mode` | 存于 saved view 的 **JSONB 配置** | 需数据迁移 |
 > | `aiagent` 的 `PageContext.ReportView` | **前端传入** | 需前后端同步 |
 > | `fpna_plan_versions.status` | `draft/review/approved/official/retired` 五值，把审批状态与版本生命周期**混在一列** | 需迁移 + 拆列 |

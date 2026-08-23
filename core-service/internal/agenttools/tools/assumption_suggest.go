@@ -44,7 +44,7 @@ func NewAssumptionSuggestionDefinition(writer AssumptionDraftWriter) agenttools.
 					"value":{},"unit":{"type":"string"},
 					"basis":{"type":"array","minItems":1,"items":{"type":"object","required":["tool_call_id","scope"],"properties":{"tool_call_id":{"type":"string"},"scope":{"type":"string"},"period":{"type":"string"}}}},
 					"confidence":{"type":"number"},"source_tag":{"type":"string"}
-				}}}}}
+				}}}}
 			}`),
 			OutputSchema:        json.RawMessage(`{"type":"object","required":["draft_ids","side_effects"]}`),
 			Review:              agenttools.ReviewPolicy{Required: true, Reasons: []string{"ai_suggestion_draft", "assumptions_unconfirmed"}, ConfirmAction: "confirm"},

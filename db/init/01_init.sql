@@ -271,10 +271,18 @@ CREATE TABLE IF NOT EXISTS ai_contract_drafts (
     contract_data JSONB NOT NULL,
     confidence_scores JSONB,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    -- Ch2 草稿复核工作台：法人隔离（底线 1）与数据分类（底线 2）。
+    -- legal_entity_id 可空：存量行无可靠法人来源，NULL 不匹配任何调用者
+    -- （fail-closed），历史行因此对所有人不可见。
+    legal_entity_id UUID REFERENCES legal_entities(id),
+    data_classification VARCHAR(20),
     reviewed_by UUID REFERENCES users(id),
     reviewed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_ai_contract_drafts_legal_entity
+    ON ai_contract_drafts(legal_entity_id);
 
 CREATE TABLE IF NOT EXISTS ai_payment_schedule_drafts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

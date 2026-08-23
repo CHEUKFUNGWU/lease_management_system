@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -902,4 +904,129 @@ func (r *ContractRepository) ConfirmDiscountRate(
 	}
 	result, err := r.db.Exec(ctx, query, args...)
 	return requireWorkflowTransition(result, err, "contract discount rate", contractID)
+}
+
+// ── Ch2 草稿复核工作台：ai_contract_drafts 只读/审面 ─────────────────────
+// fail-closed：legal_entity_id 与调用者法人严格相等才可见；NULL 不匹配任何
+// 人（含 global 管理员）——这张表的 legal_entity_id 可空，存量行法人来源
+// 不可靠，因此本接缝对 Global filter 也拒绝下发无过滤查询，与其它仓库
+// 「global 即不过滤」的惯例刻意不同。隔离键是行上的列，不是 AI 抽取内容。
+
+type DraftReviewRow struct {
+	ID                 string
+	TaskID             string
+	LegalEntityID      *string
+	DataClassification string
+	Status             string
+	ContractData       json.RawMessage
+	ConfidenceScores   json.RawMessage
+	CreatedAt          time.Time
+}
+
+func (r *ContractRepository) ListDraftsForReview(ctx context.Context, entity access.EntityFilter, status string, limit int) ([]DraftReviewRow, error) {
+	if entity.IsGlobal() {
+		return nil, nil // global/零值无法人 → 空集（fail-closed；见包注释）
+	}
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	query := `SELECT d.id::text, d.task_id::text, d.legal_entity_id::text,
+			COALESCE(d.data_classification,''), d.status, d.contract_data,
+			COALESCE(d.confidence_scores,'{}'::jsonb), d.created_at
+		FROM ai_contract_drafts d WHERE 1=1`
+	args := make([]any, 0, 3)
+	if clause, arg, err := entity.SQLClause("d.legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	if status != "" {
+		query += ` AND d.status = $` + fmt.Sprint(len(args)+1)
+		args = append(args, status)
+	}
+	query += ` ORDER BY d.created_at DESC LIMIT ` + fmt.Sprint(limit)
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]DraftReviewRow, 0)
+	for rows.Next() {
+		var row DraftReviewRow
+		var legal *string
+		var taskID string
+		if err := rows.Scan(&row.ID, &taskID, &legal, &row.DataClassification, &row.Status,
+			&row.ContractData, &row.ConfidenceScores, &row.CreatedAt); err != nil {
+			return nil, err
+		}
+		row.TaskID = taskID
+		row.LegalEntityID = legal
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// GetDraftForReview 按 id 取一条草稿。异法人与不存在都落在 pgx.ErrNoRows：
+// SQL 里只有 id 与法人等值条件，没有第三种结果——存在性泄漏在形状上不可
+// 表达。global/零值 filter 直接 ErrNoRows（fail-closed；见包注释）。
+func (r *ContractRepository) GetDraftForReview(ctx context.Context, entity access.EntityFilter, id string) (DraftReviewRow, error) {
+	var row DraftReviewRow
+	var legal *string
+	if entity.IsGlobal() {
+		return DraftReviewRow{}, pgx.ErrNoRows
+	}
+	args := []any{id}
+	query := `SELECT id::text, task_id::text, legal_entity_id::text,
+			COALESCE(data_classification,''), status, contract_data,
+			COALESCE(confidence_scores,'{}'::jsonb), created_at
+		FROM ai_contract_drafts WHERE id=$1`
+	clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1)
+	if err != nil {
+		return DraftReviewRow{}, err
+	}
+	if clause != "" {
+		query += " AND " + clause
+		args = append(args, arg)
+	}
+	err = r.db.QueryRow(ctx, query, args...).Scan(&row.ID, &row.TaskID, &legal,
+		&row.DataClassification, &row.Status, &row.ContractData,
+		&row.ConfidenceScores, &row.CreatedAt)
+	if err != nil {
+		return DraftReviewRow{}, err
+	}
+	row.LegalEntityID = legal
+	return row, nil
+}
+
+// UpdateDraftReview 只改审面状态列（status / reviewed_by / reviewed_at /
+// rejected_reason）。它不重写 contract_data 与 confidence_scores——AI 提取值
+// 是抽取事实，复核动作不覆盖它；人工修订走 SaveDraftEdits 的独立分层。
+type UpdateDraftReviewInput struct {
+	Status         string
+	ReviewerUserID string // users(id)；空则 NULL
+	RejectedReason string // 仅 rejected 时有意义
+}
+
+func (r *ContractRepository) UpdateDraftReview(ctx context.Context, id string, in UpdateDraftReviewInput) error {
+	_, err := r.db.Exec(ctx, `UPDATE ai_contract_drafts SET status=$2, reviewed_by=$3::uuid,
+		reviewed_at=NOW(), rejected_reason=NULLIF($4,'') WHERE id=$1`,
+		id, in.Status, nullableUUID(in.ReviewerUserID), in.RejectedReason)
+	return err
+}
+
+// SaveDraftEdits 把人工修订层合并进 contract_data.human_edits（D-B9 差异留痕：
+// AI 提取值与人工终值同存于一个对象、互不覆盖——AI 值在原键，人工值只在
+// human_edits 子对象）。
+func (r *ContractRepository) SaveDraftEdits(ctx context.Context, id string, humanEdits json.RawMessage) error {
+	_, err := r.db.Exec(ctx, `UPDATE ai_contract_drafts SET contract_data =
+		jsonb_set(contract_data, '{human_edits}', COALESCE($2::jsonb, '{}'::jsonb), true) WHERE id=$1`, id, humanEdits)
+	return err
+}
+
+func nullableUUID(v string) any {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	return v
 }

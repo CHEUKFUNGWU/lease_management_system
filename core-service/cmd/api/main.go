@@ -82,6 +82,10 @@ func main() {
 	closeControlService := closecontrol.NewService(closeReadinessRepo, systemSettingRepo, closeControlRepo)
 	eventPersistence := eventaccounting.NewPersistenceService(database.Pool, mcRepo, eventRepo, auditLogger)
 	draftService := draftapp.NewPostgresService(database.Pool, contractRepo, psRepo, eventRepo)
+	// Ch2 草稿复核工作台：读走 contractRepo（Reader），写复用 draftapp 的
+	// 幂等 UoW（agent_draft_idempotency + lease_contracts 同一事务）。
+	draftReviewUOW := handlers.DraftReviewUOW{Inner: draftapp.NewPostgresUnitOfWork(database.Pool, contractRepo, psRepo, eventRepo)}
+	draftReviewHandler := handlers.NewContractDraftReviewHandler(contractRepo, draftReviewUOW)
 	capabilityIssuer, err := agentcapability.NewIssuer(cfg.AgentCapabilitySecret, "lease-agent-gateway", time.Duration(cfg.AgentCapabilityTTLSeconds)*time.Second)
 	if err != nil {
 		log.Fatalf("Failed to initialize agent capability issuer: %v", err)
@@ -268,6 +272,12 @@ func main() {
 		protected.Handle(http.MethodPost, "/contracts/:id/renewal-decisions", permission("renewal_decisions", "write"), contractScope, renewalCardHandler.CreateDecision)
 		protected.Handle(http.MethodGet, "/contracts/:id/renewal-decisions", permission("reports", "read"), contractScope, renewalCardHandler.ListDecisions)
 		protected.Handle(http.MethodGet, "/contracts-by-status", permission("contracts", "read"), approvalHandler.ListByStatus)
+
+		// Ch2 草稿复核工作台：草稿的生命周期长于会话，按草稿自身的状态与归属组织（D-B6）。
+		protected.Handle(http.MethodGet, "/contracts/drafts", permission("contracts", "read"), draftReviewHandler.ListDrafts)
+		protected.Handle(http.MethodPost, "/contracts/drafts/decide", permission("contracts", "approve"), draftReviewHandler.DecideDrafts)
+		protected.Handle(http.MethodGet, "/contracts/drafts/:id", permission("contracts", "read"), draftReviewHandler.GetDraft)
+		protected.Handle(http.MethodPut, "/contracts/drafts/:id", permission("contracts", "update"), draftReviewHandler.ReviseDraft)
 
 		// Discount Rate
 		protected.Handle(http.MethodGet, "/contracts/:id/discount-rate-status", permission("calculations", "read"), contractScope, handlers.CheckDiscountRate(contractRepo))

@@ -24,6 +24,7 @@
 | 现行功能规格 | [docs/specs/](docs/specs/) |
 | IFRS 16 计量口径（**模块级参考，不是产品定位**） | [docs/IFRS16_计量方法与准则映射白皮书.md](docs/IFRS16_计量方法与准则映射白皮书.md)；回归对数报告不入库，跑 `make ifrs16-regression` 生成 |
 | Agent 运行时的运维 | [docs/AI_Agent_运行运维手册.md](docs/AI_Agent_运行运维手册.md) |
+| **给 Agent 新增一个 Tool 怎么写** | **[docs/Agent_Tool_包装规范.md](docs/Agent_Tool_包装规范.md)** — 含可照抄模板、命名判定、接缝要比 API 窄、租户上下文的唯一正确写法 |
 | **AI / Agent 的现行设计与决策** | [docs/AI_文档索引与现行决策.md](docs/AI_文档索引与现行决策.md) — **动 AI 相关的东西之前先读这份**，它标着每份文档还算不算数 |
 
 变更历史不在本文维护，用 `git log`。

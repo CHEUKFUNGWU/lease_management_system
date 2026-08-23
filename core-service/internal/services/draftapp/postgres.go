@@ -111,8 +111,11 @@ func (s *postgresStore) LookupIdempotency(ctx context.Context, operation, key st
 	// Lock by operation/key before checking for a row. This closes the race
 	// between two first attempts with the same idempotency key: the waiter sees
 	// the committed result and replays it instead of creating a duplicate draft.
+	// 分隔符用 ":" 而不是 NUL 字节：Postgres 文本参数拒绝 0x00（SQLSTATE
+	// 22021），NUL 拼接的锁键让每一次 Lookup 都直接报错。operation 与 key 各自
+	// 不含 ":" 前后拼接歧义的最坏情形是过度串行化，不影响正确性。
 	if _, err := s.db.Exec(ctx,
-		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, operation+"\x00"+key,
+		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, operation+":"+key,
 	); err != nil {
 		return nil, false, fmt.Errorf("lock draft idempotency key: %w", err)
 	}

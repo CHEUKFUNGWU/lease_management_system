@@ -4,7 +4,7 @@
 > 来源：ADR-0027（采用 picoclaw agent 内核）的范围扩展。用户 2026-08-23 明确：**不止迁移 AgentCore，是把一个 agent runtime 应有的能力完整囊括进来，包含 session manager 与 context engineering**
 > 发布位置说明：本仓无 issue tracker，按既有惯例落 `docs/specs/`
 > 配套模块设计：[CodebaseDesign_AgentRuntime升级_模块深化.md](../CodebaseDesign_AgentRuntime升级_模块深化.md)
-> **ADR-0027 需随本 spec 扩写**：其 Non-goals 现排除 `providers`/`identity`/`auth`/`credential`，未提 `bus`/`session`/`memory`/`routing`，与本 spec 的范围不一致
+> **本 spec 是新方案，不受既往决策登记约束。** 其中沿用的既有约束只有一类：**五条不可突破的底线**（尤其底线 1 跨法人隔离）。其余历史决策一律按实测能力重新判断，可推翻。ADR-0027 需随本 spec 扩写以消除范围矛盾
 
 ---
 
@@ -14,7 +14,19 @@
 
 **picoclaw `pkg/` 36 个包**（Go 1.25, MIT, 谱系 picoclaw ← openclaw ← pi）。
 
-**「完整升级」不等于替换那 18,200 行。** 最大的两块恰恰不该换：`aiagent` 6603 行是领域接线，picoclaw 没有本产品的业务因而给不出对应物；`agentrunner` 2455 行是 checkpoint 与租约恢复，ADR-0022 原文即写「pi does not have and this product does need」。**升级的是能力面，不是行数。**
+**「完整升级」不等于替换那 18,200 行。** 最大的两块恰恰不该换：`aiagent` 6603 行是领域接线，picoclaw 没有本产品的业务因而给不出对应物；`agentrunner` 2455 行是 checkpoint 与租约恢复，picoclaw 侧无对应物，而长跑任务断点续跑是本产品的实际需求。**升级的是能力面，不是行数。**
+
+### 一个必须先说清的事实：`agentcore` 目前是生产环境的死代码
+
+`agentcore.New` 在**非测试代码里一次都没有被调用**。生产聊天路径跑的是 `aichat.Runtime[T]`（1784 行），不是那 1819 行纯循环内核；`aiagent/agent.go` 只 import 了 agentcore 的类型与 hooks，从不实例化它的 loop。
+
+这与 `docs/AI_文档索引与现行决策.md` 登记的现状一致：**「G1 两个 Agent 平面未汇流 —— 未解决」**。W1/W2 交付了内核与治理链，W3+ 的汇流从未发生。
+
+三个后果，本 spec 全程按它们校准：
+
+1. **第一层不是「置换内核」，是「置换内核 + 让它上生产路径」。** 后半句才是难的部分，也是这套内核当初立项要解决、至今没解决的那件事。
+2. **ACORE-2 锁的那条治理链目前不在任何生产请求的路径上。** 它保护的是一个没在跑的内核。这不降低九项变异必须重新证红证绿的要求（D-C6）——恰恰相反：它们要在**上了生产路径的**新内核上重新成立，那才是它们第一次真正保护线上流量。
+3. **那 1819 行内核加治理链，到今天为止没有产生任何生产价值。** 架构选择本身没错——picoclaw 走的正是同一条路——错的是建完就停在那里。本 spec 的第一层把汇流做完，否则再换一次内核仍然是死代码换死代码。
 
 ## Problem Statement
 
@@ -22,7 +34,7 @@
 
 **第一，长会话是靠运气。** 全仓**没有任何上下文管理**——无裁剪、无窗口、无预算，连 token 计数都没有（`tiktoken` / `CountTokens` / `NumTokens` 全仓零命中）。`agentcore.State.Messages()` 原样返回整个会话。一次底稿排查对话跑到几十轮，消息列表只增不减，直到某次 LLM 调用因超限失败——失败点不可预测，且失败时用户已经投入了半小时的上下文。ADR-0022 的 Non-goals 把压缩推迟到「观察到真实溢出」，但**没有任何机制会观察到它**：没有 token 计数就没有可观测量，条件永远不会被满足。
 
-**第二，会话有存储但没有管理者。** 库里有七张表（`ai_chat_sessions` / `runs` / `messages` / `run_events` / `artifacts` / `review_actions` / `attachments`），生命周期逻辑却散在六处：`handlers/ai_chat.go`、`handlers/ai_chat_runtime.go`、`handlers/agent_gateway_sessions.go`、`aichat/runtime.go`、`aichat/continuation.go`、`agentrunner/runner.go`。「一个会话现在是什么状态、能不能续、该不该淘汰、并发进来两条消息怎么办」这些问题没有单一的回答处，只能靠读六个文件拼出来。ADR-0022 §2 已经要求「持久化是订阅者不是循环里的一步」，但那只解决了写的时机，没有解决**谁拥有会话**。
+**第二，会话有存储但没有管理者。** 库里有七张表（`ai_chat_sessions` / `runs` / `messages` / `run_events` / `artifacts` / `review_actions` / `attachments`），生命周期逻辑却散在六处：`handlers/ai_chat.go`、`handlers/ai_chat_runtime.go`、`handlers/agent_gateway_sessions.go`、`aichat/runtime.go`、`aichat/continuation.go`、`agentrunner/runner.go`。「一个会话现在是什么状态、能不能续、该不该淘汰、并发进来两条消息怎么办」这些问题没有单一的回答处，只能靠读六个文件拼出来。既有设计已经把持久化做成订阅者而非循环里的一步，但那只解决了写的时机，没有解决**谁拥有会话**。
 
 **第三，runtime 缺少一批本该有的基础能力。** MCP（全仓零）、模型路由、定时触发、健康探针、跨会话记忆——这些不是锦上添花，是「agent runtime」这个词的通常含义的一部分。缺了它们，每一个新需求都要在 `aiagent` 那 6603 行里再接一根线，那个文件已经是全仓最大的单包。
 
@@ -30,13 +42,15 @@
 
 分三层推进，每层可独立交付、独立验收。
 
-**第一层：内核置换（ADR-0027 §1）。** `agentcore` 的 1819 行换成 picoclaw `pkg/agent` 的适配版，治理链移植到其 `ToolInterceptor` / `LLMInterceptor` / `ToolApprover` 挂点。这是后两层的地基——`context_manager` 与 `session` 都挂在这个内核上。
+**第一层：内核置换 + 汇流（ADR-0027 §1 + G1）。** `agentcore` 的 1819 行换成 picoclaw `pkg/agent` 的适配版，治理链移植到其 `ToolInterceptor` / `LLMInterceptor` / `ToolApprover` 挂点，**并把生产聊天路径从 `aichat.Runtime[T]` 切到新内核上**。后半句是 G1 遗留的汇流，不做的话这一层只是把一份死代码换成另一份死代码。这是后两层的地基——`context_manager` 与 `session` 都挂在这个内核上。
 
 **第二层：Session Manager 与 Context Engineering。** 前者把散在六处的生命周期收拢成一个模块；后者从零建起 token 计数 → 预算 → 压缩三级，且压缩必须对审计与溯源无损。
 
 **第三层：能力补齐。** 子任务委派、MCP、模型路由、定时、健康探针、记忆，按价值排序逐个接入，每个都是可独立回退的增量。
 
-**不做的**：`providers`（ADR-0022 §4，`internal/llm` 的中国区 endpoint 是一等公民）、`identity`/`auth`/`credential`（ADR-0022 §3 + 底线 1，picoclaw 是个人助手无租户模型）、以及边缘硬件场景的 `audio`/`media`/`devices`/`netbind`/`pid`/`seahorse`。
+**不做的**：`identity`/`auth`/`credential`（跨法人隔离是五条底线之一，picoclaw 无租户模型，搬进来只能削弱）、边缘硬件场景的 `audio`/`media`/`devices`/`netbind`/`pid`/`seahorse`、自更新的 `updater`/`evolution`。
+
+**暂不做但可重开的**：`providers`——现有 `internal/llm` 已把中国区 endpoint 做成一等公民且在跑，换它要先证明上游更强。这一条按实测能力判，不按既往决策判。
 
 ## User Stories
 
@@ -77,7 +91,7 @@
 
 25. 作为平台工程师，我想让 runtime 支持 MCP，以便接入外部工具时不必每次改 `aiagent`
 26. 作为安全负责人，我想让 MCP 引入的工具**同样经过治理链**（六前三后），以便外部工具不绕过权限、审计与 Review Gate
-27. 作为安全负责人，我想让 MCP 工具默认不可用、需显式登记，以便不存在「装上就能用」的开放生态（ADR-0022 Non-goals）
+27. 作为安全负责人，我想让 MCP 工具默认不可用、需显式登记，以便不存在绕过权限、审计与 Review Gate 的调用路径
 
 ### 其余能力
 
@@ -87,11 +101,18 @@
 31. 作为 BP，我想让 agent 记得我上次说过的偏好（如常看的门店、习惯的口径），以便不必每次重复
 32. 作为安全负责人，我想让跨会话记忆同样按 `legal_entity_id` 隔离，以便记忆不成为跨租户泄漏的新通道
 
+### 每账号 runtime 隔离
+
+33. 作为安全负责人，我想让任一账号的会话历史、steering 通道与工具结果对其他账号完全不可见，以便底线 1 在 runtime 层也由结构保证
+34. 作为安全负责人，我想让「共享实例 + 持有 per-run 可变状态」这种形状被架构测试禁止，以便串味不能靠接线疏忽引入
+35. 作为平台工程师，我想让如果选每账号独立实例，则必须带淘汰策略，以便长期运行不泄漏内存
+
 ### 迁移纪律
 
-33. 作为安全负责人，我想让 ACORE-2 的九项变异在新挂点上逐项重新证红证绿，以便治理链不在迁移中被悄悄削弱
-34. 作为平台工程师，我想让每一层都能独立回退，以便一层出问题不必整体回滚
-35. 作为使用者，我想让所有既有 Agent 能力在升级后行为不变，以便升级是叠加而不是替换
+36. 作为安全负责人，我想让 ACORE-2 的九项变异在新挂点上逐项重新证红证绿，以便治理链不在迁移中被悄悄削弱
+37. 作为平台工程师，我想让每一层都能独立回退，以便一层出问题不必整体回滚
+38. 作为使用者，我想让所有既有 Agent 能力在升级后行为不变，以便升级是叠加而不是替换
+39. 作为平台工程师，我想让生产聊天路径真的切到新内核上，以便这次升级不是把一份死代码换成另一份死代码（G1 汇流）
 
 ## Implementation Decisions
 
@@ -124,8 +145,8 @@
 | **定时触发** | **零** | 取自 picoclaw |
 | **健康探针 / 心跳** | **零** | 取自 picoclaw |
 | **跨会话记忆** | **零** | 取自 picoclaw |
-| 身份 / 权限 / 租户 | 已有且 picoclaw 结构上不可能有 | 留（ADR-0022 §3） |
-| Provider 抽象 | 已有（中国区一等公民） | 留（ADR-0022 §4） |
+| 身份 / 权限 / 租户 | 已有；picoclaw 结构上不可能有 | 留（底线 1，硬约束） |
+| Provider 抽象 | 已有（中国区一等公民） | 暂留，若上游更强可重开 |
 | 领域接线 | 已有（`aiagent`，picoclaw 无对应物） | 留 |
 
 清单里没有「零」而未被处置的项。这是「都必须有」的兑现方式。
@@ -134,23 +155,23 @@
 
 | picoclaw | 本仓 | 裁决 | 依据 |
 |---|---|---|---|
-| `agent` | `agentcore`(1819) | **换** | ADR-0027 §1 |
-| `tools` | `agenttools`(1806) | **留** | 已含治理、权限、审计、Review Gate；picoclaw 只有 `tool_allowlist` |
+| `agent` | `agentcore`(1819) | **换** | 上下文预算、subturn、MCP 挂点都在它那侧；且本仓这份目前是死代码（见先决），换的代价远低于看上去 |
+| `tools` | `agenttools`(1806) | **留** | 已含治理、权限、审计、Review Gate；picoclaw 只有 `tool_allowlist`，是个人尺度的防打扰清单 |
 | `skills` | `agentskill`(857) | **留** | 已有受控注册与合约版本化 |
-| `providers` | `llm`(1086) | **留** | ADR-0022 §4，中国区 endpoint 一等公民 |
-| `auth`/`identity`/`credential` | `access` + `middleware` | **留** | ADR-0022 §3 + 底线 1；picoclaw 无租户模型 |
+| `providers` | `llm`(1086) | **暂留，可重开** | 现有实现已把中国区 endpoint 做成一等公民且在跑。若 picoclaw 的 provider 层在这点上更强，本条可推翻——判据是实测能力，不是既往决策 |
+| `auth`/`identity`/`credential` | `access` + `middleware` | **留（硬约束）** | **跨法人隔离是五条底线之一**，不是可交易的历史决策。picoclaw 是个人助手，结构上没有租户模型，搬进来只能削弱不能增强 |
 | `session` | 散在六处 | **重建**（见 D-C4） | 有存储无管理者 |
 | `events`/`state` | `agentcore` 内 | **随内核换** | 与 loop 同生命周期 |
 | `config` | `config` | **留** | 已接既有配置体系 |
 | — | `aiagent`(6603) | **留** | 领域接线，picoclaw 无对应物 |
-| — | `agentrunner`(2455) | **留** | checkpoint 与租约恢复，ADR-0022 明言 pi 缺此而本产品需要 |
+| — | `agentrunner`(2455) | **留** | checkpoint 与租约恢复；picoclaw 侧无对应物，长跑任务断点续跑是本产品的实际需求 |
 
 ### D-C2：Context Engineering 分三级，先计数再预算最后压缩
 
 **顺序不可颠倒。** 没有 token 计数就没有预算，没有预算就无法判断何时该压缩——直接上压缩等于凭感觉裁剪。
 
 1. **计数**：token 计数必须与所用模型的分词器一致，不得用字符数或词数估算。估算的误差会在预算边界处系统性失效，而那正是唯一重要的地方。
-2. **预算**：按模型可配置的上下文预算，暴露为可观测指标。这条同时兑现 ADR-0022 Non-goals 里那个从未可被满足的重入条件——「观察到真实溢出」需要先有观察手段。
+2. **预算**：按模型可配置的上下文预算，暴露为可观测指标。附带解掉一个死结：压缩此前被推迟到「观察到真实溢出」，而没有计数就没有可观测量，那个条件永远不会被满足。
 3. **压缩**：仅在预算触发时执行。
 
 ### D-C3：压缩是呈现层裁剪，不是记录删除
@@ -173,7 +194,7 @@
 
 MCP 是能力面的补齐，不是治理的例外。经 MCP 引入的工具与一等工具走**同一条**六前三后链：租户 scope、能力检查、受保护度量、预算闸、幂等闸、Review Gate。
 
-**默认不可用、需显式登记。** ADR-0022 Non-goals 写明「No open extension ecosystem. Tool registration stays controlled」——这条不因 MCP 而松动。装上即可用的生态与本产品的审批模型不相容。
+**默认不可用、需显式登记。** 装上即可用的开放生态与本产品的审批模型不相容：一个未经登记的工具能被调用，就意味着有一条路径绕过了权限、审计与 Review Gate。这不是沿袭旧规，是审批模型的直接推论。
 
 ### D-C6：治理链移植后 ACORE-2 九项逐项重新证红证绿
 
@@ -192,7 +213,28 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 
 反向测试：构造一个子回合尝试调用父回合 scope 外的数据，断言被拒且原因是 `scope_denied`；构造超过深度上限的委派，断言被拒。
 
-### D-C7：分层交付，每层可独立回退
+### D-C9：每账号的 runtime 必须隔离，且只允许两种合法形状
+
+**当前生产路径已经没有跨账号串味的可能，但机制与蓝图描述的不同。** `aichat.Runtime[T]` 的字段只有 `store` / `planner` / `executor` / `project` / `dispatch` / `timeout` / `now` / `reviewCommit`——**没有 map、没有 cache、没有 channel、没有 mutex**。它是无状态服务，全部 per-run 状态经 `Input` → `preparedRun` → Postgres 流转。没有共享可变状态，就没有可串的东西。
+
+蓝图 §三 描述的是另一种机制：「每用户独立 Agent 实例，各有独立 history / steering 通道」。**两种都能成立，但不能混。**
+
+内核上生产路径后这条才真正咬合：`agentcore.Agent` 持有 `state` / `steering` / `followUp` / `cancel` / `running` 五个可变字段，picoclaw 的 `pkg/agent` 也有 `instance.go`。**一旦一个持有 per-run 可变状态的对象被跨请求复用，串味就从「结构上不可能」变成「靠接线正确」。**
+
+因此本 spec 只承认两种合法形状：
+
+| 形状 | 要求 |
+|---|---|
+| **A. 无状态共享**（当前形状） | 内核实例不持有任何 per-run 可变状态；状态全部随调用传入。守卫：架构测试断言共享实例的结构体无 map / channel / mutex / 可变切片字段 |
+| **B. 每账号独立实例** | 实例按 `(legal_entity_id, user_id)` 键隔离，且**必须有淘汰策略**（空闲超时 + 上限），否则长期运行必然泄漏。守卫：并发测试断言两个账号的 history 与 steering 通道互不可见 |
+
+**禁止第三种：共享实例 + 持有 per-run 可变状态。** 这是唯一会串味的组合，也是内核上线后最容易滑进去的形状——先直接复用 picoclaw 的实例模型，再发现它是有状态的。
+
+**倾向 A。** per-user 实例要额外处理生命周期、淘汰与内存泄漏，而隔离最终仍依赖 scope 接线正确；多一层实例不会让隔离更强，只会多一处会漏的地方。选 B 需要在模块设计里写明为什么 A 不够。
+
+无论选哪种，`legal_entity_id` 由与 JWT 同一个解析器产出，不接受调用方传入（与 D-C4、ADR-0027 §3 同构）。
+
+### D-C10：分层交付，每层可独立回退
 
 三层之间是地基关系而非原子事务。第一层（内核）不通过则后两层不启动；第二层内部，Context 与 Session 可并行；第三层每个能力独立增量。
 
@@ -227,6 +269,8 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 | Session Manager | 生命周期接口（存储经端口注入） | 全部分支不起库；跨法人隔离带库 | `handlers/ai_chat_runtime_permissions_test.go` |
 | MCP 治理 | 同一条治理链 | MCP 工具与一等工具走同样的拒绝路径 | `agenttools/runtime_test.go` |
 | 工具注册完整性 | 运行时枚举 | 迁移前后工具数与名单一致 | `aiagent/registration_completeness_test.go` |
+| 每账号隔离形状 | 架构测试 | 形状 A：断言共享实例结构体无 map/channel/mutex/可变切片字段；形状 B：并发断言两账号 history 与 steering 互不可见 | `finmodel/importguard_test.go` 的架构测试范式 |
+| 汇流是否真的发生 | 生产路径断言 | 断言生产 chat 入口经过新内核，而非 `aichat.Runtime[T]` | 本 spec 新增（G1 至今无此守卫，正是它长期未被发现的原因） |
 
 ### 反向测试要求
 
@@ -247,8 +291,8 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 
 ## Out of Scope
 
-- **`providers` / `llm` 替换**：ADR-0022 §4，`internal/llm` 保留
-- **`identity` / `auth` / `credential`**：ADR-0022 §3 + 底线 1，权限与租户模型全部自有
+- **`identity` / `auth` / `credential`**：跨法人隔离是五条底线之一。picoclaw 无租户模型，搬进来只能削弱
+- **`providers` / `llm` 替换**：**暂不做但可重开**。判据是实测能力——现有实现的中国区 endpoint 在跑，要换先证明上游更强
 - **`aiagent` 与 `agentrunner` 重写**：前者是领域接线，后者是 checkpoint 与租约恢复，两者 picoclaw 都给不出对应物
 - **边缘硬件包**：`audio` / `media` / `devices` / `netbind` / `pid` / `seahorse`
 - **`isolation` 沙箱**：D11 已把沙箱后置到阶段 4，进入条件是「有 ≥1 真实客户且合规要求明确」，条件未满足

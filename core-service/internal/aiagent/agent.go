@@ -115,8 +115,8 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 // NewWithOperationalReadersAndGovernanceAndRetail is the production
 // constructor: it wires the operating-facts / close-readiness / control /
 // governance / retail seams into the same governed Agent Tool Runtime.
-func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, draftServices...)
+func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, factsReader, draftServices...)
 }
 
 // registerCollector is the single implementation of “attempt a tool
@@ -164,7 +164,7 @@ func (c *registerCollector) fail() error {
 		len(c.failed), c.attempted, strings.Join(lines, "\n"))
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
@@ -274,11 +274,18 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		collector.add(agenttooldefs.NewCashflowScenarioDefinition(controls.Cashflow))
 		collector.add(agenttooldefs.NewRenewalDecisionDefinition(controls.Renewal))
 	}
+	// B-3：经营事实只读面。事实写入走导入管线与审批，接口只有读方法。
+	if factsReader != nil {
+		collector.add(agenttooldefs.NewOperatingStoresDefinition(factsReader))
+		collector.add(agenttooldefs.NewOperatingStoreDaysDefinition(factsReader))
+	}
 	if retail != nil {
 		collector.add(agenttooldefs.NewRetailOperatingPulseDefinition(retail))
 		collector.add(agenttooldefs.NewRetailStoreDiagnosticsDefinition(retail))
 		collector.add(agenttooldefs.NewRetailScenarioEvaluateDefinition(retail))
 		collector.add(agenttooldefs.NewRetailPaperDefinition(retail))
+		// B-3：store-day 指标聚合视图，复用 retailKPIRepo 的 QueryFacts 接缝。
+		collector.add(agenttooldefs.NewKpiStoreDaysDefinition(retail))
 	}
 	if sensitivity != nil {
 		collector.add(agenttooldefs.NewSensitivityDefinition(sensitivity))

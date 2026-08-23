@@ -126,8 +126,21 @@ func productionWire() *Agent {
 		repository.NewFinModelRepository(nil),
 		registrationRetailStub{}, // facts
 		repository.NewFPnAGovernanceRepository(nil),
+		registrationFactsStub{},
 		draftapp.NewService(nil, nil),
 	)
+}
+
+// registrationFactsStub satisfies agenttooldefs.OperatingFactsReader so the
+// full production surface exercises the operating-facts tool registrations.
+type registrationFactsStub struct{}
+
+func (registrationFactsStub) ListStores(context.Context, access.EntityFilter, string, string) ([]*repository.StoreOperatingFact, error) {
+	return nil, nil
+}
+
+func (registrationFactsStub) ListRetailStoreDayFactsPage(context.Context, access.EntityFilter, string, string, []string, string, int, int) (*repository.RetailStoreDayFactsPage, error) {
+	return &repository.RetailStoreDayFactsPage{}, nil
 }
 
 // registrationStorePnlStub satisfies agenttooldefs.StorePnlReader so the full

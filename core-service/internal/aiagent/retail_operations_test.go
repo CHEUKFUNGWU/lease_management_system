@@ -53,7 +53,7 @@ func agentRetailContext() context.Context {
 
 func TestRetailAgentUsesDeterministicPulseWithoutLLM(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "查看经营脉搏", PageContext: &PageContext{Filters: map[string]string{"as_of": "2026-06-14", "window_days": "7", "classification": "simulated", "dataset_version": "planA-v1"}}}, nil, agent.toolRuntime)
 	if err != nil || response.Model != retailDeterministicModel || response.RetailOperations == nil || response.RetailOperations.Pulse == nil {
 		t.Fatalf("response=%#v err=%v", response, err)
@@ -73,7 +73,7 @@ func TestRetailAgentUsesDeterministicPulseWithoutLLM(t *testing.T) {
 
 func TestRetailAgentParsesExplicitContextWithoutPageFilters(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "查看 simulated dataset_version=planA-v1 as_of=2026-06-14 window_days=7 的经营脉搏"}, nil, agent.toolRuntime)
 	if err != nil || response.RetailOperations == nil || response.RetailOperations.Pulse == nil || reader.calls != 1 {
 		t.Fatalf("explicit context response=%#v calls=%d err=%v", response, reader.calls, err)
@@ -82,7 +82,7 @@ func TestRetailAgentParsesExplicitContextWithoutPageFilters(t *testing.T) {
 
 func TestRetailAgentActionProducesProposalOnly(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "请生成行动提议，人工下降10%", PageContext: &PageContext{Filters: map[string]string{"as_of": "2026-06-14", "window_days": "7", "horizon_months": "12", "classification": "simulated", "dataset_version": "planA-v1", "store_id": "11111111-1111-4111-8111-111111111111", "revenue_change_pct": "0", "gross_margin_rate_change_pp": "0", "labor_cost_change_pct": "-10", "fixed_rent_change_pct": "0", "variable_rent_rate_change_pp": "0", "non_lease_cost_change_pct": "0", "other_controllable_cost_change_pct": "0"}}}, nil, agent.toolRuntime)
 	if err != nil || response.RetailActionProposal == nil {
 		t.Fatalf("response=%#v err=%v", response, err)
@@ -106,7 +106,7 @@ func TestRetailAgentActionProducesProposalOnly(t *testing.T) {
 
 func TestRetailAgentKeepsExplicitZeroScenarioAssumptions(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	filters := map[string]string{"as_of": "2026-06-14", "window_days": "7", "horizon_months": "12", "classification": "simulated", "dataset_version": "planA-v1", "store_id": "11111111-1111-4111-8111-111111111111", "revenue_change_pct": "0", "gross_margin_rate_change_pp": "0", "labor_cost_change_pct": "0", "fixed_rent_change_pct": "0", "variable_rent_rate_change_pp": "0", "non_lease_cost_change_pct": "0", "other_controllable_cost_change_pct": "0"}
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "评估这个零假设方案", PageContext: &PageContext{Filters: filters}}, nil, agent.toolRuntime)
 	if err != nil || response.RetailOperations == nil || response.RetailOperations.Scenario == nil || reader.calls != 3 {
@@ -116,7 +116,7 @@ func TestRetailAgentKeepsExplicitZeroScenarioAssumptions(t *testing.T) {
 
 func TestRetailAgentIgnoresPromptAuthorityAndRequestsMissingContext(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	missing, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "查看经营脉搏"}, nil, agent.toolRuntime)
 	if err != nil || missing.RetailOperations == nil || !missing.RetailOperations.NeedsInput || reader.calls != 0 {
 		t.Fatalf("missing context response=%#v calls=%d err=%v", missing, reader.calls, err)
@@ -126,7 +126,7 @@ func TestRetailAgentIgnoresPromptAuthorityAndRequestsMissingContext(t *testing.T
 		t.Fatalf("prompt injection response=%#v err=%v", response, err)
 	}
 	traffic := &agentRetailReader{set: agentRetailSet()}
-	trafficAgent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, traffic, nil, nil, nil, nil, nil, nil)
+	trafficAgent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, traffic, nil, nil, nil, nil, nil, nil, nil)
 	trafficResponse, err := trafficAgent.executeRetailOperations(agentRetailContext(), Request{Message: "Store002 客流下降 10% 会怎样", PageContext: &PageContext{Filters: map[string]string{"as_of": "2026-06-14", "window_days": "7", "classification": "simulated", "dataset_version": "planA-v1", "store_id": "11111111-1111-4111-8111-111111111111"}}}, nil, trafficAgent.toolRuntime)
 	if err != nil || trafficResponse.RetailOperations == nil || !trafficResponse.RetailOperations.NeedsInput || traffic.calls != 0 || trafficResponse.RetailOperations.Reason == "" {
 		t.Fatalf("unsupported traffic assumption response=%#v calls=%d err=%v", trafficResponse, traffic.calls, err)
@@ -136,7 +136,7 @@ func TestRetailAgentIgnoresPromptAuthorityAndRequestsMissingContext(t *testing.T
 func TestRetailAgentSuppressesScenarioWhenPulseEvidenceIsInsufficient(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
 	reader.set.Facts = reader.set.Facts[7:]
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "Store 006 人工下降 10% 会怎样", PageContext: &PageContext{Filters: map[string]string{
 		"as_of": "2026-06-14", "window_days": "7", "horizon_months": "12", "classification": "simulated", "dataset_version": "planA-v1", "store_id": "11111111-1111-4111-8111-111111111111",
 		"revenue_change_pct": "0", "gross_margin_rate_change_pp": "0", "labor_cost_change_pct": "-10", "fixed_rent_change_pct": "0", "variable_rent_rate_change_pp": "0", "non_lease_cost_change_pct": "0", "other_controllable_cost_change_pct": "0",
@@ -214,7 +214,7 @@ func TestRetailAgentNarrowsSingleStoreEvidenceBeforeDiagnosticsAndScenario(t *te
 	reader := &agentRetailReader{set: set, query: func(_ int, stores []string) (*repository.RetailKPIFactSet, error) {
 		return filterAgentRetailSet(set, stores), nil
 	}}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "Store 006 人工下降10% 会怎样", PageContext: &PageContext{Filters: agentRetailScenarioFilters()}}, nil, agent.toolRuntime)
 	if err != nil || response.RetailOperations == nil || response.RetailOperations.Scenario == nil || response.RetailActionProposal != nil || reader.calls != 3 {
 		t.Fatalf("target scenario response=%#v calls=%d err=%v", response, reader.calls, err)
@@ -233,7 +233,7 @@ func TestRetailAgentDiagnosticsUnavailableDoesNotCompletePlanOrCreateProposal(t 
 		}
 		return filterAgentRetailSet(agentRetailSet(), stores), nil
 	}}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	filters := agentRetailScenarioFilters()
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "生成行动提议，人工下降10%", PageContext: &PageContext{Filters: filters}}, nil, agent.toolRuntime)
 	if err != nil || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 || response.Confidence != 0.40 || reader.calls != 2 {
@@ -256,7 +256,7 @@ func TestRetailAgentDiagnosticsNotReadyBlocksScenario(t *testing.T) {
 		}
 		return result, nil
 	}}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "人工下降10% 会怎样", PageContext: &PageContext{Filters: agentRetailScenarioFilters()}}, nil, agent.toolRuntime)
 	if err != nil || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 || response.RetailOperations == nil || response.RetailOperations.Scenario != nil || reader.calls != 2 {
 		t.Fatalf("diagnostics not-ready response=%#v calls=%d err=%v", response, reader.calls, err)
@@ -288,7 +288,7 @@ func TestRetailAgentScenarioFailuresAreInsufficientAndNeverProposal(t *testing.T
 				}
 				return filterAgentRetailSet(agentRetailSet(), stores), nil
 			}}
-			agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+			agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 			filters := agentRetailScenarioFilters()
 			if tc.mutate != nil {
 				tc.mutate(filters)
@@ -309,7 +309,7 @@ func TestRetailAgentScenarioFailuresAreInsufficientAndNeverProposal(t *testing.T
 
 func TestRetailAgentLowEvidenceContractsAreInAssistantOutput(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	missing, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "请分析经营脉搏"}, nil, agent.toolRuntime)
 	// The reason code, evidence status and confidence are asserted on the
 	// structured channel rather than scraped out of the prose; what the answer
@@ -327,7 +327,7 @@ func TestRetailAgentLowEvidenceContractsAreInAssistantOutput(t *testing.T) {
 	noFactsSet.ExpectedStoreCount = 0
 	noFactsSet.Facts = nil
 	noFactsReader := &agentRetailReader{set: noFactsSet, query: func(_ int, _ []string) (*repository.RetailKPIFactSet, error) { return noFactsSet, nil }}
-	noFactsAgent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, noFactsReader, nil, nil, nil, nil, nil, nil)
+	noFactsAgent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, noFactsReader, nil, nil, nil, nil, nil, nil, nil)
 	noFactsContext := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{Principal: agenttools.Principal{UserID: "user-1", Permissions: []string{"reports:read"}, Scope: access.Scope{LegalEntityID: "entity-a"}}, RunID: "run-no-facts", SkillID: "retail_operations", SkillVersion: "v1"})
 	noFacts, err := noFactsAgent.executeRetailOperations(noFactsContext, Request{Message: "查看经营脉搏", PageContext: &PageContext{Filters: map[string]string{"as_of": "2026-06-14", "window_days": "7", "classification": "simulated", "dataset_version": "planA-v1-empty"}}}, nil, noFactsAgent.toolRuntime)
 	if err != nil || noFacts.RetailOperations == nil || noFacts.RetailOperations.Pulse == nil || retailPulseInsufficientReason(noFacts.RetailOperations.Pulse) != "no_facts" || noFacts.RetailOperations.EvidenceStatus != "insufficient" || noFacts.Confidence != 0.40 || noFacts.RetailOperations.SideEffects || noFacts.RetailActionProposal != nil || len(ProjectResult(noFacts).Artifacts) != 0 || noFacts.RetailOperations.Scenario != nil {
@@ -339,7 +339,7 @@ func TestRetailAgentLowEvidenceContractsAreInAssistantOutput(t *testing.T) {
 	}
 
 	invalidReader := &agentRetailReader{set: agentRetailSet()}
-	invalidAgent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, invalidReader, nil, nil, nil, nil, nil, nil)
+	invalidAgent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, invalidReader, nil, nil, nil, nil, nil, nil, nil)
 	filters := agentRetailScenarioFilters()
 	filters["gross_margin_rate_change_pp"] = "1"
 	invalid, err := invalidAgent.executeRetailOperations(agentRetailContext(), Request{Message: "人工下降10% 会怎样", PageContext: &PageContext{Filters: filters}}, nil, invalidAgent.toolRuntime)
@@ -350,7 +350,7 @@ func TestRetailAgentLowEvidenceContractsAreInAssistantOutput(t *testing.T) {
 
 func TestRetailAgentScopeDeniedIsNotReclassifiedByDatasetName(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	deniedContext := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
 		Principal: agenttools.Principal{UserID: "user-1", Permissions: []string{"reports:read"}, Scope: access.Scope{LegalEntityID: "entity-a", StoreIDs: []string{"22222222-2222-4222-8222-222222222222"}}},
 		RunID:     "run-scope-denied", SkillID: "retail_operations", SkillVersion: "v1",

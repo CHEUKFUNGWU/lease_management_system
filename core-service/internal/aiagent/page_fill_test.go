@@ -26,7 +26,7 @@ func TestExtractSourceSystem(t *testing.T) {
 // preview.
 func TestExecuteRetailIngestFillHonestWithoutReader(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
 		Principal: agenttools.Principal{UserID: "bp-zhang", Permissions: []string{"*:*"}},
 		RunID:     "run-fill-1",
@@ -49,7 +49,7 @@ func TestExecuteRetailIngestFillHonestWithoutReader(t *testing.T) {
 
 func TestExecuteRetailIngestFillRequiresSourceSystem(t *testing.T) {
 	reader := &agentRetailReader{set: agentRetailSet()}
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil)
 	ctx := agenttools.WithExecutionContext(context.Background(), agenttools.ExecutionContext{
 		Principal: agenttools.Principal{UserID: "bp-zhang", Permissions: []string{"*:*"}},
 		RunID:     "run-fill-2",

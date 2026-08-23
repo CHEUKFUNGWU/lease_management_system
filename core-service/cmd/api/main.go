@@ -127,7 +127,7 @@ func main() {
 	storePnlKPIAdapter := handlers.NewStorePnlKPIAdapter(retailKPIRepo)
 	storePnlHandler := handlers.NewStorePnlHandler(storePnlKPIAdapter, nil, fpnaGovernanceRepo).WithPeer(storePnlKPIAdapter).WithMasterData(masterDataRepo).WithOccupancy(handlers.NewStorePnlOccupancyAdapter(psRepo)).WithLease(handlers.NewStorePnlLeaseAdapter(mcRepo)).WithTemplates(finModelRepo)
 	storePnlAgentReader := handlers.NewStorePnlAgentReader(storePnlHandler)
-	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, storePnlAgentReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
+	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, storePnlAgentReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, operatingFactsRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
 	// W5-1: document parser seam (ADR-0024 routing). AnyDoc binary is pinned
 	// in the runtime image (Dockerfile); OCR is enabled when a PaddleOCR token is configured.
 	ocrParser := docparse.NewPaddleOCR(docparse.PaddleOCRConfig{

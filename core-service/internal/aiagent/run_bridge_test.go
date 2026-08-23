@@ -31,7 +31,7 @@ func TestRunnerIntentToolDetection(t *testing.T) {
 }
 
 func TestPlanQueuesRunnerIntentsForWorker(t *testing.T) {
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	// Selects the FP&A copilot skill AND carries a runner tool intent.
 	plan := agent.Plan(aichat.Input{Message: "经营决策：做个现金流情景", Role: "editor", Initiator: "user"}, nil)
 	if !plan.QueueForWorker {
@@ -73,7 +73,7 @@ func TestRunbookHasTool(t *testing.T) {
 // plan flag itself; execution skipping lives in preparedRun plumbing covered
 // by the full suite.
 func TestPlanFlagRoundTrip(t *testing.T) {
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	_ = context.Background()
 	plan := agent.Plan(aichat.Input{Message: "做个现金流情景", Role: "editor", Initiator: "user"}, nil)
 	if plan.QueueForWorker != (plan.SkillID != "") {

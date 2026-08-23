@@ -279,7 +279,13 @@ cd core-service && GOCACHE=$(pwd)/.gocache go test ./... && go vet ./...
 cd ../web && npm run type-check && npm run build && npm test
 ```
 
-真实 PostgreSQL 集成测试需 `TEST_DATABASE_URL`，未设置时正常 skip —— **跨法人隔离、幂等与勾稽落库的证据大多在集成测试里**，只跑单元测试证明不了底线 1 和底线 4，改这些路径时必须带库跑。IFRS 16 回归用 `make ifrs16-regression`。
+真实 PostgreSQL 集成测试需 `TEST_DATABASE_URL`，未设置时正常 skip —— **跨法人隔离、幂等与勾稽落库的证据大多在集成测试里**，只跑单元测试证明不了底线 1 和底线 4，改这些路径时必须带库跑。
+
+**带库跑用 `make test-integration`**（可选 `ARGS="./pkg/ -run TestX"`）。它起一个一次性容器、灌 `db/init/01_init.sql`、导出 `TEST_DATABASE_URL`、跑完无论成败都销毁，**不碰既有的 `lease-postgres` 卷**。别手动导 `TEST_DATABASE_URL` 连 5432：那个端口上常是宿主机原生 postgres 或用另一套凭据初始化过的既有卷，连过去会得到 `role "lease" does not exist`。
+
+**skip 掉的集成测试不构成任何证据。** 报告「跨法人隔离已验证」之前，先确认它真的 RUN 过而不是 SKIP —— 两者在 `go test` 的输出里都不是 FAIL。
+
+IFRS 16 回归用 `make ifrs16-regression`。
 
 核对本文「当前工程事实」用：
 

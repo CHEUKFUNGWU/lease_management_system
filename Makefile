@@ -1,4 +1,4 @@
-.PHONY: help setup up down restart logs migrate migrate-status migrate-baseline web core db reset-db ifrs16-regression
+.PHONY: help setup up down restart logs migrate migrate-status migrate-baseline web core db reset-db ifrs16-regression test-integration
 
 help: ## 显示帮助信息
 	@echo "零售经营分析工作站 — 常用命令"
@@ -13,10 +13,10 @@ help: ## 显示帮助信息
 	@echo "  make migrate-status    查看已应用 / 待应用的迁移（只读）"
 	@echo "  make migrate-baseline  把全部迁移标记为已应用但不执行"
 	@echo "  make reset-db   删除数据库卷并重建（清空所有数据）"
+	@echo "  make test-integration   起一次性库跑集成测试（跨法人/幂等的证据在这里）"
 	@echo "  make ifrs16-regression  运行 IFRS 16 计量回归测试并生成对数报告"
 	@echo "  make web        进入前端开发容器"
 	@echo "  make core       进入核心服务容器"
-	@echo "  make ai         进入 AI 服务容器"
 	@echo ""
 
 setup: ## 初始化项目环境
@@ -67,3 +67,6 @@ ifrs16-regression: ## 运行 IFRS 16 计量回归测试并生成对数报告
 	cd core-service && GOCACHE=$$(pwd)/.gocache go test ./internal/services/ifrs16
 	cd core-service && GOCACHE=$$(pwd)/.gocache go run ./cmd/ifrs16-regression -out ../docs/IFRS16_计量回归对数报告.md
 	@echo "已生成 docs/IFRS16_计量回归对数报告.md"
+
+test-integration: ## 起一次性库跑集成测试，跑完销毁；不碰既有 lease-postgres 卷
+	@./scripts/test_with_db.sh $(ARGS)

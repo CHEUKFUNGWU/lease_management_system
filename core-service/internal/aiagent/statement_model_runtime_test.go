@@ -37,7 +37,7 @@ func (errRow) Scan(...any) error { return pgx.ErrNoRows }
 // the unconditional nil registration used to make impossible.
 func TestStatementModelToolsWireProductionPorts(t *testing.T) {
 	agent := newAgent(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		repository.NewFinModelRepository(errDBTX{}), nil, nil, nil)
+		repository.NewFinModelRepository(errDBTX{}), nil, nil, nil, nil)
 	runtime := agent.ToolRuntime()
 	if runtime == nil {
 		t.Fatal("runtime must exist with a repo wired")

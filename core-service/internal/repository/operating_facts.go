@@ -807,6 +807,41 @@ func optionalValue(value string) *string {
 	return &value
 }
 
+// ListScenarioDrafts returns the caller-scoped scenario drafts, newest first.
+// It is the read half of the scenario-draft surface (the write half is
+// CreateScenarioDraft): B-4's draft-basis report overlay reads user-authored
+// scenarios through it. Read-only; never mutates a draft.
+func (r *OperatingFactsRepository) ListScenarioDrafts(ctx context.Context, entity access.EntityFilter, limit int) ([]*FPnAScenarioDraft, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	query := `SELECT id,legal_entity_id,scenario_type,name,assumptions,COALESCE(result,'{}'::jsonb),COALESCE(data_version,''),status,COALESCE(source_run_id,''),COALESCE(idempotency_key,''),created_by,created_at,updated_at
+		FROM fpna_scenario_drafts`
+	args := []any{}
+	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
+		return nil, err
+	} else if clause != "" {
+		query += " WHERE " + clause
+		args = append(args, arg)
+	}
+	query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d", len(args)+1)
+	args = append(args, limit)
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list scenario drafts: %w", err)
+	}
+	defer rows.Close()
+	result := make([]*FPnAScenarioDraft, 0)
+	for rows.Next() {
+		item := &FPnAScenarioDraft{}
+		if err := rows.Scan(&item.ID, &item.LegalEntityID, &item.ScenarioType, &item.Name, &item.Assumptions, &item.Result, &item.DataVersion, &item.Status, &item.SourceRunID, &item.IdempotencyKey, &item.CreatedBy, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
 type PerformanceOverview struct {
 	Period                         string     `json:"period"`
 	StoreFactCount                 int        `json:"store_fact_count"`

@@ -115,8 +115,8 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 // NewWithOperationalReadersAndGovernanceAndRetail is the production
 // constructor: it wires the operating-facts / close-readiness / control /
 // governance / retail seams into the same governed Agent Tool Runtime.
-func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, factsReader, draftServices...)
+func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, reports agenttooldefs.ReportReader, draftServices ...*draftapp.Service) *Agent {
+	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, factsReader, reports, draftServices...)
 }
 
 // registerCollector is the single implementation of “attempt a tool
@@ -164,7 +164,7 @@ func (c *registerCollector) fail() error {
 		len(c.failed), c.attempted, strings.Join(lines, "\n"))
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, draftServices ...*draftapp.Service) *Agent {
+func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, reports agenttooldefs.ReportReader, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
@@ -286,6 +286,16 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		collector.add(agenttooldefs.NewRetailPaperDefinition(retail))
 		// B-3：store-day 指标聚合视图，复用 retailKPIRepo 的 QueryFacts 接缝。
 		collector.add(agenttooldefs.NewKpiStoreDaysDefinition(retail))
+	}
+	// B-4：报表只读面（摊销/负债滚动/现金流预测、披露与关账包、合同汇总
+	// 与准则对比、单价对比、标签）。导出路由（reports:export）不包——文件类
+	// Artifact 走 LevelDraft + Review Gate，与只读报表不是一件事。
+	if reports != nil {
+		collector.add(agenttooldefs.NewReportScheduleDefinition(reports))
+		collector.add(agenttooldefs.NewReportDisclosurePackageDefinition(reports))
+		collector.add(agenttooldefs.NewReportContractViewDefinition(reports))
+		collector.add(agenttooldefs.NewReportUnitPriceDefinition(reports))
+		collector.add(agenttooldefs.NewReportTagsDefinition(reports))
 	}
 	if sensitivity != nil {
 		collector.add(agenttooldefs.NewSensitivityDefinition(sensitivity))

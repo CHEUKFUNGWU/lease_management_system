@@ -112,7 +112,9 @@ func main() {
 		Cashflow: agentreaders.NewCashflowScenarioReader(contractRepo, psRepo),
 		Renewal:  agentreaders.NewRenewalDecisionReader(contractRepo, renewalDecisionRepo),
 	}
-	sensitivityReader := agenttooldefs.NewReportingSensitivityReader(reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo, mcRepo).WithStores(masterDataRepo))
+	// B-4：报表快照构建器只建一次，HTTP 报表与 Agent 工具共用同一条投影路径。
+	reportSnapshotBuilder := reporting.NewSnapshotBuilder(contractRepo, psRepo, systemSettingRepo, mcRepo).WithStores(masterDataRepo)
+	sensitivityReader := agenttooldefs.NewReportingSensitivityReader(reportSnapshotBuilder)
 	minioClient, minioErr := miniostore.New(miniostore.Config{
 		Endpoint: cfg.MinIOEndpoint, AccessKey: cfg.MinIOAccessKey, SecretKey: cfg.MinIOSecretKey, Bucket: cfg.MinIOBucket,
 	})
@@ -127,7 +129,7 @@ func main() {
 	storePnlKPIAdapter := handlers.NewStorePnlKPIAdapter(retailKPIRepo)
 	storePnlHandler := handlers.NewStorePnlHandler(storePnlKPIAdapter, nil, fpnaGovernanceRepo).WithPeer(storePnlKPIAdapter).WithMasterData(masterDataRepo).WithOccupancy(handlers.NewStorePnlOccupancyAdapter(psRepo)).WithLease(handlers.NewStorePnlLeaseAdapter(mcRepo)).WithTemplates(finModelRepo)
 	storePnlAgentReader := handlers.NewStorePnlAgentReader(storePnlHandler)
-	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, storePnlAgentReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, operatingFactsRepo, draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
+	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, storePnlAgentReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, operatingFactsRepo, agenttooldefs.NewReportSnapshotReader(reportSnapshotBuilder, fpnaGovernanceRepo, operatingFactsRepo, closeControlRepo, mcRepo), draftService).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
 	// W5-1: document parser seam (ADR-0024 routing). AnyDoc binary is pinned
 	// in the runtime image (Dockerfile); OCR is enabled when a PaddleOCR token is configured.
 	ocrParser := docparse.NewPaddleOCR(docparse.PaddleOCRConfig{

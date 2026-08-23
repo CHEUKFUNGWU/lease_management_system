@@ -19,6 +19,10 @@ type Mode string
 const (
 	Working  Mode = "working"
 	Official Mode = "official"
+	// Pending 是 B-4 新增的累积口径中间档（CONTEXT.md「Report Basis」）：
+	// 含 Pending + Approved，不含 Draft。它不取代 working/official —— 那两个
+	// 值仍是公开 ?mode= 参数的线格式，收敛是另一个带迁移的专项。
+	Pending Mode = "pending"
 )
 
 const policyVersion = "report-snapshot-v1"
@@ -96,15 +100,21 @@ func NewSnapshotBuilder(contracts contractSource, payments paymentSource, rates 
 }
 
 func NormalizeMode(mode string) Mode {
-	if Mode(mode) == Official {
+	switch Mode(mode) {
+	case Official:
 		return Official
+	case Pending:
+		return Pending
 	}
 	return Working
 }
 
 func (b *SnapshotBuilder) Build(ctx context.Context, request Request) (*Snapshot, error) {
 	mode := request.Mode
-	if mode != Official {
+	switch mode {
+	case Official, Pending:
+		// 保留：Pending 是累积口径中间档，不得被吞成 Working。
+	default:
 		mode = Working
 	}
 	contracts, err := b.contracts.GetByStatuses(ctx, statusesFor(mode), request.LegalEntityID)
@@ -182,6 +192,10 @@ func statusesFor(mode Mode) []string {
 	if mode == Official {
 		return []string{"approved"}
 	}
+	if mode == Pending {
+		// 累积口径：Pending + Approved，不含 Draft。
+		return []string{"submitted", "reviewed", "pending_approval", "approved"}
+	}
 	return []string{"draft", "submitted", "reviewed", "pending_approval", "approved"}
 }
 
@@ -201,6 +215,9 @@ func filterPayments(mode Mode, schedules []*repository.PaymentSchedule) []*repos
 			continue
 		}
 		if mode == Working && schedule.ApprovalStatus == "rejected" {
+			continue
+		}
+		if mode == Pending && (schedule.ApprovalStatus == "draft" || schedule.ApprovalStatus == "rejected") {
 			continue
 		}
 		filtered = append(filtered, schedule)

@@ -127,8 +127,33 @@ func productionWire() *Agent {
 		registrationRetailStub{}, // facts
 		repository.NewFPnAGovernanceRepository(nil),
 		registrationFactsStub{},
+		registrationReportStub{},
 		draftapp.NewService(nil, nil),
 	)
+}
+
+// registrationReportStub satisfies agenttooldefs.ReportReader so the full
+// production surface exercises the report tool registrations.
+type registrationReportStub struct{}
+
+func (registrationReportStub) Project(context.Context, reporting.Mode, reporting.ProjectionRequest) (reporting.ProjectionResult, error) {
+	return reporting.ProjectionResult{}, nil
+}
+
+func (registrationReportStub) ClosePack(context.Context, reporting.Mode, string) (map[string]any, error) {
+	return map[string]any{}, nil
+}
+
+func (registrationReportStub) ListPlanVersions(context.Context, access.EntityFilter, string, string, string) ([]*repository.FPnAPlanVersion, error) {
+	return nil, nil
+}
+
+func (registrationReportStub) ListAssumptions(context.Context, access.EntityFilter, string) ([]*repository.FPnAAssumptionVersion, error) {
+	return nil, nil
+}
+
+func (registrationReportStub) ListScenarioDrafts(context.Context, access.EntityFilter, int) ([]*repository.FPnAScenarioDraft, error) {
+	return nil, nil
 }
 
 // registrationFactsStub satisfies agenttooldefs.OperatingFactsReader so the

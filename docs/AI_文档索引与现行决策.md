@@ -93,7 +93,8 @@ FP&A 版本治理与滚动预测
 | [**0024**](adr/0024-remove-the-agpl-pdf-dependency.md) | **移除 AGPL 的 PyMuPDF，解析按证据需求分流** | **Accepted（新）** |
 | [**0025**](adr/0025-separate-certified-engine-output-from-exploratory-analysis.md) | **双轨执行与受保护度量红线** | **Accepted（新）** |
 | [**0026**](adr/0026-vendor-picoclaw-im-channels.md) | **vendor picoclaw 的飞书/企微渠道（MIT）** | **Accepted（新）**；§2 被 ADR-0027 修订 |
-| [**0027**](adr/0027-adopt-picoclaw-agent-core-keep-the-governance-chain.md) | **采用 picoclaw agent 内核，治理链移植到其 hook 挂点** | **Accepted（新）** |
+| [**0027**](adr/0027-adopt-picoclaw-agent-core-keep-the-governance-chain.md) | **采用 picoclaw agent 内核，治理链移植到其 hook 挂点** | **Accepted**；Non-goals 被 ADR-0028 收窄 |
+| [**0028**](adr/0028-extend-picoclaw-adoption-to-the-whole-runtime.md) | **把采用范围从 agent loop 扩到整个 runtime**（session / 上下文工程 / subturn / MCP 等） | **Accepted（新）** |
 
 ### 1.5 归档区
 
@@ -153,6 +154,11 @@ FP&A 版本治理与滚动预测
 | **D29** | **治理链移植不重写**，六前三后接到 `ToolInterceptor`/`LLMInterceptor`/`ToolApprover`；**ACORE-2 九项变异必须逐项重新证红证绿**，一项不少，否则迁移中止 | — | ADR-0027 §3 |
 | **D30** | **picoclaw 的信任模型仍不采纳**（ADR-0022 §3 不变）。`tool_allowlist.go` 是防打扰清单不是授权，与渠道侧 `IsAllowed` 同一性质 | — | ADR-0027 §2 |
 | **D31** | **上下文压缩改为「可得但需门禁」**。ADR-0022 Non-goals 曾推迟它至「观察到真实溢出」，该条件**未被证明满足**；采用上游 `context_manager`/`budget`/`usage` 后仍须先用本仓会话形状钉住行为：压缩不得丢审计内容、压缩后的 run 仍可从 checkpoint 重放。与底稿溯源冲突时**溯源优先** | ADR-0022 Non-goals | ADR-0027 §4 |
+| **D32** | **范围按能力清单判，不按包判。** picoclaw 36 个包里 7 个是边缘硬件、2 个是自更新，搬进来不增加能力只增加漂移风险；反过来「我们已经有类似的」也不能用来跳过真实缺口——`State.Messages()` 曾因此被当作「有上下文管理」 | — | ADR-0028 §1 · Spec C1 D-C0 |
+| **D33** | **runtime 隔离取无状态共享，不做每账号实例。** 蓝图 §三 描述的是每账号实例，不采用：其四条要求无状态共享全部满足，且按权限过滤工具改为逐次进行后**权限变更立即生效**。硬约束：`agentcore.Agent` 的五个可变字段必须推到调用参数 | 蓝图 §三 | ADR-0028 §2 · D-C19 |
+| **D34** | **`ContextKey` 是隔离原语，五个维度**：法人 / 用户 / 会话 / scope 指纹 / 数据分类。字段非导出、唯一构造器吃 `Principal`——漏传、传错顺序、传空串三类错误变成编译期不可表达 | — | ADR-0028 §3 · D-C11/12/20 |
+| **D35** | **上下文工程顺序不可颠倒**：先计数、再预算、最后压缩。分词器不可得时**拒绝而非估算**（误差在预算边界最大，而边界是唯一重要处）。审计承载内容靠 `classify` 先切两段、压缩器签名只收 compactable 来保护，不靠规则 | ADR-0022 Non-goals 的压缩推迟条款 | ADR-0028 §4 · D-C14/15 |
+| **D36** | **汇流是内核置换的一部分，不是后续项。** `agentcore.New` 生产零调用，换一个没在跑的内核等于死代码换死代码。G1 悬置数月正因为从没有一条断言说「生产路径确实经过内核」 | G1「两平面未汇流」 | ADR-0028 §5 |
 
 ---
 

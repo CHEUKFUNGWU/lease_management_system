@@ -97,6 +97,28 @@ _Avoid_: Role separation, four-eyes rule
 An exceptional, reasoned, and audited bypass of Segregation of Duties by a System Admin.
 _Avoid_: Admin exemption, superuser approval
 
+## Agent Runtime
+
+**Context Key**:
+The identity of a body of context: which Legal Entity, which User, which session, the fingerprint of that User's Scope, and the Data Classification of the conversation. A caller holding one has already passed permission resolution, because the only way to obtain one is from a resolved Principal.
+_Avoid_: Cache key, session key, tenant key
+
+**Context Pollution**:
+One conversation's content reaching another's prompt. It is a separate failure from unauthorised data access: access controls govern what a tool call may read, and say nothing about whose messages the model already sees.
+_Avoid_: Leakage, bleed, cross-talk
+
+**Compaction**:
+Shortening the message sequence sent to the model when it exceeds the model's budget. It shapes what the model sees and never removes a stored message, and content carrying audit meaning is not eligible for it.
+_Avoid_: Truncation, pruning, summarisation, trimming
+
+**Context Budget**:
+The token allowance for one model's prompt, counted with that model's own tokenizer. An unavailable tokenizer yields no count rather than an estimate, because estimation error is largest at the boundary where the number is consulted.
+_Avoid_: Token limit, window size, context window
+
+**Subturn**:
+A unit of work a turn delegates to run on its own. Its Scope is the intersection of the parent's and the request's, never wider, and each of its tool calls passes the full governance chain on its own account.
+_Avoid_: Subagent, child agent, sub-task
+
 ## Approval and Reporting Basis
 
 **Approval State**:

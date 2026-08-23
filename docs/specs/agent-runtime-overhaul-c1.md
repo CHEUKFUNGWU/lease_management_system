@@ -239,6 +239,14 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 
 这条对记忆尤其致命：**跨会话记忆若以 `user_id` 为键，就是一条绕过跨法人隔离的合法通道**。
 
+#### 键还须含 scope 指纹（模块设计 D-C12 补入）
+
+`access.Scope` 不只有 `LegalEntityID`，还有 `Global` / `StoreIDs` / `Regions` / `Brands` / `Plants` / `ProductionLines` / `EquipmentIDs`，而**同一个 `(法人, 用户)` 的 scope 会随时间变化**——门店重新分配、区域调整、权限收回。
+
+只按 `(legal_entity_id, user_id)` 缓存，则 scope 收窄之后该用户自己的缓存里**仍含有他已经不该看到的门店数据**，并继续被送进他的 prompt。这条不触发任何权限检查：取缓存的确实是本人，法人也确实没变。
+
+因此键含 `Scope` 全字段的稳定指纹——**scope 一变键就变，旧上下文自然不再命中**，无需显式失效逻辑。
+
 #### 只承认两种形状
 
 | 形状 | 要求 |

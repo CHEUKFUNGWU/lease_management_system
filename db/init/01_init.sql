@@ -299,6 +299,25 @@ CREATE TABLE IF NOT EXISTS ai_payment_schedule_drafts (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS channel_identity_bindings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    channel VARCHAR(32) NOT NULL CHECK (channel IN ('feishu', 'wecom')),
+    external_user_id VARCHAR(255) NOT NULL,
+    internal_user_id UUID NOT NULL REFERENCES users(id),
+    bound_by UUID REFERENCES users(id),
+    bound_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    -- 同一渠道身份只能映射到一个内部用户；换绑走显式 DELETE + INSERT，
+    -- 不做静默覆盖（审计可追溯谁在什么时候绑的）。
+    CONSTRAINT uq_channel_identity UNIQUE (channel, external_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_channel_identity_bindings_user
+    ON channel_identity_bindings(internal_user_id);
+
+-- ============================================================================
+-- Audit trail
+-- ============================================================================
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     table_name VARCHAR(100) NOT NULL,
@@ -2305,5 +2324,6 @@ INSERT INTO schema_migrations (version) VALUES
 ('053_statement_models'), ('054_assumption_suggestion'),
 ('055_saved_views_and_template_governance'), ('056_template_copy_lineage'),
 ('057_async_run_progress'), ('058_assumption_draft_idempotency'),
-('059_assumption_draft_idempotency_batch')
+('059_assumption_draft_idempotency_batch'), ('060_draft_review_isolation'),
+('061_channel_identity_bindings')
 ON CONFLICT (version) DO NOTHING;

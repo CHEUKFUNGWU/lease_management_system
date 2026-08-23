@@ -4,11 +4,14 @@ package finmodel
 // 不是重算——源值保持逐月，折叠只在导出时发生）。两条语义固定：
 //   - 流量行求和；桶内任一月份缺失 → 桶值缺失（不填 0，D-S4）；
 //   - 存量行取桶内最新非空月值（期末口径）；全空 → 缺失。
-// 哪些行是存量由默认模板的资产负债表行注册决定；未注册的行按流量处理。
+// 哪些行是存量由默认模板的资产负债表行注册决定；自定义行可在模板行上
+// 显式声明 fold=stock/flow（F1 D-F4），声明优先于默认。
 
 import (
 	"sort"
 	"strings"
+
+	"github.com/lease-management-system/core-service/internal/finmodel/template"
 )
 
 // FoldKind is the presentation grain of an export.
@@ -40,13 +43,20 @@ type FoldBucket struct {
 
 // foldStockKeys registers the default template's balance-sheet rows whose
 // folded value is the period-end (latest non-nil month) rather than the
-// sum. Custom templates default to flow semantics, documented on the row.
-var foldStockKeys = map[string]bool{
-	"cash": true, "ar": true, "inventory": true, "ppe": true, "rou_asset": true,
-	"total_assets": true, "ap": true, "lease_liability": true, "borrowings": true,
-	"total_liabilities": true, "share_capital": true, "retained_earnings": true,
-	"total_equity": true, "nwc": true, "borrowings_opening": true, "ending_cash": true,
-}
+// sum. Single-sourced from template.ReservedSheetKeys（F1 D-F1）；custom rows
+// declare their own 存量/流量 on the row, defaulting to flow semantics —
+// documented on the row.
+var foldStockKeys = func() map[string]bool {
+	keys := make(map[string]bool)
+	for _, key := range template.ReservedSheetKeys {
+		keys[key] = true
+	}
+	return keys
+}()
+
+// DefaultStockRow reports the fold default for a row key: reserved sheet
+// keys are stocks, everything else flows.
+func DefaultStockRow(rowKey string) bool { return foldStockKeys[rowKey] }
 
 // FoldBuckets groups ascending monthly periods into month/quarter/year
 // buckets. Months outside a bucket boundary (a partial quarter) stay
@@ -172,23 +182,30 @@ func itoa(value int) string {
 	return string(digits)
 }
 
-// FoldMonthValues folds row→month values into row→bucketLabel values.
-// values is keyed rowKey → month → value (nil = missing month).
+// FoldMonthValues folds row→month values into row→bucketLabel values using
+// the default stock registry.
 func FoldMonthValues(values map[string]map[string]*float64, buckets []FoldBucket) map[string]map[string]*float64 {
+	return FoldMonthValuesWithStocks(values, buckets, DefaultStockRow)
+}
+
+// FoldMonthValuesWithStocks folds with an explicit per-row stock predicate —
+// F1 D-F4: custom rows carry their declared 存量/流量 from the template row
+// (declared choice wins over the default).
+func FoldMonthValuesWithStocks(values map[string]map[string]*float64, buckets []FoldBucket, stock func(rowKey string) bool) map[string]map[string]*float64 {
 	out := map[string]map[string]*float64{}
 	for rowKey, months := range values {
 		folded := map[string]*float64{}
 		for _, bucket := range buckets {
-			folded[bucket.Label] = foldOne(rowKey, months, bucket)
+			folded[bucket.Label] = foldOne(rowKey, months, bucket, stock(rowKey))
 		}
 		out[rowKey] = folded
 	}
 	return out
 }
 
-func foldOne(rowKey string, months map[string]*float64, bucket FoldBucket) *float64 {
+func foldOne(rowKey string, months map[string]*float64, bucket FoldBucket, stock bool) *float64 {
 	// 存量行：期末口径——桶内反向取最新非空月。
-	if foldStockKeys[rowKey] {
+	if stock {
 		var latest *float64
 		for i := len(bucket.Periods) - 1; i >= 0; i-- {
 			if value, ok := months[bucket.Periods[i]]; ok && value != nil {

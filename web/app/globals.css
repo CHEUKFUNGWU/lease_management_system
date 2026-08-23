@@ -3058,7 +3058,8 @@ body .app-content.app-content-full-bleed .app-content-inner {
 /* Full-width fills */
 .pulse-full-width,
 .store360-full-width,
-.scenario-full-width {
+.scenario-full-width,
+.finmodel-full-width {
   width: 100%;
 }
 

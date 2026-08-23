@@ -211,6 +211,8 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		collector.add(agenttooldefs.NewAssumptionSuggestionDefinition(nil))
 		collector.add(agenttooldefs.NewAssumptionSuggestionBatchDefinition(nil))
 		collector.add(agenttooldefs.NewModelDiffMemoDefinition(nil))
+		// F1：科目树草稿生成。未接线保持诚实拒绝。
+		collector.add(agenttooldefs.NewCoaSuggestTemplateDefinition(nil))
 	} else {
 		writer := finadapter.NewDraftWriter(finModelRepo)
 		var plansCapex finadapter.CapexSource
@@ -224,6 +226,8 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		collector.add(agenttooldefs.NewFinModelPaperDefinition(ports))
 		collector.add(agenttooldefs.NewAssumptionSuggestionDefinition(writer))
 		collector.add(agenttooldefs.NewAssumptionSuggestionBatchDefinition(writer))
+		// F1：科目树草稿生成，draft-only，source=ai_suggestion。
+		collector.add(agenttooldefs.NewCoaSuggestTemplateDefinition(agenttooldefs.NewCoaTemplateStore(finModelRepo)))
 		if plans != nil {
 			collector.add(agenttooldefs.NewModelDiffMemoDefinition(plans))
 		} else {

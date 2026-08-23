@@ -2410,6 +2410,9 @@ export interface TemplateValidationError {
 export interface TemplateValidationResult {
   valid: boolean;
   errors?: TemplateValidationError[];
+  /** F1 D-F1：保留键缺口独立告示（不翻 valid；硬拦在模型 Run）。 */
+  reserved_keys_missing?: string[];
+  reserved_keys_reason?: string;
 }
 
 export interface VarianceAttributionFactor {
@@ -2451,7 +2454,42 @@ export const finModelTemplatesApi = {
       body: JSON.stringify(def),
       token,
     }),
+  list: (token: string, params?: { status?: string; visibility?: string }): Promise<{ templates: FinStatementTemplateRow[] }> =>
+    apiRequest(`/api/v1/financial-model/templates?${new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => [k, String(v)]))}`, { token }),
+  create: (
+    def: { name: string; version: number; rows: unknown[]; source?: string },
+    token: string,
+    visibility?: "shared" | "personal"
+  ): Promise<{ saved: boolean; id: string; name: string; version: number }> =>
+    apiRequest(`/api/v1/financial-model/templates`, {
+      method: "POST",
+      body: JSON.stringify({ ...def, visibility: visibility ?? "shared" }),
+      token,
+    }),
 };
+
+/** F1：科目树编辑器的行声明（模板 JSONB 的行结构，前端只做展示与组装）。 */
+export interface FinStatementTemplateRowDef {
+  key: string;
+  label: string;
+  kind: "input" | "link" | "formula" | "subtotal" | "check";
+  basis: "operating_basis" | "ifrs16_basis" | "shared";
+  source?: string;
+  formula?: string;
+  children?: string[];
+  subtract?: string[];
+  fold?: "" | "stock" | "flow";
+  actual_source?: string;
+}
+
+export interface FinStatementTemplateRow {
+  id: string;
+  legal_entity_id?: string | null;
+  name: string;
+  version: number;
+  status: "draft" | "review" | "approved" | "retired" | string;
+  rows: { name: string; version: number; source?: string; rows: FinStatementTemplateRowDef[] };
+}
 
 export const retailVarianceApi = {
   attribution: (

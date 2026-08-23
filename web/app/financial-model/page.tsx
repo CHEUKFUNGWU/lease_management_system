@@ -32,6 +32,7 @@ import { financialModelHelpContent } from "../components/help-content";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { EXAMPLE_ASSUMPTIONS, EXAMPLE_OPENING_FORM, assumptionHint } from "./hints";
 import { FormulaEditor } from "./FormulaEditor";
+import { CoaEditorPanel } from "./coa-editor";
 import {
   addPeriod,
   applyAssumptionFormValues,
@@ -538,6 +539,13 @@ export default function FinancialModelPage() {
               {/* R2-4: formula editor (RH6). Validation is backend-only by contract (D-R16). */}
               <Card size="small" title={t("finmodel.formula.editor_title", language)}>
                 <FormulaEditor language={language} />
+              </Card>
+
+              {/* F1: chart-of-accounts editor. Preset rows are tie-out read
+                  points and cannot be deleted; custom rows need a parent
+                  subtotal plus an explicit stock/flow declaration. */}
+              <Card size="small" title={t("finmodel.coa.editor_title", language)}>
+                <CoaEditorPanel language={language} />
               </Card>
 
               <Card

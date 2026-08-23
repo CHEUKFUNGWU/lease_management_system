@@ -17,7 +17,7 @@ import (
 
 // Provenance traces one result cell (bottom line 3).
 type Provenance struct {
-	SourceType         string `json:"source_type"` // fact_aggregate | ifrs16_engine | contract_schedule | assumption | formula | opening_balance
+	SourceType         string `json:"source_type"` // fact_aggregate | ifrs16_engine | contract_schedule | assumption | formula | opening_balance | human_input
 	Ref                string `json:"ref,omitempty"`
 	DataVersion        string `json:"data_version,omitempty"`
 	DataClassification string `json:"data_classification,omitempty"`
@@ -75,8 +75,16 @@ type ModelInputs struct {
 	Schedules          ScheduleReader
 	Assumptions        AssumptionReader
 	Opening            OpeningBalanceReader
+	HumanZeros map[string]HumanZero
 	Versions           VersionSet
 	DataClassification string
+}
+
+// HumanZero is a user-asserted zero (F1 D-F2): 「我的业务没有这一项」。它与
+// 缺失在数据层是不同的值——0 + human_input provenance vs nil + 具名 Gap。
+type HumanZero struct {
+	ConfirmedBy string `json:"confirmed_by"`
+	ConfirmedAt string `json:"confirmed_at,omitempty"`
 }
 
 // ── Run ──────────────────────────────────────────────────────────────────
@@ -87,6 +95,15 @@ type ModelInputs struct {
 func Run(ctx context.Context, def ModelDef, in ModelInputs) (*RunResult, error) {
 	if def.Template == nil {
 		return nil, errors.New("finmodel: a parsed template is required")
+	}
+	// F1 D-F1：保留键是 T1–T16 的读取点。缺键在这里拦（机械后果发生地），
+	// 错误列出全部缺失键与结构原因，绝不以权限问题措辞。
+	rowKeys := make([]string, 0, len(def.Template.Rows))
+	for _, row := range def.Template.Rows {
+		rowKeys = append(rowKeys, row.Key)
+	}
+	if missing := template.MissingReservedSheetKeys(rowKeys); len(missing) > 0 {
+		return nil, &template.ErrMissingReservedKeys{Missing: missing}
 	}
 	if def.Policy.InterestCashFlowPresentation == "" {
 		return nil, errors.New("finmodel: policy.interest_cash_flow_presentation is required (T9 — the run refuses to start without the switch)")
@@ -552,6 +569,15 @@ func (s *runState) idxOf(period string) int {
 }
 
 func (s *runState) loadInput(ctx context.Context, row template.Row, period string) {
+	// F1 D-F2：用户主张的零是数据层的不同值——0 + human_input provenance，
+	// 优先于假设读取；缺失仍走 nil + 具名 Gap。两者绝不混同。
+	if hz, asserted := s.in.HumanZeros[row.Key]; asserted {
+		confirmedBy := hz.ConfirmedBy
+		s.setValue(row.Key, period, func() *float64 { v := 0.0; return &v }(), Provenance{
+			SourceType: "human_input", Ref: "confirmed_by:" + confirmedBy, DataClassification: s.in.DataClassification,
+		})
+		return
+	}
 	prov := Provenance{SourceType: "assumption", Ref: row.Key, DataClassification: s.in.DataClassification}
 	if s.in.Assumptions == nil {
 		s.setValue(row.Key, period, nil, prov)

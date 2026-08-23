@@ -357,7 +357,21 @@ func (h *FinModelHandler) ExportRun(c *gin.Context) {
 	}
 	sortStrings(periodList)
 	buckets := finmodel.FoldBuckets(periodList, fold)
-	folded := finmodel.FoldMonthValues(byRow, buckets)
+	// F1 D-F4：折叠存量/流量以模板行声明为准（自定义行显式声明），
+	// 保留键继承默认存量语义。
+	foldByRow := map[string]string{}
+	for _, row := range tmpl.Rows {
+		foldByRow[row.Key] = row.Fold
+	}
+	folded := finmodel.FoldMonthValuesWithStocks(byRow, buckets, func(rowKey string) bool {
+		switch foldByRow[rowKey] {
+		case "stock":
+			return true
+		case "flow":
+			return false
+		}
+		return finmodel.DefaultStockRow(rowKey)
+	})
 
 	rows := make([]modelExportRow, 0, len(tmpl.Rows))
 	for _, row := range tmpl.Rows {
@@ -1005,6 +1019,10 @@ type templateValidationError struct {
 type templateValidationResult struct {
 	Valid  bool                      `json:"valid"`
 	Errors []templateValidationError `json:"errors,omitempty"`
+	// F1 D-F1：保留键缺口作为独立告示返回，不翻 Valid——validate 也服务
+	// 公式编辑器的碎片草稿，它们本来就不含全科目树；硬拦在模型 Run。
+	ReservedKeysMissing []string `json:"reserved_keys_missing,omitempty"`
+	ReservedKeysReason  string   `json:"reserved_keys_reason,omitempty"`
 }
 
 // ValidateTemplate POST /api/v1/financial-model/templates/validate
@@ -1053,7 +1071,18 @@ func (h *FinModelHandler) ValidateTemplate(c *gin.Context) {
 		c.JSON(http.StatusOK, templateValidationResult{Valid: false, Errors: errs})
 		return
 	}
-	c.JSON(http.StatusOK, templateValidationResult{Valid: true})
+	// F1 D-F1：结构合法 ≠ 可跑勾稽。保留键缺口独立告示（不翻 Valid），
+	// 编辑器据此在删除预置科目时向用户解释机械原因，而非报权限错。
+	keys := make([]string, 0, len(def.Rows))
+	for _, row := range def.Rows {
+		keys = append(keys, row.Key)
+	}
+	response := templateValidationResult{Valid: true}
+	if missing := template.MissingReservedSheetKeys(keys); len(missing) > 0 {
+		response.ReservedKeysMissing = missing
+		response.ReservedKeysReason = template.ReservedKeysReason
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 // extractTemplateRowKey 从 Parse 包装错误里取行键（"template: row \"k\": ..."）。

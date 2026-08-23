@@ -101,6 +101,13 @@ type RowDef struct {
 	// Actual 区永不来自假设. Empty on link rows (their Source already is the
 	// fact binding).
 	ActualSource string `json:"actual_source,omitempty"`
+	// Fold declares 存量/流量 for custom rows (F1 D-F4): "stock" folds to the
+	// period-end value, "flow" sums across the bucket. Empty is allowed at
+	// parse time and means the fold default applies (reserved keys stock,
+	// everything else flow) — but the EDITOR must not submit a balance-sheet
+	// custom row without an explicit choice, because the flow default turns
+	// twelve months into a plausible-looking wrong number.
+	Fold string `json:"fold,omitempty"`
 }
 
 // TemplateDef is the declared form consumed by Parse.
@@ -108,6 +115,11 @@ type TemplateDef struct {
 	Name    string   `json:"name"`
 	Version int      `json:"version"`
 	Rows    []RowDef `json:"rows"`
+	// Source marks who authored the declaration (F1 D-F9): "ai_suggestion"
+	// for AI-generated drafts, empty for human-authored. It rides in the
+	// stored JSONB — no table change. AI has no approved path; the field
+	// survives review so an audited template shows its origin.
+	Source string `json:"source,omitempty"`
 }
 
 // Row is the validated row as seen by the engine.
@@ -128,6 +140,9 @@ type Row struct {
 	// ActualSource is the fact binding a formula row reads inside the Actual
 	// window (PRD C7); empty means the formula applies in every period.
 	ActualSource string
+	// Fold is the declared 存量/流量 semantics (F1 D-F4). Empty inherits the
+	// fold default (reserved keys stock, others flow).
+	Fold string
 }
 
 // ChildSign reports whether a child is added (+1) or subtracted (−1) in a
@@ -257,6 +272,12 @@ func Parse(def TemplateDef) (*Template, error) {
 			Key: key, Label: rd.Label, Kind: rd.Kind, Basis: rd.Basis,
 			Source: strings.TrimSpace(rd.Source), Format: rd.Format,
 			ActualSource: strings.TrimSpace(rd.ActualSource),
+			Fold:         strings.TrimSpace(rd.Fold),
+		}
+		switch rows[i].Fold {
+		case "", FoldStock, FoldFlow:
+		default:
+			return nil, fmt.Errorf("template: row %q has invalid fold %q (use stock or flow)", key, rows[i].Fold)
 		}
 	}
 
@@ -293,6 +314,8 @@ func Parse(def TemplateDef) (*Template, error) {
 			return nil, fmt.Errorf("template: row %q: %w", rd.Key, err)
 		}
 		rows[i].Formula = &Expr{node: expr}
+		// S1-9：声明文本必须存活于 Parse——页面编辑器按 def 重建行时依赖它。
+		rows[i].FormulaText = strings.TrimSpace(rd.Formula)
 	case RowLink:
 		if rows[i].Source == "" {
 			return nil, fmt.Errorf("template: link row %q must declare a source", rd.Key)

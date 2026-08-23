@@ -20,7 +20,23 @@ const asyncTemplateRows = `{"name":"ASYNC-TPL","version":1,"rows":[
 	{"key":"rev","label":"营业收入","kind":"link","basis":"shared","source":"fact.revenue"},
 	{"key":"gross_margin_rate","label":"毛利率假设","kind":"input","basis":"shared"},
 	{"key":"gp","label":"毛利","kind":"formula","basis":"shared","formula":"rows.rev * rows.gross_margin_rate"},
-	{"key":"total_gp","label":"毛利合计","kind":"subtotal","basis":"shared","children":["gp"]}
+	{"key":"total_gp","label":"毛利合计","kind":"subtotal","basis":"shared","children":["gp"]},
+	{"key":"cash","label":"现金","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"ar","label":"应收账款","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"inventory","label":"存货","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"ppe","label":"固定资产","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"rou_asset","label":"使用权资产","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"total_assets","label":"资产合计","kind":"subtotal","basis":"ifrs16_basis","children":["cash","ar","inventory","ppe","rou_asset"]},
+	{"key":"ap","label":"应付账款","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"lease_liability","label":"租赁负债","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"borrowings","label":"借款","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"total_liabilities","label":"负债合计","kind":"subtotal","basis":"ifrs16_basis","children":["ap","lease_liability","borrowings"]},
+	{"key":"share_capital","label":"股本","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"retained_earnings","label":"留存收益","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"total_equity","label":"权益合计","kind":"subtotal","basis":"ifrs16_basis","children":["share_capital","retained_earnings"]},
+	{"key":"nwc","label":"营运资本","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"borrowings_opening","label":"期初借款","kind":"input","basis":"ifrs16_basis","fold":"stock"},
+	{"key":"ending_cash","label":"期末现金","kind":"input","basis":"ifrs16_basis","fold":"stock"}
 ]}`
 
 // asyncFixture provisions entity/template/definition and a handler whose

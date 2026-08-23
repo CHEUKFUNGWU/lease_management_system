@@ -156,7 +156,8 @@
 - **底稿类 Tool（`*.working_paper.*.generate`）产出 Artifact，走 LevelDraft + Review Gate**，不落业务表
 - **端口未接线时工具必须诚实拒绝**，返回 unavailable，不得产出数字。反过来：**不要用 nil 端口无条件注册工具**，那会让重名注册把真实端口挡在外面（P0-8 教训，`aiagent/agent.go` 现在按 `finModelRepo == nil` 二选一分支注册）
 - **权限拒绝必须保持原因。** `scope_denied` 不得被改写成「无数据」之类的软化表述 —— 这会掩盖权限问题，触及底线 1
-- **Tool 名只有三个顶层命名空间**：`lease.*`（合同、计量、月结、事件、文件解析）、`fpna.*`（三表模型、单店利润表、假设、备忘录）、`retail.*`（经营脉搏、门店诊断、情景、经营事实）。**新增工具必须归入其一，不得开第四个根。** 新领域用二级段表达（`fpna.store_pnl.read` 而不是 `store_pnl.read`）。理由：命名空间的作用是让模型可预测地找到工具，每个新领域自立门户会让根的数量随功能线性增长，检索价值归零
+- **Tool 名只有三个顶层命名空间**：`lease.*`（合同、计量、月结、事件、文件解析）、`fpna.*`（三表模型、单店利润表、假设、备忘录、经营行动与决策备忘）、`retail.*`（经营脉搏、门店诊断、情景、经营事实）。**新增工具必须归入其一，不得开第四个根。** 新领域用二级段表达（`fpna.store_pnl.read` 而不是 `store_pnl.read`）。理由：命名空间的作用是让模型可预测地找到工具，每个新领域自立门户会让根的数量随功能线性增长，检索价值归零
+- **归哪个命名空间，看工具读写的数据属于哪个域，不看哪个页面调它。** 这条是 2026-08-23 盘点出 15 个错位工具后补的：`lease.store.performance` 读的是 store-day 经营事实、`lease.fpna.action.draft.create` 写的是 `fpna_action_items`，两者都因为「从租赁那条线长出来的」而挂了 `lease.`。判定示例：月结留在 `lease.*` 不是因为习惯，而是 `journal_entries.contract_id` 是 NOT NULL 外键指向 `lease_contracts`，每条分录都属于一份租赁合同，`entry_type` 也全是 IFRS 16 概念——它是 IFRS 16 过账跑批，不是总账月结
 - **每个 Descriptor 必须声明 `Permissions`。** 缺失会被 `Descriptor.Validate` 以 `at least one permission is required` 拒绝，而注册失败一度是静默的——`lease.file.triage` 就这样从未进过 registry。取值按**工具自身的读写性质**，不是按它下游对象的权限：`lease.file.triage` 只读零写入用 `ai_chat:use`，而非 `lease.file.parse_*` 的 `contracts:create`，否则「还不知道是不是合同」的分诊会被挡在合同创建权之后
 - **工具数只能运行时枚举，不能 grep。** 三种 grep 口径给出三个不同答案。构造 registry 后调 `Runtime.Describe`，守卫在 `aiagent/registration_completeness_test.go`
 
@@ -174,6 +175,12 @@
 - **Pending 由显式的 Prepare 动作产生**，不是超时或推断。多数记录 Draft → Approved 直达，因为起草人与批准人常是同一人；只有推给另一个账号时才经过 Pending
 - 报表需显示审批状态、版本地位、生成时间与版本；导出文件须标注口径
 - **`review` 是 `pending` 的旧名**，新代码不得使用（`fpna_plan_versions.status` 仍存旧值，见下）
+
+> **已知命名债：15 个工具挂错命名空间（2026-08-23 盘点，待改）。** 零售经营 5 个（`lease.store.performance`、`lease.rent_to_sales`、`lease.store.scenario.simulate`、`lease.equipment.performance`、`lease.equipment.scenario.simulate`）与 FP&A 10 个（`lease.fpna.*` 三个、`lease.decision.*` 两个、`lease.explanation.draft.create`、`lease.meeting.action.draft.create`、`lease.budget.variance`、`lease.cashflow.scenario`、`lease.management.pre_read`）都该搬出 `lease.*`。
+>
+> **这件事有到期日。** 工具名落在 `audit_logs.new_values` 的 JSONB 里（`table_name='agent_tool_executions'` 的 `tool_name`，`repository/audit.go` 按它筛选）。改名后旧审计记录仍是旧名，按新名查不到。当前无真实客户、审计日志是开发数据，所以现在改代价为零；**第一个真实客户产生审计轨迹之后，代价变成永久**。
+>
+> 前端零硬编码工具名，库结构不用动。要改的只有工具定义、`agentskill/registry.go` 的 `AllowedTools`、`testdata/skill-contracts.v1.json` 与相关测试。工具名不属于本文「不要顺手重命名」那三处（docker-compose `name:`、go.mod module 路径、docs/archive）——那三处是基础设施命名，工具名是模型与用户可见的接口。
 
 > **已知词表分叉（2026-08-23 盘点，未收敛）**：`working` / `official` 仍活在以下位置，收敛需要一个带迁移的专项，**未排期**。在此之前：**新代码一律用 Draft / Pending / Approved，既有位置不要顺手改**——下面前三项改动会破坏对外契约或既有数据。
 >

@@ -247,16 +247,22 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 
 因此键含 `Scope` 全字段的稳定指纹——**scope 一变键就变，旧上下文自然不再命中**，无需显式失效逻辑。
 
-#### 只承认两种形状
+#### 键还须含 `data_classification`（底线 2 在上下文层的落点，模块设计 D-C20）
 
-| 形状 | 要求 |
-|---|---|
-| **A. 无状态共享**（当前形状，倾向） | 实例不持有任何 per-run / per-account 可变状态；上下文全部随调用传入并由持久层按 `(legal_entity_id, user_id, session_id)` 取。守卫：架构测试断言共享实例的结构体无 map / channel / mutex / 可变切片字段 |
-| **B. 每账号独立实例** | 实例按 `(legal_entity_id, user_id)` 键隔离，且**必须有淘汰策略**（空闲超时 + 上限），否则长期运行必然泄漏 |
+底线 2 要求模拟数据永不进入 Official 链路，既有落点在库、API、导出、UI 四处，**上下文层没有落点**——C1 之前不存在跨会话搬运上下文的东西。记忆与跨会话摘要正是这样的东西：一段基于 `simulated` 的对话，其记忆若进了 `production` 语境，模型看到的就是模拟数字而语境是正式的。同样不触发任何权限检查。
 
-**禁止第三种：共享实例 + 持有 per-run 可变状态。** 这是唯一会污染的组合，也是直接复用 picoclaw 实例模型最容易滑进去的形状。
+实测 `ai_chat_sessions` **没有 `data_classification` 列**。
 
-**倾向 A**：per-account 实例要额外处理生命周期、淘汰与内存泄漏，而上下文正确性最终仍取决于取数时的键是否完整；多一层实例不会让隔离更强，只会多一处会漏的地方。选 B 需在模块设计里写明 A 为何不够。
+两类查找分开，避免会话内分类升级孤立自身历史：**本会话历史按 `sessionID` 取**（会话内稳定），**跨会话搬运按完整键取**（含分类）。写入按会话当前分类——升级为 `mixed` 的会话，其记忆写在 `mixed` 下，纯 `production` 会话永远读不到，单向阻断。
+
+#### 定案：形状 A（无状态共享），2026-08-23
+
+蓝图 §三 描述的是每账号独立实例（`AgentManager.GetOrCreate()`、Hot/Cold state、专有 history 与 steeringCh）。**不采用。** 蓝图 §三 列的四条要求，形状 A 全部满足且机制更强——尤其「按权限注入工具集」：`Runtime.Describe` 按 `Principal` 逐次过滤，**权限变更立即生效**，而实例方案要等实例重建。蓝图描述的是一种实现，不是要求本身。
+
+- **A. 无状态共享（定案）**：实例不持有任何 per-run / per-account 可变状态；上下文全部随调用传入，由持久层按键取
+- **禁止：共享实例 + 持有 per-run 可变状态**。唯一会污染的组合，也是直接复用 picoclaw `instance.go` 最容易滑进去的形状
+
+对内核适配的硬性约束：`agentcore.Agent` 的五个可变字段（`state` / `steering` / `followUp` / `cancel` / `running`）适配时**必须推到调用参数里**，不能留在共享实例上。守卫为必做项，非条件性。
 
 #### 反向测试
 
@@ -282,7 +288,7 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 | 新增第三方代码 | picoclaw `pkg/agent` 及其最小依赖骨架（MIT，vendor 非 module 依赖） |
 | 新增可观测指标 | token 用量与上下文预算占用 |
 | 新增配置 | 按模型的上下文预算、压缩阈值、会话淘汰策略、MCP 登记表 |
-| 表结构 | **本批次不改表**。七张 `ai_chat_*` 表沿用；压缩不删记录因而无需新表 |
+| 表结构 | **改一列**：`ai_chat_sessions.data_classification`（D-C20）。迁移 `060_*` 与 `01_init.sql` 空库版本必须同时提供，缺一即环境漂移。其余七张 `ai_chat_*` 表沿用；压缩不删记录因而无需新表 |
 | ADR | ADR-0027 扩写（或续 ADR-0028）以覆盖本 spec 范围 |
 
 ## Testing Decisions
@@ -334,6 +340,7 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 - **开放扩展生态**：MCP 接入不等于开放生态，工具注册仍受控（ADR-0022 Non-goals）
 - **表结构变更**：本批次不改表
 - **Auto-Post Mode**：AI 仍只在 Assist Mode 运行
+- **`fpna.coa.suggest_template`**（AI 生成行业专属科目树）：架构蓝图 §四.1 点名但全仓零实现。它属于 **Tool 覆盖率（Batch B）** 而非 runtime 升级，B-4 之后另排一组，勿在 C1 内实现
 
 ## Further Notes
 

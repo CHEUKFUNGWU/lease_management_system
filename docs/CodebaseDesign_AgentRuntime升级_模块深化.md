@@ -59,10 +59,11 @@ D-C9 要求键是 `(legal_entity_id, user_id)`。但「要求」写在文档里�
 // ContextKey 标识「这份上下文属于谁」。
 // 字段全部非导出：调用方无法拼装一个残缺的键。
 type ContextKey struct {
-    legalEntityID string
-    userID        string
-    sessionID     string
-    scopeFinger   string // 见 D-C12
+    legalEntityID  string
+    userID         string
+    sessionID      string
+    scopeFinger    string // 见 D-C12
+    classification string // production / simulated / mixed，见 D-C20
 }
 
 // KeyFrom 是唯一的构造器。它要求一个已解析的 Principal——
@@ -102,6 +103,33 @@ func (k ContextKey) Cache() string
 因此 `ContextKey` 含 `scopeFinger`：`Scope` 全字段的稳定指纹。**scope 一变，键就变，旧上下文自然不再命中**，无需显式失效逻辑。
 
 指纹计算要求：字段顺序固定、切片先排序、空切片与 nil 同形（否则同一 scope 会算出两个指纹，缓存永不命中，退化为无缓存——不产生错误但白费）。
+
+### 决策留痕 D-C20：键必须含 `data_classification`（底线 2 在上下文层的落点）
+
+底线 2 要求模拟数据**永不进入 Official 链路**。既有落点在库、API、导出、UI 四处，但**上下文层没有落点**——因为在 C1 之前不存在跨会话搬运上下文的东西。
+
+C1 的记忆与跨会话摘要正是这样的东西。一段基于 `simulated` 数据的对话，其摘要或记忆若被带进 `production` 语境的对话，模型看到的就是模拟数字而语境是正式的。与 scope 那条同理：**它不触发任何权限检查**，取记忆的确实是本人、法人也确实没变。
+
+实测：`ai_chat_sessions` 表**没有 `data_classification` 列**，会话级根本没有这个概念。
+
+#### 语义细节：会话内升级不得孤立自身历史
+
+分类不是创建时固定的——一段 `production` 对话中途查了模拟数据集，就应升级为 `mixed`（沿用 store-day 事实信封既有的三值词表）。
+
+若把分类直接放进**所有**查找的键，升级会让会话丢失自己前半段的上下文。因此两类查找分开：
+
+| 查找 | 键 | 理由 |
+|---|---|---|
+| **本会话历史** | `sessionID`（会话内稳定） | 分类升级不应孤立自己的历史 |
+| **跨会话搬运**（记忆、跨会话摘要） | 完整 `ContextKey`（含 `classification`） | 这才是污染发生的地方 |
+
+**写入方向的规则**：记忆按会话**当前**分类写入。因此一个升级为 `mixed` 的会话，其记忆写在 `mixed` 下，**纯 `production` 的会话永远读不到它**。单向阻断，不需要额外的失效逻辑。
+
+#### 契约影响
+
+需要一列：`ai_chat_sessions.data_classification`（迁移 `060_*` + `01_init.sql` 空库版本同步，缺一就环境漂移）。这推翻了 Spec 契约清单里「本批次不改表」——**改一列**。
+
+反向测试：`simulated` 会话写入的记忆，在 `production` 会话中断言取不到；把 `classification` 从 `Cache()` 里删掉，该测试必须变红。
 
 ### 守卫 AR1-G1：全字段参与缓存键
 
@@ -247,7 +275,7 @@ func compact(compactable []Message, budget int) ([]Message, []MessageRef)
 
 ### 与 AR6 Memory 的关系
 
-记忆是 `Assemble` 的一个输入源，不是独立接口。它按同一个 `ContextKey` 取——**因此 D-C12 的 scope 指纹自动覆盖记忆**，无需为记忆单独设计失效逻辑。这是把键做成类型的复利。
+记忆是 `Assemble` 的一个输入源，不是独立接口。它按同一个 `ContextKey` 取——**因此 D-C12 的 scope 指纹与 D-C20 的分类自动覆盖记忆**，无需为记忆单独设计失效逻辑。这是把键做成类型的复利：加一个隔离维度，所有消费者一次性获得保护。
 
 ---
 
@@ -325,16 +353,28 @@ type Executor interface {
 
 **「测试改成匹配新实现所以绿了」不算通过。** 判据是：删掉对应的治理中间件，这条测试会不会红？
 
-### 决策留痕 D-C19：隔离形状二选一，禁止第三种
+### 决策留痕 D-C19：定案形状 A（无状态共享），不做每账号实例
 
-按 D-C9，只承认：
+2026-08-23 定案。蓝图 §三 描述的是形状 B（`AgentManager.GetOrCreate()`、Hot/Cold state、专有 history 与 steeringCh、`last_active` 时戳），**本设计不采用**。
 
-- **A. 无状态共享**——实例不持有任何 per-run / per-account 可变状态
-- **B. 每账号独立实例**——按 `ContextKey` 的 `(legalEntityID, userID)` 部分键隔离，且带淘汰策略
+蓝图 §三 列的四条要求——专有 history、专有 steering、绑定 `legal_entity_id`、按权限注入工具集——形状 A 全部满足，且靠的是更强的机制：
 
-**倾向 A。** `agentcore.Agent` 现有五个可变字段（`state` / `steering` / `followUp` / `cancel` / `running`），picoclaw 的 `pkg/agent` 有 `instance.go`——适配时要把这些状态推到调用参数里，而不是留在实例上。
+| 蓝图要求 | 形状 B 的做法 | 形状 A 的做法 |
+|---|---|---|
+| 专有 history | 实例各自持有 | 按 `ContextKey` 从持久层取，键不完整则取不到（AR1） |
+| 专有 steering | 实例各自持有 channel | steering 随调用传入，作用域即一次执行 |
+| 绑定 `legal_entity_id` | 创建实例时绑定 | `KeyFrom` 从 `Principal` 取，拿不到就没有键 |
+| 按权限注入工具集 | 建实例时按 caller 权限过滤 | `Runtime.Describe` 按 `Principal` 逐次过滤——**权限当场变更立即生效，实例方案则要等实例重建** |
 
-守卫 AR5-G3：若选 A，架构测试断言共享实例的结构体无 map / channel / mutex / 可变切片字段。若选 B，并发测试断言两个账号的 history 与 steering 互不可见，且模块设计里要写明 A 为何不够。
+**B 的代价是真实的**：实例生命周期、淘汰策略、内存上限、热/冷状态一致性，四件事都要做对；而隔离最终仍取决于取数时键是否完整——多一层实例不会让隔离更强，只会多一处会漏的地方。蓝图描述的是一种实现，不是要求本身。
+
+#### 定案 A 对内核适配的硬性约束
+
+`agentcore.Agent` 现有五个可变字段（`state` / `steering` / `followUp` / `cancel` / `running`），picoclaw 的 `pkg/agent` 有 `instance.go`。**适配时必须把这些状态推到调用参数里，不能留在共享实例上。**
+
+这是本轮内核适配最容易做错的一处：直接复用上游的实例模型会把 per-run 状态留在长生命周期对象上，那正是 D-C9 禁止的第三种形状。
+
+守卫 AR5-G3（**必做，非条件性**）：架构测试断言生产接线中长生命周期持有的执行器结构体，字段里没有 map / channel / mutex / 可变切片。反向验证：给它加一个 `map[string]*State` 字段，测试必须变红。
 
 ---
 
@@ -358,5 +398,8 @@ type Executor interface {
 | 隔离键 | `(legal_entity_id, user_id)` | **加 scope 指纹**（D-C12） | `access.Scope` 有七个维度且会随时间变化；scope 收窄后旧缓存仍含已不可见的门店数据，且不触发任何权限检查 |
 | 审计内容保护 | 「永不参与压缩」 | 改为**压缩器在类型上看不见**（D-C14） | 规则可以被改错，类型不会 |
 | 分词器缺失 | 未规定 | **拒绝，不估算**（D-C15） | 近似值在预算边界处系统性失效，而边界是唯一重要的地方 |
+| 底线 2 上下文落点 | 未覆盖 | **键含 `data_classification`**（D-C20） | 记忆与跨会话摘要会把模拟语境带进正式语境，且不触发权限检查 |
+| 隔离形状 | A 或 B，倾向 A | **定案 A**（D-C19） | 蓝图 §三 描述的是 B，但其四条要求 A 全部满足且机制更强（权限变更立即生效）|
+| 表结构 | 本批次不改表 | **改一列** | `ai_chat_sessions.data_classification` |
 
 Spec 的 D-C9 应按 D-C12 补上 scope 指纹一条。

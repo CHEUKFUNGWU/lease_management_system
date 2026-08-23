@@ -149,6 +149,9 @@ func TestRunWithStaticPlanDoesNotRequireAPIKey(t *testing.T) {
 func TestNewPlannerFailsClosedWithoutPlanOrKey(t *testing.T) {
 	// With no API key configured and no static plan, the in-process planner
 	// must fail at plan time — never silently fall back to an empty plan.
+	t.Setenv("LLM_API_KEY", "")
+	t.Setenv("OPENAI_API_KEY", "")
+	t.Setenv("DEEPSEEK_API_KEY", "")
 	planner, err := newPlanner(nil)
 	if err != nil {
 		t.Fatalf("construction: %v", err)

@@ -8,7 +8,7 @@
 // 交互：科目键 chips 点选插入 rows.<key>；输入停顿 300ms 调后端；
 // 错误按 kind 渲染（循环引用展示完整链路），不 split 后端文本。
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Input, Space, Spin, Tag, Typography } from "antd";
 import { useLanguage } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
@@ -39,10 +39,14 @@ export function FormulaEditor({ language: langProp, __testResult }: FormulaEdito
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const seq = useRef(0);
 
-  const rowKeys = rowKeysText
-    .split(/[,\s]+/)
-    .map((k) => k.trim())
-    .filter(Boolean);
+  const rowKeys = useMemo(
+    () =>
+      rowKeysText
+        .split(/[,\s]+/)
+        .map((k) => k.trim())
+        .filter(Boolean),
+    [rowKeysText],
+  );
 
   // 输入停顿后调校验端点：debounce 是交互节奏，不是本地校验。
   useEffect(() => {
@@ -56,7 +60,7 @@ export function FormulaEditor({ language: langProp, __testResult }: FormulaEdito
           name: "formula-editor-draft",
           version: 1,
           rows: [
-            ...rowKeys.map((key) => ({ key, label: key, kind: "input", basis: "shared" })),
+            ...rowKeys.map((key: string) => ({ key, label: key, kind: "input", basis: "shared" })),
             // label 是发给后端的模板行元数据（非界面文案），用常量避免被文案守卫误判
             { key: "__editor_formula__", label: FORMULA_ROW_LABEL, kind: "formula", basis: "shared", formula },
           ],
@@ -74,7 +78,7 @@ export function FormulaEditor({ language: langProp, __testResult }: FormulaEdito
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [formula, rowKeysText, token]);
+  }, [__testResult, formula, rowKeys, token]);
 
   const insertKey = (key: string) => {
     const el = textareaRef.current;
@@ -150,7 +154,7 @@ export function FormulaEditor({ language: langProp, __testResult }: FormulaEdito
         />
       </div>
       <Space wrap size={4}>
-        {rowKeys.map((key) => (
+        {rowKeys.map((key: string) => (
           <Button key={key} size="small" onClick={() => insertKey(key)} title={`rows.${key}`}>
             {key}
           </Button>

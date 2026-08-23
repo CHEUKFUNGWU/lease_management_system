@@ -14,6 +14,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/agentreaders"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/config"
+	"github.com/lease-management-system/core-service/internal/gateway"
 	"github.com/lease-management-system/core-service/internal/db"
 	"github.com/lease-management-system/core-service/internal/docparse"
 	"github.com/lease-management-system/core-service/internal/handlers"
@@ -583,6 +584,21 @@ func main() {
 		protected.Handle(http.MethodPost, "/admin/machine-credentials/:id/revoke", permission("settings", "update"), sourceFeedHandler.RevokeMachineCredential)
 	}
 
+	// Ch3 IM 网关：接线但默认关（ADR-0026 §6）。Enabled=false 时 Start 是
+	// no-op 且零渠道连接；渠道凭据缺失时该渠道被跳过并记录具名原因。
+	gatewayRunner := gateway.NewRunner(gateway.GatewaySettingsFromConfig(cfg.Gateway), gateway.NewIdentityResolver(
+		repository.NewChannelIdentityBindingRepository(database.Pool),
+		userRepo,
+		roleRepo,
+	), gateway.NoopDispatcher{})
+	if cfg.Gateway.Enabled {
+		if err := gatewayRunner.Start(context.Background()); err != nil {
+			log.Printf("Gateway start failed: %v", err)
+		} else {
+			log.Printf("Gateway started with %d channel(s)", gatewayRunner.ChannelsStarted())
+		}
+	}
+
 	port := cfg.Port
 	if port == "" {
 		port = "8080"
@@ -603,6 +619,9 @@ func main() {
 	log.Println("Shutting down server...")
 	stopCapabilityMaintenance()
 	stopRefreshMaintenance()
+	if err := gatewayRunner.Stop(context.Background()); err != nil {
+		log.Printf("Gateway stop failed: %v", err)
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

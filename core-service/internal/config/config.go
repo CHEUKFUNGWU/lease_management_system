@@ -34,6 +34,29 @@ type Config struct {
 	// image (see Dockerfile). Empty disables the office-document parser, which
 	// then degrades to parser_unavailable instead of fabricating a parse.
 	AnyDocBinPath string
+
+	// IM 网关（Ch3，ADR-0026 §6）：接线但默认关。Enabled=false 或凭据缺失时
+	// 对应渠道不启动；记录具名原因，不 panic、不重试刷屏。
+	Gateway GatewaySettings
+}
+
+// GatewaySettings carries the IM channel switch and credentials. The zero
+// value is fully disabled; no environment variable turns it on implicitly.
+type GatewaySettings struct {
+	Enabled bool
+	Feishu  ChannelCredentials
+	WeCom   ChannelCredentials
+}
+
+type ChannelCredentials struct {
+	AppID             string
+	AppSecret         string
+	EncryptKey        string
+	VerificationToken string
+	IsLark            bool
+	BotID             string
+	Secret            string
+	WebSocketURL      string
 }
 
 func Load() (*Config, error) {
@@ -91,6 +114,24 @@ func Load() (*Config, error) {
 		MinIOBucket:    getEnv("MINIO_BUCKET", "lease-uploads"),
 
 		AnyDocBinPath: getEnv("ANYDOC_BIN_PATH", "/usr/local/lib/node_modules/@firecrawl/anydoc/cli.js"),
+	}
+
+	// IM 网关：默认关。只有 GATEWAY_ENABLED=true 才读取渠道凭据；凭据本身
+	// 只从环境变量来，无默认值（ADR-0026 §6）。
+	cfg.Gateway.Enabled = os.Getenv("GATEWAY_ENABLED") == "true"
+	if cfg.Gateway.Enabled {
+		cfg.Gateway.Feishu = ChannelCredentials{
+			AppID:             os.Getenv("GATEWAY_FEISHU_APP_ID"),
+			AppSecret:         os.Getenv("GATEWAY_FEISHU_APP_SECRET"),
+			EncryptKey:        os.Getenv("GATEWAY_FEISHU_ENCRYPT_KEY"),
+			VerificationToken: os.Getenv("GATEWAY_FEISHU_VERIFICATION_TOKEN"),
+			IsLark:            os.Getenv("GATEWAY_FEISHU_IS_LARK") == "true",
+		}
+		cfg.Gateway.WeCom = ChannelCredentials{
+			BotID:        os.Getenv("GATEWAY_WECOM_BOT_ID"),
+			Secret:       os.Getenv("GATEWAY_WECOM_SECRET"),
+			WebSocketURL: os.Getenv("GATEWAY_WECOM_WEBSOCKET_URL"),
+		}
 	}
 
 	return cfg, nil

@@ -59,7 +59,9 @@ abstractions.
 
 ## Decision
 
-### 1. Vendor `pkg/channels/{feishu,wecom}` under `internal/gateway/vendor/picoclaw/`
+### 1. Vendor `pkg/channels/{feishu,wecom}` under `internal/gateway/third_party/picoclaw/`
+
+> **Corrected 2026-08-24.** This section first said `internal/gateway/vendor/picoclaw/`. That path does not work: `vendor` is reserved by the Go toolchain, and in modules mode a package whose path contains `/vendor/` cannot be imported normally — the compiler rejects it with `must be imported as <name>`. Verified by experiment. `third_party/` preserves every property this section asks for: per-file provenance headers, commit pinning, the architecture guards, and a meaningful diff against upstream.
 
 Scope is bounded explicitly:
 
@@ -126,7 +128,7 @@ path as every other caller.
 
 - `internal/gateway/**` (vendor included) must not construct `access.Scope` and
   must not contain a `legal_entity_id` literal.
-- `internal/gateway/vendor/picoclaw/**` must not import `internal/repository`,
+- `internal/gateway/third_party/picoclaw/**` must not import `internal/repository`,
   `internal/services`, `internal/agenttools` or `internal/access`. Dependency
   direction is one-way: the wrapper depends on the vendor, never the reverse.
 - A reverse test proves each guard fails when violated.

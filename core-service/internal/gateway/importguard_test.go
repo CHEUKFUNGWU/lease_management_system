@@ -127,3 +127,56 @@ func TestGatewayGuardDetectsViolations(t *testing.T) {
 		t.Fatalf("guard missed shapes: scope=%v tenant=%v in %+v", sawScope, sawTenant, violations)
 	}
 }
+
+// filepathAbs / writeFile / removeFile are small os shims shared with the
+// runner tests.
+func filepathAbs(rel string) (string, error) {
+	return filepath.Abs(rel)
+}
+
+func writeFile(path, content string) error {
+	return os.WriteFile(path, []byte(content), 0o600)
+}
+
+func removeFile(path string) {
+	_ = os.Remove(path)
+}
+
+// bannedBusinessImports lists the packages vendored code must never depend on;
+// the dependency direction is outer-wraps-vendor only (ADR-0026 §5).
+var bannedBusinessImports = []string{
+	"internal/repository",
+	"internal/services",
+	"internal/agenttools",
+	"internal/access",
+	"internal/handlers",
+	"internal/middleware",
+}
+
+// scanThirdPartyImports walks dir for non-test Go files importing business
+// packages.
+func scanThirdPartyImports(dir string) []string {
+	violations := []string{}
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		for _, banned := range bannedBusinessImports {
+			for index, line := range strings.Split(string(content), "\n") {
+				if strings.Contains(line, `"github.com/lease-management-system/core-service/`+banned+`"`) ||
+					strings.Contains(line, `"github.com/lease-management-system/core-service/`+banned+`/`) {
+					violations = append(violations, path+":"+itoa(index+1)+" imports "+banned)
+				}
+			}
+		}
+		return nil
+	})
+	return violations
+}

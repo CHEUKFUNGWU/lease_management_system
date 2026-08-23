@@ -1,0 +1,60 @@
+// Vendored from github.com/sipeed/picoclaw at commit bbf6893ca7afad27f1d00a0f5a45982a549c6ed6.
+// Upstream path: channels/feishu/token_cache.go
+// SPDX-License-Identifier: MIT — Copyright (c) 2026 PicoClaw contributors.
+// See THIRD_PARTY_NOTICES at the repository root. Do not add business
+// logic here; adapt upstream behaviour in the wrapping layer instead.
+// Local adaptations (mechanical, behaviour-preserving):
+//   - import path rewrites (picoclaw module -> this vendor tree)
+
+package feishu
+
+import (
+	"context"
+	"sync"
+	"time"
+)
+
+// tokenCache implements larkcore.Cache with an extra InvalidateAll method.
+// This works around a bug in the Lark SDK v3 where the built-in token retry
+// loop does not clear stale tokens from cache on auth errors.
+type tokenCache struct {
+	mu    sync.RWMutex
+	store map[string]*tokenEntry
+}
+
+type tokenEntry struct {
+	value    string
+	expireAt time.Time
+}
+
+func newTokenCache() *tokenCache {
+	return &tokenCache{store: make(map[string]*tokenEntry)}
+}
+
+func (c *tokenCache) Set(_ context.Context, key, value string, ttl time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.store[key] = &tokenEntry{value: value, expireAt: time.Now().Add(ttl)}
+	return nil
+}
+
+func (c *tokenCache) Get(_ context.Context, key string) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	e, ok := c.store[key]
+	if !ok {
+		return "", nil
+	}
+	if e.expireAt.Before(time.Now()) {
+		delete(c.store, key)
+		return "", nil
+	}
+	return e.value, nil
+}
+
+// InvalidateAll removes all cached tokens, forcing fresh acquisition.
+func (c *tokenCache) InvalidateAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	clear(c.store)
+}

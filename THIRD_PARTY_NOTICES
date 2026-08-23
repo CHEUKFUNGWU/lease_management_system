@@ -1,0 +1,40 @@
+# Third-Party Notices
+
+Vendored third-party code carried in this repository. Each vendored file
+records its upstream path, commit and licence in a header comment; this file
+is the repository-level register (ADR-0026).
+
+## sipeed/picoclaw (partial vendoring)
+
+- Upstream: https://github.com/sipeed/picoclaw
+- Commit: bbf6893ca7afad27f1d00a0f5a45982a549c6ed6 (2026-08-19)
+- Licence: MIT License — Copyright (c) 2026 PicoClaw contributors
+- Location: core-service/internal/gateway/third_party/picoclaw/
+- Scope: pkg/channels/{base,errors,errutil,interfaces,media,registry,
+  tool_feedback_animator,voice_capabilities}.go and pkg/channels/{feishu,wecom}
+  protocol code; bus types.go/inbound_context.go/outbound_context.go;
+  identity identity helpers (BuildCanonicalID, ParseCanonicalID, MatchAllowed).
+  Everything else upstream — agent loop, session, memory, routing, the other
+  19 channels — is excluded per ADR-0026 §1.
+- Local adaptations: import-path rewrites to this module; the concrete
+  *bus.MessageBus narrowed to a one-method local interface; commands-coupled
+  interface segment removed. Behaviour-preserving; see each file header.
+- Companion first-party files (NOT upstream code, marked in their headers):
+  third_party/picoclaw/bus/bus.go (MessageBus interface),
+  third_party/picoclaw/config/config.go (trimmed settings shapes),
+  third_party/picoclaw/logger/logger.go (log/slog backing),
+  third_party/picoclaw/media/media.go (store contract + TempDir),
+  third_party/picoclaw/utils/utils.go (three string/file helpers).
+
+### Transitive dependencies introduced by the vendored slice
+
+| Module | Licence | Why |
+|---|---|---|
+| github.com/larksuite/oapi-sdk-go/v3 | MIT | Feishu WebSocket/SDK client |
+| github.com/gorilla/websocket | BSD-2-Clause | WeCom WebSocket transport |
+| github.com/h2non/filetype | MIT | WeCom media type sniffing |
+| github.com/gogo/protobuf | BSD-3-Clause | transitive via lark ws |
+
+Upstream licences are consulted at
+https://github.com/sipeed/picoclaw/blob/<commit>/LICENSE and the respective
+dependency repositories.

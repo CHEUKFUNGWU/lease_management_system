@@ -463,7 +463,7 @@ D19 容易被扩大成一次全仓重命名，必须提前划清：
 
 ## 9. F 批次：财务视角的 UI/UX 与术语整改（2026-08-22 执行）
 
-按 `docs/execution/财务视角UIUX与术语整改_任务指令.md`（transient 工单，复核后可删）完成的整改。审查方法：ui-ux-pro-max（119 条 UX 准则）+ unslop，站在财务会计 / FP&A 分析师 / Finance BP / 经营分析师四个岗位视角逐页核查。**未改任何计算逻辑与后端契约。**
+执行工单 `docs/execution/财务视角UIUX与术语整改_任务指令.md` 是 transient 文档，已交付完毕、待删除，结论即本节。审查方法：ui-ux-pro-max（119 条 UX 准则）+ unslop，站在财务会计 / FP&A 分析师 / Finance BP / 经营分析师四个岗位视角逐页核查。**未改任何计算逻辑与后端契约。**
 
 ### F0 输入正确性与信息泄漏
 
@@ -496,3 +496,80 @@ npm run build ✅        npm run lint ✅（--max-warnings 0 + enforce-design �
 ```
 
 遗留（下一批次）：monthly-closing 批次状态与 store-360 currency_status 的枚举翻译（后者需后端先固化取值全集）；「经营脉搏/经营驾驶舱」功能重叠待产品票。
+
+---
+
+## 10. R 批次：诚实性止血与能力补齐（2026-08-22 ~ 08-23 执行）
+
+来源是一份《UIUX与产品能力全面改善建议书》。**它的缺口清单有一半被代码推翻**，所以本批次不是照建议书施工，而是照复核后的 [Spec](specs/retail-workstation-honesty-and-capability-r1.md)（D-R1~D-R9）与 [模块深化](CodebaseDesign_经营工作站诚实性与能力补齐_模块深化.md)（RH1~RH8，D-R10~D-R18）施工。建议书本身已标 Partially Superseded 并保留 §0.5 复核记录。
+
+七张票、六次合并、约 5700 行净增、**零删除**（无路由/表/导航项被移除，增量叠加纪律全程守住）。
+
+### 10.1 R0 诚实性止血（`6836bbf`）
+
+本批最严重的问题，也是建议书**没有发现**的那个。
+
+| 位置 | 显示成 | 实际渲染的是 |
+|---|---|---|
+| `performance/page.tsx:165`（硬编码，未过 i18n） | 同群平均坪效达成率 | `oee_pct \|\| utilization_pct`，设备综合效率 |
+| `i18n.ts` `perf.col.utilization` | 坪效达成率（en: Efficiency） | `utilization_pct` 产能利用率 |
+| `i18n.ts` `perf.col.equipment` | 商圈 / 区域（en: Circle / Region） | `equipment_code` |
+| `i18n.ts` `perf.tab.equipment` | 商圈与同群对比 | 整个 tab 挂在设备事实数据源上 |
+| `i18n.ts` `perf.kpi.equipment_facts` | 商圈对标门店（en: Benchmark stores） | 设备事实计数 |
+| `page.tsx:164` 两处兜底 | 核心商圈 / 标杆同群 | `plant_code` / `production_line_code` 为空时的兜底 |
+
+不是「写代码时贴错一个标题」，是**有人对整张设备表做过一次零售化批量改名，连英文一起改了**。同一页上「坪效」出现两次，一次真（`sales_per_sqm`，合法零售口径）一次假——这也是禁词式断言在这里行不通的原因。
+
+做法（`resolveBasis`，D-R11）：口径不一致就不可用，**不提供换算**，只有两条路——可用则显示、不可用则「—」加原因。给第三条路（估算、近似、改名）就会有人走。六个 i18n 键的值改回设备真名，键名不动（键留着值是假的就是定时炸弹）。空态分三种情况：无数据 / 口径不可用 / 可用，第三种今天走不到但**必须留着**，否则 `resolveBasis` 就是装饰品、自检句无从验起。
+
+同批处理：`/performance` 与 `/store-360` 的四处枚举裸渲染；三页定位说明（`/performance` 与 `/operating-pulse` 互指，重叠问题按 2026-08-22 决定不合并；`/roi` 声明自己不是经营分析）；导航不变性守卫（21 条路由仍在 + `/roi` 仍不在，两个方向都红得出来）。
+
+### 10.2 R1 人效上架（`0225783`）
+
+建议书判定「人效只有一个总人工成本数字」。实际上 `sales_per_labor_hour` 与 `labor_hours_per_transaction` **早已在 `retail-kpi-v1` 里定义好**（含零分母 null 规则），事实层也有 `labor_hours` / `headcount` 两列——缺的只是 `retailstore360` 那两个字符串切片没把它们列进去。
+
+RH1 Metric Surface 把「哪些指标露出到哪个页面」做成受校验清单（D-R23），并**删掉包内第二张 labels map**，中文名收敛为 `retailkpi` 一个真相源。零新增指标计算；**严禁从 `labor_cost` 反推 `labor_hours`**（会造出类型上是事实、语义上是猜测的值，绕过整套覆盖率门槛）。
+
+新面板底部常驻一句说明：时段排班分析做不了，因为事实层是 store-day 粒度，需要先接入 POS 分时流水。**这不是免责声明**，是告诉用户为什么某个他期待的功能不在这儿、以及需要什么才能有。
+
+同批给品类毛利拆解 / 库存周转 / 竞对对标三个既有面板补口径说明——它们后端一直是对的，但界面没说清分子分母是什么、什么时候降级，BP 因此仍然回去用 Excel。
+
+### 10.3 R2 能力补齐（`d325f15` / `c96c709` / `ec97325`）
+
+| 票 | 内容 | 关键纪律 |
+|---|---|---|
+| R2-1 促销投前保本 | 进 `promotionattribution` 同包，基线复用同包 `RunRate` 类型 | 一致性靠类型共享不靠文档约定；`PromoMarginRate ≤ 0` 返回 `unachievable` 且金额指针为 nil，**不返回巨大数字假装有解** |
+| R2-3 利润差异归因 | 新包 `varianceattribution`，七因子连环替代 | 顺序回显（换顺序数字就变，不声明顺序没人能复核）；残差不摊进任何因子；缺一即整体 `unavailable` 不做部分归因 |
+| R2-4 模板校验 + 公式编辑器 | `POST /financial-model/templates/validate` 复用 `template.Compile` | **前端零本地校验**（D-R16），括号配对这类检查也走后端；`CycleError` 携带结构化链路而非塞进 error 字符串 |
+| R2-2 新店可行性 | 新包 `newstorefeasibility`，纯函数 + Ports | 禁 import `ifrs16`，guard 遍历全部子包；折现率缺失是**部分降级**（静态回本期与盈亏平衡照常返回） |
+
+**R2-3 纠正了 Spec 的一处概念错误。** 原 D-R5 同时要求连环替代（须声明顺序）与「residual 承载高阶交叉项」，二者互斥：精确连环替代下各步贡献是望远镜和，求和恒等于总差异，残差恒为浮点噪声。守恒等式因此是构造性质不是检查对象，已按风险红线 12 降级为构造断言，检查改为中间值序列逐格锁定 + 顺序敏感性。Spec 已同步更正。
+
+### 10.4 R3 文案守卫（`ec97325`）
+
+三条 CI 可强制：枚举不裸奔（映射表用 `Record<联合类型, i18n键>`，漏一个值 type-check 就红）、pp 与 % 不混用、i18n **值**的内部词汇黑名单（批次号 / 阶段号 / 模块代号）。第一条从 `/financial-model` 推广到 `/performance`、`/promotions`、`/store-360`。
+
+### 10.5 验证
+
+```
+web:   type-check ✅   npm test ✅（87 文件 / 536 用例）   build ✅
+core:  go test ./... ✅（env -u DEEPSEEK_API_KEY）        go vet ✅
+docs:  check_docs_archive.sh ✅
+增量叠加：路由删除 0 · db 改动 0 · 既有测试断言删除 0
+```
+
+集成测试均起一次性容器实跑并确认 `=== RUN` / `--- PASS` 而非静默 skip。
+
+### 10.6 这一批学到的（值得带进下一批）
+
+**Review 要把改动跑坏，不能只读 diff。** 本批 Reviewer 侧发现的五处问题，全部是靠**手动把实现改坏再跑测试**才暴露的，没有一处是读 diff 看出来的：fixture 被喂饱后掩盖了新行为（同群多出一行 `insufficient_peers` 无人知晓）、反向断言被换成正面断言、机器枚举从一个页面挪到另一个页面、新代码没继承仓库已付学费的教训（`/100` 浮点残渣，三个月前修过、修法藏在页面私有文件里所以又踩一遍）。
+
+共同形状是**验证强度或呈现诚实度的悄悄滑落**，不是代码写错。测试全绿、type-check 全绿、build 成功，但守卫已经不承重了。CI 抓不到这类东西。
+
+**正面断言与反向断言挡的不是同一件事。** 「渲染了 `is-missing` 类」挡不住「同时渲染了一个 0」。删反向断言之前先确认它真的失效了，而不是顺手。
+
+### 10.7 遗留
+
+登记在 [Spec 的「交付后的决策与遗留」节](specs/retail-workstation-honesty-and-capability-r1.md)，不在此重复：公式编辑器的模板加载/保存回写、可行性面板窄视口栅格（待实机走查）、归因面板 period 模式、存量裸 `/100` 与 `*100` 进 payload 的位置未扫。
+
+「经营脉搏 / 经营驾驶舱」功能重叠仍未处理（2026-08-22 决定推迟，本批只加互指说明）。

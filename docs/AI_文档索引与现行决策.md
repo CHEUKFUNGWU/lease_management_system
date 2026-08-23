@@ -141,6 +141,12 @@ FP&A 版本治理与滚动预测
 | **D19** | **期初的两种失败走相反路径**：`openingAbsent` 降级、`openingRejected` 阻止 run 落库 | 初版把闸失败一律降级为「未提供期初」 | 模块深化 SM4；`finmodel/engine.go` |
 | **D20** | **AI 写类工具只写 draft 层**，`source=ai_suggestion`；approved-only 读取永不回采 draft。**端口未接线的工具诚实拒绝，但不得用 nil 端口无条件注册**（会让重名注册把真实端口挡在外面） | 「工具注册了就算接线了」的隐含假设（1d67dd6 的声明曾因此落空） | ADR-0025；`aiagent/agent.go` 的 `finModelRepo == nil` 二选一分支 |
 | **D21** | **ADR-0023 的退役已全部完成（W4–W6，2026-08-20）。** ai-service 目录已删除，任何代码不得再调用已退役的 Python 端点；现状以 AGENTS.md「当前工程事实」与本文 G6/G7 已解决为准 | 多份设计文档中「ai-service 退役映射」被读成已完成事实（现已成真） | 本文 §3 缺口 G7 → ✅ |
+| **D22** | **口径冲突只降级不换算。** 一个数值在某展示语境下要么可用、要么显示「—」加原因，**不存在第三条路**（估算、近似、改名）。设备口径的数不得贴零售标题，`resolveBasis` 是唯一判定点 | `/performance` 用 `oee_pct` 渲染「同群平均坪效达成率」、`plant_code` 空值兜底成「核心商圈」；i18n 层六个键被系统性零售化改名（连英文一起改） | Spec D-R1；模块深化 D-R11；`web/app/lib/displayBasis.ts` |
+| **D23** | **指标露出做成受校验清单，标签表收敛为一处。** 清单里的每个 code 必须在 `retailkpi.Definitions` 里存在，否则启动即失败；中文名只有 `retailkpi` 一个真相源 | `retailstore360` 包内第二张 labels map（加指标要改四处，漏一处的表现是前端显示指标码） | 模块深化 D-R10；`retailkpi/surface.go` |
+| **D24** | **连环替代法与「有意义的残差」互斥，二选一。** 精确连环替代下各步贡献是望远镜和，求和恒等于总差异，残差恒为浮点噪声；残差只在隔离替代法下非零，而那种方法与顺序无关。选连环替代则守恒等式是构造性质**不是检查对象**，真正的检查是中间值序列 + 顺序敏感性 | 本文 D18 的精神在差异归因上被误用：Spec D-R5 初版同时要求两者，会留下一条永远绿的守恒断言 | Spec D-R5 更正节；`varianceattribution/attribution_test.go` |
+| **D25** | **折现率缺失是部分降级不是整体拒绝。** IRR / NPV / 动态回本期返回具名 Gap，静态回本期与盈亏平衡销售额照常返回——后两者不依赖折现率，一起挡掉是过度保守。**任何情况下不得使用默认折现率** | 「缺一个输入就整体不可用」的一刀切 | 模块深化 D-R14；`newstorefeasibility/feasibility.go` |
+| **D26** | **新店测算不得长出第二套租赁计算。** `newstorefeasibility` 禁 import `ifrs16`，租赁与 ROU 只经 `LeaseProjectionReader` 从 `measurement_results` 只读投影取；import guard **遍历全部子包** | 风险红线 14 在 finmodel 之外的第二个落点 | 模块深化 D-R13；`newstorefeasibility/importguard_test.go` |
+| **D27** | **前端不复刻后端的 DSL 解析器，一次本地校验也不做**（含括号配对这类「显然安全」的检查）。公式校验一律走 `POST /financial-model/templates/validate`，复用 `template.Compile` 同一条路径 | 「先在前端挡一下明显错误」的直觉——开了口子它会长大，然后与后端分叉，届时「界面说没问题、保存时报错」比现在难查 | 模块深化 D-R16；`web/app/financial-model/formula-editor.test.tsx` |
 
 ---
 
@@ -188,11 +194,27 @@ FP&A 版本治理与滚动预测
 | 3 | protected_measures 清单首次定稿 | ~~阶段 0~~ **不阻塞**——写一条带日期和理由的决策日志条目即可（D15） | ADR-0025 §2 |
 | 4 | Tier B 产物能否导出给外部审计师 | 阶段 4 | 底稿方案 §15.5 |
 | 5 | ~~固化通道的季度人力承诺~~ → 改为**自动建 issue** | 不阻塞 | ADR-0025 §4 |
-| 6 | anydoc 二进制的供应链管理（版本 + checksum 钉死方式） | ✅ **已定（W5-1）**：`@firecrawl/anydoc@0.2.0` + npm SRI integrity（sha512）钉死进 core-service Dockerfile（`Dockerfile` / `Dockerfile.agent-runner` 的 `anydoc-install` 阶段），`ANYDOC_BIN_PATH` 由 compose 传入 | ADR-0024 |
+| 6 | anydoc 二进制的供应链管理（版本 + checksum 钉死方式） | ✅ **已定（W5-1）且自 2026-08-23 起真正生效**：`@firecrawl/anydoc@0.2.0` + npm SRI integrity（sha512）钉死进 `Dockerfile` / `Dockerfile.agent-runner` 的 `anydoc-install` 阶段，`ANYDOC_BIN_PATH` 由 compose 传入。**订正：W5-1 到 2026-08-23 之间这条校验从未执行过**——`$ANYDOC_INTEGRITY` 无引号插进 JS 源码导致 SyntaxError，一直被 Docker layer cache 掩盖；`5e1e6f0` 修好并用错误哈希实证它拦得住。详见下方 §5.1 | ADR-0024；`5e1e6f0` |
 | 7 | `controlledxlsx` 与 excelize 的去留 | ✅ **已定（W5-3）**：`controlledxlsx` **保留**——受控模板路径的零依赖优点成立，不与 excelize 合并；intake 的 Excel 确定性读取统一走 `internal/aiintake/excel.go`（excelize），`internal/controlledxlsx` 仅服务受控模板导出 | Agent Core 设计 §12.1 |
 | 8 | 上下文压缩是否进 W1–W6 | W6 | Agent Core 设计 §12.2 |
 
 **当前没有阻塞阶段 0 的未决项。** 阶段 0 + 阶段 1 可以立即开工。
+
+### 5.1 构建期守卫会被 layer cache 掩盖（2026-08-23 教训）
+
+上表第 6 项的订正值得单列，因为它是一类问题不是一次事故。
+
+W5-1 把 anydoc 的 SRI 校验写进 Dockerfile，本文当时记为「✅ 已定」。实际上那段 `RUN node -e "..."` 把 `$ANYDOC_INTEGRITY` **无引号**插进 JS 源码，生成的是 `if(got!=sha512-Hm4x…==)`——不是字符串字面量，node 每次都 SyntaxError 退出 1。也就是说这个控制项**从引入起就没有比较过任何东西**。
+
+它没被发现的原因是 Docker layer cache：这一层在首次（失败前的某个版本）之后一直命中缓存，从不重跑。2026-08-23 重建镜像时 `node:20-alpine` 的 digest 变了、缓存失效，它才第一次真的执行并暴露。
+
+**这是风险红线 12「假装在检查」长在构建基础设施上的形态。** 勾稽侧我们已经有纪律（恒真即改写、每条要有反向测试），构建期守卫没有对应纪律，而它们更隐蔽——单元测试跑不到，CI 若也命中缓存就同样看不见。
+
+现行结论：
+
+- 修复见 `5e1e6f0`，把期望值先赋给 JS 变量再比较；`Dockerfile.agent-runner` 的失败分支引用未定义变量 `helping` 一并改掉（它 fail-closed 正确，但拿不到 got/want 对照）。
+- 钉死的哈希经实证与 0.2.0 tarball 相符，**不存在供应链问题**，只是校验没跑。
+- **未决**：需要一条定期用错误输入跑构建期守卫的检查，确认它们还会失败。手动做法已验证可行（`docker build --build-arg ANYDOC_INTEGRITY=sha512-WRONG… --target anydoc-install`，应中止并打印 got/want）。尚未进 CI。
 
 ---
 

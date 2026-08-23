@@ -4,7 +4,7 @@
 > 来源：[docs/UIUX与产品能力全面改善建议书.md](../UIUX与产品能力全面改善建议书.md)（下称「建议书」），经代码实测复核后重写缺口清单
 > 发布位置说明：本仓无 issue tracker，按既有惯例落 `docs/specs/`；`ready-for-agent` 标签以本行声明代替
 > 配套模块设计：[CodebaseDesign_经营工作站诚实性与能力补齐_模块深化.md](../CodebaseDesign_经营工作站诚实性与能力补齐_模块深化.md)
-> 配套执行工单：[docs/execution/经营工作站诚实性与能力补齐_任务指令.md](../execution/经营工作站诚实性与能力补齐_任务指令.md)
+> 配套执行工单 `docs/execution/经营工作站诚实性与能力补齐_任务指令.md` 是 transient 文档，2026-08-23 已交付完毕、待删除。落地结论见本文「交付后的决策与遗留」节与 [docs/UIUX改善方案.md §10](../UIUX改善方案.md)
 
 ---
 

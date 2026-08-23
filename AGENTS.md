@@ -159,11 +159,32 @@
 - **每个 Descriptor 必须声明 `Permissions`。** 缺失会被 `Descriptor.Validate` 以 `at least one permission is required` 拒绝，而注册失败一度是静默的——`lease.file.triage` 就这样从未进过 registry。取值按**工具自身的读写性质**，不是按它下游对象的权限：`lease.file.triage` 只读零写入用 `ai_chat:use`，而非 `lease.file.parse_*` 的 `contracts:create`，否则「还不知道是不是合同」的分诊会被挡在合同创建权之后
 - **工具数只能运行时枚举，不能 grep。** 三种 grep 口径给出三个不同答案。构造 registry 后调 `Runtime.Describe`，守卫在 `aiagent/registration_completeness_test.go`
 
-### 报表双模式
+### 报表口径（Report Basis）
 
-- **Working Report**：可含 Draft / Pending Approval 数据，用于内部试算
-- **Official Report**：仅含 Approved 数据，用于正式财务与审计
-- 报表需显示 `approval_status`、`is_official_version`、生成时间与版本；导出文件须标注 Draft / Pending Approval / Official
+**词表以 [CONTEXT.md](CONTEXT.md) 的「Approval and Reporting Basis」为准。** 审批状态全系统只有三个词：**Draft / Pending / Approved**，报表口径复用同一套词表，取值语义是**「最低包含到哪一级」**（累积，不互斥）：
+
+| 口径 | 包含 | 用途 |
+|---|---|---|
+| `approved` | 仅 Approved | 正式财务与审计 |
+| `pending` | Pending + Approved | 待批件的复核视图 |
+| `draft` | Draft + Pending + Approved | 内部试算；用户可在此叠加自己的情景草稿与自定义假设 |
+
+- **`working` / `official` 不再作为口径名。** `working` 与 CONTEXT.md 既有的 **Working Paper**（审计底稿）撞词根却毫不相关；`official` 表达的是**版本地位**，由 `is_official_version` 承担，与审批状态是两条独立的轴（一份记录可以 Approved 但已被取代）
+- **Pending 由显式的 Prepare 动作产生**，不是超时或推断。多数记录 Draft → Approved 直达，因为起草人与批准人常是同一人；只有推给另一个账号时才经过 Pending
+- 报表需显示审批状态、版本地位、生成时间与版本；导出文件须标注口径
+- **`review` 是 `pending` 的旧名**，新代码不得使用（`fpna_plan_versions.status` 仍存旧值，见下）
+
+> **已知词表分叉（2026-08-23 盘点，未收敛）**：`working` / `official` 仍活在以下位置，收敛需要一个带迁移的专项，**未排期**。在此之前：**新代码一律用 Draft / Pending / Approved，既有位置不要顺手改**——下面前三项改动会破坏对外契约或既有数据。
+>
+> | 位置 | 形态 | 改动代价 |
+> |---|---|---|
+> | `handlers/fpna_governance.go` 的 `?official=true` | **公开 API 查询参数** | 破坏性变更，需前端同步 |
+> | `finmodel/view` 的 `basis_mode` | 存于 saved view 的 **JSONB 配置** | 需数据迁移 |
+> | `aiagent` 的 `PageContext.ReportView` | **前端传入** | 需前后端同步 |
+> | `fpna_plan_versions.status` | `draft/review/approved/official/retired` 五值，把审批状态与版本生命周期**混在一列** | 需迁移 + 拆列 |
+> | `services/reporting` 的 `Mode`、`services/retailexport` 的 `mark`、`draftapp` 的 `ReportMode` | 内部枚举 | 低，随专项一起做 |
+>
+> 已对齐的只有 `lease.monthly_closing.entries.preview` 的 `report_basis`（B-2，2026-08-23 新建，无持久化与外部消费者）。
 
 ### Discount Rate 人机协同
 

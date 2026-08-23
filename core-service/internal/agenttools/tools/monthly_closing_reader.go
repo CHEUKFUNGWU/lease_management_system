@@ -66,7 +66,7 @@ type MonthlyClosingBatchesToolData struct {
 	SideEffects  bool                              `json:"side_effects"`
 }
 
-// MonthlyClosingEntriesPreviewToolData 分录预览信封。Working 口径声明是
+// MonthlyClosingEntriesPreviewToolData 分录预览信封。Draft 口径声明是
 // 硬约束：预览含 draft/approved 条目，is_official_version 恒 false，
 // approval_status 汇总的是过滤全集（不只是当前页），每条 item 自带
 // posting_status —— 不可能被误读成 Official 报表。
@@ -157,7 +157,7 @@ func NewMonthlyClosingEntriesPreviewDefinition(reader MonthlyClosingReader) agen
 		Descriptor: agenttools.ToolDescriptor{
 			Name: "lease.monthly_closing.entries.preview", Version: "v1",
 			DisplayName: "预览月结会计分录",
-			Description: "按期间预览租赁会计分录及审批/过账状态。Working 口径：包含 draft 与 approved 条目，响应声明 is_official_version=false，approval_status 汇总过滤全集；Official 口径仅含 posted 分录。只读：不改变任何分录的审批或过账状态。",
+			Description: "按期间预览租赁会计分录及审批/过账状态。Draft 口径（report_basis=draft）：最低包含到 Draft，即 Draft + Pending + Approved 全含，响应声明 is_official_version=false，审批状态汇总按过滤全集统计；Approved 口径仅含已批准分录。词表见 CONTEXT.md「Approval and Reporting Basis」。只读：不改变任何分录的审批或过账状态。",
 			Level:       agenttools.LevelRead, ReadOnly: true,
 			Permissions: []agenttools.Permission{{Resource: "monthly_closing", Action: "read"}},
 			InputSchema: json.RawMessage(`{
@@ -213,7 +213,7 @@ func NewMonthlyClosingEntriesPreviewDefinition(reader MonthlyClosingReader) agen
 				return rejected(call.CallID, agenttools.ErrorBusinessFailure, "failed to list journal entries"), nil
 			}
 			data := MonthlyClosingEntriesPreviewToolData{
-				ReportBasis: "working", IsOfficialVersion: false,
+				ReportBasis: "draft", IsOfficialVersion: false,
 				ApprovalStatus: summary, Period: args.Period, PeriodLocked: locked,
 				Page: page, PageSize: pageSize, Items: items, SideEffects: false,
 			}

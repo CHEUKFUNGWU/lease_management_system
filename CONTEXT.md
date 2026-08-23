@@ -97,6 +97,36 @@ _Avoid_: Role separation, four-eyes rule
 An exceptional, reasoned, and audited bypass of Segregation of Duties by a System Admin.
 _Avoid_: Admin exemption, superuser approval
 
+## Approval and Reporting Basis
+
+**Approval State**:
+The position of a record on the single path from authorship to authority: Draft, Pending, Approved. It is a property of the record, and the same three words name every stage of that path everywhere in the system.
+_Avoid_: Status, workflow state, approval stage
+
+**Draft**:
+A record its author has not Prepared. Most records reach Approved straight from Draft, because the author and the approver are frequently the same User, and because an agent-authored record waits in a queue rather than being handed to a named account.
+_Avoid_: Working, WIP, unapproved, provisional
+
+**Prepare**:
+The act by which a Draft's author declares it complete and hands it to another account for approval, moving it to Pending. It is an explicit act, not a timeout or an inference: a Draft nobody prepared stays a Draft however long it sits.
+_Avoid_: Submit, send for approval, finalise, lock
+
+**Pending**:
+A Draft that has been Prepared and is awaiting the receiving account's decision. It exists only when the author and the approver are different Users, which is why most records never pass through it.
+_Avoid_: Review, in review, submitted, awaiting approval
+
+**Approved**:
+A record an authorised User has accepted as a basis for formal work. Approval says nothing about whether this record is the one that currently carries authority — that is Official Version.
+_Avoid_: Final, official, signed off, confirmed
+
+**Report Basis**:
+The lowest Approval State a report admits. An Approved-basis report contains only Approved records; a Pending-basis report also admits Pending; a Draft-basis report admits all three and is where a User layers their own Scenario Drafts and custom assumptions to test an idea.
+_Avoid_: Working Report, Official Report, report mode, working basis
+
+**Official Version**:
+The one version of a record that currently carries authority among several Approved versions of the same thing. It is independent of Approval State: superseding a version changes which one is Official without changing that both were Approved.
+_Avoid_: Latest, final, approved version, current
+
 ## Retail Operations
 
 **Operating Unit**:

@@ -215,7 +215,7 @@ func TestMonthlyClosingEntriesPreviewEnvelope(t *testing.T) {
 	if !ok {
 		t.Fatalf("data type %T", result.Data)
 	}
-	if data.ReportBasis != "working" || data.IsOfficialVersion {
+	if data.ReportBasis != "draft" || data.IsOfficialVersion {
 		t.Fatalf("preview must declare working/non-official basis: %+v", data)
 	}
 	if !data.PeriodLocked {

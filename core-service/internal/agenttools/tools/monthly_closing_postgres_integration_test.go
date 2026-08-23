@@ -164,7 +164,7 @@ func TestMonthlyClosingToolsPostgresIsolationNoWrites(t *testing.T) {
 		t.Fatalf("entries preview failed: %+v", result.Error)
 	}
 	preview := result.Data.(MonthlyClosingEntriesPreviewToolData)
-	if preview.ReportBasis != "working" || preview.IsOfficialVersion {
+	if preview.ReportBasis != "draft" || preview.IsOfficialVersion {
 		t.Fatalf("envelope must declare working/non-official: %+v", preview)
 	}
 	if !preview.PeriodLocked {

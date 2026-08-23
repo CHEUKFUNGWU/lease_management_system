@@ -68,7 +68,7 @@ type ContextKey struct {
 
 // KeyFrom 是唯一的构造器。它要求一个已解析的 Principal——
 // 因此拿不到 Principal 就拿不到 Key，也就取不到任何上下文。
-func KeyFrom(p agenttools.Principal, sessionID string) (ContextKey, error)
+func KeyFrom(p agenttools.Principal, sessionID string, classification string) (ContextKey, error)
 
 // Cache 返回缓存键。所有字段参与，由 AR1-G1 守卫保证。
 func (k ContextKey) Cache() string

@@ -278,7 +278,10 @@ CREATE TABLE IF NOT EXISTS ai_contract_drafts (
     data_classification VARCHAR(20),
     reviewed_by UUID REFERENCES users(id),
     reviewed_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    -- 与迁移 060 同名同义：空库基线与增量迁移必须等价（AGENTS.md 关键设计决策）。
+    CONSTRAINT ai_contract_drafts_classification_check
+        CHECK (data_classification IN ('production', 'simulated', 'mixed'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_contract_drafts_legal_entity

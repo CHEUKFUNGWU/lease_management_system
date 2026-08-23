@@ -164,6 +164,16 @@ func TestMigration060MatchesInitBaseline(t *testing.T) {
 	pool := postgresTestPool(t)
 	ctx := context.Background()
 
+	// 约束必须先由 01_init 自身建立——这正是「迁移漏合并进空库基线」的
+	// 检查点（曾真实漂移过：约束只在 060 里，空库永远拿不到）。
+	var checkBefore int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM pg_constraint
+		WHERE conname='ai_contract_drafts_classification_check'`,
+	).Scan(&checkBefore); err != nil || checkBefore != 1 {
+		t.Fatalf("constraint missing from the init baseline (migration/init drift): count=%d err=%v", checkBefore, err)
+	}
+
 	wantColumns := map[string]string{
 		"legal_entity_id":     "uuid",
 		"data_classification": "character varying",

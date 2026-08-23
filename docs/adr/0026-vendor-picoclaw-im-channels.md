@@ -80,6 +80,17 @@ stays meaningful.
 
 ### 2. The agent loop is not vendored
 
+> **Amended by ADR-0027 (2026-08-23).** This section is superseded. ADR-0027
+> adopts picoclaw's `pkg/agent` as the agent core and ports the governance chain
+> onto its hook points, on the grounds that ADR-0022 never evaluated picoclaw
+> (it evaluated the TypeScript `earendil-works/pi`, whose Node-runtime objection
+> does not apply to a Go project) and that picoclaw descends from the same pi
+> base ADR-0022 §2 chose to model on. The scope limits recorded below no longer
+> bound the agent package; the limits on `pkg/identity`, `pkg/auth`,
+> `pkg/credential` and `pkg/providers` still hold.
+
+*Superseded text, retained for the record:*
+
 ADR-0022 stands unchanged: the agent core is first-party Go in
 `internal/agentcore`, "not tau, not pi, not any third-party runtime". This
 decision borrows a transport, not a brain. The channel layer connects to the

@@ -88,10 +88,12 @@ FP&A 版本治理与滚动预测
 | [0012](adr/0012-separate-agent-signals-from-control-conclusions.md) | Agent 信号与控制结论分离 | Accepted |
 | [0019](adr/0019-agent-tool-runtime-policy-and-threat-model.md) | Tool Runtime 政策与威胁模型 | Accepted **+ Addendum A（治理中间件链）** |
 | [0021](adr/0021-licensing-and-open-source-posture.md) | 许可证姿态（非 MIT，三层） | Accepted |
-| [**0022**](adr/0022-first-party-go-agent-core-modelled-on-pi.md) | **自研 Go Agent Core，架构对齐 pi** | **Accepted（新）** |
+| [0022](adr/0022-first-party-go-agent-core-modelled-on-pi.md) | 自研 Go Agent Core，架构对齐 pi | **Partially Superseded**（§1 被 ADR-0027 取代；§2–4 仍现行） |
 | [**0023**](adr/0023-retire-the-first-party-python-ai-service.md) | **退役自研 Python ai-service** | **Accepted（新）** |
 | [**0024**](adr/0024-remove-the-agpl-pdf-dependency.md) | **移除 AGPL 的 PyMuPDF，解析按证据需求分流** | **Accepted（新）** |
 | [**0025**](adr/0025-separate-certified-engine-output-from-exploratory-analysis.md) | **双轨执行与受保护度量红线** | **Accepted（新）** |
+| [**0026**](adr/0026-vendor-picoclaw-im-channels.md) | **vendor picoclaw 的飞书/企微渠道（MIT）** | **Accepted（新）**；§2 被 ADR-0027 修订 |
+| [**0027**](adr/0027-adopt-picoclaw-agent-core-keep-the-governance-chain.md) | **采用 picoclaw agent 内核，治理链移植到其 hook 挂点** | **Accepted（新）** |
 
 ### 1.5 归档区
 
@@ -120,7 +122,7 @@ FP&A 版本治理与滚动预测
 
 | # | 决策 | 推翻的旧结论 | 留痕 |
 |---|---|---|---|
-| **D1** | Agent 内核自研 Go（`internal/agentcore`），**架构对齐 pi**，不引入 tau、不引入 pi 本体 | 填表计划 D1/D2/D4「引入 tau 作为大脑」 | ADR-0022 |
+| ~~**D1**~~ | ~~Agent 内核自研 Go（`internal/agentcore`），不引入 pi 本体~~ **已被 D28 取代** | 填表计划 D1/D2/D4「引入 tau 作为大脑」 | ADR-0022 §1 |
 | **D2** | 借鉴 pi 的**运行时抽象**（纯循环 + 注入依赖 + 两个闸点 + 订阅者结算），**不借鉴其信任模型**（无权限、无持久化、开放生态） | — | ADR-0022 §2–3 |
 | **D3** | 治理收拢为**有序中间件链**：TenantScope → CapabilityCheck → ProtectedMeasure → BudgetGuard → IdempotencyGuard → ReviewGate | 治理散落在 descriptor / scope.go / audit.go / Limits / allowlist 五处 | ADR-0019 Addendum A |
 | **D4** | 持久化改为**订阅者**；run 直到所有订阅者返回才结算 | `aichat.Runtime` 在循环内同步写库 | ADR-0004 Addendum A |
@@ -147,6 +149,10 @@ FP&A 版本治理与滚动预测
 | **D25** | **折现率缺失是部分降级不是整体拒绝。** IRR / NPV / 动态回本期返回具名 Gap，静态回本期与盈亏平衡销售额照常返回——后两者不依赖折现率，一起挡掉是过度保守。**任何情况下不得使用默认折现率** | 「缺一个输入就整体不可用」的一刀切 | 模块深化 D-R14；`newstorefeasibility/feasibility.go` |
 | **D26** | **新店测算不得长出第二套租赁计算。** `newstorefeasibility` 禁 import `ifrs16`，租赁与 ROU 只经 `LeaseProjectionReader` 从 `measurement_results` 只读投影取；import guard **遍历全部子包** | 风险红线 14 在 finmodel 之外的第二个落点 | 模块深化 D-R13；`newstorefeasibility/importguard_test.go` |
 | **D27** | **前端不复刻后端的 DSL 解析器，一次本地校验也不做**（含括号配对这类「显然安全」的检查）。公式校验一律走 `POST /financial-model/templates/validate`，复用 `template.Compile` 同一条路径 | 「先在前端挡一下明显错误」的直觉——开了口子它会长大，然后与后端分叉，届时「界面说没问题、保存时报错」比现在难查 | 模块深化 D-R16；`web/app/financial-model/formula-editor.test.tsx` |
+| **D28** | **Agent 内核改用 picoclaw 的 `pkg/agent`**（vendor + 适配）。ADR-0022 从未评估过 picoclaw——它否决的 pi 是 TypeScript 的 `earendil-works/pi`，理由是 Node 运行时成本，对 Go 的 picoclaw 不成立；且 picoclaw ← openclaw ← pi 同源，采用它是**落实**而非推翻 ADR-0022 §2 | D1「不引入 pi 本体」 | ADR-0027 §1 |
+| **D29** | **治理链移植不重写**，六前三后接到 `ToolInterceptor`/`LLMInterceptor`/`ToolApprover`；**ACORE-2 九项变异必须逐项重新证红证绿**，一项不少，否则迁移中止 | — | ADR-0027 §3 |
+| **D30** | **picoclaw 的信任模型仍不采纳**（ADR-0022 §3 不变）。`tool_allowlist.go` 是防打扰清单不是授权，与渠道侧 `IsAllowed` 同一性质 | — | ADR-0027 §2 |
+| **D31** | **上下文压缩改为「可得但需门禁」**。ADR-0022 Non-goals 曾推迟它至「观察到真实溢出」，该条件**未被证明满足**；采用上游 `context_manager`/`budget`/`usage` 后仍须先用本仓会话形状钉住行为：压缩不得丢审计内容、压缩后的 run 仍可从 checkpoint 重放。与底稿溯源冲突时**溯源优先** | ADR-0022 Non-goals | ADR-0027 §4 |
 
 ---
 

@@ -191,6 +191,15 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 	// The fill seam registers without a file reader for now (D-D2): the tool
 	// refuses honestly until W5 wires minio-go into core-service.
 	collector.add(agenttooldefs.NewRetailIngestPreviewDefinition(fillReader))
+	// B-2：月结只读面（跑批状态 / 期间级分录预览 / 有分录期间 / 锁账状态），
+	// 仅依赖 mcRepo。写口（生成、审批、过账、红冲、锁账、解锁、ERP 回写）
+	// 一律不开放给 Agent——那是审批与锁账控制的核心。
+	if mcRepo != nil {
+		collector.add(agenttooldefs.NewMonthlyClosingBatchesDefinition(mcRepo))
+		collector.add(agenttooldefs.NewMonthlyClosingEntriesPreviewDefinition(mcRepo))
+		collector.add(agenttooldefs.NewMonthlyClosingPeriodsDefinition(mcRepo))
+		collector.add(agenttooldefs.NewMonthlyClosingLockStatusDefinition(mcRepo))
+	}
 	// SM7：三表模型工具注册。生产接线在下面 finModelRepo 的 else 分支注册
 	// 真实端口；无仓库（测试/轻量适配器）时才注册 nil 版（工具诚实拒绝，
 	// 绝不让 nil 注册挡住生产端口——P0-8）。

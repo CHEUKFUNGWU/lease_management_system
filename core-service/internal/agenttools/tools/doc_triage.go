@@ -135,6 +135,15 @@ func NewDocTriageDefinition(classifier TriageClassifier) agenttools.ToolDefiniti
 			Description: "判断上传文件的业务类型（合同/租金表/台账/经营数据/发票等）。识别不了时返回 unknown 与候选，绝不默认按合同处理。",
 			Level:       agenttools.LevelRead,
 			ReadOnly:    true,
+			// 缺 Permissions 会让 Descriptor.Validate 以「at least one permission
+			// is required」拒绝注册，工具随即静默消失——注册完整性守卫抓出的第二个
+			// 此类 bug（第一个是 fpna.assumptions.suggest，62db083）。
+			//
+			// 取 ai_chat:use 而非 lease.file.parse_* 的 contracts:create：那几个
+			// 是 LevelDraft、要落草稿，所以按落库对象取写权限；triage 只读、零写入，
+			// 且只能从 AI 录入路径到达，用写权限门它会把「还不知道是不是合同」的
+			// 分诊挡在合同创建权之后，因果颠倒。
+			Permissions: []agenttools.Permission{{Resource: "ai_chat", Action: "use"}},
 			InputSchema: json.RawMessage(`{
 				"type": "object",
 				"required": ["file_id", "object_name", "content_type"],

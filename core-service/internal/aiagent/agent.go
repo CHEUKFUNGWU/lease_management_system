@@ -43,6 +43,13 @@ type Agent struct {
 	// fileBytes is the MinIO read seam used by the intake parse endpoints
 	// (W5-3); nil means parse tools refuse honestly.
 	fileBytes FileBytesReader
+	// registrationAttempted / registrationFailed record construction-time
+	// registration accounting. They exist for the completeness guard
+	// (registration_completeness_test.go): every attempted registration must
+	// either land in the registry or fail construction — a silent drop is the
+	// disease (62db083). White-box tests read them; the runtime never does.
+	registrationAttempted int
+	registrationFailed    int
 }
 
 // SetLLMClient injects the LLM client used by the chat paths. Tests and the
@@ -108,65 +115,88 @@ func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.Co
 	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, finModelRepo, facts, plans, draftServices...)
 }
 
+// registerCollector is the single implementation of “attempt a tool
+// registration” and the single implementation of “handle registration
+// failure” during Agent construction. Deleting it does not remove the
+// complexity — it scatters one add/fail pair back over ~30 call sites,
+// which is exactly the shape that silently swallowed the original
+// fpna.assumptions.suggest schema error (62db083).
+//
+// Fail-fast discipline matches retailkpi.Surface / retailstore360: a tool
+// that cannot register is invisible to the Agent, and an invisible tool is a
+// deployed lie. P0-8 nil-port registrations are NOT failures — they register
+// honest-refusal definitions successfully and never reach this type's error
+// list.
+type registerCollector struct {
+	registry  *agenttools.Registry
+	attempted int
+	succeeded int
+	failed    []error
+}
+
+// add attempts one registration. The tool name and the underlying Register
+// error are preserved verbatim so a startup panic is actionable — the
+// original “input_schema must be a JSON object” was the decisive clue.
+func (c *registerCollector) add(def agenttools.ToolDefinition) {
+	c.attempted++
+	if err := c.registry.Register(def); err != nil {
+		c.failed = append(c.failed, fmt.Errorf("%s@%s: %w", def.Descriptor.Name, def.Descriptor.Version, err))
+		return
+	}
+	c.succeeded++
+}
+
+// fail reports every failed registration, or nil when all attempts landed.
+// The caller fails construction (panic) on a non-nil result.
+func (c *registerCollector) fail() error {
+	if len(c.failed) == 0 {
+		return nil
+	}
+	lines := make([]string, 0, len(c.failed))
+	for _, err := range c.failed {
+		lines = append(lines, "  - "+err.Error())
+	}
+	return fmt.Errorf("agent tool registration failed: %d/%d attempted tools did not register:\n%s",
+		len(c.failed), c.attempted, strings.Join(lines, "\n"))
+}
+
 func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, draftServices ...*draftapp.Service) *Agent {
 	agent := &Agent{
 		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
 		skillRegistry: agentskill.ProductionRegistry(),
 	}
 	registry := agenttools.NewRegistry()
-	registered := false
+	collector := &registerCollector{registry: registry}
 	if contractRepo != nil {
-		_ = registry.Register(agenttooldefs.NewContractSearchDefinition(contractRepo))
-		if err := registry.Register(agenttooldefs.NewContractGetDefinition(contractRepo)); err == nil {
-			registered = true
-			if mcRepo != nil {
-				_ = registry.Register(agenttooldefs.NewMeasurementListDefinition(contractRepo, mcRepo))
-				_ = registry.Register(agenttooldefs.NewJournalListDefinition(contractRepo, mcRepo))
-			}
-			if eventRepo != nil {
-				_ = registry.Register(agenttooldefs.NewEventListDefinition(contractRepo, eventRepo))
-			}
+		collector.add(agenttooldefs.NewContractSearchDefinition(contractRepo))
+		collector.add(agenttooldefs.NewContractGetDefinition(contractRepo))
+		if mcRepo != nil {
+			collector.add(agenttooldefs.NewMeasurementListDefinition(contractRepo, mcRepo))
+			collector.add(agenttooldefs.NewJournalListDefinition(contractRepo, mcRepo))
+		}
+		if eventRepo != nil {
+			collector.add(agenttooldefs.NewEventListDefinition(contractRepo, eventRepo))
 		}
 	}
 	for _, definition := range agent.fileParseDefinitions() {
-		if err := registry.Register(definition); err == nil {
-			registered = true
-		}
+		collector.add(definition)
 	}
-	if err := registry.Register(agenttooldefs.NewDocTriageDefinition(nil)); err == nil {
-		registered = true
-	}
-	if err := registry.Register(agenttooldefs.NewS1GenerateDefinition()); err == nil {
-		registered = true
-	}
+	collector.add(agenttooldefs.NewDocTriageDefinition(nil))
+	collector.add(agenttooldefs.NewS1GenerateDefinition())
 	// The fill seam registers without a file reader for now (D-D2): the tool
 	// refuses honestly until W5 wires minio-go into core-service.
-	if err := registry.Register(agenttooldefs.NewRetailIngestPreviewDefinition(fillReader)); err == nil {
-		registered = true
-	}
+	collector.add(agenttooldefs.NewRetailIngestPreviewDefinition(fillReader))
 	// SM7：三表模型工具注册。生产接线在下面 finModelRepo 的 else 分支注册
 	// 真实端口；无仓库（测试/轻量适配器）时才注册 nil 版（工具诚实拒绝，
 	// 绝不让 nil 注册挡住生产端口——P0-8）。
 	if finModelRepo == nil {
-		if err := registry.Register(agenttooldefs.NewStatementModelReadDefinition(nil)); err == nil {
-			registered = true
-		}
-		if err := registry.Register(agenttooldefs.NewStatementModelEvaluateDefinition(nil)); err == nil {
-			registered = true
-		}
-		if err := registry.Register(agenttooldefs.NewFinModelPaperDefinition(nil)); err == nil {
-			registered = true
-		}
+		collector.add(agenttooldefs.NewStatementModelReadDefinition(nil))
+		collector.add(agenttooldefs.NewStatementModelEvaluateDefinition(nil))
+		collector.add(agenttooldefs.NewFinModelPaperDefinition(nil))
 		// 假设建议等写口（S4）：未接线保持诚实拒绝。写入路径全部 draft-only。
-		if err := registry.Register(agenttooldefs.NewAssumptionSuggestionDefinition(nil)); err == nil {
-			registered = true
-		}
-		if err := registry.Register(agenttooldefs.NewAssumptionSuggestionBatchDefinition(nil)); err == nil {
-			registered = true
-		}
-		if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(nil)); err == nil {
-			registered = true
-		}
+		collector.add(agenttooldefs.NewAssumptionSuggestionDefinition(nil))
+		collector.add(agenttooldefs.NewAssumptionSuggestionBatchDefinition(nil))
+		collector.add(agenttooldefs.NewModelDiffMemoDefinition(nil))
 	} else {
 		writer := finadapter.NewDraftWriter(finModelRepo)
 		var plansCapex finadapter.CapexSource
@@ -175,72 +205,42 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		}
 		ports := finadapter.NewPortsBuilder(finModelRepo, facts).WithSources(mcRepo, nil, plansCapex)
 		reader := finadapter.NewStatementReader(finModelRepo)
-		for _, definition := range []agenttools.ToolDefinition{
-			agenttooldefs.NewStatementModelReadDefinition(reader),
-			agenttooldefs.NewStatementModelEvaluateDefinition(ports),
-			agenttooldefs.NewFinModelPaperDefinition(ports),
-			agenttooldefs.NewAssumptionSuggestionDefinition(writer),
-			agenttooldefs.NewAssumptionSuggestionBatchDefinition(writer),
-		} {
-			if err := registry.Register(definition); err == nil {
-				registered = true
-			}
-		}
+		collector.add(agenttooldefs.NewStatementModelReadDefinition(reader))
+		collector.add(agenttooldefs.NewStatementModelEvaluateDefinition(ports))
+		collector.add(agenttooldefs.NewFinModelPaperDefinition(ports))
+		collector.add(agenttooldefs.NewAssumptionSuggestionDefinition(writer))
+		collector.add(agenttooldefs.NewAssumptionSuggestionBatchDefinition(writer))
 		if plans != nil {
-			if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(plans)); err == nil {
-				registered = true
-			}
-		} else if err := registry.Register(agenttooldefs.NewModelDiffMemoDefinition(nil)); err == nil {
-			registered = true
+			collector.add(agenttooldefs.NewModelDiffMemoDefinition(plans))
+		} else {
+			collector.add(agenttooldefs.NewModelDiffMemoDefinition(nil))
 		}
 	}
 	if len(draftServices) > 0 && draftServices[0] != nil {
-		if err := registry.Register(agenttooldefs.NewContractDraftDefinition(draftServices[0])); err == nil {
-			registered = true
-		}
-		if err := registry.Register(agenttooldefs.NewPaymentScheduleDraftDefinition(draftServices[0])); err == nil {
-			registered = true
-		}
+		collector.add(agenttooldefs.NewContractDraftDefinition(draftServices[0]))
+		collector.add(agenttooldefs.NewPaymentScheduleDraftDefinition(draftServices[0]))
 		if eventRepo != nil {
-			if err := registry.Register(agenttooldefs.NewEventDraftDefinition(draftServices[0])); err == nil {
-				registered = true
-			}
+			collector.add(agenttooldefs.NewEventDraftDefinition(draftServices[0]))
 		}
 	}
 	if performance != nil {
-		for _, definition := range []agenttools.ToolDefinition{
-			agenttooldefs.NewPortfolioSummaryDefinition(performance),
-			agenttooldefs.NewManagementPreReadDefinition(performance),
-			agenttooldefs.NewStorePerformanceDefinition(performance),
-			agenttooldefs.NewRentToSalesDefinition(performance),
-			agenttooldefs.NewEquipmentPerformanceDefinition(performance),
-			agenttooldefs.NewActionListDefinition(performance),
-		} {
-			if err := registry.Register(definition); err == nil {
-				registered = true
-			}
-		}
+		collector.add(agenttooldefs.NewPortfolioSummaryDefinition(performance))
+		collector.add(agenttooldefs.NewManagementPreReadDefinition(performance))
+		collector.add(agenttooldefs.NewStorePerformanceDefinition(performance))
+		collector.add(agenttooldefs.NewRentToSalesDefinition(performance))
+		collector.add(agenttooldefs.NewEquipmentPerformanceDefinition(performance))
+		collector.add(agenttooldefs.NewActionListDefinition(performance))
 		if writer, ok := performance.(agenttooldefs.ActionDraftWriter); ok {
-			if err := registry.Register(agenttooldefs.NewActionDraftDefinition(writer)); err == nil {
-				registered = true
-			}
-			if err := registry.Register(agenttooldefs.NewExplanationDraftDefinition(writer)); err == nil {
-				registered = true
-			}
-			if err := registry.Register(agenttooldefs.NewMeetingActionDraftDefinition(writer)); err == nil {
-				registered = true
-			}
+			collector.add(agenttooldefs.NewActionDraftDefinition(writer))
+			collector.add(agenttooldefs.NewExplanationDraftDefinition(writer))
+			collector.add(agenttooldefs.NewMeetingActionDraftDefinition(writer))
 		}
 		if writer, ok := performance.(agenttooldefs.ScenarioDraftWriter); ok {
-			if err := registry.Register(agenttooldefs.NewScenarioDraftDefinition(writer)); err == nil {
-				registered = true
-			}
+			collector.add(agenttooldefs.NewScenarioDraftDefinition(writer))
 		}
 	}
 	if governance != nil {
-		if err := registry.Register(agenttooldefs.NewDecisionMemoDraftDefinition(governance)); err == nil {
-			registered = true
-		}
+		collector.add(agenttooldefs.NewDecisionMemoDraftDefinition(governance))
 	}
 	for _, definition := range []agenttools.ToolDefinition{
 		agenttooldefs.NewStoreScenarioDefinition(),
@@ -250,44 +250,35 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		agenttooldefs.NewRenewalSimulationDefinition(),
 		agenttooldefs.NewDecisionSummaryDefinition(),
 	} {
-		if err := registry.Register(definition); err == nil {
-			registered = true
-		}
+		collector.add(definition)
 	}
 	if closeReadiness != nil {
-		if err := registry.Register(agenttooldefs.NewCloseReadinessDefinition(closeReadiness)); err == nil {
-			registered = true
-		}
+		collector.add(agenttooldefs.NewCloseReadinessDefinition(closeReadiness))
 	}
 	if controls != nil {
-		for _, definition := range []agenttools.ToolDefinition{
-			agenttooldefs.NewBudgetVarianceDefinition(controls.Budget),
-			agenttooldefs.NewCashflowScenarioDefinition(controls.Cashflow),
-			agenttooldefs.NewRenewalDecisionDefinition(controls.Renewal),
-		} {
-			if err := registry.Register(definition); err == nil {
-				registered = true
-			}
-		}
+		collector.add(agenttooldefs.NewBudgetVarianceDefinition(controls.Budget))
+		collector.add(agenttooldefs.NewCashflowScenarioDefinition(controls.Cashflow))
+		collector.add(agenttooldefs.NewRenewalDecisionDefinition(controls.Renewal))
 	}
 	if retail != nil {
-		for _, definition := range []agenttools.ToolDefinition{
-			agenttooldefs.NewRetailOperatingPulseDefinition(retail),
-			agenttooldefs.NewRetailStoreDiagnosticsDefinition(retail),
-			agenttooldefs.NewRetailScenarioEvaluateDefinition(retail),
-			agenttooldefs.NewRetailPaperDefinition(retail),
-		} {
-			if err := registry.Register(definition); err == nil {
-				registered = true
-			}
-		}
+		collector.add(agenttooldefs.NewRetailOperatingPulseDefinition(retail))
+		collector.add(agenttooldefs.NewRetailStoreDiagnosticsDefinition(retail))
+		collector.add(agenttooldefs.NewRetailScenarioEvaluateDefinition(retail))
+		collector.add(agenttooldefs.NewRetailPaperDefinition(retail))
 	}
 	if sensitivity != nil {
-		if err := registry.Register(agenttooldefs.NewSensitivityDefinition(sensitivity)); err == nil {
-			registered = true
-		}
+		collector.add(agenttooldefs.NewSensitivityDefinition(sensitivity))
 	}
-	if registered {
+	agent.registrationAttempted = collector.attempted
+	agent.registrationFailed = len(collector.failed)
+	// Fail-fast: a tool that did not register is invisible to the Agent.
+	// The panic carries every failed name@version and the original Register
+	// error so startup failure is actionable. Same discipline as
+	// retailkpi.Surface: an incomplete registration surface must not boot.
+	if err := collector.fail(); err != nil {
+		panic(err)
+	}
+	if collector.succeeded > 0 {
 		// W2: every tool call in the chat plane crosses the ordered governance
 		// chain (TenantScope → CapabilityCheck → ProtectedMeasure →
 		// BudgetGuard → IdempotencyGuard → ReviewGate) instead of scattered

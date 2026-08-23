@@ -40,6 +40,19 @@ type RetailOperationsData struct {
 	Pulse              *retailpulse.Response    `json:"pulse,omitempty"`
 	Diagnostics        *retailstore360.Response `json:"diagnostics,omitempty"`
 	Scenario           *retailscenario.Response `json:"scenario,omitempty"`
+	// Ch1：诊断链附带的利润差异瀑布图（图与数同一次调用产生，D-B0）。
+	ProfitWaterfall *ProfitWaterfallBlock `json:"profit_waterfall,omitempty"`
+}
+
+// ProfitWaterfallBlock mirrors the agenttools block so the chat plane can
+// project it into a chart_svg artifact without re-rendering.
+type ProfitWaterfallBlock struct {
+	SVG                string   `json:"chart_svg"`
+	DecompositionOrder []string `json:"decomposition_order"`
+	DataClassification string   `json:"data_classification"`
+	Status             string   `json:"status"`
+	MissingFacts       []string `json:"missing_facts,omitempty"`
+	Currency           string   `json:"currency,omitempty"`
 }
 
 type RetailActionProposal struct {
@@ -391,6 +404,16 @@ func (h *Agent) executeRetailOperations(ctx context.Context, req Request, emit f
 			if diagnosticData, ok := diagnosticResult.Data.(agenttooldefs.RetailDiagnosticsToolData); ok {
 				data.Diagnostics = diagnosticData.Response
 				sources = append(sources, toolSourcesToAgent(diagnosticResult.Sources)...)
+				if diagnosticData.ProfitWaterfall != nil {
+					data.ProfitWaterfall = &ProfitWaterfallBlock{
+						SVG:                diagnosticData.ProfitWaterfall.SVG,
+						DecompositionOrder: diagnosticData.ProfitWaterfall.DecompositionOrder,
+						DataClassification: diagnosticData.ProfitWaterfall.DataClassification,
+						Status:             diagnosticData.ProfitWaterfall.Status,
+						MissingFacts:       diagnosticData.ProfitWaterfall.MissingFacts,
+						Currency:           diagnosticData.ProfitWaterfall.Currency,
+					}
+				}
 				if diagnosticData.Response != nil {
 					data.EvidenceStatus = retailEvidence(diagnosticData.Response.DecisionReady, diagnosticData.Response.TargetCoverage, diagnosticData.Response.ComparisonCoverage)
 				}
@@ -405,6 +428,9 @@ func (h *Agent) executeRetailOperations(ctx context.Context, req Request, emit f
 		if intent == "store_diagnostics" {
 			response.Confidence = retailDiagnosticsConfidence(data.Diagnostics)
 			response.Answer += retailDiagnosticsAnswer(data.Diagnostics)
+			// Ch1：瀑布图随诊断进入 Response，ProjectResult 投影为 chart_svg
+			// artifact（图与数同源，无二次往返）。
+			response.ProfitWaterfall = data.ProfitWaterfall
 			if err != nil || data.Diagnostics == nil {
 				response.Confidence = 0.40
 				response.Answer += retailEvidenceMarker(data.Reason, data.EvidenceStatus, response.Confidence)

@@ -54,6 +54,7 @@ import ConfidenceBadge from "../components/ConfidenceBadge";
 import ApprovalCard, { type ApprovalProposalLike } from "../components/ApprovalCard";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
+import { sanitizeSvg } from "../lib/sanitize-svg";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -289,6 +290,20 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
               复核项：{artifact.review_reasons.join("、")}
             </div>
           )}
+          {artifact.artifact_type === "chart_svg" && artifact.data?.chart_svg && (() => {
+            // BG2 白名单消毒：剥离 script/on*/javascript:/foreignObject/外部引用。
+            const { svg, stripped } = sanitizeSvg(String(artifact.data.chart_svg));
+            return (
+              <div className="sty-f82c4a7a">
+                <div className="sty-2c2c74e0">
+                  {stripped.length > 0
+                    ? `消毒剥离 ${stripped.length} 项：${stripped.join("；")}`
+                    : "消毒检查通过（0 项剥离）"}
+                </div>
+                <div className="finmodel-full-width" data-testid="chart-svg" dangerouslySetInnerHTML={{ __html: svg }} />
+              </div>
+            );
+          })()}
           {artifact.artifact_type === "working_paper" && artifact.data && (
             <div className="sty-f82c4a7a">
               <WorkingPaperSummary

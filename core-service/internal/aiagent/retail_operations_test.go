@@ -109,7 +109,8 @@ func TestRetailAgentKeepsExplicitZeroScenarioAssumptions(t *testing.T) {
 	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil, nil)
 	filters := map[string]string{"as_of": "2026-06-14", "window_days": "7", "horizon_months": "12", "classification": "simulated", "dataset_version": "planA-v1", "store_id": "11111111-1111-4111-8111-111111111111", "revenue_change_pct": "0", "gross_margin_rate_change_pp": "0", "labor_cost_change_pct": "0", "fixed_rent_change_pct": "0", "variable_rent_rate_change_pp": "0", "non_lease_cost_change_pct": "0", "other_controllable_cost_change_pct": "0"}
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "评估这个零假设方案", PageContext: &PageContext{Filters: filters}}, nil, agent.toolRuntime)
-	if err != nil || response.RetailOperations == nil || response.RetailOperations.Scenario == nil || reader.calls != 3 {
+	if err != nil || response.RetailOperations == nil || response.RetailOperations.Scenario == nil || reader.calls != 5 {
+		// Ch1：诊断工具为瀑布图补查基线/当期两个窗口（+2）。
 		t.Fatalf("explicit zero assumptions response=%#v calls=%d err=%v", response, reader.calls, err)
 	}
 }
@@ -216,7 +217,7 @@ func TestRetailAgentNarrowsSingleStoreEvidenceBeforeDiagnosticsAndScenario(t *te
 	}}
 	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "Store 006 人工下降10% 会怎样", PageContext: &PageContext{Filters: agentRetailScenarioFilters()}}, nil, agent.toolRuntime)
-	if err != nil || response.RetailOperations == nil || response.RetailOperations.Scenario == nil || response.RetailActionProposal != nil || reader.calls != 3 {
+	if err != nil || response.RetailOperations == nil || response.RetailOperations.Scenario == nil || response.RetailActionProposal != nil || reader.calls != 5 {
 		t.Fatalf("target scenario response=%#v calls=%d err=%v", response, reader.calls, err)
 	}
 	for _, source := range response.Sources {
@@ -258,7 +259,7 @@ func TestRetailAgentDiagnosticsNotReadyBlocksScenario(t *testing.T) {
 	}}
 	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, reader, nil, nil, nil, nil, nil, nil, nil, nil)
 	response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "人工下降10% 会怎样", PageContext: &PageContext{Filters: agentRetailScenarioFilters()}}, nil, agent.toolRuntime)
-	if err != nil || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 || response.RetailOperations == nil || response.RetailOperations.Scenario != nil || reader.calls != 2 {
+	if err != nil || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 || response.RetailOperations == nil || response.RetailOperations.Scenario != nil || reader.calls != 4 {
 		t.Fatalf("diagnostics not-ready response=%#v calls=%d err=%v", response, reader.calls, err)
 	}
 	if response.RetailOperations.Reason != "diagnostics_not_decision_ready" || response.RetailOperations.EvidenceStatus != "insufficient" || response.Confidence != 0.40 {
@@ -276,14 +277,18 @@ func TestRetailAgentScenarioFailuresAreInsufficientAndNeverProposal(t *testing.T
 		mutate     func(map[string]string)
 		wantReason string
 		wantInput  bool
+		wantCalls  int
 	}{
-		{name: "resulting rate out of range", mutate: func(filters map[string]string) { filters["gross_margin_rate_change_pp"] = "1" }, wantReason: "resulting_rate_out_of_range", wantInput: true},
-		{name: "data unavailable", fail: retailscenario.ErrDataUnavailable, wantReason: "data_unavailable", wantInput: false},
+		// Ch1：诊断工具为瀑布图补查基线/当期两个窗口，调用数整体 +2。
+		{name: "resulting rate out of range", mutate: func(filters map[string]string) { filters["gross_margin_rate_change_pp"] = "1" }, wantReason: "resulting_rate_out_of_range", wantInput: true, wantCalls: 5},
+		{name: "data unavailable", fail: retailscenario.ErrDataUnavailable, wantReason: "data_unavailable", wantInput: false, wantCalls: 5},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			// Ch1 后查询序列：pulse(1) → 诊断内部(2) → 瀑布基线/当期(3,4) → 情景(5)。
+			// 注入点跟随情景自身的取数位置，保证失败的仍是「情景取数」。
 			reader := &agentRetailReader{set: agentRetailSet(), query: func(call int, stores []string) (*repository.RetailKPIFactSet, error) {
-				if tc.fail != nil && call == 3 {
+				if tc.fail != nil && call == 5 {
 					return nil, tc.fail
 				}
 				return filterAgentRetailSet(agentRetailSet(), stores), nil
@@ -294,8 +299,8 @@ func TestRetailAgentScenarioFailuresAreInsufficientAndNeverProposal(t *testing.T
 				tc.mutate(filters)
 			}
 			response, err := agent.executeRetailOperations(agentRetailContext(), Request{Message: "人工下降10% 会怎样", PageContext: &PageContext{Filters: filters}}, nil, agent.toolRuntime)
-			if err != nil || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 || response.RetailOperations == nil || response.RetailOperations.Scenario != nil || reader.calls != 3 {
-				t.Fatalf("scenario failure response=%#v calls=%d err=%v", response, reader.calls, err)
+			if err != nil || response.RetailActionProposal != nil || len(ProjectResult(response).Artifacts) != 0 || response.RetailOperations == nil || response.RetailOperations.Scenario != nil || reader.calls != tc.wantCalls {
+				t.Fatalf("scenario failure response=%#v calls=%d want=%d err=%v", response, reader.calls, tc.wantCalls, err)
 			}
 			if response.RetailOperations.Reason != tc.wantReason || response.RetailOperations.NeedsInput != tc.wantInput || response.RetailOperations.EvidenceStatus != "insufficient" || response.Confidence != 0.40 {
 				t.Fatalf("scenario failure state=%#v confidence=%v", response.RetailOperations, response.Confidence)

@@ -257,8 +257,9 @@ func TestRetailOperationsPostgresIsolationNoWrites(t *testing.T) {
 	if foreign.Status == agenttools.StatusCompleted {
 		t.Fatal("entity B read entity A store")
 	}
-	if reader.calls != 7 {
-		t.Fatalf("unexpected QueryFacts count: got %d want 7", reader.calls)
+	// Ch1：诊断工具为瀑布图补查基线/当期两个窗口，QueryFacts 9 次。
+	if reader.calls != 9 {
+		t.Fatalf("unexpected QueryFacts count: got %d want 9", reader.calls)
 	}
 	after := tableCounts()
 	for table, count := range before {

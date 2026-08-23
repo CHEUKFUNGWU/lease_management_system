@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"sort"
+
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
 // RH5 利润差异归因（Spec D-R5，模块设计 §7）。
@@ -235,4 +237,92 @@ func validateOrder(order []Factor) error {
 
 func round2(v float64) float64 {
 	return math.Round(v*100) / 100
+}
+
+// AggregateWindow folds one window's store-day facts into PeriodFacts.
+// 缺失传播：任一门店日在任一字段上为 nil，该字段的期间聚合即为缺失（nil），
+// 由 Attribute 整体降级——不许拿 0 补齐后继续分解（retail-kpi-v1）。
+// 返回的 issues 是窗口级数据问题（如 currency_conflict / no_facts），由调用方
+// 并入 MissingFacts 回显。单一真相源：HTTP 归因端点与 Agent 诊断链共用。
+func AggregateWindow(facts []retailkpi.DailyFact) (PeriodFacts, []string) {
+	out := PeriodFacts{}
+	if len(facts) == 0 {
+		return out, []string{"no_facts"}
+	}
+	currencies := map[string]bool{}
+	type acc struct {
+		allPresent bool
+		sum        float64
+	}
+	fields := map[string]*acc{
+		"footfall":                {allPresent: true},
+		"transactions":            {allPresent: true},
+		"revenue":                 {allPresent: true},
+		"gross_profit":            {allPresent: true},
+		"labor_cost":              {allPresent: true},
+		"occupancy_cost":          {allPresent: true},
+		"other_controllable_cost": {allPresent: true},
+	}
+	add := func(name string, v *float64) {
+		a := fields[name]
+		if v == nil {
+			a.allPresent = false
+			return
+		}
+		a.sum += *v
+	}
+	for _, f := range facts {
+		currencies[f.Currency] = true
+		add("footfall", f.Footfall)
+		add("transactions", f.Transactions)
+		add("revenue", f.Revenue)
+		add("gross_profit", f.GrossProfit)
+		add("labor_cost", f.LaborCost)
+		occ := sumNonNil(f.FixedRent, f.VariableRent, f.NonLeaseCost)
+		if f.FixedRent == nil || f.VariableRent == nil || f.NonLeaseCost == nil {
+			fields["occupancy_cost"].allPresent = false
+		} else {
+			fields["occupancy_cost"].sum += occ
+		}
+		add("other_controllable_cost", f.OtherControllableCost)
+	}
+	issues := make([]string, 0)
+	if len(currencies) > 1 {
+		issues = append(issues, "currency_conflict")
+	}
+	get := func(name string) *float64 {
+		a := fields[name]
+		if !a.allPresent {
+			return nil
+		}
+		v := a.sum
+		return &v
+	}
+	out.Footfall = get("footfall")
+	out.Transactions = nil
+	if tx := get("transactions"); tx != nil {
+		txInt := *tx
+		out.Transactions = &txInt
+	}
+	out.Revenue = get("revenue")
+	out.GrossProfit = get("gross_profit")
+	out.LaborCost = get("labor_cost")
+	out.OccupancyCost = get("occupancy_cost")
+	out.OtherControllableCost = get("other_controllable_cost")
+
+	if len(issues) > 0 || out.Footfall == nil || out.Transactions == nil || out.Revenue == nil ||
+		out.GrossProfit == nil || out.LaborCost == nil || out.OccupancyCost == nil || out.OtherControllableCost == nil {
+		return out, issues
+	}
+	return out, issues
+}
+
+func sumNonNil(vs ...*float64) float64 {
+	var s float64
+	for _, v := range vs {
+		if v != nil {
+			s += *v
+		}
+	}
+	return s
 }

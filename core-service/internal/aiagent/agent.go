@@ -616,6 +616,20 @@ func ProjectResult(response Response) aichat.Result {
 			Data: response.AuditPack,
 		})
 	}
+	if response.ProfitWaterfall != nil {
+		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
+			Type:          string(agentartifact.ArtifactChartSVG),
+			Title:         "利润差异瀑布图",
+			SchemaVersion: agentartifact.SchemaVersion,
+			Data: map[string]any{
+				"chart_svg":            response.ProfitWaterfall.SVG,
+				"decomposition_order":  response.ProfitWaterfall.DecompositionOrder,
+				"data_classification": response.ProfitWaterfall.DataClassification,
+				"status":               response.ProfitWaterfall.Status,
+				"currency":             response.ProfitWaterfall.Currency,
+			},
+		})
+	}
 	if response.ReportExplanation != nil {
 		evidenceRefs := response.EvidenceRefs
 		if len(evidenceRefs) == 0 {
@@ -799,6 +813,9 @@ type Response struct {
 	FileTriage             *agenttooldefs.TriageResult       `json:"file_triage,omitempty"`
 	WorkingPaper           *workingpaper.Paper               `json:"working_paper,omitempty"`
 	PageFill               *pagefill.Fill                    `json:"page_fill,omitempty"`
+	// Ch1：利润差异瀑布图（chart_svg artifact 的来源）。图与数在同一次
+	// 工具调用里产生（D-B0），chat 平面只做投影。
+	ProfitWaterfall *ProfitWaterfallBlock `json:"profit_waterfall,omitempty"`
 }
 
 type AuditPackData struct {

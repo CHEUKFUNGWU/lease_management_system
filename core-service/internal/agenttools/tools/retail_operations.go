@@ -66,6 +66,22 @@ type RetailDiagnosticsToolData struct {
 	*retailstore360.Response
 	NumericAuthority string `json:"numeric_authority"`
 	SideEffects      bool   `json:"side_effects"`
+	// ProfitWaterfall 是 Ch1 BG1 的落点：归因结果在工具内渲染为确定性
+	// SVG，图与数在同一次调用里产生（D-B0）。Status != complete 时不产出
+	// 本块——不画空坐标系、不用 0 填段（D-B5）。
+	ProfitWaterfall *ProfitWaterfallBlock `json:"profit_waterfall,omitempty"`
+}
+
+// ProfitWaterfallBlock carries the rendered chart plus the fields the
+// chart_svg artifact contract requires (data_classification +
+// decomposition_order) and the honesty fields (status / missing_facts).
+type ProfitWaterfallBlock struct {
+	SVG                string   `json:"chart_svg"`
+	DecompositionOrder []string `json:"decomposition_order"`
+	DataClassification string   `json:"data_classification"`
+	Status             string   `json:"status"`
+	MissingFacts       []string `json:"missing_facts,omitempty"`
+	Currency           string   `json:"currency,omitempty"`
 }
 type RetailScenarioToolData struct {
 	*retailscenario.Response
@@ -131,7 +147,11 @@ func NewRetailStoreDiagnosticsDefinition(reader RetailOperationsReader) agenttoo
 			if err != nil {
 				return nil, nil, err
 			}
-			return RetailDiagnosticsToolData{Response: response, NumericAuthority: "deterministic_service", SideEffects: false}, diagnosticsSources(response), nil
+			data := RetailDiagnosticsToolData{Response: response, NumericAuthority: "deterministic_service", SideEffects: false}
+			// Ch1 D-B0：诊断工具已持有双窗口事实，附带产出瀑布图 artifact。
+			// 归因不可得时不产图（D-B5）——不画空坐标系、不用 0 填段。
+			data.ProfitWaterfall = profitWaterfallForDiagnostics(ctx, scopedRetailReader{base: reader, scope: execution.Principal.Scope, requestedStoreIDs: []string{storeID}}, q.legalEntityID, response)
+			return data, diagnosticsSources(response), nil
 		},
 	)
 }

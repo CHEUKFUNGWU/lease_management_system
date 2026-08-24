@@ -245,7 +245,8 @@ func TestEveryFieldParticipatesInCache(t *testing.T) {
 // AR2 Session Manager is registered; AR3 Context Assembler / AR6 Memory join
 // as they land.
 var contextConsumers = map[string][]string{
-	"../sessionmanager": nil,
+	"../sessionmanager":   nil,
+	"../contextassembler": nil,
 }
 
 var bareParamPattern = regexp.MustCompile(

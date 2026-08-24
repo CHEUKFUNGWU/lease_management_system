@@ -91,6 +91,20 @@ func (r *Runtime) WithAudit(audit AuditRecorder) *Runtime {
 	return &copy
 }
 
+// WithGuard returns a shallow Adapter of the same Runtime with a per-run
+// governance guard. It is the AR5d convergence seam: the kernel executor
+// derives a per-turn runtime whose guard is the vendored HookManager chain,
+// while the shared base Runtime keeps its construction-time guard for the
+// planes that have not converged yet.
+func (r *Runtime) WithGuard(guard ExecutionGuard) *Runtime {
+	if r == nil {
+		return nil
+	}
+	copy := *r
+	copy.guard = guard
+	return &copy
+}
+
 func (r *Runtime) Describe(ctx context.Context, filter ToolFilter) ([]ToolDescriptor, error) {
 	execution, err := RequireExecutionContext(ctx)
 	if err != nil {

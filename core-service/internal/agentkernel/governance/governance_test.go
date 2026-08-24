@@ -153,6 +153,17 @@ func TestMutationTenantScope(t *testing.T) {
 	if denied(decision) {
 		t.Fatalf("removing TenantScope must let the incomplete-identity call through (that is the red), got %+v", decision)
 	}
+
+	// AR5d parity case: a global administrator carries no LegalEntityID
+	// (middleware.GetTenantID returns "" for admin accounts). The pre-port
+	// chain admitted those calls; the ported judgement must too, otherwise
+	// switching the chat plane locks every admin tool call out.
+	admin := readFacts()
+	admin.Principal.Scope = access.Scope{Global: true} // no legal entity, global grant
+	adminDeps := Deps{Policy: agenttools.DefaultPolicy(), Facts: &staticFacts{facts: admin}}
+	if _, decision := mustManager(t, adminDeps, "").BeforeTool(context.Background(), request("lease.contract.get")); denied(decision) {
+		t.Fatalf("a global-scope principal without a legal entity must pass TenantScope as before the port, got %+v", decision)
+	}
 }
 func TestMutationCapabilityCheck(t *testing.T) {
 	facts := readFacts()

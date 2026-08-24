@@ -506,7 +506,32 @@ func buildPerformanceRunbook(skillID string, req Request) *AgentRunbook {
 	}
 }
 
+// Execute implements aichat.Executor on the legacy in-agent plane. It wraps
+// the shared tool runtime with the per-run event bridge, then delegates to
+// ExecuteWithRuntime. AR5d: the production chat path no longer comes through
+// here — it goes through the kernel executor (agentkernel/chatexec), which
+// calls ExecuteWithRuntime with a kernel-governed runtime. This method stays
+// for direct callers and as the reference behaviour of the domain seam.
 func (h *Agent) Execute(ctx context.Context, execution aichat.Execution) (Response, error) {
+	toolRuntime := h.toolRuntime
+	if toolRuntime != nil {
+		toolRuntime = toolRuntime.WithAudit(agenttools.AuditRecorderFunc(func(auditCtx context.Context, audit agenttools.ToolExecutionAudit) error {
+			if execution.Emit == nil {
+				return nil
+			}
+			return execution.Emit(auditCtx, "tool_execution", audit)
+		}))
+	}
+	return h.ExecuteWithRuntime(ctx, execution, toolRuntime)
+}
+
+// ExecuteWithRuntime runs the identical domain chat execution with a
+// caller-supplied tool runtime. This is the AR5d convergence seam: the kernel
+// executor derives a per-turn governed runtime (vendored HookManager + ACORE-2
+// chain + event bridge) and injects it here, so every tool call of the turn
+// crosses the new kernel while prompt building, skill routing and the
+// deterministic paper paths stay first-party (ADR-0028 §7).
+func (h *Agent) ExecuteWithRuntime(ctx context.Context, execution aichat.Execution, toolRuntime *agenttools.Runtime) (Response, error) {
 	runbook, _ := execution.Plan.Payload.(*AgentRunbook)
 	scope, scoped := access.ScopeFromContext(ctx)
 	if !scoped {
@@ -518,15 +543,6 @@ func (h *Agent) Execute(ctx context.Context, execution aichat.Execution) (Respon
 	runID := ""
 	if execution.Run != nil {
 		runID = execution.Run.ID
-	}
-	toolRuntime := h.toolRuntime
-	if toolRuntime != nil {
-		toolRuntime = toolRuntime.WithAudit(agenttools.AuditRecorderFunc(func(auditCtx context.Context, audit agenttools.ToolExecutionAudit) error {
-			if execution.Emit == nil {
-				return nil
-			}
-			return execution.Emit(auditCtx, "tool_execution", audit)
-		}))
 	}
 	ctx = withAIServiceAuth(ctx, execution.Input.AuthHeader)
 	ctx = agenttools.WithExecutionContext(ctx, agenttools.ExecutionContext{
@@ -622,11 +638,11 @@ func ProjectResult(response Response) aichat.Result {
 			Title:         "利润差异瀑布图",
 			SchemaVersion: agentartifact.SchemaVersion,
 			Data: map[string]any{
-				"chart_svg":            response.ProfitWaterfall.SVG,
-				"decomposition_order":  response.ProfitWaterfall.DecompositionOrder,
+				"chart_svg":           response.ProfitWaterfall.SVG,
+				"decomposition_order": response.ProfitWaterfall.DecompositionOrder,
 				"data_classification": response.ProfitWaterfall.DataClassification,
-				"status":               response.ProfitWaterfall.Status,
-				"currency":             response.ProfitWaterfall.Currency,
+				"status":              response.ProfitWaterfall.Status,
+				"currency":            response.ProfitWaterfall.Currency,
 			},
 		})
 	}

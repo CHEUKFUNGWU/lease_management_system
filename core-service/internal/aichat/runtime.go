@@ -37,6 +37,17 @@ func NewRuntime[T any](persistence *repository.AIChatRuntimeRepository, planner 
 	return newRuntime[T](persistence, planner, executor, project, options)
 }
 
+// ExecutorKind reports the concrete type of the wired executor. Diagnostic
+// seam for AR5-G1: the convergence assertion must prove which execution plane
+// a production runtime instance carries without reaching into unexported
+// fields — G1 stayed open for months because no such machine check existed.
+func (r *Runtime[T]) ExecutorKind() string {
+	if r == nil || r.executor == nil {
+		return ""
+	}
+	return fmt.Sprintf("%T", r.executor)
+}
+
 func newRuntime[T any](persistence store, planner Planner, executor Executor[T], project Projector[T], options Options) *Runtime[T] {
 	dispatch := options.Dispatch
 	if dispatch == nil {

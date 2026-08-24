@@ -120,9 +120,23 @@ func resolveFacts(ctx context.Context, resolver FactsResolver, req *picoclawagen
 }
 
 // identityComplete is the TenantScope-owned judgement.
+//
+// AR5d note: the pre-port chain (agentcore/hooks TenantScope) only required an
+// authenticated execution context (non-empty user). Requiring a non-empty
+// LegalEntityID on top would lock out global administrators — production chat
+// inputs carry an empty tenant id for admin accounts (middleware.GetTenantID
+// returns "" when the account has no legal entity), and the old chain let
+// their tool calls through. Global scope is therefore accepted as complete
+// identity; the repository-level scope filter remains the isolation authority
+// (底线 1), exactly as before the port.
 func identityComplete(facts CallFacts) bool {
-	return strings.TrimSpace(facts.Principal.UserID) != "" &&
-		strings.TrimSpace(facts.Principal.Scope.LegalEntityID) != ""
+	if strings.TrimSpace(facts.Principal.UserID) == "" {
+		return false
+	}
+	if facts.Principal.Scope.Global {
+		return true
+	}
+	return strings.TrimSpace(facts.Principal.Scope.LegalEntityID) != ""
 }
 
 // ── before controls ────────────────────────────────────────────────────────
@@ -161,9 +175,9 @@ func (TenantScope) AfterTool(
 // CapabilityCheck replicates policy.Evaluate's level/capability/permission/
 // dry-run decisions with the same sentinel reasons as agentcore hooks.
 type CapabilityCheck struct {
-	Policy          agenttools.Policy
-	Facts           FactsResolver
-	DescriptorFor   func(toolName string) (agenttools.ToolDescriptor, bool)
+	Policy        agenttools.Policy
+	Facts         FactsResolver
+	DescriptorFor func(toolName string) (agenttools.ToolDescriptor, bool)
 }
 
 func (c CapabilityCheck) Name() string { return "CapabilityCheck" }
@@ -332,8 +346,8 @@ func (g ReviewGate) BeforeTool(
 // auditFailures collects adjudication-(b) markers: audit failures recorded at
 // hook time and drained by the runner at turn end to fail the whole run.
 type auditFailures struct {
-	mu    sync.Mutex
-	errs  []error
+	mu   sync.Mutex
+	errs []error
 }
 
 func (a *auditFailures) record(err error) {
@@ -472,7 +486,6 @@ func Assembly(d Deps) ([]NamedControl, *AuditRecorder) {
 		mount("MetricsRecorder", MetricsRecorder{Metrics: d.Metrics, Facts: d.Facts}),
 	}, recorder
 }
-
 
 // ── inert counterparts ─────────────────────────────────────────────────────
 // picoclaw's ToolInterceptor requires both phases; controls that own only one

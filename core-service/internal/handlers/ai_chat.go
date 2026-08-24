@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/agentkernel/chatexec"
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
@@ -166,7 +167,14 @@ func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
 ) *AIChatHandler {
 	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, factsReader, reports, draftServices...)
 	handler := &AIChatHandler{agent: agent, runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
-	handler.agentRuntime = aichat.NewRuntime(runtimeRepo, agent, agent, aiagent.ProjectResult, aichat.Options{ReviewCommit: handler.commitReviewTransaction})
+	// AR5d convergence (ADR-0028 §5): the chat plane's executor is the kernel
+	// adapter. Persistence, planning and projection keep their previous
+	// injections; only the executor changes. The guarded convergence assertion
+	// lives in ai_chat_kernel_convergence_test.go.
+	executor := chatexec.New(chatexec.Deps{
+		Domain: agent, Tools: handler.toolRuntime, MaxToolCalls: chatexec.DefaultChatToolBudget,
+	})
+	handler.agentRuntime = aichat.NewRuntime(runtimeRepo, agent, executor, aiagent.ProjectResult, aichat.Options{ReviewCommit: handler.commitReviewTransaction})
 	return handler
 }
 

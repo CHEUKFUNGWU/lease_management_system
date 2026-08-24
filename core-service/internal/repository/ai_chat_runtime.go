@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
@@ -234,6 +235,73 @@ func (r *AIChatRuntimeRepository) CreateSession(ctx context.Context, session *AI
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create ai chat session: %w", err)
+	}
+	return nil
+}
+
+// SessionContent is the content face of an ai_chat_sessions row — the columns
+// outside sessionmanager's lifecycle ownership, written by the chat runtime
+// (SI1 Q2: 模块回答谁的/什么状态/什么时候；repository 回答携带什么内容).
+type SessionContent struct {
+	// Title is the conversation title. The module writes its default
+	// ("新会话") at create; the runtime overwrites with the explicit command
+	// title or the first-message summary.
+	Title string
+	// BoundContractID binds the conversation to one lease contract.
+	BoundContractID string
+	// ContextSnapshot is the page-context snapshot of the session.
+	ContextSnapshot json.RawMessage
+	// Initiator marks who started the session: 'user' or 'system' (CHAT-001).
+	Initiator string
+}
+
+// UpdateSessionContent writes the content face of an existing session row.
+// The ownership predicate mirrors Save's: id + user + legal entity must all
+// match, else the update touches zero rows and refuses — a foreign or
+// NULL-entity row cannot have its content rewritten by a scoped caller.
+func (r *AIChatRuntimeRepository) UpdateSessionContent(ctx context.Context, sessionID, userID string, entity access.EntityFilter, content SessionContent) error {
+	title := content.Title
+	if title == "" {
+		title = "新会话"
+	}
+	var boundContract any
+	if content.BoundContractID != "" {
+		boundContract = content.BoundContractID
+	}
+	initiator := content.Initiator
+	if initiator == "" {
+		initiator = "user"
+	}
+	snapshot := normalizeJSON(content.ContextSnapshot, "null")
+
+	clause, arg, err := entity.SQLClause("legal_entity_id", 7)
+	if err != nil {
+		return fmt.Errorf("update ai chat session content: %w", err)
+	}
+	if clause == "" { // global boundary: only NULL-entity rows are owned
+		clause = "legal_entity_id IS NULL"
+	}
+	args := []any{title, boundContract, snapshot, initiator, sessionID, userID}
+	if arg != nil {
+		args = append(args, arg)
+	}
+
+	var tag pgconn.CommandTag
+	tag, err = r.db.Exec(ctx, `
+		UPDATE ai_chat_sessions
+		SET title = $1,
+		    bound_contract_id = $2::uuid,
+		    context_snapshot = $3::jsonb,
+		    initiator = $4,
+		    updated_at = NOW()
+		WHERE id = $5::uuid AND user_id = $6::uuid AND `+clause,
+		args...,
+	)
+	if err != nil {
+		return fmt.Errorf("update ai chat session content: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("%w: session %s not owned", ErrSessionScopeDenied, sessionID)
 	}
 	return nil
 }

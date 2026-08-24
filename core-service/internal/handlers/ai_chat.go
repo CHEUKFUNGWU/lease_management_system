@@ -23,6 +23,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/agentguard"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
+	"github.com/lease-management-system/core-service/internal/sessionmanager"
 )
 
 // aiChatRuntimeStore is the read-side seam used by the HTTP adapters. Run
@@ -186,6 +187,24 @@ func (h *AIChatHandler) WithAuditRepository(reader AgentAuditReader) *AIChatHand
 	clone := *h
 	clone.auditRepo = reader
 	return &clone
+}
+
+// WithSessionOwner wires the AR2 session lifecycle into the chat runtime
+// (SI1 Part B): production chat session create/load flows through
+// sessionmanager instead of the legacy store.CreateSession / GetSessionByID
+// path. Optional — tests and pre-wiring adapters keep the legacy path.
+func (h *AIChatHandler) WithSessionOwner(owner sessionmanager.Manager) *AIChatHandler {
+	if h == nil || h.agentRuntime == nil || h.runtimeRepo == nil || owner == nil {
+		return h
+	}
+	repo, ok := h.runtimeRepo.(*repository.AIChatRuntimeRepository)
+	if !ok {
+		// The seam needs the concrete repository for the content dual-read; an
+		// interface-backed test store keeps the legacy path.
+		return h
+	}
+	h.agentRuntime.WithSessionOwner(aichat.NewSessionOwner(owner, repo))
+	return h
 }
 
 // WithWorkerRunStore enables the lease-protected event stream used by an

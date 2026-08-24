@@ -178,7 +178,7 @@ FP&A 版本治理与滚动预测
 | G5 无 xlsx/docx 产出（导出仍是 CSV） | 🟡 **部分解决**：`workingpaper` xlsx/docx 确定性渲染器 + lint 门 + `GET /ai/chat/artifacts/:id/export` 端点已落地；端到端 WorkingPaper 生成链路（S1 底稿）未接线 | 阶段 0 → 阶段 1 |
 | **G6 PyMuPDF 的 AGPL 风险** | ✅ **已解决（W6，2026-08-20）。** `ai-service/` 整目录已删除，该 AGPL PDF 依赖不再存在于仓库代码；解析改由 `internal/docparse`（anydoc / PaddleOCR）承担 | ADR-0024 |
 | **G7 ai-service 未退役（新登记，2026-08-20）** | ✅ **已解决（W6，2026-08-20）。** W4+W5 全部落地：chat（`/chat` ×2）与 planner（`/api/v1/agent/plan`）迁入 `internal/llm` / `agentrunner.PlannerLLM`；四个 `/parse/*` 迁入 `internal/aiintake` 生产侧 + `internal/docparse`；`/suggest-mapping` 迁入 `internal/llm`；`/files/upload` 迁入 `miniostore` 写入侧。§0.2 九条依赖点清零，ai-service 整目录删除 | ADR-0023 W4–W6 |
-| **G9 sessionmanager 零调用方（AR2 已交付但未接线）** | 🟡 **已登记到期日（2026-08-24）**。模块本体与跨法人隔离证据齐全，但没有生产路径调用它——正是母 spec 开篇痛批 agentcore 的形状。**到期日：2026-09-30 前接线或正式裁决废弃**，逾期转入 agentcore 同款「死代码」审计口径 | C1 批次评审 |
+| **G9 sessionmanager 零调用方（AR2 已交付但未接线）** | 🟡 **部分解决（SI1 Part B，2026-08-25）**：**chat 平面已接线**——生产 chat 会话创建/加载经 `sessionmanager`（`aichat.SessionOwner` seam，独占租约让同会话消息串行，机器断言 + 反向对照见 `ai_chat_sessionowner_convergence_test.go`），配套 AR1 D-C9b（ContextKey 显式 global 维度，全局管理员可成键）。**gateway 与 runner 平面仍未接线，继续挂在 G9 下**。**到期日：2026-09-30 前完成剩余两平面接线或正式裁决废弃**，逾期转入 agentcore 同款「死代码」审计口径 | C1 批次评审 + SI1 工单 |
 
 > W1 + 阶段 0 已按 [CodebaseDesign 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) 交付：`internal/agentcore`（纯循环内核 + ACORE-1/5/6/8 测试）、`protected_measures`（10 项 + 词法探针）、`internal/workingpaper`（I1/I2/I3/I6 lint + 封面 + 渲染）、`internal/docparse`（CSV/anydoc/PaddleOCR）、`internal/agentseval`（不变量与 triage 用例，harness 第三段 `invariants`）、CLI 三层命令（commit 只对人）、Web（去关键词猜测、tool_start 消费、working_paper 渲染）。
 >

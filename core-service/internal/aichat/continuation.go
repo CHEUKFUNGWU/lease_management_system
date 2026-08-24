@@ -19,12 +19,31 @@ type continuationSeed struct {
 	instruction         string
 	target              Target
 	compressionStrategy string
+	// releaseSession is the AR2 exclusive lease held for the continuation's
+	// run lifecycle (nil for the legacy store path).
+	releaseSession func()
 }
 
 func (r *Runtime[T]) Continue(ctx context.Context, command ContinueCommand) (*Started, error) {
 	seed, err := r.resolveContinuation(ctx, command)
 	if err != nil {
 		return nil, err
+	}
+	// AR2 seam: the anchor session was resolved through the legacy store for
+	// target discovery; re-acquire it through the owner so the continuation
+	// run holds the exclusive per-session lease (serializes with other
+	// messages of the same conversation).
+	if r.sessionOwner != nil && seed.session != nil {
+		owned, release, ownerErr := r.sessionOwner.ResolveSession(ctx, SessionIntent{
+			UserID:    command.UserID,
+			SessionID: seed.session.ID,
+			HoldLease: true,
+		})
+		if ownerErr != nil {
+			return nil, fmt.Errorf("acquire continuation session: %w", ownerErr)
+		}
+		seed.session = owned
+		seed.releaseSession = release
 	}
 	input := Input{
 		SessionID: seed.session.ID, ParentRunID: seed.parentRunID,
@@ -35,7 +54,13 @@ func (r *Runtime[T]) Continue(ctx context.Context, command ContinueCommand) (*St
 	}
 	prepared, err := r.prepare(ctx, input, seed.session, seed.sourceRun)
 	if err != nil {
+		if seed.releaseSession != nil {
+			seed.releaseSession()
+		}
 		return nil, fmt.Errorf("prepare AI agent continuation: %w", err)
+	}
+	if prepared.releaseSession == nil {
+		prepared.releaseSession = seed.releaseSession
 	}
 	continuation := &Continuation{
 		Target: seed.target, ParentRunID: seed.parentRunID,
@@ -50,6 +75,7 @@ func (r *Runtime[T]) Continue(ctx context.Context, command ContinueCommand) (*St
 		// resumed from a run/artifact target.
 		runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.timeout)
 		defer cancel()
+		defer releaseAfterRun(prepared)
 		r.executeDispatched(runCtx, prepared)
 	})
 	return started, nil

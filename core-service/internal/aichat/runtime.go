@@ -24,6 +24,7 @@ type Runtime[T any] struct {
 	timeout      time.Duration
 	now          func() time.Time
 	reviewCommit ReviewCommitFunc
+	sessionOwner SessionOwner
 }
 
 type preparedRun struct {
@@ -32,6 +33,10 @@ type preparedRun struct {
 	message *repository.AIChatMessage
 	input   Input
 	plan    Plan
+	// releaseSession releases the exclusive per-session lease acquired by the
+	// SessionOwner for this run. nil means no lease is held (legacy path or
+	// create-only). It fires exactly once after the run finishes.
+	releaseSession func()
 }
 
 func NewRuntime[T any](persistence *repository.AIChatRuntimeRepository, planner Planner, executor Executor[T], project Projector[T], options Options) *Runtime[T] {
@@ -47,6 +52,17 @@ func (r *Runtime[T]) ExecutorKind() string {
 		return ""
 	}
 	return fmt.Sprintf("%T", r.executor)
+}
+
+// SessionOwnerKind reports the concrete type of the wired session lifecycle
+// owner. Diagnostic seam for SI1 Part B (AR5-G1 pattern): the convergence
+// assertion proves production chat session create/load really flows through
+// the sessionmanager adapter — empty when nothing is wired (legacy path).
+func (r *Runtime[T]) SessionOwnerKind() string {
+	if r == nil || r.sessionOwner == nil {
+		return ""
+	}
+	return fmt.Sprintf("%T", r.sessionOwner)
 }
 
 func newRuntime[T any](persistence store, planner Planner, executor Executor[T], project Projector[T], options Options) *Runtime[T] {
@@ -68,9 +84,41 @@ func newRuntime[T any](persistence store, planner Planner, executor Executor[T],
 	}
 }
 
+// WithSessionOwner attaches the AR2 lifecycle seam (SI1 Part B). Production
+// wiring calls it after construction; tests may attach a fake or leave the
+// legacy path. Nil removes the seam.
+func (r *Runtime[T]) WithSessionOwner(owner SessionOwner) *Runtime[T] {
+	if r == nil {
+		return r
+	}
+	r.sessionOwner = owner
+	return r
+}
+
 func (r *Runtime[T]) OpenSession(ctx context.Context, command SessionCommand) (*repository.AIChatSession, error) {
 	if strings.TrimSpace(command.UserID) == "" {
 		return nil, errors.New("AI chat session requires a user")
+	}
+	if r.sessionOwner != nil {
+		// AR2 seam：显式创建也经过 sessionmanager（D3：创建即释放，不持租约，
+		// 会话未被 run 占用时不该把自己锁死）。标题语义：显式 command.Title
+		// 优先于模块默认。
+		session, release, err := r.sessionOwner.ResolveSession(ctx, SessionIntent{
+			UserID:          command.UserID,
+			LegalEntityID:   command.LegalEntityID,
+			Title:           strings.TrimSpace(command.Title),
+			ContractID:      command.BoundContractID,
+			ContextSnapshot: marshalJSON(command.ContextSnapshot),
+			Initiator:       command.Initiator,
+			HoldLease:       false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create AI chat session: %w", err)
+		}
+		if release != nil {
+			release() // 创建即释放（D3）；防防御性调用（HoldLease=false 本应 nil）
+		}
+		return session, nil
 	}
 	session := &repository.AIChatSession{
 		UserID: command.UserID, Title: strings.TrimSpace(command.Title),
@@ -102,8 +150,14 @@ func (r *Runtime[T]) Start(ctx context.Context, input Input) (*Started, error) {
 			// the scope before asynchronous Agent execution.
 			runCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.timeout)
 			defer cancel()
+			defer releaseAfterRun(prepared)
 			r.executeDispatched(runCtx, prepared)
 		})
+	} else {
+		// G1 bridge: the worker plane executes this run outside the chat
+		// process (gateway/runner stay under G9). The in-process lease must
+		// not hang on a run nobody here finishes; release at dispatch.
+		releaseAfterRun(prepared)
 	}
 	return started, nil
 }
@@ -113,6 +167,7 @@ func (r *Runtime[T]) Run(ctx context.Context, input Input) (*Completed[T], error
 	if err != nil {
 		return nil, err
 	}
+	defer releaseAfterRun(prepared)
 	response, executionErr, persistenceErr := r.execute(ctx, prepared)
 	if persistenceErr != nil {
 		_ = r.markPersistenceFailure(ctx, prepared, persistenceErr)
@@ -155,7 +210,17 @@ func (r *Runtime[T]) prepare(ctx context.Context, input Input, session *reposito
 	}
 
 	var err error
-	if session == nil {
+	var releaseSession func()
+	if session == nil && r.sessionOwner != nil {
+		// AR2 seam: get-or-create AND hold the exclusive per-session lease for
+		// the duration of this run. Content dual-read happens inside the owner
+		// with the same boundary; the lease is released after execution.
+		session, releaseSession, err = r.sessionOwner.ResolveSession(ctx, sessionIntentFromPrepare(input))
+		if err != nil {
+			return nil, fmt.Errorf("resolve AI chat session: %w", err)
+		}
+		input.SessionID = session.ID
+	} else if session == nil {
 		if input.SessionID != "" {
 			boundary, boundaryErr := entityBoundary(ctx)
 			if boundaryErr != nil {
@@ -232,7 +297,7 @@ func (r *Runtime[T]) prepare(ctx context.Context, input Input, session *reposito
 		return nil, fmt.Errorf("link AI agent trigger message: %w", err)
 	}
 
-	prepared := &preparedRun{session: session, run: run, message: message, input: input, plan: plan}
+	prepared := &preparedRun{session: session, run: run, message: message, input: input, plan: plan, releaseSession: releaseSession}
 	if err := r.appendEvent(ctx, prepared, "message_start", map[string]any{
 		"message_id": message.ID, "role": "user", "content": input.Message,
 		"has_file": input.FileID != "", "contract_id": input.ContractID,
@@ -449,6 +514,30 @@ func entityBoundary(ctx context.Context) (access.EntityFilter, error) {
 		return access.EntityFilter{}, fmt.Errorf("resolve entity boundary from scope: %w", err)
 	}
 	return filter, nil
+}
+
+// sessionIntentFromPrepare maps a chat run's Input onto the AR2 session
+// intent. HoldLease is always true for run paths: the lease spans execution
+// so two messages of one conversation serialize (SI1 Part B, D-C4).
+func sessionIntentFromPrepare(input Input) SessionIntent {
+	return SessionIntent{
+		UserID:          input.UserID,
+		LegalEntityID:   input.LegalEntityID,
+		SessionID:       input.SessionID,
+		Title:           summarizeTitle(input.Message),
+		ContractID:      input.ContractID,
+		ContextSnapshot: marshalJSON(input.PageContext),
+		Initiator:       input.Initiator,
+		HoldLease:       true,
+	}
+}
+
+// releaseAfterRun fires the exclusive session lease exactly once after the
+// run's execution settles. Safe when nil (legacy path / create-only).
+func releaseAfterRun(prepared *preparedRun) {
+	if prepared != nil && prepared.releaseSession != nil {
+		prepared.releaseSession()
+	}
 }
 
 func attachmentReferences(input Input) []map[string]string {

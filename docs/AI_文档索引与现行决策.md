@@ -53,7 +53,7 @@ FP&A 版本治理与滚动预测
 | [CodebaseDesign：AI 阶段 4 PageFill 填表缝模块深化](CodebaseDesign_AI阶段4_PageFill填表缝_模块深化.md) | **Current** | page_fill 协议（Exploratory 结构性不入 payload，I5/ACORE-12）、`retail.store_days.import.preview` 工具、导入页 `?fill=` 消费；D-D1~D3 |
 | [CodebaseDesign：AI 阶段 5 MinIO 接线与三入口汇流模块深化](CodebaseDesign_AI阶段5_MinIO接线与三入口汇流_模块深化.md) | **Current** | MinIO 读取接线（page_fill 点亮）、三入口统一、G1 两平面汇流；D-E1~E4。**M1 已交付，M2/M3 进行中** |
 | [Spec：Agent Runtime 完整升级（C1 批次）](specs/agent-runtime-overhaul-c1.md) | **Current** | **C1 批次口径来源**：D-C0~D-C10，Story 1–43。范围按能力清单判不按包判（D32）；三层推进各自可独立回退 |
-| [CodebaseDesign：Agent Runtime 升级模块深化](CodebaseDesign_AgentRuntime升级_模块深化.md) | **Current** | **C1 实施级设计**：AR1 ContextKey（已交付）、AR2 Session Manager（已交付）、AR3 上下文工程、AR4 Subturn 委派、AR5 内核置换与汇流（b/c/d 已交付）、AR6 Memory；决策留痕 D-C11~D-C20 与守卫 AR*-G* |
+| [CodebaseDesign：Agent Runtime 升级模块深化](CodebaseDesign_AgentRuntime升级_模块深化.md) | **Current** | **C1 实施级设计**：AR1 ContextKey（已交付）、AR2 Session Manager（已交付）、AR3 上下文工程（已交付并接线，flag 默认关，见 D38）、AR4 Subturn 委派、AR5 内核置换与汇流（b/c/d 已交付）、AR6 Memory；决策留痕 D-C11~D-C20 与守卫 AR*-G* |
 | [Research：picoclaw agent 闭包分析](research/AR5_picoclaw_agent闭包分析_2026-08-24.md) | **Historical** | AR5a 的只读分析：最小闭包清单、挂点对齐表、ACORE-2 九项可移植性判定（含审计传播三选一裁决）、形状 A 可行性、拆单建议。其裁决已被 AR5b/c/d 落实，作为决策依据留档 |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current | 业务需求有效。**§9 制造功能已标注为不在当前范围**；§12 的工具勾选表已移除，实现状态以代码为准 |
 | [PRD：三表财务模型与单店利润表](PRD_三表财务模型与单店利润表.md) | **Current** | **业务需求现行依据**（财务经理视角）：S1 单店利润表页、S2 法人级三表模型、S3 受治理模板自定义、S4 AI 填数与报表生成、S5 集团合并视图。AI 相关诉求均声明沿用 ADR-0019/0025 与既有 WorkingPaper 先例，未改动 §2 任何决策。**附录 E（2026-08-20）全部 ✅、无 ⚠/❌ 行**；附录 B 的勾稽表述已随 P0-4 重设计同步修订 |
@@ -163,6 +163,7 @@ FP&A 版本治理与滚动预测
 | **D35** | **上下文工程顺序不可颠倒**：先计数、再预算、最后压缩。分词器不可得时**拒绝而非估算**（误差在预算边界最大，而边界是唯一重要处）。审计承载内容靠 `classify` 先切两段、压缩器签名只收 compactable 来保护，不靠规则 | ADR-0022 Non-goals 的压缩推迟条款 | ADR-0028 §4 · D-C14/15 |
 | **D36** | **汇流是内核置换的一部分，不是后续项。** `agentcore.New` 生产零调用，换一个没在跑的内核等于死代码换死代码。G1 悬置数月正因为从没有一条断言说「生产路径确实经过内核」 | G1「两平面未汇流」 | ADR-0028 §5 |
 | **D37** | **token 计数取 pi 双轨形态**：provider 实测 usage（llm.ParseUsage 同源字段）为主真值，未发送尾部消息 chars/4 兜底、下一轮被真值覆盖；分词器注册制与「缺失即拒绝」不采用。中文密度问题因此消解（历史计数与语言无关）。残余风险：纯中文尾部低估，已由真值主轨封顶；除数可一行调整 | D35/D-C15 的注册制方案 | 用户裁决 2026-08-24；contextassembler.PiStyleEstimator |
+| **D38** | **AR3 接线完成（2026-08-24）：chat history 来源唯一换轨**。`executeChatRequest` 在 callLLM 前 Assemble，只换 history 参数来源，路由/上下文加载/prompt 构建零改动；flag `CONTEXT_ASSEMBLER_ENABLED`（默认关）= 进程接线层 nil 注入，回滚即重启。usage 真值经 callLLM 第 4 返回值回填 `ai_chat_messages.measured_tokens`（迁移 063，0=未测量哨兵）。压缩发生时 emit `context_compacted`（Dropped refs 可解析）。Assemble 失败响亮终止；全局 admin 无法人身份自动走 legacy 路径。预算默认 deepseek-v4-flash 1M / gpt-4o 128K、reserve 4096，env 可覆盖 | D37 | 移交单 `tmp/handover-AR3wiring.md`；Summarizer drop-only 上线（摘要模型待裁决）、Story 18 延后、工具消息进历史前 Kind 分类对存量历史不触发（登记不扩表） |
 
 ---
 

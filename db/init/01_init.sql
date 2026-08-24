@@ -551,6 +551,7 @@ CREATE TABLE IF NOT EXISTS ai_chat_messages (
     model VARCHAR(100),
     confidence DOUBLE PRECISION,
     confidence_reason TEXT,
+    measured_tokens INTEGER NOT NULL DEFAULT 0,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     CHECK (role IN ('system', 'user', 'assistant', 'tool')),
@@ -2328,5 +2329,6 @@ INSERT INTO schema_migrations (version) VALUES
 ('055_saved_views_and_template_governance'), ('056_template_copy_lineage'),
 ('057_async_run_progress'), ('058_assumption_draft_idempotency'),
 ('059_assumption_draft_idempotency_batch'), ('060_draft_review_isolation'),
-('061_channel_identity_bindings'), ('062_session_data_classification')
+('061_channel_identity_bindings'), ('062_session_data_classification'),
+('063_ai_chat_messages_tokens')
 ON CONFLICT (version) DO NOTHING;

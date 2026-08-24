@@ -70,6 +70,17 @@ curl -fsS "$CORE_URL/api/v1/agent/metrics/prometheus" \
 
 任一条件缺失都必须保留 `cost_status=unavailable`，不能用模型名称、历史价格或 token 数量猜测金额。AI Service 启动配置会拒绝空版本、负价格和半配置价格簿；正式环境应把价格版本纳入发布记录和审计资料。
 
+### 4.1 上下文装配器（AR3）
+
+`CONTEXT_ASSEMBLER_ENABLED=true` 时，chat 路径的 history 在进 prompt 前经 `contextassembler` 计数→预算→压缩；默认关闭，行为与接线前逐字一致。预算几何默认：`deepseek-v4-flash` window=1,000,000、`gpt-4o` window=128,000（来源：provider 官方文档），reserve 统一 4096；`CONTEXT_BUDGET_WINDOW_TOKENS` / `CONTEXT_BUDGET_RESERVE_TOKENS` 设置后覆盖所有模型。
+
+开启后需要知道的运行事实：
+
+- token 计数双轨：assistant 消息行 `ai_chat_messages.measured_tokens`（迁移 063）回填 provider 实测 prompt_tokens，是主真值；从未发送过的尾部消息用 chars/4 兜底估算，下一轮被真值覆盖。0 是「未测量」哨兵，不是零。
+- 压缩只丢 text 类消息且只发生在超预算时；被丢弃内容以 ref 形式记入 `context_compacted` Run Event（Dropped 可解析回原行），消息行本身永不删除。
+- Assemble 失败（如模型无预算配置）会响亮地终止该轮请求，不会静默退回无界 prompt。全局 admin（无法人身份）无法构造隔离键，这类请求自动走 legacy history 路径。
+- 回滚：把 flag 置回 false 并重启即可，无需数据回滚。
+
 ## 5. 发布前验收
 
 每次 Core 或 Runner 发布至少执行：

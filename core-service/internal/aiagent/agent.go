@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -13,12 +14,14 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
+	"github.com/lease-management-system/core-service/internal/agentcontext"
 	agentcorehooks "github.com/lease-management-system/core-service/internal/agentcore/hooks"
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/aiintake"
+	"github.com/lease-management-system/core-service/internal/contextassembler"
 	"github.com/lease-management-system/core-service/internal/docparse"
 	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/llm"
@@ -43,6 +46,12 @@ type Agent struct {
 	// fileBytes is the MinIO read seam used by the intake parse endpoints
 	// (W5-3); nil means parse tools refuse honestly.
 	fileBytes FileBytesReader
+	// ctxAssembler is the AR3 context assembler seam. Nil keeps the legacy
+	// behaviour: req.History goes to the LLM verbatim. Injection happens only
+	// when CONTEXT_ASSEMBLER_ENABLED=true at process wiring — the flag IS the
+	// nil/non-nil choice, so a rollback (D-C10) is a restart without the env,
+	// not a code path inside the hot loop.
+	ctxAssembler contextassembler.Assembler
 	// storePnl is the single-store P&L projection seam (B-1). Nil means the
 	// fpna.store_pnl.read tool is not registered at all (P0-8: never register a
 	// nil-port version over a real one).
@@ -64,6 +73,15 @@ func (h *Agent) SetLLMClient(c *llm.Client) {
 		return
 	}
 	h.llmClient = c
+}
+
+// SetContextAssembler injects the AR3 context assembler (feature-flagged at
+// process wiring). Nil — the default — keeps req.History verbatim.
+func (h *Agent) SetContextAssembler(a contextassembler.Assembler) {
+	if h == nil {
+		return
+	}
+	h.ctxAssembler = a
 }
 
 // llm returns the injected client or builds one from the environment.
@@ -599,6 +617,7 @@ func ProjectResult(response Response) aichat.Result {
 		ReviewRequired:   len(response.ReviewPrompts) > 0,
 		Confidence:       confidencePointer(response.Confidence),
 		ConfidenceReason: confidenceReasonFor(response),
+		MeasuredTokens:   response.MeasuredTokens,
 	}
 	if len(response.DraftContracts) > 0 {
 		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
@@ -805,13 +824,18 @@ type Request struct {
 type ChatMessage = aichat.Message
 
 type Response struct {
-	SessionID              string                            `json:"session_id,omitempty"`
-	RunID                  string                            `json:"run_id,omitempty"`
-	Answer                 string                            `json:"answer"`
-	Sources                []Source                          `json:"sources"`
-	Confidence             float64                           `json:"confidence"`
-	IsOfficial             bool                              `json:"is_official"`
-	Model                  string                            `json:"model,omitempty"`
+	SessionID  string   `json:"session_id,omitempty"`
+	RunID      string   `json:"run_id,omitempty"`
+	Answer     string   `json:"answer"`
+	Sources    []Source `json:"sources"`
+	Confidence float64  `json:"confidence"`
+	IsOfficial bool     `json:"is_official"`
+	Model      string   `json:"model,omitempty"`
+	// MeasuredTokens is the provider-reported prompt-token usage of the round
+	// that produced this answer (AR3 dual-track counting truth). Zero means
+	// not measured — fallback answers and providers without a usage block —
+	// never a measured zero.
+	MeasuredTokens         int                               `json:"measured_tokens,omitempty"`
 	AgentMode              bool                              `json:"agent_mode,omitempty"`
 	AgentPlan              []AgentPlanStep                   `json:"agent_plan,omitempty"`
 	ToolCalls              []AgentToolCall                   `json:"tool_calls,omitempty"`
@@ -1317,7 +1341,39 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	}); err != nil {
 		return Response{Answer: "AI agent event persistence failed", Model: "runtime", Sources: sources}, err
 	}
-	answer, modelName, err := h.callLLM(ctx, systemPrompt, req.Message, req.History, req.Language)
+
+	// AR3 wiring: the ONLY thing that changes under the assembler is where the
+	// history argument comes from. Routing, context loading and prompt building
+	// above are untouched — when the assembler is absent or not applicable
+	// here, req.History goes in verbatim, exactly as before.
+	history := req.History
+	prompt, asmErr := h.assembleTurnHistory(ctx, legalEntityID, userIDStr, req)
+	switch {
+	case asmErr == nil:
+		history = chatMessagesFromPrompt(prompt.Messages)
+		if prompt.Compacted {
+			// D-C16 evidence trail: what left the prompt is recorded as refs
+			// resolvable back to ai_chat_messages rows — compaction deleted
+			// nothing, and this event is the proof it happened.
+			if err := emitAgentEvent(ctx, emit, "context_compacted", map[string]interface{}{
+				"dropped":          prompt.Dropped,
+				"preserved":        prompt.Preserved,
+				"budget":           prompt.Budget,
+				"tokens":           prompt.Tokens,
+				"estimated_tokens": prompt.EstimatedTokens,
+			}); err != nil {
+				return Response{Answer: "AI agent event persistence failed", Model: "runtime", Sources: sources}, err
+			}
+		}
+	case errors.Is(asmErr, errAssemblerNotApplicable):
+		// legacy path — history already carries req.History
+	default:
+		// Assemble failures are real failures (unconfigured budget geometry,
+		// storage refusal). They stop the turn loudly instead of silently
+		// degrading to an unbounded prompt.
+		return Response{Answer: "AI agent context assembly failed", Model: "runtime", Sources: sources}, asmErr
+	}
+	answer, modelName, usage, err := h.callLLM(ctx, systemPrompt, req.Message, history, req.Language)
 	if err != nil {
 		// Fallback: return context data without LLM if AI Service is unavailable
 		fallbackAnswer := fmt.Sprintf("（AI 服务暂不可用，以下为系统数据摘要）\n\n%s", contextData.String())
@@ -1348,7 +1404,7 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 			"model":  modelName,
 		},
 	}); err != nil {
-		return Response{Answer: answer, Model: modelName, Sources: sources}, err
+		return Response{Answer: answer, Model: modelName, Sources: sources, MeasuredTokens: measuredInputTokens(usage)}, err
 	}
 
 	// 7. Extract sources from answer and merge with context sources.
@@ -1361,15 +1417,16 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 	plan, calls := foldExecutedIntoRunbook(agentRunbook, executedCalls)
 	resp := Response{
-		Answer:        answer,
-		Sources:       extractedSources,
-		Confidence:    0.9,
-		IsOfficial:    false,
-		Model:         modelName,
-		AgentMode:     agentRunbook != nil,
-		AgentPlan:     plan,
-		ToolCalls:     calls,
-		ReviewPrompts: reviewPromptsFromRunbook(agentRunbook),
+		Answer:         answer,
+		Sources:        extractedSources,
+		Confidence:     0.9,
+		IsOfficial:     false,
+		Model:          modelName,
+		MeasuredTokens: measuredInputTokens(usage),
+		AgentMode:      agentRunbook != nil,
+		AgentPlan:      plan,
+		ToolCalls:      calls,
+		ReviewPrompts:  reviewPromptsFromRunbook(agentRunbook),
 	}
 	if req.PageContext != nil && strings.EqualFold(strings.TrimSpace(req.PageContext.Page), "reports") {
 		basis := strings.ToLower(strings.TrimSpace(req.PageContext.ReportView))
@@ -2156,10 +2213,10 @@ var fileParseTools = []map[string]interface{}{
 // language directive is appended to the system prompt exactly as chat.py did
 // (buildSystemPrompt adds its own directive first, so the doubling the old
 // path produced is preserved).
-func (h *Agent) callLLM(ctx context.Context, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, error) {
+func (h *Agent) callLLM(ctx context.Context, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, *llm.UsageMetadata, error) {
 	client, err := h.llm()
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
 	result, err := client.Chat(ctx, llm.ChatRequest{
 		Messages:  buildLLMMessages(systemPrompt, userMessage, history, language),
@@ -2167,9 +2224,75 @@ func (h *Agent) callLLM(ctx context.Context, systemPrompt, userMessage string, h
 		MaxTokens: 2000,
 	})
 	if err != nil {
-		return "", "", err
+		return "", "", nil, err
 	}
-	return result.Answer, result.Model, nil
+	// AR3 dual-track counting: the provider-reported usage rides back to the
+	// caller so the assistant message row can carry the measured truth.
+	return result.Answer, result.Model, result.Usage, nil
+}
+
+// errAssemblerNotApplicable marks the legacy-history fallbacks inside
+// assembleTurnHistory: assembler not injected (flag off), no session id to
+// locate history with, or an identity that cannot form an isolation key
+// (global admin carries no legal entity). These are "the assembler does not
+// apply", NOT failures — Assemble errors themselves propagate loudly.
+var errAssemblerNotApplicable = errors.New("context assembler not applicable")
+
+// assembleTurnHistory runs the AR3 Assemble step for this chat turn: stored,
+// ownership-checked history plus the current message, counted and compacted
+// against the model's budget. The returned Prompt's Messages replace the raw
+// request history on the LLM call.
+func (h *Agent) assembleTurnHistory(ctx context.Context, legalEntityID, userID string, req Request) (contextassembler.Prompt, error) {
+	if h == nil || h.ctxAssembler == nil || strings.TrimSpace(req.SessionID) == "" {
+		return contextassembler.Prompt{}, errAssemblerNotApplicable
+	}
+	client, err := h.llm()
+	if err != nil {
+		return contextassembler.Prompt{}, err
+	}
+	key, err := agentcontext.KeyFrom(agenttools.Principal{
+		UserID: userID,
+		Scope:  access.Scope{LegalEntityID: legalEntityID},
+	}, req.SessionID, agentcontext.ClassificationProduction)
+	if err != nil {
+		// An identity that cannot form a key cannot be checked against stored
+		// history; those requests keep the legacy path. Registered limitation:
+		// the chat plane persists every session as 'production' today (062
+		// column default), so the classification dimension is fixed until a
+		// simulated-context chat exists.
+		return contextassembler.Prompt{}, errAssemblerNotApplicable
+	}
+	turn := contextassembler.Turn{
+		Model: client.Config().Model,
+		Messages: []contextassembler.Message{{
+			Role: "user",
+			Kind: contextassembler.KindText,
+			Text: req.Message,
+		}},
+	}
+	return h.ctxAssembler.Assemble(ctx, key, turn)
+}
+
+// chatMessagesFromPrompt projects assembled messages back onto the wire
+// history shape. Kind never survives the projection because ai_chat_messages
+// stores only text today — the audit-bearing taxonomy activates when tool
+// messages enter history (registered future work, not silently dropped).
+func chatMessagesFromPrompt(messages []contextassembler.Message) []ChatMessage {
+	out := make([]ChatMessage, 0, len(messages))
+	for _, m := range messages {
+		out = append(out, ChatMessage{Role: m.Role, Content: m.Text})
+	}
+	return out
+}
+
+// measuredInputTokens extracts the provider-reported prompt tokens from a
+// chat round's usage metadata. A missing block or count yields 0 — the
+// "never measured" sentinel, never a fabricated number.
+func measuredInputTokens(usage *llm.UsageMetadata) int {
+	if usage == nil || usage.InputTokens == nil {
+		return 0
+	}
+	return *usage.InputTokens
 }
 
 // callLLMWithTools is the function-calling variant of callLLM. It keeps the

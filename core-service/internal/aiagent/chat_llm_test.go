@@ -36,7 +36,7 @@ func TestCallLLMRoundTripsThroughInProcessClient(t *testing.T) {
 	agent := &Agent{}
 	agent.SetLLMClient(client)
 
-	answer, model, err := agent.callLLM(context.Background(),
+	answer, model, usage, err := agent.callLLM(context.Background(),
 		"你是经营分析师。", "5月营收如何？",
 		[]ChatMessage{{Role: "user", Content: "5月营收如何？"}}, "zh-CN")
 	if err != nil {
@@ -50,6 +50,11 @@ func TestCallLLMRoundTripsThroughInProcessClient(t *testing.T) {
 	}
 	if model != "deepseek/deepseek-v4-flash" {
 		t.Errorf("model = %q", model)
+	}
+	// AR3 dual-track counting truth: the provider usage block rides out of
+	// callLLM so the assistant row can carry the measured prompt tokens.
+	if usage == nil || usage.InputTokens == nil || *usage.InputTokens != 10 {
+		t.Errorf("usage = %#v, want InputTokens 10", usage)
 	}
 	// buildLLMMessages must fold system prompt (with the chat.py language
 	// directive) before the history, exactly like the old /chat handler.

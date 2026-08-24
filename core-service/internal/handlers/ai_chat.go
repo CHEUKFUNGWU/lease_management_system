@@ -15,6 +15,7 @@ import (
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aiagent"
 	"github.com/lease-management-system/core-service/internal/aichat"
+	"github.com/lease-management-system/core-service/internal/contextassembler"
 	"github.com/lease-management-system/core-service/internal/docparse"
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
@@ -195,6 +196,16 @@ func (h *AIChatHandler) WithAuditRepository(reader AgentAuditReader) *AIChatHand
 func (h *AIChatHandler) WithGuard(guard *agentguard.Guard) *AIChatHandler {
 	h.guard = guard
 	return h
+}
+
+// SetContextAssembler injects the AR3 context assembler into the inner chat
+// agent. Wiring-only seam (feature flag lives in cmd/api); tests may also use
+// it to pin a stub assembler. Nil keeps the legacy history path.
+func (h *AIChatHandler) SetContextAssembler(a contextassembler.Assembler) {
+	if h == nil || h.agent == nil {
+		return
+	}
+	h.agent.SetContextAssembler(a)
 }
 
 func (h *AIChatHandler) WithWorkerRunStore(store AgentWorkerRunStore) *AIChatHandler {

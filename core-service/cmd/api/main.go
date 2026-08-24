@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/agentreaders"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/config"
+	"github.com/lease-management-system/core-service/internal/contextassembler"
 	"github.com/lease-management-system/core-service/internal/gateway"
 	"github.com/lease-management-system/core-service/internal/db"
 	"github.com/lease-management-system/core-service/internal/docparse"
@@ -30,6 +32,34 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/monthend"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
 )
+
+// contextBudgetSpecs returns the per-model context geometry (window sizes are
+// configuration, not guesses — handover裁决 2). Defaults verified against
+// provider docs: deepseek-v4-flash 1M window (api-docs.deepseek.com Models &
+// Pricing), gpt-4o 128K. Reserve covers the maximum expected answer length:
+// both providers' calls cap MaxTokens at 2000, so 4096 leaves headroom.
+// CONTEXT_BUDGET_WINDOW_TOKENS / CONTEXT_BUDGET_RESERVE_TOKENS override all
+// models when set (single-provider deployments).
+func contextBudgetSpecs() map[string]contextassembler.BudgetSpec {
+	specs := map[string]contextassembler.BudgetSpec{
+		"deepseek-v4-flash": {Window: 1_000_000, ReserveTokens: 4096},
+		"gpt-4o":            {Window: 128_000, ReserveTokens: 4096},
+	}
+	window, reserve := 0, 0
+	if _, err := fmt.Sscanf(os.Getenv("CONTEXT_BUDGET_WINDOW_TOKENS"), "%d", &window); err == nil && window > 0 {
+		for model, spec := range specs {
+			spec.Window = window
+			specs[model] = spec
+		}
+	}
+	if _, err := fmt.Sscanf(os.Getenv("CONTEXT_BUDGET_RESERVE_TOKENS"), "%d", &reserve); err == nil && reserve > 0 {
+		for model, spec := range specs {
+			spec.ReserveTokens = reserve
+			specs[model] = spec
+		}
+	}
+	return specs
+}
 
 func main() {
 	cfg, err := config.Load()
@@ -148,6 +178,20 @@ func main() {
 	})
 	uploadHandler := handlers.UploadAIFile(minioClient)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
+
+	// AR3 wiring (feature-flagged, D-C10): the context assembler replaces only
+	// where the chat history argument comes from. Flag off (default) keeps the
+	// legacy path byte-for-byte; rollback is a restart without the env var.
+	if os.Getenv("CONTEXT_ASSEMBLER_ENABLED") == "true" {
+		assembler := contextassembler.NewAssembler(contextassembler.NewPgHistorySource(database.Pool))
+		for model, spec := range contextBudgetSpecs() {
+			if err := contextassembler.RegisterBudget(assembler, model, spec); err != nil {
+				log.Fatalf("Invalid context budget for %q: %v", model, err)
+			}
+		}
+		aiChatHandler.SetContextAssembler(assembler)
+		log.Println("AR3 context assembler enabled")
+	}
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
 	masterDataHandler := handlers.NewMasterDataHandler(masterDataRepo)

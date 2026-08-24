@@ -10,7 +10,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentcontext"
+	"github.com/lease-management-system/core-service/internal/agenttools"
 )
 
 // postgresPool connects to the real test database named by TEST_DATABASE_URL
@@ -197,6 +199,83 @@ func TestPostgresStoreRoundTrip(t *testing.T) {
 		loaded.Title != "roundtrip" || loaded.Status != "active" ||
 		loaded.Classification != agentcontext.ClassificationProduction {
 		t.Fatalf("round trip mismatch: %+v", loaded)
+	}
+}
+
+// ── 验收 4b：global 键（D-C9b）—— 全局管理员收下，NULL 法人行归 global ───────
+
+// TestGlobalKeySavesAndLoadsNullEntityRow pins the AR1 D-C9b consumer
+// contract for AR2: a global admin key (Scope.Global==true, 无具体法人)
+// creates/loads a NULL-legal-entity session row — the shape admin chat
+// sessions actually take (空租户创建 → legal_entity_id NULL, SEC-004)。
+// The Save must write SQL NULL (not an empty uuid string, which errors),
+// and the Load round trip must succeed.
+func TestGlobalKeySavesAndLoadsNullEntityRow(t *testing.T) {
+	pool := postgresPool(t)
+	ctx := context.Background()
+
+	// 全局管理员用户（users.legal_entity_id 可空，角色无关紧要）。
+	var userID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO users (username, email, password_hash)
+		VALUES ($1, $2, 'bcrypt-placeholder') RETURNING id
+	`, "ar2-global-"+shortID(), "ar2-global@test.local").Scan(&userID); err != nil {
+		t.Fatalf("seed global admin user: %v", err)
+	}
+	sessionID := "aaaaaaaa-0000-4000-8000-0000000000aa"
+	t.Cleanup(func() {
+		cleanupCtx := context.Background()
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM ai_chat_sessions WHERE id = $1`, sessionID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM users WHERE id = $1`, userID)
+	})
+
+	globalKey, err := agentcontext.KeyFrom(agenttools.Principal{
+		UserID: userID, SubjectType: "web_ai_agent",
+		Scope: access.Scope{Global: true},
+	}, sessionID, agentcontext.ClassificationProduction)
+	if err != nil {
+		t.Fatalf("build global key: %v", err)
+	}
+	if !globalKey.IsGlobal() {
+		t.Fatal("expected a global key")
+	}
+
+	store := NewPostgresStore(pool)
+	created := &Session{Title: "admin 会话", Status: "active"}
+	if err := store.Save(ctx, globalKey, created); err != nil {
+		t.Fatalf("global key Save: %v", err)
+	}
+
+	// 行内 legal_entity_id 必须是 SQL NULL（不是空串）。
+	var storedEntity *string
+	if err := pool.QueryRow(ctx,
+		`SELECT legal_entity_id FROM ai_chat_sessions WHERE id = $1::uuid`, sessionID,
+	).Scan(&storedEntity); err != nil {
+		t.Fatalf("read stored entity: %v", err)
+	}
+	if storedEntity != nil {
+		t.Fatalf("global-key session stored legal_entity_id=%q; want NULL", *storedEntity)
+	}
+
+	loaded, err := store.Load(ctx, globalKey)
+	if err != nil {
+		t.Fatalf("global key Load: %v", err)
+	}
+	if loaded.SessionID != sessionID || loaded.UserID != userID || loaded.LegalEntityID != "" {
+		t.Fatalf("global round trip mismatch: %+v", loaded)
+	}
+
+	// 反向：另一法人（scoped key）不得拿 NULL 行。
+	entityAID, _ := seedSessionTenant(t, ctx, pool, "globA")
+	_ = entityAID
+	scopedA, err := agentcontext.KeyFrom(
+		principalFor(entityAID, userID), sessionID, agentcontext.ClassificationProduction,
+	)
+	if err != nil {
+		t.Fatalf("build scoped-A key with same user: %v", err)
+	}
+	if _, err := store.Load(ctx, scopedA); !IsScopeDenied(err) {
+		t.Fatalf("scoped key loaded the global NULL row: err=%v; want scope_denied", err)
 	}
 }
 

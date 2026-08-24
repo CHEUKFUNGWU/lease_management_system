@@ -66,6 +66,13 @@ func (s *PgHistorySource) Read(ctx context.Context, key agentcontext.ContextKey)
 	if err != nil {
 		return nil, fmt.Errorf("load ai chat session %s for context assembly: %w", key.SessionID(), err)
 	}
+	// 消费方策略（AR1 D-C9b）：记忆/压缩摘要不得跨法人搬运，因而 AR3 显式拒绝
+	// global 键——无论行内法人为何值。这不是构造器策略（构造器允许 global），
+	// 是 AR3 自己的裁决：global 上下文没有可归属的法人，存不了“谁的记忆”。
+	if key.IsGlobal() {
+		return nil, fmt.Errorf("%w: context assembler does not accept global keys (memory must not cross legal entities) (session %s)",
+			ErrScopeDenied, key.SessionID())
+	}
 	if ownerEntity == nil || *ownerEntity != key.LegalEntityID() || ownerUser != key.UserID() {
 		return nil, fmt.Errorf("%w (session %s)", ErrScopeDenied, key.SessionID())
 	}

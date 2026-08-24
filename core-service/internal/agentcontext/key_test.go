@@ -45,7 +45,6 @@ func TestKeyFromRefusesIncompletePrincipal(t *testing.T) {
 		class     string
 	}{
 		{"empty legal entity", principal("", "user-1", access.Scope{}), "s", ClassificationProduction},
-		{"global admin carries no entity", principal("", "admin-1", access.Scope{Global: true}), "s", ClassificationProduction},
 		{"empty user id", principal("entity-a", "", access.Scope{}), "s", ClassificationProduction},
 		{"blank user id", principal("entity-a", "   ", access.Scope{}), "s", ClassificationProduction},
 		{"empty session", principal("entity-a", "user-1", access.Scope{}), "", ClassificationProduction},
@@ -81,6 +80,62 @@ func TestConstructorSignatureTakesPrincipal(t *testing.T) {
 		if got := constructorType.In(i); got != reflect.TypeOf("") {
 			t.Fatalf("parameter %d is %s; want string", i, got)
 		}
+	}
+}
+
+// ── D-C9b: 全局管理员可成键，global 是显式第五态 ────────────────────────────
+
+func TestKeyFromAcceptsGlobalAdmin(t *testing.T) {
+	key, err := KeyFrom(principal("", "admin-1", access.Scope{Global: true}), "session-g", ClassificationProduction)
+	if err != nil {
+		t.Fatalf("global admin must be able to form a key (AR1 D-C9b): %v", err)
+	}
+	if !key.IsGlobal() {
+		t.Fatal("global key does not report IsGlobal()")
+	}
+	if key.LegalEntityID() != "" {
+		t.Fatalf("global key legal_entity = %q; want empty (无具体法人)", key.LegalEntityID())
+	}
+	if key.UserID() != "admin-1" || key.SessionID() != "session-g" || key.Classification() != ClassificationProduction {
+		t.Fatalf("global key lost face dimensions: %+v", key)
+	}
+}
+
+// TestGlobalCacheKeyDistinctFromScoped pins that a global key's cache key is
+// unambiguous: it differs from any scoped key of the same user/session — global
+// 既不等于任何法人，也不等于空.
+func TestGlobalCacheKeyDistinctFromScoped(t *testing.T) {
+	global, err := KeyFrom(principal("", "admin-1", access.Scope{Global: true}), "session-g", ClassificationProduction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scoped, err := KeyFrom(principal("entity-a", "admin-1", access.Scope{LegalEntityID: "entity-a"}), "session-g", ClassificationProduction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if global.Cache() == scoped.Cache() {
+		t.Fatalf("global key collides with scoped key: %q", global.Cache())
+	}
+	// 与 Part A 的 EntityFilter 语义一致：global 也不等于任何具体法人。
+	scopedOther, err := KeyFrom(principal("entity-b", "admin-1", access.Scope{LegalEntityID: "entity-b"}), "session-g", ClassificationProduction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if global.Cache() == scopedOther.Cache() {
+		t.Fatal("global key collides with another entity's scoped key")
+	}
+}
+
+// TestMixedGlobalStateGlobalWins pins the mixed policy: Scope.Global==true
+// with a legal_entity claim (real output of BuildAccessScope for admin + tenant
+// claim) still constructs a global key — global priority matches access.FromScope.
+func TestMixedGlobalStateGlobalWins(t *testing.T) {
+	key, err := KeyFrom(principal("entity-a", "admin-1", access.Scope{Global: true, LegalEntityID: "entity-a"}), "s", ClassificationProduction)
+	if err != nil {
+		t.Fatalf("mixed global+tenant scope must construct: %v", err)
+	}
+	if !key.IsGlobal() || key.LegalEntityID() != "" {
+		t.Fatalf("mixed state: key global=%v entity=%q; want global with empty entity", key.IsGlobal(), key.LegalEntityID())
 	}
 }
 
@@ -228,6 +283,11 @@ func TestEveryFieldParticipatesInCache(t *testing.T) {
 			// NewAt re-arms the setter for the same memory.
 			settable := reflect.NewAt(fieldValue.Type(), unsafePointerOf(fieldValue)).Elem()
 			settable.SetString(settable.String() + "-mutated")
+		case reflect.Bool:
+			// D-C9b global dimension: toggle in place (the base key is a scoped
+			// construction, global=false).
+			settable := reflect.NewAt(fieldValue.Type(), unsafePointerOf(fieldValue)).Elem()
+			settable.SetBool(!settable.Bool())
 		default:
 			t.Fatalf("field %s has unhandled kind %s — extend this guard's mutation table when adding it", field.Name, fieldValue.Kind())
 		}

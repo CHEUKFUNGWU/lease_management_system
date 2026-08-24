@@ -2231,6 +2231,12 @@ func (h *Agent) assembleTurnHistory(ctx context.Context, legalEntityID, userID s
 	if err != nil {
 		return contextassembler.Prompt{}, err
 	}
+	// AR1 D-C9b 消费方策略：global 上下文（无具体法人）没有可归属的记忆，
+	// AR3 拒绝 global 键。这里在 seam 处显式回落 legacy 路径（与 AR3 的
+	// Read 拒绝同源：记忆不跨法人搬运），而不是让 Assemble 硬报错。
+	if scope, ok := access.ScopeFromContext(ctx); ok && scope.Global {
+		return contextassembler.Prompt{}, errAssemblerNotApplicable
+	}
 	key, err := agentcontext.KeyFrom(agenttools.Principal{
 		UserID: userID,
 		Scope:  access.Scope{LegalEntityID: legalEntityID},

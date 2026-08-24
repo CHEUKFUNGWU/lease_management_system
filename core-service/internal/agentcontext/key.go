@@ -40,22 +40,41 @@ var ErrIncompleteKey = errors.New("context key requires a resolved principal and
 // D-C11: the type deliberately has no String() method — an implicit %v would
 // scatter tenant and user identifiers into logs. Cache() is explicit and its
 // output is only ever a cache key.
+//
+// 六个维度 = 五项 + global（D-C9b）：global 是 Scope.Global==true 的显式态，
+// global 既不等于任何法人，也不等于空（与“零值/无法人”在构造上可区分）。
+// 消费方各自裁决是否收下 global 键：AR2 收（NULL 法人的存量会话归 global
+// 管理员，SEC-004 语义），AR3/AR6 可显式拒绝（记忆/压缩摘要不跨法人搬运）——
+// 那是消费方策略，不是构造器策略。
 type ContextKey struct {
 	legalEntityID  string
 	userID         string
 	sessionID      string
 	scopeFinger    string // D-C12: stable fingerprint of the full access.Scope
 	classification string // production | simulated | mixed (D-C20)
+	global         bool   // D-C9b: Scope.Global==true，且只能由 KeyFrom 从该态构造
 }
+
+// IsGlobal reports whether the key carries the global scope dimension
+// (Scope.Global == true, 无具体法人). Consumers that must not move context
+// across legal entities check this and refuse the key.
+func (k ContextKey) IsGlobal() bool { return k.global }
 
 // KeyFrom is the only constructor. It demands a resolved Principal, so holding
 // a key proves the permission resolver ran on this identity.
+//
+// 全局管理员（Scope.Global==true）：构造成功，global 维度置位、legalEntityID
+// 留空。全局性由解析器验证（permissions 里的 `*:*`，见 middleware.BuildAccess-
+// Scope），不是从空字符串推断——与 access.FromScope 同一哲学：global 即
+// GlobalEntityFilter。mixed 态（Global 且带法人 claim）global 优先，忽略
+// LegalEntityID，与 FromScope 一致。非 global 仍需非空法人；零值 fail-closed
+// 语义保留（global=false + 空法人仍拒绝）。
 func KeyFrom(p agenttools.Principal, sessionID string, classification string) (ContextKey, error) {
 	entityID := strings.TrimSpace(p.Scope.LegalEntityID)
-	if entityID == "" {
-		// 全局管理员（无法人）同样拒绝：隔离键必须五维俱全，
-		// 缺任何一维都意味着这条上下文无法被安全地归属。
-		return ContextKey{}, fmt.Errorf("%w: principal scope carries no legal entity", ErrIncompleteKey)
+	global := p.Scope.Global
+	if !global && entityID == "" {
+		// 非 global 的空法人：隔离键缺一维，无法安全归属（含零值 fail-closed）。
+		return ContextKey{}, fmt.Errorf("%w: principal scope carries no legal entity and is not global", ErrIncompleteKey)
 	}
 	if strings.TrimSpace(p.UserID) == "" {
 		return ContextKey{}, fmt.Errorf("%w: principal carries no user id", ErrIncompleteKey)
@@ -67,18 +86,26 @@ func KeyFrom(p agenttools.Principal, sessionID string, classification string) (C
 	if !validClassifications[classification] {
 		return ContextKey{}, fmt.Errorf("%w: unknown data classification %q", ErrIncompleteKey, classification)
 	}
+	if global {
+		// mixed 态 policy：global 优先，法人留空（同 access.FromScope）。
+		entityID = ""
+	}
 	return ContextKey{
 		legalEntityID:  entityID,
 		userID:         strings.TrimSpace(p.UserID),
 		sessionID:      sid,
 		scopeFinger:    fingerprint(p.Scope),
 		classification: classification,
+		global:         global,
 	}, nil
 }
 
-// Cache returns the cache key. All five dimensions participate in a fixed
+// Cache returns the cache key. All six dimensions participate in a fixed
 // order; AR1-G1's reflection guard fails if a future field stops influencing
-// this output.
+// this output. The global dimension is spliced in explicitly (in addition to
+// its appearance inside scopeFinger) because AR1-G1 mutates fields directly
+// — a global flag that only rode the fingerprint could silently drift out of
+// the join when the fingerprint changes shape.
 func (k ContextKey) Cache() string {
 	return strings.Join([]string{
 		k.classification,
@@ -86,6 +113,7 @@ func (k ContextKey) Cache() string {
 		k.userID,
 		k.sessionID,
 		k.scopeFinger,
+		fmt.Sprintf("global=%t", k.global),
 	}, "\x1e")
 }
 

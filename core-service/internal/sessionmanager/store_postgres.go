@@ -63,17 +63,24 @@ func (s *PostgresStore) Load(ctx context.Context, key agentcontext.ContextKey) (
 // owned by another entity or user matches zero rows and the save refuses with
 // ErrScopeDenied instead of silently editing someone else's conversation.
 func (s *PostgresStore) Save(ctx context.Context, key agentcontext.ContextKey, sess *Session) error {
+	// 单一 SQL 形状覆盖两种键。参数类型纪律：每个 $N 全句只推断一种类型，
+	// 避免 pgx 42P18（同一参数双 cast 无法确定类型）。
+	//  $1/$2（id、user_id）恒为 uuid：WHERE 侧 cast 列而非参数。
+	//  $3 恒为 text（法人 id 或 global 的空串）：VALUES 写 NULLIF($3,'')::uuid
+	//  —— global 键的空串在此变为 SQL NULL（而非非法 uuid），scoped 键原样
+	//  落库；WHERE 用 COALESCE(col,'') = $3 —— global 键（''）只认 NULL 法人行
+	//  （SEC-004 全局 filter 含 NULL 行的语义），scoped 键认精确法人。
 	tag, err := s.pool.Exec(ctx, `
 		INSERT INTO ai_chat_sessions
 			(id, user_id, legal_entity_id, title, status, data_classification, updated_at)
-		VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, NOW())
+		VALUES ($1::uuid, $2::uuid, NULLIF($3, '')::uuid, $4, $5, $6, NOW())
 		ON CONFLICT (id) DO UPDATE SET
 			title = EXCLUDED.title,
 			status = EXCLUDED.status,
 			data_classification = EXCLUDED.data_classification,
 			updated_at = NOW()
-		WHERE ai_chat_sessions.user_id::text = $2::text
-		  AND COALESCE(ai_chat_sessions.legal_entity_id::text, '') = $3::text`,
+		WHERE ai_chat_sessions.user_id = $2::uuid
+		  AND COALESCE(ai_chat_sessions.legal_entity_id::text, '') = $3`,
 		key.SessionID(), key.UserID(), key.LegalEntityID(), sess.Title, sess.Status, key.Classification(),
 	)
 	if err != nil {
@@ -92,10 +99,16 @@ func (s *PostgresStore) Save(ctx context.Context, key agentcontext.ContextKey, s
 }
 
 // ownershipChecked refuses rows whose stored owner disagrees with the key.
+// Global keys own NULL-entity rows (the only rows they can own); scoped keys
+// refuse NULL and foreign rows alike.
 func ownershipChecked(row *Session, key agentcontext.ContextKey) (*Session, error) {
 	if row.LegalEntityID != key.LegalEntityID() || row.UserID != key.UserID() {
-		return nil, fmt.Errorf("%w (session owner entity=%q user=%q; key entity=%q)",
-			ErrScopeDenied, row.LegalEntityID, maskUser(row.UserID), key.LegalEntityID())
+		keyState := "global"
+		if !key.IsGlobal() {
+			keyState = "scoped"
+		}
+		return nil, fmt.Errorf("%w (session owner entity=%q user=%q; key %s entity=%q)",
+			ErrScopeDenied, row.LegalEntityID, maskUser(row.UserID), keyState, key.LegalEntityID())
 	}
 	return row, nil
 }

@@ -186,6 +186,39 @@ func TestPgHistorySourceRefusesLegacyNullEntitySession(t *testing.T) {
 	}
 }
 
+// AR1 D-C9b 消费方策略：AR3 显式拒绝 global 键——记忆/压缩摘要不跨法人搬运。
+// 无论行内法人为何值（NULL 或任何实体），global 上下文在 AR3 里没有可归属
+// 的记忆，拒绝保持 scope_denied 不软化。
+func TestPgHistorySourceRefusesGlobalKey(t *testing.T) {
+	pool := ar3Pool(t)
+	ctx := context.Background()
+
+	entityID, userID := ar3SeedTenant(t, ctx, pool)
+	sessionID := ar3SeedSession(t, ctx, pool, userID, &entityID)
+	ar3SeedMessage(t, ctx, pool, sessionID, "user", "法人内的对话", 1, 10)
+
+	globalKey, err := agentcontext.KeyFrom(agenttools.Principal{
+		UserID: userID, Scope: access.Scope{Global: true},
+	}, sessionID, agentcontext.ClassificationProduction)
+	if err != nil {
+		t.Fatalf("construct global key: %v", err)
+	}
+	if !globalKey.IsGlobal() {
+		t.Fatal("expected global key")
+	}
+
+	source := NewPgHistorySource(pool)
+	if _, err := source.Read(ctx, globalKey); !errors.Is(err, ErrScopeDenied) {
+		t.Fatalf("global-key read returned %v; AR3 consumer policy refuses global keys", err)
+	}
+
+	// 反向验证：同用户同会话的 scoped 键（+对应法人）仍可读——拒绝是键形态
+	// 触发的，不是行数据触发的。
+	if _, err := source.Read(ctx, ar3Key(t, entityID, userID, sessionID)); err != nil {
+		t.Fatalf("scoped key read failed after global refusal: %v", err)
+	}
+}
+
 func TestPgHistorySourceUnknownSessionIsEmptyNotDenied(t *testing.T) {
 	pool := ar3Pool(t)
 	ctx := context.Background()

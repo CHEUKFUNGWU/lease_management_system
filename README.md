@@ -40,7 +40,7 @@ The transformation is **additive**. Retail operations analytics was layered on t
 | 三表财务模型与单店利润表<br>Three-statement model & store P&L | ✅ S1–S5 全部编号功能项落地并有测试锁定（2026-08-20）；19 项评审修复已合并<br>Every numbered S1–S5 requirement is implemented and test-locked (2026-08-20); the 19 review fixes are merged |
 | 三表模型的真实 GL / 试算平衡表联调<br>Live GL / trial-balance integration | ⚠️ 未完成。引擎与四个生产适配器已接线，但只跑过构造数据；端口缺数据时诚实降级为缺口，不产出数字<br>Not done. The engine and its four production adapters are wired, but only exercised against constructed data; a port with no data degrades to an explicit gap rather than a number |
 | Python `ai-service` 退役（ADR-0023/0024）<br>Retiring the Python AI service | ✅ **已退役并删除（W6，2026-08-20）**。LLM/解析/上传/planner 全部迁入 Go（`internal/llm`、`internal/docparse`、`internal/aiintake` 生产侧、`miniostore`、`agentrunner.PlannerLLM`）；AGPL 版 PDF 依赖已随 ai-service 一起删除<br>**Retired and removed.** All LLM / parsing / upload / planner paths now run in Go; the `pymupdf` AGPL dependency is gone with the ai-service directory |
-| Agent Runtime 升级 C1（ADR-0027/0028）<br>Agent runtime overhaul | 🚧 **部分交付（2026-08-24）**。治理链已移植到 vendored picoclaw 的 hook 挂点，**生产 chat 路径第一次真的经过它**（G1 汇流，含反向对照守卫）；ACORE-2 九项变异在生产装配下逐项重证。会话管理器与上下文装配器**模块已建但尚未接线**，上下文装配器默认关（`CONTEXT_ASSEMBLER_ENABLED=false`）且有四项整改在途（见 [整改工单](docs/specs/agent-runtime-c1-review-fixes.md)）<br>**Partially delivered.** The governance chain now runs on production chat traffic for the first time. The session manager and context assembler exist as modules but are not yet wired; the assembler is flag-off pending four review fixes |
+| Agent Runtime 升级 C1（ADR-0027/0028）<br>Agent runtime overhaul | 🚧 **部分交付（2026-08-24）**。治理链已移植到 vendored picoclaw 的 hook 挂点，**生产 chat 路径第一次真的经过它**（G1 汇流，含反向对照守卫）；ACORE-2 九项变异在生产装配下逐项重证。上下文装配器已接线并通过[评审整改 AF1–AF4](docs/specs/agent-runtime-c1-review-fixes.md)（复验用与实现方不同的输入独立跑过），**但仍默认关闭**——开关是 `CONTEXT_ASSEMBLER_ENABLED`，未打开过生产流量。会话管理器**模块已建但尚无生产调用方**，接线到期日 2026-09-30（索引 G9）<br>**Partially delivered.** The governance chain now runs on production chat traffic for the first time. The context assembler is wired and its four review fixes are verified, but it stays off by default and has never seen production traffic. The session manager is built but has no production caller; wiring is due 2026-09-30 |
 | IM 渠道网关（飞书 / 企微，ADR-0026）<br>IM channel gateway | 🚧 **代码在，默认关闭**。`GATEWAY_ENABLED` 未设为 `true` 时零值配置完全禁用，不校验凭据也不建连接。**未接过真实渠道**，渠道身份到法人的绑定关系需人工登记<br>**Present but disabled by default.** Never exercised against a live channel; channel-identity-to-entity bindings must be registered by hand |
 | 第三方 vendor 代码（picoclaw，MIT）<br>Vendored third-party code | ℹ️ 仓库首次引入第三方源码，分两处：`internal/gateway/third_party/`（飞书 / 企微渠道）与 `internal/agentkernel/third_party/`（agent hook 内核切片）。均逐文件标注上游出处、按 commit 钉版、有架构守卫禁止其 import 第一方业务包<br>Two vendored slices, each with per-file upstream provenance, a pinned commit, and an architecture guard forbidding imports of first-party business packages |
 
@@ -294,7 +294,7 @@ make setup
 
 | 变量 / Variable | 作用 / Effect |
 |---|---|
-| `CONTEXT_ASSEMBLER_ENABLED` | 打开 AR3 上下文装配器（chat history 经计数 → 预算 → 压缩再进 prompt）。**当前保持 `false`**，四项整改完成前不要开；回滚就是去掉这个变量重启。可选 `CONTEXT_BUDGET_WINDOW_TOKENS` / `CONTEXT_BUDGET_RESERVE_TOKENS` 覆盖预算几何<br>Turns on the context assembler. **Keep it `false`** until the outstanding fixes land; rolling back is a restart without the variable |
+| `CONTEXT_ASSEMBLER_ENABLED` | 打开 AR3 上下文装配器（chat history 经计数 → 预算 → 压缩再进 prompt）。默认 `false`，**至今未在生产流量上打开过**；回滚就是去掉这个变量重启。打开时会在启动期校验实际在跑的模型有没有预算几何，没有就拒绝启动并报出模型名——所以换模型（`DEEPSEEK_MODEL` 用 `deepseek-v4-pro` 等非默认值）时要同时设 `CONTEXT_BUDGET_WINDOW_TOKENS`，可选 `CONTEXT_BUDGET_RESERVE_TOKENS`<br>Turns on the context assembler. Off by default and never yet enabled against production traffic. When on, startup refuses if the running model has no budget geometry, naming the model — so a non-default `DEEPSEEK_MODEL` needs `CONTEXT_BUDGET_WINDOW_TOKENS` set alongside it |
 | `GATEWAY_ENABLED` | 打开 IM 渠道网关。为 `true` 时才读 `GATEWAY_FEISHU_*` / `GATEWAY_WECOM_*`；否则零值配置完全禁用，不校验凭据也不建连接<br>Turns on the IM gateway; channel credentials are only read when it is `true` |
 
 ### 3. 启动服务 / Start services
@@ -554,7 +554,8 @@ English:
 
 - [Spec：Agent Runtime 完整升级（C1）](docs/specs/agent-runtime-overhaul-c1.md) — 三层范围与能力清单
 - [CodebaseDesign：Agent Runtime 升级模块深化](docs/CodebaseDesign_AgentRuntime升级_模块深化.md) — AR1–AR6 模块接口
-- [工单：C1 批次评审整改（AF1–AF4）](docs/specs/agent-runtime-c1-review-fixes.md) — **上下文装配器在这四条落地前保持关闭**
+- [工单：C1 批次评审整改（AF1–AF4）](docs/specs/agent-runtime-c1-review-fixes.md) — 已交付并复验（2026-08-24）
+- [工单：治理链拒绝的错误码保真（RC1）](docs/specs/agent-tool-rejection-code-fidelity.md) — **未开工**。装 guard 的路径把九个控制的所有拒绝一律映射成 `scope_denied`，把六种别的拒绝伪装成跨法人拒绝
 - [Spec：FP&A 科目树灵活性（F1）](docs/specs/fpna-chart-of-accounts-flexibility-f1.md)
 - [Spec：词表收敛 V1](docs/specs/vocabulary-convergence-v1.md) — 审批状态统一为 Draft / Pending / Approved
 

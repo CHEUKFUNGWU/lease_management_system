@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
@@ -156,7 +157,11 @@ func (r *Runtime[T]) prepare(ctx context.Context, input Input, session *reposito
 	var err error
 	if session == nil {
 		if input.SessionID != "" {
-			session, err = r.store.GetSessionByID(ctx, input.SessionID, input.UserID)
+			boundary, boundaryErr := entityBoundary(ctx)
+			if boundaryErr != nil {
+				return nil, fmt.Errorf("resolve AI chat session boundary: %w", boundaryErr)
+			}
+			session, err = r.store.GetSessionByID(ctx, input.SessionID, input.UserID, boundary)
 			if err != nil {
 				return nil, fmt.Errorf("load AI chat session: %w", err)
 			}
@@ -426,6 +431,24 @@ func (r *Runtime[T]) started(prepared *preparedRun, continuation *Continuation) 
 		StreamPath:   fmt.Sprintf("/api/v1/ai/chat/runs/%s/stream", prepared.run.ID),
 		Continuation: continuation,
 	}
+}
+
+// entityBoundary resolves the caller's legal-entity boundary for session
+// loads from the resolved access.Scope installed in the request context
+// (DataScopeMiddleware for the chat plane, gatewayContext for the gateway
+// plane) — the same resolver that produced the JWT (D-C4: 该值由与 JWT 同一
+// 个解析器产出, 不接受调用方传入). No scope in context fails closed: an
+// unresolved identity can never degrade into "no filtering" (SI1).
+func entityBoundary(ctx context.Context) (access.EntityFilter, error) {
+	scope, ok := access.ScopeFromContext(ctx)
+	if !ok {
+		return access.EntityFilter{}, fmt.Errorf("no resolved access scope in request context")
+	}
+	filter, err := access.FromScope(scope)
+	if err != nil {
+		return access.EntityFilter{}, fmt.Errorf("resolve entity boundary from scope: %w", err)
+	}
+	return filter, nil
 }
 
 func attachmentReferences(input Input) []map[string]string {

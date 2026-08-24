@@ -32,7 +32,7 @@ type sessionListerStub struct {
 	gotFilter repository.AIChatSessionFilter
 }
 
-func (s *sessionListerStub) GetSessionByID(context.Context, string, string) (*repository.AIChatSession, error) {
+func (s *sessionListerStub) GetSessionByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatSession, error) {
 	return nil, nil
 }
 func (s *sessionListerStub) ListSessions(ctx context.Context, filter repository.AIChatSessionFilter) ([]*repository.AIChatSession, error) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/aichat"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
@@ -79,6 +80,18 @@ type AIChatFollowUpRequest struct {
 	ContractID  string       `json:"contract_id,omitempty"`
 	Language    string       `json:"language,omitempty"`
 	PageContext *PageContext `json:"page_context,omitempty"`
+}
+
+// writeSessionAccessError maps a session-load refusal: cross-entity / wrong
+// owner stays 403 with the scope_denied code preserved (never softened to
+// 404); a genuinely absent row stays 404.
+func writeSessionAccessError(c *gin.Context, err error) {
+	if errcontract.CodeOf(err) == errcontract.CodeScopeDenied {
+		writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied,
+			errcontract.SafeMessage(err), nil)
+		return
+	}
+	c.JSON(http.StatusNotFound, gin.H{"error": "ai chat session not found"})
 }
 
 func reverseMessages(messages []*repository.AIChatMessage) []*repository.AIChatMessage {
@@ -182,9 +195,14 @@ func (h *AIChatHandler) GetSession(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 	sessionID := c.Param("id")
 
-	session, err := h.runtimeRepo.GetSessionByID(c.Request.Context(), sessionID, userIDStr)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	session, err := h.runtimeRepo.GetSessionByID(c.Request.Context(), sessionID, userIDStr, entity)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ai chat session not found"})
+		writeSessionAccessError(c, err)
 		return
 	}
 
@@ -227,9 +245,14 @@ func (h *AIChatHandler) CreateRun(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 	sessionID := c.Param("id")
 
-	_, err := h.runtimeRepo.GetSessionByID(c.Request.Context(), sessionID, userIDStr)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	_, err := h.runtimeRepo.GetSessionByID(c.Request.Context(), sessionID, userIDStr, entity)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ai chat session not found"})
+		writeSessionAccessError(c, err)
 		return
 	}
 
@@ -273,8 +296,13 @@ func (h *AIChatHandler) ListRuns(c *gin.Context) {
 	userIDStr, _ := userID.(string)
 	sessionID := c.Param("id")
 
-	if _, err := h.runtimeRepo.GetSessionByID(c.Request.Context(), sessionID, userIDStr); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ai chat session not found"})
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	if _, err := h.runtimeRepo.GetSessionByID(c.Request.Context(), sessionID, userIDStr, entity); err != nil {
+		writeSessionAccessError(c, err)
 		return
 	}
 
@@ -441,6 +469,11 @@ func (h *AIChatHandler) CreateContinuation(c *gin.Context) {
 		Role: roleString, Permissions: append([]string(nil), permissions...), AuthHeader: c.GetHeader("Authorization"),
 	})
 	if err != nil {
+		if errcontract.CodeOf(err) == errcontract.CodeScopeDenied {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied,
+				errcontract.SafeMessage(err), nil)
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create ai chat continuation: " + err.Error()})
 		return
 	}

@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -64,8 +66,20 @@ func (h *AgentGatewayHandler) CreateRun(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "authenticated agent context is required"})
 		return
 	}
-	session, err := h.runs.GetSessionByID(ctx, request.SessionID, execution.Principal.UserID)
+	boundary, err := access.FromScope(execution.Principal.Scope)
+	if err != nil {
+		// Fail closed: an unresolvable principal scope must not degrade into
+		// an unfiltered session lookup.
+		c.JSON(http.StatusForbidden, gin.H{"error": "agent principal scope is not resolvable"})
+		return
+	}
+	session, err := h.runs.GetSessionByID(ctx, request.SessionID, execution.Principal.UserID, boundary)
 	if err != nil || session == nil {
+		if err != nil && errcontract.CodeOf(err) == errcontract.CodeScopeDenied {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied,
+				errcontract.SafeMessage(err), nil)
+			return
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "agent session not found"})
 		return
 	}

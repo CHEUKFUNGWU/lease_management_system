@@ -58,10 +58,6 @@ func (s *PostgresStore) Load(ctx context.Context, key agentcontext.ContextKey) (
 // the key, never from the caller; legal_entity_id/user_id/classification are
 // written from the KEY on insert and never updated afterwards — ownership is
 // immutable once established.
-// Save inserts or updates the module-owned columns. The session id comes from
-// the key, never from the caller; legal_entity_id/user_id/classification are
-// written from the KEY on insert and never updated afterwards — ownership is
-// immutable once established.
 //
 // The UPDATE branch carries an ownership predicate: a key that locates a row
 // owned by another entity or user matches zero rows and the save refuses with

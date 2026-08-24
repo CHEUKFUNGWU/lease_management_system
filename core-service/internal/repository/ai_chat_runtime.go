@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 )
 
 type AIChatSession struct {
@@ -237,19 +238,60 @@ func (r *AIChatRuntimeRepository) CreateSession(ctx context.Context, session *AI
 	return nil
 }
 
-func (r *AIChatRuntimeRepository) GetSessionByID(ctx context.Context, sessionID, userID string) (*AIChatSession, error) {
+// ErrSessionScopeDenied is the ownership refusal of the by-id session load.
+// It carries errcontract.CodeScopeDenied so handlers and the agent runtime
+// keep the real reason instead of softening it into "not found" (AGENTS.md:
+// 权限拒绝必须保持原因).
+var ErrSessionScopeDenied = errcontract.New(errcontract.CodeScopeDenied,
+	"ai chat session belongs to another legal entity or user")
+
+// GetSessionByID loads one session AND enforces the caller's legal-entity
+// boundary. The boundary is the closed access.EntityFilter produced from the
+// resolved access scope — never a bare tenant string:
+//
+//   - GlobalEntityFilter (Scope.Global == true): admin reads any session,
+//     including NULL-entity legacy rows (AR5d preserved). The global state
+//     is verified by the scope resolver, not by an empty string, so this
+//     forgiveness does not weaken the scoped check.
+//   - A scoped boundary refuses with ErrSessionScopeDenied when the row's
+//     legal_entity_id is NULL or differs — the same ownership semantics as
+//     sessionmanager.PostgresStore.Load, where a NULL row can never match a
+//     scoped key. The user_id axis is always enforced (even a global admin
+//     only loads their own sessions), matching ListSessions and the old SQL.
+func (r *AIChatRuntimeRepository) GetSessionByID(ctx context.Context, sessionID, userID string, entity access.EntityFilter) (*AIChatSession, error) {
 	var session AIChatSession
 	err := r.db.QueryRow(ctx, `
 		SELECT id, user_id, legal_entity_id, title, status, bound_contract_id,
 		       COALESCE(context_snapshot, 'null'::jsonb), initiator, created_at, updated_at, last_message_at, archived_at
 		FROM ai_chat_sessions
-		WHERE id = $1 AND user_id = $2
-	`, sessionID, userID).Scan(
+		WHERE id = $1
+	`, sessionID).Scan(
 		&session.ID, &session.UserID, &session.LegalEntityID, &session.Title, &session.Status, &session.BoundContractID,
 		&session.ContextSnapshot, &session.Initiator, &session.CreatedAt, &session.UpdatedAt, &session.LastMessageAt, &session.ArchivedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat session: %w", err)
+	}
+	// Ownership axis 1: user. Even a global admin only loads their own
+	// sessions (mirrors the old WHERE user_id = $2 and ListSessions).
+	if session.UserID != userID {
+		return nil, fmt.Errorf("%w: session %s owned by another user", ErrSessionScopeDenied, sessionID)
+	}
+	// Ownership axis 2: legal entity. Only the resolved-scope-derived global
+	// boundary skips this; the zero-value filter fails closed.
+	if !entity.IsGlobal() {
+		want, filterErr := entity.LegalEntityID()
+		if filterErr != nil {
+			return nil, fmt.Errorf("get ai chat session %s: %w", sessionID, filterErr)
+		}
+		entityLabel := "NULL"
+		if session.LegalEntityID != nil {
+			entityLabel = *session.LegalEntityID
+		}
+		if session.LegalEntityID == nil || *session.LegalEntityID != want {
+			return nil, fmt.Errorf("%w: session %s entity=%s requires=%q",
+				ErrSessionScopeDenied, sessionID, entityLabel, want)
+		}
 	}
 	return &session, nil
 }

@@ -44,7 +44,7 @@ func TestOpenSessionPersistsUserAndTenantContext(t *testing.T) {
 
 func TestStartPersistsOneInspectableSuccessfulRun(t *testing.T) {
 	store := newMemoryStore()
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	runtime := newRuntime(
 		store,
 		PlannerFunc(func(Input, *repository.AIChatRun) Plan {
@@ -62,7 +62,7 @@ func TestStartPersistsOneInspectableSuccessfulRun(t *testing.T) {
 		Options{Dispatch: func(task func()) { task() }},
 	)
 
-	started, err := runtime.Start(context.Background(), Input{
+	started, err := runtime.Start(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), Input{
 		SessionID: "session-1",
 		Message:   "review this contract",
 		UserID:    "user-1",
@@ -90,7 +90,7 @@ func TestStartPersistsOneInspectableSuccessfulRun(t *testing.T) {
 
 func TestStartPreservesAccessScopeForDetachedAgentRun(t *testing.T) {
 	store := newMemoryStore()
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("le-001")}
 	var observed access.Scope
 	runtime := newRuntime(
 		store,
@@ -120,7 +120,7 @@ func TestStartPreservesAccessScopeForDetachedAgentRun(t *testing.T) {
 
 func TestStartTerminatesFailedExecution(t *testing.T) {
 	store := newMemoryStore()
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	runtime := newRuntime(
 		store,
 		PlannerFunc(func(Input, *repository.AIChatRun) Plan { return Plan{} }),
@@ -133,7 +133,7 @@ func TestStartTerminatesFailedExecution(t *testing.T) {
 		Options{Dispatch: func(task func()) { task() }},
 	)
 
-	started, err := runtime.Start(context.Background(), Input{SessionID: "session-1", Message: "answer", UserID: "user-1"})
+	started, err := runtime.Start(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), Input{SessionID: "session-1", Message: "answer", UserID: "user-1"})
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestStartTerminatesFailedExecution(t *testing.T) {
 func TestContinueResolvesRunTargetInsideRuntime(t *testing.T) {
 	store := newMemoryStore()
 	pageContext, _ := json.Marshal(PageContext{Page: "contract-detail", ContractID: "contract-1"})
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	skillID := "payment_schedule"
 	store.runs["source-run"] = &repository.AIChatRun{
 		ID: "source-run", SessionID: "session-1", SkillID: &skillID,
@@ -188,7 +188,7 @@ func TestContinueResolvesRunTargetInsideRuntime(t *testing.T) {
 		Options{Dispatch: func(task func()) { task() }},
 	)
 
-	started, err := runtime.Continue(context.Background(), ContinueCommand{
+	started, err := runtime.Continue(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), ContinueCommand{
 		Target: Target{Type: "run", ID: "source-run"}, UserID: "user-1",
 	})
 	if err != nil {
@@ -210,7 +210,7 @@ func TestContinueResolvesRunTargetInsideRuntime(t *testing.T) {
 
 func TestContinuePreservesAccessScopeForDetachedAgentRun(t *testing.T) {
 	store := newMemoryStore()
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("le-001")}
 	store.runs["source-run"] = &repository.AIChatRun{ID: "source-run", SessionID: "session-1", Status: "waiting_review"}
 	store.messages["session-1"] = []*repository.AIChatMessage{
 		{ID: "message-1", SessionID: "session-1", RunID: stringPointer("source-run"), Role: "user", Content: "review"},
@@ -252,7 +252,7 @@ func TestContinueSupportsMessageArtifactAndActionTargets(t *testing.T) {
 		t.Run(target.Type, func(t *testing.T) {
 			store := newMemoryStore()
 			pageContext, _ := json.Marshal(PageContext{Page: "contract-detail", ContractID: "contract-1"})
-			store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+			store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 			store.runs["source-run"] = &repository.AIChatRun{ID: "source-run", SessionID: "session-1", PageContext: pageContext, Status: "waiting_review"}
 			store.messages["session-1"] = []*repository.AIChatMessage{
 				{ID: "message-1", SessionID: "session-1", Role: "user", Content: "upload"},
@@ -276,7 +276,7 @@ func TestContinueSupportsMessageArtifactAndActionTargets(t *testing.T) {
 				Options{Dispatch: func(task func()) { task() }},
 			)
 
-			started, err := runtime.Continue(context.Background(), ContinueCommand{Target: target, UserID: "user-1"})
+			started, err := runtime.Continue(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), ContinueCommand{Target: target, UserID: "user-1"})
 			if err != nil {
 				t.Fatalf("Continue returned error: %v", err)
 			}
@@ -292,7 +292,7 @@ func TestContinueSupportsMessageArtifactAndActionTargets(t *testing.T) {
 
 func TestReviewRecordsActionAndProjectsArtifactStatus(t *testing.T) {
 	store := newMemoryStore()
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	store.runs["run-1"] = &repository.AIChatRun{ID: "run-1", SessionID: "session-1", Status: "waiting_review"}
 	store.artifacts["artifact-1"] = &repository.AIChatArtifact{
 		ID: "artifact-1", SessionID: "session-1", RunID: "run-1",
@@ -351,7 +351,7 @@ func TestReviewUsesAtomicRuntimeCommitWhenAvailable(t *testing.T) {
 
 func TestReviewUsesApplicationTransactionCommitResult(t *testing.T) {
 	store := newMemoryStore()
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	store.runs["run-1"] = &repository.AIChatRun{ID: "run-1", SessionID: "session-1", Status: "waiting_review"}
 	store.artifacts["artifact-1"] = &repository.AIChatArtifact{
 		ID: "artifact-1", SessionID: "session-1", RunID: "run-1", ArtifactType: "contract_draft", Status: "ready",
@@ -387,7 +387,7 @@ func TestReviewUsesApplicationTransactionCommitResult(t *testing.T) {
 
 func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 	store := newMemoryStore()
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	runtime := newRuntime(
 		store,
 		PlannerFunc(func(Input, *repository.AIChatRun) Plan {
@@ -414,7 +414,7 @@ func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 		Options{Dispatch: func(task func()) { task() }},
 	)
 
-	started, err := runtime.Start(context.Background(), Input{SessionID: "session-1", Message: "review", UserID: "user-1"})
+	started, err := runtime.Start(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), Input{SessionID: "session-1", Message: "review", UserID: "user-1"})
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 func TestStartTurnsCompletionPersistenceFailureIntoTerminalFailure(t *testing.T) {
 	store := newMemoryStore()
 	store.failAssistantMessage = true
-	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	store.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	runtime := newRuntime(
 		store,
 		PlannerFunc(func(Input, *repository.AIChatRun) Plan { return Plan{} }),
@@ -457,7 +457,7 @@ func TestStartTurnsCompletionPersistenceFailureIntoTerminalFailure(t *testing.T)
 		Options{Dispatch: func(task func()) { task() }},
 	)
 
-	started, err := runtime.Start(context.Background(), Input{SessionID: "session-1", Message: "run", UserID: "user-1"})
+	started, err := runtime.Start(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), Input{SessionID: "session-1", Message: "run", UserID: "user-1"})
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
@@ -530,10 +530,22 @@ func (s *memoryStore) CreateSession(_ context.Context, session *repository.AICha
 	s.sessions[session.ID] = session
 	return nil
 }
-func (s *memoryStore) GetSessionByID(_ context.Context, id, userID string) (*repository.AIChatSession, error) {
+func (s *memoryStore) GetSessionByID(_ context.Context, id, userID string, entity access.EntityFilter) (*repository.AIChatSession, error) {
 	session := s.sessions[id]
-	if session == nil || session.UserID != userID {
+	if session == nil {
 		return nil, fmt.Errorf("session not found")
+	}
+	if session.UserID != userID {
+		return nil, fmt.Errorf("scope_denied: session belongs to another user")
+	}
+	if !entity.IsGlobal() {
+		want, err := entity.LegalEntityID()
+		if err != nil {
+			return nil, err
+		}
+		if session.LegalEntityID == nil || *session.LegalEntityID != want {
+			return nil, fmt.Errorf("scope_denied: session belongs to another legal entity")
+		}
 	}
 	return session, nil
 }

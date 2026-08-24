@@ -73,13 +73,17 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 	var pageContext *PageContext
 	var fallbackContractIDs []string
 
+	boundary, boundaryErr := entityBoundary(ctx)
+	if boundaryErr != nil {
+		return nil, fmt.Errorf("resolve AI chat continuation boundary: %w", boundaryErr)
+	}
 	switch target.Type {
 	case "run":
 		run, err := r.store.GetRunByID(ctx, target.ID, command.UserID)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation run: %w", err)
 		}
-		session, err = r.store.GetSessionByID(ctx, run.SessionID, command.UserID)
+		session, err = r.store.GetSessionByID(ctx, run.SessionID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation session: %w", err)
 		}
@@ -94,7 +98,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		if err != nil {
 			return nil, fmt.Errorf("load continuation message: %w", err)
 		}
-		session, err = r.store.GetSessionByID(ctx, message.SessionID, command.UserID)
+		session, err = r.store.GetSessionByID(ctx, message.SessionID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation session: %w", err)
 		}
@@ -112,7 +116,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		if err != nil {
 			return nil, fmt.Errorf("load continuation artifact: %w", err)
 		}
-		session, err = r.store.GetSessionByID(ctx, artifact.SessionID, command.UserID)
+		session, err = r.store.GetSessionByID(ctx, artifact.SessionID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation session: %w", err)
 		}
@@ -133,7 +137,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		if err != nil {
 			return nil, fmt.Errorf("load continuation review action: %w", err)
 		}
-		session, err = r.store.GetSessionByID(ctx, action.SessionID, command.UserID)
+		session, err = r.store.GetSessionByID(ctx, action.SessionID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation session: %w", err)
 		}

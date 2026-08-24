@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
@@ -206,7 +207,7 @@ type Inspection struct {
 // selected only while constructing the module.
 type store interface {
 	CreateSession(context.Context, *repository.AIChatSession) error
-	GetSessionByID(context.Context, string, string) (*repository.AIChatSession, error)
+	GetSessionByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatSession, error)
 	CreateRun(context.Context, *repository.AIChatRun) error
 	LinkRunTriggerMessage(context.Context, string, string) error
 	UpdateRunStatus(context.Context, string, string, bool, *string, *string, *time.Time, *time.Time) error

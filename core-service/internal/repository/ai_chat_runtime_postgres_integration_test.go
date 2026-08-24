@@ -149,14 +149,16 @@ func TestAIChatSessionInitiatorFiltering(t *testing.T) {
 	}
 
 	// The system sessions remain retrievable by ID — runs, messages and
-	// audit trail hang off them and must stay reachable.
+	// audit trail hang off them and must stay reachable. These rows carry
+	// no legal_entity_id, so the reading scope must be the global (admin /
+	// system) boundary — exactly the AR5d behavior SI1 preserves.
 	systemSessions := 0
 	for _, s := range all {
 		if s.Initiator != "system" {
 			continue
 		}
 		systemSessions++
-		got, err := repo.GetSessionByID(ctx, s.ID, userID)
+		got, err := repo.GetSessionByID(ctx, s.ID, userID, access.GlobalEntityFilter())
 		if err != nil {
 			t.Fatalf("get system session %s: %v", s.ID, err)
 		}

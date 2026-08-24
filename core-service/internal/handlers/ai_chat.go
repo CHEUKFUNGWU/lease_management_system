@@ -28,7 +28,7 @@ import (
 // aiChatRuntimeStore is the read-side seam used by the HTTP adapters. Run
 // transitions and writes live behind aichat.Runtime's interface.
 type aiChatRuntimeStore interface {
-	GetSessionByID(context.Context, string, string) (*repository.AIChatSession, error)
+	GetSessionByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatSession, error)
 	ListSessions(context.Context, repository.AIChatSessionFilter) ([]*repository.AIChatSession, error)
 	GetRunByID(context.Context, string, string) (*repository.AIChatRun, error)
 	ListRunsBySession(context.Context, string, int, int) ([]*repository.AIChatRun, error)
@@ -44,7 +44,7 @@ type aiChatRuntimeStore interface {
 // Gateway. It allows a Pi-like Runner to create/inspect/control a Core Run
 // without gaining access to repositories or SQL.
 type AgentRunStore interface {
-	GetSessionByID(context.Context, string, string) (*repository.AIChatSession, error)
+	GetSessionByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatSession, error)
 	CreateRun(context.Context, *repository.AIChatRun) error
 	GetRunByID(context.Context, string, string) (*repository.AIChatRun, error)
 	UpdateRunStatus(context.Context, string, string, bool, *string, *string, *time.Time, *time.Time) error
@@ -340,6 +340,11 @@ func (h *AIChatHandler) Chat(c *gin.Context) {
 	}
 	completed, err := h.agentRuntime.Run(c.Request.Context(), runtimeInput(c, req))
 	if err != nil {
+		if errcontract.CodeOf(err) == errcontract.CodeScopeDenied {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied,
+				errcontract.SafeMessage(err), nil)
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to run AI agent: " + err.Error()})
 		return
 	}

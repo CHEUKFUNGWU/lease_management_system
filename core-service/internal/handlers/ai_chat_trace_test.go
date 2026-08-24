@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -21,8 +23,18 @@ type traceRuntimeStore struct {
 	checkpoints []*repository.AgentRunCheckpointAudit
 }
 
-func (s *traceRuntimeStore) GetSessionByID(context.Context, string, string) (*repository.AIChatSession, error) {
-	return &repository.AIChatSession{ID: "session-1", UserID: "user-1"}, nil
+func (s *traceRuntimeStore) GetSessionByID(_ context.Context, _ string, _ string, entity access.EntityFilter) (*repository.AIChatSession, error) {
+	if !entity.IsGlobal() {
+		want, err := entity.LegalEntityID()
+		if err != nil {
+			return nil, err
+		}
+		if want != "le-001" {
+			return nil, errcontract.New(errcontract.CodeScopeDenied,
+				"ai chat session belongs to another legal entity or user")
+		}
+	}
+	return &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("le-001")}, nil
 }
 func (s *traceRuntimeStore) ListSessions(context.Context, repository.AIChatSessionFilter) ([]*repository.AIChatSession, error) {
 	return nil, nil

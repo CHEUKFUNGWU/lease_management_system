@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentskill"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -28,7 +29,9 @@ type memoryAgentRunStore struct {
 func newMemoryAgentRunStore() *memoryAgentRunStore {
 	return &memoryAgentRunStore{
 		sessions: map[string]*repository.AIChatSession{
-			"session-1": {ID: "session-1", UserID: "user-1", Status: "active"},
+			// The fixtures run under the le-001 scope, so the owned session
+			// must carry the same legal_entity_id (SI1: 跨法人会话续接隔离).
+			"session-1": {ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("le-001"), Status: "active"},
 		},
 		runs:        make(map[string]*repository.AIChatRun),
 		events:      make(map[string][]*repository.AIChatRunEvent),
@@ -36,12 +39,22 @@ func newMemoryAgentRunStore() *memoryAgentRunStore {
 	}
 }
 
-func (s *memoryAgentRunStore) GetSessionByID(_ context.Context, sessionID, userID string) (*repository.AIChatSession, error) {
+func (s *memoryAgentRunStore) GetSessionByID(_ context.Context, sessionID, userID string, entity access.EntityFilter) (*repository.AIChatSession, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	session := s.sessions[sessionID]
 	if session == nil || session.UserID != userID {
 		return nil, context.Canceled
+	}
+	if !entity.IsGlobal() {
+		want, err := entity.LegalEntityID()
+		if err != nil {
+			return nil, err
+		}
+		if session.LegalEntityID == nil || *session.LegalEntityID != want {
+			return nil, errcontract.New(errcontract.CodeScopeDenied,
+				"ai chat session belongs to another legal entity or user")
+		}
 	}
 	copy := *session
 	return &copy, nil

@@ -52,6 +52,9 @@ FP&A 版本治理与滚动预测
 | [CodebaseDesign：AI 阶段 3 零售经营底稿模块深化](CodebaseDesign_AI阶段3零售经营底稿_模块深化.md) | **Current** | **实施级设计**。零售经营底稿（收尾底稿主线的产品决策 D-C1~C5）：retailpulse/store360/scenario 引擎 → 全 Certified 经营底稿 |
 | [CodebaseDesign：AI 阶段 4 PageFill 填表缝模块深化](CodebaseDesign_AI阶段4_PageFill填表缝_模块深化.md) | **Current** | page_fill 协议（Exploratory 结构性不入 payload，I5/ACORE-12）、`retail.store_days.import.preview` 工具、导入页 `?fill=` 消费；D-D1~D3 |
 | [CodebaseDesign：AI 阶段 5 MinIO 接线与三入口汇流模块深化](CodebaseDesign_AI阶段5_MinIO接线与三入口汇流_模块深化.md) | **Current** | MinIO 读取接线（page_fill 点亮）、三入口统一、G1 两平面汇流；D-E1~E4。**M1 已交付，M2/M3 进行中** |
+| [Spec：Agent Runtime 完整升级（C1 批次）](specs/agent-runtime-overhaul-c1.md) | **Current** | **C1 批次口径来源**：D-C0~D-C10，Story 1–43。范围按能力清单判不按包判（D32）；三层推进各自可独立回退 |
+| [CodebaseDesign：Agent Runtime 升级模块深化](CodebaseDesign_AgentRuntime升级_模块深化.md) | **Current** | **C1 实施级设计**：AR1 ContextKey（已交付）、AR2 Session Manager（已交付）、AR3 上下文工程、AR4 Subturn 委派、AR5 内核置换与汇流（b/c/d 已交付）、AR6 Memory；决策留痕 D-C11~D-C20 与守卫 AR*-G* |
+| [Research：picoclaw agent 闭包分析](research/AR5_picoclaw_agent闭包分析_2026-08-24.md) | **Historical** | AR5a 的只读分析：最小闭包清单、挂点对齐表、ACORE-2 九项可移植性判定（含审计传播三选一裁决）、形状 A 可行性、拆单建议。其裁决已被 AR5b/c/d 落实，作为决策依据留档 |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current | 业务需求有效。**§9 制造功能已标注为不在当前范围**；§12 的工具勾选表已移除，实现状态以代码为准 |
 | [PRD：三表财务模型与单店利润表](PRD_三表财务模型与单店利润表.md) | **Current** | **业务需求现行依据**（财务经理视角）：S1 单店利润表页、S2 法人级三表模型、S3 受治理模板自定义、S4 AI 填数与报表生成、S5 集团合并视图。AI 相关诉求均声明沿用 ADR-0019/0025 与既有 WorkingPaper 先例，未改动 §2 任何决策。**附录 E（2026-08-20）全部 ✅、无 ⚠/❌ 行**；附录 B 的勾稽表述已随 P0-4 重设计同步修订 |
 | [CodebaseDesign：三表财务模型与单店利润表模块深化](CodebaseDesign_三表模型与单店利润表_模块深化.md) | **Current** | **实施级设计**（上述 PRD 的配套，SM1–SM8 已全量落地）：SM1 模板/DSL、SM2 纯函数引擎（Run/Persist）、SM3 门店利润表投影、SM4 期初三道闸、SM5 AI 假设草稿、SM6 finmodel 底稿构建器、SM7 Agent 工具（现为 `fpna.*` 六个）、SM8 集团视图（克制）；决策留痕 D-S1~S9；三条架构测试：`finmodel` 不得 import `ifrs16`（遍历全部子包）、`fin_model_runs` 唯一写入口、底稿 lint 的 `tie_out_unpassed` fail-closed |
@@ -166,7 +169,7 @@ FP&A 版本治理与滚动预测
 
 | 缺口 | 状态 | 归属 |
 |---|---|---|
-| G1 两个 Agent 平面未汇流（23 处 `Status: "pending"` 静态卡片） | **未解决** | ADR-0022 / W1–W6 |
+| G1 两个 Agent 平面未汇流（23 处 `Status: "pending"` 静态卡片） | ✅ **已解决（2026-08-24，`b2f532e` AR5d）。** 生产 chat 接线（`handlers/ai_chat.go`）的 executor 换为内核适配器 `agentkernel/chatexec.Executor`：每回合绑定 vendored HookManager 并挂 ACORE-2 九控制治理链。汇流断言 `ExecutorKind()` 双层锁定（类型层 + 判别器反向对照）；形状 A 守卫 `TestExecutorHoldsNoPerRunMutableState` 防回归 | ADR-0028 §5 / Spec C1 D36 |
 | G2 无文件分诊，兜底 `return "contract"` | 🟡 **部分解决**：`lease.file.triage` 确定性分诊落地、`return "contract"` 兜底已删除、域外文件（发票/劳动合同/宣传册）显式拒绝并问用户；LLM 分类器与 ≥50 份语料的 CORR-6 完整判据待 L2 语料建设 | 底稿方案 §6.1，阶段 0 |
 | G3 经营数据语义映射 | ✅ **已解决**（Profile 复用与漂移检测未做） | — / 阶段 3 |
 | G4 无代码执行能力 | 未解决（**刻意后置**） | ADR-0025 §5，阶段 4 |
@@ -181,6 +184,8 @@ FP&A 版本治理与滚动预测
 > **三表财务模型与单店利润表已全量交付（2026-08-20）**：SM1–SM8 按 [模块深化](CodebaseDesign_三表模型与单店利润表_模块深化.md) 落地，PRD 附录 E 全部 ✅。随后的**双轴评审 19 项修复**（P0 九项 / P1 五项 / P2 五项）已合并，其中改变结论的五项值得记住：跨法人校验补进 definition 与门店两条入口（底线 1，两处泄露）；出厂模板 Actual 区改为读事实而非假设推导（否则真实数据的 run 永远过不了发布门禁）；T2/T4/T11 三条恒真/桩勾稽重设计 + 十六条反向测试补齐；期初闸失败改为阻止 run 而非降级；`fpna.*` 工具的 nil 注册挡住生产端口（1d67dd6 的接线声明曾因此落空）。修复工单已完成删除，逐条结论已吸收进本表、AGENTS.md 与 PRD 附录 E。
 >
 > **阶段 3（零售经营底稿，产品主线的底稿）已按 [CodebaseDesign：AI 阶段 3](CodebaseDesign_AI阶段3零售经营底稿_模块深化.md) 交付（2026-08-19）**：底稿主线切回零售（D-C1：S4/S3/S2 后移，S1 保留）；`workingpaper/retail` 构建器（pulse/store360/scenario → 全 Certified/SystemFact 单元格，1:1 保值断言锁定、nil 跳格不填 0、覆盖不足/多币种/模拟标识/抑制信号一一进 DataGaps、残差显式保留）；`retail.working_paper.store.generate` 工具（LevelDraft + Review Gate，复用 scopedRetailReader 权限过滤，情景镜像聊天阻断语义 D-C3）；aiagent「底稿 + filters」确定性触发 → working_paper artifact（复用面板与 xlsx/docx 导出）；评测新增 `retail_paper_sanctity` category（harness 13/13）；CLI `run events --format table|ndjson`。core-service `go test ./...` + `go vet ./...`、web 回归全绿。
+>
+> **C1 批次已交付（2026-08-24，截至 `192234e`）**：AR1 ContextKey（`agentcontext`，五维隔离键，`f2dcaf0`）；AR5b vendor picoclaw 内核切片（`agentkernel/third_party/picoclaw`，回合循环仍在 `picoclaw_agent_core` build tag 后，启用是独立票，`e0b4546`）；AR5c 治理链移植到 HookManager 挂点（九控制 + 装配序显式优先级，`9b700d0`）；AR5d 汇流（生产 chat executor 切到 `chatexec.Executor`，G1 关闭，`b2f532e`）；AR2 Session Manager（`sessionmanager`，两方法接口 + Store 端口 + 引用计数防孤儿租约 + migration 062，`192234e`）。评审修复随票吸收：admin 空法人回归（identityComplete 接受 Global）、Save upsert 归属谓词、挂载优先级显式化。
 
 ---
 
@@ -209,6 +214,11 @@ FP&A 版本治理与滚动预测
 | 6 | anydoc 二进制的供应链管理（版本 + checksum 钉死方式） | ✅ **已定（W5-1）且自 2026-08-23 起真正生效**：`@firecrawl/anydoc@0.2.0` + npm SRI integrity（sha512）钉死进 `Dockerfile` / `Dockerfile.agent-runner` 的 `anydoc-install` 阶段，`ANYDOC_BIN_PATH` 由 compose 传入。**订正：W5-1 到 2026-08-23 之间这条校验从未执行过**——`$ANYDOC_INTEGRITY` 无引号插进 JS 源码导致 SyntaxError，一直被 Docker layer cache 掩盖；`5e1e6f0` 修好并用错误哈希实证它拦得住。详见下方 §5.1 | ADR-0024；`5e1e6f0` |
 | 7 | `controlledxlsx` 与 excelize 的去留 | ✅ **已定（W5-3）**：`controlledxlsx` **保留**——受控模板路径的零依赖优点成立，不与 excelize 合并；intake 的 Excel 确定性读取统一走 `internal/aiintake/excel.go`（excelize），`internal/controlledxlsx` 仅服务受控模板导出 | Agent Core 设计 §12.1 |
 | 8 | 上下文压缩是否进 W1–W6 | W6 | Agent Core 设计 §12.2 |
+| 9 | **Story 18 会话状态迁移可追溯**（spec C1）未实现且曾无延期登记——需裁决去向：进六处调用方接线票范围，或登记延后 | C1 第二层验收完整性 | Spec C1 Story 18 |
+| 10 | **Session Manager 接线票约束两条**：release 不落盘 / Close 落盘的不对称；`Session` 导出字段跨持有者共享可变锚点。接线定调用契约时一并处理（flush 语义或只读视图二选一） | 六处调用方接线票 | `tmp/delivery-AR2.md` §4 |
+| 11 | **AR5c 离线测试按字母序派发**（NamedHook 默认 Priority=0）：单控制变异不受影响但顺序未被那些测试锁定；生产绑定已用显式优先级并有顺序断言。建议 governance_test 补显式优先级 | 无阻塞；防未来误读 | AR5 双轴评审 Standards #3 |
+| 12 | **picoclaw 完整回合循环启用**（去掉 `picoclaw_agent_core` build tag 需补 ~6,300 行闭包）与 AR5e（steering/abort + 流式事件接 Web 层） | AR3/AR4 的地基选择 | `tmp/blocked-AR5b.md`；AR5a §5 |
+| 13 | 定期用错误输入跑构建期守卫的检查尚未进 CI | 见下方 §5.1 | 本文 §5.1 |
 
 **当前没有阻塞阶段 0 的未决项。** 阶段 0 + 阶段 1 可以立即开工。
 

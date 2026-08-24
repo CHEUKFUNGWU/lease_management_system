@@ -288,7 +288,7 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 | 新增第三方代码 | picoclaw `pkg/agent` 及其最小依赖骨架（MIT，vendor 非 module 依赖） |
 | 新增可观测指标 | token 用量与上下文预算占用 |
 | 新增配置 | 按模型的上下文预算、压缩阈值、会话淘汰策略、MCP 登记表 |
-| 表结构 | **改一列**：`ai_chat_sessions.data_classification`（D-C20）。迁移 `060_*` 与 `01_init.sql` 空库版本必须同时提供，缺一即环境漂移。其余七张 `ai_chat_*` 表沿用；压缩不删记录因而无需新表 |
+| 表结构 | **改一列**：`ai_chat_sessions.data_classification`（D-C20）。迁移与 `01_init.sql` 空库版本必须同时提供，缺一即环境漂移。其余七张 `ai_chat_*` 表沿用；压缩不删记录因而无需新表。**落地订正（2026-08-24）**：实际迁移号为 `062_session_data_classification`（060/061 已被其他票占用），随 AR2 交付 |
 | ADR | ADR-0027 扩写（或续 ADR-0028）以覆盖本 spec 范围 |
 
 ## Testing Decisions
@@ -321,7 +321,7 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 - Session：法人 A 的账号取不到法人 B 的会话，且拒绝保持 `scope_denied` 不被软化
 - MCP：一个 MCP 工具在权限不足时被拒，拒绝路径与一等工具完全相同
 - MCP：未登记的 MCP 工具不可被调用
-- 迁移：工具数与名单在内核置换前后一致（当前基线 52 个，33 读 / 19 写）
+- 迁移：工具数与名单在内核置换前后一致。基线数字以运行时枚举为准（AGENTS.md「当前工程事实」，2026-08-23 核出 55 个：36 读 / 19 写；本票未增删工具）——不在此抄第二份会过期的数字
 
 ### 集成测试
 
@@ -338,7 +338,7 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 - **`isolation` 沙箱**：D11 已把沙箱后置到阶段 4，进入条件是「有 ≥1 真实客户且合规要求明确」，条件未满足
 - **`updater` / `evolution` 自更新**：与本产品的发布与审计模型不相容
 - **开放扩展生态**：MCP 接入不等于开放生态，工具注册仍受控（ADR-0022 Non-goals）
-- **表结构变更**：本批次不改表
+- **表结构变更**：除上方契约变更清单明确的一列（`ai_chat_sessions.data_classification`，D-C20 要求）外不改表
 - **Auto-Post Mode**：AI 仍只在 Assist Mode 运行
 - **FP&A 科目树的灵活性（两项，均不属 runtime 升级，B-4 之后优先于 C1）**。2026-08-23 复核发现：引擎**已经支持**逐科目选取数来源（行类型 `RowInput` 自填 / `RowLink` 挂系统事实 / `RowFormula` 推导，外加 `ActualSource` 让同一行在 Actual 冻结线左侧读事实、右侧跑公式），**但界面不支持**。`FormulaEditor.tsx` 只把一条公式送后端校验，构造临时模板时把所有行写成 `kind:"input"` 仅为让公式可解析；`page.tsx` 的 `addRow` 只接受 `"leaseRef" | "engine"` 两个固定分区。用户建不了自定义科目，也选不了某科目取系统数还是自己填。
   - **科目树编辑器（前端）+ 逐科目取数来源选择**：完全缺失。没有它，AI 生成的科目树用户改不了

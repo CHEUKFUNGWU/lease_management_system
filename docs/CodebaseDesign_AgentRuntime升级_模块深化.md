@@ -127,7 +127,7 @@ C1 的记忆与跨会话摘要正是这样的东西。一段基于 `simulated` �
 
 #### 契约影响
 
-需要一列：`ai_chat_sessions.data_classification`（迁移 `060_*` + `01_init.sql` 空库版本同步，缺一就环境漂移）。这推翻了 Spec 契约清单里「本批次不改表」——**改一列**。
+需要一列：`ai_chat_sessions.data_classification`（迁移与 `01_init.sql` 空库版本同步，缺一就环境漂移；实际落点 `062_session_data_classification`，随 AR2 交付）。这推翻了 Spec 契约清单里「本批次不改表」——**改一列**。
 
 反向测试：`simulated` 会话写入的记忆，在 `production` 会话中断言取不到；把 `classification` 从 `Cache()` 里删掉，该测试必须变红。
 

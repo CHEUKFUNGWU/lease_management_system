@@ -108,6 +108,47 @@ func deny(reason string) picoclawagent.HookDecision {
 	return picoclawagent.HookDecision{Action: picoclawagent.HookActionDenyTool, Reason: reason}
 }
 
+// RejectSink is the per-call side channel that carries an explicit error code
+// from the reject site to the guard adapter (RC1). The vendored HookDecision
+// has no code field and must not gain one (no-edits-in-place), so the code
+// travels beside it: each control calls denyWith with the code chosen at that
+// site, and chatexec reads the sink after the chain denies. No string
+// matching on Reason text anywhere.
+type RejectSink struct {
+	code agenttools.ErrorCode
+}
+
+// Code returns the recorded rejection code, or "" when none was recorded.
+func (s *RejectSink) Code() agenttools.ErrorCode {
+	if s == nil {
+		return ""
+	}
+	return s.code
+}
+
+type rejectSinkContextKey struct{}
+
+// WithRejectSink attaches the call's sink. Installed once by the guard
+// adapter before the chain runs.
+func WithRejectSink(ctx context.Context, sink *RejectSink) context.Context {
+	return context.WithValue(ctx, rejectSinkContextKey{}, sink)
+}
+
+func sinkFromContext(ctx context.Context) *RejectSink {
+	sink, _ := ctx.Value(rejectSinkContextKey{}).(*RejectSink)
+	return sink
+}
+
+// denyWith records the rejection's code at the site that owns the decision,
+// then denies with the reason. First writer wins: only one control denies a
+// given call, so this is belt-and-braces against accidental double-writes.
+func denyWith(ctx context.Context, code agenttools.ErrorCode, reason string) picoclawagent.HookDecision {
+	if sink := sinkFromContext(ctx); sink != nil && sink.code == "" {
+		sink.code = code
+	}
+	return deny(reason)
+}
+
 // resolveFacts is the wrapper's infrastructure step: it only reports whether
 // the FactsResolver itself failed. Identity completeness is NOT judged here —
 // that is TenantScope's exclusive check (ACORE-2 mutation #1 requires exactly
@@ -155,13 +196,15 @@ func (g TenantScope) BeforeTool(
 	facts, ok := resolveFacts(ctx, g.Facts, request)
 	if !ok {
 		// wrapper infrastructure failure — fail closed
-		return request, deny("execution context could not be resolved"), nil
+		return request, denyWith(ctx, agenttools.ErrorSystemFailure,
+			"execution context could not be resolved"), nil
 	}
 	// THE check this hook exclusively owns (ACORE-2 mutation #1): identity
 	// completeness. No other control re-judges it; removing this hook must
 	// let an incomplete-identity call reach the executor.
 	if !identityComplete(facts) {
-		return request, deny("missing execution context"), nil
+		return request, denyWith(ctx, agenttools.ErrorUnauthenticated,
+			"missing execution context"), nil
 	}
 	return request, picoclawagent.HookDecision{Action: picoclawagent.HookActionContinue}, nil
 }
@@ -196,7 +239,8 @@ func (c CapabilityCheck) BeforeTool(
 	if !ok {
 		// wrapper infrastructure failure — fail closed, but this is not the
 		// TenantScope check (that one owns identity completeness)
-		return request, deny("call facts could not be resolved"), nil
+		return request, denyWith(ctx, agenttools.ErrorSystemFailure,
+			"call facts could not be resolved"), nil
 	}
 	desc := facts.Descriptor
 	call := facts.Call
@@ -208,25 +252,30 @@ func (c CapabilityCheck) BeforeTool(
 		policy = agenttools.DefaultPolicy()
 	}
 	if desc.Name != "" && desc.Name != call.ToolName {
-		return request, deny(fmt.Sprintf("%s: tool descriptor version mismatch", agenttools.ErrInvalidToolCall)), nil
+		return request, denyWith(ctx, agenttools.ErrorInvalidArguments,
+			fmt.Sprintf("%s: tool descriptor version mismatch", agenttools.ErrInvalidToolCall)), nil
 	}
 	if !policy.AllowedLevels[desc.Level] {
-		return request, deny(fmt.Sprintf("%s: level %s is disabled", agenttools.ErrToolCapabilityRequired, desc.Level)), nil
+		return request, denyWith(ctx, agenttools.ErrorCapabilityDenied,
+			fmt.Sprintf("%s: level %s is disabled", agenttools.ErrToolCapabilityRequired, desc.Level)), nil
 	}
 	if facts.Principal.CapabilityActive && !facts.Principal.HasCapability(desc.Name) {
-		return request, deny(fmt.Sprintf("%s: %s", agenttools.ErrToolCapabilityRequired, desc.Name)), nil
+		return request, denyWith(ctx, agenttools.ErrorCapabilityDenied,
+			fmt.Sprintf("%s: %s", agenttools.ErrToolCapabilityRequired, desc.Name)), nil
 	}
 	if desc.Level == agenttools.LevelCommand && (!policy.AllowCommand || !facts.Principal.HasCapability(desc.Name)) {
-		return request, deny(fmt.Sprintf("%s: %s", agenttools.ErrToolCapabilityRequired, desc.Name)), nil
+		return request, denyWith(ctx, agenttools.ErrorCapabilityDenied,
+			fmt.Sprintf("%s: %s", agenttools.ErrToolCapabilityRequired, desc.Name)), nil
 	}
 	for _, permission := range desc.Permissions {
 		if !facts.Principal.HasPermission(permission) {
-			return request, deny(fmt.Sprintf("%s: %s:%s",
-				agenttools.ErrToolNotPermitted, permission.Resource, permission.Action)), nil
+			return request, denyWith(ctx, agenttools.ErrorPermissionDenied,
+				fmt.Sprintf("%s: %s:%s", agenttools.ErrToolNotPermitted, permission.Resource, permission.Action)), nil
 		}
 	}
 	if call.DryRun && !desc.SupportsDryRun {
-		return request, deny(fmt.Sprintf("%s: tool does not support dry_run", agenttools.ErrInvalidToolCall)), nil
+		return request, denyWith(ctx, agenttools.ErrorInvalidArguments,
+			fmt.Sprintf("%s: tool does not support dry_run", agenttools.ErrInvalidToolCall)), nil
 	}
 	return request, picoclawagent.HookDecision{Action: picoclawagent.HookActionContinue}, nil
 }
@@ -251,7 +300,10 @@ func (p ProtectedMeasure) BeforeTool(
 		return request, picoclawagent.HookDecision{Action: picoclawagent.HookActionContinue}, nil
 	}
 	if decision := agenttools.RouteMeasures(measures, p.Resolver.IsCertified(request.Tool)); decision.Tier == "Reject" {
-		return request, deny(decision.RejectReason), nil
+		// Domain-policy refusal (ADR-0025 dual-track red line): the request was
+		// understood and refused by certification routing — not a caller fault,
+		// not a permission gap. business_failure keeps the authored guidance.
+		return request, denyWith(ctx, agenttools.ErrorBusinessFailure, decision.RejectReason), nil
 	}
 	return request, picoclawagent.HookDecision{Action: picoclawagent.HookActionContinue}, nil
 }
@@ -266,7 +318,12 @@ func (b BudgetGuard) BeforeTool(
 	request *picoclawagent.ToolCallHookRequest,
 ) (*picoclawagent.ToolCallHookRequest, picoclawagent.HookDecision, error) {
 	if b.Budget.exhausted() {
-		return request, deny(fmt.Sprintf("tool call budget exhausted (%d)", b.Budget.MaxToolCalls)), nil
+		// rate_limited matches the M6.3 budget guard's external semantics. NOT
+		// retryable: the Budget is per-turn (bindTurn news it up) and its count
+		// only grows, so agentrunner's auto-retry would burn MaxRetries calls
+		// that are guaranteed to fail again.
+		return request, denyWith(ctx, agenttools.ErrorRateLimited,
+			fmt.Sprintf("tool call budget exhausted (%d)", b.Budget.MaxToolCalls)), nil
 	}
 	b.Budget.take()
 	return request, picoclawagent.HookDecision{Action: picoclawagent.HookActionContinue}, nil
@@ -286,10 +343,12 @@ func (g IdempotencyGuard) BeforeTool(
 ) (*picoclawagent.ToolCallHookRequest, picoclawagent.HookDecision, error) {
 	facts, ok := resolveFacts(ctx, g.Facts, request)
 	if !ok {
-		return request, deny("call facts could not be resolved"), nil
+		return request, denyWith(ctx, agenttools.ErrorSystemFailure,
+			"call facts could not be resolved"), nil
 	}
 	if facts.Descriptor.Level != agenttools.LevelRead && strings.TrimSpace(facts.Call.IdempotencyKey) == "" {
-		return request, deny(fmt.Sprintf("%s: write-capable tool requires idempotency_key", agenttools.ErrInvalidToolCall)), nil
+		return request, denyWith(ctx, agenttools.ErrorInvalidArguments,
+			fmt.Sprintf("%s: write-capable tool requires idempotency_key", agenttools.ErrInvalidToolCall)), nil
 	}
 	if g.Replay != nil && strings.TrimSpace(facts.Call.IdempotencyKey) != "" {
 		if stored, hit := g.Replay.Lookup(ctx, facts.Call.IdempotencyKey); hit && stored != nil {
@@ -318,7 +377,8 @@ func (g ReviewGate) BeforeTool(
 ) (*picoclawagent.ToolCallHookRequest, picoclawagent.HookDecision, error) {
 	facts, ok := resolveFacts(ctx, g.Facts, request)
 	if !ok {
-		return request, deny("call facts could not be resolved"), nil
+		return request, denyWith(ctx, agenttools.ErrorSystemFailure,
+			"call facts could not be resolved"), nil
 	}
 	desc := facts.Descriptor
 	if !agenttools.RequiresReviewDecision(desc, agenttools.Policy{RequireDraftReview: g.RequireDraftReview}) ||

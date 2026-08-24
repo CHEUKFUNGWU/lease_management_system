@@ -22,9 +22,13 @@ type BeforeContext struct {
 // execution entirely with a short-circuit result (the Review Gate shape).
 type BeforeResult struct {
 	Block  bool
-	Reason string          // surfaced in audit and to the user
-	Args   json.RawMessage // non-empty rewrites the call arguments
-	Short  *agenttools.ToolResult
+	Reason string // surfaced in audit and to the user
+	// Code is the rejection's error code, set explicitly at the reject site
+	// (RC1). The runtime fails closed to system_failure when a Block arrives
+	// without one — it never guesses scope_denied.
+	Code  agenttools.ErrorCode
+	Args  json.RawMessage // non-empty rewrites the call arguments
+	Short *agenttools.ToolResult
 }
 
 // BeforeToolCall runs before a tool executes, after parameter validation.

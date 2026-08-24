@@ -30,7 +30,7 @@ func (g *ExecutionGuard) Before(ctx context.Context, call agenttools.ToolCall, d
 	res, err := g.before(ctx, agentcore.BeforeContext{
 		Call: call, Descriptor: descriptor, State: g.state, Principal: principal,
 	})
-	return agenttools.GuardResult{Block: res.Block, Reason: res.Reason, Short: res.Short}, err
+	return agenttools.GuardResult{Block: res.Block, Reason: res.Reason, Short: res.Short, Code: res.Code}, err
 }
 
 func (g *ExecutionGuard) After(ctx context.Context, call agenttools.ToolCall, descriptor agenttools.ToolDescriptor, result *agenttools.ToolResult, principal agenttools.Principal) error {

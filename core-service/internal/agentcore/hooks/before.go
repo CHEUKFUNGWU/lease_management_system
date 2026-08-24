@@ -83,7 +83,8 @@ func ProtectedMeasure(resolver MeasureResolver) agentcore.BeforeToolCall {
 		}
 		decision := agenttools.RouteMeasures(measures, resolver.IsCertified(bc.Call.ToolName))
 		if decision.Tier == "Reject" {
-			return agentcore.BeforeResult{Block: true, Reason: decision.RejectReason}, nil
+			// Domain-policy refusal (ADR-0025): business_failure keeps the authored guidance.
+			return agentcore.BeforeResult{Block: true, Reason: decision.RejectReason, Code: agenttools.ErrorBusinessFailure}, nil
 		}
 		return agentcore.BeforeResult{}, nil
 	}
@@ -112,7 +113,9 @@ func BudgetGuard(b *Budget) agentcore.BeforeToolCall {
 			return agentcore.BeforeResult{}, nil
 		}
 		if b.exhausted() {
-			return agentcore.BeforeResult{Block: true, Reason: fmt.Sprintf("tool call budget exhausted (%d)", b.MaxToolCalls)}, nil
+			// rate_limited per M6.3 precedent; NOT retryable — this budget only grows,
+			// so agentrunner auto-retry would burn calls guaranteed to fail.
+			return agentcore.BeforeResult{Block: true, Reason: fmt.Sprintf("tool call budget exhausted (%d)", b.MaxToolCalls), Code: agenttools.ErrorRateLimited}, nil
 		}
 		b.take()
 		return agentcore.BeforeResult{}, nil

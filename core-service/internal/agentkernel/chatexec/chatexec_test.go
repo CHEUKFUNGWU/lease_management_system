@@ -188,9 +188,12 @@ func TestExecuteRoutesGovernedToolCallsThroughKernelChain(t *testing.T) {
 	if invoked != 1 {
 		t.Fatal("the denied call incremented handler invocations")
 	}
+	// RC1: identity incompleteness is unauthenticated — NOT scope_denied,
+	// which is bottom-line-1 evidence and only appears for real tenant
+	// violations. The external wording converges like publicPolicyError.
 	if result.Status != agenttools.StatusRejected || result.Error == nil ||
-		result.Error.Message != "missing execution context" {
-		t.Fatalf("rejection = %+v, want scope-denied with the TenantScope reason preserved", result)
+		result.Error.Code != agenttools.ErrorUnauthenticated {
+		t.Fatalf("rejection = %+v, want rejected with unauthenticated", result)
 	}
 }
 

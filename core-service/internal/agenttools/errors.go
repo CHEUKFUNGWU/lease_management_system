@@ -32,6 +32,7 @@ const (
 	ErrorReviewRequired   = errcontract.CodeReviewRequired
 	ErrorCapabilityDenied = errcontract.CodeCapabilityDenied
 	ErrorBusinessFailure  = errcontract.CodeBusinessFailure
+	ErrorRateLimited      = errcontract.CodeRateLimited
 	ErrorSystemFailure    = errcontract.CodeSystemFailure
 	ErrorTimeout          = errcontract.CodeTimeout
 	ErrorCancelled        = errcontract.CodeCancelled

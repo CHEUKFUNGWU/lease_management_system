@@ -16,6 +16,12 @@ type GuardResult struct {
 	Block  bool
 	Reason string
 	Short  *ToolResult
+	// Code is the rejection's error code, carried EXPLICITLY by the guard at
+	// the reject site (RC1). Empty means the guard did not say — the runtime
+	// then fails closed to system_failure instead of guessing (and never
+	// defaults to scope_denied: that code is底线 1 evidence and must only
+	// appear for real tenant/scope violations).
+	Code ErrorCode
 }
 
 // ExecutionGuard is the seam the governance middleware chain (W2) crosses.
@@ -175,7 +181,17 @@ func (r *Runtime) execute(ctx context.Context, call ToolCall) (ToolResult, error
 			return rejectedResult(call.CallID, policyErrorCode(err), publicPolicyError(err), false), nil
 		}
 		if out.Block {
-			return rejectedResult(call.CallID, ErrorScopeDenied, out.Reason, false), nil
+			// RC1: the code travels from the guard's reject site — never
+			// inferred from Reason text. Empty means the guard did not carry
+			// one: fail closed loudly instead of defaulting to scope_denied
+			// (which would disguise the rejection as a tenant violation).
+			code := out.Code
+			message := publicGuardError(code, out.Reason)
+			if code == "" {
+				code = ErrorSystemFailure
+				message = "governance rejection carried no error code"
+			}
+			return rejectedResult(call.CallID, code, message, false), nil
 		}
 		if out.Short != nil {
 			short := *out.Short
@@ -350,6 +366,31 @@ func publicPolicyError(err error) string {
 		return "tool call arguments or identity are invalid"
 	default:
 		return strings.TrimSpace(err.Error())
+	}
+}
+
+// publicGuardError converges a guard rejection's external message, mirroring
+// what publicPolicyError does for the Evaluate path (RC1): internal sentinel
+// text does not leak verbatim. Two deliberate exceptions keep their reason:
+// scope_denied — AGENTS.md requires its reason preserved unsoftened — and
+// business_failure / rate_limited, whose reasons are authored user-facing
+// guidance (protected-measure routing hints, budget counts), not sentinels.
+func publicGuardError(code ErrorCode, reason string) string {
+	reason = strings.TrimSpace(reason)
+	switch code {
+	case ErrorCapabilityDenied:
+		return "tool capability is not granted"
+	case ErrorPermissionDenied:
+		return "tool permission is not granted"
+	case ErrorInvalidArguments:
+		return "tool call arguments or identity are invalid"
+	case ErrorUnauthenticated:
+		return "authenticated tool context is required"
+	case ErrorSystemFailure:
+		return "tool governance infrastructure failed"
+	default:
+		// scope_denied, business_failure, rate_limited: authored guidance stays.
+		return reason
 	}
 }
 

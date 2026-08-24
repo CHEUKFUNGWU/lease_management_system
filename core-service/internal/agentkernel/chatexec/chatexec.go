@@ -229,6 +229,11 @@ func (k *turnKernel) Before(ctx context.Context, call agenttools.ToolCall, descr
 	k.capture(call, descriptor, principal, nil)
 	candidate := k.deriveShortCircuit(ctx, descriptor, call)
 
+	// RC1: the chain writes each rejection's explicit code into this per-call
+	// sink; deny sites own the code, this adapter only transports it.
+	sink := &governance.RejectSink{}
+	ctx = governance.WithRejectSink(ctx, sink)
+
 	request := &picoclawagent.ToolCallHookRequest{
 		Meta:      k.meta(call),
 		Tool:      call.ToolName,
@@ -249,7 +254,7 @@ func (k *turnKernel) Before(ctx context.Context, call agenttools.ToolCall, descr
 		}
 		return blocked("tool short-circuit carried no derivable first-party payload"), nil
 	default: // deny_tool / abort_turn / hard_abort — rejection reason preserved verbatim
-		return blocked(decision.Reason), nil
+		return agenttools.GuardResult{Block: true, Reason: decision.Reason, Code: sink.Code()}, nil
 	}
 }
 

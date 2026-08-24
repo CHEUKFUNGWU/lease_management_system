@@ -137,12 +137,20 @@ func rejectedWith(result agenttools.ToolResult, reasonPart string) bool {
 		result.Error != nil && strings.Contains(result.Error.Message, reasonPart)
 }
 
+// rejectedWithCode asserts the rejection by its ERROR CODE — the contract
+// surface since RC1. External wording converges via publicGuardError and may
+// change; codes may not.
+func rejectedWithCode(result agenttools.ToolResult, code agenttools.ErrorCode) bool {
+	return result.Status == agenttools.StatusRejected &&
+		result.Error != nil && result.Error.Code == code
+}
+
 // ── 1 TenantScope ────────────────────────────────────────────────────────────
 
 func TestProductionMutationTenantScope(t *testing.T) {
 	w := newMutationWorld(t, nil)
 
-	if got := w.call(noIdentity(), "mut.read"); !rejectedWith(got, "missing execution context") {
+	if got := w.call(noIdentity(), "mut.read"); !rejectedWithCode(got, agenttools.ErrorUnauthenticated) {
 		t.Fatalf("full assembly must reject an incomplete identity, got %+v", got)
 	}
 	w.unmount(t, "TenantScope")
@@ -150,7 +158,7 @@ func TestProductionMutationTenantScope(t *testing.T) {
 		t.Fatalf("removing TenantScope must let the incomplete-identity call through (that is the red), got %+v", got)
 	}
 	w.remount(t, "TenantScope")
-	if got := w.call(noIdentity(), "mut.read"); !rejectedWith(got, "missing execution context") {
+	if got := w.call(noIdentity(), "mut.read"); !rejectedWithCode(got, agenttools.ErrorUnauthenticated) {
 		t.Fatalf("restored assembly must reject again, got %+v", got)
 	}
 }
@@ -169,7 +177,7 @@ func noPermissionIdentity() context.Context {
 func TestProductionMutationCapabilityCheck(t *testing.T) {
 	w := newMutationWorld(t, nil)
 
-	if got := w.call(noPermissionIdentity(), "mut.read"); !rejectedWith(got, "not permitted") {
+	if got := w.call(noPermissionIdentity(), "mut.read"); !rejectedWithCode(got, agenttools.ErrorPermissionDenied) {
 		t.Fatalf("full assembly must reject a call lacking the tool permission, got %+v", got)
 	}
 	w.unmount(t, "CapabilityCheck")
@@ -177,7 +185,7 @@ func TestProductionMutationCapabilityCheck(t *testing.T) {
 		t.Fatalf("removing CapabilityCheck must let the unpermitted call through, got %+v", got)
 	}
 	w.remount(t, "CapabilityCheck")
-	if got := w.call(noPermissionIdentity(), "mut.read"); !rejectedWith(got, "not permitted") {
+	if got := w.call(noPermissionIdentity(), "mut.read"); !rejectedWithCode(got, agenttools.ErrorPermissionDenied) {
 		t.Fatalf("restored assembly must reject again, got %+v", got)
 	}
 }
@@ -245,7 +253,7 @@ func TestProductionMutationBudgetGuard(t *testing.T) {
 		t.Fatalf("first call must fit the budget, got %+v", got)
 	}
 	_ = w.call(fullIdentity(), "mut.read")
-	if got := w.call(fullIdentity(), "mut.read"); !rejectedWith(got, "budget exhausted") {
+	if got := w.call(fullIdentity(), "mut.read"); !rejectedWithCode(got, agenttools.ErrorRateLimited) {
 		t.Fatalf("exhausted budget must block the third call, got %+v", got)
 	}
 	w.unmount(t, "BudgetGuard")
@@ -253,7 +261,7 @@ func TestProductionMutationBudgetGuard(t *testing.T) {
 		t.Fatalf("removing BudgetGuard must let further calls through, got %+v", got)
 	}
 	w.remount(t, "BudgetGuard")
-	if got := w.call(fullIdentity(), "mut.read"); !rejectedWith(got, "budget exhausted") {
+	if got := w.call(fullIdentity(), "mut.read"); !rejectedWithCode(got, agenttools.ErrorRateLimited) {
 		t.Fatalf("restored assembly must block again (counter survives within the turn), got %+v", got)
 	}
 }
@@ -275,7 +283,7 @@ func TestProductionMutationIdempotencyGuard(t *testing.T) {
 		return result
 	}
 
-	if got := draftCall(fullIdentity()); !rejectedWith(got, "requires idempotency_key") {
+	if got := draftCall(fullIdentity()); !rejectedWithCode(got, agenttools.ErrorInvalidArguments) {
 		t.Fatalf("full assembly must require an idempotency key for write-capable tools, got %+v", got)
 	}
 	w.unmount(t, "IdempotencyGuard")
@@ -289,7 +297,7 @@ func TestProductionMutationIdempotencyGuard(t *testing.T) {
 		t.Fatalf("unmounted flow must reach execution/review forcing, got %+v", got)
 	}
 	w.remount(t, "IdempotencyGuard")
-	if got := draftCall(fullIdentity()); !rejectedWith(got, "requires idempotency_key") {
+	if got := draftCall(fullIdentity()); !rejectedWithCode(got, agenttools.ErrorInvalidArguments) {
 		t.Fatalf("restored assembly must reject again, got %+v", got)
 	}
 }
@@ -372,7 +380,7 @@ func TestProductionOrderCommandToolsGatedByCapabilityCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !rejectedWith(result, "level command is disabled") {
+	if !rejectedWithCode(result, agenttools.ErrorCapabilityDenied) {
 		t.Fatalf("under production policy CapabilityCheck must deny command level before any later control answers, got %+v", result)
 	}
 }

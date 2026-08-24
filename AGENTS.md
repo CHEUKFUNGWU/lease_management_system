@@ -34,7 +34,7 @@
 > 这一节是**易腐事实**。数字变了就改，不要在别处再抄一份。核对命令见本文末「验证」。
 
 - `db/init/01_init.sql`：91 张业务表 + `schema_migrations`（空库基线自动标记全部迁移已应用）；增量迁移到 `063_ai_chat_messages_tokens.sql`
-- `core-service/internal/`：33 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentcore` / `agentkernel`（vendor picoclaw 切片 + `governance` 治理链 + `chatexec` 生产执行器）/ `agentcontext`（隔离键）/ `sessionmanager`（会话生命周期）/ `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore`
+- `core-service/internal/`：34 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentcore` / `agentkernel`（vendor picoclaw 切片 + `governance` 治理链 + `chatexec` 生产执行器）/ `agentcontext`（隔离键）/ `sessionmanager`（会话生命周期）/ `contextassembler`（计数→预算→压缩，默认关）/ `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore`
 - R 批次（2026-08-23）新增两个纯函数服务包：`services/varianceattribution`（利润差异归因，连环替代）、`services/newstorefeasibility`（新店可行性，纯函数 + Ports，**禁 import `ifrs16`**）；`services/promotionattribution` 增投前保本（同包，与投后共用 `RunRate`）
 - `web/app/`：32 个页面。零售主线 `/operating-pulse`、`/store-360`、`/scenario-workbench`；**财务主线 `/store-pnl`（单店利润表）、`/financial-model`（法人级三表模型工作台）**
 - **Agent Tool：55 个（36 读 / 19 写）**，2026-08-23 由运行时枚举核出。**这个数只能运行时枚举，不能 grep**——工具有多种定义写法，三种 grep 口径曾分别给出 31 / 21 / 19 三个不同答案。核对方式是构造生产配置的 registry 后调 `Runtime.Describe`，守卫在 `aiagent/registration_completeness_test.go`（它同时断言尝试注册数 == 成功数，任何静默丢弃都会红）

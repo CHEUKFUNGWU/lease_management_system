@@ -40,9 +40,15 @@ The transformation is **additive**. Retail operations analytics was layered on t
 | 三表财务模型与单店利润表<br>Three-statement model & store P&L | ✅ S1–S5 全部编号功能项落地并有测试锁定（2026-08-20）；19 项评审修复已合并<br>Every numbered S1–S5 requirement is implemented and test-locked (2026-08-20); the 19 review fixes are merged |
 | 三表模型的真实 GL / 试算平衡表联调<br>Live GL / trial-balance integration | ⚠️ 未完成。引擎与四个生产适配器已接线，但只跑过构造数据；端口缺数据时诚实降级为缺口，不产出数字<br>Not done. The engine and its four production adapters are wired, but only exercised against constructed data; a port with no data degrades to an explicit gap rather than a number |
 | Python `ai-service` 退役（ADR-0023/0024）<br>Retiring the Python AI service | ✅ **已退役并删除（W6，2026-08-20）**。LLM/解析/上传/planner 全部迁入 Go（`internal/llm`、`internal/docparse`、`internal/aiintake` 生产侧、`miniostore`、`agentrunner.PlannerLLM`）；AGPL 版 PDF 依赖已随 ai-service 一起删除<br>**Retired and removed.** All LLM / parsing / upload / planner paths now run in Go; the `pymupdf` AGPL dependency is gone with the ai-service directory |
+| Agent Runtime 升级 C1（ADR-0027/0028）<br>Agent runtime overhaul | 🚧 **部分交付（2026-08-24）**。治理链已移植到 vendored picoclaw 的 hook 挂点，**生产 chat 路径第一次真的经过它**（G1 汇流，含反向对照守卫）；ACORE-2 九项变异在生产装配下逐项重证。会话管理器与上下文装配器**模块已建但尚未接线**，上下文装配器默认关（`CONTEXT_ASSEMBLER_ENABLED=false`）且有四项整改在途（见 [整改工单](docs/specs/agent-runtime-c1-review-fixes.md)）<br>**Partially delivered.** The governance chain now runs on production chat traffic for the first time. The session manager and context assembler exist as modules but are not yet wired; the assembler is flag-off pending four review fixes |
+| IM 渠道网关（飞书 / 企微，ADR-0026）<br>IM channel gateway | 🚧 **代码在，默认关闭**。`GATEWAY_ENABLED` 未设为 `true` 时零值配置完全禁用，不校验凭据也不建连接。**未接过真实渠道**，渠道身份到法人的绑定关系需人工登记<br>**Present but disabled by default.** Never exercised against a live channel; channel-identity-to-entity bindings must be registered by hand |
+| 第三方 vendor 代码（picoclaw，MIT）<br>Vendored third-party code | ℹ️ 仓库首次引入第三方源码，分两处：`internal/gateway/third_party/`（飞书 / 企微渠道）与 `internal/agentkernel/third_party/`（agent hook 内核切片）。均逐文件标注上游出处、按 commit 钉版、有架构守卫禁止其 import 第一方业务包<br>Two vendored slices, each with per-file upstream provenance, a pinned commit, and an architecture guard forbidding imports of first-party business packages |
 
-**关于命名 / On naming:** 仓库、容器、数据库和 JWT 仍使用 `lease_*` 命名。产品定位已经调整，但底层大规模物理重命名要等内部技术门槛通过后再决定 —— 2026-05 已经改过一次名，不再频繁变更。
-The repository, containers, database and JWT still use the `lease_*` namespace. Positioning has moved; a second large physical rename is deliberately deferred until the internal validation gate is passed (the project was already renamed once in 2026-05).
+**关于命名 / On naming:** GitHub 仓库已于 2026-08 改名为 `retail_performance_workstation`，**但代码命名空间没有跟着改，也不打算改**：容器、数据库、MinIO bucket、JWT、Go module（`github.com/lease-management-system/core-service`）、CLI 与 Compose 项目名仍是 `lease_*`。显示名与代码命名空间是两件事；2026-05 已经做过一次物理重命名，第二次被刻意推迟到内部验证门槛通过之后。
+
+**不要顺手重命名**——`docker-compose.yml` 的 `name:` 改了会孤立现有 postgres 卷与网络（等于清库），`go.mod` 的 module 路径改了要动全仓每一个 import，`docs/archive/**` 里的旧名是历史记录本就该保留。
+
+The GitHub repository was renamed to `retail_performance_workstation` in 2026-08, **but the code namespace was not and will not be**: containers, database, MinIO bucket, JWT, the Go module path, the CLI and the Compose project name all remain `lease_*`. Display names and code namespaces are separate concerns; a second physical rename is deliberately deferred until the internal validation gate is passed. **Do not rename opportunistically** — changing the Compose `name:` orphans the existing postgres volume and network, and changing the module path touches every import in the repository.
 
 ---
 
@@ -60,7 +66,7 @@ The capabilities added by the transformation. Grain is **store-day**; the metric
 | **情景工作台**<br>Scenario Workbench<br>`/scenario-workbench` | 基于同一批事实生成透明的 30 日 run-rate，对销售、毛利率、人工、固定租金、变量租金率、非租赁成本和其他成本七个杠杆做 What-if；输出守恒的贡献变化桥，并可生成待确认的 open action。结果过期或数据不足时会阻断保存。<br>Builds a transparent 30-day run-rate from the same facts and runs what-if on seven levers (sales, gross-margin rate, labour, fixed rent, variable-rent rate, non-lease cost, other cost). Produces a conservation-checked contribution bridge and can raise an open action for confirmation. Saving is blocked when the result is stale or the data is insufficient. |
 | **AI 经营分析 Agent**<br>AI operations analyst<br>`/ai-chat` | `retail_operations@v1` Skill，只允许调用经营脉搏、门店诊断和确定性情景三个**只读** Tool。回答带引用来源、口径说明、置信度和建议下一步；行动建议以 Artifact 形式产出，**不直接写入任何业务表**。权限拒绝保持 `scope_denied` 原因，不被改写成「无数据」。<br>The `retail_operations@v1` skill may call exactly three **read-only** tools: operating pulse, store diagnostics and deterministic scenario. Answers carry citations, metric definitions, a confidence value and a suggested next step. Action suggestions are emitted as artifacts and **never written straight into business tables**. A permission denial keeps its `scope_denied` reason rather than being masked as "no data". |
 | **销售人效与工时**<br>Labour efficiency<br>`/store-360` | 销售人效（销售额 ÷ 工时）、单均工时、人工成本率、期末在岗人数，全部走 `retail-kpi-v1` 既有语义与同群对标。工时缺失时显示「—」——**不从人工成本除以假定时薪反推**，那会造出一个类型上是事实、语义上是猜测的值。面板常驻一句说明：时段排班吻合度做不了，因为事实层是 store-day 粒度，需要先接入 POS 分时流水。<br>Sales per labour hour, labour hours per transaction, labour cost rate and headcount, all on the existing `retail-kpi-v1` semantics with peer benchmarking. Missing labour hours render an em dash — **never back-derived from labour cost and an assumed wage**, which would produce a value that is a fact by type and a guess by meaning. A standing note explains that intraday scheduling fit cannot be computed at store-day grain and what it would take. |
-| **利润差异归因**<br>Profit variance attribution<br>`/store-360` | 门店利润变化按连环替代拆成七个因子：客流、转化率、客单价、毛利率、人工、经营占用、其他可控。**替代顺序会改变数字，所以顺序是答案的一部分并始终回显**；残差单独呈现不摊进任何因子；任一必需事实缺失则整体不可用并列出缺哪些，不做部分归因。品类层下钻复用既有的量 / 结构 / 价三效应拆解。<br>Store profit change decomposed by chained substitution into seven factors: footfall, conversion, average ticket, gross margin rate, labour, occupancy and other controllable cost. **The substitution order changes the numbers, so the order is part of the answer and is always echoed back.** The residual is shown separately rather than absorbed into any factor; if any required fact is missing the whole attribution is unavailable and names what is missing, rather than attributing partially. Category-level drill-down reuses the existing volume / mix / rate decomposition. |
+| **利润差异归因**<br>Profit variance attribution<br>`/store-360` | 门店利润变化按连环替代拆成七个因子：客流、转化率、客单价、毛利率、人工、经营占用、其他可控。**替代顺序会改变数字，所以顺序是答案的一部分并始终回显**；残差单独呈现不摊进任何因子；任一必需事实缺失则整体不可用并列出缺哪些，不做部分归因。品类层下钻复用既有的量 / 结构 / 价三效应拆解。归因结果可渲染为**瀑布图**（`internal/charts` 纯函数渲染器，图与数在同一次调用里产生，构造上不存在图数不一致；前端经消毒器渲染 SVG）。<br>Store profit change decomposed by chained substitution into seven factors: footfall, conversion, average ticket, gross margin rate, labour, occupancy and other controllable cost. **The substitution order changes the numbers, so the order is part of the answer and is always echoed back.** The residual is shown separately rather than absorbed into any factor; if any required fact is missing the whole attribution is unavailable and names what is missing, rather than attributing partially. Category-level drill-down reuses the existing volume / mix / rate decomposition. The result renders as a **waterfall chart** from a pure-function renderer — chart and numbers are produced in one call, so they cannot disagree — sanitised before it reaches the DOM. |
 | **促销投前保本**<br>Pre-launch break-even<br>`/promotions` | 活动批准之前算出「至少要多卖多少才不亏」：固定投入加上原有销量的让利损失，除以折后边际毛利率。基线与投后复盘**共用同一个 run-rate 类型**，所以投前投后两个数对得上。折后边际毛利率不为正时报「不存在保本点」——卖得越多亏得越多，**不返回一个巨大的数字假装有解**。<br>Computes the required incremental sales before a promotion is approved: fixed spend plus margin sacrificed on baseline volume, divided by the discounted marginal margin rate. The baseline **shares one run-rate type** with post-hoc attribution, so the before and after numbers reconcile. When the discounted margin rate is not positive it reports that no break-even point exists — selling more loses more — **rather than returning a very large number as if there were a solution**. |
 | **零售 KPI 语义层**<br>Retail KPI semantic layer<br>`retail-kpi-v1` | 统一的日粒度指标定义与中文数据字典，配 Golden 对数。严格的 null / 零分母语义、覆盖率门槛、最高事实版本选择、来源冲突保护（409）和多币种分区。指标由后端计算，前端不重算评分。<br>One day-grain metric definition set with a data dictionary and golden datasets. Strict null / zero-denominator semantics, coverage thresholds, highest-fact-version selection, source-conflict protection (HTTP 409) and multi-currency partitioning. Metrics are computed server-side; the frontend never re-scores. |
 | **固定 seed 模拟数据生成器**<br>Fixed-seed simulation generator | 一键生成可重复复演的 60 店 / 181 天数据集，内含六类固定经营异常。模拟数据在数据库、API、导出和 UI 中全程带标识，**永不进入 Official 过账链路**。<br>Generates a reproducible 60-store / 181-day dataset containing six fixed anomaly types. Simulated data is labelled end-to-end in the database, API, exports and UI, and **can never enter the Official posting chain**. |
@@ -110,6 +116,7 @@ The finance-manager layer: four-wall economics per store, and a linked income st
 |---|---|
 | **单店利润表**<br>Store P&L<br>`/store-pnl` | 日 / 周 / 月 / 季 / 年期间视图；Actual 与第二列（预算 / 预测 / 去年同期）并排；经营口径与 IFRS 16 口径 side-by-side 且块级带 basis 标签，禁止混算；三级下钻（金额 → 构成 → 合同级占用成本拆分 → 来源事实信封）；同群对比列；多店按区域 / 品牌 / 法人汇总，混币种分区呈现且**不做任何跨币种合计**；CSV 与带活公式的 XLSX 导出。<br>Day/week/month/quarter/year views; Actual beside budget, forecast or prior year; operating and IFRS 16 bases shown side by side with block-level basis labels and no mixing; three-level drill-down down to per-contract occupancy split and the source envelope behind each fact; a peer-cohort column; multi-store roll-up by region/brand/entity with currency partitioning and never a cross-currency total; CSV and live-formula XLSX export. |
 | **三表模型工作台**<br>Statement model workbench<br>`/financial-model` | 法人级 IS/BS/CF 联动模型。冻结线左侧读事实、右侧跑驱动公式（SSSG × 新店爬坡 × 门店增减）；输入带五条版本线与溯源；期初三道闸（自平衡、归并口径跨期一致、租赁余额对计量引擎勾稽）不过则拒绝运行；**T1–T16 勾稽全绿才允许发布**；同步与异步（进度、取消、幂等重放）两种运行方式；月 / 季 / 年折叠的活公式导出。**公式编辑器**点选科目插入引用、支持 `lag(键, n)` 引用上期，输入停顿即校验，语法错误定位到字符、循环引用给出完整引用链路——校验一律走后端，**前端不做任何本地解析（连括号配对都不做）**，两套解析器必然分叉。<br>A linked IS/BS/CF model per legal entity. Facts left of the freeze line, driver formulas right of it. Inputs carry five version lines and provenance. Three opening-balance gates must pass or the run is refused. Publication requires all sixteen tie-outs green. Runs synchronously or asynchronously with progress, cancellation and idempotent replay. Exports fold to month, quarter or year as a live-formula workbook. |
+| **科目树编辑器与 AI 生成**<br>Chart-of-accounts editor & AI drafting<br>`/financial-model` | 用户可自建科目、调整层级、隐藏不用的行，并**逐科目**选择取数来源（自填 / 挂系统事实 / 公式推导）——引擎一直支持这三种行类型，此前只是界面不给选。隐藏行时校验小计是否仍然配平，不平则拒绝。AI 生成行业专属科目树走 `fpna.coa.suggest_template`：**该工具自己不调 LLM**，模型在 chat plane 组好 rows JSON 再交由工具做确定性校验与落库，因此「AI 建议」与「校验规则」是两件可分别测试的事。<br>Users can create accounts, restructure the hierarchy, hide unused rows and choose the data source **per account** (typed input / linked system fact / derived formula) — the engine always supported all three row kinds; only the interface withheld them. Hiding a row is refused if subtotals would stop balancing. Industry-specific trees are drafted through `fpna.coa.suggest_template`, which **does not call an LLM itself**: the model assembles the rows JSON in the chat plane and the tool performs deterministic validation and persistence, keeping "AI suggestion" and "validation rule" separately testable. |
 | **受治理的模板与视图**<br>Governed templates & saved views | 白名单公式 DSL（字面量、循环引用、跨法人、basis 混行一律在 Parse 期拒绝）；模板版本冻结、复核批准、复制谱系、共享 / 个人可见性；保存视图带 fail-closed 配置 lint；**未登记的自定义公式行在 JSON、XLSX 与页面三处都带「未经指标治理」标识**。<br>A whitelist formula DSL that rejects literals, cycles, cross-entity references and mixed-basis rows at parse time; versioned, frozen, reviewed and approved templates with copy lineage and shared/personal visibility; saved views behind a fail-closed config lint; and ungoverned custom formula rows marked as such in JSON, XLSX and the interface alike. |
 | **AI 填数与差异备忘录**<br>AI assumptions & variance memos | `fpna.*` 六个 Tool：读模型、跑试算、生成底稿、建议假设（单条与批量）、起草四层差异备忘录。**写类工具一律只写 draft 层**，`source=ai_suggestion`，approved-only 的读取路径永不回采 draft；无法建议的项目如实留空而不是编造。<br>Six `fpna.*` tools: read a model, evaluate it, generate a working paper, suggest assumptions (single and batch), and draft a four-layer variance memo. Every writing tool writes only to the draft layer, tagged `source=ai_suggestion`; approved-only reads never pick drafts back up, and an item the model cannot justify is left empty rather than invented. |
 | **集团合并视图**<br>Group view | 按授权集合汇总，未授权成员显式呈现而非静默省略；原币分区为默认视图，折算视图必须指定汇率版本与类型（缺汇率整体降级）；固定声明「未做内部交易抵销」。<br>Aggregates the authorised set and shows unauthorised members explicitly instead of silently dropping them; native-currency partitions are the default view and a translated view demands an explicit rate version and type, degrading wholesale when a rate is missing; carries a standing note that intercompany eliminations are not performed. |
@@ -122,8 +129,13 @@ The finance-manager layer: four-wall economics per store, and a linked income st
 | 文件分诊<br>File triage | `lease.file.triage` 做确定性分诊；域外文件（发票、劳动合同、宣传册）**显式拒绝并回问用户**，没有「猜成合同」的兜底。<br>`lease.file.triage` classifies deterministically. Out-of-domain files (invoices, employment contracts, brochures) are refused explicitly and referred back to the user; there is no silent "assume it's a contract" fallback. |
 | 底稿产出<br>Working papers | `workingpaper` 按单元格级 provenance 渲染 xlsx / docx，经 fail-closed lint 才能导出：Certified 单元格必须挂已完成审计的 Tool 调用，勾稽未全绿的 run 不产出底稿，缺失值跳格而不填 0。<br>`workingpaper` renders xlsx/docx with cell-level provenance behind a fail-closed lint: a certified cell must reference a completed, audited tool call, a run with unpassed tie-outs yields no paper at all, and a missing value leaves the cell empty rather than writing zero. |
 | Human-in-the-loop | AI 草稿必须人工确认才能创建合同草稿，正式入库仍走审批。AI 不得猜测折现率，缺失时标记 `discount_rate_missing`。<br>An AI draft only becomes a contract draft after human confirmation, and formal entry still goes through approval. The AI may not guess a discount rate; a missing one is flagged `discount_rate_missing`. |
-| Agent Tool Runtime | Web、CLI 与 Pi-like Runner 共用 Tool Registry、Scope Guard、Review Gate、幂等与审计接缝。<br>Web, CLI and the Pi-like runner share one tool registry, scope guard, review gate, idempotency layer and audit seam. |
+| Agent Tool Runtime | Web、CLI 与 Pi-like Runner 共用 Tool Registry、Scope Guard、Review Gate、幂等与审计接缝。工具名为**三段式命名空间**（`lease.*` / `retail.*` / `fpna.*`），新增工具照 [Agent Tool 包装规范](docs/Agent_Tool_包装规范.md) 写。**注册失败 fail-fast**：任何工具注册不上即 panic 并报出工具名与原始错误——此前每个注册点吞错，两个工具因此带着自己的绿测试从未进过 registry。<br>Web, CLI and the Pi-like runner share one tool registry, scope guard, review gate, idempotency layer and audit seam. Tool names use a three-part namespace and registration failure is fail-fast: a tool that cannot register panics with its name and the original error, rather than disappearing behind its own passing tests. |
+| 治理链与内核<br>Governance chain & kernel | 六前三后九个控制（租户 scope → 能力检查 → 受保护度量 → 预算闸 → 幂等闸 → Review Gate，之后审计 → Artifact 采集 → 指标）。2026-08-24 起该链挂载在 vendored picoclaw 的 `ToolInterceptor` 挂点上，**且生产聊天路径第一次真的经过它**——此前它保护的是一个从未处理过生产请求的内核。汇流本身有机器守卫（断言生产 executor 的具体类型，并有反向对照防恒真）。**准确说法**：换掉的是工具调用的分发挂点与治理链的挂载方式，agent 主循环仍是第一方的；vendored 切片里被第一方代码实际引用的只有 hook 那一组类型。<br>Nine controls, six before and three after. Since 2026-08-24 the chain is mounted on the vendored picoclaw hook points **and, for the first time, sits on the production chat path** — previously it guarded a kernel that had never served a production request. The convergence itself is machine-guarded, with a reverse control so the assertion cannot be vacuously true. **Stated precisely:** what changed is the tool-call dispatch point and how the chain mounts; the agent loop remains first-party, and only the hook types of the vendored slice are actually referenced. |
+| 会话与上下文工程<br>Sessions & context engineering | `sessionmanager` 把会话生命周期（取用即持独占租约、幂等结算、空闲淘汰）收拢成单一所有者；`contextassembler` 把 token 计数 → 预算 → 压缩做成**一个方法**，压缩只裁剪送进模型的消息序列，**不删 `ai_chat_messages` 的记录**，且工具调用、Artifact 引用、审批动作等承载审计意义的内容永不参与压缩。两者都以 `agentcontext.ContextKey`（法人 + 用户 + 会话 + scope 指纹 + 数据分类五维）为隔离键。**当前状态**：两个模块均已建成并有测试，但 `sessionmanager` 尚无生产调用方，`contextassembler` 默认关闭。<br>A single owner for session lifecycle, and context engineering as one method (count → budget → compact). Compaction trims only what goes to the model; nothing is deleted from storage, and audit-bearing content never participates. Both key off a five-dimension isolation key. **Both are built and tested but not yet on a production path.** |
+| IM 渠道网关<br>IM channel gateway | 飞书 / Lark 与企业微信接入（ADR-0026，vendored 上游渠道实现）。渠道身份先解析成本仓的租户身份再进 Agent，**渠道侧不携带任何法人信息**。默认完全关闭：`GATEWAY_ENABLED` 不为 `true` 时零值配置既不校验凭据也不建连接；「启用但缺凭据」的渠道带具名错误跳过，不 panic、不重试刷屏。**尚未接过真实渠道。**<br>Feishu/Lark and WeCom ingress. A channel identity is resolved into this system's tenant identity before anything reaches the agent; the channel side carries no legal-entity information. Disabled by default, and a channel that is enabled but missing credentials is skipped with a named error rather than crashing or retry-storming. **Never exercised against a live channel.** |
+| 草稿复核工作台<br>Draft review workbench<br>`/contracts/drafts` | 左栏草稿列表 + 右栏详情。字段区把 **AI 提取值与人工终值并排**——两者互不覆盖，差异是留痕的一部分而不是要抹平的噪声。置信度缺失渲染「—」不造数。低置信度字段构成批准闸：blockers 非空时批准按钮禁用并列出被挡字段，**闸本身在服务端 Decide，前端只是提示**（有绕过前端直调的测试）。部分失败逐条可见，不折叠成一句汇总。<br>A draft list beside a detail pane. AI-extracted values and human final values sit **side by side and never overwrite each other** — the divergence is part of the record. Missing confidence renders an em dash. Low-confidence fields form an approval gate enforced server-side; the frontend only surfaces it. Partial failures stay itemised rather than collapsing into one summary line. |
 | Skill Registry | 合同台账、合同复核、租金表、审计包与 `retail_operations@v1` 均以版本化描述注册，并按角色过滤。<br>Contract ledger, contract review, rent schedule, audit pack and `retail_operations@v1` are all registered as versioned descriptors and filtered by role. |
+| Agent 可达的业务面<br>What the agent can reach | 除零售三件只读工具外，单店利润表、月结、经营事实与报表也已接入（Batch B）：Agent 可以读四墙损益、月结状态、store-day 事实与报表数据，写类能力一律只落 draft 层。**工具总数与读写分布是易腐事实，记在 [AGENTS.md](AGENTS.md)「当前工程事实」一处**，且只能由运行时枚举核出——grep 不出正确答案（三种 grep 口径曾给出三个不同数字）。<br>Beyond the three read-only retail tools, store P&L, month-end close, store-day facts and reporting are reachable too. Writing capabilities only ever reach the draft layer. The tool count and read/write split are perishable facts kept in one place in AGENTS.md, and can only be established by runtime enumeration. |
 | `lease-agent` CLI | Skill / Tool discovery、合同搜索与只读查询、Draft 命令、Capability 签发与撤销、Run Trace、worker lease 和机器可读退出码。<br>Skill/tool discovery, contract search and read-only queries, draft commands, capability issue/revoke, run traces, worker leases and machine-readable exit codes. |
 | `agent-runner` | 独立 Worker 进程，只通过 Agent Gateway 执行受控 Tool，不挂载数据库或 MinIO 凭证；Run 按 `worker_id + lease_token` 绑定。<br>A standalone worker that executes controlled tools only through the Agent Gateway, with no database or MinIO credentials mounted; runs are bound by `worker_id + lease_token`. |
 | Agent 可观测性 `/agent-metrics`<br>Agent observability | JSON 与 Prometheus 指标、跨 Run Planner 用量、Token 与成本状态；价格未配置时明确标记 unavailable，不臆造成本。<br>JSON and Prometheus metrics, cross-run planner usage, token and cost status. When pricing is not configured, cost is explicitly marked unavailable rather than invented. |
@@ -168,6 +180,7 @@ No change made during the retail transformation may weaken these five. Each was 
 | OCR / 文档结构化 | PaddleOCR-VL-1.5（AI Studio 异步 API）+ anydoc（`internal/docparse`，ADR-0024 分流）；AGPL 版 PDF 依赖已删除 |
 | 报表产出 / Report output | excelize（xlsx，含活公式）+ 确定性 docx 渲染器 |
 | 大模型 / LLM | DeepSeek API（默认 / default）、OpenAI API（备用 / fallback） |
+| Vendored 第三方 / Vendored third-party | picoclaw（MIT，按 commit 钉版）两处切片：IM 渠道 `internal/gateway/third_party/`、agent hook 内核 `internal/agentkernel/third_party/`。依赖均为宽松许可、无 copyleft；出处见 [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) 与 ADR-0026/0027/0028 |
 | 对象存储 / Object storage | MinIO |
 | 认证授权 / Auth | 自建 JWT + RBAC + 多租户行级过滤；Agent Gateway 支持短时效、Run 绑定的 Capability Token |
 | 部署 / Deployment | Docker Compose |
@@ -182,16 +195,28 @@ No change made during the retail transformation may weaken these five. Each was 
 │   ├── init/                      # PostgreSQL 首次初始化 schema / first-run schema
 │   └── migrations/                # 增量迁移 SQL / incremental migrations
 ├── core-service/                  # Go + Gin 核心 API
-│   ├── cmd/api/                   # API 服务入口
+│   ├── cmd/api/                   # API 服务入口（唯一的生产接线点）
 │   ├── cmd/ifrs16-regression/     # IFRS 16 回归报告生成命令
 │   ├── cmd/lease-agent/           # 只调用 Agent Gateway 的 CLI Adapter
 │   ├── cmd/agent-runner/          # Pi-like Worker 进程入口（无 DB/MinIO 凭证）
+│   ├── cmd/agent-evaluation/      # L1 评测 harness 运行入口
+│   ├── cmd/bootstrap-admin/       # 首个管理员引导（唯一入口，凭据只从环境变量读）
 │   └── internal/
-│       ├── agentcore/             # 纯 Go Agent 循环内核（ADR-0022）
-│       ├── agentartifact/         # Artifact / Evidence 协议
+│       ├── agentcore/             # 第一方 Agent 循环内核与旧治理链挂点（ADR-0022）
+│       ├── agentkernel/           # C1 内核层
+│       │   ├── governance/        #   ACORE-2 九个控制，挂在 picoclaw hook 上
+│       │   ├── chatexec/          #   生产 chat 执行器（汇流点，AR5d）
+│       │   └── third_party/       #   vendored picoclaw 切片（MIT，架构守卫锁死依赖方向）
+│       ├── agentcontext/          # 隔离键 ContextKey（法人+用户+会话+scope 指纹+分类）
+│       ├── sessionmanager/        # 会话生命周期单一所有者（尚无生产调用方）
+│       ├── contextassembler/      # 计数 → 预算 → 压缩（默认关，见 CONTEXT_ASSEMBLER_ENABLED）
+│       ├── agentartifact/         # Artifact / Evidence 协议（含 chart_svg）
 │       ├── agentskill/            # Skill Registry
 │       ├── agenttools/            # Tool Registry / Runtime / Policy（lease.* / retail.* / fpna.*）
 │       ├── agentseval/            # L1 评测 harness 与不变量用例
+│       ├── gateway/               # IM 渠道网关：渠道身份 → 租户身份（默认关）
+│       │   └── third_party/       #   vendored 飞书 / 企微渠道实现（MIT）
+│       ├── charts/                # 确定性 SVG 渲染器（纯函数，无 Options）
 │       ├── docparse/              # CSV / anydoc / PaddleOCR 解析层
 │       ├── workingpaper/          # 单元格级 provenance、fail-closed lint、xlsx/docx 渲染
 │       ├── finmodel/              # 三表模型：纯函数引擎 + 勾稽 T1–T16
@@ -205,12 +230,16 @@ No change made during the retail transformation may weaken these five. Each was 
 │       ├── handlers/              # HTTP handlers（含 retail_* / finmodel / store_pnl）
 │       ├── middleware/            # JWT、tenant、CORS
 │       ├── repository/            # pgx 数据访问层
-│       └── services/
+│       └── services/              # 业务服务（40+ 包，以下为主线）
 │           ├── retailkpi/         # retail-kpi-v1 指标语义层
 │           ├── retailpulse/       # 经营脉搏聚合
 │           ├── retailstore360/    # 门店 360 与同群对比
 │           ├── retailscenario/    # 确定性情景计算
 │           ├── retailsimulation/  # 固定 seed 模拟数据生成器
+│           ├── varianceattribution/   # 利润差异归因（连环替代）
+│           ├── newstorefeasibility/   # 新店可行性（纯函数 + Ports，禁 import ifrs16）
+│           ├── promotionattribution/  # 促销投前保本与投后复盘（共用 RunRate）
+│           ├── draftreview/       # 草稿复核工作台后端（置信度闸在服务端）
 │           └── ifrs16/            # IFRS 16 计量
 # ai-service/ 已删除（W6）：解析、LLM、上传全部迁入 core-service（ADR-0023/0024）
 ├── contracts/ai-intake.v1/        # 抽取契约 JSON Schema（实现方可换，契约不变）
@@ -224,6 +253,9 @@ No change made during the retail transformation may weaken these five. Each was 
 │       ├── fpna-workbench/        # FP&A 版本与差异工作台
 │       ├── ai-chat/               # AI 录入与经营问答
 │       ├── contracts/             # 合同台账与详情
+│       │   └── drafts/            #   草稿复核工作台（AI 值与人工终值并排）
+│       ├── promotions/            # 促销投前保本与投后复盘
+│       ├── retail-data-import/    # store-day 事实导入
 │       ├── monthly-closing/       # 月结跑批
 │       ├── reports/               # 报表
 │       ├── performance/           # 经营驾驶舱
@@ -258,6 +290,13 @@ make setup
 - `OPENAI_API_KEY`（备用 / fallback）
 - `PADDLEOCR_ACCESS_TOKEN`（启用 PaddleOCR 时 / when PaddleOCR is enabled）
 
+默认关闭、需要显式打开的能力 / Off by default, opt in explicitly:
+
+| 变量 / Variable | 作用 / Effect |
+|---|---|
+| `CONTEXT_ASSEMBLER_ENABLED` | 打开 AR3 上下文装配器（chat history 经计数 → 预算 → 压缩再进 prompt）。**当前保持 `false`**，四项整改完成前不要开；回滚就是去掉这个变量重启。可选 `CONTEXT_BUDGET_WINDOW_TOKENS` / `CONTEXT_BUDGET_RESERVE_TOKENS` 覆盖预算几何<br>Turns on the context assembler. **Keep it `false`** until the outstanding fixes land; rolling back is a restart without the variable |
+| `GATEWAY_ENABLED` | 打开 IM 渠道网关。为 `true` 时才读 `GATEWAY_FEISHU_*` / `GATEWAY_WECOM_*`；否则零值配置完全禁用，不校验凭据也不建连接<br>Turns on the IM gateway; channel credentials are only read when it is `true` |
+
 ### 3. 启动服务 / Start services
 
 ```bash
@@ -275,8 +314,11 @@ export AGENT_GATEWAY_TOKEN="$(curl -fsS -X POST "$AGENT_CORE_URL/api/v1/auth/log
 docker compose --profile worker up -d --build agent-runner
 ```
 
-本地如遇 8080 / 8081 被占用，可在 `.env` 改 `CORE_PORT` / `AI_PORT`；容器内部地址仍固定为 Core `8080`、AI `8000`。**不要把 Worker JWT 写入 Git 或 `.env.example`。**
-If 8080 / 8081 are taken locally, change `CORE_PORT` / `AI_PORT` in `.env`; in-container addresses stay at Core `8080` and AI `8000`. **Never commit a worker JWT to Git or `.env.example`.**
+本地如遇端口被占用，可在 `.env` 改 `CORE_PORT` / `WEB_PORT` / `DB_PORT` / `MINIO_*_PORT`；容器内部地址仍固定为 Core `8080`。**不要把 Worker JWT 写入 Git 或 `.env.example`。**
+If a port is taken locally, change `CORE_PORT` / `WEB_PORT` / `DB_PORT` / `MINIO_*_PORT` in `.env`; the in-container address stays at Core `8080`. **Never commit a worker JWT to Git or `.env.example`.**
+
+Compose 默认起四个服务（PostgreSQL、MinIO、Core、Web），`worker` profile 另起 `agent-runner`。
+Compose starts four services by default; the `worker` profile adds `agent-runner`.
 
 服务地址 / Service endpoints:
 
@@ -284,7 +326,6 @@ If 8080 / 8081 are taken locally, change `CORE_PORT` / `AI_PORT` in `.env`; in-c
 |------|------|
 | Web | http://localhost:3000 |
 | Core Service | http://localhost:8080 |
-| AI Service | http://localhost:8081 |
 | MinIO Console | http://localhost:9001 |
 | PostgreSQL | localhost:5432 |
 
@@ -336,25 +377,25 @@ The retail MVP's demo script, release checklist and end-to-end acceptance eviden
 
 ### 6. 数据库迁移 / Database migrations
 
-`db/init/01_init.sql` 只在 PostgreSQL volume 首次为空时执行。已有旧 volume 时需要手动跑增量迁移。
-`db/init/01_init.sql` runs only when the PostgreSQL volume is empty. Existing volumes need the incremental migrations applied by hand.
+`db/init/01_init.sql` 只在 PostgreSQL volume 首次为空时执行，且会把 `db/migrations/` 下的全部迁移在 `schema_migrations` 里标记为已应用（空库基线）。已有旧 volume 时跑增量迁移：
 
-零售转型相关的迁移 / Migrations introduced by the retail transformation:
-
-```bash
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/037_budget_versions_source_backfill.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/038_retail_store_day_facts.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/039_retail_simulation_datasets.sql
-docker exec -i lease-postgres psql -U lease -d lease < db/migrations/040_agent_artifact_retail_proposal.sql
-```
-
-早期迁移（005–036）见 [`db/migrations/`](db/migrations/)；要清空并按最新 schema 重建：
-For the earlier migrations (005–036) see [`db/migrations/`](db/migrations/). To wipe and rebuild on the latest schema:
+`db/init/01_init.sql` runs only when the PostgreSQL volume is empty, and baselines `schema_migrations` so every migration counts as applied. Existing volumes take the increments:
 
 ```bash
-make reset-db
-make up
+make migrate-status   # 看哪些已应用、哪些待应用，不做任何修改 / read-only
+make migrate          # 按序应用尚未执行的迁移 / apply what is pending
 ```
+
+其余两个相关命令 / The other two:
+
+```bash
+make migrate-baseline # schema 已就位但 schema_migrations 空时，只标记不执行
+make reset-db && make up   # 删卷重建到最新 schema（会清库）/ wipes and rebuilds
+```
+
+**每一次表结构变更都必须同时提供增量迁移和 `db/init/01_init.sql` 的空库版本**，缺一即环境漂移——已经因此踩过两次（`27ccdd2` 漏合并 CHECK 约束、`32aac80` 漏登记基线）。一致性测试会断言两者等价。
+
+**Every schema change ships both an incremental migration and the matching `01_init.sql` definition.** Missing either causes environment drift; consistency tests assert the two agree.
 
 ---
 
@@ -372,6 +413,9 @@ make up
 | AI 助手 / AI assistant | `/ai-chat` | 文件录入、草稿确认、经营问答与行动建议 |
 | 待办 / To-do | `/todo` | 关键日期、审批与异常待办 |
 | 合同台账 / Contracts | `/contracts` | 合同列表、搜索、筛选、排序、余额与在租金额 |
+| 草稿复核 / Draft review | `/contracts/drafts` | AI 提取值与人工终值并排、置信度闸、逐条可见的批量结果 |
+| 促销 / Promotions | `/promotions` | 投前保本测算与投后复盘（共用同一 run-rate） |
+| 事实导入 / Data import | `/retail-data-import` | store-day 事实导入、来源信封与幂等保护 |
 | 月结跑批 / Month-end close | `/monthly-closing` | 生成、审批、过账、锁账、ERP 导出与回写 |
 | 报表 / Reports | `/reports` | Working / Official 报表、披露报表包、预算差异与 CSV 导出 |
 | 组合分析 / Portfolio | `/portfolio` | 资产类型、范围、租金承诺与到期分布 |
@@ -402,8 +446,15 @@ cd ..
 make ifrs16-regression
 ```
 
-真实 PostgreSQL 集成测试需要设置 `TEST_DATABASE_URL`，未设置时相关用例会正常 skip。
-The real-PostgreSQL integration tests require `TEST_DATABASE_URL`; without it those cases skip cleanly.
+集成测试（跨法人隔离与幂等的证据在这里）跑一次性库，跑完销毁，不碰既有 `lease-postgres` 卷：
+The integration tests — where the cross-entity isolation and idempotency evidence lives — run against a throwaway database and never touch the existing volume:
+
+```bash
+make test-integration            # 可选 ARGS= 传 go test 参数 / optional ARGS=
+```
+
+> ⚠️ **skip 掉的集成测试不构成任何证据。** `skip` 与 `pass` 在 `go test` 输出里都不是 `FAIL`，读输出时要分清楚。直接 `go test` 而不设 `TEST_DATABASE_URL` 时，这些用例会安静地 skip。
+> **A skipped integration test proves nothing** — neither `skip` nor `pass` shows up as `FAIL`. Plain `go test` without `TEST_DATABASE_URL` skips them silently.
 
 常用命令 / Common commands:
 
@@ -414,7 +465,10 @@ make down                 # 停止服务 / stop
 make restart              # 重启 / restart
 make logs                 # 日志 / logs
 make db                   # 进入 PostgreSQL
+make migrate-status       # 迁移状态（只读）/ migration status (read-only)
+make migrate              # 应用待执行迁移 / apply pending migrations
 make ifrs16-regression    # IFRS 16 回归 / regression report
+make test-integration     # 一次性库跑集成测试 / integration tests on a throwaway DB
 ```
 
 ---
@@ -432,6 +486,11 @@ make ifrs16-regression    # IFRS 16 回归 / regression report
 - 模拟数据必须在数据库、API、导出和 UI 中保持标识，不得进入 Official 过账链路。
 - 所有数据库变更必须同时提供增量迁移和 `db/init/01_init.sql` 空库初始化版本。
 - 经营口径的占用成本不等于 IFRS 16 折旧、利息、ROU 或租赁负债变动，两者不可互相替代。
+- 权限拒绝必须保持 `scope_denied` 原因，**不得软化成「无数据」或「未找到」**——软化会把权限问题伪装成数据问题。
+- 新增 Agent Tool 照 [Agent Tool 包装规范](docs/Agent_Tool_包装规范.md) 写，命名落在 `lease.*` / `retail.*` / `fpna.*` 三个命名空间之一；注册失败 fail-fast，不得吞错。
+- 引入第三方源码必须：逐文件标注上游出处、按 commit 钉版、加架构守卫禁止其 import 第一方业务包、可对上游 diff；许可证需为宽松许可（无 copyleft），并登记进 `THIRD_PARTY_NOTICES`。
+- 有风险的新能力默认关闭、可独立回退（回滚是去掉环境变量重启，不是在热路径里加分支）。
+- 易腐事实（表数、包数、页面数、工具数）只在 [AGENTS.md](AGENTS.md)「当前工程事实」维护一份，**不要在别处抄第二份**；工具数只能由运行时枚举核出。
 
 English:
 
@@ -444,6 +503,11 @@ English:
 - Simulated data stays labelled across database, API, exports and UI, and never enters the Official posting chain.
 - Every database change ships both an incremental migration and an updated `db/init/01_init.sql`.
 - Operating-basis occupancy cost is not IFRS 16 depreciation, interest, ROU or lease-liability movement; the two are never substituted for each other.
+- A permission refusal keeps its `scope_denied` reason and is **never softened into "no data" or "not found"** — softening disguises a permission problem as a data problem.
+- New agent tools follow the [tool-wrapping standard](docs/Agent_Tool_包装规范.md), take a name in one of the three namespaces, and fail fast on registration errors.
+- Vendored third-party source must carry per-file upstream provenance, a pinned commit, an architecture guard forbidding imports of first-party business packages, and a permissive (non-copyleft) licence recorded in `THIRD_PARTY_NOTICES`.
+- Risky new capabilities ship disabled by default and independently revertible — rolling back is a restart without an environment variable, not a branch in the hot path.
+- Perishable facts (table, package, page and tool counts) live in exactly one place, AGENTS.md; the tool count can only be established by runtime enumeration.
 
 ---
 
@@ -471,12 +535,28 @@ English:
 - [IFRS 16 计量方法与准则映射白皮书](docs/IFRS16_计量方法与准则映射白皮书.md)
 - 计量回归对数报告：**不入库**，跑 `make ifrs16-regression` 生成到 `docs/IFRS16_计量回归对数报告.md`（已 gitignore）
 
+**架构 / Architecture**
+
+- [智能体系统架构全景蓝图](docs/architecture/ARCHITECTURE_BLUEPRINT.md) — 目标形态与能力面全景
+- [ADR-0026](docs/adr/0026-vendor-picoclaw-im-channels.md) — vendor 飞书 / 企微渠道
+- [ADR-0027](docs/adr/0027-adopt-picoclaw-agent-core-keep-the-governance-chain.md) — 采用 picoclaw agent 内核、保留治理链
+- [ADR-0028](docs/adr/0028-extend-picoclaw-adoption-to-the-whole-runtime.md) — 采用范围扩到整个 runtime
+
 **Agent 与运维 / Agent & Operations**
 
-- [AGENTS.md](AGENTS.md)
+- [AGENTS.md](AGENTS.md) — **贡献者入口**，含「当前工程事实」这一份易腐数字的唯一出处
 - [AI 文档索引与现行决策](docs/AI_文档索引与现行决策.md) — **AI 相关文档的入口**，标注每份文档是否仍然有效
+- [Agent Tool 包装规范](docs/Agent_Tool_包装规范.md) — 可照抄模板、命名判定、接缝要比 API 窄、租户上下文的唯一正确写法
 - [AI Agent 运行运维手册](docs/AI_Agent_运行运维手册.md)
 - [ops/prometheus/README.md](ops/prometheus/README.md)
+
+**在途工作 / In flight**
+
+- [Spec：Agent Runtime 完整升级（C1）](docs/specs/agent-runtime-overhaul-c1.md) — 三层范围与能力清单
+- [CodebaseDesign：Agent Runtime 升级模块深化](docs/CodebaseDesign_AgentRuntime升级_模块深化.md) — AR1–AR6 模块接口
+- [工单：C1 批次评审整改（AF1–AF4）](docs/specs/agent-runtime-c1-review-fixes.md) — **上下文装配器在这四条落地前保持关闭**
+- [Spec：FP&A 科目树灵活性（F1）](docs/specs/fpna-chart-of-accounts-flexibility-f1.md)
+- [Spec：词表收敛 V1](docs/specs/vocabulary-convergence-v1.md) — 审批状态统一为 Draft / Pending / Approved
 
 > 历史文档（已被取代或已完结）统一归档在 `docs/archive/`，均带 ARCHIVED 横幅，**不作为现行依据**。
 

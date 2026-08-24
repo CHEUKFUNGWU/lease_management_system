@@ -53,7 +53,7 @@ FP&A 版本治理与滚动预测
 | [CodebaseDesign：AI 阶段 4 PageFill 填表缝模块深化](CodebaseDesign_AI阶段4_PageFill填表缝_模块深化.md) | **Current** | page_fill 协议（Exploratory 结构性不入 payload，I5/ACORE-12）、`retail.store_days.import.preview` 工具、导入页 `?fill=` 消费；D-D1~D3 |
 | [CodebaseDesign：AI 阶段 5 MinIO 接线与三入口汇流模块深化](CodebaseDesign_AI阶段5_MinIO接线与三入口汇流_模块深化.md) | **Current** | MinIO 读取接线（page_fill 点亮）、三入口统一、G1 两平面汇流；D-E1~E4。**M1 已交付，M2/M3 进行中** |
 | [Spec：Agent Runtime 完整升级（C1 批次）](specs/agent-runtime-overhaul-c1.md) | **Current** | **C1 批次口径来源**：D-C0~D-C10，Story 1–43。范围按能力清单判不按包判（D32）；三层推进各自可独立回退 |
-| [CodebaseDesign：Agent Runtime 升级模块深化](CodebaseDesign_AgentRuntime升级_模块深化.md) | **Current** | **C1 实施级设计**：AR1 ContextKey（已交付）、AR2 Session Manager（已交付）、AR3 上下文工程（已交付并接线，flag 默认关，见 D38）、AR4 Subturn 委派、AR5 内核置换与汇流（b/c/d 已交付）、AR6 Memory；决策留痕 D-C11~D-C20 与守卫 AR*-G* |
+| [CodebaseDesign：Agent Runtime 升级模块深化](CodebaseDesign_AgentRuntime升级_模块深化.md) | **Current** | **C1 实施级设计**：AR1 ContextKey（已交付）、AR2 Session Manager（已交付）、AR3 上下文工程（已交付并接线，flag 默认关，见 D38）、AR4 Subturn 委派、AR5 汇流与治理链上生产（b/c/d 已交付；「内核置换」口径订正见 ADR-0028 Correction）、AR6 Memory；决策留痕 D-C11~D-C20 与守卫 AR*-G* |
 | [Research：picoclaw agent 闭包分析](research/AR5_picoclaw_agent闭包分析_2026-08-24.md) | **Historical** | AR5a 的只读分析：最小闭包清单、挂点对齐表、ACORE-2 九项可移植性判定（含审计传播三选一裁决）、形状 A 可行性、拆单建议。其裁决已被 AR5b/c/d 落实，作为决策依据留档 |
 | [FP&A 与 Finance BP 经营决策及 AI 辅助需求清单](FP&A与Finance_BP经营决策及AI辅助需求清单.md) | Current | 业务需求有效。**§9 制造功能已标注为不在当前范围**；§12 的工具勾选表已移除，实现状态以代码为准 |
 | [PRD：三表财务模型与单店利润表](PRD_三表财务模型与单店利润表.md) | **Current** | **业务需求现行依据**（财务经理视角）：S1 单店利润表页、S2 法人级三表模型、S3 受治理模板自定义、S4 AI 填数与报表生成、S5 集团合并视图。AI 相关诉求均声明沿用 ADR-0019/0025 与既有 WorkingPaper 先例，未改动 §2 任何决策。**附录 E（2026-08-20）全部 ✅、无 ⚠/❌ 行**；附录 B 的勾稽表述已随 P0-4 重设计同步修订 |
@@ -178,6 +178,7 @@ FP&A 版本治理与滚动预测
 | G5 无 xlsx/docx 产出（导出仍是 CSV） | 🟡 **部分解决**：`workingpaper` xlsx/docx 确定性渲染器 + lint 门 + `GET /ai/chat/artifacts/:id/export` 端点已落地；端到端 WorkingPaper 生成链路（S1 底稿）未接线 | 阶段 0 → 阶段 1 |
 | **G6 PyMuPDF 的 AGPL 风险** | ✅ **已解决（W6，2026-08-20）。** `ai-service/` 整目录已删除，该 AGPL PDF 依赖不再存在于仓库代码；解析改由 `internal/docparse`（anydoc / PaddleOCR）承担 | ADR-0024 |
 | **G7 ai-service 未退役（新登记，2026-08-20）** | ✅ **已解决（W6，2026-08-20）。** W4+W5 全部落地：chat（`/chat` ×2）与 planner（`/api/v1/agent/plan`）迁入 `internal/llm` / `agentrunner.PlannerLLM`；四个 `/parse/*` 迁入 `internal/aiintake` 生产侧 + `internal/docparse`；`/suggest-mapping` 迁入 `internal/llm`；`/files/upload` 迁入 `miniostore` 写入侧。§0.2 九条依赖点清零，ai-service 整目录删除 | ADR-0023 W4–W6 |
+| **G9 sessionmanager 零调用方（AR2 已交付但未接线）** | 🟡 **已登记到期日（2026-08-24）**。模块本体与跨法人隔离证据齐全，但没有生产路径调用它——正是母 spec 开篇痛批 agentcore 的形状。**到期日：2026-09-30 前接线或正式裁决废弃**，逾期转入 agentcore 同款「死代码」审计口径 | C1 批次评审 |
 
 > W1 + 阶段 0 已按 [CodebaseDesign 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) 交付：`internal/agentcore`（纯循环内核 + ACORE-1/5/6/8 测试）、`protected_measures`（10 项 + 词法探针）、`internal/workingpaper`（I1/I2/I3/I6 lint + 封面 + 渲染）、`internal/docparse`（CSV/anydoc/PaddleOCR）、`internal/agentseval`（不变量与 triage 用例，harness 第三段 `invariants`）、CLI 三层命令（commit 只对人）、Web（去关键词猜测、tool_start 消费、working_paper 渲染）。
 >

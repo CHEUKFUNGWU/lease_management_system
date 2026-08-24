@@ -3,6 +3,7 @@ package contextassembler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -98,8 +99,11 @@ func measuredMsg(ref, role, text string, tokens int) Message {
 // ── 正常路径：不压缩 ────────────────────────────────────────────────────────
 
 func TestAssembleFitsBudgetWithoutCompaction(t *testing.T) {
+	// Round-total semantics (AF1-a): each assistant row carries the ROUND
+	// TOTAL of that round's prompt. The newest value (40) already covers both
+	// rows — summing would invent 70 out of a true prompt of ~40.
 	hist := newFakeHistory(
-		measuredMsg("m1", "user", strings.Repeat("a", 30), 30),
+		measuredMsg("m1", "user", strings.Repeat("a", 30), 0),
 		measuredMsg("m2", "assistant", strings.Repeat("b", 40), 40),
 	)
 	a := newTestAssembler(t, hist)
@@ -111,11 +115,76 @@ func TestAssembleFitsBudgetWithoutCompaction(t *testing.T) {
 	if prompt.Compacted || len(prompt.Dropped) != 0 {
 		t.Fatalf("unexpected compaction: %+v", prompt)
 	}
-	if prompt.Tokens != 70 || prompt.Budget != 180 {
-		t.Fatalf("tokens=%d budget=%d; want 70/180 (window 200 - reserve 20)", prompt.Tokens, prompt.Budget)
+	if prompt.Tokens != 40 || prompt.Budget != 180 {
+		t.Fatalf("tokens=%d budget=%d; want 40/180 (baseline round total, window 200 - reserve 20)", prompt.Tokens, prompt.Budget)
 	}
 	if len(prompt.Preserved) != 0 {
 		t.Fatalf("plain prose must not be marked audit-bearing: %+v", prompt.Preserved)
+	}
+}
+
+// ── AF1-a：以生产写入语义（轮总量）为输入的计数断言 ─────────────────────────
+
+// The review probe: three rounds whose provider-measured prompt totals are
+// 1000 / 1100 / 1200. Under the old sum-per-row reading this counted 3303
+// while the true next-round prompt is ~1200 (error grows quadratically with
+// turns). Baseline semantics must count the newest round truth plus the
+// unsent tail estimate only. Mutation check: reverting to sum makes this red.
+func TestMeasuredRoundTotalsAreBaselinesNotSummands(t *testing.T) {
+	hist := newFakeHistory(
+		textMsg("u1", "user", strings.Repeat("a", 40)),
+		measuredMsg("a1", "assistant", strings.Repeat("b", 40), 1000),
+		textMsg("u2", "user", strings.Repeat("c", 40)),
+		measuredMsg("a2", "assistant", strings.Repeat("d", 40), 1100),
+		textMsg("u3", "user", strings.Repeat("e", 40)),
+		measuredMsg("a3", "assistant", strings.Repeat("f", 40), 1200),
+		// Unsent tail: never part of any measured round.
+		textMsg("u4", "user", strings.Repeat("g", 40)), // est ceil(40/4)=10
+	)
+	a := newTestAssembler(t, hist)
+	// A budget large enough that the probe stays OUT of compaction — this
+	// test isolates counting semantics, not trimming.
+	if err := RegisterBudget(a, "test-model", BudgetSpec{Window: 2000, ReserveTokens: 20}); err != nil {
+		t.Fatal(err)
+	}
+
+	prompt, err := a.Assemble(context.Background(), mustKeyAR3(t), Turn{Model: "test-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prompt.Tokens != 1210 {
+		t.Fatalf("tokens = %d; want 1210 = baseline 1200 + tail estimate 10 (summing would say 3310)", prompt.Tokens)
+	}
+	if prompt.EstimatedTokens != 10 {
+		t.Fatalf("estimated portion = %d; want 10 (only the unsent tail)", prompt.EstimatedTokens)
+	}
+}
+
+// Dropping the baseline carrier must degrade safely, not fabricate: with the
+// newest measured row compacted away, counting falls back to the next-newest
+// measured row still present (or full estimation) — never to a sum.
+func TestCountingDegradesSafelyWhenBaselineRowIsDropped(t *testing.T) {
+	hist := newFakeHistory(
+		measuredMsg("a1", "assistant", strings.Repeat("b", 40), 500),
+		measuredMsg("a2", "assistant", strings.Repeat("d", 40), 600),
+		// Long unsent tail forces compaction of the oldest turns; a1 may drop.
+		textMsg("u1", "user", strings.Repeat("x", 800)), // est 200
+		textMsg("u2", "user", strings.Repeat("y", 800)), // est 200
+	)
+	a := newTestAssembler(t, hist)
+
+	prompt, err := a.Assemble(context.Background(), mustKeyAR3(t), Turn{Model: "test-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !prompt.Compacted {
+		t.Fatal("expected compaction")
+	}
+	// Whatever was kept, the recount after compaction must be bounded by the
+	// surviving measured truth plus estimates — strictly less than the naive
+	// sum (500+600+400=1500).
+	if prompt.Tokens >= 1500 {
+		t.Fatalf("post-compaction tokens = %d; summed semantics resurfaced", prompt.Tokens)
 	}
 }
 
@@ -134,9 +203,12 @@ func TestUnconfiguredBudgetRefuses(t *testing.T) {
 // Dual-track core (pi shape): provider-measured truth always wins; only
 // never-sent messages fall back to the chars/4 tail estimate.
 func TestMeasuredTokensTakePrecedenceOverEstimates(t *testing.T) {
+	// The measured value is a ROUND TOTAL (production write semantics); the
+	// unsent tail is estimated on top of it.
 	hist := newFakeHistory(
-		measuredMsg("m1", "user", strings.Repeat("中", 40), 100), // est would say 10, truth says 100
-		textMsg("m2", "assistant", strings.Repeat("b", 8)),      // unsent → estimated ceil(8/4)=2
+		measuredMsg("m1", "user", strings.Repeat("中", 40), 0),
+		measuredMsg("m2", "assistant", strings.Repeat("b", 8), 100), // round truth says 100
+		textMsg("m3", "user", strings.Repeat("b", 8)),               // unsent → estimated ceil(8/4)=2
 	)
 	a := newTestAssembler(t, hist)
 
@@ -159,15 +231,18 @@ func TestMeasuredTokensTakePrecedenceOverEstimates(t *testing.T) {
 // of them must still be in the prompt — protection by invisibility.
 func TestCompactionNeverDropsAuditBearingContent(t *testing.T) {
 	hist := newFakeHistory(
-		measuredMsg("t1", "user", strings.Repeat("u", 60), 60),
-		Message{Ref: "c1", Role: "assistant", Kind: KindToolCall, Text: "call lease.portfolio.summary{}", MeasuredTokens: 15},
-		Message{Ref: "r1", Role: "tool", Kind: KindToolResult, Text: strings.Repeat("r", 80), MeasuredTokens: 80},
-		Message{Ref: "a1", Role: "assistant", Kind: KindArtifactRef, Text: "artifact:wp-1", MeasuredTokens: 6},
-		measuredMsg("t2", "assistant", strings.Repeat("x", 60), 60),
-		Message{Ref: "v1", Role: "assistant", Kind: KindApproval, Text: "approved wp-1", MeasuredTokens: 5},
-		Message{Ref: "d1", Role: "tool", Kind: KindScopeDenied, Text: "scope_denied: store-9", MeasuredTokens: 7},
-		measuredMsg("t3", "user", strings.Repeat("y", 60), 60),
-		measuredMsg("t4", "assistant", strings.Repeat("z", 60), 60),
+		textMsg("t1", "user", strings.Repeat("u", 60)),
+		Message{Ref: "c1", Role: "assistant", Kind: KindToolCall, Text: "call lease.portfolio.summary{}"},
+		Message{Ref: "r1", Role: "tool", Kind: KindToolResult, Text: strings.Repeat("r", 80)},
+		Message{Ref: "a1", Role: "assistant", Kind: KindArtifactRef, Text: "artifact:wp-1"},
+		textMsg("t2", "assistant", strings.Repeat("x", 60)),
+		Message{Ref: "v1", Role: "assistant", Kind: KindApproval, Text: "approved wp-1"},
+		Message{Ref: "d1", Role: "tool", Kind: KindScopeDenied, Text: "scope_denied: store-9"},
+		// Newest measured round truth, followed by a long unsent tail whose
+		// estimates push the prompt over budget.
+		measuredMsg("m-last", "assistant", strings.Repeat("x", 40), 80),
+		textMsg("u1", "user", strings.Repeat("y", 400)),
+		textMsg("u2", "user", strings.Repeat("z", 400)),
 	)
 	a := newTestAssembler(t, hist)
 
@@ -223,10 +298,13 @@ func TestClassifyMutationWouldExposeAuditBearingContent(t *testing.T) {
 
 func TestDroppedRefsResolveBackToStorage(t *testing.T) {
 	rows := []Message{
-		measuredMsg("h1", "user", strings.Repeat("1", 50), 50),
+		measuredMsg("h1", "user", strings.Repeat("1", 50), 0),
 		measuredMsg("h2", "assistant", strings.Repeat("2", 50), 50),
-		measuredMsg("h3", "user", strings.Repeat("3", 50), 50),
-		measuredMsg("h4", "assistant", strings.Repeat("4", 50), 50),
+		measuredMsg("h3", "user", strings.Repeat("3", 50), 0),
+		measuredMsg("h4", "assistant", strings.Repeat("4", 50), 70),
+		// Unsent tail pushes the baseline-plus-tail count over budget:
+		// 70 + ceil(480/4)=120 → 190 > 180.
+		textMsg("u5", "user", strings.Repeat("5", 480)),
 	}
 	hist := newFakeHistory(rows...)
 	a := newTestAssembler(t, hist)
@@ -269,9 +347,10 @@ func TestTrimCutsAtTurnBoundariesOnly(t *testing.T) {
 
 func TestSummarizerRecapStaysInPrompt(t *testing.T) {
 	hist := newFakeHistory(
-		measuredMsg("h1", "user", strings.Repeat("1", 90), 90),
+		measuredMsg("h1", "user", strings.Repeat("1", 90), 0),
 		measuredMsg("h2", "assistant", strings.Repeat("2", 90), 90),
-		measuredMsg("h3", "user", strings.Repeat("3", 50), 50),
+		// Unsent tail drives the count over budget.
+		textMsg("h3", "user", strings.Repeat("3", 400)),
 	)
 	sum := &countingSummarizer{text: "earlier: user confirmed discount rate 4.5%"}
 	a := newTestAssembler(t, hist, WithSummarizer(sum))
@@ -297,8 +376,9 @@ func TestSummarizerRecapStaysInPrompt(t *testing.T) {
 
 func TestOversizedSummaryIsAnErrorNotASilentSend(t *testing.T) {
 	hist := newFakeHistory(
-		measuredMsg("h1", "user", strings.Repeat("1", 170), 170),
+		measuredMsg("h1", "user", strings.Repeat("1", 170), 0),
 		measuredMsg("h2", "user", strings.Repeat("2", 30), 30),
+		textMsg("h3", "user", strings.Repeat("9", 800)), // unsent tail forces compaction
 	)
 	sum := &countingSummarizer{text: strings.Repeat("s", 2000)}
 	a := newTestAssembler(t, hist, WithSummarizer(sum))
@@ -338,5 +418,37 @@ func TestToolDefsCountTowardBudget(t *testing.T) {
 	}
 	if !prompt.Compacted {
 		t.Fatalf("150 msg chars + 50 def chars > 180 budget must trigger compaction, tokens=%d", prompt.Tokens)
+	}
+}
+
+// ── AF4：裁剪判据里工具定义只算一次 ────────────────────────────────────────
+
+// Review probe reproduced: with the wire's tool-schema cost charged BOTH in
+// the floor and again inside every trim-step recount, the trimmer over-cuts.
+// Numbers below are tuned so that the true usage needs exactly ONE turn cut;
+// under the double charge the old code cut TWO (dropped=2, want 1).
+func TestTrimDoesNotDoubleChargeToolDefs(t *testing.T) {
+	// Six single-message turns, each estimated at ceil(224/4)=56 tokens.
+	rows := make([]Message, 0, 6)
+	for i := 0; i < 6; i++ {
+		rows = append(rows, textMsg(fmt.Sprintf("u%d", i), "user", strings.Repeat("a", 224)))
+	}
+	hist := newFakeHistory(rows...)
+	a := newTestAssembler(t, hist)
+	if err := RegisterBudget(a, "test-model", BudgetSpec{Window: 320, ReserveTokens: 20}); err != nil {
+		t.Fatal(err)
+	}
+
+	defs := []ToolDef{{Name: "t", JSON: strings.Repeat("j", 41)}} // est ceil(42/4)=11
+	prompt, err := a.Assemble(context.Background(), mustKeyAR3(t), Turn{Model: "test-model", ToolDefs: defs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !prompt.Compacted {
+		t.Fatal("expected compaction")
+	}
+	if len(prompt.Dropped) != 1 || len(prompt.Messages) != 5 {
+		t.Fatalf("dropped=%d kept=%d; want exactly 1 turn cut (double charge would cut 2)",
+			len(prompt.Dropped), len(prompt.Messages))
 	}
 }

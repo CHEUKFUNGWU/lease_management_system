@@ -102,6 +102,16 @@ A child's context is the task description the parent passed plus the child's own
 
 **Two documents now disagree with reality by design.** The architecture blueprint still describes webhook transport, DOMPurify, per-user runtime instances and a 47-tool count. Those statements predate ADR-0026, ADR-0027 and this ADR. The owner chose on 2026-08-23 to leave the blueprint as written; readers should treat these ADRs as current where they conflict.
 
+## Correction (2026-08-24, C1 batch review)
+
+The phrase "kernel swap" overstates what AR5b/c/d actually shipped. The audited facts:
+
+- First-party code references only picoclaw's **hook symbols** (`HookManager` / `ToolInterceptor` / `HookDecision` and siblings). The vendored `pipeline`, `providers`, `events`, `bus`, `routing` and `session` packages have zero first-party callers.
+- `internal/agentcore` still exists (~1,370 lines), and `agentcorehooks.Governance` remains the guard for every plane that has not converged — so ACORE-2's nine controls now have **two implementations** in the tree.
+- What is real and shipped: the governance chain runs on production chat traffic for the first time (the convergence assertion with its reverse probe proves it), and tool-call dispatch moved onto picoclaw's `HookManager`. That is "governance chain first production run + hook-based dispatch", not a kernel replacement.
+
+Read this ADR's Decision §5 and the spec's 第一层 framing subject to that correction.
+
 ## Non-goals
 
 - Not an adoption of `providers`, `identity`, `auth` or `credential`. §7 gives the reasons, and the first of them is reopenable on evidence.

@@ -72,10 +72,12 @@ type Message struct {
 	Role string // user | assistant | system | tool
 	Kind MessageKind
 	Text string
-	// MeasuredTokens is the provider-reported usage attributable to this
-	// message (backfilled by adapters from llm.ParseUsage). Non-zero values
-	// are TRUTH and always win over estimation; zero means "never sent yet"
-	// and routes the message to the tail estimator.
+	// MeasuredTokens stores the provider-reported ROUND TOTAL of prompt tokens
+	// (prompt_tokens) as of the round where this message was the newest
+	// content — NOT a per-message token count (AF1-a). Read side: the newest
+	// measured row is the baseline for everything before it; only unsent rows
+	// after it are estimated. Zero means "never measured" — a sentinel, never
+	// a measured zero.
 	MeasuredTokens int
 }
 

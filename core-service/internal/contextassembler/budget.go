@@ -7,8 +7,11 @@
 // and the budget is the three-term form messages + tools + reserve > window.
 //
 // What was deliberately NOT adopted from upstream: its heuristic tokenizer
-// (2.5 chars/token). This module refuses to count without an exact tokenizer
-// (D-C15); see ErrTokenizerUnavailable.
+// (2.5 chars/token). Counting follows the 2026-08-24 "学 pi" adjudication
+// (D37, supersedes the original D-C15 exact-tokenizer registration): the
+// provider-reported round usage is the primary truth (see
+// measuredBaselineIndex), and only never-sent tail messages fall back to a
+// chars/4 estimate via PiStyleEstimator.
 
 package contextassembler
 

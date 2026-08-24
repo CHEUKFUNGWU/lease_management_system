@@ -31,7 +31,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/lease-management-system/core-service/internal/agentkernel/governance"
 	picoclawagent "github.com/lease-management-system/core-service/internal/agentkernel/third_party/picoclaw/agent"
@@ -85,8 +84,6 @@ type Deps struct {
 	// nil: the runtime layer observes metrics for every executed call, and
 	// wiring both would double-count.
 	Metrics *agenttools.RuntimeMetrics
-	// Now overrides the clock (tests). Nil means time.Now.
-	Now func() time.Time
 }
 
 // Executor implements aichat.Executor[aiagent.Response] on the kernel.
@@ -104,19 +101,13 @@ type Executor struct {
 	replay       governance.ReplayStore
 	sink         governance.ArtifactSink
 	metrics      *agenttools.RuntimeMetrics
-	now          func() time.Time
 }
 
 // New constructs the production chat executor.
 func New(deps Deps) *Executor {
-	now := deps.Now
-	if now == nil {
-		now = time.Now
-	}
 	return &Executor{
 		domain: deps.Domain, tools: deps.Tools, maxToolCalls: deps.MaxToolCalls,
 		chainAudit: deps.ChainAudit, replay: deps.Replay, sink: deps.Sink, metrics: deps.Metrics,
-		now: now,
 	}
 }
 
@@ -292,25 +283,32 @@ func (k *turnKernel) meta(call agenttools.ToolCall) picoclawagent.HookMeta {
 	}
 }
 
-// deriveShortCircuit rebuilds the first-party result a Respond decision stands
-// for, using exactly the two predicates the mounted controls use.
+// deriveShortCircuit rebuilds the first-party result a Respond decision
+// stands for. The predicate ORDER comes from governance.ShortCircuitOrder —
+// the same sequence Assembly mounts the controls in (AF3-b): when several
+// short-circuits apply, chain and derivation must answer identically, so the
+// order is written down exactly once.
 func (k *turnKernel) deriveShortCircuit(ctx context.Context, descriptor agenttools.ToolDescriptor, call agenttools.ToolCall) *agenttools.ToolResult {
-	policy := agenttools.Policy{RequireDraftReview: k.requireDraftReview}
-	if agenttools.RequiresReviewDecision(descriptor, policy) && descriptor.Level == agenttools.LevelCommand {
-		reasons := append([]string(nil), descriptor.Review.Reasons...)
-		if len(reasons) == 0 {
-			reasons = []string{"tool policy requires human review"}
-		}
-		return &agenttools.ToolResult{
-			CallID: call.CallID,
-			Status: agenttools.StatusNeedsReview,
-			Review: agenttools.ReviewResult{
-				Required: true,
-				Reasons:  reasons,
-				Actions:  append([]string(nil), descriptor.Review.ConfirmAction),
-			},
+	predicates := map[string]func(context.Context) *agenttools.ToolResult{
+		"IdempotencyGuard": func(c context.Context) *agenttools.ToolResult {
+			return k.replayShortCircuit(c, call)
+		},
+		"ReviewGate": func(context.Context) *agenttools.ToolResult {
+			return k.reviewShortCircuit(descriptor, call)
+		},
+	}
+	for _, name := range governance.ShortCircuitOrder {
+		if predicate, ok := predicates[name]; ok {
+			if result := predicate(ctx); result != nil {
+				return result
+			}
 		}
 	}
+	return nil
+}
+
+// replayShortCircuit mirrors IdempotencyGuard's Respond branch.
+func (k *turnKernel) replayShortCircuit(ctx context.Context, call agenttools.ToolCall) *agenttools.ToolResult {
 	if k.replay != nil && strings.TrimSpace(call.IdempotencyKey) != "" {
 		if stored, hit := k.replay.Lookup(ctx, call.IdempotencyKey); hit && stored != nil {
 			short := *stored
@@ -321,6 +319,27 @@ func (k *turnKernel) deriveShortCircuit(ctx context.Context, descriptor agenttoo
 		}
 	}
 	return nil
+}
+
+// reviewShortCircuit mirrors ReviewGate's Respond branch.
+func (k *turnKernel) reviewShortCircuit(descriptor agenttools.ToolDescriptor, call agenttools.ToolCall) *agenttools.ToolResult {
+	policy := agenttools.Policy{RequireDraftReview: k.requireDraftReview}
+	if !agenttools.RequiresReviewDecision(descriptor, policy) || descriptor.Level != agenttools.LevelCommand {
+		return nil
+	}
+	reasons := append([]string(nil), descriptor.Review.Reasons...)
+	if len(reasons) == 0 {
+		reasons = []string{"tool policy requires human review"}
+	}
+	return &agenttools.ToolResult{
+		CallID: call.CallID,
+		Status: agenttools.StatusNeedsReview,
+		Review: agenttools.ReviewResult{
+			Required: true,
+			Reasons:  reasons,
+			Actions:  append([]string(nil), descriptor.Review.ConfirmAction),
+		},
+	}
 }
 
 func blocked(reason string) agenttools.GuardResult {

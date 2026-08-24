@@ -101,9 +101,9 @@ type Result struct {
 	// Nil means no confidence is available.
 	Confidence       *float64
 	ConfidenceReason *string
-	// MeasuredTokens is the provider-reported prompt-token usage of the round
-	// (AR3 truth backfill). Persisted onto the assistant message row; 0 means
-	// not measured — never a measured zero.
+	// MeasuredTokens carries the provider-reported ROUND TOTAL of prompt
+	// tokens for the round (AF1-a: not a per-message count). Persisted onto
+	// the assistant message row; 0 means not measured — never a measured zero.
 	MeasuredTokens int
 }
 

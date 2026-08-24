@@ -37,7 +37,7 @@ func TestCallLLMRoundTripsThroughInProcessClient(t *testing.T) {
 	agent.SetLLMClient(client)
 
 	answer, model, usage, err := agent.callLLM(context.Background(),
-		"你是经营分析师。", "5月营收如何？",
+		"你是经营分析师。",
 		[]ChatMessage{{Role: "user", Content: "5月营收如何？"}}, "zh-CN")
 	if err != nil {
 		t.Fatalf("callLLM: %v", err)
@@ -108,7 +108,8 @@ func TestCallLLMWithToolsRoutesFirstToolCall(t *testing.T) {
 	agent.SetLLMClient(client)
 
 	_, model, calls, err := agent.callLLMWithTools(context.Background(),
-		"用户上传了文件，请决定调用哪个工具。", "请解析文件", nil, "zh-CN",
+		"用户上传了文件，请决定调用哪个工具。",
+		[]ChatMessage{{Role: "user", Content: "请解析文件"}}, "zh-CN",
 		[]map[string]interface{}{{"type": "function", "function": map[string]interface{}{"name": "parse_contract"}}})
 	if err != nil {
 		t.Fatalf("callLLMWithTools: %v", err)
@@ -132,7 +133,7 @@ func TestCallLLMWithToolsFailsClosedWithoutKey(t *testing.T) {
 	agent := &Agent{}
 	agent.SetLLMClient(client)
 
-	_, _, _, err := agent.callLLMWithTools(context.Background(), "sp", "um", nil, "zh-CN", nil)
+	_, _, _, err := agent.callLLMWithTools(context.Background(), "sp", []ChatMessage{{Role: "user", Content: "um"}}, "zh-CN", nil)
 	if err == nil {
 		t.Fatal("missing API key must fail closed")
 	}

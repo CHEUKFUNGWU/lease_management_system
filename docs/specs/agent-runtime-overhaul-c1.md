@@ -42,7 +42,10 @@
 
 分三层推进，每层可独立交付、独立验收。
 
-**第一层：内核置换 + 汇流（ADR-0027 §1 + G1）。** `agentcore` 的 1819 行换成 picoclaw `pkg/agent` 的适配版，治理链移植到其 `ToolInterceptor` / `LLMInterceptor` / `ToolApprover` 挂点，**并把生产聊天路径从 `aichat.Runtime[T]` 切到新内核上**。后半句是 G1 遗留的汇流，不做的话这一层只是把一份死代码换成另一份死代码。这是后两层的地基——`context_manager` 与 `session` 都挂在这个内核上。
+**第一层：内核置换 + 汇流（ADR-0027 §1 + G1）。**
+
+> **实施结果订正（2026-08-24 评审）**：AR5b/c/d 实际交付的是「治理链首次跑在生产 chat 流量 + 工具分发换到 picoclaw HookManager」，不是完整内核置换——第一方代码引用的 picoclaw 符号只有 hook 那一组，vendored 的 pipeline/providers/events/bus/routing/session 无调用方；`agentcore` 仍在且其 Governance 仍是未汇流平面的守卫，九个控制现有两套实现。详见 ADR-0028 的 Correction 节。
+ `agentcore` 的 1819 行换成 picoclaw `pkg/agent` 的适配版，治理链移植到其 `ToolInterceptor` / `LLMInterceptor` / `ToolApprover` 挂点，**并把生产聊天路径从 `aichat.Runtime[T]` 切到新内核上**。后半句是 G1 遗留的汇流，不做的话这一层只是把一份死代码换成另一份死代码。这是后两层的地基——`context_manager` 与 `session` 都挂在这个内核上。
 
 **第二层：Session Manager 与 Context Engineering。** 前者把散在六处的生命周期收拢成一个模块；后者从零建起 token 计数 → 预算 → 压缩三级，且压缩必须对审计与溯源无损。
 
@@ -302,7 +305,7 @@ picoclaw 的 `subturn` / `turn_coord` 让一个回合可以派生子任务。这
 | 模块 | 接缝 | 测试方式 | 先例 |
 |---|---|---|---|
 | 治理链移植 | `ToolInterceptor`/`LLMInterceptor`/`ToolApprover` | **ACORE-2 九项变异逐项重跑** | `agentcore/hooks/mutation_test.go` |
-| 内核纯度 | import guard | 断言不 import `database/sql`/`net/http`/`repository`/MinIO | `agentcore/importguard_test.go` |
+| 内核纯度 | import guard | 断言不 import 第一方业务包（`repository`/`services`/`agenttools` 等）。~~`database/sql`/`net/http`~~ **口径订正（2026-08-24）**：vendored providers 本来就用 net/http，全量断言不可行；只查第一方业务包的偏离经评审接受，订正的是本表而非实现 | `agentkernel/importguard_test.go` |
 | token 计数 | 纯函数 | 已知文本 × 已知模型的 golden 值 | `agenttools/protocol_test.go` 的表驱动 |
 | 上下文压缩 | 纯函数（消息序列进、消息序列出） | 审计承载内容在压缩前后逐条比对**必须完全一致** | — |
 | Session Manager | 生命周期接口（存储经端口注入） | 全部分支不起库；跨法人隔离带库 | `handlers/ai_chat_runtime_permissions_test.go` |

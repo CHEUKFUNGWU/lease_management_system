@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -174,10 +175,15 @@ func (TenantScope) AfterTool(
 
 // CapabilityCheck replicates policy.Evaluate's level/capability/permission/
 // dry-run decisions with the same sentinel reasons as agentcore hooks.
+// No DescriptorFor fallback (AF3-a, deleted 2026-08-24): the field was a nil
+// trap — Assembly never set it, so a facts frame with an empty descriptor
+// name reached a nil func call. Wiring it would need a new by-name descriptor
+// lookup on agenttools.Runtime (Describe is a permission-filtered list API,
+// not a point lookup); today's call facts always carry the registry
+// descriptor, so the branch protected nothing that can happen.
 type CapabilityCheck struct {
-	Policy        agenttools.Policy
-	Facts         FactsResolver
-	DescriptorFor func(toolName string) (agenttools.ToolDescriptor, bool)
+	Policy agenttools.Policy
+	Facts  FactsResolver
 }
 
 func (c CapabilityCheck) Name() string { return "CapabilityCheck" }
@@ -193,11 +199,6 @@ func (c CapabilityCheck) BeforeTool(
 		return request, deny("call facts could not be resolved"), nil
 	}
 	desc := facts.Descriptor
-	if desc.Name == "" {
-		if loaded, found := c.DescriptorFor(request.Tool); found {
-			desc = loaded
-		}
-	}
 	call := facts.Call
 	if call.ToolName == "" {
 		call.ToolName = request.Tool
@@ -465,6 +466,14 @@ type NamedControl struct {
 // IdempotencyGuard → ReviewGate, then AuditRecorder → ArtifactCollector →
 // MetricsRecorder. A new control has exactly one place to live. The returned
 // recorder exposes adjudication-(b) audit failure markers to the runner.
+//
+// ShortCircuitOrder (AF3-b) is the single source of truth for the relative
+// order of the two Respond-capable controls: both the chain mount above and
+// chatexec's deriveShortCircuit consume it, so a replay hit and a review
+// requirement can never be answered in different orders by chain and
+// derivation.
+var ShortCircuitOrder = []string{"IdempotencyGuard", "ReviewGate"}
+
 func Assembly(d Deps) ([]NamedControl, *AuditRecorder) {
 	if d.Policy.AllowedLevels == nil {
 		d.Policy = agenttools.DefaultPolicy()
@@ -474,7 +483,7 @@ func Assembly(d Deps) ([]NamedControl, *AuditRecorder) {
 	mount := func(name string, hook picoclawagent.ToolInterceptor) NamedControl {
 		return NamedControl{Name: name, Hook: hook}
 	}
-	return []NamedControl{
+	controls := []NamedControl{
 		mount("TenantScope", TenantScope{Facts: d.Facts}),
 		mount("CapabilityCheck", CapabilityCheck{Policy: d.Policy, Facts: d.Facts}),
 		mount("ProtectedMeasure", ProtectedMeasure{Resolver: d.MeasureResolver, Facts: d.Facts}),
@@ -484,7 +493,24 @@ func Assembly(d Deps) ([]NamedControl, *AuditRecorder) {
 		mount("AuditRecorder", recorder),
 		mount("ArtifactCollector", ArtifactCollector{Sink: d.Sink, Facts: d.Facts}),
 		mount("MetricsRecorder", MetricsRecorder{Metrics: d.Metrics, Facts: d.Facts}),
-	}, recorder
+	}
+	// Structural guard (AF3-b): chatexec derives Respond short-circuits by
+	// walking ShortCircuitOrder — this list is the single source of truth for
+	// the order those controls are mounted in AND the order derivations apply
+	// in. If a future edit reorders or inserts between them here, refuse to
+	// build rather than letting the derivation silently diverge from the chain.
+	var respondMounted []string
+	for _, c := range controls {
+		for _, sc := range ShortCircuitOrder {
+			if c.Name == sc {
+				respondMounted = append(respondMounted, sc)
+			}
+		}
+	}
+	if !slices.Equal(respondMounted, ShortCircuitOrder) {
+		panic(fmt.Sprintf("governance: mounted Respond-capable controls %v diverge from ShortCircuitOrder %v — update both together", respondMounted, ShortCircuitOrder))
+	}
+	return controls, recorder
 }
 
 // ── inert counterparts ─────────────────────────────────────────────────────

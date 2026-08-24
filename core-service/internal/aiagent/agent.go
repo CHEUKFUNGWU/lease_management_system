@@ -831,10 +831,10 @@ type Response struct {
 	Confidence float64  `json:"confidence"`
 	IsOfficial bool     `json:"is_official"`
 	Model      string   `json:"model,omitempty"`
-	// MeasuredTokens is the provider-reported prompt-token usage of the round
-	// that produced this answer (AR3 dual-track counting truth). Zero means
-	// not measured — fallback answers and providers without a usage block —
-	// never a measured zero.
+	// MeasuredTokens carries the provider-reported ROUND TOTAL of prompt
+	// tokens for the round that produced this answer (AF1-a: prompt_tokens,
+	// not a per-message count). Zero means not measured — fallback answers
+	// and providers without a usage block — never a measured zero.
 	MeasuredTokens         int                               `json:"measured_tokens,omitempty"`
 	AgentMode              bool                              `json:"agent_mode,omitempty"`
 	AgentPlan              []AgentPlanStep                   `json:"agent_plan,omitempty"`
@@ -1033,7 +1033,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 用户消息: %s`, req.ObjectName, req.ContentType, req.Message)
 
-		_, modelName, toolCalls, err := h.callLLMWithTools(ctx, fileSystemPrompt, req.Message, req.History, req.Language, fileParseTools)
+		conversation, asmErr := h.assembledConversation(ctx, legalEntityID, userIDStr, req, fileParseToolDefs(), emit)
+		if asmErr != nil {
+			return Response{Answer: "AI agent context assembly failed", Model: "runtime"}, asmErr
+		}
+		_, modelName, toolCalls, err := h.callLLMWithTools(ctx, fileSystemPrompt, conversation, req.Language, fileParseTools)
 		triage := agenttooldefs.DeterministicTriage(agenttooldefs.TriageRequest{
 			FileID:      req.FileID,
 			ObjectName:  req.ObjectName,
@@ -1343,37 +1347,15 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 	}
 
 	// AR3 wiring: the ONLY thing that changes under the assembler is where the
-	// history argument comes from. Routing, context loading and prompt building
-	// above are untouched — when the assembler is absent or not applicable
-	// here, req.History goes in verbatim, exactly as before.
-	history := req.History
-	prompt, asmErr := h.assembleTurnHistory(ctx, legalEntityID, userIDStr, req)
-	switch {
-	case asmErr == nil:
-		history = chatMessagesFromPrompt(prompt.Messages)
-		if prompt.Compacted {
-			// D-C16 evidence trail: what left the prompt is recorded as refs
-			// resolvable back to ai_chat_messages rows — compaction deleted
-			// nothing, and this event is the proof it happened.
-			if err := emitAgentEvent(ctx, emit, "context_compacted", map[string]interface{}{
-				"dropped":          prompt.Dropped,
-				"preserved":        prompt.Preserved,
-				"budget":           prompt.Budget,
-				"tokens":           prompt.Tokens,
-				"estimated_tokens": prompt.EstimatedTokens,
-			}); err != nil {
-				return Response{Answer: "AI agent event persistence failed", Model: "runtime", Sources: sources}, err
-			}
-		}
-	case errors.Is(asmErr, errAssemblerNotApplicable):
-		// legacy path — history already carries req.History
-	default:
-		// Assemble failures are real failures (unconfigured budget geometry,
-		// storage refusal). They stop the turn loudly instead of silently
-		// degrading to an unbounded prompt.
+	// conversation comes from. Routing, context loading and prompt building
+	// above are untouched — when the assembler is absent or not applicable,
+	// the legacy history+current-message fold applies verbatim. Plain chat
+	// sends no tool schemas on the wire, so ToolDefs is nil here (AF4).
+	conversation, asmErr := h.assembledConversation(ctx, legalEntityID, userIDStr, req, nil, emit)
+	if asmErr != nil {
 		return Response{Answer: "AI agent context assembly failed", Model: "runtime", Sources: sources}, asmErr
 	}
-	answer, modelName, usage, err := h.callLLM(ctx, systemPrompt, req.Message, history, req.Language)
+	answer, modelName, usage, err := h.callLLM(ctx, systemPrompt, conversation, req.Language)
 	if err != nil {
 		// Fallback: return context data without LLM if AI Service is unavailable
 		fallbackAnswer := fmt.Sprintf("（AI 服务暂不可用，以下为系统数据摘要）\n\n%s", contextData.String())
@@ -2208,18 +2190,18 @@ var fileParseTools = []map[string]interface{}{
 	},
 }
 
-// callLLM runs one non-streaming chat round through the in-process LLM client
-// (W4-2). It replaces the former AI_SERVICE_URL /api/v1/chat call. The Python
-// language directive is appended to the system prompt exactly as chat.py did
-// (buildSystemPrompt adds its own directive first, so the doubling the old
-// path produced is preserved).
-func (h *Agent) callLLM(ctx context.Context, systemPrompt, userMessage string, history []ChatMessage, language string) (string, string, *llm.UsageMetadata, error) {
+// callLLM runs one non-streaming chat round through the in-process LLM
+// client (W4-2). conversation is the FULL post-system message list INCLUDING
+// the current user message — the caller owns its shape and must include it
+// exactly once (AF1-b invariant: the assembled prompt already ends with it,
+// so wired callers pass prompt.Messages verbatim and never append).
+func (h *Agent) callLLM(ctx context.Context, systemPrompt string, conversation []ChatMessage, language string) (string, string, *llm.UsageMetadata, error) {
 	client, err := h.llm()
 	if err != nil {
 		return "", "", nil, err
 	}
 	result, err := client.Chat(ctx, llm.ChatRequest{
-		Messages:  buildLLMMessages(systemPrompt, userMessage, history, language),
+		Messages:  buildLLMMessages(systemPrompt, conversation, language),
 		Temp:      0.3,
 		MaxTokens: 2000,
 	})
@@ -2239,10 +2221,9 @@ func (h *Agent) callLLM(ctx context.Context, systemPrompt, userMessage string, h
 var errAssemblerNotApplicable = errors.New("context assembler not applicable")
 
 // assembleTurnHistory runs the AR3 Assemble step for this chat turn: stored,
-// ownership-checked history plus the current message, counted and compacted
-// against the model's budget. The returned Prompt's Messages replace the raw
-// request history on the LLM call.
-func (h *Agent) assembleTurnHistory(ctx context.Context, legalEntityID, userID string, req Request) (contextassembler.Prompt, error) {
+// ownership-checked history plus this request's wire tool schemas, counted
+// and compacted against the model's budget.
+func (h *Agent) assembleTurnHistory(ctx context.Context, legalEntityID, userID string, req Request, toolDefs []contextassembler.ToolDef) (contextassembler.Prompt, error) {
 	if h == nil || h.ctxAssembler == nil || strings.TrimSpace(req.SessionID) == "" {
 		return contextassembler.Prompt{}, errAssemblerNotApplicable
 	}
@@ -2263,14 +2244,84 @@ func (h *Agent) assembleTurnHistory(ctx context.Context, legalEntityID, userID s
 		return contextassembler.Prompt{}, errAssemblerNotApplicable
 	}
 	turn := contextassembler.Turn{
-		Model: client.Config().Model,
-		Messages: []contextassembler.Message{{
-			Role: "user",
-			Kind: contextassembler.KindText,
-			Text: req.Message,
-		}},
+		Model:    client.Config().Model,
+		ToolDefs: toolDefs,
+		// AF1-b contract: the current user message is NOT placed here. It is
+		// persisted by aichat.prepare before execution and read back as the
+		// final history row, so Assemble returns it as the prompt's LAST
+		// message — exactly once. Turn.Messages stays a port for future
+		// fresh-message consumers (AR6); the chat plane keeps it empty.
 	}
-	return h.ctxAssembler.Assemble(ctx, key, turn)
+	prompt, err := h.ctxAssembler.Assemble(ctx, key, turn)
+	if err != nil {
+		return contextassembler.Prompt{}, err
+	}
+	// Defensive invariant: if a future path ever executes without persisting
+	// the trigger first, the current message would silently vanish from the
+	// wire. Refuse loudly instead.
+	if n := len(prompt.Messages); n == 0 || prompt.Messages[n-1].Role != "user" {
+		lastRole := ""
+		if n > 0 {
+			lastRole = prompt.Messages[n-1].Role
+		}
+		return contextassembler.Prompt{}, fmt.Errorf(
+			"assembled prompt for session %s does not end with the current user message (%d messages, last role %q)",
+			key.SessionID(), n, lastRole)
+	}
+	return prompt, nil
+}
+
+// fileParseToolDefs projects the static file-triage tool table onto the
+// assembler's ToolDef shape. These schemas ride the triage request's `tools`
+// param, so the provider counts them — they belong in the budget (AF4).
+func fileParseToolDefs() []contextassembler.ToolDef {
+	defs := make([]contextassembler.ToolDef, 0, len(fileParseTools))
+	for _, t := range fileParseTools {
+		fn, _ := t["function"].(map[string]interface{})
+		name, _ := fn["name"].(string)
+		desc, _ := fn["description"].(string)
+		paramsJSON, _ := json.Marshal(fn["parameters"])
+		defs = append(defs, contextassembler.ToolDef{Name: name, Description: desc, JSON: string(paramsJSON)})
+	}
+	return defs
+}
+
+// assembledConversation resolves the wire conversation for one LLM round:
+// the assembled prompt under the flag, the legacy history+current-message
+// fold otherwise. toolDefs carries ONLY the tool schemas that actually ride
+// THIS request's tools param — plain chat sends none (adjudication: budget
+// predicts provider-side overflow, and the provider counts what is sent;
+// counting absent schemas would be a typed number with guessed semantics).
+func (h *Agent) assembledConversation(ctx context.Context, legalEntityID, userIDStr string, req Request, toolDefs []contextassembler.ToolDef, emit func(context.Context, string, any) error) ([]ChatMessage, error) {
+	prompt, asmErr := h.assembleTurnHistory(ctx, legalEntityID, userIDStr, req, toolDefs)
+	switch {
+	case asmErr == nil:
+		// AF1-b invariant: the assembled prompt already ends with the current
+		// user message — pass it verbatim, never append again.
+		conversation := chatMessagesFromPrompt(prompt.Messages)
+		if prompt.Compacted {
+			// D-C16 evidence trail: what left the prompt is recorded as refs
+			// resolvable back to ai_chat_messages rows — compaction deleted
+			// nothing, and this event is the proof it happened.
+			if err := emitAgentEvent(ctx, emit, "context_compacted", map[string]interface{}{
+				"dropped":          prompt.Dropped,
+				"preserved":        prompt.Preserved,
+				"budget":           prompt.Budget,
+				"tokens":           prompt.Tokens,
+				"estimated_tokens": prompt.EstimatedTokens,
+			}); err != nil {
+				return nil, err
+			}
+		}
+		return conversation, nil
+	case errors.Is(asmErr, errAssemblerNotApplicable):
+		return withCurrentMessage(req.History, req.Message), nil
+	default:
+		// Assemble failures are real failures (unconfigured budget geometry,
+		// storage refusal). They stop the turn loudly instead of silently
+		// degrading to an unbounded prompt.
+		return nil, asmErr
+	}
 }
 
 // chatMessagesFromPrompt projects assembled messages back onto the wire
@@ -2295,17 +2346,19 @@ func measuredInputTokens(usage *llm.UsageMetadata) int {
 	return *usage.InputTokens
 }
 
-// callLLMWithTools is the function-calling variant of callLLM. It keeps the
-// existing single-tool-call behavior: the caller inspects result.ToolCalls and
-// runs the first one; multi-round looping belongs to the agentcore loop (C
-// wave) and is deliberately not built here.
-func (h *Agent) callLLMWithTools(ctx context.Context, systemPrompt, userMessage string, history []ChatMessage, language string, tools []map[string]interface{}) (string, string, []AgentToolCall, error) {
+// callLLMWithTools is the function-calling variant of callLLM. Same AF1-b
+// contract: conversation is the full post-system message list including the
+// current user message exactly once. It keeps the existing single-tool-call
+// behavior: the caller inspects result.ToolCalls and runs the first one;
+// multi-round looping belongs to the agentcore loop (C wave) and is
+// deliberately not built here.
+func (h *Agent) callLLMWithTools(ctx context.Context, systemPrompt string, conversation []ChatMessage, language string, tools []map[string]interface{}) (string, string, []AgentToolCall, error) {
 	client, err := h.llm()
 	if err != nil {
 		return "", "", nil, err
 	}
 	result, err := client.Chat(ctx, llm.ChatRequest{
-		Messages:   buildLLMMessages(systemPrompt, userMessage, history, language),
+		Messages:   buildLLMMessages(systemPrompt, conversation, language),
 		Temp:       0.1,
 		MaxTokens:  2000,
 		Tools:      tools,
@@ -2331,17 +2384,26 @@ func (h *Agent) callLLMWithTools(ctx context.Context, systemPrompt, userMessage 
 
 // buildLLMMessages appends the language directive to the system prompt and
 // folds it into the message list, mirroring ai-service chat.py's /chat handler.
-func buildLLMMessages(systemPrompt, userMessage string, history []ChatMessage, language string) []llm.Message {
+func buildLLMMessages(systemPrompt string, conversation []ChatMessage, language string) []llm.Message {
 	systemPrompt = applyLanguageDirective(systemPrompt, language)
-	msgs := make([]llm.Message, 0, len(history)+2)
+	msgs := make([]llm.Message, 0, len(conversation)+1)
 	if systemPrompt != "" {
 		msgs = append(msgs, llm.Message{Role: "system", Content: systemPrompt})
 	}
-	for _, h := range history {
-		msgs = append(msgs, llm.Message{Role: h.Role, Content: h.Content})
+	for _, m := range conversation {
+		msgs = append(msgs, llm.Message{Role: m.Role, Content: m.Content})
 	}
-	msgs = append(msgs, llm.Message{Role: "user", Content: userMessage})
 	return msgs
+}
+
+// withCurrentMessage folds a caller's raw history plus the current user
+// message into one conversation — the legacy (unwired) shape. The wired path
+// must NOT use this: its conversation already ends with the current message.
+func withCurrentMessage(history []ChatMessage, userMessage string) []ChatMessage {
+	out := make([]ChatMessage, 0, len(history)+1)
+	out = append(out, history...)
+	out = append(out, ChatMessage{Role: "user", Content: userMessage})
+	return out
 }
 
 // applyLanguageDirective replicates chat.py's per-language suffix.

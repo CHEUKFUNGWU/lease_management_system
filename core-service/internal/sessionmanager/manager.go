@@ -249,7 +249,20 @@ func newSessionFromKey(key agentcontext.ContextKey, now time.Time) *Session {
 func (m *manager) Close(ctx context.Context, key agentcontext.ContextKey) error {
 	loc := locator(key)
 	entry := m.acquireEntry(loc)
-	if entry.closing && entry.refs > 1 {
+
+	// AF2 fix: the already-closing check AND the flag write happen in ONE
+	// critical section. The old code read entry.closing/entry.refs here
+	// outside m.mu — a concurrent Close's entry.closing=true (and
+	// releaseEntry's refs--) raced the read, and two settlers could both pass
+	// the gate and double-save. Only the goroutine that flips closing
+	// false→true now proceeds to settle.
+	m.mu.Lock()
+	alreadyClosing := entry.closing
+	if !alreadyClosing {
+		entry.closing = true // this call owns settlement
+	}
+	m.mu.Unlock()
+	if alreadyClosing {
 		// A concurrent Close already owns settlement; treat as done.
 		m.releaseEntry(entry)
 		return nil
@@ -266,7 +279,6 @@ func (m *manager) Close(ctx context.Context, key agentcontext.ContextKey) error 
 
 	m.mu.Lock()
 	session := entry.session
-	entry.closing = true
 	m.mu.Unlock()
 
 	if session == nil {

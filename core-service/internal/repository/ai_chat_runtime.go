@@ -77,10 +77,12 @@ type AIChatMessage struct {
 	//   carries no confidence — absent is never fabricated.
 	Confidence       *float64 `json:"confidence,omitempty"`
 	ConfidenceReason *string  `json:"confidence_reason,omitempty"`
-	// MeasuredTokens is the provider-reported prompt-token usage attributable
-	// to this message's round (AR3 dual-track counting truth). Zero means
-	// "never measured" — a sentinel, never a measured zero; legacy rows and
-	// provider responses without a usage block both stay at zero.
+	// MeasuredTokens stores the provider-reported ROUND TOTAL of prompt
+	// tokens as of the round where this message was the newest content (AF1-a:
+	// prompt_tokens of that round — NOT a per-message token count; every
+	// round re-sends the full prompt, so a per-message share is undefined).
+	// Zero is the "never measured" sentinel, never a measured zero; consumers
+	// read it baseline-style via contextassembler.measuredBaselineIndex.
 	MeasuredTokens int       `json:"measured_tokens"`
 	CreatedBy      *string   `json:"created_by"`
 	CreatedAt      time.Time `json:"created_at"`

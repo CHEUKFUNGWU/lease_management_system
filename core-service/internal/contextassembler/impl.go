@@ -128,14 +128,18 @@ func (a *assembler) Assemble(ctx context.Context, key agentcontext.ContextKey, t
 
 	// Over budget from here on. Preserved content alone exceeding the budget
 	// is unfixable by definition — refuse before touching anything.
-	floor := countMsgs(preserved) + a.estimator.EstimateToolDefs(turn.ToolDefs)
+	// AF4: the wire's tool schemas cost is computed ONCE here and shared by
+	// every trim-step recount — the old code added it again inside countKept,
+	// double-charging the fixed cost and cutting one turn too many.
+	toolDefsCost := a.estimator.EstimateToolDefs(turn.ToolDefs)
+	floor := countMsgs(preserved) + toolDefsCost
 	if overBudget(budget, floor) {
 		return Prompt{}, fmt.Errorf("%w: session %s (%d > %d)",
 			ErrOverBudgetAfterCompaction, key.SessionID(), floor, budget)
 	}
 
 	countKept := func(kept []Message) int {
-		return floor + countMsgs(kept) + a.estimator.EstimateToolDefs(turn.ToolDefs)
+		return floor + countMsgs(kept)
 	}
 	kept, droppedMsgs := trimToBudget(compactable, countKept, budget)
 
@@ -173,27 +177,44 @@ func (a *assembler) Assemble(ctx context.Context, key agentcontext.ContextKey, t
 	return prompt, nil
 }
 
-// countMessages sums measured truth where present; estimation only for
-// messages that have never been sent.
-func countMessages(est TokenEstimator, msgs []Message) int {
-	total := 0
-	for _, m := range msgs {
-		if m.MeasuredTokens > 0 {
-			total += m.MeasuredTokens
-		} else {
-			total += est.EstimateMessage(m)
+// measuredBaselineIndex returns the position of the newest message carrying
+// provider-measured round truth, or -1 when the list has none.
+//
+// Semantics (AF1-a, read side of D37 dual-track): MeasuredTokens stores the
+// ROUND TOTAL of provider prompt_tokens as of the round where that message
+// was the newest content — NOT a per-message token count. Summing those
+// totals across rows double-counts every shared prefix (error grows
+// quadratically with turns). The truthful reading: everything up to and
+// including the newest measured row is already covered by its round total;
+// only unsent rows AFTER it need estimation. The baseline slightly
+// over-counts (that round's system prompt and tool defs rode in it), which
+// errs toward earlier compaction — the safe direction.
+func measuredBaselineIndex(msgs []Message) int {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].MeasuredTokens > 0 {
+			return i
 		}
 	}
+	return -1
+}
+
+// countMessages totals the list under the baseline semantics above.
+func countMessages(est TokenEstimator, msgs []Message) int {
+	total, _ := splitCount(est, msgs, nil)
 	return total
 }
 
 // splitCount additionally reports how much of the total came from estimates —
 // the observability hook for provider-usage calibration.
 func splitCount(est TokenEstimator, msgs []Message, defs []ToolDef) (total, estimated int) {
-	for _, m := range msgs {
-		if m.MeasuredTokens > 0 {
+	base := measuredBaselineIndex(msgs)
+	for i, m := range msgs {
+		switch {
+		case i < base:
+			// covered by the baseline round truth; adds nothing
+		case i == base:
 			total += m.MeasuredTokens
-		} else {
+		default:
 			e := est.EstimateMessage(m)
 			total += e
 			estimated += e

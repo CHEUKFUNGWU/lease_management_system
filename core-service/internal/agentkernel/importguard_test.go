@@ -3,6 +3,7 @@ package agentkernel
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -75,23 +76,11 @@ func scanImports(dir string) []string {
 			for index, line := range strings.Split(string(content), "\n") {
 				if strings.Contains(line, pattern) {
 					violations = append(violations,
-						path+":"+strings.Repeat("", 0)+fmtInt(index+1)+" imports "+banned)
+						path+":"+strconv.Itoa(index+1)+" imports "+banned)
 				}
 			}
 		}
 		return nil
 	})
 	return violations
-}
-
-func fmtInt(v int) string {
-	if v == 0 {
-		return "0"
-	}
-	digits := ""
-	for v > 0 {
-		digits = string(rune('0'+v%10)) + digits
-		v /= 10
-	}
-	return digits
 }

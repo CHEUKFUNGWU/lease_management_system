@@ -501,12 +501,15 @@ CREATE TABLE IF NOT EXISTS ai_chat_sessions (
     bound_contract_id UUID REFERENCES lease_contracts(id),
     context_snapshot JSONB,
     initiator VARCHAR(20) NOT NULL DEFAULT 'user',
+    data_classification VARCHAR(20) NOT NULL DEFAULT 'production',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     last_message_at TIMESTAMP WITH TIME ZONE,
     archived_at TIMESTAMP WITH TIME ZONE,
     CHECK (status IN ('active', 'archived', 'closed')),
-    CHECK (initiator IN ('user', 'system'))
+    CHECK (initiator IN ('user', 'system')),
+    CONSTRAINT ai_chat_sessions_classification_check
+        CHECK (data_classification IN ('production', 'simulated', 'mixed'))
 );
 
 CREATE TABLE IF NOT EXISTS ai_chat_runs (
@@ -2325,5 +2328,5 @@ INSERT INTO schema_migrations (version) VALUES
 ('055_saved_views_and_template_governance'), ('056_template_copy_lineage'),
 ('057_async_run_progress'), ('058_assumption_draft_idempotency'),
 ('059_assumption_draft_idempotency_batch'), ('060_draft_review_isolation'),
-('061_channel_identity_bindings')
+('061_channel_identity_bindings'), ('062_session_data_classification')
 ON CONFLICT (version) DO NOTHING;

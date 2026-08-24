@@ -13,8 +13,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/lease-management-system/core-service/internal/access"
+	"github.com/lease-management-system/core-service/internal/agenttools"
 )
 
 // classification 词表沿用 store-day 事实信封的三值（底线 2）。
@@ -88,6 +88,17 @@ func (k ContextKey) Cache() string {
 		k.scopeFinger,
 	}, "\x1e")
 }
+
+// Dimension readers. AR2 Session Manager is the first consumer: it must
+// compare a loaded session row's ownership against the key's entity and user
+// (cross-tenant reads refuse with scope_denied), and its per-session lease is
+// keyed on the three LOCATOR dimensions. The fields themselves stay
+// unexported — readers expose facts, they do not enable hand-assembled keys.
+func (k ContextKey) LegalEntityID() string    { return k.legalEntityID }
+func (k ContextKey) UserID() string           { return k.userID }
+func (k ContextKey) SessionID() string        { return k.sessionID }
+func (k ContextKey) Classification() string   { return k.classification }
+func (k ContextKey) ScopeFingerprint() string { return k.scopeFinger }
 
 // dimension separators are ASCII control characters that cannot appear in
 // UUIDs or scope codes, so joins stay unambiguous without escaping.

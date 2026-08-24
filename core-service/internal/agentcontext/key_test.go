@@ -240,10 +240,13 @@ func TestEveryFieldParticipatesInCache(t *testing.T) {
 // ── AR1-G2: 消费方不得旁路（可扩展骨架）────────────────────────────────────
 
 // contextConsumers lists directories whose exported functions may only take an
-// agentcontext.ContextKey — never bare identifier strings. Empty today by
-// design; AR2 Session Manager / AR3 Context Assembler / AR6 Memory register
-// here as they land.
-var contextConsumers = map[string][]string{}
+// agentcontext.ContextKey — never bare identifier strings. Paths are relative
+// to this package's directory (go test runs with the package dir as CWD).
+// AR2 Session Manager is registered; AR3 Context Assembler / AR6 Memory join
+// as they land.
+var contextConsumers = map[string][]string{
+	"../sessionmanager": nil,
+}
 
 var bareParamPattern = regexp.MustCompile(
 	`func [A-Z]\w*\([^)]*\b(entityID|userID|sessionID|legalEntityID)\s+string[^)]*\)`)
@@ -276,6 +279,44 @@ func TestConsumerScannerDetectsBareIdentifierParams(t *testing.T) {
 	}
 	if !strings.Contains(violations[0], "userID") {
 		t.Fatalf("violation does not name the offending parameter: %v", violations)
+	}
+}
+
+// Reverse fixture against every REGISTERED consumer package: plant a bare-
+// identifier function beside its real sources, require red, remove it so CI
+// sees only the clean tree (same pattern as the vendor import guard). This
+// proves the scanner actually scans each registration — a typo'd path would
+// otherwise scan nothing and stay silently green.
+func TestConsumerScannerDetectsBareParamsInRegisteredPackages(t *testing.T) {
+	if len(contextConsumers) == 0 {
+		t.Fatal("no consumers registered — the AR1-G2 guard is scanning nothing")
+	}
+	for dir := range contextConsumers {
+		if _, err := os.Stat(dir); err != nil {
+			t.Fatalf("registered consumer %q does not exist: %v", dir, err)
+		}
+		fixture := filepath.Join(dir, "zz_ar1g2_fixture_test_bare.go")
+		content := "package sessionmanager\n\nfunc GetSession(sessionID string) string { return sessionID }\n"
+		if err := os.WriteFile(fixture, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		violations, err := scanForBareIdentifierParams(dir)
+		os.Remove(fixture)
+		if err != nil {
+			t.Fatalf("scan %s: %v", dir, err)
+		}
+		if len(violations) == 0 {
+			t.Fatalf("scanner failed to flag the planted bare param in registered consumer %s", dir)
+		}
+		found := false
+		for _, violation := range violations {
+			if strings.Contains(violation, "sessionID") {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("violation for %s does not name sessionID: %v", dir, violations)
+		}
 	}
 }
 

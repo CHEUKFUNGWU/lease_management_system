@@ -1,21 +1,26 @@
-//go:build picoclaw_agent_core
-
 // Vendored from github.com/sipeed/picoclaw at commit bbf6893ca7afad27f1d00a0f5a45982a549c6ed6.
 // Upstream path: agent/turn_context.go
 // SPDX-License-Identifier: MIT — Copyright (c) 2026 PicoClaw contributors.
+// See THIRD_PARTY_NOTICES at the repository root. Do not add business
+// logic here; adapt upstream behaviour in the wrapping layer instead.
+// Local adaptations (mechanical, behaviour-preserving):
+//   - import path rewrites (picoclaw module -> this vendor tree; routing and
+//     session resolve to symbol-level first-party shims in this tree)
 
 package agent
 
 import (
 	"github.com/lease-management-system/core-service/internal/agentkernel/third_party/picoclaw/bus"
+	"github.com/lease-management-system/core-service/internal/agentkernel/third_party/picoclaw/routing"
+	"github.com/lease-management-system/core-service/internal/agentkernel/third_party/picoclaw/session"
 )
 
 // TurnContext carries normalized turn-scoped facts that can be shared across
 // events, hooks, and other runtime observers without re-parsing legacy fields.
 type TurnContext struct {
 	Inbound *bus.InboundContext    `json:"inbound,omitempty"`
-	Route   any                    `json:"route,omitempty"` // *routing.ResolvedRoute; session/routing not vendored (AR5b)
-	Scope   any                    `json:"scope,omitempty"` // *session.SessionScope; not vendored (AR5b)
+	Route   *routing.ResolvedRoute `json:"route,omitempty"`
+	Scope   *session.SessionScope  `json:"scope,omitempty"`
 }
 
 func newTurnContext(

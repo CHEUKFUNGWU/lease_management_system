@@ -38,3 +38,28 @@ is the repository-level register (ADR-0026).
 Upstream licences are consulted at
 https://github.com/sipeed/picoclaw/blob/<commit>/LICENSE and the respective
 dependency repositories.
+
+## sipeed/picoclaw — agent kernel slice (AR5b, second vendoring wave)
+
+- Upstream: https://github.com/sipeed/picoclaw
+- Commit: bbf6893ca7afad27f1d00a0f5a45982a549c6ed6 (same pin as the channels slice)
+- Licence: MIT License — Copyright (c) 2026 PicoClaw contributors
+- Location: core-service/internal/agentkernel/third_party/picoclaw/
+- Scope (capability-driven per ADR-0028 §1): hooks.go (interceptor/approver
+  mount points), turn/pipeline protocol files, steering and stop entry points,
+  event payload/channel/bus types. Files under agent/ carry the build tag
+  `picoclaw_agent_core` and are NOT compiled until AR5c/AR5b2 land the missing
+  AgentLoop dependency closure — see tmp/blocked-AR5b.md for the handover list.
+- First-party replacements in-tree (headers say "NOT upstream code"): bus/bus.go,
+  config/config.go, logger/logger.go, media/media.go, tools/tools.go.
+- Vendored providers strategy slice: types.go, protocoltypes/, fallback.go,
+  error_classifier.go, cooldown.go, ratelimiter.go, model_ref.go,
+  provider_metadata.go, provider_catalog.go, common/. The HTTP provider
+  implementations (factory_provider, openai_compat, anthropic, bedrock …)
+  are deliberately excluded — internal/llm stays the LLM boundary (ADR-0028 §7).
+
+### New transitive dependencies from this wave
+
+None beyond the channels wave: gorilla/websocket, h2non/filetype and
+larksuite/oapi-sdk-go were already registered there; the kernel slice adds no
+third-party module requirements.

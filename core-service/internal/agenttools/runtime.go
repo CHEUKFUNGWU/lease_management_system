@@ -189,7 +189,15 @@ func (r *Runtime) execute(ctx context.Context, call ToolCall) (ToolResult, error
 			message := publicGuardError(code, out.Reason)
 			if code == "" {
 				code = ErrorSystemFailure
+				// This branch means a control denied without claiming a code —
+				// a wiring bug, not a runtime condition. There is no
+				// convergence rule to apply (no control owns the rejection), so
+				// the guard's own reason rides along: losing it would leave the
+				// one case that needs diagnosis with nothing to diagnose from.
 				message = "governance rejection carried no error code"
+				if reason := strings.TrimSpace(out.Reason); reason != "" {
+					message += ": " + reason
+				}
 			}
 			return rejectedResult(call.CallID, code, message, false), nil
 		}

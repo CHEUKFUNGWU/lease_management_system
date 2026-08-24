@@ -254,3 +254,52 @@ func TestRuntimeSurfacesAuditFailureAsSystemFailure(t *testing.T) {
 		t.Fatalf("audit failure result=%#v err=%v", result, err)
 	}
 }
+
+// ── RC1 fail-closed fallback ───────────────────────────────────────────────
+//
+// A guard that blocks without claiming a code is a wiring bug. The runtime
+// must fail closed to system_failure and must NOT reach for scope_denied —
+// that code is bottom-line-1 evidence and may only appear for a real tenant
+// violation. The guard's own reason rides along, because this is precisely
+// the case someone will have to diagnose.
+
+type codelessBlockGuard struct{ reason string }
+
+func (g codelessBlockGuard) Before(context.Context, ToolCall, ToolDescriptor, Principal) (GuardResult, error) {
+	return GuardResult{Block: true, Reason: g.reason}, nil
+}
+
+func (codelessBlockGuard) After(context.Context, ToolCall, ToolDescriptor, *ToolResult, Principal) error {
+	return nil
+}
+
+func TestRuntimeCodelessGuardBlockFailsClosedAndKeepsReason(t *testing.T) {
+	registry := NewRegistry()
+	if err := registry.Register(readTool("lease.contract.get", "contracts",
+		func(context.Context, ToolCall) (ToolResult, error) {
+			return ToolResult{Data: map[string]any{"ok": true}}, nil
+		})); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	runtime := NewRuntime(registry, RuntimeOptions{Guard: codelessBlockGuard{reason: "hook wiring lost its code"}})
+
+	result, err := runtime.Execute(runtimeContext(), ToolCall{
+		CallID: "call-1", RunID: "run-1", ToolName: "lease.contract.get",
+		ToolVersion: "v1", Arguments: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if result.Error == nil {
+		t.Fatalf("codeless block must reject, got %+v", result)
+	}
+	if result.Error.Code == ErrorScopeDenied {
+		t.Fatal("codeless block defaulted to scope_denied — that code is reserved for real tenant violations")
+	}
+	if result.Error.Code != ErrorSystemFailure {
+		t.Fatalf("code = %q, want %q", result.Error.Code, ErrorSystemFailure)
+	}
+	if !strings.Contains(result.Error.Message, "hook wiring lost its code") {
+		t.Fatalf("message = %q, want the guard's reason preserved for diagnosis", result.Error.Message)
+	}
+}

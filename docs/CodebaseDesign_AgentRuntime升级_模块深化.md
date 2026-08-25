@@ -385,7 +385,7 @@ type Executor interface {
 | 1 | **AR1 ContextKey** | 无。**必须最先做**——AR2/AR3/AR4/AR6 全部依赖它 |
 | 2 | AR5 内核置换 + 汇流 | ACORE-2 九项重锁；AR5-G1 汇流断言 |
 | 3 | AR2 Session Manager · AR3 Context Assembler | 依赖 AR1 与 AR5；两者可并行 |
-| 4 | AR4 Subturn · AR6 Memory · MCP · 路由 · 定时 · 健康探针 | 依赖 AR3（都要经 `Assemble`） |
+| 4 | AR4 Subturn · AR6 Memory · MCP · 路由 · 定时 · 健康检查 | 依赖 AR3（都要经 `Assemble`） |
 
 **AR1 先做的理由**：它是唯一一个「做晚了要返工全部调用点」的模块。先把键做成类型，后面每个模块自然带着保护长出来；后做则每个模块都会先长出裸字符串签名，再逐个改回去。
 

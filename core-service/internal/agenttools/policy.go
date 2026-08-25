@@ -75,7 +75,7 @@ func Evaluate(ctx context.Context, descriptor ToolDescriptor, call ToolCall, pol
 }
 
 // RequiresReviewDecision is the review half of Evaluate, factored out so the
-// governance chain (agentcore/hooks ReviewGate) and the runtime's
+// governance chain (governance.ReviewGate) and the runtime's
 // post-execution forcing share the same rule.
 func RequiresReviewDecision(descriptor ToolDescriptor, policy Policy) bool {
 	return descriptor.Review.Required || (descriptor.Level == LevelDraft && policy.RequireDraftReview)

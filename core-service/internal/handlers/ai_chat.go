@@ -276,16 +276,6 @@ func firstDraftService(services []*draftapp.Service) *draftapp.Service {
 	return services[0]
 }
 
-// AgentToolRuntime is the adapter seam used by the standalone Agent Gateway.
-// It intentionally returns the Tool Runtime rather than the Agent so Gateway
-// callers cannot reach planner, model or repository internals.
-func (h *AIChatHandler) AgentToolRuntime() agenttools.ToolRuntime {
-	if h == nil {
-		return nil
-	}
-	return h.toolRuntime
-}
-
 // AgentGovernedToolRuntime builds the RT1-D-1 gateway runtime: the same
 // registry as the chat plane's tool runtime, but guarded by the NEW chain
 // (governance.Assembly nine controls) instead of the legacy agentcore chain.

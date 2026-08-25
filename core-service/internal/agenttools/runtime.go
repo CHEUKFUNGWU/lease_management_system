@@ -27,7 +27,9 @@ type GuardResult struct {
 // ExecutionGuard is the seam the governance middleware chain (W2) crosses.
 // Before runs after registry resolution and parameter validation; After runs
 // after the handler returned. The runtime keeps this interface free of any
-// agentcore dependency — the chain adapter lives in agentcore/hooks.
+// agentcore dependency — since RT1-D-2 the only guard adapters live with the
+// governance chain (agentkernel/governance) and its consumers (chatexec,
+// handlers.governedGatewayGuard).
 type ExecutionGuard interface {
 	Before(ctx context.Context, call ToolCall, descriptor ToolDescriptor, principal Principal) (GuardResult, error)
 	After(ctx context.Context, call ToolCall, descriptor ToolDescriptor, result *ToolResult, principal Principal) error

@@ -15,7 +15,6 @@ import (
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/agentcontext"
-	agentcorehooks "github.com/lease-management-system/core-service/internal/agentcore/hooks"
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
@@ -350,18 +349,17 @@ func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.Mo
 		panic(err)
 	}
 	if collector.succeeded > 0 {
-		// W2: every tool call in the chat plane crosses the ordered governance
-		// chain (TenantScope → CapabilityCheck → ProtectedMeasure →
-		// BudgetGuard → IdempotencyGuard → ReviewGate) instead of scattered
-		// policy checks. Behaviour is equivalent; the chain is the mount
-		// point for future controls.
-		before, after := agentcorehooks.Governance(agentcorehooks.Deps{
-			Policy:             agenttools.DefaultPolicy(),
-			RequireDraftReview: true,
-		})
-		agent.toolRuntime = agenttools.NewRuntime(registry, agenttools.RuntimeOptions{
-			Guard: agentcorehooks.NewExecutionGuard(before, after),
-		})
+		// RT1-D-2：base runtime 不再挂任何 execution guard。旧链
+		// （agentcore/hooks，W2）已删除——它此前只被 chat/gateway 的 WithGuard
+		// 覆盖（永不作答）与无生产调用方的 Agent.Execute 使用；三边比对
+		// 证实其判定与 Evaluate 逐项同构、码同映射器，删除零漂移。
+		// 无 guard 的 Runtime 回落 agenttools.Evaluate（内联策略），即
+		// RuntimeOptions.Guard 文档自 W2 起写明的预期语义。等价性的适用范围
+		// 与已知不对称见 governance/dualpath_rc1_test.go 的锚测试注释：
+		// ProtectedMeasure / BudgetGuard 不在 Evaluate 内（两条路径的生产
+		// Deps 里本就是 nil）；TenantScope 身份完整性链侧严于 Evaluate
+		// （AR5d 决策，隔离权威在仓库层范围过滤）。
+		agent.toolRuntime = agenttools.NewRuntime(registry, agenttools.RuntimeOptions{})
 	}
 	return agent
 }

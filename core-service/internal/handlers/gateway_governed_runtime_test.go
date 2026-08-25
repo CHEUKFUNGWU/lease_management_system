@@ -391,12 +391,12 @@ func TestGatewayGovernanceParityAuditExactlyOnePerCall(t *testing.T) {
 }
 
 // ── 机器断言 + 反向对照（照 AR5-G1 / RT1-B SessionOwnerKind 模式）────────────
-// AgentGovernedToolRuntime 的 guard 是新链适配器；legacy AgentToolRuntime
-// 的 guard 是旧链（agentcorehooks.ExecutionGuard）或空（inline policy）。
-// 判别器必须能区分，否则断言恒真。
-
-// AgentGovernedToolRuntime 的 guard 是新链适配器；同一 registry 上不换 guard
-// 的 legacy runtime 报告空串。走过真实生产方法（handler 持有 toolRuntime），
+// AgentGovernedToolRuntime 的 guard 是新链适配器（governance.Assembly）；
+// 无 guard 的 base runtime 回落 Evaluate、报空串。判别器必须能区分，否则断
+// 言恒真。RT1-D-2 删除旧链与 AgentToolRuntime() 后：正向走真实生产方法，反
+// 向直接构造 base runtime —— 不依赖任何生产方法继续存在。
+// AgentGovernedToolRuntime 的 guard 是新链适配器；无 guard 的 base runtime
+// 报告空串。走过真实生产方法（handler 持有 toolRuntime），
 // 判别器必须能区分，否则断言恒真（反向对照）。
 func TestAgentGovernedToolRuntimeCrossesNewChain(t *testing.T) {
 	registry := agenttools.NewRegistry()
@@ -426,9 +426,11 @@ func TestAgentGovernedToolRuntimeCrossesNewChain(t *testing.T) {
 	if got := rt.GuardKind(); got != newGuard {
 		t.Fatalf("governed runtime guard = %q; want %q — the RT1-D-1 gateway wiring was reverted or bypassed", got, newGuard)
 	}
-	// 反向对照：同一 base 不换 guard → 不报告新适配器（legacy path）。
-	if got := handler.AgentToolRuntime().(*agenttools.Runtime).GuardKind(); got == newGuard {
-		t.Fatalf("legacy runtime reports the new guard — discriminator cannot distinguish old from new")
+	// 反向对照：无 guard 的 base runtime 不报告新适配器。RT1-D-2 后生产中
+	// 不再有「未换 guard 的 legacy 链」这个东西 —— base 直接构造（不依赖任何
+	// 生产方法继续存在），未接线报空串。
+	if got := base.GuardKind(); got != "" {
+		t.Fatalf("unguarded base runtime reports %q — discriminator cannot distinguish wired from unwired", got)
 	}
 }
 

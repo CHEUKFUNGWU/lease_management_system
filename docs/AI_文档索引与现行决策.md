@@ -178,7 +178,7 @@ FP&A 版本治理与滚动预测
 | G5 无 xlsx/docx 产出（导出仍是 CSV） | 🟡 **部分解决**：`workingpaper` xlsx/docx 确定性渲染器 + lint 门 + `GET /ai/chat/artifacts/:id/export` 端点已落地；端到端 WorkingPaper 生成链路（S1 底稿）未接线 | 阶段 0 → 阶段 1 |
 | **G6 PyMuPDF 的 AGPL 风险** | ✅ **已解决（W6，2026-08-20）。** `ai-service/` 整目录已删除，该 AGPL PDF 依赖不再存在于仓库代码；解析改由 `internal/docparse`（anydoc / PaddleOCR）承担 | ADR-0024 |
 | **G7 ai-service 未退役（新登记，2026-08-20）** | ✅ **已解决（W6，2026-08-20）。** W4+W5 全部落地：chat（`/chat` ×2）与 planner（`/api/v1/agent/plan`）迁入 `internal/llm` / `agentrunner.PlannerLLM`；四个 `/parse/*` 迁入 `internal/aiintake` 生产侧 + `internal/docparse`；`/suggest-mapping` 迁入 `internal/llm`；`/files/upload` 迁入 `miniostore` 写入侧。§0.2 九条依赖点清零，ai-service 整目录删除 | ADR-0023 W4–W6 |
-| **G9 sessionmanager 零调用方（AR2 已交付但未接线）** | ✅ **全部接线完成（RT1-B，2026-08-25）**：chat 平面（SI1 Part B）、**gateway + runner 平面（RT1-B）**——gateway `CreateSession` 经同一 `SessionOwner`（agentrunner 唯一会话路径是 gateway HTTP 入口，接好即覆盖），机器断言 + 反向对照见 `TestAgentGatewayWithSessionOwnerReportsAdapterKind`。worker 租约轴不加法人参数（机器身份信任模型，断言钉住「租约绑死具体 run row、claim 不改所有权」）。G9 关闭，不再有到期日 | C1 批次评审 + SI1 + RT1 |
+| **G9 sessionmanager 零调用方（AR2 已交付但未接线）** | ✅ **全部接线完成（RT1-B，2026-08-25）**：chat 平面（SI1 Part B）、**gateway + runner 平面（RT1-B）**——gateway `CreateSession` 经同一 `SessionOwner`（agentrunner 唯一会话路径是 gateway HTTP 入口，接好即覆盖），机器断言 + 反向对照见 `TestAgentGatewayWithSessionOwnerReportsAdapterKind`。worker 租约轴不加法人参数（机器身份信任模型）：断言钉住的是「worker 只能访问自己持租约的那个 run、claim 不改所有权」——**不是**「worker 池不跨法人」（worker 池从共享队列取队，不按法人分区，是部署级信任的选择，不是结构保证）。**worker→法人绑定关系为独立开放决策，见新登记 RT1-OPEN-1，不随 G9 关闭。** G9 关闭，不再有到期日 | C1 批次评审 + SI1 + RT1 |
 
 > W1 + 阶段 0 已按 [CodebaseDesign 模块深化](CodebaseDesign_AI阶段0产物底座与W1内核抽取_模块深化.md) 交付：`internal/agentcore`（纯循环内核 + ACORE-1/5/6/8 测试）、`protected_measures`（10 项 + 词法探针）、`internal/workingpaper`（I1/I2/I3/I6 lint + 封面 + 渲染）、`internal/docparse`（CSV/anydoc/PaddleOCR）、`internal/agentseval`（不变量与 triage 用例，harness 第三段 `invariants`）、CLI 三层命令（commit 只对人）、Web（去关键词猜测、tool_start 消费、working_paper 渲染）。
 >
@@ -222,6 +222,7 @@ FP&A 版本治理与滚动预测
 | 11 | **AR5c 离线测试按字母序派发**（NamedHook 默认 Priority=0）：单控制变异不受影响但顺序未被那些测试锁定；生产绑定已用显式优先级并有顺序断言。建议 governance_test 补显式优先级 | 无阻塞；防未来误读 | AR5 双轴评审 Standards #3 |
 | 12 | **picoclaw 完整回合循环启用**（去掉 `picoclaw_agent_core` build tag 需补 ~6,300 行闭包）与 AR5e（steering/abort + 流式事件接 Web 层） | AR3/AR4 的地基选择 | `tmp/blocked-AR5b.md`；AR5a §5 |
 | 13 | 定期用错误输入跑构建期守卫的检查尚未进 CI | 见下方 §5.1 | 本文 §5.1 |
+| 14 | **RT1-OPEN-1：worker→法人的绑定关系**——worker 池从共享队列取队、不按法人分区（部署级信任的选择，不是结构保证；RT1-B 已如实登记并订正）。若需要分租户 worker（worker 只服务特定法人），需新授权策略（worker→法人绑定表）。**独立开放决策，不随 G9 关闭。** | 分租户部署 | `tmp/delivery-RT1.md` |
 
 **当前没有阻塞阶段 0 的未决项。** 阶段 0 + 阶段 1 可以立即开工。
 

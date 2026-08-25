@@ -9,16 +9,21 @@ import (
 	"github.com/lease-management-system/core-service/internal/access"
 )
 
-// RT1-B worker 轴断言：租约签发时法人已被 run 结构约束。
+// RT1-B worker 轴断言：worker 只能访问自己持租约的那一个 run。
 //
 // worker 是受信任机器身份（agent_runtime:worker 权限），租约边界 =
-// worker_id + lease_token 绑定到具体 run row。本测试证明「跨法人」在结构上
-// 不可能发生：两个不同法人的 run 各被不同 worker 租走，各自的 GetClaimedRun
-// 只能取自己的 run；用 A 的租约取 B 的 run → ErrAgentRunLeaseLost。
+// worker_id + lease_token 绑定到具体 run row。本测试证明的是这个更弱的命题：
+// 两个不同法人的 run 各被不同 worker 租走，各自的 GetClaimedRun 只能取自己
+// 的 run；用 A 的租约取 B 的 run → ErrAgentRunLeaseLost。
+//
+// 注意不要把本测试往强了读：它证的不是「worker 池不跨法人」——
+// ClaimQueuedRun 从共享队列按 created_at 取队，一个 worker 能连续领到
+// 不同法人的 run（部署级信任的选择，不是结构保证）。本测试只证「租约绑死
+// 具体 run row，claim 不改所有权」。
 //
 // 注：这不是把 SI2 的用户法人轴套到 worker 上——worker 没有会话用户语义，
 // 它是部署级信任的通用执行器。worker→法人绑定的授权策略（如需分租户 worker）
-// 是独立开放决策，见 tmp/delivery-RT1.md。跑 make test-integration 实跑。
+// 是独立开放决策（未随 G9 关闭，见 tmp/delivery-RT1.md）。跑 make test-integration 实跑。
 func TestClaimedRunLeaseBindsTheRunRowAcrossEntities(t *testing.T) {
 	pool := postgresTestPool(t)
 	ctx := context.Background()
@@ -69,8 +74,8 @@ func TestClaimedRunLeaseBindsTheRunRowAcrossEntities(t *testing.T) {
 	}
 
 	// 交叉：worker-a 拿 runA 的租约去取 runB → lease lost（run row 不匹配）。
-	// 这就是「租约签发时法人已被 run 结构约束」的可执行形态——跨法人取
-	// 另一个 run 在结构上不可能，租约绑死具体 run row。
+	// 证实的是「worker 只能访问自己持租约的那个 run」，不是「跨法人不可能」——
+	// worker 池本身不按法人分区（部署级信任的选择），租约只绑死具体 run row。
 	if _, err := queue.GetClaimedRun(ctx, runB, "worker-a", tokenA); !errors.Is(err, ErrAgentRunLeaseLost) {
 		t.Fatalf("worker-a with runA lease fetched runB: err=%v; want ErrAgentRunLeaseLost", err)
 	}

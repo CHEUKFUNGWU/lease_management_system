@@ -77,6 +77,16 @@ func NewRuntime(registry *Registry, options RuntimeOptions) *Runtime {
 	return &Runtime{registry: registry, policy: policy, timeout: timeout, audit: options.Audit, now: now, metrics: metrics, guard: options.Guard}
 }
 
+// Registry returns the underlying tool registry. RT1-L3-D uses it to register
+// MCP tools post-construction on the SAME registry the chat and gateway planes
+// share — registration is mutex-guarded, so wiring after startup is safe.
+func (r *Runtime) Registry() *Registry {
+	if r == nil {
+		return nil
+	}
+	return r.registry
+}
+
 // Metrics returns the shared process metrics sink. WithAudit keeps this sink
 // shared so the Web Agent and standalone Gateway observe one aggregate.
 func (r *Runtime) Metrics() *RuntimeMetrics {

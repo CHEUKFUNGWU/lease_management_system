@@ -22,6 +22,8 @@ type Config struct {
 	AgentCapabilityCleanupSeconds int
 	// RT1-L3-C: interval for the expired-lease recovery scheduled job.
 	AgentRunLeaseRecoverySeconds int
+	// RT1-L3-D: path to the MCP registration manifest; empty = feature off.
+	MCPManifestPath string
 	LogLevel                     string
 	Port                         string
 
@@ -112,6 +114,7 @@ func Load() (*Config, error) {
 		AgentCapabilityTTLSeconds:     capabilityTTL,
 		AgentCapabilityCleanupSeconds: capabilityCleanup,
 		AgentRunLeaseRecoverySeconds:  leaseRecovery,
+		MCPManifestPath:              getEnv("MCP_MANIFEST_PATH", ""),
 		LogLevel:                      getEnv("LOG_LEVEL", "info"),
 		Port:                          port,
 

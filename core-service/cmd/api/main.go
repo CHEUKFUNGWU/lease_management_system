@@ -193,6 +193,15 @@ func main() {
 	})
 	docParser := docparse.NewRouter(docparse.CSV(), docparse.AnyDoc(cfg.AnyDocBinPath, 60*time.Second), ocrParser, docparse.OCREnabled(ocrParser))
 	aiChatHandler.SetDocumentParser(docParser)
+	// RT1-L3-D: if an MCP manifest is configured, register its tools into the
+	// shared runtime registry BEFORE any traffic is served. Fail-fast: a
+	// manifest that cannot fully register (unreachable server, missing tool,
+	// non-read entry) refuses startup — honest absence, never a silent skip.
+	if cfg.MCPManifestPath != "" {
+		if err := aiChatHandler.RegisterMCPTools(cfg.MCPManifestPath); err != nil {
+			log.Fatalf("Failed to register MCP tools: %v", err)
+		}
+	}
 	// W5-3: the intake parse endpoints read uploaded files through MinIO.
 	aiChatHandler.SetFileBytesReader(func(ctx context.Context, objectName string) ([]byte, error) {
 		return minioClient.GetObject(ctx, objectName)

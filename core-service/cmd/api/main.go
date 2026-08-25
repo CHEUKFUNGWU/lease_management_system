@@ -245,23 +245,21 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(corsMiddleware())
 
-	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		dbStatus := "ok"
-		if err := database.HealthCheck(ctx); err != nil {
-			dbStatus = "error: " + err.Error()
-		}
-
-		c.JSON(200, gin.H{
-			"status":   "ok",
-			"service":  "core-service",
-			"version":  "0.1.0",
-			"database": dbStatus,
-		})
-	})
+	// RT1-L3-B: honest health surface. The previous inline handler answered
+	// 200 + "status":"ok" even when the postgres probe failed and pasted the
+	// raw error into the body — a control that existed but could never be
+	// false. /live is liveness (dependency-blind: restarting cannot heal
+	// postgres); /ready gates on postgres+minio; /health keeps its URL for
+	// existing callers but now carries the readiness contract. LLM provider
+	// state comes from cached real-call outcomes (never actively probed) and
+	// does not gate.
+	healthHandler := handlers.NewHealthHandler(database.HealthCheck)
+	if minioClient != nil {
+		healthHandler = healthHandler.WithMinioProbe(minioClient.HealthCheck)
+	}
+	r.GET("/health", healthHandler.Ready)
+	r.GET("/live", healthHandler.Live)
+	r.GET("/ready", healthHandler.Ready)
 
 	// Public routes - registration disabled, only login is public
 	r.POST("/api/v1/auth/register", authHandler.Register)

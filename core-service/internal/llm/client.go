@@ -74,8 +74,23 @@ func NewClient(cfg Config) (*Client, error) {
 // Config exposes the client's resolved configuration.
 func (c *Client) Config() Config { return c.cfg }
 
-// Chat performs one non-streaming chat completion round.
+// Chat performs one non-streaming chat completion round. Every real provider
+// round records its outcome into the process-wide health signal (RT1-L3-B);
+// ErrNotConfigured is config absence, not provider failure, and records nothing.
 func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResult, error) {
+	result, err := c.chat(ctx, req)
+	switch {
+	case err == nil:
+		recordCallSuccess()
+	case errors.Is(err, ErrNotConfigured):
+		// config absence: no call was attempted, signal untouched
+	default:
+		recordCallFailure()
+	}
+	return result, err
+}
+
+func (c *Client) chat(ctx context.Context, req ChatRequest) (ChatResult, error) {
 	if c == nil || strings.TrimSpace(c.cfg.APIKey) == "" {
 		return ChatResult{}, ErrNotConfigured
 	}

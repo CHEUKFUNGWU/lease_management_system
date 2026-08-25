@@ -48,6 +48,22 @@ func New(cfg Config) (*Client, error) {
 	return &Client{mc: mc, bucket: cfg.Bucket}, nil
 }
 
+// HealthCheck probes the configured endpoint with a metadata-level call
+// (bucket existence) — no data transfer. RT1-L3-B readiness dependency probe.
+func (c *Client) HealthCheck(ctx context.Context) error {
+	if c == nil || c.mc == nil {
+		return fmt.Errorf("miniostore: client is disabled")
+	}
+	ok, err := c.mc.BucketExists(ctx, c.bucket)
+	if err != nil {
+		return fmt.Errorf("miniostore probe: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("miniostore bucket %q does not exist", c.bucket)
+	}
+	return nil
+}
+
 // GetObject reads a whole object by name into memory. Callers cap size at
 // their own limits (the ingest template path is ≤10MB by policy).
 func (c *Client) GetObject(ctx context.Context, objectName string) ([]byte, error) {

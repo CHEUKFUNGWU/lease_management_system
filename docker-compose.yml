@@ -80,6 +80,16 @@ services:
       ANYDOC_BIN_PATH: ${ANYDOC_BIN_PATH:-/usr/local/bin/anydoc}
     ports:
       - "${CORE_PORT:-8080}:8080"
+    # RT1-L3-B: readiness against the honest health surface. /ready fails when
+    # postgres or minio is down — compose then restarts/reports the container
+    # instead of pretending it is healthy (risk red line 12). Liveness is
+    # intentionally not used here: restarting cannot heal dependency outages.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8080/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy

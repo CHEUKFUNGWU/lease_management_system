@@ -230,7 +230,10 @@ func main() {
 	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
 	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
 	decisionScenarioHandler := handlers.NewDecisionScenarioHandler(draftService)
-	agentGatewayHandler := handlers.NewAgentGatewayHandler(aiChatHandler.AgentToolRuntime(), handlers.NewAgentToolAuditRecorder(auditLogger)).WithCapabilityIssuer(capabilityIssuer).WithSkillRegistry(aiChatHandler.AgentSkillRegistry()).WithSessionStore(aiChatHandler.AgentSessionStore()).WithContractScopeReader(contractRepo).WithRunStore(aiChatHandler.AgentRunStore()).WithCheckpointStore(aiChatHandler.AgentRunCheckpointStore()).WithQueueStore(aiRunQueueRepo).WithWorkerRunStore(aiRunQueueRepo).WithTerminalAlertStore(aiChatRuntimeRepo).WithUsageStore(aiChatRuntimeRepo).WithContextMetrics(aiChatHandler.ContextMetrics()).WithSessionOwner(aiChatHandler.SessionOwner())
+	gatewayAudit := handlers.NewAgentToolAuditRecorder(auditLogger)
+	// RT1-D-1: gateway 工具执行走新链（governance.Assembly 九控制），经
+	// AgentGovernedToolRuntime（共享 chat 的 registry，只换 guard）。
+	agentGatewayHandler := handlers.NewAgentGatewayHandler(aiChatHandler.AgentGovernedToolRuntime(), gatewayAudit).WithCapabilityIssuer(capabilityIssuer).WithSkillRegistry(aiChatHandler.AgentSkillRegistry()).WithSessionStore(aiChatHandler.AgentSessionStore()).WithContractScopeReader(contractRepo).WithRunStore(aiChatHandler.AgentRunStore()).WithCheckpointStore(aiChatHandler.AgentRunCheckpointStore()).WithQueueStore(aiRunQueueRepo).WithWorkerRunStore(aiRunQueueRepo).WithTerminalAlertStore(aiChatRuntimeRepo).WithUsageStore(aiChatRuntimeRepo).WithContextMetrics(aiChatHandler.ContextMetrics()).WithSessionOwner(aiChatHandler.SessionOwner())
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)

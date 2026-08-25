@@ -286,6 +286,21 @@ func (h *AIChatHandler) AgentToolRuntime() agenttools.ToolRuntime {
 	return h.toolRuntime
 }
 
+// AgentGovernedToolRuntime builds the RT1-D-1 gateway runtime: the same
+// registry as the chat plane's tool runtime, but guarded by the NEW chain
+// (governance.Assembly nine controls) instead of the legacy agentcore chain.
+// WithGuard shares the registry/metrics/audit — only the guard swaps.
+//
+// RT1-D-1 复验修正：guard 不再接审计。链上 AuditRecorder 控制留 nil（Deps.Audit），
+// 与 chat 平面一致——runtime 层是 tool_execution 发布的唯一所有者；gateway 的
+// 审计由 handler 的 runtime 层 WithAudit 承担（NewAgentGatewayHandler 第二参）。
+func (h *AIChatHandler) AgentGovernedToolRuntime() agenttools.ToolRuntime {
+	if h == nil || h.toolRuntime == nil {
+		return nil
+	}
+	return h.toolRuntime.WithGuard(newGovernedGatewayGuard())
+}
+
 // AgentSkillRegistry is the read-only descriptor seam used by the Agent
 // Gateway. It does not expose planner or repository internals.
 func (h *AIChatHandler) AgentSkillRegistry() *agentskill.Registry {

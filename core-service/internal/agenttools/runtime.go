@@ -102,6 +102,17 @@ func (r *Runtime) WithAudit(audit AuditRecorder) *Runtime {
 // derives a per-turn runtime whose guard is the vendored HookManager chain,
 // while the shared base Runtime keeps its construction-time guard for the
 // planes that have not converged yet.
+// GuardKind reports the concrete type of the wired execution guard. Machine
+// discriminator for RT1-D-1: the gateway plane's governed runtime must prove
+// it crosses the NEW chain (governance.Assembly) instead of the legacy
+// agentcore chain — empty when no guard is wired (inline policy path).
+func (r *Runtime) GuardKind() string {
+	if r == nil || r.guard == nil {
+		return ""
+	}
+	return fmt.Sprintf("%T", r.guard)
+}
+
 func (r *Runtime) WithGuard(guard ExecutionGuard) *Runtime {
 	if r == nil {
 		return nil

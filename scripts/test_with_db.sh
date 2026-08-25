@@ -14,6 +14,10 @@
 #   scripts/test_with_db.sh ./... -run TestFoo   # 透传 go test 参数
 #
 # 它不碰既有的 lease-postgres 容器与卷。容器名与端口都是独立的。
+#
+# 为什么固定 -count=1：go test 缓存不感知环境变量。TEST_DATABASE_URL 是本脚本
+# 导出的，缓存回放的结果可能来自没带库的上一轮 —— skip 不算证据（AGENTS.md）,
+# cached 同样不算。集成跑批必须真跑。
 
 set -euo pipefail
 
@@ -71,4 +75,4 @@ echo "→ TEST_DATABASE_URL 已导出，开始跑测试"
 echo
 
 cd "$ROOT/core-service"
-GOCACHE="$(pwd)/.gocache" go test "${@:-./...}"
+GOCACHE="$(pwd)/.gocache" go test -count=1 "${@:-./...}"

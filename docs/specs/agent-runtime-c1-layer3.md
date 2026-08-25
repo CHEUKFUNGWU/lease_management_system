@@ -158,8 +158,14 @@ r.GET("/health", func(c *gin.Context) {
 - **反向测试**：同一 job 在同一触发时刻被触发两次，断言只产生一次执行；把幂等键去掉必须变红
 - **反向测试**：未登记 Principal 的 job 拒绝启动（不是静默跳过——静默跳过和成功在日志里长得一样）
 - lease recovery job 有集成测试：造一条过期租约，跑一轮调度，断言它回到队列
-- 调度产生的 run 在审计里与用户发起的 run 可区分（否则「谁触发的」这个问题答不了）
+- ~~调度产生的 run 在审计里与用户发起的 run 可区分~~ **转移（2026-08-26）：v1 无 run 可谈**——lease recovery 被裁决为 Type A 系统维护型（见下），其可区分痕迹是 requeue 自带的 error_message 与 queue_update（reason=lease_expired）trace；run 级区分随第一个 Type B 任务落地时兑现
 - 全量 `go test ./...` + `go vet` 绿；`make test-integration` 实跑非 SKIP
+
+**L3-C 裁决落地（2026-08-26，复验人批准）**：
+
+1. **lease recovery 不进治理链**。九控制全是围绕 ToolCall 的闸门；给不调工具的运维动作造假 ToolCall 过链本身是新的说谎面。本段「走同一条治理链」的禁令针对的是「定时任务直接调工具绕过审批」——lease recovery 不是那个形状。结构性守卫：internal/scheduler 仅依赖标准库（import guard 双向测试含种违规 fixture），Registration.Run 签名无任何 runtime/registry 参数。
+2. **任务两类分治**：Type A 系统维护型（v1 三件：lease recovery、capability cleanup、auth-refresh cleanup——后两者是 main.go 既有手写 ticker 的吸收）与 Type B 业务运行型（Story 29 等）。跨法人豁免、边界、与 #14 的关系登记为决策 D39（AI 文档索引 §2）。
+3. **幂等谓词三重冗余**（status='running' / leased_until<NOW / SET 置空 leased_until）：任一存活即保住幂等，单点变异打不穿是设计强度而非测试弱点；变异自检用双点失效验证（去掉 status 谓词且不清 leased_until → once-only 断言与活租约保护各红一条）。
 
 ---
 

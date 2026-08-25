@@ -55,6 +55,9 @@ services:
       AGENT_CAPABILITY_SECRET: ${AGENT_CAPABILITY_SECRET:-lease_agent_capability_secret}
       AGENT_CAPABILITY_TTL_SECONDS: ${AGENT_CAPABILITY_TTL_SECONDS:-300}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # RT1-L3-C：过期租约回收 job 的调度间隔（秒）。系统维护型任务，不产生
+      # run、不调工具、跨法人只重置队列/租约列（决策 D39）。
+      AGENT_RUN_LEASE_RECOVERY_SECONDS: ${AGENT_RUN_LEASE_RECOVERY_SECONDS:-60}
       # AR3 上下文装配器（RT1-A 两级开关，L3-A 起默认 count）：off=legacy 逐字节
       # 不变；count=只计数只上报不压缩（占用率需要分母，故仍要求预算几何）；
       # on=启用压缩。旧 CONTEXT_ASSEMBLER_ENABLED=true 映射为 on。

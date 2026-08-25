@@ -20,8 +20,10 @@ type Config struct {
 	AgentCapabilitySecret         string
 	AgentCapabilityTTLSeconds     int
 	AgentCapabilityCleanupSeconds int
-	LogLevel                      string
-	Port                          string
+	// RT1-L3-C: interval for the expired-lease recovery scheduled job.
+	AgentRunLeaseRecoverySeconds int
+	LogLevel                     string
+	Port                         string
 
 	// MinIO read seam for agent-side import preview (page-fill). Empty
 	// endpoint disables it; the agent then refuses honestly (D-D2).
@@ -74,6 +76,10 @@ func Load() (*Config, error) {
 	if capabilityTTL <= 0 {
 		capabilityTTL = 300
 	}
+	leaseRecovery, _ := strconv.Atoi(os.Getenv("AGENT_RUN_LEASE_RECOVERY_SECONDS"))
+	if leaseRecovery <= 0 {
+		leaseRecovery = 60
+	}
 	capabilityCleanup, _ := strconv.Atoi(os.Getenv("AGENT_CAPABILITY_CLEANUP_SECONDS"))
 	if capabilityCleanup <= 0 {
 		capabilityCleanup = 900
@@ -105,6 +111,7 @@ func Load() (*Config, error) {
 		AgentCapabilitySecret:         getEnv("AGENT_CAPABILITY_SECRET", "lease_agent_capability_secret"),
 		AgentCapabilityTTLSeconds:     capabilityTTL,
 		AgentCapabilityCleanupSeconds: capabilityCleanup,
+		AgentRunLeaseRecoverySeconds:  leaseRecovery,
 		LogLevel:                      getEnv("LOG_LEVEL", "info"),
 		Port:                          port,
 

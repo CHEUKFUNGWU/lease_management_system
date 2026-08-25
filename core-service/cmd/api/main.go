@@ -24,7 +24,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/miniostore"
 	"github.com/lease-management-system/core-service/internal/repository"
-	"github.com/lease-management-system/core-service/internal/sessionmanager"
+	"github.com/lease-management-system/core-service/internal/scheduler"
 	"github.com/lease-management-system/core-service/internal/services/agentguard"
 	"github.com/lease-management-system/core-service/internal/services/audit"
 	"github.com/lease-management-system/core-service/internal/services/closecontrol"
@@ -33,6 +33,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 	"github.com/lease-management-system/core-service/internal/services/monthend"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
+	"github.com/lease-management-system/core-service/internal/sessionmanager"
 )
 
 func main() {
@@ -97,10 +98,53 @@ func main() {
 	}
 	capabilityStore := agentcapability.NewPostgresStore(database.Pool)
 	capabilityIssuer = capabilityIssuer.WithRevocationStore(capabilityStore)
-	maintenanceCtx, stopCapabilityMaintenance := context.WithCancel(context.Background())
-	go runCapabilityMaintenance(maintenanceCtx, capabilityStore, time.Duration(cfg.AgentCapabilityCleanupSeconds)*time.Second)
-	refreshMaintenanceCtx, stopRefreshMaintenance := context.WithCancel(context.Background())
-	go runAuthRefreshMaintenance(refreshMaintenanceCtx, authRefreshRepo, time.Duration(cfg.RefreshTokenCleanupSeconds)*time.Second)
+	// RT1-L3-C: all in-process scheduled jobs live in internal/scheduler —
+	// the single home that replaced three same-shaped hand-written tickers
+	// (lease recovery + capability cleanup + auth-refresh cleanup). Type A
+	// (system maintenance) jobs produce no runs and call no tools, so they
+	// never cross the governance chain; the package is stdlib-only by import
+	// guard. Lease recovery closes the L3-B registered debt: before this job
+	// existed, a dead worker's runs stayed leased until expiry with nothing
+	// to requeue them.
+	maintenanceJobs := []scheduler.Registration{
+		scheduler.LeaseRecovery(aiRunQueueRepo, time.Duration(cfg.AgentRunLeaseRecoverySeconds)*time.Second),
+		{
+			Name:     "agent-capability-cleanup",
+			Interval: time.Duration(cfg.AgentCapabilityCleanupSeconds) * time.Second,
+			Auth:     scheduler.AuthSystemMaintenance,
+			Run: func(ctx context.Context) error {
+				deleted, err := capabilityStore.CleanupExpired(ctx, time.Now().UTC())
+				if err != nil {
+					return err
+				}
+				stats, err := capabilityStore.Stats(ctx, time.Now().UTC())
+				if err != nil {
+					return err
+				}
+				log.Printf("Agent capability maintenance: deleted=%d active=%d revoked=%d expired=%d", deleted, stats.Active, stats.Revoked, stats.Expired)
+				return nil
+			},
+		},
+		{
+			Name:     "auth-refresh-cleanup",
+			Interval: time.Duration(cfg.RefreshTokenCleanupSeconds) * time.Second,
+			Auth:     scheduler.AuthSystemMaintenance,
+			Run: func(ctx context.Context) error {
+				deleted, err := authRefreshRepo.CleanupExpired(ctx, time.Now().UTC())
+				if err != nil {
+					return err
+				}
+				log.Printf("Auth refresh session maintenance: deleted=%d", deleted)
+				return nil
+			},
+		},
+	}
+	maintenanceScheduler, schedulerErr := scheduler.New(maintenanceJobs)
+	if schedulerErr != nil {
+		log.Fatalf("Failed to initialize scheduler: %v", schedulerErr)
+	}
+	schedulerCtx, stopScheduler := context.WithCancel(context.Background())
+	maintenanceScheduler.Start(schedulerCtx)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(cfg, userRepo, roleRepo).WithRefreshTokenStore(authRefreshRepo)
@@ -658,8 +702,8 @@ func main() {
 
 	<-quit
 	log.Println("Shutting down server...")
-	stopCapabilityMaintenance()
-	stopRefreshMaintenance()
+	stopScheduler()
+	maintenanceScheduler.Wait() // let in-flight job executions settle
 	if err := gatewayRunner.Stop(context.Background()); err != nil {
 		log.Printf("Gateway stop failed: %v", err)
 	}
@@ -672,63 +716,6 @@ func main() {
 	}
 
 	log.Println("Server exited")
-}
-
-func runCapabilityMaintenance(ctx context.Context, store *agentcapability.PostgresStore, interval time.Duration) {
-	if store == nil || interval <= 0 {
-		return
-	}
-	cleanup := func() {
-		deleted, err := store.CleanupExpired(ctx, time.Now().UTC())
-		if err != nil {
-			log.Printf("Agent capability cleanup failed: %v", err)
-			return
-		}
-		stats, err := store.Stats(ctx, time.Now().UTC())
-		if err != nil {
-			log.Printf("Agent capability stats failed after cleanup: %v", err)
-			return
-		}
-		log.Printf("Agent capability maintenance: deleted=%d active=%d revoked=%d expired=%d", deleted, stats.Active, stats.Revoked, stats.Expired)
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			cleanup()
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-type authRefreshCleanupStore interface {
-	CleanupExpired(context.Context, time.Time) (int64, error)
-}
-
-func runAuthRefreshMaintenance(ctx context.Context, store authRefreshCleanupStore, interval time.Duration) {
-	if store == nil || interval <= 0 {
-		return
-	}
-	cleanup := func() {
-		deleted, err := store.CleanupExpired(ctx, time.Now().UTC())
-		if err != nil {
-			log.Printf("Auth refresh session cleanup failed: %v", err)
-			return
-		}
-		log.Printf("Auth refresh session maintenance: deleted=%d", deleted)
-	}
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			cleanup()
-		case <-ctx.Done():
-			return
-		}
-	}
 }
 
 func corsMiddleware() gin.HandlerFunc {

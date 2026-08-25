@@ -15,7 +15,9 @@ import (
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
+	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/sessionmanager"
 )
 
 type gatewayContractReader struct {
@@ -622,5 +624,25 @@ func TestAgentGatewayMetricsAppendsContextMetrics(t *testing.T) {
 		if strings.Contains(body, forbidden) {
 			t.Fatalf("metrics payload leaks tenant identifier %q:\n%s", forbidden, body)
 		}
+	}
+}
+
+// RT1-B 汇流断言（照 SI1 Part B SessionOwnerKind 模式）：gateway 平面装配
+// sessionmanager 时，CreateSession 实际经过 AR2 生命周期所有者；不装配则
+// 回落 legacy store。反向对照：未接线绝不能报告适配器类型。
+func TestAgentGatewayWithSessionOwnerReportsAdapterKind(t *testing.T) {
+	reader := &gatewayContractReader{attributes: access.ContractAttributes{LegalEntityID: "le-001"}, contract: &repository.Contract{ID: "contract-1", ContractName: "Lease"}}
+	gateway := NewAgentGatewayHandler(newContractGatewayRuntime(reader))
+	if got, want := gateway.SessionOwnerKind(), ""; got != want {
+		t.Fatalf("unwired gateway session owner kind = %q; want %q", got, want)
+	}
+
+	repo := &repository.AIChatRuntimeRepository{}
+	mgr := sessionmanager.New(nil, sessionmanager.Policy{})
+	owner := aichat.NewSessionOwner(mgr, repo)
+	wired := gateway.WithSessionOwner(owner)
+	const adapterKind = "*aichat.sessionOwnerAdapter"
+	if got := wired.SessionOwnerKind(); got != adapterKind {
+		t.Fatalf("wired gateway session owner kind = %q; want %q — the RT1-B wiring was reverted or bypassed", got, adapterKind)
 	}
 }

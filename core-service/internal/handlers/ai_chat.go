@@ -190,6 +190,15 @@ func (h *AIChatHandler) WithAuditRepository(reader AgentAuditReader) *AIChatHand
 	return &clone
 }
 
+// SessionOwner exposes the wired AR2 lifecycle seam so the gateway plane can
+// share the same session-management authority (RT1-B). Nil when legacy.
+func (h *AIChatHandler) SessionOwner() aichat.SessionOwner {
+	if h == nil || h.agentRuntime == nil {
+		return nil
+	}
+	return h.agentRuntime.SessionOwner()
+}
+
 // ContextMetrics returns the RT1-A context-budget occupancy sink (nil when
 // no assembler is wired). The gateway's /agent/metrics/prometheus appends
 // its payload to the tool-runtime metrics.

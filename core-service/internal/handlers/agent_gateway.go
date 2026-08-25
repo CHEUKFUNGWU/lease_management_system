@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/agentcapability"
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
+	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	auditservice "github.com/lease-management-system/core-service/internal/services/audit"
 )
@@ -37,6 +39,7 @@ type AgentGatewayHandler struct {
 	alerts      AgentRunTerminalAlertStore
 	usage       AgentUsageReader
 	contextMetrics *agenttools.ContextMetrics
+	sessionOwner   aichat.SessionOwner
 }
 
 // WithContextMetrics attaches the RT1-A context-budget sink so
@@ -47,6 +50,29 @@ func (h *AgentGatewayHandler) WithContextMetrics(m *agenttools.ContextMetrics) *
 	}
 	h.contextMetrics = m
 	return h
+}
+
+// WithSessionOwner shares the AR2 lifecycle seam with the gateway plane
+// (RT1-B): gateway session creation flows through sessionmanager exactly like
+// the chat plane, so the runner (whose only session path is this HTTP entry)
+// is covered too. Nil keeps the legacy store path.
+func (h *AgentGatewayHandler) WithSessionOwner(owner aichat.SessionOwner) *AgentGatewayHandler {
+	if h == nil {
+		return h
+	}
+	h.sessionOwner = owner
+	return h
+}
+
+// SessionOwnerKind reports the concrete wired session owner type. Machine
+// assertion seam for RT1-B (AR5-G1 / SI1 SessionOwnerKind pattern): empty
+// when legacy; the reverse control in the test proves the discriminator can
+// tell wired from unwired.
+func (h *AgentGatewayHandler) SessionOwnerKind() string {
+	if h == nil || h.sessionOwner == nil {
+		return ""
+	}
+	return fmt.Sprintf("%T", h.sessionOwner)
 }
 
 func NewAgentGatewayHandler(runtime agenttools.ToolRuntime, auditRecorders ...agenttools.AuditRecorder) *AgentGatewayHandler {

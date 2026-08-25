@@ -1,0 +1,122 @@
+package repository
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/lease-management-system/core-service/internal/access"
+)
+
+// RT1-B worker 轴断言：租约签发时法人已被 run 结构约束。
+//
+// worker 是受信任机器身份（agent_runtime:worker 权限），租约边界 =
+// worker_id + lease_token 绑定到具体 run row。本测试证明「跨法人」在结构上
+// 不可能发生：两个不同法人的 run 各被不同 worker 租走，各自的 GetClaimedRun
+// 只能取自己的 run；用 A 的租约取 B 的 run → ErrAgentRunLeaseLost。
+//
+// 注：这不是把 SI2 的用户法人轴套到 worker 上——worker 没有会话用户语义，
+// 它是部署级信任的通用执行器。worker→法人绑定的授权策略（如需分租户 worker）
+// 是独立开放决策，见 tmp/delivery-RT1.md。跑 make test-integration 实跑。
+func TestClaimedRunLeaseBindsTheRunRowAcrossEntities(t *testing.T) {
+	pool := postgresTestPool(t)
+	ctx := context.Background()
+
+	// 两个法人、一个横跨用户（SI1 形状），各一个会话 + 一个 queued run。
+	entityA, entityB, userID := seedChatIsolationTenants(t, ctx, pool, "wax")
+	sessionA := seedChatSession(t, ctx, pool, userID, &entityA, "A 会话")
+	sessionB := seedChatSession(t, ctx, pool, userID, &entityB, "B 会话")
+
+	mkRun := func(sessionID string) string {
+		t.Helper()
+		var runID string
+		if err := pool.QueryRow(ctx, `
+			INSERT INTO ai_chat_runs (session_id, status, agent_mode)
+			VALUES ($1, 'queued', true) RETURNING id`, sessionID).Scan(&runID); err != nil {
+			t.Fatalf("seed queued run: %v", err)
+		}
+		return runID
+	}
+	runA := mkRun(sessionA)
+	runB := mkRun(sessionB)
+	t.Cleanup(func() {
+		cleanupCtx := context.Background()
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM ai_chat_runs WHERE session_id = ANY($1::uuid[])`, []string{sessionA, sessionB})
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM ai_chat_sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM legal_entities WHERE id = ANY($1::uuid[])`, []string{entityA, entityB})
+	})
+
+	queue := NewAgentRunQueueRepository(pool)
+
+	// 两个 worker 各租一个 run：worker-a 租 runA，worker-b 租 runB。
+	claimedA, tokenA, err := queue.ClaimQueuedRun(ctx, "worker-a", time.Minute)
+	if err != nil || claimedA == nil || claimedA.ID != runA {
+		t.Fatalf("worker-a claim: run=%+v err=%v (queue is FIFO oldest-first)", claimedA, err)
+	}
+	claimedB, tokenB, err := queue.ClaimQueuedRun(ctx, "worker-b", time.Minute)
+	if err != nil || claimedB == nil || claimedB.ID != runB {
+		t.Fatalf("worker-b claim: run=%+v err=%v", claimedB, err)
+	}
+
+	// 各 worker 取自己的 run：成功。
+	if got, err := queue.GetClaimedRun(ctx, runA, "worker-a", tokenA); err != nil || got == nil || got.ID != runA {
+		t.Fatalf("worker-a owns runA: err=%v", err)
+	}
+	if got, err := queue.GetClaimedRun(ctx, runB, "worker-b", tokenB); err != nil || got == nil || got.ID != runB {
+		t.Fatalf("worker-b owns runB: err=%v", err)
+	}
+
+	// 交叉：worker-a 拿 runA 的租约去取 runB → lease lost（run row 不匹配）。
+	// 这就是「租约签发时法人已被 run 结构约束」的可执行形态——跨法人取
+	// 另一个 run 在结构上不可能，租约绑死具体 run row。
+	if _, err := queue.GetClaimedRun(ctx, runB, "worker-a", tokenA); !errors.Is(err, ErrAgentRunLeaseLost) {
+		t.Fatalf("worker-a with runA lease fetched runB: err=%v; want ErrAgentRunLeaseLost", err)
+	}
+	if _, err := queue.GetClaimedRun(ctx, runA, "worker-b", tokenB); !errors.Is(err, ErrAgentRunLeaseLost) {
+		t.Fatalf("worker-b with runB lease fetched runA: err=%v; want ErrAgentRunLeaseLost", err)
+	}
+}
+
+// TestClaimedRunSessionEntityIsRunBoundary pins that the claimed run's session
+// carries the entity it was created under — the claim does not alter ownership.
+func TestClaimedRunSessionEntityIsRunBoundary(t *testing.T) {
+	pool := postgresTestPool(t)
+	ctx := context.Background()
+
+	entityA, _, userID := seedChatIsolationTenants(t, ctx, pool, "ownr")
+	repo := NewAIChatRuntimeRepository(pool)
+	sessionA := seedChatSession(t, ctx, pool, userID, &entityA, "A 会话")
+	var runID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO ai_chat_runs (session_id, status, agent_mode)
+		VALUES ($1, 'queued', true) RETURNING id`, sessionA).Scan(&runID); err != nil {
+		t.Fatalf("seed run: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx := context.Background()
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM ai_chat_runs WHERE id = $1`, runID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM ai_chat_sessions WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(cleanupCtx, `DELETE FROM legal_entities WHERE id = $1`, entityA)
+	})
+
+	queue := NewAgentRunQueueRepository(pool)
+	claimed, token, err := queue.ClaimQueuedRun(ctx, "worker-a", time.Minute)
+	if err != nil || claimed == nil || claimed.ID != runID {
+		t.Fatalf("claim: %+v err=%v", claimed, err)
+	}
+	// 租约取回后，run 的 session 法人仍是创建时的 A——claim 不改所有权。
+	ownerRun, err := queue.GetClaimedRun(ctx, runID, "worker-a", token)
+	if err != nil {
+		t.Fatalf("get claimed: %v", err)
+	}
+	sess, err := repo.GetSessionByID(ctx, ownerRun.SessionID, userID, access.GlobalEntityFilter())
+	if err != nil {
+		t.Fatalf("load session: %v", err)
+	}
+	if sess.LegalEntityID == nil || *sess.LegalEntityID != entityA {
+		t.Fatalf("claimed run's session entity = %v; want %s (claim must not change ownership)", sess.LegalEntityID, entityA)
+	}
+}

@@ -65,6 +65,16 @@ func (r *Runtime[T]) SessionOwnerKind() string {
 	return fmt.Sprintf("%T", r.sessionOwner)
 }
 
+// SessionOwner returns the wired AR2 lifecycle seam (nil when the legacy
+// store path is in use). Exposed so sibling planes (gateway) can share the
+// same session-management authority (RT1-B).
+func (r *Runtime[T]) SessionOwner() SessionOwner {
+	if r == nil {
+		return nil
+	}
+	return r.sessionOwner
+}
+
 func newRuntime[T any](persistence store, planner Planner, executor Executor[T], project Projector[T], options Options) *Runtime[T] {
 	dispatch := options.Dispatch
 	if dispatch == nil {

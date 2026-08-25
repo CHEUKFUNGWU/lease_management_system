@@ -186,11 +186,15 @@ func (r *Runtime[T]) executeDispatched(ctx context.Context, prepared *preparedRu
 }
 
 func (r *Runtime[T]) Inspect(ctx context.Context, userID, runID string, afterSequence int) (*Inspection, error) {
-	run, err := r.store.GetRunByID(ctx, runID, userID)
+	boundary, boundaryErr := entityBoundary(ctx)
+	if boundaryErr != nil {
+		return nil, fmt.Errorf("resolve AI run inspection boundary: %w", boundaryErr)
+	}
+	run, err := r.store.GetRunByID(ctx, runID, userID, boundary)
 	if err != nil {
 		return nil, fmt.Errorf("load AI agent run: %w", err)
 	}
-	events, err := r.store.ListRunEvents(ctx, runID, afterSequence, 200)
+	events, err := r.store.ListRunEvents(ctx, runID, afterSequence, 200, boundary, userID)
 	if err != nil {
 		return nil, fmt.Errorf("load AI agent run events: %w", err)
 	}

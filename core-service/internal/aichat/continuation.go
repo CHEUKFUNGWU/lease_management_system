@@ -105,7 +105,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 	}
 	switch target.Type {
 	case "run":
-		run, err := r.store.GetRunByID(ctx, target.ID, command.UserID)
+		run, err := r.store.GetRunByID(ctx, target.ID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation run: %w", err)
 		}
@@ -120,7 +120,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		}
 		instruction = continuationInstruction("run", summarizeRun(run))
 	case "message":
-		message, err := r.store.GetMessageByID(ctx, target.ID, command.UserID)
+		message, err := r.store.GetMessageByID(ctx, target.ID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation message: %w", err)
 		}
@@ -131,14 +131,14 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		anchorMessageID = message.ID
 		if message.RunID != nil && *message.RunID != "" {
 			parentRunID = *message.RunID
-			sourceRun, _ = r.store.GetRunByID(ctx, parentRunID, command.UserID)
+			sourceRun, _ = r.store.GetRunByID(ctx, parentRunID, command.UserID, boundary)
 			if sourceRun != nil {
 				pageContext = parsePageContext(sourceRun.PageContext)
 			}
 		}
 		instruction = continuationInstruction("message", fmt.Sprintf("role=%s, content=%s", message.Role, truncate(message.Content, 120)))
 	case "artifact":
-		artifact, err := r.store.GetArtifactByID(ctx, target.ID, command.UserID)
+		artifact, err := r.store.GetArtifactByID(ctx, target.ID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation artifact: %w", err)
 		}
@@ -148,7 +148,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		}
 		parentRunID = artifact.RunID
 		if parentRunID != "" {
-			sourceRun, _ = r.store.GetRunByID(ctx, parentRunID, command.UserID)
+			sourceRun, _ = r.store.GetRunByID(ctx, parentRunID, command.UserID, boundary)
 			if sourceRun != nil {
 				pageContext = parsePageContext(sourceRun.PageContext)
 				if sourceRun.TriggerMessageID != nil {
@@ -159,7 +159,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		fallbackContractIDs = append(fallbackContractIDs, contractIDFromJSON(artifact.Data))
 		instruction = continuationInstruction("artifact", summarizeArtifact(artifact))
 	case "action":
-		action, err := r.store.GetReviewActionByID(ctx, target.ID, command.UserID)
+		action, err := r.store.GetReviewActionByID(ctx, target.ID, command.UserID, boundary)
 		if err != nil {
 			return nil, fmt.Errorf("load continuation review action: %w", err)
 		}
@@ -169,7 +169,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		}
 		var artifact *repository.AIChatArtifact
 		if action.ArtifactID != nil && *action.ArtifactID != "" {
-			artifact, _ = r.store.GetArtifactByID(ctx, *action.ArtifactID, command.UserID)
+			artifact, _ = r.store.GetArtifactByID(ctx, *action.ArtifactID, command.UserID, boundary)
 			if artifact != nil {
 				parentRunID = artifact.RunID
 				fallbackContractIDs = append(fallbackContractIDs, contractIDFromJSON(artifact.Data))
@@ -179,7 +179,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 			parentRunID = *action.RunID
 		}
 		if parentRunID != "" {
-			sourceRun, _ = r.store.GetRunByID(ctx, parentRunID, command.UserID)
+			sourceRun, _ = r.store.GetRunByID(ctx, parentRunID, command.UserID, boundary)
 			if sourceRun != nil {
 				pageContext = parsePageContext(sourceRun.PageContext)
 				if sourceRun.TriggerMessageID != nil {
@@ -193,7 +193,7 @@ func (r *Runtime[T]) resolveContinuation(ctx context.Context, command ContinueCo
 		return nil, fmt.Errorf("unsupported AI agent continuation target: %s", command.Target.Type)
 	}
 
-	messages, err := r.store.ListMessagesBySession(ctx, session.ID, 100)
+	messages, err := r.store.ListMessagesBySession(ctx, session.ID, command.UserID, boundary, 100)
 	if err != nil {
 		return nil, fmt.Errorf("load AI chat continuation history: %w", err)
 	}

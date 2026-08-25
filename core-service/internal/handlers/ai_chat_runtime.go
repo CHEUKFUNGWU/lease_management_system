@@ -94,6 +94,18 @@ func writeSessionAccessError(c *gin.Context, err error) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "ai chat session not found"})
 }
 
+// writeRunAccessError maps a run/artifact/message/action-load refusal the
+// same way: scope_denied stays 403 with the code preserved, never softened
+// into 404 (SI2 直读路径)。
+func writeRunAccessError(c *gin.Context, err error) {
+	if errcontract.CodeOf(err) == errcontract.CodeScopeDenied {
+		writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied,
+			errcontract.SafeMessage(err), nil)
+		return
+	}
+	c.JSON(http.StatusNotFound, gin.H{"error": "ai chat run not found"})
+}
+
 func reverseMessages(messages []*repository.AIChatMessage) []*repository.AIChatMessage {
 	reversed := append([]*repository.AIChatMessage(nil), messages...)
 	for i, j := 0, len(reversed)-1; i < j; i, j = i+1, j-1 {
@@ -206,24 +218,24 @@ func (h *AIChatHandler) GetSession(c *gin.Context) {
 		return
 	}
 
-	messages, err := h.runtimeRepo.ListMessagesBySession(c.Request.Context(), sessionID, 100)
+	messages, err := h.runtimeRepo.ListMessagesBySession(c.Request.Context(), sessionID, userIDStr, entity, 100)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat messages: " + err.Error()})
+		writeSessionAccessError(c, err)
 		return
 	}
-	runs, err := h.runtimeRepo.ListRunsBySession(c.Request.Context(), sessionID, 50, 0)
+	runs, err := h.runtimeRepo.ListRunsBySession(c.Request.Context(), sessionID, userIDStr, entity, 50, 0)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat runs: " + err.Error()})
+		writeSessionAccessError(c, err)
 		return
 	}
-	artifacts, err := h.runtimeRepo.ListArtifactsBySession(c.Request.Context(), sessionID, 100)
+	artifacts, err := h.runtimeRepo.ListArtifactsBySession(c.Request.Context(), sessionID, userIDStr, entity, 100)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat artifacts: " + err.Error()})
+		writeSessionAccessError(c, err)
 		return
 	}
-	reviewActions, err := h.runtimeRepo.ListReviewActionsBySession(c.Request.Context(), sessionID, 200)
+	reviewActions, err := h.runtimeRepo.ListReviewActionsBySession(c.Request.Context(), sessionID, userIDStr, entity, 200)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat review actions: " + err.Error()})
+		writeSessionAccessError(c, err)
 		return
 	}
 
@@ -308,7 +320,7 @@ func (h *AIChatHandler) ListRuns(c *gin.Context) {
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	runs, err := h.runtimeRepo.ListRunsBySession(c.Request.Context(), sessionID, limit, offset)
+	runs, err := h.runtimeRepo.ListRunsBySession(c.Request.Context(), sessionID, userIDStr, entity, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat runs: " + err.Error()})
 		return
@@ -325,18 +337,23 @@ func (h *AIChatHandler) ListRunEvents(c *gin.Context) {
 	}
 	userIDStr, _ := userID.(string)
 	runID := c.Param("id")
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
 
-	run, err := h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDStr)
+	run, err := h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDStr, entity)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ai chat run not found"})
+		writeRunAccessError(c, err)
 		return
 	}
 
 	afterSequence, _ := strconv.Atoi(c.DefaultQuery("after_sequence", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
-	events, err := h.runtimeRepo.ListRunEvents(c.Request.Context(), runID, afterSequence, limit)
+	events, err := h.runtimeRepo.ListRunEvents(c.Request.Context(), runID, afterSequence, limit, entity, userIDStr)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list ai chat run events: " + err.Error()})
+		writeRunAccessError(c, err)
 		return
 	}
 
@@ -378,9 +395,21 @@ func (h *AIChatHandler) StreamRunEvents(c *gin.Context) {
 			return
 		}
 		userIDStr, _ := userID.(string)
-		run, err = h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDStr)
+		// SI2: 建流前一次边界检查（chat 平面）。run 归属在会话行上不可变，
+		// scope 是每请求的（JWT），长连接期间不因权限变更而改变归属；每帧的
+		// listEvents 绑定在已校验的 runID 上，不再重复检查。
+		entity, entityOK := tenantEntity(c)
+		if !entityOK {
+			c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+			return
+		}
+		run, err = h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDStr, entity)
+		if err != nil {
+			writeRunAccessError(c, err)
+			return
+		}
 		listEvents = func(ctx context.Context, after, limit int) ([]*repository.AIChatRunEvent, error) {
-			return h.runtimeRepo.ListRunEvents(ctx, runID, after, limit)
+			return h.runtimeRepo.ListRunEvents(ctx, runID, after, limit, entity, userIDStr)
 		}
 	}
 	if err != nil || run == nil {
@@ -516,9 +545,16 @@ func (h *AIChatHandler) CreateReviewAction(c *gin.Context) {
 		ArtifactID: c.Param("id"), ActionType: req.ActionType,
 		ActionPayload: req.ActionPayload, Comment: req.Comment, UserID: userIDStr,
 	}
-	_, artifactErr := h.runtimeRepo.GetArtifactByID(c.Request.Context(), command.ArtifactID, userIDStr)
+	// SI2 写路径：审批动作前必须确认 artifact 归属调用方的法人。预检先于
+	// Review 的 Runtime 内检查，scope_denied 保持 403 不软化为 not_found。
+	entity, entityOK := tenantEntity(c)
+	if !entityOK {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	_, artifactErr := h.runtimeRepo.GetArtifactByID(c.Request.Context(), command.ArtifactID, userIDStr, entity)
 	if artifactErr != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "AI draft artifact not found"})
+		writeRunAccessError(c, artifactErr)
 		return
 	}
 	if req.FollowUp != nil {
@@ -580,9 +616,14 @@ func (h *AIChatHandler) RetryDraftBatch(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), req.ArtifactID, userIDStr)
+	entity, entityOK := tenantEntity(c)
+	if !entityOK {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), req.ArtifactID, userIDStr, entity)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "AI draft artifact not found"})
+		writeRunAccessError(c, err)
 		return
 	}
 	if req.ActionPayload == nil {

@@ -49,6 +49,10 @@ func TestSameSessionConcurrentRunsSerialize(t *testing.T) {
 		Options{Dispatch: func(task func()) { task() }},
 	).WithSessionOwner(owner)
 
+	scopedA, err := access.EntityFilterFor(entityA)
+	if err != nil {
+		t.Fatalf("build scoped filter: %v", err)
+	}
 	ctx := access.WithScope(baseCtx, access.Scope{LegalEntityID: entityA})
 
 	completed := make([]*Completed[testResponse], 2)
@@ -72,7 +76,7 @@ func TestSameSessionConcurrentRunsSerialize(t *testing.T) {
 	// 每个 run 的终结事件时间。
 	ends := [2]time.Time{}
 	for i := 0; i < 2; i++ {
-		events, err := repo.ListRunEvents(context.Background(), completed[i].Started.Run.ID, 0, 200)
+		events, err := repo.ListRunEvents(context.Background(), completed[i].Started.Run.ID, 0, 200, scopedA, userID)
 		if err != nil || len(events) == 0 {
 			t.Fatalf("run%d events: %v (n=%d)", i+1, err, len(events))
 		}
@@ -93,7 +97,7 @@ func TestSameSessionConcurrentRunsSerialize(t *testing.T) {
 	}
 
 	// 后终结者的首个事件时间。
-	lateEvents, err := repo.ListRunEvents(context.Background(), completed[lateIdx].Started.Run.ID, 0, 1)
+	lateEvents, err := repo.ListRunEvents(context.Background(), completed[lateIdx].Started.Run.ID, 0, 1, scopedA, userID)
 	if err != nil || len(lateEvents) == 0 {
 		t.Fatalf("late run first event: %v (n=%d)", err, len(lateEvents))
 	}

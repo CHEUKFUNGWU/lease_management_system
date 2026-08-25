@@ -39,19 +39,19 @@ func (s *traceRuntimeStore) GetSessionByID(_ context.Context, _ string, _ string
 func (s *traceRuntimeStore) ListSessions(context.Context, repository.AIChatSessionFilter) ([]*repository.AIChatSession, error) {
 	return nil, nil
 }
-func (s *traceRuntimeStore) GetRunByID(_ context.Context, runID, userID string) (*repository.AIChatRun, error) {
+func (s *traceRuntimeStore) GetRunByID(_ context.Context, runID, userID string, _ access.EntityFilter) (*repository.AIChatRun, error) {
 	if s.run == nil || s.run.ID != runID || userID != "user-1" {
 		return nil, context.Canceled
 	}
 	return s.run, nil
 }
-func (s *traceRuntimeStore) ListRunsBySession(context.Context, string, int, int) ([]*repository.AIChatRun, error) {
+func (s *traceRuntimeStore) ListRunsBySession(context.Context, string, string, access.EntityFilter, int, int) ([]*repository.AIChatRun, error) {
 	return nil, nil
 }
-func (s *traceRuntimeStore) ListMessagesBySession(context.Context, string, int) ([]*repository.AIChatMessage, error) {
+func (s *traceRuntimeStore) ListMessagesBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatMessage, error) {
 	return nil, nil
 }
-func (s *traceRuntimeStore) ListRunEvents(_ context.Context, runID string, _, _ int) ([]*repository.AIChatRunEvent, error) {
+func (s *traceRuntimeStore) ListRunEvents(_ context.Context, runID string, _, _ int, _ access.EntityFilter, _ string) ([]*repository.AIChatRunEvent, error) {
 	result := make([]*repository.AIChatRunEvent, 0)
 	for _, event := range s.events {
 		if event != nil && event.RunID == runID {
@@ -60,14 +60,14 @@ func (s *traceRuntimeStore) ListRunEvents(_ context.Context, runID string, _, _ 
 	}
 	return result, nil
 }
-func (s *traceRuntimeStore) ListArtifactsBySession(context.Context, string, int) ([]*repository.AIChatArtifact, error) {
+func (s *traceRuntimeStore) ListArtifactsBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatArtifact, error) {
 	return s.artifacts, nil
 }
-func (s *traceRuntimeStore) GetArtifactByID(context.Context, string, string) (*repository.AIChatArtifact, error) {
+func (s *traceRuntimeStore) GetArtifactByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatArtifact, error) {
 	return nil, nil
 }
 func (s *traceRuntimeStore) UpdateArtifactStatus(context.Context, string, string) error { return nil }
-func (s *traceRuntimeStore) ListReviewActionsBySession(context.Context, string, int) ([]*repository.AIChatReviewAction, error) {
+func (s *traceRuntimeStore) ListReviewActionsBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatReviewAction, error) {
 	return s.actions, nil
 }
 func (s *traceRuntimeStore) ListRunAuditLinks(context.Context, string, string) ([]*repository.AgentRunAuditLink, error) {
@@ -108,7 +108,13 @@ func TestGetAgentRunTraceFiltersSessionDataToOwnedRun(t *testing.T) {
 	})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(func(c *gin.Context) { c.Set("user_id", "user-1"); c.Next() })
+	scope := access.Scope{LegalEntityID: "le-001"}
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Set("access_scope", scope)
+		c.Request = c.Request.WithContext(access.WithScope(c.Request.Context(), scope))
+		c.Next()
+	})
 	router.GET("/agent/runs/:id/trace", handler.GetAgentRunTrace)
 
 	response := httptest.NewRecorder()
@@ -145,7 +151,13 @@ func TestGetAgentRunTraceDoesNotRevealOtherOwnerRun(t *testing.T) {
 	handler := &AIChatHandler{runtimeRepo: store}
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Use(func(c *gin.Context) { c.Set("user_id", "user-2"); c.Next() })
+	scope := access.Scope{LegalEntityID: "le-001"}
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", "user-2")
+		c.Set("access_scope", scope)
+		c.Request = c.Request.WithContext(access.WithScope(c.Request.Context(), scope))
+		c.Next()
+	})
 	router.GET("/agent/runs/:id/trace", handler.GetAgentRunTrace)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/agent/runs/run-1/trace", nil))

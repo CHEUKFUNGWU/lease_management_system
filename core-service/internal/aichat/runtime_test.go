@@ -70,7 +70,7 @@ func TestStartPersistsOneInspectableSuccessfulRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
-	inspection, err := runtime.Inspect(context.Background(), "user-1", started.Run.ID, 0)
+	inspection, err := runtime.Inspect(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), "user-1", started.Run.ID, 0)
 	if err != nil {
 		t.Fatalf("Inspect returned error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestStartTerminatesFailedExecution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
-	inspection, err := runtime.Inspect(context.Background(), "user-1", started.Run.ID, 0)
+	inspection, err := runtime.Inspect(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), "user-1", started.Run.ID, 0)
 	if err != nil {
 		t.Fatalf("Inspect returned error: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestReviewRecordsActionAndProjectsArtifactStatus(t *testing.T) {
 		Options{Dispatch: func(task func()) { task() }},
 	)
 
-	result, err := runtime.Review(context.Background(), ReviewCommand{
+	result, err := runtime.Review(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), ReviewCommand{
 		ArtifactID: "artifact-1", ActionType: "confirm", UserID: "user-1",
 		ActionPayload: map[string]any{"selected_count": 1},
 	})
@@ -328,7 +328,7 @@ func TestReviewRecordsActionAndProjectsArtifactStatus(t *testing.T) {
 
 func TestReviewUsesAtomicRuntimeCommitWhenAvailable(t *testing.T) {
 	base := newMemoryStore()
-	base.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1"}
+	base.sessions["session-1"] = &repository.AIChatSession{ID: "session-1", UserID: "user-1", LegalEntityID: stringPointer("entity-1")}
 	base.runs["run-1"] = &repository.AIChatRun{ID: "run-1", SessionID: "session-1", Status: "waiting_review"}
 	base.artifacts["artifact-1"] = &repository.AIChatArtifact{
 		ID: "artifact-1", SessionID: "session-1", RunID: "run-1", ArtifactType: "event_draft", Status: "ready",
@@ -341,7 +341,7 @@ func TestReviewUsesAtomicRuntimeCommitWhenAvailable(t *testing.T) {
 		func(response testResponse) Result { return Result{Answer: response.Answer, Model: response.Model} },
 		Options{Dispatch: func(task func()) { task() }},
 	)
-	if _, err := runtime.Review(context.Background(), ReviewCommand{ArtifactID: "artifact-1", ActionType: "confirm", UserID: "user-1"}); err != nil {
+	if _, err := runtime.Review(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), ReviewCommand{ArtifactID: "artifact-1", ActionType: "confirm", UserID: "user-1"}); err != nil {
 		t.Fatalf("Review returned error: %v", err)
 	}
 	if !store.atomic || base.artifacts["artifact-1"].Status != "confirmed" || len(base.actions) != 1 {
@@ -373,7 +373,7 @@ func TestReviewUsesApplicationTransactionCommitResult(t *testing.T) {
 			},
 		},
 	)
-	result, err := runtime.Review(context.Background(), ReviewCommand{ArtifactID: "artifact-1", ActionType: "confirm", UserID: "user-1"})
+	result, err := runtime.Review(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), ReviewCommand{ArtifactID: "artifact-1", ActionType: "confirm", UserID: "user-1"})
 	if err != nil || !committed {
 		t.Fatalf("Review err=%v committed=%v", err, committed)
 	}
@@ -418,7 +418,7 @@ func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
-	inspection, err := runtime.Inspect(context.Background(), "user-1", started.Run.ID, 0)
+	inspection, err := runtime.Inspect(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), "user-1", started.Run.ID, 0)
 	if err != nil {
 		t.Fatalf("Inspect returned error: %v", err)
 	}
@@ -461,7 +461,7 @@ func TestStartTurnsCompletionPersistenceFailureIntoTerminalFailure(t *testing.T)
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
-	inspection, err := runtime.Inspect(context.Background(), "user-1", started.Run.ID, 0)
+	inspection, err := runtime.Inspect(access.WithScope(context.Background(), access.Scope{LegalEntityID: "entity-1"}), "user-1", started.Run.ID, 0)
 	if err != nil {
 		t.Fatalf("Inspect returned error: %v", err)
 	}
@@ -571,12 +571,29 @@ func (s *memoryStore) UpdateRunStatus(_ context.Context, runID, status string, r
 	}
 	return nil
 }
-func (s *memoryStore) GetRunByID(_ context.Context, id, userID string) (*repository.AIChatRun, error) {
+func (s *memoryStore) GetRunByID(_ context.Context, id, userID string, entity access.EntityFilter) (*repository.AIChatRun, error) {
 	run := s.runs[id]
-	if run == nil || s.sessions[run.SessionID].UserID != userID {
+	if run == nil || !s.sessionOwned(run.SessionID, userID, entity) {
 		return nil, fmt.Errorf("run not found")
 	}
 	return run, nil
+}
+
+// sessionOwned mirrors the repository's two-axis ownership check for the
+// in-memory fake: user always, entity per filter.
+func (s *memoryStore) sessionOwned(sessionID, userID string, entity access.EntityFilter) bool {
+	session := s.sessions[sessionID]
+	if session == nil || session.UserID != userID {
+		return false
+	}
+	if entity.IsGlobal() {
+		return true
+	}
+	want, err := entity.LegalEntityID()
+	if err != nil {
+		return false
+	}
+	return session.LegalEntityID != nil && *session.LegalEntityID == want
 }
 func (s *memoryStore) CreateMessage(_ context.Context, message *repository.AIChatMessage) error {
 	if message.Role == "assistant" && s.failAssistantMessage {
@@ -591,16 +608,19 @@ func (s *memoryStore) CreateMessage(_ context.Context, message *repository.AICha
 func (s *memoryStore) GetNextMessageSequence(_ context.Context, sessionID string) (int, error) {
 	return len(s.messages[sessionID]) + 1, nil
 }
-func (s *memoryStore) ListMessagesBySession(_ context.Context, sessionID string, _ int) ([]*repository.AIChatMessage, error) {
+func (s *memoryStore) ListMessagesBySession(_ context.Context, sessionID, userID string, entity access.EntityFilter, _ int) ([]*repository.AIChatMessage, error) {
+	if !s.sessionOwned(sessionID, userID, entity) {
+		return nil, fmt.Errorf("scope_denied: session belongs to another user or legal entity")
+	}
 	messages := append([]*repository.AIChatMessage(nil), s.messages[sessionID]...)
 	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
 		messages[i], messages[j] = messages[j], messages[i]
 	}
 	return messages, nil
 }
-func (s *memoryStore) GetMessageByID(_ context.Context, id, userID string) (*repository.AIChatMessage, error) {
+func (s *memoryStore) GetMessageByID(_ context.Context, id, userID string, entity access.EntityFilter) (*repository.AIChatMessage, error) {
 	for sessionID, messages := range s.messages {
-		if s.sessions[sessionID].UserID != userID {
+		if !s.sessionOwned(sessionID, userID, entity) {
 			continue
 		}
 		for _, message := range messages {
@@ -618,7 +638,11 @@ func (s *memoryStore) AppendRunEvent(_ context.Context, event *repository.AIChat
 	s.events[event.RunID] = append(s.events[event.RunID], event)
 	return nil
 }
-func (s *memoryStore) ListRunEvents(_ context.Context, runID string, after, limit int) ([]*repository.AIChatRunEvent, error) {
+func (s *memoryStore) ListRunEvents(_ context.Context, runID string, after, limit int, entity access.EntityFilter, userID string) ([]*repository.AIChatRunEvent, error) {
+	run := s.runs[runID]
+	if run != nil && !s.sessionOwned(run.SessionID, userID, entity) {
+		return nil, fmt.Errorf("scope_denied: run belongs to another user or legal entity")
+	}
 	var result []*repository.AIChatRunEvent
 	for _, event := range s.events[runID] {
 		if event.SequenceNo > after {
@@ -640,9 +664,9 @@ func (s *memoryStore) CreateArtifact(_ context.Context, artifact *repository.AIC
 	s.artifacts[artifact.ID] = artifact
 	return nil
 }
-func (s *memoryStore) GetArtifactByID(_ context.Context, id, userID string) (*repository.AIChatArtifact, error) {
+func (s *memoryStore) GetArtifactByID(_ context.Context, id, userID string, entity access.EntityFilter) (*repository.AIChatArtifact, error) {
 	artifact := s.artifacts[id]
-	if artifact == nil || s.sessions[artifact.SessionID].UserID != userID {
+	if artifact == nil || !s.sessionOwned(artifact.SessionID, userID, entity) {
 		return nil, fmt.Errorf("artifact not found")
 	}
 	return artifact, nil
@@ -658,9 +682,9 @@ func (s *memoryStore) RecordReviewAction(_ context.Context, action *repository.A
 	s.actions[action.ID] = action
 	return nil
 }
-func (s *memoryStore) GetReviewActionByID(_ context.Context, id, userID string) (*repository.AIChatReviewAction, error) {
+func (s *memoryStore) GetReviewActionByID(_ context.Context, id, userID string, entity access.EntityFilter) (*repository.AIChatReviewAction, error) {
 	action := s.actions[id]
-	if action == nil || s.sessions[action.SessionID].UserID != userID {
+	if action == nil || !s.sessionOwned(action.SessionID, userID, entity) {
 		return nil, fmt.Errorf("action not found")
 	}
 	return action, nil

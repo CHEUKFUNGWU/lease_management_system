@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 // AR3 acceptance 3 + migration 063 consistency (062 precedent: assert the
@@ -91,7 +93,7 @@ func TestAIChatMessageMeasuredTokensRoundTrip(t *testing.T) {
 		t.Fatalf("create assistant message: %v", err)
 	}
 
-	messages, err := repo.ListMessagesBySession(ctx, session.ID, 10)
+	messages, err := repo.ListMessagesBySession(ctx, session.ID, userID, access.GlobalEntityFilter(), 10)
 	if err != nil {
 		t.Fatalf("list messages: %v", err)
 	}
@@ -110,7 +112,7 @@ func TestAIChatMessageMeasuredTokensRoundTrip(t *testing.T) {
 		t.Errorf("user row MeasuredTokens = %d, want the 0 sentinel", got)
 	}
 
-	single, err := repo.GetMessageByID(ctx, assistantMsg.ID, userID)
+	single, err := repo.GetMessageByID(ctx, assistantMsg.ID, userID, access.GlobalEntityFilter())
 	if err != nil {
 		t.Fatalf("get message by id: %v", err)
 	}

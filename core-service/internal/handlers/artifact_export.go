@@ -41,10 +41,15 @@ func (h *AIChatHandler) ExportArtifact(c *gin.Context) {
 		return
 	}
 	userIDStr, _ := userID.(string)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
 
-	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), artifactID, userIDStr)
+	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), artifactID, userIDStr, entity)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "artifact not found"})
+		writeRunAccessError(c, err)
 		return
 	}
 

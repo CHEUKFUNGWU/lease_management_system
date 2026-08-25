@@ -211,19 +211,19 @@ type store interface {
 	CreateRun(context.Context, *repository.AIChatRun) error
 	LinkRunTriggerMessage(context.Context, string, string) error
 	UpdateRunStatus(context.Context, string, string, bool, *string, *string, *time.Time, *time.Time) error
-	GetRunByID(context.Context, string, string) (*repository.AIChatRun, error)
+	GetRunByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatRun, error)
 	CreateMessage(context.Context, *repository.AIChatMessage) error
 	GetNextMessageSequence(context.Context, string) (int, error)
-	ListMessagesBySession(context.Context, string, int) ([]*repository.AIChatMessage, error)
-	GetMessageByID(context.Context, string, string) (*repository.AIChatMessage, error)
+	ListMessagesBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatMessage, error)
+	GetMessageByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatMessage, error)
 	AppendRunEvent(context.Context, *repository.AIChatRunEvent) error
-	ListRunEvents(context.Context, string, int, int) ([]*repository.AIChatRunEvent, error)
+	ListRunEvents(context.Context, string, int, int, access.EntityFilter, string) ([]*repository.AIChatRunEvent, error)
 	GetNextRunEventSequence(context.Context, string) (int, error)
 	CreateArtifact(context.Context, *repository.AIChatArtifact) error
-	GetArtifactByID(context.Context, string, string) (*repository.AIChatArtifact, error)
+	GetArtifactByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatArtifact, error)
 	UpdateArtifactStatus(context.Context, string, string) error
 	RecordReviewAction(context.Context, *repository.AIChatReviewAction) error
-	GetReviewActionByID(context.Context, string, string) (*repository.AIChatReviewAction, error)
+	GetReviewActionByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatReviewAction, error)
 	CreateAttachment(context.Context, *repository.AIChatAttachment) error
 }
 

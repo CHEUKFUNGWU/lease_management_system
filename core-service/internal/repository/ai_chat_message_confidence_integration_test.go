@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/lease-management-system/core-service/internal/access"
 )
 
 // FIX-001 F3/F4: the assistant message confidence and its degradation reason
@@ -56,7 +58,7 @@ func TestAIChatMessageConfidenceRoundTrip(t *testing.T) {
 		t.Fatalf("create legacy message: %v", err)
 	}
 
-	messages, err := repo.ListMessagesBySession(ctx, session.ID, 10)
+	messages, err := repo.ListMessagesBySession(ctx, session.ID, userID, access.GlobalEntityFilter(), 10)
 	if err != nil {
 		t.Fatalf("list messages: %v", err)
 	}
@@ -76,7 +78,7 @@ func TestAIChatMessageConfidenceRoundTrip(t *testing.T) {
 		t.Fatalf("confidence reason = %v, want %q", reloaded.ConfidenceReason, reason)
 	}
 
-	byID, err := repo.GetMessageByID(ctx, withConfidence.ID, userID)
+	byID, err := repo.GetMessageByID(ctx, withConfidence.ID, userID, access.GlobalEntityFilter())
 	if err != nil {
 		t.Fatalf("get message by id: %v", err)
 	}

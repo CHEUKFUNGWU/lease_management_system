@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
 
@@ -39,17 +40,27 @@ func (h *AIChatHandler) GetAgentRunTrace(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "run ID is required"})
 		return
 	}
-	run, err := h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDString)
+	entity, entityOK := tenantEntity(c)
+	if !entityOK {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	run, err := h.runtimeRepo.GetRunByID(c.Request.Context(), runID, userIDString, entity)
 	if err != nil || run == nil {
+		if err != nil && errcontract.CodeOf(err) == errcontract.CodeScopeDenied {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied,
+				errcontract.SafeMessage(err), nil)
+			return
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "agent run not found"})
 		return
 	}
-	events, err := h.runtimeRepo.ListRunEvents(c.Request.Context(), runID, 0, 1000)
+	events, err := h.runtimeRepo.ListRunEvents(c.Request.Context(), runID, 0, 1000, entity, userIDString)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load agent run events"})
 		return
 	}
-	artifacts, err := h.runtimeRepo.ListArtifactsBySession(c.Request.Context(), run.SessionID, 1000)
+	artifacts, err := h.runtimeRepo.ListArtifactsBySession(c.Request.Context(), run.SessionID, userIDString, entity, 1000)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load agent artifacts"})
 		return
@@ -60,7 +71,7 @@ func (h *AIChatHandler) GetAgentRunTrace(c *gin.Context) {
 			filteredArtifacts = append(filteredArtifacts, artifact)
 		}
 	}
-	actions, err := h.runtimeRepo.ListReviewActionsBySession(c.Request.Context(), run.SessionID, 1000)
+	actions, err := h.runtimeRepo.ListReviewActionsBySession(c.Request.Context(), run.SessionID, userIDString, entity, 1000)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load review actions"})
 		return

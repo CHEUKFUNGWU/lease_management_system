@@ -39,28 +39,28 @@ func (s *sessionListerStub) ListSessions(ctx context.Context, filter repository.
 	s.gotFilter = filter
 	return nil, nil
 }
-func (s *sessionListerStub) GetRunByID(context.Context, string, string) (*repository.AIChatRun, error) {
+func (s *sessionListerStub) GetRunByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatRun, error) {
 	return nil, nil
 }
-func (s *sessionListerStub) ListRunsBySession(context.Context, string, int, int) ([]*repository.AIChatRun, error) {
+func (s *sessionListerStub) ListRunsBySession(context.Context, string, string, access.EntityFilter, int, int) ([]*repository.AIChatRun, error) {
 	return nil, nil
 }
-func (s *sessionListerStub) ListMessagesBySession(context.Context, string, int) ([]*repository.AIChatMessage, error) {
+func (s *sessionListerStub) ListMessagesBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatMessage, error) {
 	return nil, nil
 }
-func (s *sessionListerStub) ListRunEvents(context.Context, string, int, int) ([]*repository.AIChatRunEvent, error) {
+func (s *sessionListerStub) ListRunEvents(context.Context, string, int, int, access.EntityFilter, string) ([]*repository.AIChatRunEvent, error) {
 	return nil, nil
 }
-func (s *sessionListerStub) ListArtifactsBySession(context.Context, string, int) ([]*repository.AIChatArtifact, error) {
+func (s *sessionListerStub) ListArtifactsBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatArtifact, error) {
 	return nil, nil
 }
-func (s *sessionListerStub) GetArtifactByID(context.Context, string, string) (*repository.AIChatArtifact, error) {
+func (s *sessionListerStub) GetArtifactByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatArtifact, error) {
 	return nil, nil
 }
 func (s *sessionListerStub) UpdateArtifactStatus(context.Context, string, string) error {
 	return nil
 }
-func (s *sessionListerStub) ListReviewActionsBySession(context.Context, string, int) ([]*repository.AIChatReviewAction, error) {
+func (s *sessionListerStub) ListReviewActionsBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatReviewAction, error) {
 	return nil, nil
 }
 

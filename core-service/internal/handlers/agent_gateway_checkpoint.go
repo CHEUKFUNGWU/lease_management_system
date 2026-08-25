@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 )
 
@@ -90,7 +91,12 @@ func (h *AgentGatewayHandler) GetRunCheckpoint(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "authenticated agent context is required"})
 			return
 		}
-		checkpoint, err = h.checkpoints.GetRunCheckpoint(ctx, runID, execution.Principal.UserID)
+		boundary, boundaryErr := access.FromScope(execution.Principal.Scope)
+		if boundaryErr != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "agent principal scope is not resolvable"})
+			return
+		}
+		checkpoint, err = h.checkpoints.GetRunCheckpoint(ctx, runID, execution.Principal.UserID, boundary)
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load agent checkpoint"})

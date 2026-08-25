@@ -182,3 +182,45 @@ func TestContinueSameEntityProceeds(t *testing.T) {
 func uuidSuffix() string {
 	return "chat-" + randSuffix()
 }
+
+// ── SI2 写路径红测试 ──────────────────────────────────────────────────────
+// 对另一法人会话的 artifact 执行审批动作必须拒绝（scope_denied，不软化）。
+// 今天 Review 只按 user 校验 → 成功 → 本测试红；修复后绿。
+func TestReviewRefusesCrossEntityArtifactAction(t *testing.T) {
+	pool := postgresPool(t)
+	ctx := context.Background()
+
+	_, entityB, userID, sessionID, _ := seedContinuationTenant(t, ctx, pool)
+
+	repo := repository.NewAIChatRuntimeRepository(pool)
+	artifactID := ""
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO ai_chat_artifacts (session_id, run_id, artifact_type, title, data)
+		VALUES ($1, (SELECT id FROM ai_chat_runs WHERE session_id = $1 LIMIT 1), 'contract_draft', 'A 的草稿', '{}'::jsonb)
+		RETURNING id`, sessionID).Scan(&artifactID); err != nil {
+		t.Fatalf("seed artifact: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM ai_chat_artifacts WHERE id = $1`, artifactID)
+	})
+
+	runtime := newRuntime(
+		repo,
+		PlannerFunc(func(Input, *repository.AIChatRun) Plan { return Plan{} }),
+		ExecutorFunc[testResponse](func(context.Context, Execution) (testResponse, error) { return testResponse{}, nil }),
+		func(response testResponse) Result { return Result{} },
+		Options{},
+	)
+
+	// U 的身份，法人 B 的上下文，对一个法人 A 的 artifact 执行审批。
+	ctxB := access.WithScope(ctx, access.Scope{LegalEntityID: entityB})
+	_, err := runtime.Review(ctxB, ReviewCommand{
+		ArtifactID: artifactID, ActionType: "confirm", UserID: userID,
+	})
+	if err == nil {
+		t.Fatal("法人 B 上下文对法人 A 的 artifact 执行了审批 —— SI2 写路径跨法人缺口")
+	}
+	if got := errcontract.CodeOf(err); got != errcontract.CodeScopeDenied {
+		t.Fatalf("cross-entity review error code = %q; want %q", got, errcontract.CodeScopeDenied)
+	}
+}

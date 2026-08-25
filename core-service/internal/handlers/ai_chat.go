@@ -31,14 +31,14 @@ import (
 type aiChatRuntimeStore interface {
 	GetSessionByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatSession, error)
 	ListSessions(context.Context, repository.AIChatSessionFilter) ([]*repository.AIChatSession, error)
-	GetRunByID(context.Context, string, string) (*repository.AIChatRun, error)
-	ListRunsBySession(context.Context, string, int, int) ([]*repository.AIChatRun, error)
-	ListMessagesBySession(context.Context, string, int) ([]*repository.AIChatMessage, error)
-	ListRunEvents(context.Context, string, int, int) ([]*repository.AIChatRunEvent, error)
-	ListArtifactsBySession(context.Context, string, int) ([]*repository.AIChatArtifact, error)
-	GetArtifactByID(context.Context, string, string) (*repository.AIChatArtifact, error)
+	GetRunByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatRun, error)
+	ListRunsBySession(context.Context, string, string, access.EntityFilter, int, int) ([]*repository.AIChatRun, error)
+	ListMessagesBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatMessage, error)
+	ListRunEvents(context.Context, string, int, int, access.EntityFilter, string) ([]*repository.AIChatRunEvent, error)
+	ListArtifactsBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatArtifact, error)
+	GetArtifactByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatArtifact, error)
 	UpdateArtifactStatus(context.Context, string, string) error
-	ListReviewActionsBySession(context.Context, string, int) ([]*repository.AIChatReviewAction, error)
+	ListReviewActionsBySession(context.Context, string, string, access.EntityFilter, int) ([]*repository.AIChatReviewAction, error)
 }
 
 // AgentRunStore is the narrow persistence seam used by the external Agent
@@ -47,11 +47,11 @@ type aiChatRuntimeStore interface {
 type AgentRunStore interface {
 	GetSessionByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatSession, error)
 	CreateRun(context.Context, *repository.AIChatRun) error
-	GetRunByID(context.Context, string, string) (*repository.AIChatRun, error)
+	GetRunByID(context.Context, string, string, access.EntityFilter) (*repository.AIChatRun, error)
 	UpdateRunStatus(context.Context, string, string, bool, *string, *string, *time.Time, *time.Time) error
 	AppendRunEvent(context.Context, *repository.AIChatRunEvent) error
 	GetNextRunEventSequence(context.Context, string) (int, error)
-	ListRunEvents(context.Context, string, int, int) ([]*repository.AIChatRunEvent, error)
+	ListRunEvents(context.Context, string, int, int, access.EntityFilter, string) ([]*repository.AIChatRunEvent, error)
 }
 
 // AgentRunCheckpointStore is kept separate from AgentRunStore so existing
@@ -59,7 +59,7 @@ type AgentRunStore interface {
 // persist Runner checkpoints on the owned AI Run row.
 type AgentRunCheckpointStore interface {
 	SaveRunCheckpoint(context.Context, string, string, json.RawMessage) error
-	GetRunCheckpoint(context.Context, string, string) (json.RawMessage, error)
+	GetRunCheckpoint(context.Context, string, string, access.EntityFilter) (json.RawMessage, error)
 }
 
 // AgentRunQueueStore is the worker-only lease seam. It deliberately does not
@@ -320,9 +320,14 @@ func (h *AIChatHandler) GetArtifact(c *gin.Context) {
 		return
 	}
 	userIDStr, _ := userID.(string)
-	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), c.Param("id"), userIDStr)
+	entity, ok := tenantEntity(c)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})
+		return
+	}
+	artifact, err := h.runtimeRepo.GetArtifactByID(c.Request.Context(), c.Param("id"), userIDStr, entity)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "artifact not found"})
+		writeRunAccessError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"artifact": artifact})

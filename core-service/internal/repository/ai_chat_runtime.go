@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -461,15 +462,20 @@ func (r *AIChatRuntimeRepository) UpdateRunStatus(ctx context.Context, runID, st
 	return nil
 }
 
-func (r *AIChatRuntimeRepository) GetRunCheckpoint(ctx context.Context, runID, userID string) (json.RawMessage, error) {
+func (r *AIChatRuntimeRepository) GetRunCheckpoint(ctx context.Context, runID, userID string, entity access.EntityFilter) (json.RawMessage, error) {
 	var checkpoint []byte
+	var owner sessionOwnerRow
 	err := r.db.QueryRow(ctx, `
-		SELECT COALESCE(checkpoint, 'null'::jsonb)
-		FROM ai_chat_runs
-		WHERE id = $1 AND created_by = $2
-	`, runID, userID).Scan(&checkpoint)
+		SELECT COALESCE(r.checkpoint, 'null'::jsonb), s.user_id, s.legal_entity_id
+		FROM ai_chat_runs r
+		INNER JOIN ai_chat_sessions s ON s.id = r.session_id
+		WHERE r.id = $1
+	`, runID).Scan(&checkpoint, &owner.User, &owner.Entity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat run checkpoint: %w", err)
+	}
+	if err := checkSessionOwner(owner, userID, entity, "run checkpoint", runID); err != nil {
+		return nil, err
 	}
 	return json.RawMessage(checkpoint), nil
 }
@@ -486,31 +492,92 @@ func (r *AIChatRuntimeRepository) UpdateRunParent(ctx context.Context, runID, pa
 	return nil
 }
 
-func (r *AIChatRuntimeRepository) GetRunByID(ctx context.Context, runID, userID string) (*AIChatRun, error) {
+// sessionOwnerRow carries the two ownership axes of a run/artifact/message/
+// action's owning session, loaded alongside the row itself.
+type sessionOwnerRow struct {
+	Entity *string
+	User   string
+}
+
+// checkSessionOwner compares a loaded session owner against the calling
+// boundary (user axis always; entity axis per the filter), mirroring
+// GetSessionByID's two-axis check so cross-tenant reads keep scope_denied
+// instead of degrading into not-found. The zero-value filter fails closed.
+func checkSessionOwner(owner sessionOwnerRow, userID string, entity access.EntityFilter, kind, subjectID string) error {
+	if owner.User != userID {
+		return fmt.Errorf("%w: %s %s owned by another user", ErrSessionScopeDenied, kind, subjectID)
+	}
+	if !entity.IsGlobal() {
+		want, err := entity.LegalEntityID()
+		if err != nil {
+			return fmt.Errorf("check %s %s ownership: %w", kind, subjectID, err)
+		}
+		if owner.Entity == nil || *owner.Entity != want {
+			label := "NULL"
+			if owner.Entity != nil {
+				label = *owner.Entity
+			}
+			return fmt.Errorf("%w: %s %s has session entity=%s requires=%q",
+				ErrSessionScopeDenied, kind, subjectID, label, want)
+		}
+	}
+	return nil
+}
+
+// GetRunByID loads one run, ownership-checked against the calling user AND
+// the calling legal-entity boundary (SI2): the run's session must belong to
+// the caller on both axes, else ErrSessionScopeDenied (never softened into
+// not-found). Fetch-then-compare mirrors GetSessionByID / sessionmanager.Load.
+// checkSessionOwnershipByID loads the session owner row by id and compares it
+// against the caller boundary — the gate every List*BySession uses so listing
+// under a foreign session id refuses with scope_denied instead of returning
+// the session's children (SI2 Q2: each list carries its own boundary; the
+// caller is not relied on to have loaded the session first).
+func (r *AIChatRuntimeRepository) checkSessionOwnershipByID(ctx context.Context, sessionID, userID string, entity access.EntityFilter, kind string) error {
+	var owner sessionOwnerRow
+	err := r.db.QueryRow(ctx, `
+		SELECT user_id, legal_entity_id FROM ai_chat_sessions WHERE id = $1
+	`, sessionID).Scan(&owner.User, &owner.Entity)
+	if err != nil {
+		return fmt.Errorf("failed to list %s: load session owner: %w", kind, err)
+	}
+	return checkSessionOwner(owner, userID, entity, kind, sessionID)
+}
+
+func (r *AIChatRuntimeRepository) GetRunByID(ctx context.Context, runID, userID string, entity access.EntityFilter) (*AIChatRun, error) {
 	var run AIChatRun
+	var owner sessionOwnerRow
 	err := r.db.QueryRow(ctx, `
 		SELECT r.id, r.session_id, r.trigger_message_id, r.parent_run_id, r.status, r.agent_mode,
 		       r.skill_id, r.skill_version, COALESCE(r.page_context, 'null'::jsonb), r.review_required,
 		       r.summary_text, r.error_message, r.created_by, r.created_at, r.started_at, r.completed_at,
-		       r.worker_id, r.leased_until, r.heartbeat_at, r.attempt_count
+		       r.worker_id, r.leased_until, r.heartbeat_at, r.attempt_count,
+		       s.user_id, s.legal_entity_id
 		FROM ai_chat_runs r
 		INNER JOIN ai_chat_sessions s ON s.id = r.session_id
-		WHERE r.id = $1 AND s.user_id = $2
-	`, runID, userID).Scan(
+		WHERE r.id = $1
+	`, runID).Scan(
 		&run.ID, &run.SessionID, &run.TriggerMessageID, &run.ParentRunID, &run.Status, &run.AgentMode,
 		&run.SkillID, &run.SkillVersion, &run.PageContext, &run.ReviewRequired,
 		&run.SummaryText, &run.ErrorMessage, &run.CreatedBy, &run.CreatedAt, &run.StartedAt, &run.CompletedAt,
 		&run.WorkerID, &run.LeasedUntil, &run.HeartbeatAt, &run.AttemptCount,
+		&owner.User, &owner.Entity,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat run: %w", err)
 	}
+	if err := checkSessionOwner(owner, userID, entity, "run", runID); err != nil {
+		return nil, err
+	}
 	return &run, nil
 }
 
-func (r *AIChatRuntimeRepository) ListRunsBySession(ctx context.Context, sessionID string, limit, offset int) ([]*AIChatRun, error) {
+func (r *AIChatRuntimeRepository) ListRunsBySession(ctx context.Context, sessionID, userID string, entity access.EntityFilter, limit, offset int) ([]*AIChatRun, error) {
 	if limit <= 0 {
 		limit = 50
+	}
+	if err := r.checkSessionOwnershipByID(ctx, sessionID, userID, entity, "runs"); err != nil {
+		return nil, err
 	}
 
 	rows, err := r.db.Query(ctx, `
@@ -594,9 +661,12 @@ func (r *AIChatRuntimeRepository) GetNextMessageSequence(ctx context.Context, se
 	return nextSeq, nil
 }
 
-func (r *AIChatRuntimeRepository) ListMessagesBySession(ctx context.Context, sessionID string, limit int) ([]*AIChatMessage, error) {
+func (r *AIChatRuntimeRepository) ListMessagesBySession(ctx context.Context, sessionID, userID string, entity access.EntityFilter, limit int) ([]*AIChatMessage, error) {
 	if limit <= 0 {
 		limit = 100
+	}
+	if err := r.checkSessionOwnershipByID(ctx, sessionID, userID, entity, "messages"); err != nil {
+		return nil, err
 	}
 
 	rows, err := r.db.Query(ctx, `
@@ -630,24 +700,30 @@ func (r *AIChatRuntimeRepository) ListMessagesBySession(ctx context.Context, ses
 	return messages, rows.Err()
 }
 
-func (r *AIChatRuntimeRepository) GetMessageByID(ctx context.Context, messageID, userID string) (*AIChatMessage, error) {
+func (r *AIChatRuntimeRepository) GetMessageByID(ctx context.Context, messageID, userID string, entity access.EntityFilter) (*AIChatMessage, error) {
 	var message AIChatMessage
+	var owner sessionOwnerRow
 	err := r.db.QueryRow(ctx, `
 		SELECT m.id, m.session_id, m.run_id, m.role, m.message_type, m.sequence_no, m.content,
 		       COALESCE(m.content_json, 'null'::jsonb), COALESCE(m.sources, 'null'::jsonb),
-		       COALESCE(m.attachments, 'null'::jsonb), m.model, m.confidence, m.confidence_reason,
-		       m.measured_tokens, m.created_by, m.created_at
+	       	COALESCE(m.attachments, 'null'::jsonb), m.model, m.confidence, m.confidence_reason,
+		       m.measured_tokens, m.created_by, m.created_at,
+		       s.user_id, s.legal_entity_id
 		FROM ai_chat_messages m
 		INNER JOIN ai_chat_sessions s ON s.id = m.session_id
-		WHERE m.id = $1 AND s.user_id = $2
-	`, messageID, userID).Scan(
+		WHERE m.id = $1
+	`, messageID).Scan(
 		&message.ID, &message.SessionID, &message.RunID, &message.Role, &message.MessageType,
 		&message.SequenceNo, &message.Content, &message.ContentJSON, &message.Sources,
 		&message.Attachments, &message.Model, &message.Confidence, &message.ConfidenceReason,
 		&message.MeasuredTokens, &message.CreatedBy, &message.CreatedAt,
+		&owner.User, &owner.Entity,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat message: %w", err)
+	}
+	if err := checkSessionOwner(owner, userID, entity, "message", messageID); err != nil {
+		return nil, err
 	}
 	return &message, nil
 }
@@ -745,10 +821,30 @@ func (r *AIChatRuntimeRepository) GetRunAuditSummary(ctx context.Context, runID 
 	return &summary, nil
 }
 
-func (r *AIChatRuntimeRepository) ListRunEvents(ctx context.Context, runID string, afterSequence, limit int) ([]*AIChatRunEvent, error) {
+// ListRunEvents lists a run's events, ownership-checked via the run's session
+// (SI2): the caller must own the run on both user and entity axes, else
+// ErrSessionScopeDenied — events never leak to a foreign tenant.
+func (r *AIChatRuntimeRepository) ListRunEvents(ctx context.Context, runID string, afterSequence, limit int, entity access.EntityFilter, userID string) ([]*AIChatRunEvent, error) {
 	if limit <= 0 {
 		limit = 200
 	}
+	var owner sessionOwnerRow
+	err := r.db.QueryRow(ctx, `
+		SELECT s.user_id, s.legal_entity_id
+		FROM ai_chat_runs r
+		INNER JOIN ai_chat_sessions s ON s.id = r.session_id
+		WHERE r.id = $1
+	`, runID).Scan(&owner.User, &owner.Entity)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("failed to list ai chat run events: %w", err)
+		}
+		return nil, fmt.Errorf("failed to list ai chat run events: %w", err)
+	}
+	if err := checkSessionOwner(owner, userID, entity, "run", runID); err != nil {
+		return nil, err
+	}
+
 	rows, err := r.db.Query(ctx, `
 		SELECT id, run_id, session_id, sequence_no, event_type, payload, is_terminal, created_at
 		FROM ai_chat_run_events
@@ -827,32 +923,41 @@ func defaultArtifactSchemaVersion(version string) string {
 	return version
 }
 
-func (r *AIChatRuntimeRepository) GetArtifactByID(ctx context.Context, artifactID, userID string) (*AIChatArtifact, error) {
+func (r *AIChatRuntimeRepository) GetArtifactByID(ctx context.Context, artifactID, userID string, entity access.EntityFilter) (*AIChatArtifact, error) {
 	var artifact AIChatArtifact
+	var owner sessionOwnerRow
 	err := r.db.QueryRow(ctx, `
 		SELECT a.id, a.session_id, a.run_id, a.artifact_type, a.title, a.status,
 		       COALESCE(a.data, '{}'::jsonb), COALESCE(a.actions, 'null'::jsonb),
 		       COALESCE(a.evidence_refs, '[]'::jsonb), a.schema_version, a.evidence_complete,
 		       COALESCE(a.review_reasons, '[]'::jsonb), a.model_version, a.rule_version,
-		       a.review_required, a.created_by, a.created_at, a.updated_at
+		       a.review_required, a.created_by, a.created_at, a.updated_at,
+		       s.user_id, s.legal_entity_id
 		FROM ai_chat_artifacts a
 		INNER JOIN ai_chat_sessions s ON s.id = a.session_id
-		WHERE a.id = $1 AND s.user_id = $2
-	`, artifactID, userID).Scan(
+		WHERE a.id = $1
+	`, artifactID).Scan(
 		&artifact.ID, &artifact.SessionID, &artifact.RunID, &artifact.ArtifactType, &artifact.Title, &artifact.Status,
 		&artifact.Data, &artifact.Actions, &artifact.EvidenceRefs, &artifact.SchemaVersion, &artifact.EvidenceComplete,
 		&artifact.ReviewReasons, &artifact.ModelVersion, &artifact.RuleVersion, &artifact.ReviewRequired, &artifact.CreatedBy,
 		&artifact.CreatedAt, &artifact.UpdatedAt,
+		&owner.User, &owner.Entity,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat artifact: %w", err)
 	}
+	if err := checkSessionOwner(owner, userID, entity, "artifact", artifactID); err != nil {
+		return nil, err
+	}
 	return &artifact, nil
 }
 
-func (r *AIChatRuntimeRepository) ListArtifactsBySession(ctx context.Context, sessionID string, limit int) ([]*AIChatArtifact, error) {
+func (r *AIChatRuntimeRepository) ListArtifactsBySession(ctx context.Context, sessionID, userID string, entity access.EntityFilter, limit int) ([]*AIChatArtifact, error) {
 	if limit <= 0 {
 		limit = 100
+	}
+	if err := r.checkSessionOwnershipByID(ctx, sessionID, userID, entity, "artifacts"); err != nil {
+		return nil, err
 	}
 	rows, err := r.db.Query(ctx, `
 		SELECT id, session_id, run_id, artifact_type, title, status,
@@ -956,27 +1061,36 @@ func actionArtifactID(action *AIChatReviewAction) string {
 	return *action.ArtifactID
 }
 
-func (r *AIChatRuntimeRepository) GetReviewActionByID(ctx context.Context, actionID, userID string) (*AIChatReviewAction, error) {
+func (r *AIChatRuntimeRepository) GetReviewActionByID(ctx context.Context, actionID, userID string, entity access.EntityFilter) (*AIChatReviewAction, error) {
 	var action AIChatReviewAction
+	var owner sessionOwnerRow
 	err := r.db.QueryRow(ctx, `
 		SELECT ra.id, ra.session_id, ra.run_id, ra.artifact_id, ra.action_type,
-		       COALESCE(ra.action_payload, 'null'::jsonb), ra.comment, ra.acted_by, ra.acted_at
+		       COALESCE(ra.action_payload, 'null'::jsonb), ra.comment, ra.acted_by, ra.acted_at,
+		       s.user_id, s.legal_entity_id
 		FROM ai_chat_review_actions ra
 		INNER JOIN ai_chat_sessions s ON s.id = ra.session_id
-		WHERE ra.id = $1 AND s.user_id = $2
-	`, actionID, userID).Scan(
+		WHERE ra.id = $1
+	`, actionID).Scan(
 		&action.ID, &action.SessionID, &action.RunID, &action.ArtifactID, &action.ActionType,
 		&action.ActionPayload, &action.Comment, &action.ActedBy, &action.ActedAt,
+		&owner.User, &owner.Entity,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ai chat review action: %w", err)
 	}
+	if err := checkSessionOwner(owner, userID, entity, "review action", actionID); err != nil {
+		return nil, err
+	}
 	return &action, nil
 }
 
-func (r *AIChatRuntimeRepository) ListReviewActionsBySession(ctx context.Context, sessionID string, limit int) ([]*AIChatReviewAction, error) {
+func (r *AIChatRuntimeRepository) ListReviewActionsBySession(ctx context.Context, sessionID, userID string, entity access.EntityFilter, limit int) ([]*AIChatReviewAction, error) {
 	if limit <= 0 {
 		limit = 100
+	}
+	if err := r.checkSessionOwnershipByID(ctx, sessionID, userID, entity, "review actions"); err != nil {
+		return nil, err
 	}
 
 	rows, err := r.db.Query(ctx, `

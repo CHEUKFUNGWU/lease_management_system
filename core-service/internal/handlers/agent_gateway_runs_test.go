@@ -98,15 +98,30 @@ func (s *memoryAgentRunStore) CreateRun(_ context.Context, run *repository.AICha
 	return nil
 }
 
-func (s *memoryAgentRunStore) GetRunByID(_ context.Context, runID, userID string) (*repository.AIChatRun, error) {
+func (s *memoryAgentRunStore) GetRunByID(_ context.Context, runID, userID string, entity access.EntityFilter) (*repository.AIChatRun, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	run := s.runs[runID]
-	if run == nil || s.sessions[run.SessionID] == nil || s.sessions[run.SessionID].UserID != userID {
+	if run == nil || !s.agentSessionOwned(run.SessionID, userID, entity) {
 		return nil, context.Canceled
 	}
 	copy := *run
 	return &copy, nil
+}
+
+func (s *memoryAgentRunStore) agentSessionOwned(sessionID, userID string, entity access.EntityFilter) bool {
+	session := s.sessions[sessionID]
+	if session == nil || session.UserID != userID {
+		return false
+	}
+	if entity.IsGlobal() {
+		return true
+	}
+	want, err := entity.LegalEntityID()
+	if err != nil {
+		return false
+	}
+	return session.LegalEntityID != nil && *session.LegalEntityID == want
 }
 
 func (s *memoryAgentRunStore) UpdateRunStatus(_ context.Context, runID, status string, reviewRequired bool, summaryText, errorMessage *string, startedAt, completedAt *time.Time) error {
@@ -140,9 +155,13 @@ func (s *memoryAgentRunStore) GetNextRunEventSequence(_ context.Context, runID s
 	return len(s.events[runID]) + 1, nil
 }
 
-func (s *memoryAgentRunStore) ListRunEvents(_ context.Context, runID string, afterSequence, limit int) ([]*repository.AIChatRunEvent, error) {
+func (s *memoryAgentRunStore) ListRunEvents(_ context.Context, runID string, afterSequence, limit int, entity access.EntityFilter, userID string) ([]*repository.AIChatRunEvent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	run := s.runs[runID]
+	if run != nil && !s.agentSessionOwned(run.SessionID, userID, entity) {
+		return nil, context.Canceled
+	}
 	result := make([]*repository.AIChatRunEvent, 0)
 	for _, event := range s.events[runID] {
 		if event.SequenceNo <= afterSequence {
@@ -168,11 +187,11 @@ func (s *memoryAgentRunStore) SaveRunCheckpoint(_ context.Context, runID, userID
 	return nil
 }
 
-func (s *memoryAgentRunStore) GetRunCheckpoint(_ context.Context, runID, userID string) (json.RawMessage, error) {
+func (s *memoryAgentRunStore) GetRunCheckpoint(_ context.Context, runID, userID string, entity access.EntityFilter) (json.RawMessage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	run := s.runs[runID]
-	if run == nil || s.sessions[run.SessionID] == nil || s.sessions[run.SessionID].UserID != userID {
+	if run == nil || !s.agentSessionOwned(run.SessionID, userID, entity) {
 		return nil, context.Canceled
 	}
 	return append(json.RawMessage(nil), s.checkpoints[runID]...), nil
@@ -223,7 +242,7 @@ func (s *memoryAgentRunStore) ListClaimedRunEvents(_ context.Context, runID, wor
 	if _, err := s.GetClaimedRun(context.Background(), runID, workerID, leaseToken); err != nil {
 		return nil, err
 	}
-	return s.ListRunEvents(context.Background(), runID, afterSequence, limit)
+	return s.ListRunEvents(context.Background(), runID, afterSequence, limit, access.GlobalEntityFilter(), "user-1")
 }
 
 func (s *memoryAgentRunStore) AppendClaimedRunEvent(_ context.Context, runID, workerID, leaseToken string, event *repository.AIChatRunEvent) error {
@@ -332,7 +351,7 @@ func TestAgentGatewayRunLifecyclePersistsEventsAndControls(t *testing.T) {
 	if cancel.Code != http.StatusAccepted {
 		t.Fatalf("cancel status=%d body=%s", cancel.Code, cancel.Body.String())
 	}
-	run, err := store.GetRunByID(context.Background(), created.Run.ID, "user-1")
+	run, err := store.GetRunByID(context.Background(), created.Run.ID, "user-1", access.GlobalEntityFilter())
 	if err != nil || run.Status != "cancelled" {
 		t.Fatalf("run=%+v err=%v", run, err)
 	}

@@ -147,7 +147,17 @@ func (h *AgentGatewayHandler) ListRunEvents(c *gin.Context) {
 	if isWorker {
 		events, err = h.workerRuns.ListClaimedRunEvents(ctx, run.ID, workerID, leaseToken, after, limit)
 	} else {
-		events, err = h.runs.ListRunEvents(ctx, run.ID, after, limit)
+		execution, exists := agenttools.ExecutionContextFromContext(ctx)
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "authenticated agent context is required"})
+			return
+		}
+		boundary, boundaryErr := access.FromScope(execution.Principal.Scope)
+		if boundaryErr != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "agent principal scope is not resolvable"})
+			return
+		}
+		events, err = h.runs.ListRunEvents(ctx, run.ID, after, limit, boundary, execution.Principal.UserID)
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list agent run events"})
@@ -306,7 +316,12 @@ func (h *AgentGatewayHandler) BranchRun(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "authenticated agent context is required"})
 		return
 	}
-	checkpoint, err := h.checkpoints.GetRunCheckpoint(ctx, run.ID, execution.Principal.UserID)
+	boundary, boundaryErr := access.FromScope(execution.Principal.Scope)
+	if boundaryErr != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "agent principal scope is not resolvable"})
+		return
+	}
+	checkpoint, err := h.checkpoints.GetRunCheckpoint(ctx, run.ID, execution.Principal.UserID, boundary)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load agent checkpoint"})
 		return
@@ -413,9 +428,21 @@ func (h *AgentGatewayHandler) loadRun(c *gin.Context, allowWorker bool) (*reposi
 		}
 		run, err = h.workerRuns.GetClaimedRun(ctx, runID, workerID, leaseToken)
 	} else {
-		run, err = h.runs.GetRunByID(ctx, runID, execution.Principal.UserID)
+		// SI2: gateway 平面法人来源 = execution.Principal.Scope（JWT 解析，经
+		// gatewayContext 装入 ctx；能力缩窄时重新装有效 scope）。实体先于
+		// 单点闸门的用法见 spec Q1——两条平面同一解析器，一并处理。
+		boundary, boundaryErr := access.FromScope(execution.Principal.Scope)
+		if boundaryErr != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "agent principal scope is not resolvable"})
+			return nil, nil, 0, false
+		}
+		run, err = h.runs.GetRunByID(ctx, runID, execution.Principal.UserID, boundary)
 	}
 	if err != nil || run == nil {
+		if err != nil && errcontract.CodeOf(err) == errcontract.CodeScopeDenied {
+			c.JSON(http.StatusForbidden, gin.H{"error": errcontract.SafeMessage(err)})
+			return nil, nil, 0, false
+		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "agent run not found"})
 		return nil, nil, 0, false
 	}

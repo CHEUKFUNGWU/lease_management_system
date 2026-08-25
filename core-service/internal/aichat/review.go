@@ -18,7 +18,13 @@ func (r *Runtime[T]) Review(ctx context.Context, command ReviewCommand) (*Review
 	if strings.TrimSpace(command.ActionType) == "" {
 		return nil, fmt.Errorf("AI agent review requires an action")
 	}
-	artifact, err := r.store.GetArtifactByID(ctx, command.ArtifactID, command.UserID)
+	// SI2 写路径：审批动作前必须确认 artifact 归属调用方的法人（scope_denied
+	// 不软化）——跨法人审批是写路径，比读更重。
+	boundary, boundaryErr := entityBoundary(ctx)
+	if boundaryErr != nil {
+		return nil, fmt.Errorf("resolve AI artifact review boundary: %w", boundaryErr)
+	}
+	artifact, err := r.store.GetArtifactByID(ctx, command.ArtifactID, command.UserID, boundary)
 	if err != nil {
 		return nil, fmt.Errorf("load AI agent artifact: %w", err)
 	}

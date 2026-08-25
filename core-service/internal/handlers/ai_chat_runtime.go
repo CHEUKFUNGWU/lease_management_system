@@ -395,9 +395,14 @@ func (h *AIChatHandler) StreamRunEvents(c *gin.Context) {
 			return
 		}
 		userIDStr, _ := userID.(string)
-		// SI2: 建流前一次边界检查（chat 平面）。run 归属在会话行上不可变，
-		// scope 是每请求的（JWT），长连接期间不因权限变更而改变归属；每帧的
-		// listEvents 绑定在已校验的 runID 上，不再重复检查。
+		// SI2: 建流前做边界检查（chat 平面）。RT1-C 订正登记：
+		// （1）存在一个受连接寿命限制的暴露窗口——listEvents 闭包在建流那一刻
+		// 捕获 entity，scope 中途被收回的用户会继续收到本会话的事件直到重连。
+		// 方向安全（不会跨到别人的法人，窗口只覆盖已建流会话自身的后续事件）、
+		// 窗口有界，但把它说成「不构成问题」是在断言一件没被证明的事——收窄
+		// 需单独提案，不在此顺手改。
+		// （2）listEvents 每帧都把 entity 传给 ListRunEvents——是每帧都校验，
+		// 不是「每帧不重复检查」。
 		entity, entityOK := tenantEntity(c)
 		if !entityOK {
 			c.JSON(http.StatusForbidden, gin.H{"error": "legal entity scope is required"})

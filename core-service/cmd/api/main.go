@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lease-management-system/core-service/internal/agentcapability"
 	"github.com/lease-management-system/core-service/internal/agentreaders"
+	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/config"
 	"github.com/lease-management-system/core-service/internal/contextassembler"
@@ -155,25 +156,37 @@ func main() {
 	uploadHandler := handlers.UploadAIFile(minioClient)
 	auditHandler := handlers.NewAuditHandler(auditRepo)
 
-	// AR3 wiring (feature-flagged, D-C10): the context assembler replaces only
-	// where the chat history argument comes from. Flag off (default) keeps the
-	// legacy path byte-for-byte; rollback is a restart without the env var.
-	if os.Getenv("CONTEXT_ASSEMBLER_ENABLED") == "true" {
+	// AR3 wiring (RT1-A two-level switch, D-C10): CONTEXT_ASSEMBLER_MODE is
+	// off (default) / count / on. off keeps the legacy path byte-for-byte;
+	// count runs the budget geometry and reports occupancy but never compacts
+	// (production traffic data before the first behavior change); on adds
+	// compaction. The old CONTEXT_ASSEMBLER_ENABLED=true maps to on.
+	contextMode := contextassembler.ParseMode(
+		os.Getenv("CONTEXT_ASSEMBLER_MODE"),
+	)
+	if os.Getenv("CONTEXT_ASSEMBLER_ENABLED") == "true" && contextMode == contextassembler.ModeOff {
+		contextMode = contextassembler.ModeOn
+	}
+	if contextMode != contextassembler.ModeOff {
 		specs := contextassembler.BudgetSpecsFromEnv(os.Getenv)
-		// AF1-c fail-fast: a model actually running MUST have budget geometry.
-		// Discovering this at first request would mean every turn failing with
-		// ErrBudgetUnconfigured — reject startup instead, naming the model.
+		// AF1-c fail-fast: a model actually running MUST have budget geometry —
+		// in count mode too, because occupancy needs a denominator (the budget).
 		if err := contextassembler.ValidateModelCoverage(specs, llm.ConfigFromEnv().Model); err != nil {
-			log.Fatalf("CONTEXT_ASSEMBLER_ENABLED: %v", err)
+			log.Fatalf("context assembler mode %q: %v", contextMode, err)
 		}
-		assembler := contextassembler.NewAssembler(contextassembler.NewPgHistorySource(database.Pool))
+		assembler := contextassembler.NewAssembler(
+			contextassembler.NewPgHistorySource(database.Pool),
+			contextassembler.WithMode(contextMode),
+		)
 		for model, spec := range specs {
 			if err := contextassembler.RegisterBudget(assembler, model, spec); err != nil {
 				log.Fatalf("Invalid context budget for %q: %v", model, err)
 			}
 		}
+		contextMetrics := agenttools.NewContextMetrics()
 		aiChatHandler.SetContextAssembler(assembler)
-		log.Println("AR3 context assembler enabled")
+		aiChatHandler.WithContextMetrics(contextMetrics)
+		log.Printf("AR3 context assembler enabled (mode %s)", contextMode)
 	}
 	settingsHandler := handlers.NewSettingsHandler(systemSettingRepo)
 	leaseAdminHandler := handlers.NewLeaseAdminHandler(leaseAdminRepo, contractRepo, auditLogger)
@@ -217,7 +230,7 @@ func main() {
 	fpnaPlanImportHandler := handlers.NewFPnAPlanImportHandler(retailKPIRepo, fpnaGovernanceRepo)
 	trialBalanceHandler := handlers.NewTrialBalanceHandler(operatingFactsRepo)
 	decisionScenarioHandler := handlers.NewDecisionScenarioHandler(draftService)
-	agentGatewayHandler := handlers.NewAgentGatewayHandler(aiChatHandler.AgentToolRuntime(), handlers.NewAgentToolAuditRecorder(auditLogger)).WithCapabilityIssuer(capabilityIssuer).WithSkillRegistry(aiChatHandler.AgentSkillRegistry()).WithSessionStore(aiChatHandler.AgentSessionStore()).WithContractScopeReader(contractRepo).WithRunStore(aiChatHandler.AgentRunStore()).WithCheckpointStore(aiChatHandler.AgentRunCheckpointStore()).WithQueueStore(aiRunQueueRepo).WithWorkerRunStore(aiRunQueueRepo).WithTerminalAlertStore(aiChatRuntimeRepo).WithUsageStore(aiChatRuntimeRepo)
+	agentGatewayHandler := handlers.NewAgentGatewayHandler(aiChatHandler.AgentToolRuntime(), handlers.NewAgentToolAuditRecorder(auditLogger)).WithCapabilityIssuer(capabilityIssuer).WithSkillRegistry(aiChatHandler.AgentSkillRegistry()).WithSessionStore(aiChatHandler.AgentSessionStore()).WithContractScopeReader(contractRepo).WithRunStore(aiChatHandler.AgentRunStore()).WithCheckpointStore(aiChatHandler.AgentRunCheckpointStore()).WithQueueStore(aiRunQueueRepo).WithWorkerRunStore(aiRunQueueRepo).WithTerminalAlertStore(aiChatRuntimeRepo).WithUsageStore(aiChatRuntimeRepo).WithContextMetrics(aiChatHandler.ContextMetrics())
 
 	if cfg.LogLevel == "debug" {
 		gin.SetMode(gin.DebugMode)

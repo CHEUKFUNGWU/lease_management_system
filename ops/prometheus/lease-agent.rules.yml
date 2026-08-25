@@ -33,3 +33,18 @@ groups:
         annotations:
           summary: "Agent cost accounting is unavailable"
           description: "This is expected until the model pricing book is configured; do not infer cost from token counts alone."
+
+      - alert: LeaseAgentContextOccupancyHigh
+        expr: |
+          (
+            sum by (model) (rate(lease_agent_context_tokens_measured_total[5m]))
+            +
+            sum by (model) (rate(lease_agent_context_tokens_estimated_total[5m]))
+          ) / clamp_min(lease_agent_context_budget_tokens, 1) > 0.80
+        for: 10m
+        labels:
+          severity: warning
+          service: lease-agent
+        annotations:
+          summary: "Context budget occupancy is persistently high"
+          description: "Measured+estimated context tokens are running at 80%+ of the per-model effective budget for ten minutes. This is the pre-compaction warning — inspect occupancy data before enabling compaction, or tune the budget."

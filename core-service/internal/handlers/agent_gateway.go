@@ -36,6 +36,17 @@ type AgentGatewayHandler struct {
 	workerRuns  AgentWorkerRunStore
 	alerts      AgentRunTerminalAlertStore
 	usage       AgentUsageReader
+	contextMetrics *agenttools.ContextMetrics
+}
+
+// WithContextMetrics attaches the RT1-A context-budget sink so
+// /agent/metrics/prometheus appends its payload to the tool metrics.
+func (h *AgentGatewayHandler) WithContextMetrics(m *agenttools.ContextMetrics) *AgentGatewayHandler {
+	if h == nil {
+		return h
+	}
+	h.contextMetrics = m
+	return h
 }
 
 func NewAgentGatewayHandler(runtime agenttools.ToolRuntime, auditRecorders ...agenttools.AuditRecorder) *AgentGatewayHandler {
@@ -179,7 +190,11 @@ func (h *AgentGatewayHandler) MetricsPrometheus(c *gin.Context) {
 		c.JSON(status, gin.H{"error": message})
 		return
 	}
-	c.Data(http.StatusOK, "text/plain; version=0.0.4; charset=utf-8", []byte(runtime.Prometheus(time.Now().UTC())))
+	payload := runtime.Prometheus(time.Now().UTC())
+	if h != nil && h.contextMetrics != nil {
+		payload += h.contextMetrics.Prometheus(time.Now().UTC())
+	}
+	c.Data(http.StatusOK, "text/plain; version=0.0.4; charset=utf-8", []byte(payload))
 }
 
 func (h *AgentGatewayHandler) metricsRuntime(ctx context.Context) (*agenttools.RuntimeMetrics, int, bool) {

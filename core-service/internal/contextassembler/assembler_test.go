@@ -123,6 +123,99 @@ func TestAssembleFitsBudgetWithoutCompaction(t *testing.T) {
 	}
 }
 
+// ── RT1-A：两级开关（count 只计数不压缩）+ 撞墙前信号 ──────────────────────
+
+// TestCountModeReportsOccupancyWithoutCompacting pins the RT1-A count mode:
+// an over-budget turn reports the full occupancy truth and the WouldCompact
+// pre-warning, but the prompt content comes back BYTE-FOR-BYTE unchanged (no
+// message dropped, nothing summarized) — production traffic data before the
+// first behavior change.
+func TestCountModeReportsOccupancyWithoutCompacting(t *testing.T) {
+	// 充分超出 200-20 预算的历史，on 模式必然压缩。
+	hist := newFakeHistory(
+		textMsg("m1", "user", strings.Repeat("a", 400)),
+		textMsg("m2", "assistant", strings.Repeat("b", 400)),
+		textMsg("m3", "user", strings.Repeat("c", 400)),
+	)
+	a := newTestAssembler(t, hist, WithMode(ModeCount))
+
+	prompt, err := a.Assemble(context.Background(), mustKeyAR3(t), Turn{Model: "test-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !prompt.WouldCompact {
+		t.Fatal("count mode over budget must set WouldCompact (the pre-warning signal)")
+	}
+	if prompt.Compacted || len(prompt.Dropped) != 0 {
+		t.Fatalf("count mode must NOT compact: compacted=%v dropped=%d", prompt.Compacted, len(prompt.Dropped))
+	}
+	if len(prompt.Messages) != 3 {
+		t.Fatalf("count mode changed prompt content: %d messages, want 3 unchanged", len(prompt.Messages))
+	}
+	if prompt.Messages[0].Text != strings.Repeat("a", 400) ||
+		prompt.Messages[2].Text != strings.Repeat("c", 400) {
+		t.Fatal("count mode altered message text — prompt must be byte-for-byte unchanged")
+	}
+	if prompt.Tokens == 0 || prompt.Budget == 0 {
+		t.Fatalf("count mode must still report occupancy: tokens=%d budget=%d", prompt.Tokens, prompt.Budget)
+	}
+}
+
+// TestWouldCompactPrecedesCompactionOrdering pins that the pre-warning fires
+// BEFORE any drop: the same over-budget input in count mode records
+// WouldCompact with zero drops, while on mode compacts the same input — proving
+// the signal and the post-hoc event coexist and one is not a rename of the other.
+func TestWouldCompactPrecedesCompactionOrdering(t *testing.T) {
+	hist := newFakeHistory(
+		textMsg("m1", "user", strings.Repeat("a", 400)),
+		textMsg("m2", "assistant", strings.Repeat("b", 400)),
+		textMsg("m3", "user", strings.Repeat("c", 400)),
+	)
+
+	count := newTestAssembler(t, hist, WithMode(ModeCount))
+	countPrompt, err := count.Assemble(context.Background(), mustKeyAR3(t), Turn{Model: "test-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !countPrompt.WouldCompact || countPrompt.Compacted || len(countPrompt.Dropped) != 0 {
+		t.Fatalf("count: would=%v compacted=%v dropped=%d; want would=true compacted=false dropped=0",
+			countPrompt.WouldCompact, countPrompt.Compacted, len(countPrompt.Dropped))
+	}
+
+	on := newTestAssembler(t, newFakeHistory(
+		textMsg("m1", "user", strings.Repeat("a", 400)),
+		textMsg("m2", "assistant", strings.Repeat("b", 400)),
+		textMsg("m3", "user", strings.Repeat("c", 400)),
+	), WithMode(ModeOn))
+	onPrompt, err := on.Assemble(context.Background(), mustKeyAR3(t), Turn{Model: "test-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !onPrompt.Compacted || len(onPrompt.Dropped) == 0 {
+		t.Fatalf("on: compacted=%v dropped=%d; want compaction to actually drop", onPrompt.Compacted, len(onPrompt.Dropped))
+	}
+}
+
+// TestParseModeDefaultIsOff pins the switch semantics: unset/unknown flows
+// to off (legacy byte-for-byte), "count" and "on"/"true" map exactly.
+func TestParseModeDefaultIsOff(t *testing.T) {
+	if got := ParseMode(""); got != ModeOff {
+		t.Fatalf("empty mode = %q; want off", got)
+	}
+	if got := ParseMode("bogus"); got != ModeOff {
+		t.Fatalf("unknown mode = %q; want off", got)
+	}
+	if got := ParseMode("count"); got != ModeCount {
+		t.Fatalf("count mode = %q; want count", got)
+	}
+	if got := ParseMode("on"); got != ModeOn {
+		t.Fatalf("on mode = %q; want on", got)
+	}
+	if got := ParseMode("true"); got != ModeOn {
+		t.Fatalf("true (= legacy enabled) = %q; want on", got)
+	}
+}
+
 // ── AF1-a：以生产写入语义（轮总量）为输入的计数断言 ─────────────────────────
 
 // The review probe: three rounds whose provider-measured prompt totals are

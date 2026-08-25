@@ -48,10 +48,14 @@ type Agent struct {
 	fileBytes FileBytesReader
 	// ctxAssembler is the AR3 context assembler seam. Nil keeps the legacy
 	// behaviour: req.History goes to the LLM verbatim. Injection happens only
-	// when CONTEXT_ASSEMBLER_ENABLED=true at process wiring — the flag IS the
-	// nil/non-nil choice, so a rollback (D-C10) is a restart without the env,
-	// not a code path inside the hot loop.
+	// when the context assembler mode != off at process wiring — the mode IS
+	// the nil/non-nil choice, so a rollback (D-C10) is a restart without the
+	// env, not a code path inside the hot loop.
 	ctxAssembler contextassembler.Assembler
+	// contextMetrics is the RT1-A sink for assembled-turn occupancy. Nil when
+	// no assembler is wired; fed from the returned Prompt after each Assemble
+	// (measured and estimated stay separate).
+	contextMetrics *agenttools.ContextMetrics
 	// storePnl is the single-store P&L projection seam (B-1). Nil means the
 	// fpna.store_pnl.read tool is not registered at all (P0-8: never register a
 	// nil-port version over a real one).
@@ -82,6 +86,15 @@ func (h *Agent) SetContextAssembler(a contextassembler.Assembler) {
 		return
 	}
 	h.ctxAssembler = a
+}
+
+// SetContextMetrics injects the RT1-A occupancy sink. Nil (no assembler)
+// keeps observability off.
+func (h *Agent) SetContextMetrics(m *agenttools.ContextMetrics) {
+	if h == nil {
+		return
+	}
+	h.contextMetrics = m
 }
 
 // llm returns the injected client or builds one from the environment.
@@ -2261,6 +2274,19 @@ func (h *Agent) assembleTurnHistory(ctx context.Context, legalEntityID, userID s
 	prompt, err := h.ctxAssembler.Assemble(ctx, key, turn)
 	if err != nil {
 		return contextassembler.Prompt{}, err
+	}
+	// RT1-A: feed the observability sink from the returned Prompt. Measured
+	// and estimated travel as two separate series (AF1-a lesson: never merge
+	// truth and guess into one number). WouldCompact is the pre-warning
+	// signal that fires before any drop; Compacted is the post-hoc record.
+	if h.contextMetrics != nil {
+		h.contextMetrics.ObserveContext(turn.Model,
+			prompt.Tokens-prompt.EstimatedTokens,
+			prompt.EstimatedTokens,
+			prompt.Budget,
+			prompt.Compacted,
+			prompt.WouldCompact || prompt.Compacted,
+		)
 	}
 	// Defensive invariant: if a future path ever executes without persisting
 	// the trigger first, the current message would silently vanish from the

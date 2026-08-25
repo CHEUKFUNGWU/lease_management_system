@@ -584,3 +584,43 @@ func TestAgentGatewayRevokesRunBoundCapability(t *testing.T) {
 func stringsReader(value string) *strings.Reader {
 	return strings.NewReader(value)
 }
+
+// RT1-A: the metrics endpoint appends the context-budget payload when a
+// ContextMetrics sink is attached — measured and estimated stay separate.
+func TestAgentGatewayMetricsAppendsContextMetrics(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	runtime := newContractGatewayRuntime(&gatewayContractReader{
+		attributes: access.ContractAttributes{LegalEntityID: "le-001"},
+		contract:   &repository.Contract{ID: "contract-1", ContractName: "Lease"},
+	})
+	scope := access.Scope{LegalEntityID: "le-001"}
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Set("role", "editor")
+		c.Set("permissions", []string{"agent_runtime:metrics"})
+		c.Set("access_scope", scope)
+		c.Request = c.Request.WithContext(access.WithScope(c.Request.Context(), scope))
+		c.Next()
+	})
+	contextMetrics := agenttools.NewContextMetrics()
+	contextMetrics.ObserveContext("deepseek-v4", 800, 200, 1000, false, true)
+	handler := NewAgentGatewayHandler(runtime).WithContextMetrics(contextMetrics)
+	router.GET("/agent/metrics/prometheus", handler.MetricsPrometheus)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/agent/metrics/prometheus", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("metrics status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "lease_agent_context_tokens_measured_total") ||
+		!strings.Contains(body, "lease_agent_context_tokens_estimated_total") {
+		t.Fatalf("metrics payload lacks separate context series:\n%s", body)
+	}
+	for _, forbidden := range []string{"legal_entity", "user_id", "session_id"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("metrics payload leaks tenant identifier %q:\n%s", forbidden, body)
+		}
+	}
+}

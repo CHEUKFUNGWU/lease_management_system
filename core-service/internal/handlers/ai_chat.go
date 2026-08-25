@@ -117,6 +117,7 @@ type AgentRunAuditLinkReader interface {
 
 type AIChatHandler struct {
 	agent         *aiagent.Agent
+	contextMetrics *agenttools.ContextMetrics
 	runtimeRepo   aiChatRuntimeStore
 	contractRepo  *repository.ContractRepository
 	draftService  *draftapp.Service
@@ -187,6 +188,29 @@ func (h *AIChatHandler) WithAuditRepository(reader AgentAuditReader) *AIChatHand
 	clone := *h
 	clone.auditRepo = reader
 	return &clone
+}
+
+// ContextMetrics returns the RT1-A context-budget occupancy sink (nil when
+// no assembler is wired). The gateway's /agent/metrics/prometheus appends
+// its payload to the tool-runtime metrics.
+func (h *AIChatHandler) ContextMetrics() *agenttools.ContextMetrics {
+	if h == nil {
+		return nil
+	}
+	return h.contextMetrics
+}
+
+// WithContextMetrics attaches the RT1-A occupancy sink to the inner agent
+// (fed after each Assemble) and retains it for the metrics endpoint.
+func (h *AIChatHandler) WithContextMetrics(metrics *agenttools.ContextMetrics) *AIChatHandler {
+	if h == nil {
+		return h
+	}
+	if h.agent != nil {
+		h.agent.SetContextMetrics(metrics)
+	}
+	h.contextMetrics = metrics
+	return h
 }
 
 // WithSessionOwner wires the AR2 session lifecycle into the chat runtime

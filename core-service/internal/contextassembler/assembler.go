@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/lease-management-system/core-service/internal/agentcontext"
@@ -104,9 +105,16 @@ type Prompt struct {
 	EstimatedTokens int          // the portion that came from the tail estimator (observability)
 	Budget          int          // effective budget: window minus output reserve
 	Compacted       bool         // whether anything left the prompt
-	Preserved       []MessageRef // audit-bearing content: never participated in compaction
-	Dropped         []MessageRef // content that left the prompt; still resolvable in storage
-	Summary         string       // summarizer output covering dropped content, when available
+	// WouldCompact is the RT1-A pre-warning signal: true when the turn would
+	// have exceeded its budget and therefore would have compacted — set in
+	// count mode where compaction is deliberately deferred. It fires BEFORE
+	// any content is dropped (count mode drops nothing), and the compaction
+	// event (context_compacted) remains the post-hoc record when compaction
+	// actually runs. The two coexist; one is not a rename of the other.
+	WouldCompact   bool
+	Preserved      []MessageRef // audit-bearing content: never participated in compaction
+	Dropped        []MessageRef // content that left the prompt; still resolvable in storage
+	Summary        string       // summarizer output covering dropped content, when available
 }
 
 // MessageRef identifies a message that was preserved or dropped.
@@ -118,6 +126,32 @@ type MessageRef struct {
 // Assembler builds the per-turn prompt. One method (module design §5).
 type Assembler interface {
 	Assemble(ctx context.Context, key agentcontext.ContextKey, turn Turn) (Prompt, error)
+}
+
+// Mode is RT1-A's two-level switch: what the assembler does with the counting
+// it already performs. off = legacy path (no assembly at all, gated upstream
+// by the flag); count = run the full budget geometry, report occupancy, but
+// do NOT compact (production traffic data before the first behavior change);
+// on = count AND compact (the pre-RT1-A behavior of CONTEXT_ASSEMBLER_ENABLED).
+type Mode string
+
+const (
+	ModeOff   Mode = "off"
+	ModeCount Mode = "count"
+	ModeOn    Mode = "on"
+)
+
+// ParseMode converts the env value to a Mode. Unknown and empty values are
+// off so an unset env var keeps the legacy byte-for-byte path.
+func ParseMode(value string) Mode {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case "count":
+		return ModeCount
+	case "on", "true":
+		return ModeOn
+	default:
+		return ModeOff
+	}
 }
 
 // TokenEstimator estimates tokens for content that has no provider truth yet.

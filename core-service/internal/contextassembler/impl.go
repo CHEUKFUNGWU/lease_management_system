@@ -53,6 +53,7 @@ type assembler struct {
 	budgets    *budgetRegistry
 	estimator  TokenEstimator
 	summarizer Summarizer
+	mode       Mode // RT1-A: off/count/on（count 只计数不压缩）
 }
 
 // Option configures the assembler at construction.
@@ -65,6 +66,12 @@ func WithSummarizer(s Summarizer) Option { return func(a *assembler) { a.summari
 
 // WithEstimator overrides the tail estimator. Default is PiStyleEstimator.
 func WithEstimator(e TokenEstimator) Option { return func(a *assembler) { a.estimator = e } }
+
+// WithMode sets the RT1-A mode. Default is ModeOff (legacy path is gated
+// upstream; an assembler constructed without WithMode behaves as before — no
+// compaction). ModeCount runs the budget geometry and reports occupancy but
+// never trims; ModeOn adds compaction.
+func WithMode(m Mode) Option { return func(a *assembler) { a.mode = m } }
 
 // NewAssembler constructs the module. All IO sits behind ports; every branch
 // is testable without a database.
@@ -123,6 +130,17 @@ func (a *assembler) Assemble(ctx context.Context, key agentcontext.ContextKey, t
 	prompt.Tokens, prompt.EstimatedTokens = splitCount(a.estimator, msgs, turn.ToolDefs)
 	if !overBudget(budget, prompt.Tokens) {
 		prompt.Messages = msgs
+		return prompt, nil
+	}
+
+	// RT1-A count mode: over budget but compression deferred. Report the
+	// occupancy truth and the pre-warning WouldCompact signal, return the
+	// UNTRIMMED prompt unchanged — prompt content is byte-for-byte what on
+	// mode would have sent, and no content leaves. context_compacted remains
+	// the post-hoc record only when compaction actually runs (mode on).
+	if a.mode == ModeCount {
+		prompt.Messages = msgs
+		prompt.WouldCompact = true
 		return prompt, nil
 	}
 

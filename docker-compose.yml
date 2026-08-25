@@ -55,6 +55,10 @@ services:
       AGENT_CAPABILITY_SECRET: ${AGENT_CAPABILITY_SECRET:-lease_agent_capability_secret}
       AGENT_CAPABILITY_TTL_SECONDS: ${AGENT_CAPABILITY_TTL_SECONDS:-300}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # AR3 上下文装配器（RT1-A 两级开关，L3-A 起默认 count）：off=legacy 逐字节
+      # 不变；count=只计数只上报不压缩（占用率需要分母，故仍要求预算几何）；
+      # on=启用压缩。旧 CONTEXT_ASSEMBLER_ENABLED=true 映射为 on。
+      CONTEXT_ASSEMBLER_MODE: ${CONTEXT_ASSEMBLER_MODE:-count}
       # LLM 配置（W4/W5：chat/parse/upload 均在 core 进程内，经 internal/llm、
       # aiintake 与 docparse 直连；ai-service 已在 W6 退役）
       LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}

@@ -41,6 +41,13 @@ export const dict: TranslationDict = {
     "zh-HK": "請求的資料不存在或已被移除。",
     en: "The requested data does not exist or has been removed.",
   },
+  // T2 (UIUX 任务书 2026-08-26)：errcontract 的 rate_limited 此前落到
+  // generic「请求失败」；具名文案让限流可与其他失败区分。
+  "api.rate_limited": {
+    "zh-CN": "请求过于频繁，请稍后再试。",
+    "zh-HK": "請求過於頻繁，請稍後再試。",
+    en: "Too many requests. Please try again later.",
+  },
   // FIX-002 data_unavailable detail reason: the engine refuses to measure
   // lease liability while a contract has no confirmed discount rate. The fix
   // is data entry, not retrying — AGENTS.md forbids guessing a rate.

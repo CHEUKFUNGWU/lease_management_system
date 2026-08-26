@@ -53,6 +53,8 @@ export class ApiError extends Error {
         return t("api.scope_denied", apiLanguage);
       case "not_found":
         return t("api.not_found", apiLanguage);
+      case "rate_limited":
+        return t("api.rate_limited", apiLanguage);
       case "network_error":
         return t("api.network_error", apiLanguage);
       case "system_failure":
@@ -491,20 +493,35 @@ export async function apiRequest(
   return response.json();
 }
 
-async function downloadBlob(endpoint: string, token: string): Promise<Blob> {
+// T2 (UIUX 任务书 2026-08-26): the single download seam. Same 401-refresh
+// contract as apiRequest so an expired token silently retries instead of
+// surfacing one inexplicable failure; GET-only by construction.
+export async function downloadBlob(endpoint: string, token: string): Promise<Blob> {
+  const fetchRequest = (accessToken?: string) =>
+    fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    response = await fetchRequest(token);
   } catch {
     throw new ApiError("network_error", 0);
+  }
+  if (response.status === 401 && token) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) {
+      try {
+        response = await fetchRequest(refreshedToken);
+      } catch {
+        throw new ApiError("network_error", 0);
+      }
+    }
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     const code = typeof error?.code === "string" ? error.code : typeof error?.error === "string" ? error.error : `http_${response.status}`;
     if (response.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event("auth-session-expired"));
-    throw new ApiError(code, response.status, error);
+    throw new ApiError(code, response.status, error, endpoint);
   }
   return response.blob();
 }

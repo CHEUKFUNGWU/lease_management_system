@@ -78,7 +78,7 @@ import {
 } from "./runtime";
 import { notifyError } from "../lib/notify";
 import { safeInternalAIURL } from "../lib/retailAI";
-import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioResponse } from "../lib/api";
+import { apiErrorMessage, apiRequest, downloadBlob, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioResponse } from "../lib/api";
 import MarkdownText from "./MarkdownText";
 import { AI_CHAT_SESSION_ITEM_CLASS, AI_CHAT_SESSION_MORE_CLASS, getAIChatResponsiveState, getAIChatSessionButtonProps, getAIChatSessionRowProps, transitionAIChatDrawer, type AIChatDrawerEvent } from "./responsive";
 
@@ -251,14 +251,9 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
   const downloadWorkingPaperExport = async (artifactId: string, format: "xlsx" | "docx") => {
     if (!token) return;
     try {
-      const response = await fetch(`/api/v1/ai/chat/artifacts/${artifactId}/export?format=${format}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.error || `export failed (${response.status})`);
-      }
-      const blob = await response.blob();
+      // T2 (UIUX 任务书 2026-08-26)：裸 fetch 换共享下载缝 downloadBlob，
+      // 401 自动刷新与错误契约映射在缝内统一生效。
+      const blob = await downloadBlob(`/api/v1/ai/chat/artifacts/${encodeURIComponent(artifactId)}/export?format=${format}`, token);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -1657,25 +1652,19 @@ function AIChatPageContent() {
 
   const handleFileUpload = async (options: any) => {
     const { file, onSuccess, onError } = options;
+    if (!token) {
+      onError(new Error(t("ai.upload_failed", language, { name: "file" })));
+      return;
+    }
     const formData = new FormData();
     // No task_type guessing here: the backend doc.triage classifies the file
     // from metadata and the user message, and refuses honestly when unsure.
     formData.append("file", file);
 
     try {
-      const response = await fetch(`${window.location.origin}/api/ai/files/upload`, {
-        method: "POST",
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(t("ai.upload_failed", language, { name: "file" }));
-      }
-
-      const data = await response.json();
+      // T2 (UIUX 任务书 2026-08-26)：裸 fetch（同源 rewrite 路径）换 apiRequest
+      // 直连 core 路由，401 处理与错误契约映射与其他上传口一致。
+      const data = await apiRequest("/api/v1/ai/files/upload", { method: "POST", body: formData, token });
       const uploadedFile: UploadedFile = {
         file_id: data.file_id,
         original_name: data.original_name,

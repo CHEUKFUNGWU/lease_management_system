@@ -12,7 +12,7 @@
  * There is deliberately NO second column list here — every column comes from
  * the descriptor (CONTRACT-001 shape, pinned by retail-export.test.ts).
  */
-import { API_BASE_URL, type RetailPulseResponse, type RetailStoreDiagnosticsResponse, type RetailScenarioResponse } from "./api";
+import { apiRequest, type RetailPulseResponse, type RetailStoreDiagnosticsResponse, type RetailScenarioResponse } from "./api";
 
 export type ExportFormulaSpec = { kind: "sum" | "delta" | "ratio"; source?: string[]; scale?: number };
 export type ExportColumnSpec = { key: string; header: string; formula?: ExportFormulaSpec; sum?: boolean };
@@ -35,10 +35,8 @@ let descriptorCache: Record<string, ExportDescriptor> | null = null;
 
 export async function fetchExportDescriptors(token: string): Promise<Record<string, ExportDescriptor>> {
   if (descriptorCache) return descriptorCache;
-  const baseUrl = (API_BASE_URL || "").replace(/\/$/, "");
-  const response = await fetch(`${baseUrl}/api/v1/retail/exports/descriptors`, { headers: { Authorization: `Bearer ${token}` } });
-  if (!response.ok) throw new Error(`export descriptors unavailable (${response.status})`);
-  const payload = (await response.json()) as { data: Record<string, ExportDescriptor> };
+  // T2 (UIUX 任务书 2026-08-26)：裸 fetch 换 apiRequest（401 自动刷新 + 错误契约）。
+  const payload = await apiRequest("/api/v1/retail/exports/descriptors", { token }) as { data: Record<string, ExportDescriptor> };
   descriptorCache = payload.data;
   return descriptorCache;
 }

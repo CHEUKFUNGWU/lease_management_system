@@ -17,7 +17,7 @@ import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { BudgetVariancePanel } from "./components/BudgetVariancePanel";
 import { DisclosurePanel } from "./components/DisclosurePanel";
-import { reportApi } from "../lib/api";
+import { reportApi, downloadBlob, apiErrorMessage } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -435,18 +435,22 @@ function ReportsPageContent() {
               icon={<DownloadOutlined />}
               onClick={async () => {
                 if (!token) return;
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-                const res = await fetch(
-                  `${apiUrl}/api/v1/reports/liability-rolling/export?mode=${reportMode}&language=${language}`,
-                  { headers: { Authorization: `Bearer ${token}` } },
-                );
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `Lease_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
-                a.click();
-                window.URL.revokeObjectURL(url);
+                // T2 (UIUX 任务书 2026-08-26)：裸 fetch 换共享下载缝 downloadBlob
+                // （401 自动刷新 + 错误契约映射），失败不再静默。
+                try {
+                  const blob = await downloadBlob(
+                    `/api/v1/reports/liability-rolling/export?mode=${reportMode}&language=${language}`,
+                    token,
+                  );
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `Lease_${reportMode}_${new Date().toISOString().slice(0, 10)}.csv`;
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                } catch (error) {
+                  notifyError(apiErrorMessage(error));
+                }
               }}
               style={{ borderRadius: 6 }}
             >

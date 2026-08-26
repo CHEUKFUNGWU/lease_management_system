@@ -28,9 +28,14 @@ describe("ApiError userMessage code mapping (ERR-001 vocabulary)", () => {
     expect(scopeCopy).not.toContain("暂无数据");
   });
 
-  it("maps not_found, network_error and system_failure to their copies", () => {
+  it("maps not_found and network_error to their copies, rate_limited to its own named copy (T2, 2026-08-26)", () => {
     expect(ApiError.userMessage("not_found", 404)).toBe(t("api.not_found", "zh-CN"));
     expect(ApiError.userMessage("network_error", 0)).toBe(t("api.network_error", "zh-CN"));
+    // T2 (UIUX 任务书 2026-08-26): rate_limited used to fall through to the
+    // generic request_failed copy; it now gets its own named branch.
+    const limited = ApiError.userMessage("rate_limited", 429);
+    expect(limited).toBe(t("api.rate_limited", "zh-CN"));
+    expect(limited).not.toBe(t("api.request_failed", "zh-CN"));
     expect(ApiError.userMessage("system_failure", 500)).toBe(t("api.server_unavailable", "zh-CN"));
   });
 

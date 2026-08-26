@@ -11,7 +11,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
 import { UploadGlyph, DownloadGlyph, SourceCircleGlyph } from "../components/MonochromeGlyphs";
-import { apiErrorMessage, fpnaPlanImportApi, operatingFactsApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
+import { apiErrorMessage, apiRequest, fpnaPlanImportApi, operatingFactsApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
 import { tableScrollX } from "../lib/tableScroll";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -57,11 +57,8 @@ export default function RetailDataImportPage() {
     if (!fillId || !token) return;
     (async () => {
       try {
-        const response = await fetch(`/api/v1/ai/chat/artifacts/${encodeURIComponent(fillId)}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) return;
-        const body = await response.json();
+        // T2 (UIUX 任务书 2026-08-26)：裸 fetch 换 apiRequest（401 自动刷新 + 错误契约）。
+        const body = await apiRequest(`/api/v1/ai/chat/artifacts/${encodeURIComponent(fillId)}`, { token });
         const data = body?.artifact?.data || {};
         const payload = data.payload || {};
         if (typeof payload.source_system?.value === "string" && payload.source_system.value) {

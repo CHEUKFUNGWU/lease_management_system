@@ -2713,3 +2713,389 @@ export const competitorApi = {
       token,
     }),
 };
+
+// ============================================================================
+// 电商独立站模式（ecommerce-dtc-mode-v1 P0）
+// 类型镜像 core-service/internal/handlers/ecommerce.go 与 services/ecompulse。
+// 前端零计算：所有行、合计、评分来自后端。
+
+export type EcomAdBasis = "booked" | "paid";
+export const ECOM_AD_BASIS = ["booked", "paid"] as const;
+
+export type SettlementCategory = "fee" | "fx" | "chargeback" | "in_transit" | "adjustment" | "reserve";
+export const SETTLEMENT_CATEGORIES = ["fee", "fx", "chargeback", "in_transit", "adjustment", "reserve"] as const;
+
+export type SettlementRunStatus = "draft" | "prepared" | "pending" | "approved" | "rejected";
+export const SETTLEMENT_RUN_STATUSES = ["draft", "prepared", "pending", "approved", "rejected"] as const;
+
+export interface EcomStorefront {
+  id: string;
+  legal_entity_id: string;
+  code: string;
+  name: string;
+  market: string;
+  currency: string;
+  platform: string;
+  status: string;
+}
+
+export interface EcomKpiValue {
+  code: string;
+  name: string;
+  currency: string;
+  value: number | null;
+  status: "complete" | "partial" | "unavailable";
+  reason?: string;
+  unit: string;
+  numerator?: string;
+  denominator?: string;
+}
+
+export interface EcomSourceEnvelope {
+  data_classification: string;
+  source_systems: string[];
+  fact_version_min: number;
+  fact_version_max: number;
+  highest_as_of?: string;
+  semantic_version: string;
+  generated_at: string;
+}
+
+export interface EcomPulseDiffFactor {
+  metric: string;
+  label: string;
+  direction: "up" | "down";
+  impact: number | null;
+}
+
+export interface EcomPulseStorefrontRow {
+  storefront_id: string;
+  code: string;
+  name: string;
+  current: Record<string, EcomKpiValue>;
+  previous: Record<string, EcomKpiValue>;
+  deltas: Record<string, number | null>;
+  top_diff_factors: EcomPulseDiffFactor[];
+  restated_days?: string[];
+  decision_ready: boolean;
+}
+
+export interface EcomSitePulseResponse {
+  envelope: EcomSourceEnvelope;
+  window: { from: string; to: string; comparison_from: string; comparison_to: string };
+  storefronts: EcomPulseStorefrontRow[];
+}
+
+export interface EcomCurrencyPartition {
+  currency: string;
+  kpis: Record<string, EcomKpiValue>;
+  issues?: string[];
+  decision_ready: boolean;
+}
+
+export interface EcomCoverage {
+  expected_days: number;
+  observed_days: number;
+  coverage_rate: number | null;
+}
+
+export interface EcomCACFigure {
+  value: number | null;
+  numerator: string;
+  denominator: string;
+  numerator_value?: number;
+  denominator_value?: number;
+  status: string;
+  reason?: string;
+}
+
+export interface EcomCACReport {
+  paid: EcomCACFigure;
+  blended: EcomCACFigure;
+}
+
+export interface EcomBreakEven {
+  status: "achieved" | "unachievable";
+  reason?: string;
+  break_even_mer?: number;
+  break_even_roas?: number;
+  required_revenue?: number;
+}
+
+export interface EcomDiagnosticsResponse {
+  envelope: EcomSourceEnvelope;
+  storefront: EcomStorefront;
+  window: { from: string; to: string };
+  currency: string;
+  kpis: EcomCurrencyPartition[];
+  coverage: EcomCoverage;
+  decision_ready: boolean;
+  cac: EcomCACReport;
+  break_even: EcomBreakEven;
+}
+
+export interface EcomPnlRow {
+  key: string;
+  label: string;
+  kind: "line" | "subtotal";
+  sign: number;
+  value: number | null;
+  children?: string[];
+  components?: { key: string; label: string; value: number | null }[];
+}
+
+export interface EcomPnlBreakdownRow {
+  dimension: string;
+  key: string;
+  net_revenue?: number;
+  cm1?: number;
+  ad_spend_paid?: number;
+}
+
+export interface EcomPnlAccountingBlock {
+  basis: "gl";
+  revenue: number | null;
+  currency: string;
+  source_system?: string;
+  import_batch_id?: string;
+  fact_version?: number;
+  as_of_at?: string;
+  gap?: string;
+}
+
+export interface EcomPnlBlock {
+  currency: string;
+  basis: "operating";
+  rows: EcomPnlRow[];
+  break_even: EcomBreakEven;
+  accounting: EcomPnlAccountingBlock;
+  breakdown?: EcomPnlBreakdownRow[];
+  restated_days?: string[];
+}
+
+export interface EcomPnlResponse {
+  storefront: { legal_entity_id: string; storefront_id: string };
+  period: { kind: "monthly" | "weekly"; month?: string; from?: string; to?: string };
+  breakdown_dimension: "none" | "channel" | "campaign" | "sku";
+  blocks: EcomPnlBlock[];
+  gaps: string[];
+}
+
+export interface EcomSettlementRun {
+  id: string;
+  legal_entity_id: string;
+  storefront_id: string;
+  period: string;
+  currency: string;
+  status: SettlementRunStatus;
+  policy_version: string;
+  gate_verdict?: "allow" | "deny";
+  matched_count: number;
+  difference_count: number;
+  total_difference_amount: number;
+  results: unknown[];
+  differences: unknown[];
+  prepared_by?: string;
+  prepared_at?: string;
+  submitted_by?: string;
+  submitted_at?: string;
+  approved_by?: string;
+  approved_at?: string;
+  rejected_by?: string;
+  rejection_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EcomReservePosition {
+  currency: string;
+  held_open: number;
+  released: number;
+  net_frozen: number;
+  issues?: string[];
+}
+
+export interface EcomReserveResponse {
+  events: { id: string; provider: string; event_type: "hold" | "release"; event_date: string; currency: string; amount: number; payout_id?: string; hold_event_id?: string; status: string }[];
+  positions: EcomReservePosition[];
+}
+
+export interface EcomImportTemplate {
+  source: string;
+  version: string;
+  grain: string;
+  columns: string[];
+}
+
+export interface EcomImportRowError {
+  row: number;
+  column?: string;
+  code: string;
+  message: string;
+}
+
+export interface EcomImportReport {
+  source: string;
+  template_version: string;
+  total_rows: number;
+  accepted_rows: number;
+  failed_rows: number;
+  errors?: EcomImportRowError[];
+}
+
+export interface EcomImportResult {
+  batch: { id: string; status: string; accepted_rows: number; rejected_rows: number };
+  report: EcomImportReport;
+  idempotent_replay?: boolean;
+  template_version: string;
+  current_template: { source: string; version: string; grain: string; columns: string[] };
+}
+
+export interface EcomBfcmInput {
+  storefront_id?: string;
+  currency?: string;
+  ad_budget: number;
+  cpm?: number;
+  cpc?: number;
+  cvr?: number;
+  aov?: number;
+  cm1_rate: number;
+  fixed_cost?: number;
+  target_profit?: number;
+  inventory_outlay?: number;
+  payout_lag_days?: number;
+  reserve_hold_pct?: number;
+}
+
+export interface EcomBfcmResponse {
+  data_classification: "simulated";
+  currency: string;
+  impressions?: number;
+  clicks?: number;
+  orders?: number;
+  gmv?: number;
+  cm1?: number;
+  mer?: number;
+  break_even_mer?: number;
+  break_even_roas?: number;
+  break_even_status: "achieved" | "unachievable";
+  break_even_reason?: string;
+  base_cm1_rate?: number;
+  warnings?: string[];
+  cash_gap_hint?: { inventory_outlay?: number; ad_prepay: number; expected_collect_in_window: number; gap: number; basis_note: string };
+}
+
+export interface EcomPriceSensitivityResponse {
+  data_classification: "simulated";
+  currency: string;
+  base_unit_price: number;
+  new_unit_price: number;
+  base_unit_cm1: number;
+  new_unit_cm1: number;
+  base_units: number;
+  projected_units: number;
+  base_total_cm1: number;
+  new_total_cm1: number;
+  units_assumption: string;
+  warnings?: string[];
+}
+
+export interface EcomQueryBase {
+  data_classification: "production" | "simulated";
+  dataset_version?: string;
+  as_of: string;
+  window_days?: number;
+}
+
+export const ecomApi = {
+  listStorefronts: (token: string) =>
+    apiRequest("/api/v1/ecom/sites", { token }) as Promise<{ data: EcomStorefront[] }>,
+
+  createStorefront: (body: { code: string; name: string; market?: string; currency: string; platform?: string }, token: string) =>
+    apiRequest("/api/v1/ecom/sites", { method: "POST", body: JSON.stringify(body), token }) as Promise<EcomStorefront>,
+
+  sitePulse: (params: EcomQueryBase, token: string) => {
+    const query = ecomQuery(params);
+    return apiRequest(`/api/v1/ecom/site-pulse?${query.toString()}`, { token }) as Promise<EcomSitePulseResponse>;
+  },
+
+  siteDiagnostics: (params: EcomQueryBase & { storefront_id: string }, token: string) => {
+    const query = ecomQuery(params);
+    return apiRequest(`/api/v1/ecom/sites/${encodeURIComponent(params.storefront_id)}/diagnostics?${query.toString()}`, { token }) as Promise<EcomDiagnosticsResponse>;
+  },
+
+  sitePnl: (params: { storefront_id: string; period?: string; from?: string; to?: string; breakdown?: string; currency?: string; target_profit?: number; data_classification?: "production" | "simulated"; dataset_version?: string }, token: string) => {
+    const query = new URLSearchParams();
+    if (params.period) query.set("period", params.period);
+    if (params.from) query.set("from", params.from);
+    if (params.to) query.set("to", params.to);
+    if (params.breakdown) query.set("breakdown", params.breakdown);
+    if (params.currency) query.set("currency", params.currency);
+    if (params.target_profit !== undefined) query.set("target_profit", String(params.target_profit));
+    if (params.data_classification) query.set("data_classification", params.data_classification);
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    return apiRequest(`/api/v1/ecom/sites/${encodeURIComponent(params.storefront_id)}/pnl?${query.toString()}`, { token }) as Promise<EcomPnlResponse>;
+  },
+
+  reserve: (storefront_id: string, token: string) =>
+    apiRequest(`/api/v1/ecom/sites/${encodeURIComponent(storefront_id)}/reserve`, { token }) as Promise<EcomReserveResponse>,
+
+  listSettlementRuns: (params: { storefront_id?: string; period?: string }, token: string) => {
+    const query = new URLSearchParams();
+    if (params.storefront_id) query.set("storefront_id", params.storefront_id);
+    if (params.period) query.set("period", params.period);
+    return apiRequest(`/api/v1/ecom/settlement/runs?${query.toString()}`, { token }) as Promise<{ data: EcomSettlementRun[] }>;
+  },
+
+  getSettlementRun: (id: string, token: string) =>
+    apiRequest(`/api/v1/ecom/settlement/runs/${encodeURIComponent(id)}`, { token }) as Promise<EcomSettlementRun>,
+
+  createSettlementRun: (body: { storefront_id: string; period: string }, idempotencyKey: string, token: string) =>
+    apiRequest("/api/v1/ecom/settlement/runs", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(body),
+      token,
+    }) as Promise<EcomSettlementRun>,
+
+  transitionSettlementRun: (id: string, action: "prepare" | "submit" | "approve" | "reject", reason: string, token: string) =>
+    apiRequest(`/api/v1/ecom/settlement/runs/${encodeURIComponent(id)}/transition`, {
+      method: "POST",
+      body: JSON.stringify({ action, reason }),
+      token,
+    }) as Promise<EcomSettlementRun>,
+
+  listImportTemplates: (token: string) =>
+    apiRequest("/api/v1/ecom/import/templates", { token }) as Promise<{ data: EcomImportTemplate[] }>,
+
+  importPreview: (form: FormData, token: string) =>
+    apiRequest("/api/v1/ecom/import/preview", { method: "POST", body: form, token }) as Promise<EcomImportReport>,
+
+  importCommit: (form: FormData, idempotencyKey: string, token: string) =>
+    apiRequest("/api/v1/ecom/import/commit", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: form,
+      token,
+    }) as Promise<EcomImportResult>,
+
+  evaluateBFCM: (input: EcomBfcmInput, token: string) =>
+    apiRequest("/api/v1/ecom/scenarios/bfcm", { method: "POST", body: JSON.stringify(input), token }) as Promise<EcomBfcmResponse>,
+
+  evaluatePriceSensitivity: (delta: Record<string, number | null | undefined>, base: Record<string, number | string>, token: string) =>
+    apiRequest("/api/v1/ecom/scenarios/price-sensitivity", { method: "POST", body: JSON.stringify({ delta, base }), token }) as Promise<EcomPriceSensitivityResponse>,
+};
+
+function ecomQuery(params: EcomQueryBase): URLSearchParams {
+  const query = new URLSearchParams();
+  query.set("data_classification", params.data_classification);
+  query.set("as_of", params.as_of);
+  if (params.data_classification === "simulated") {
+    if (!params.dataset_version) throw new Error("simulated ecom read requires dataset_version");
+    query.set("dataset_version", params.dataset_version);
+  } else if (params.dataset_version) {
+    throw new Error("production ecom read cannot include dataset_version");
+  }
+  if (params.window_days !== undefined) query.set("window_days", String(params.window_days));
+  return query;
+}

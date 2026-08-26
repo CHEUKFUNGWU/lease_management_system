@@ -23,6 +23,11 @@ import {
   DQ_STATUSES,
 } from "../fpna-workbench/types";
 import { DRAFT_REVIEW_STATUSES, DRAFT_DATA_CLASSIFICATIONS } from "../contracts/drafts/enums";
+import {
+  SETTLEMENT_CATEGORIES,
+  SETTLEMENT_RUN_STATUSES,
+  ECOM_AD_BASIS,
+} from "./api";
 
 const repoRoot = path.join(import.meta.dirname, "../../../");
 const pulseBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/retailpulse/retail_pulse.go"), "utf8");
@@ -33,6 +38,7 @@ const ingestBackend = readFileSync(path.join(repoRoot, "core-service/internal/se
 const ingestPage = readFileSync(path.join(import.meta.dirname, "../retail-data-import/page.tsx"), "utf8");
 const storepnlBackend = readFileSync(path.join(repoRoot, "core-service/internal/storepnl/project.go"), "utf8");
 const sqlInit = readFileSync(path.join(repoRoot, "db/init/01_init.sql"), "utf8");
+const settlementMatchBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/settlement/match.go"), "utf8");
 const draftReviewBackend = readFileSync(path.join(repoRoot, "core-service/internal/services/draftreview/service.go"), "utf8");
 
 function quotedTokens(source: string, pattern: RegExp): string[] {
@@ -184,5 +190,25 @@ describe("CONTRACT-001 code-list contracts", () => {
         expect(draftReviewBackend, `draftreview service references status '${status}'`).toContain(`"${status}"`);
       }
     }
+  });
+
+  it("对账差异六类枚举 = 后端 settlement.Category 六值封闭枚举（R-E4-1）", () => {
+    const categories = quotedTokens(settlementMatchBackend, /Category(?:Fee|FX|Chargeback|InTransit|Adjustment|Reserve) +Category = "([^"]+)"/g);
+    expect(categories).toHaveLength(6);
+    expect([...SETTLEMENT_CATEGORIES].sort()).toEqual([...categories].sort());
+  });
+
+  it("对账 run 状态五值 = settlement_runs.status CHECK 约束（单一来源）", () => {
+    const statusMatch = /settlement_runs[\s\S]*?CHECK\s*\(\s*status\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(statusMatch, "settlement_runs status CHECK constraint found").not.toBeNull();
+    const dbStatuses = quotedTokens(statusMatch![1], /'([^']+)'/g).sort();
+    expect([...SETTLEMENT_RUN_STATUSES].sort()).toEqual(dbStatuses);
+  });
+
+  it("广告口径两值 = campaign_day_facts.basis CHECK 约束（R-T3 无第三种取值）", () => {
+    const basisMatch = /campaign_day_facts[\s\S]*?CHECK\s*\(\s*basis\s+IN\s*\(([^)]+)\)\s*\)/.exec(sqlInit);
+    expect(basisMatch, "campaign_day_facts basis CHECK constraint found").not.toBeNull();
+    const dbBasis = quotedTokens(basisMatch![1], /'([^']+)'/g).sort();
+    expect([...ECOM_AD_BASIS].sort()).toEqual(dbBasis);
   });
 });

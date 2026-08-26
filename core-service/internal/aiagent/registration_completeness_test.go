@@ -16,6 +16,7 @@ package aiagent
 // 不与 collector 自比（风险红线 12：恒真的勾稽不算检查）。
 
 import (
+	"time"
 	"context"
 	"encoding/json"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/closereadiness"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
+	"github.com/lease-management-system/core-service/internal/services/ecomfact"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
 	"github.com/lease-management-system/core-service/internal/storepnl"
 )
@@ -134,6 +136,7 @@ func productionWire() *Agent {
 		Plans:           repository.NewFPnAGovernanceRepository(nil),
 		Reports:         registrationReportStub{},
 		DraftServices:   []*draftapp.Service{draftapp.NewService(nil, nil)},
+		Ecommerce:       registrationEcomStub{},
 	})
 }
 
@@ -179,6 +182,63 @@ type registrationStorePnlStub struct{}
 
 func (registrationStorePnlStub) Project(context.Context, agenttooldefs.StorePnlQuery) (*storepnl.StorePnl, error) {
 	return &storepnl.StorePnl{}, nil
+}
+
+// registrationEcomStub satisfies agenttooldefs.EcomReader so the seven
+// e-commerce tools (retail.site_* ×3、fpna.site_pnl/settlement ×2、草稿写口 ×2)
+// all exercise the full production surface.
+type registrationEcomStub struct{}
+
+func (registrationEcomStub) StorefrontDays(context.Context, ecomfact.StorefrontFilter, ecomfact.Window) ([]ecomfact.StorefrontDayFact, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) CampaignDays(context.Context, ecomfact.StorefrontFilter, ecomfact.Window, ecomfact.AdBasis) ([]ecomfact.CampaignDayFact, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) OrderLines(context.Context, ecomfact.EvidenceRef) ([]ecomfact.OrderLine, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) ListStorefronts(context.Context, access.EntityFilter) ([]*repository.Storefront, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) GetStorefront(context.Context, access.EntityFilter, string) (*repository.Storefront, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) LatestGLRevenue(context.Context, access.EntityFilter, string, string) (*repository.GLRevenueRow, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) LatestFixedCost(context.Context, access.EntityFilter, string, string) (*repository.FixedCostRow, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) ListSettlementRuns(context.Context, access.EntityFilter, string, string) ([]*repository.SettlementRun, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) GetSettlementRun(context.Context, access.EntityFilter, string) (*repository.SettlementRun, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) ListPayoutLines(context.Context, access.EntityFilter, string, time.Time, time.Time) ([]repository.PayoutLineRow, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) ListBankLines(context.Context, access.EntityFilter, string, time.Time, time.Time) ([]repository.BankLineRow, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) ListReceivablesByPayout(context.Context, access.EntityFilter, string, time.Time, time.Time) ([]repository.ReceivableRow, error) {
+	return nil, nil
+}
+
+func (registrationEcomStub) ListReserveEvents(context.Context, access.EntityFilter, string) ([]repository.ReserveEventRow, error) {
+	return nil, nil
 }
 
 func TestAgentToolRegistrationCompleteness(t *testing.T) {

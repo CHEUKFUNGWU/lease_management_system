@@ -5531,3 +5531,70 @@ body .app-content.app-content-full-bleed .app-content-inner {
   grid-column: 1 / -1;
   font-size: 12px;
 }
+
+/* E-commerce DTC mode (ecommerce-dtc-mode-v1): shared shapes for the
+   filter selects and the settlement detail stack. No static inline styles
+   (enforced by enforce-design per DESIGN.md 13-2). */
+.ecom-filter-select {
+  min-width: 150px;
+  max-width: 240px;
+}
+
+.ecom-detail-stack {
+  width: 100%;
+}
+
+/* E-commerce DTC mode (ecommerce-dtc-mode-v1): KPI grid children and page
+   shells, shaped after the pulse-kpi-card family (DESIGN.md 13-2: class
+   names + CSS variables, no inline styles). */
+.site-pulse-page,
+.site-360-page,
+.site-pnl-page,
+.settlement-workbench-page {
+  margin-bottom: 24px;
+}
+
+.stripe-metric-card {
+  height: 156px;
+  overflow: hidden;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.stripe-metric-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.stripe-metric-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.stripe-metric-delta {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.delta-up {
+  color: var(--state-success-text);
+}
+
+.delta-down {
+  color: var(--state-error-text);
+}
+
+.delta-sub {
+  margin-left: 6px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}

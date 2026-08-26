@@ -305,3 +305,31 @@ export function monthlyClosingHelpContent(language: Language): HelpContent {
   };
 }
 
+
+export function ecomHelpContent(language: Language): HelpContent {
+  return {
+    title: t("ecom.pulse.title", language),
+    flow: [
+      { key: "classification", label: t("ecom.common.classification", language) },
+      { key: "window", label: t("ecom.common.window_days", language) },
+      { key: "read", label: t("ecom.pulse.subtitle", language) },
+    ],
+    sections: [
+      {
+        key: "classification",
+        heading: t("ecom.common.classification", language),
+        body: t("ecom.common.no_data_reason", language),
+      },
+      {
+        key: "window",
+        heading: t("ecom.common.window_days", language),
+        body: t("ecom.pulse.subtitle", language),
+      },
+      {
+        key: "read",
+        heading: t("ecom.common.site", language),
+        body: t("ecom.common.currency", language),
+      },
+    ],
+  };
+}

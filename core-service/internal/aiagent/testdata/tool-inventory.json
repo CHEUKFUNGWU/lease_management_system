@@ -88,6 +88,17 @@
     ]
   },
   {
+    "name": "fpna.ecom_assumption.suggest",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fin_models",
+        "action": "write"
+      }
+    ]
+  },
+  {
     "name": "fpna.explanations.draft.create",
     "version": "v1",
     "level": "draft",
@@ -150,6 +161,39 @@
       {
         "resource": "fpna_actions",
         "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.settlement.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.settlement_recon_draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fpna_memos",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.site_pnl.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
       }
     ]
   },
@@ -595,6 +639,39 @@
   },
   {
     "name": "retail.rent_to_sales.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.site.scenario.evaluate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.site_diagnostics.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.site_pulse.read",
     "version": "v1",
     "level": "read",
     "permissions": [

@@ -31,6 +31,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/services/closecontrol"
 	"github.com/lease-management-system/core-service/internal/services/closereadiness"
 	"github.com/lease-management-system/core-service/internal/services/draftapp"
+	"github.com/lease-management-system/core-service/internal/services/ecomkpi"
 	"github.com/lease-management-system/core-service/internal/services/eventaccounting"
 	"github.com/lease-management-system/core-service/internal/services/monthend"
 	"github.com/lease-management-system/core-service/internal/services/reporting"
@@ -177,6 +178,13 @@ func main() {
 	}
 	var fillReader agenttooldefs.IngestFileReader = miniostore.NewIngestReader(minioClient)
 	finModelRepo := repository.NewFinModelRepository(database.Pool)
+	// 电商独立站模式（ecommerce-dtc-mode-v1 P0）：Metric Surface 启动校验——清单里的
+	// code 必须存在于 ecomkpi.Definitions，否则拒绝启动（与 retailkpi 同款守卫）。
+	ecomRepo := repository.NewEcommerceRepository(database.Pool)
+	if err := ecomkpi.ValidateSurface(ecomkpi.Surface); err != nil {
+		log.Fatalf("ecomkpi surface validation failed: %v", err)
+	}
+	ecomHandler := handlers.NewEcommerceHandler(ecomRepo, fpnaGovernanceRepo)
 	// B-1: the Agent Tool seam rides the same S1 adapters as /stores/:id/pnl;
 	// built here (before the Agent handler) so fpna.store_pnl.read is registered in
 	// the production runtime exactly when the HTTP projection is wired.
@@ -204,6 +212,7 @@ func main() {
 		StorePnl:        storePnlAgentReader,
 		OperatingFacts:  operatingFactsRepo,
 		RetailKPI:       retailKPIRepo,
+		Ecommerce:       ecomRepo,
 	}).WithSessionOwner(sessionManager).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
 	// W5-1: document parser seam (ADR-0024 routing). AnyDoc binary is pinned
 	// in the runtime image (Dockerfile); OCR is enabled when a PaddleOCR token is configured.
@@ -498,6 +507,24 @@ func main() {
 		protected.Handle(http.MethodPost, "/retail/stores/:store_id/scenario-action-drafts", permission("fpna_actions", "write"), retailScenarioHandler.SaveAction)
 		protected.Handle(http.MethodPost, "/retail/simulations/store-days/generate", permission("master_data", "manage"), retailSimulationHandler.GenerateStoreDays)
 		protected.Handle(http.MethodGet, "/retail/simulations/store-days/latest", permission("reports", "read"), retailSimulationHandler.LatestStoreDays)
+		// 电商独立站模式（ecommerce-dtc-mode-v1 P0：E1–E4 + E5 保本/情景部分）
+		protected.Handle(http.MethodGet, "/ecom/sites", permission("reports", "read"), ecomHandler.ListStorefronts)
+		protected.Handle(http.MethodPost, "/ecom/sites", permission("master_data", "manage"), ecomHandler.CreateStorefront)
+		protected.Handle(http.MethodGet, "/ecom/site-pulse", permission("reports", "read"), ecomHandler.SitePulse)
+		protected.Handle(http.MethodGet, "/ecom/sites/:id/diagnostics", permission("reports", "read"), ecomHandler.SiteDiagnostics)
+		protected.Handle(http.MethodGet, "/ecom/sites/:id/pnl", permission("reports", "read"), ecomHandler.SitePnl)
+		protected.Handle(http.MethodGet, "/ecom/sites/:id/reserve", permission("reports", "read"), ecomHandler.ReservePosition)
+		protected.Handle(http.MethodGet, "/ecom/settlement/runs", permission("reports", "read"), ecomHandler.ListSettlementRuns)
+		protected.Handle(http.MethodPost, "/ecom/settlement/runs", permission("reports", "write"), ecomHandler.CreateSettlementRun)
+		protected.Handle(http.MethodGet, "/ecom/settlement/runs/:id", permission("reports", "read"), ecomHandler.GetSettlementRun)
+		protected.Handle(http.MethodPost, "/ecom/settlement/runs/:id/transition", permission("reports", "write"), ecomHandler.TransitionSettlementRun)
+		protected.Handle(http.MethodGet, "/ecom/import/templates", permission("reports", "read"), ecomHandler.ImportTemplates)
+		protected.Handle(http.MethodGet, "/ecom/import/templates/:source", permission("reports", "read"), ecomHandler.DownloadImportTemplate)
+		protected.Handle(http.MethodPost, "/ecom/import/preview", permission("reports", "write"), ecomHandler.PreviewImport)
+		protected.Handle(http.MethodPost, "/ecom/import/commit", permission("reports", "write"), ecomHandler.CommitImport)
+		protected.Handle(http.MethodPost, "/ecom/scenarios/bfcm", permission("reports", "read"), ecomHandler.EvaluateBFCMScenario)
+		protected.Handle(http.MethodPost, "/ecom/scenarios/price-sensitivity", permission("reports", "read"), ecomHandler.EvaluatePriceScenario)
+		protected.Handle(http.MethodPost, "/ecom/simulations/generate", permission("master_data", "manage"), ecomHandler.GenerateSimulation)
 		protected.Handle(http.MethodGet, "/operating-facts/batches", permission("reports", "read"), operatingFactsHandler.ListBatches)
 		protected.Handle(http.MethodGet, "/reports/store-performance", permission("reports", "read"), operatingFactsHandler.StorePerformance)
 		protected.Handle(http.MethodGet, "/reports/store-performance/benchmarks", permission("reports", "read"), operatingFactsHandler.StoreBenchmarks)

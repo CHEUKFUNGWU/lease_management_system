@@ -158,6 +158,16 @@ _Avoid_: Contract, cost center
 **Store**:
 A physical operating location with a code, name, brand, region, currency, and optional area, against which operating facts are recorded and lease contracts are held.
 _Avoid_: Site, branch, location
+> 注记（电商独立站模式，spec ecommerce-dtc-mode-v1 §8）：**Site 禁用于物理门店**；
+> 电商域的「站点」使用 **Storefront**（见该词条），不要把电商站点挂到 Store 上——
+> Storefront 有独立的法人归属与收单币种语义，共用会污染行级过滤（底线 1）。
+>
+> **Storefront**（独立站 / E-commerce storefront）：
+> 电商经营分析的根对象：一个面向一个市场 / 币种独立收单与履约的电商站点（如一个 Shopify 店），
+> 带编码、市场、币种、法人归属。是 Store 在电商域的**等价物但不是同一个概念**。
+> 经营分析粒度是 Storefront-Day Fact；订单行明细只是证据不是分析粒度。
+> _Related_: Legal Entity（归属）、Currency（收单币种）
+> _Avoid_: Shop（店铺）、Site、门店
 
 **Store-Day Fact**:
 One store's operating measures for one date in one currency: revenue, gross profit, transactions, footfall, labour cost, fixed rent, variable rent, non-lease cost, other controllable cost, and area. It is the atomic unit of operating analysis; monthly operating records cannot substitute for it.

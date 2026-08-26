@@ -63,6 +63,11 @@ export const PALETTE_PAGES: PalettePageDef[] = [
   { path: "/operating-pulse", labelKey: "nav.operating_pulse", group: "analysis", visible: byGroup("analysis") },
   { path: "/store-360", labelKey: "nav.store_360", group: "analysis", visible: byGroup("analysis") },
   { path: "/store-pnl", labelKey: "nav.store_pnl", group: "analysis", visible: byGroup("analysis") },
+  // 电商独立站主线（ecommerce-dtc-mode-v1 P0）
+  { path: "/site-pulse", labelKey: "nav.site_pulse", group: "analysis", visible: byGroup("analysis") },
+  { path: "/site-360", labelKey: "nav.site_360", group: "analysis", visible: byGroup("analysis") },
+  { path: "/site-pnl", labelKey: "nav.site_pnl", group: "analysis", visible: byGroup("analysis") },
+  { path: "/settlement-workbench", labelKey: "nav.settlement_workbench", group: "analysis", visible: byGroup("analysis") },
   { path: "/financial-model", labelKey: "nav.financial_model", group: "analysis", visible: byGroup("analysis") },
   { path: "/scenario-workbench", labelKey: "nav.scenario_workbench", group: "analysis", visible: byGroup("analysis") },
   { path: "/fpna-workbench", labelKey: "nav.fpna_workbench", group: "analysis", visible: byGroup("analysis") },

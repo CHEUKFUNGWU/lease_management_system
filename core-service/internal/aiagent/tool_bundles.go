@@ -60,6 +60,9 @@ type AgentPorts struct {
 	OperatingFacts OperatingFactsSource
 	// RetailKPI: 零售运营读面 + 三表模型事实源。
 	RetailKPI RetailKPISource
+	// Ecommerce: 电商独立站模式（ecommerce-dtc-mode-v1）读面——
+	// retail.site_* 三个 + fpna.site_pnl/settlement 两读 + 两个草稿写口。
+	Ecommerce agenttooldefs.EcomReader
 }
 
 // registerLeaseTools registers the lease.* surface: contract/closing/event
@@ -199,6 +202,20 @@ func registerFPnATools(collector *registerCollector, p AgentPorts) {
 	if p.StorePnl != nil {
 		collector.add(agenttooldefs.NewStorePnlReadDefinition(p.StorePnl))
 	}
+	// 电商独立站模式（spec §5 七个工具一次定全）：fpna.site_pnl.read、
+	// fpna.settlement.read 两个读 + fpna.settlement_recon_draft.create 与
+	// fpna.ecom_assumption.suggest 两个草稿写口。写口恒 draft-only
+	// （source=ai_suggestion / memo draft）；approved-only 读不回采。
+	if p.Ecommerce != nil {
+		collector.add(agenttooldefs.NewSitePnlDefinition(p.Ecommerce))
+		collector.add(agenttooldefs.NewSettlementReadDefinition(p.Ecommerce))
+	}
+	collector.add(agenttooldefs.NewSettlementReconDraftDefinition(p.Governance))
+	writer2 := agenttooldefs.AssumptionDraftWriter(nil)
+	if p.FinModelRepo != nil {
+		writer2 = finadapter.NewDraftWriter(p.FinModelRepo)
+	}
+	collector.add(agenttooldefs.NewEcomAssumptionSuggestionDefinition(writer2))
 }
 
 // registerRetailTools registers the retail.* surface: the operating-fact
@@ -220,6 +237,13 @@ func registerRetailTools(collector *registerCollector, p AgentPorts) {
 		collector.add(agenttooldefs.NewRetailPaperDefinition(p.RetailKPI))
 		// B-3：store-day 指标聚合视图，复用 retailKPIRepo 的 QueryFacts 接缝。
 		collector.add(agenttooldefs.NewKpiStoreDaysDefinition(p.RetailKPI))
+	}
+	// 电商经营读面（spec §5 定案）：站点脉搏 / 诊断 / 大促情景——读类只读，
+	// 情景只评估不落库（输出顶层 data_classification=simulated）。
+	if p.Ecommerce != nil {
+		collector.add(agenttooldefs.NewSitePulseDefinition(p.Ecommerce))
+		collector.add(agenttooldefs.NewSiteDiagnosticsDefinition(p.Ecommerce))
+		collector.add(agenttooldefs.NewSiteScenarioEvaluateDefinition(p.Ecommerce))
 	}
 	for _, definition := range []agenttools.ToolDefinition{
 		agenttooldefs.NewStoreScenarioDefinition(),

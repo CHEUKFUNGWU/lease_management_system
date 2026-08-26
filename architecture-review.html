@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Architecture Review — Retail Performance Workstation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      .seam { stroke-dasharray: 4 4; }
+      .leak { stroke: #dc2626; }
+      .deep-box { background: linear-gradient(135deg, #0f172a, #1e293b); }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans antialiased">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+      
+      <!-- Header -->
+      <header class="border-b border-slate-200 pb-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-xs uppercase font-mono tracking-widest text-slate-500">Architecture Review</span>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900 mt-1">Retail Performance Workstation</h1>
+          </div>
+          <div class="text-right text-xs font-mono text-slate-500">
+            <div>2026-08-20</div>
+            <div class="text-emerald-700 font-semibold">4 Candidates Identified</div>
+            <div class="mt-1 px-2 py-0.5 rounded bg-amber-100 text-amber-800">2026-08-26 核实：基本属实，4 处批注见文中</div>
+          </div>
+        </div>
+
+        <!-- Compact Legend -->
+        <div class="mt-6 flex flex-wrap gap-4 text-xs font-mono text-slate-600 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+          <div class="flex items-center gap-1.5">
+            <span class="inline-block w-3.5 h-3.5 border border-slate-700 bg-slate-100 rounded-sm"></span>
+            <span>Module (模块)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="inline-block w-3.5 h-3.5 border border-dashed border-slate-700 bg-transparent rounded-sm"></span>
+            <span>Seam (接缝)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="inline-block w-3.5 h-3.5 bg-slate-900 rounded-sm"></span>
+            <span class="font-semibold text-slate-900">Deep Module (深模块)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="inline-block w-4 h-0.5 bg-red-600"></span>
+            <span class="text-red-700 font-medium">Leakage / Shallow (穿透与浅层)</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Candidates Section -->
+      <section id="candidates" class="space-y-12">
+
+        <!-- Candidate 1 -->
+        <article class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Strong</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-slate-100 text-slate-700">ports & adapters</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-blue-100 text-blue-800">Hotspot</span>
+              </div>
+              <h2 class="text-xl font-bold text-slate-900 mt-2">1. Deconstruct the 3,000-Line Agent Kernel and Mega-Constructor into Deep Subsystems</h2>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-200">
+            core-service/internal/aiagent/agent.go · internal/handlers/ai_chat.go · cmd/api/main.go · internal/agenttools/
+          </div>
+
+          <!-- Before / After Diagram -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-red-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-red-700">Before: 15-Param Mega-Constructor & Mixed Monolith</div>
+              <pre class="mermaid">
+                flowchart TD
+                  Main[cmd/api/main.go] -->|15 raw repos & ports| MegaCt[NewAIChatHandlerWith...]
+                  MegaCt --> Monolith[Agent 2927 lines]
+                  subgraph Monolith [aiagent.Agent Monolith]
+                    TR[47 Tool Registrations]
+                    RB[Runbook Router]
+                    PA[Page Context Assembler]
+                    EX[LLM Planner & Executor]
+                    PJ[Result Projector]
+                  end
+                  classDef leak stroke:#dc2626,stroke-width:1.5px;
+                  class Main,MegaCt,Monolith leak;
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-emerald-800">After: Deep Subsystems Behind Small Seams</div>
+              <pre class="mermaid">
+                flowchart TD
+                  Main[cmd/api/main.go] -->|Runtime Config| Runtime[aichat.Runtime]
+                  Runtime --> Planner[Deep Agent Planner]
+                  Runtime --> Executor[Deep Agent Executor]
+                  subgraph DeepCore [Deep Core Implementation]
+                    Planner --> CTX[Context Assembler]
+                    Executor --> ToolProv[Tool Registry Provider]
+                    ToolProv -.-> DomainTools[Domain Tool Bundles]
+                  end
+                  classDef deep fill:#0f172a,stroke:#334155,color:#ffffff;
+                  class Planner,Executor,DeepCore deep;
+              </pre>
+            </div>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div>
+              <span class="font-bold text-slate-800">Problem: </span>
+              <span class="text-slate-600">aiagent.Agent couples 47 tool registrations, runbook routing, page prompt stitching, and result projection behind an unmaintainable 15-parameter constructor that widens with every new domain capability.</span>
+            </div>
+            <div class="text-xs bg-amber-50 border border-amber-200 rounded p-2.5 text-amber-900">
+              <span class="font-bold">2026-08-26 核实：</span>
+              ① 构造函数实为 17 个固定参数 + variadic（handlers/ai_chat.go:151），比「15-param」更严重；main.go:188 调用点将 retailKPIRepo / fpnaGovernanceRepo / operatingFactsRepo 各传两遍，批评有实证。② agent.go 当时 2926 行属实，现已涨至 3205 行。③ 「47 Tool Registrations」无法 grep 验证（工具数只能运行时枚举，2026-08-23 枚举总数为 55）。
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Solution: </span>
+              <span class="text-slate-600">Decompose into deep Tool Provider, Context Assembler, and Execution Engine modules behind compact interfaces consumed directly by aichat.Runtime.</span>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Wins:</span>
+              <ul class="mt-1.5 grid grid-cols-2 gap-2 text-xs font-medium text-slate-700">
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>leverage: clean ports replace 15-param constructors</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>locality: tool definitions register within domain modules</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>seam: aichat.Runtime consumes small, stable interfaces</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>tests exercise execution and planning independently</span></li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 2 -->
+        <article class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Strong</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-slate-100 text-slate-700">in-process</span>
+              </div>
+              <h2 class="text-xl font-bold text-slate-900 mt-2">2. Collapse the Pre-Deal & Negotiation Micro-Modules into a Deep Lease Scenario Module</h2>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-200">
+            core-service/internal/services/predeal/ · services/dealcompare/ · services/renttosales/ · services/cashflow/ · services/margindecomposition/
+          </div>
+
+          <!-- Before / After Diagram -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-red-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-red-700">Before: 5 Shallow Single-File Packages</div>
+              <pre class="mermaid">
+                flowchart TD
+                  H1[deal_compare.go] --> M1[dealcompare.CompareOffers]
+                  H2[predeal.go] --> M2[predeal.EvaluateDraft]
+                  H3[decision_scenarios.go] --> M3[renttosales.Compute]
+                  H4[cashflow_scenario.go] --> M4[cashflow.ProjectScenario]
+                  H5[handlers...] --> M5[margindecomposition.Decompose]
+                  classDef leak stroke:#dc2626,stroke-width:1.5px;
+                  class M1,M2,M3,M4,M5 leak;
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-emerald-800">After: 1 Deep Lease Scenario Engine</div>
+              <pre class="mermaid">
+                flowchart TD
+                  H1[deal_compare] --> Seam[leasescenario.Engine Interface]
+                  H2[predeal] --> Seam
+                  H3[decision_scenarios] --> Seam
+                  H4[cashflow] --> Seam
+                  subgraph DeepModule [leasescenario Deep Module]
+                    Seam --> Trajectory[P&L + Cash + EBITDA Engine]
+                    Seam --> Benchmark[Offer Comparison & Break-even]
+                  end
+                  classDef deep fill:#0f172a,stroke:#334155,color:#ffffff;
+                  class DeepModule,Seam deep;
+              </pre>
+            </div>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div>
+              <span class="font-bold text-slate-800">Problem: </span>
+              <span class="text-slate-600">Five shallow calculation packages expose near-identical interfaces for pre-signature lease economics, forcing callers to coordinate multiple fragmented services.</span>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Solution: </span>
+              <span class="text-slate-600">Consolidate into a single deep Lease Negotiation & Scenario Evaluation module presenting one unified trajectory and comparison interface.</span>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Wins:</span>
+              <ul class="mt-1.5 grid grid-cols-2 gap-2 text-xs font-medium text-slate-700">
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>locality: deal evaluation rules concentrate in one module</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>leverage: one interface serves 4 HTTP routes and tools</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>interface shrinks; implementation absorbs 5 wrappers</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>tests hit one comprehensive scenario seam</span></li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 3 -->
+        <article class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">Strong</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-slate-100 text-slate-700">in-process</span>
+              </div>
+              <h2 class="text-xl font-bold text-slate-900 mt-2">3. Consolidate the Store-Day Fact Ingestion Pipeline into a Deep Intake Engine</h2>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-200">
+            core-service/internal/services/retailingest/ · services/sourceenvelope/ · services/sourcefeed/ · services/masterdataresolution/ · services/controlledintake/
+          </div>
+
+          <!-- Before / After Diagram -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-red-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-red-700">Before: 5 Fragmented Ingestion Steps</div>
+              <pre class="mermaid">
+                flowchart LR
+                  Handler[Handler/Worker] --> SF[sourcefeed]
+                  SF --> MR[masterdatares]
+                  MR --> SE[sourceenvelope]
+                  SE --> CI[controlledintake]
+                  CI --> RI[retailingest]
+                  classDef leak stroke:#dc2626,stroke-width:1.5px;
+                  class SF,MR,SE,CI,RI leak;
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-emerald-800">After: 1 Deep Store-Day Intake Engine</div>
+              <pre class="mermaid">
+                flowchart LR
+                  Caller[HTTP Route / Async Worker] -->|IngestBatch payload| Seam[StoreDayIntake Engine]
+                  subgraph DeepModule [Deep Store-Day Intake Module]
+                    Seam --> Validate[Master Data + Envelope Validation]
+                    Seam --> Idempotent[Idempotency & Version Selector]
+                    Seam --> Persist[Atomic Fact & Audit Writer]
+                  end
+                  classDef deep fill:#0f172a,stroke:#334155,color:#ffffff;
+                  class DeepModule,Seam deep;
+              </pre>
+            </div>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div>
+              <span class="font-bold text-slate-800">Problem: </span>
+              <span class="text-slate-600">Ingesting store-day facts requires crossing five shallow packages, none of which can independently enforce atomicity, idempotency, or conflict detection.</span>
+            </div>
+            <div class="text-xs bg-amber-50 border border-amber-200 rounded p-2.5 text-amber-900">
+              <span class="font-bold">2026-08-26 核实：</span>五个包均存在，但左图的线性箭头是示意而非 import 事实——sourcefeed 不 import masterdataresolution、sourceenvelope 不 import controlledintake；实际编排发生在 handler 层（retail_ingest.go 22 处调用点）。定性成立，图示勿当依赖图引用。
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Solution: </span>
+              <span class="text-slate-600">Collapse satellite packages into a deep Store-Day Fact Intake Engine that owns validation, master data matching, and transactional persistence behind one IngestBatch interface.</span>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Wins:</span>
+              <ul class="mt-1.5 grid grid-cols-2 gap-2 text-xs font-medium text-slate-700">
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>locality: envelope, idempotency, and conflict rules unite</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>leverage: one interface handles parse, validate, persist</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>deletion test: 4 shallow pass-through packages eliminated</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>seam: routes and workers share one exact intake seam</span></li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 4 -->
+        <article class="bg-white rounded-xl border border-slate-200 p-8 shadow-sm space-y-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Worth exploring</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-slate-100 text-slate-700">local-substitutable</span>
+              </div>
+              <h2 class="text-xl font-bold text-slate-900 mt-2">4. Modularize the Web API Client and Encapsulate Query Lifecycle in Deep Hooks</h2>
+            </div>
+          </div>
+
+          <div class="font-mono text-xs text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-200">
+            web/app/lib/api.ts · web/app/lib/dataState.ts · web/app/retail/useRetailQuery.ts · web/app/
+            <span class="block mt-1 text-red-700">⚠ 2026-08-26 勘误：原文写作 web/app/hooks/useRetailQuery.ts，该路径不存在——useRetailQuery 实际位于 app/retail/（hooks/ 下只有 useUrlState）。</span>
+          </div>
+
+          <!-- Before / After Diagram -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-lg border border-red-200 bg-red-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-red-700">Before: 2,500-Line api.ts & Repetitive Query Wiring</div>
+              <pre class="mermaid">
+                flowchart TD
+                  Page[31 Web Pages] -->|Manual try/catch| API[2500-line api.ts Monolith]
+                  Page -->|Manual boilerplate| DS[classifyDataState]
+                  Page -->|Manual rendering| SB[StateBlock]
+                  classDef leak stroke:#dc2626,stroke-width:1.5px;
+                  class API,DS leak;
+              </pre>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 space-y-2">
+              <div class="text-xs font-bold uppercase tracking-wider text-emerald-800">After: Domain API Modules + Deep Query Hook</div>
+              <pre class="mermaid">
+                flowchart TD
+                  Page[31 Web Pages] -->|One line: useRetailQuery| Hook[Deep Query Hook Module]
+                  subgraph DeepHook [useDomainQuery Implementation]
+                    Hook --> DomainAPI[Domain API Client]
+                    Hook --> StateEngine[classifyDataState & Error Mapping]
+                  end
+                  classDef deep fill:#0f172a,stroke:#334155,color:#ffffff;
+                  class DeepHook,Hook deep;
+              </pre>
+            </div>
+          </div>
+
+          <div class="space-y-3 text-sm">
+            <div>
+              <span class="font-bold text-slate-800">Problem: </span>
+              <span class="text-slate-600">web/app/lib/api.ts is a 2,500-line monolith exposing raw fetch promises and DTOs, forcing 31 pages to duplicate error handling and state classification boilerplate.</span>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Solution: </span>
+              <span class="text-slate-600">Partition api.ts along domain seams and encapsulate fetch, token refresh, error mapping, and classifyDataState inside a deep query hook interface.</span>
+            </div>
+            <div>
+              <span class="font-bold text-slate-800">Wins:</span>
+              <ul class="mt-1.5 grid grid-cols-2 gap-2 text-xs font-medium text-slate-700">
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>leverage: one hook manages transport, auth, and state</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>locality: domain DTOs live with domain modules</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>interface shrinks: views observe one consolidated snapshot</span></li>
+                <li class="flex items-center gap-1.5"><span class="text-emerald-600 font-bold">✓</span> <span>seam: component tests mock one clean query adapter</span></li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- Top Recommendation Section -->
+      <section id="top-recommendation" class="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-8 text-white shadow-md space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-slate-950 uppercase tracking-wide">Top Recommendation</span>
+          <a href="#candidates" class="text-xs font-mono text-slate-300 hover:text-white underline">View all candidates ↑</a>
+        </div>
+        <h3 class="text-2xl font-bold text-white">Candidate 1: Deconstruct the 3,000-Line Agent Kernel & Mega-Constructor</h3>
+        <p class="text-slate-300 text-sm leading-relaxed">
+          Following the Python retirement (W4–W6), LLM orchestration, docparse, MinIO readers, and FP&A tools have all moved into Go. <code class="text-emerald-300 bg-slate-950 px-1.5 py-0.5 rounded font-mono text-xs">aiagent.Agent</code> and <code class="text-emerald-300 bg-slate-950 px-1.5 py-0.5 rounded font-mono text-xs">NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail</code> have become the primary architectural friction hot spot. Deepening this into separated Planner, Context Assembler, and Tool Provider modules will immediately unlock testability, eliminate constructor bloat, and allow domain modules to self-register their tools cleanly.
+        </p>
+      </section>
+
+    </main>
+  </body>
+</html>

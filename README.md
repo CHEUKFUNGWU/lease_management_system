@@ -555,7 +555,8 @@ English:
 
 - [Spec：Agent Runtime 完整升级（C1）](docs/specs/agent-runtime-overhaul-c1.md) — 三层范围与能力清单
 - [CodebaseDesign：Agent Runtime 升级模块深化](docs/CodebaseDesign_AgentRuntime升级_模块深化.md) — AR1–AR6 模块接口
-> **当前没有在途工单。** C1 第三层（子任务委派 / MCP / 模型路由 / 定时触发 / 健康检查 / 跨会话记忆）尚未拆票——按 D-C10 的分层纪律，前两层验收通过后才可开工，该条件现已满足。
+- [工单：C1 第三层（L3，四部分 · 范围已裁剪）](docs/specs/agent-runtime-c1-layer3.md) — **在途（2026-08-25 开票）**：三个尾巴（未决 #12 阻塞范围 / Story 18 会话迁移留痕 / AR3 打开到 `count` 并观察）+ MCP 接入 + 定时触发 + 健康检查
+> **C1 第三层六项能力已裁剪为三项。** 2026-08-25 裁决：做 MCP 接入 / 定时触发 / 健康检查；**推迟**子任务委派（AR4）、模型路由、跨会话记忆（AR6），理由与重开条件见 L3 工单「范围裁决」。推迟不是取消，模块接口设计保留。
 
 - [工单：C1 批次收尾（RT1，四部分）](docs/specs/agent-runtime-c1-remaining-work.md) — 已交付并复验（2026-08-25）：可观测面 + 两级开关 / G9 剩余两平面 / streaming 登记订正 / 两套治理链合一
 - [工单：C1 批次评审整改（AF1–AF4）](docs/specs/agent-runtime-c1-review-fixes.md) — 已交付并复验（2026-08-24）

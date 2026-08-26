@@ -61,7 +61,9 @@ type Permission struct {
 // Validate checks structural rules that must hold before any process spawns:
 // non-empty names, direct executables (no shell interpretation), at least one
 // declared permission per tool (otherwise any authenticated caller passes
-// CapabilityCheck), positive timeout with a sane default.
+// CapabilityCheck), positive timeout with a sane default, and input schemas
+// that never declare an unshaped object (type:"object" without properties),
+// because the egress whitelist would have nothing to project against there.
 func (m Manifest) Validate() error {
 	if len(m.Servers) == 0 {
 		return fmt.Errorf("mcp manifest: no servers configured")
@@ -91,6 +93,61 @@ func (m Manifest) Validate() error {
 			if tool.TimeoutSeconds < 0 {
 				return fmt.Errorf("mcp manifest: tool %s@%s negative timeout", tool.Name, server.Name)
 			}
+			if err := validateSchemaShape(tool.InputSchema); err != nil {
+				return fmt.Errorf("mcp manifest: tool %s@%s input schema: %w", tool.Name, server.Name, err)
+			}
+		}
+	}
+	return nil
+}
+
+// validateSchemaShape enforces DEFAULT-DENY on property shapes: every
+// property must declare a type the egress whitelist knows how to project —
+// a scalar, an array (registered v1 simplification: items pass through), or
+// an object WITH sub-properties. Refused at registration:
+//   - object-typed properties with no sub-properties (nothing to project);
+//   - properties with NO type (pre-fix both Validate and projectValue only
+//     acted on explicit type:"object", so omitting the field silently
+//     bypassed the whitelist entirely);
+//   - properties declaring sub-properties but no type (same bypass).
+//
+// Unknown future type values are refused at egress time by projectValue.
+func validateSchemaShape(schema json.RawMessage) error {
+	if len(schema) == 0 {
+		return nil // RebuildArgs refuses empty schemas at call time
+	}
+	var node struct {
+		Type       string                     `json:"type"`
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal(schema, &node); err != nil {
+		return fmt.Errorf("schema unreadable: %w", err)
+	}
+	for _, propSchema := range node.Properties {
+		var prop struct {
+			Type       string                     `json:"type"`
+			Properties map[string]json.RawMessage `json:"properties"`
+		}
+		if err := json.Unmarshal(propSchema, &prop); err != nil {
+			return fmt.Errorf("property schema unreadable: %w", err)
+		}
+		switch {
+		case prop.Type == "":
+			if len(prop.Properties) > 0 {
+				return fmt.Errorf("property declares sub-properties but no type — an undeclared shape is a silent whitelist bypass; declare \"type\":\"object\"")
+			}
+			return fmt.Errorf("property declares no type — the whitelist refuses undeclared shapes; declare one of string/number/integer/boolean/array/object")
+		case prop.Type == "object":
+			if len(prop.Properties) == 0 {
+				return fmt.Errorf("object property declares no properties — the whitelist cannot project it; declare the sub-shape explicitly")
+			}
+			if err := validateSchemaShape(propSchema); err != nil {
+				return err
+			}
+		default:
+			if !projectableTypes[prop.Type] {
+				return fmt.Errorf("property declares unknown type %q — the whitelist projects string/number/integer/boolean/array/object only", prop.Type)
+			}
 		}
 	}
 	return nil
@@ -105,6 +162,7 @@ func validEnvKey(k string) bool {
 		case r == '_':
 		case r >= 'A' && r <= 'Z':
 		case r >= 'a' && r <= 'z' && i > 0: // lower-case allowed except first char
+		case r >= '0' && r <= '9' && i > 0: // digits legal after the first char (OAUTH2_TOKEN)
 		default:
 			return false
 		}

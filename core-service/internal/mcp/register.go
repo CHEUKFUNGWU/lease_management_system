@@ -23,6 +23,13 @@ import (
 	"github.com/lease-management-system/core-service/internal/agenttools"
 )
 
+// registrationTimeout bounds the tools/list round inside RegisterAll. The
+// caller (main.go → RegisterMCPTools) passes context.Background() and runs
+// BEFORE HTTP serving — an unbounded catalogue fetch would be a silent
+// startup hang. A server that answers the handshake but stalls here refuses
+// startup instead.
+const registrationTimeout = 10 * time.Second
+
 // ServerTool is what tools/list reported for one tool. Deliberately opaque:
 // only Name is read (existence check). Nothing here feeds descriptors.
 type ServerTool struct {
@@ -95,10 +102,10 @@ func BuildDefinition(serverName string, entry ToolEntry, invoke InvokeFunc) (age
 			execution, _ := agenttools.ExecutionContextFromContext(ctx)
 			rebuilt, rebuildErr := RebuildArgs(entry.InputSchema, call.Arguments)
 			if rebuildErr != nil {
-				if errors.Is(rebuildErr, ErrEgressBlocked) {
-					logRejection(rebuildErr)
-					return outboundBlockedResult(), nil
-				}
+				// RebuildArgs failures are malformed calls (missing required
+				// argument, unreadable schema) — never egress violations; it
+				// does not wrap ErrEgressBlocked. Egress blocking happens in
+				// the DefenceScan below and only there.
 				return agenttools.ToolResult{
 					CallID: call.CallID,
 					Status: agenttools.StatusRejected,
@@ -213,7 +220,9 @@ func RegisterAll(ctx context.Context, registry interface {
 		if err != nil {
 			return fmt.Errorf("mcp: server %q unavailable: %w", server.Name, err)
 		}
-		catalogue, listErr := client.ListTools(ctx)
+		listCtx, cancel := context.WithTimeout(ctx, registrationTimeout)
+		catalogue, listErr := client.ListTools(listCtx)
+		cancel()
 		if listErr != nil {
 			_ = client.Close()
 			return fmt.Errorf("mcp: server %q tools/list failed: %w", server.Name, listErr)
@@ -223,11 +232,10 @@ func RegisterAll(ctx context.Context, registry interface {
 			offered[tool.Name] = true
 		}
 		for _, entry := range server.Tools {
-			if !offered[entry.Name] {
-				_ = client.Close()
-				return fmt.Errorf("mcp: tool %s@%s is not offered by the server — refusing registration (no fuzzy matching)", entry.Name, server.Name)
-			}
-			definition, buildErr := buildFromCatalogue(server.Name, entry, map[string]bool{entry.Name: true}, func(callCtx context.Context, wireName string, arguments json.RawMessage) (ToolCallResult, error) {
+			// The existence check runs inside buildFromCatalogue against this
+			// real offered set — production exercises the same path as the
+			// unit tests; no duplicated inline check.
+			definition, buildErr := buildFromCatalogue(server.Name, entry, offered, func(callCtx context.Context, wireName string, arguments json.RawMessage) (ToolCallResult, error) {
 				return client.CallTool(callCtx, wireName, arguments)
 			})
 			if buildErr != nil {

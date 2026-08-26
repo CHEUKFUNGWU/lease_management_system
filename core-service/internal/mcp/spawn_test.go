@@ -4,7 +4,7 @@ package mcp
 //
 // 最重要的一条：TestSpawnedServerReceivesOnlyAllowlistedEnv——把本进程环境
 // 故意污染上密钥，spawn 一个把收到的全部环境变量回显成工具结果的假 server，
-// 断言密钥名与值都不在回显里。变异自检：ExecClient 把 cmd.Env 改回 nil
+// 断言密钥名与值都不在回显里。变异自检：Start 把 cmd.Env 改回 nil
 // （继承 os.Environ() 的默认写法）时它必须变红。
 //
 // 假 server 是一段 sh：按位置应答三轮固定 id 的 JSON-RPC（1=initialize、

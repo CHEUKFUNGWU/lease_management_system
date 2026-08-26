@@ -24,8 +24,8 @@ type Config struct {
 	AgentRunLeaseRecoverySeconds int
 	// RT1-L3-D: path to the MCP registration manifest; empty = feature off.
 	MCPManifestPath string
-	LogLevel                     string
-	Port                         string
+	LogLevel        string
+	Port            string
 
 	// MinIO read seam for agent-side import preview (page-fill). Empty
 	// endpoint disables it; the agent then refuses honestly (D-D2).
@@ -114,7 +114,7 @@ func Load() (*Config, error) {
 		AgentCapabilityTTLSeconds:     capabilityTTL,
 		AgentCapabilityCleanupSeconds: capabilityCleanup,
 		AgentRunLeaseRecoverySeconds:  leaseRecovery,
-		MCPManifestPath:              getEnv("MCP_MANIFEST_PATH", ""),
+		MCPManifestPath:               getEnv("MCP_MANIFEST_PATH", ""),
 		LogLevel:                      getEnv("LOG_LEVEL", "info"),
 		Port:                          port,
 

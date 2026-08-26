@@ -6,7 +6,7 @@ package mcp
 //  2. 出站白名单：schema 未声明的字段被丢弃而非透传（TestRebuildArgsDropsUndeclared），
 //     把重建改回透传必须红；
 //  3. 子进程环境：cmd.Env 是显式白名单，绝不 nil（TestBuildEnvListAllowlist +
-//     TestSpawnedServerReceivesOnlyAllowlistedEnv——后者的变异是 ExecClient 改回
+//     TestSpawnedServerReceivesOnlyAllowlistedEnv——后者的变异是 Start 把 cmd.Env 改回
 //     Env:nil）。
 
 import (
@@ -57,6 +57,76 @@ func TestRebuildArgsMissingRequiredRejected(t *testing.T) {
 	}
 }
 
+// R5（复验）：嵌套 object 未声明 sub-properties 时，整棵子树投影成 {} ——
+// 白名单没有可投影的形状，就什么都不放行。旧实现原样透传整个子树。
+func TestRebuildProjectsUnshapedNestedObjectToEmpty(t *testing.T) {
+	schema := `{"type":"object","properties":{"filter":{"type":"object"}}}`
+	out, err := RebuildArgs(json.RawMessage(schema), json.RawMessage(`{"filter":{"secret_notes":"revenue=42","anything":"goes"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != `{"filter":{}}` {
+		t.Fatalf("undeclared nested subtree must not survive the whitelist: %s", out)
+	}
+}
+
+// R5 的深半边：声明了形状的嵌套 object 逐层照常投影。
+func TestRebuildProjectsNestedObjectsRecursively(t *testing.T) {
+	schema := `{"type":"object","properties":{"filter":{"type":"object","properties":{"limit":{"type":"string"}}}}}`
+	out, err := RebuildArgs(json.RawMessage(schema), json.RawMessage(`{"filter":{"limit":"5","junk":"drop-me"},"undeclared":true}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != `{"filter":{"limit":"5"}}` {
+		t.Fatalf("nested projection must recurse and drop undeclared fields: %s", out)
+	}
+}
+
+// N2（复验二）：默认拒绝未知形状。省略 type 曾让 Validate 与投影两层全绕——
+// 形状 A 整棵业务数据逃逸且纵深防御照不到。
+func TestRebuildRefusesUntypedProperty(t *testing.T) {
+	schema := `{"type":"object","properties":{"filter":{}}}`
+	_, rebuildErr := RebuildArgs(json.RawMessage(schema), json.RawMessage(`{"filter":{"secret_notes":"revenue=42","q3_margin":"0.31"}}`))
+	if rebuildErr == nil || !strings.Contains(rebuildErr.Error(), "no known type") {
+		t.Fatalf("untyped property must be refused at egress, not passed through: %v", rebuildErr)
+	}
+	manifest := Manifest{Servers: []ServerEntry{{Name: "s", Command: "/bin/true", Tools: []ToolEntry{{
+		Name: "t", Permissions: []Permission{{Resource: "a", Action: "b"}}, InputSchema: json.RawMessage(schema),
+	}}}}}
+	if validateErr := manifest.Validate(); validateErr == nil || !strings.Contains(validateErr.Error(), "declares no type") {
+		t.Fatalf("untyped property must be refused at registration, got %v", validateErr)
+	}
+}
+
+// N2 形状 B：声明了 sub-properties 但省略 type，投影曾根本不跑。
+func TestRebuildRefusesUntypedObjectWithSubProps(t *testing.T) {
+	schema := `{"type":"object","properties":{"filter":{"properties":{"city":{"type":"string"}}}}}`
+	_, rebuildErr := RebuildArgs(json.RawMessage(schema), json.RawMessage(`{"filter":{"city":"上海","legal_entity_id":"entity-9"}}`))
+	if rebuildErr == nil || !strings.Contains(rebuildErr.Error(), "no known type") {
+		t.Fatalf("sub-properties without type must be projected, never passed wholesale: %v", rebuildErr)
+	}
+	manifest := Manifest{Servers: []ServerEntry{{Name: "s", Command: "/bin/true", Tools: []ToolEntry{{
+		Name: "t", Permissions: []Permission{{Resource: "a", Action: "b"}}, InputSchema: json.RawMessage(schema),
+	}}}}}
+	if validateErr := manifest.Validate(); validateErr == nil || !strings.Contains(validateErr.Error(), "no type") {
+		t.Fatalf("sub-properties without type must be refused at registration, got %v", validateErr)
+	}
+}
+
+// N2 补充：未知 type 值同样默认拒绝（登记期 + egress）。
+func TestRebuildRefusesUnknownTypeValue(t *testing.T) {
+	schema := `{"type":"object","properties":{"x":{"type":"frobnicate"}}}`
+	if _, rebuildErr := RebuildArgs(json.RawMessage(schema), json.RawMessage(`{"x":1}`)); rebuildErr == nil || !strings.Contains(rebuildErr.Error(), "no known type") {
+		t.Fatalf("unknown type value must be refused at egress: %v", rebuildErr)
+	}
+	manifest := Manifest{Servers: []ServerEntry{{Name: "s", Command: "/bin/true", Tools: []ToolEntry{{
+		Name: "t", Permissions: []Permission{{Resource: "a", Action: "b"}}, InputSchema: json.RawMessage(schema),
+	}}}}}
+	if validateErr := manifest.Validate(); validateErr == nil || !strings.Contains(validateErr.Error(), "unknown type") {
+		t.Fatalf("unknown type value must be refused at registration, got %v", validateErr)
+	}
+}
+
 // 纵深防御：白名单被写宽（schema 声明了租户键）时，扫描仍挡下。
 func TestDefenceScanCatchesTenantKeysWhenWhitelistTooWide(t *testing.T) {
 	wideSchema := `{"type":"object","properties":{"legal_entity_id":{"type":"string"}}}`
@@ -82,6 +152,17 @@ func TestDefenceScanPassesCleanPayloads(t *testing.T) {
 	principal := agenttools.Principal{UserID: "u1", Scope: access.Scope{LegalEntityID: "entity-9"}}
 	if err := DefenceScan(rebuilt, principal); err != nil {
 		t.Fatalf("clean payload must pass the depth scan: %v", err)
+	}
+}
+
+// R6（复验）：数组里的裸字符串也必须过值扫描——旧 walkJSON 对 []any 只递归
+// 不 visit，string 无 case，「prepared for <uuid>」藏在数组里就两层全漏。
+func TestDefenceScanCatchesStringsInsideArrays(t *testing.T) {
+	schema := `{"type":"object","properties":{"tags":{"type":"array"}}}`
+	rebuilt := mustRebuildWith(t, schema, `{"tags":["prepared for entity-9","u1"]}`)
+	principal := agenttools.Principal{UserID: "u1", Scope: access.Scope{LegalEntityID: "entity-9"}}
+	if err := DefenceScan(rebuilt, principal); err == nil || !errors.Is(err, ErrEgressBlocked) {
+		t.Fatalf("tenant identifiers inside array strings must still be caught (defence in depth), got %v", err)
 	}
 }
 
@@ -167,6 +248,49 @@ func TestManifestValidationMatrix(t *testing.T) {
 	ok := Manifest{Servers: []ServerEntry{{Name: "s", Command: "/bin/true", Tools: []ToolEntry{validTool}}}}
 	if err := ok.Validate(); err != nil {
 		t.Fatalf("valid manifest rejected: %v", err)
+	}
+}
+
+// R5（复验）登记期半边：无 sub-properties 的 object 属性在 Validate 拒绝，
+// 作者在人审前就被迫声明子形状；任意深度都拦。
+func TestManifestRejectsUnshapedObjectProperty(t *testing.T) {
+	toolWithSchema := func(schema string) ToolEntry {
+		return ToolEntry{
+			Name: "t", Permissions: []Permission{{Resource: "mcp", Action: "read"}},
+			InputSchema: json.RawMessage(schema),
+		}
+	}
+	cases := []struct {
+		name, schema string
+	}{
+		{"flat", `{"type":"object","properties":{"filter":{"type":"object"}}}`},
+		{"nested two deep", `{"type":"object","properties":{"a":{"type":"object","properties":{"b":{"type":"object"}}}}}`},
+	}
+	for _, tc := range cases {
+		m := Manifest{Servers: []ServerEntry{{Name: "s", Command: "/bin/true", Tools: []ToolEntry{toolWithSchema(tc.schema)}}}}
+		if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "declares no properties") {
+			t.Fatalf("%s: unshaped object property must be refused at registration, got %v", tc.name, err)
+		}
+	}
+	// 声明了形状的嵌套 object 合法。
+	goodSchema := `{"type":"object","properties":{"filter":{"type":"object","properties":{"limit":{"type":"string"}}}}}`
+	good := Manifest{Servers: []ServerEntry{{Name: "s", Command: "/bin/true", Tools: []ToolEntry{toolWithSchema(goodSchema)}}}}
+	if err := good.Validate(); err != nil {
+		t.Fatalf("shaped nested object must be accepted: %v", err)
+	}
+}
+
+// R9（复验）：数字是合法变量名字符（OAUTH2_TOKEN 曾被误拒）。
+func TestValidEnvKeyAllowsDigits(t *testing.T) {
+	for _, key := range []string{"OAUTH2_TOKEN", "MCP_DATA_DIR", "A1_B2", "_PRIVATE"} {
+		if !validEnvKey(key) {
+			t.Errorf("legal env var name rejected: %q", key)
+		}
+	}
+	for _, key := range []string{"1TOKEN", "BAD-KEY", "lower.first", ""} {
+		if validEnvKey(key) {
+			t.Errorf("invalid env var name accepted: %q", key)
+		}
 	}
 }
 

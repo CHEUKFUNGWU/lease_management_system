@@ -43,6 +43,18 @@ var bannedArgKeys = map[string]bool{
 // the declared fields, recursively for object-typed properties. Missing
 // required properties are an error (invalid call); undeclared properties are
 // silently DROPPED — that drop IS the boundary.
+//
+// Shape coverage, stated precisely (rework2 N2 — default deny):
+//   - scalars (string/number/integer/boolean): passed through when declared;
+//   - nested objects: projected against their declared sub-properties at every
+//     depth; an object-typed property WITHOUT declared sub-properties projects
+//     to {} — nothing undeclared survives;
+//   - arrays: the declared array passes through WHOLESALE, item contents are
+//     NOT projected (v1 registered simplification — DefenceScan still scans
+//     array elements' string values);
+//   - properties with NO type or an unknown type value: REFUSED with an
+//     error, never passed through. manifest.Validate refuses the same shapes
+//     at registration; this is the boundary guarantee if one slips past.
 func RebuildArgs(schema json.RawMessage, provided json.RawMessage) (json.RawMessage, error) {
 	if len(schema) == 0 {
 		return nil, fmt.Errorf("mcp egress: tool declared no input schema")
@@ -94,6 +106,15 @@ func RebuildArgs(schema json.RawMessage, provided json.RawMessage) (json.RawMess
 	return encoded, nil
 }
 
+// projectableTypes is the allowlist of JSON-Schema types the whitelist knows
+// how to handle. Anything else — including a MISSING type — is refused:
+// "not mentioned" must not be a silent passthrough path.
+var projectableTypes = map[string]bool{
+	"string": true, "number": true, "integer": true, "boolean": true,
+	"array":  true, // whole-value passthrough; item projection is a registered v1 simplification
+	"object": true,
+}
+
 func projectValue(propSchema json.RawMessage, value json.RawMessage) (json.RawMessage, error) {
 	var prop struct {
 		Type       string                     `json:"type"`
@@ -102,10 +123,22 @@ func projectValue(propSchema json.RawMessage, value json.RawMessage) (json.RawMe
 	if err := json.Unmarshal(propSchema, &prop); err != nil {
 		return nil, fmt.Errorf("mcp egress: property schema unreadable: %w", err)
 	}
-	if prop.Type == "object" && len(prop.Properties) > 0 {
+	// DEFAULT DENY: an undeclared or unknown type is not projected and NOT
+	// passed through — it is an error. Pre-fix both this function and manifest
+	// validation only acted on explicit type:"object", so omitting the field
+	// silently bypassed the entire whitelist (rework2 N2). manifest.Validate
+	// refuses these shapes at registration; this refusal is the boundary
+	// guarantee if a schema slips past.
+
+	if !projectableTypes[prop.Type] {
+		return nil, fmt.Errorf("mcp egress: property declares no known type (got %q) — refusing to forward undeclared shape", prop.Type)
+	}
+	if prop.Type == "object" {
 		var inner map[string]json.RawMessage
-		if err := json.Unmarshal(value, &inner); err != nil {
-			return nil, fmt.Errorf("mcp egress: object argument is not a JSON object")
+		if len(value) > 0 {
+			if err := json.Unmarshal(value, &inner); err != nil {
+				return nil, fmt.Errorf("mcp egress: object argument is not a JSON object")
+			}
 		}
 		out := make(map[string]json.RawMessage)
 		for key, innerSchema := range prop.Properties {
@@ -119,6 +152,11 @@ func projectValue(propSchema json.RawMessage, value json.RawMessage) (json.RawMe
 			}
 			out[key] = projected
 		}
+		// An object property with NO declared sub-properties projects to {}:
+		// the whitelist has nothing to project against, so nothing may pass.
+		// (Pre-fix this branch returned the value untouched, letting an entire
+		// undeclared subtree out. manifest.Validate refuses the shape anyway;
+		// this is the boundary guarantee if a schema slips past.)
 		return json.Marshal(out)
 	}
 	// Scalars and arrays pass through as-is when declared. Array item
@@ -172,6 +210,7 @@ func walkJSON(node any, visit func(key string, value any)) {
 		}
 	case []any:
 		for _, item := range typed {
+			visit("", item) // bare strings inside arrays must be scanned too
 			walkJSON(item, visit)
 		}
 	}

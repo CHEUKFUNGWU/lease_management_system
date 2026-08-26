@@ -29,9 +29,10 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/lease-management-system/core-service/internal/services/controlledintake"
+	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/controlledxlsx"
 	"github.com/lease-management-system/core-service/internal/repository"
+	"github.com/lease-management-system/core-service/internal/services/controlledintake"
 )
 
 // MaxChunkRows mirrors the store-day JSON API batch ceiling; Commit splits
@@ -48,18 +49,18 @@ const (
 
 // Standard field targets of a Mapping (file column header → field).
 const (
-	FieldStore               = "store"
-	FieldBusinessDate        = "business_date"
-	FieldCurrency            = "currency"
-	FieldRevenue             = "revenue"
-	FieldGrossProfit         = "gross_profit"
-	FieldTransactions        = "transactions"
-	FieldFootfall            = "footfall"
-	FieldAreaSqm             = "area_sqm"
-	FieldLaborCost           = "labor_cost"
-	FieldFixedRent           = "fixed_rent"
-	FieldVariableRent        = "variable_rent"
-	FieldNonLeaseCost        = "non_lease_cost"
+	FieldStore                 = "store"
+	FieldBusinessDate          = "business_date"
+	FieldCurrency              = "currency"
+	FieldRevenue               = "revenue"
+	FieldGrossProfit           = "gross_profit"
+	FieldTransactions          = "transactions"
+	FieldFootfall              = "footfall"
+	FieldAreaSqm               = "area_sqm"
+	FieldLaborCost             = "labor_cost"
+	FieldFixedRent             = "fixed_rent"
+	FieldVariableRent          = "variable_rent"
+	FieldNonLeaseCost          = "non_lease_cost"
 	FieldOtherControllableCost = "other_controllable_cost"
 )
 
@@ -146,19 +147,19 @@ type FactSink interface {
 // LLM assist adapter: counts only, plus a digit-masked sample — never raw
 // numbers.
 type ColumnProfile struct {
-	Header     string `json:"header"`
-	NonEmpty   int    `json:"non_empty"`
-	Numeric    int    `json:"numeric_like"`
-	DateLike   int    `json:"date_like"`
+	Header       string `json:"header"`
+	NonEmpty     int    `json:"non_empty"`
+	Numeric      int    `json:"numeric_like"`
+	DateLike     int    `json:"date_like"`
 	MaskedSample string `json:"masked_sample,omitempty"`
 }
 
 // StoreResolution is the outcome of matching the file's store column against
 // the store master.
 type StoreResolution struct {
-	RawToStoreID map[string]string `json:"-"`
+	RawToStoreID map[string]string   `json:"-"`
 	StoreByID    map[string]StoreRef `json:"-"`
-	Unmatched    []string           `json:"unmatched"`
+	Unmatched    []string            `json:"unmatched"`
 }
 
 // Resolved reports whether a raw identifier resolved to a store.
@@ -175,62 +176,63 @@ type RowError = controlledintake.RowError
 
 // CoverageEstimate previews the overlap of a file with existing facts.
 type CoverageEstimate struct {
-	StoreCount        int    `json:"store_count"`
-	DateFrom          string `json:"date_from,omitempty"`
-	DateTo            string `json:"date_to,omitempty"`
-	OverlapStoreDays  int    `json:"overlap_store_days"`
-	NewStoreDays      int    `json:"new_store_days"`
+	StoreCount       int    `json:"store_count"`
+	DateFrom         string `json:"date_from,omitempty"`
+	DateTo           string `json:"date_to,omitempty"`
+	OverlapStoreDays int    `json:"overlap_store_days"`
+	NewStoreDays     int    `json:"new_store_days"`
 }
 
 // ValidationReport is the full pre-commit verdict.
 type ValidationReport struct {
-	TotalRows          int            `json:"total_rows"`
-	ValidRows          int            `json:"valid_rows"`
-	Errors             []RowError     `json:"errors,omitempty"`
-	UnmatchedStores    []string       `json:"unmatched_stores,omitempty"`
-	MissingFields      []string       `json:"missing_fields,omitempty"`
-	AmbiguousMappings  []string       `json:"ambiguous_mappings,omitempty"`
-	Coverage           CoverageEstimate `json:"coverage"`
-	Facts              []ParsedFact   `json:"-"`
+	TotalRows         int              `json:"total_rows"`
+	ValidRows         int              `json:"valid_rows"`
+	Errors            []RowError       `json:"errors,omitempty"`
+	UnmatchedStores   []string         `json:"unmatched_stores,omitempty"`
+	MissingFields     []string         `json:"missing_fields,omitempty"`
+	AmbiguousMappings []string         `json:"ambiguous_mappings,omitempty"`
+	Coverage          CoverageEstimate `json:"coverage"`
+	Facts             []ParsedFact     `json:"-"`
 }
 
 // ParsedFact is a validated row ready for versioning and commit.
 type ParsedFact struct {
-	StoreID       string
-	BusinessDate  string
-	Currency      string
-	Revenue       float64
-	GrossProfit   *float64
-	Transactions  *float64
-	Footfall      *float64
-	AreaSqm       *float64
-	LaborCost     *float64
-	FixedRent     *float64
-	VariableRent  *float64
-	NonLeaseCost  *float64
+	StoreID               string
+	BusinessDate          string
+	Currency              string
+	Revenue               float64
+	GrossProfit           *float64
+	Transactions          *float64
+	Footfall              *float64
+	AreaSqm               *float64
+	LaborCost             *float64
+	FixedRent             *float64
+	VariableRent          *float64
+	NonLeaseCost          *float64
 	OtherControllableCost *float64
-	SourceRecordID string
-	RowIndex       int
+	SourceRecordID        string
+	RowIndex              int
 }
 
 // ImportReport is the Commit outcome.
 type ImportReport struct {
-	BatchID            string     `json:"batch_id"`
-	TotalRows          int        `json:"total_rows"`
-	AcceptedRows       int        `json:"accepted_rows"`
-	RejectedRows       int        `json:"rejected_rows"`
-	Chunks             int        `json:"chunks"`
-	ChunkSize          int        `json:"chunk_size"`
-	ReplayDetected     bool       `json:"replay_detected"`
-	NewStoreDays       int        `json:"new_store_days"`
-	SupersededStoreDays int       `json:"superseded_store_days"`
-	Errors             []RowError `json:"errors,omitempty"`
+	BatchID             string     `json:"batch_id"`
+	TotalRows           int        `json:"total_rows"`
+	AcceptedRows        int        `json:"accepted_rows"`
+	RejectedRows        int        `json:"rejected_rows"`
+	Chunks              int        `json:"chunks"`
+	ChunkSize           int        `json:"chunk_size"`
+	ReplayDetected      bool       `json:"replay_detected"`
+	NewStoreDays        int        `json:"new_store_days"`
+	SupersededStoreDays int        `json:"superseded_store_days"`
+	Errors              []RowError `json:"errors,omitempty"`
 }
 
 // Service owns the import pipeline behind the directory and sink adapters.
 type Service struct {
 	directory   StoreDirectory
 	sink        FactSink
+	batches     BatchStorer
 	aiSuggester MappingSuggester
 }
 
@@ -245,6 +247,10 @@ func (s *Service) WithMappingSuggester(suggester MappingSuggester) *Service {
 	s.aiSuggester = suggester
 	return s
 }
+
+// WithBatchStore attaches the batch-lifecycle port (C3, 架构重构任务书
+// 2026-08-26)。IngestBatch 需要它创建/收尾 operating_fact_batches 行；
+// 不接则 IngestBatch 以 system 失败诚实拒绝，不产出任何行。
 
 // SuggestMappingAssisted returns the AI proposal when the adapter is
 // attached and succeeds; otherwise the deterministic suggestion. The source
@@ -827,3 +833,266 @@ var headerAliases = map[string]string{
 	"其他可控成本": FieldOtherControllableCost, "其他成本": FieldOtherControllableCost, "其他费用": FieldOtherControllableCost,
 	"othercontrollablecost": FieldOtherControllableCost, "othercost": FieldOtherControllableCost,
 }
+
+// ─── IngestBatch 接缝（C3，架构重构任务书 2026-08-26）───────────────────────
+//
+// 此前编排散在 handlers/retail_ingest.go：解析 → 建议映射 → 门店归属 →
+// 校验 → 批次行生命周期 → 提交 → 收尾，22 个调用点全在 handler 里。
+// PreviewBatch 与 IngestBatch 把这条链收进引擎，handler 只剩 HTTP 参数
+// 解析、端口接线和错误码到状态码的翻译。行为逐字节保持（锚：
+// handlers 的 ingest golden + 真库集成测试）。
+
+// BatchStorer owns the operating_fact_batches lifecycle rows.
+type BatchStorer interface {
+	CreateBatch(context.Context, *repository.OperatingFactBatch) (*repository.OperatingFactBatch, error)
+	FinalizeBatch(context.Context, string, int, int, string, string, json.RawMessage) (*repository.OperatingFactBatch, error)
+}
+
+// WithBatchStore attaches the batch-lifecycle port.
+func (s *Service) WithBatchStore(batches BatchStorer) *Service {
+	s.batches = batches
+	return s
+}
+
+// ImportFailureKind tells the transport layer which status/code family a
+// failure maps to, so the mapping lives in one place instead of being
+// re-derived from error strings.
+type ImportFailureKind string
+
+const (
+	FailureParse       ImportFailureKind = "parse"         // template unreadable → 400 invalid_arguments
+	FailureSystem      ImportFailureKind = "system"        // store/batch outage → 500 system_failure
+	FailureEnvelope    ImportFailureKind = "envelope"      // provenance incomplete → 400 invalid_arguments
+	FailureNoValidRows ImportFailureKind = "no_valid_rows" // every row rejected → 422 + report details
+	FailureCommit      ImportFailureKind = "commit"        // coded commit failure → writeCodedFailure passthrough
+)
+
+// ImportError carries the exact message the previous handler wrote, plus the
+// classification and (where the contract includes them) report and batch id.
+type ImportError struct {
+	Kind    ImportFailureKind
+	Message string
+	Err     error
+	BatchID string
+	Report  *ImportReport
+}
+
+func (e *ImportError) Error() string { return e.Message }
+
+func (e *ImportError) Unwrap() error { return e.Err }
+
+func failf(kind ImportFailureKind, err error) *ImportError {
+	message := ""
+	if err != nil {
+		message = err.Error()
+	}
+	return &ImportError{Kind: kind, Message: message, Err: err}
+}
+
+// PreviewSpec is everything PreviewBatch needs. RawMapping is the client's
+// corrected column mapping as posted; empty means "suggest one". It is decoded
+// after the template parses, exactly where the previous handler did.
+type PreviewSpec struct {
+	LegalEntityID string
+	Entity        access.EntityFilter
+	SourceSystem  string
+	File          []byte
+	Format        Format
+	RawMapping    string
+}
+
+// PreviewResult carries every field the preview response serializes.
+type PreviewResult struct {
+	Format              Format
+	Headers             []string
+	StandardFields      []string
+	SuggestedMapping    Mapping
+	SuggestionSource    string
+	Mapping             Mapping
+	RowsPreview         [][]string
+	ColumnProfiles      []ColumnProfile
+	ResolutionMatched   int
+	ResolutionUnmatched []string
+	Report              ValidationReport
+}
+
+// PreviewBatch runs the deterministic pipeline without writing: parse,
+// suggest (unless the caller supplies a corrected mapping), resolve stores,
+// validate rows, estimate overlap with existing facts.
+func (s *Service) PreviewBatch(ctx context.Context, spec PreviewSpec) (*PreviewResult, error) {
+	headers, rows, err := ParseTemplate(spec.File, spec.Format)
+	if err != nil {
+		return nil, failf(FailureParse, err)
+	}
+	profiles := ColumnProfiles(headers, rows)
+	suggested, suggestionSource := s.SuggestMappingAssisted(ctx, headers, profiles)
+	mapping := suggested
+	confirmed, failure := confirmedMapping(spec.RawMapping)
+	if failure != nil {
+		return nil, failure
+	}
+	if confirmed != nil {
+		mapping = confirmed
+	}
+	resolution, err := s.ResolveStores(ctx, spec.LegalEntityID, mapping, headers, rows)
+	if err != nil {
+		return nil, failf(FailureSystem, err)
+	}
+	report := Validate(headers, rows, mapping, resolution)
+	coverage, err := s.EstimateOverlap(ctx, spec.LegalEntityID, spec.SourceSystem, report)
+	if err != nil {
+		return nil, failf(FailureSystem, err)
+	}
+	report.Coverage = coverage
+	previewRows := rows
+	if len(previewRows) > 8 {
+		previewRows = previewRows[:8]
+	}
+	return &PreviewResult{
+		Format: spec.Format, Headers: headers, StandardFields: AllFields,
+		SuggestedMapping: suggested, SuggestionSource: suggestionSource, Mapping: mapping,
+		RowsPreview: previewRows, ColumnProfiles: ColumnProfiles(headers, rows),
+		ResolutionMatched: len(resolution.RawToStoreID), ResolutionUnmatched: resolution.Unmatched,
+		Report: report,
+	}, nil
+}
+
+// IngestSpec is one commit attempt. The engine owns batch creation, replay
+// detection, envelope validation, chunked persistence and finalization.
+type IngestSpec struct {
+	LegalEntityID  string
+	Entity         access.EntityFilter
+	UserID         string
+	Filename       string
+	File           []byte
+	Format         Format
+	SourceSystem   string
+	AsOf           time.Time
+	IdempotencyKey string
+	RawMapping     string
+}
+
+// IngestBatchResult is what the transport layer serializes. Envelope echoes
+// the provenance triple verbatim — traceability fields are never rewritten.
+type IngestBatchResult struct {
+	Batch            *repository.OperatingFactBatch
+	Report           *ImportReport
+	SavedCount       int
+	FailedCount      int
+	IdempotentReplay bool
+	Envelope         Envelope
+}
+
+// IngestBatch orchestrates validate → master data mapping → envelope →
+// persist for one uploaded file, exactly as the handler used to, in order:
+//
+//  1. parse the controlled template;
+//  2. map columns (confirmed human mapping wins over the rule/AI suggestion);
+//  3. resolve raw store references against the entity-scoped master data;
+//  4. create the batch row (idempotency key attached);
+//  5. short-circuit replays of an already-finalized batch;
+//  6. re-validate the envelope triple and persist in atomic chunks;
+//  7. finalize the batch row with per-row errors attached.
+func (s *Service) IngestBatch(ctx context.Context, spec IngestSpec) (*IngestBatchResult, error) {
+	if s.batches == nil {
+		return nil, &ImportError{Kind: FailureSystem, Message: "batch store is not wired"}
+	}
+	headers, rows, err := ParseTemplate(spec.File, spec.Format)
+	if err != nil {
+		return nil, failf(FailureParse, err)
+	}
+	mapping := SuggestMapping(headers, ColumnProfiles(headers, rows))
+	confirmed, failure := confirmedMapping(spec.RawMapping)
+	if failure != nil {
+		return nil, failure
+	}
+	if confirmed != nil {
+		mapping = confirmed
+	}
+	resolution, err := s.ResolveStores(ctx, spec.LegalEntityID, mapping, headers, rows)
+	if err != nil {
+		return nil, failf(FailureSystem, err)
+	}
+	var legalEntityPayload *string
+	if scopedID, idErr := spec.Entity.LegalEntityID(); idErr == nil {
+		legalEntityPayload = &scopedID
+	}
+	batch, err := s.batches.CreateBatch(ctx, &repository.OperatingFactBatch{
+		LegalEntityID: legalEntityPayload, SourceSystem: spec.SourceSystem, SourceFile: spec.Filename,
+		TotalRows: len(rows), AsOfAt: nowUTC(), CreatedBy: optionalString(spec.UserID),
+		ReconciliationStatus: "unreconciled", IdempotencyKey: spec.IdempotencyKey,
+		FactVersion: nowUTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		return nil, failf(FailureSystem, err)
+	}
+	if (batch.Status == "completed" || batch.Status == "failed") && batch.AcceptedRows+batch.RejectedRows > 0 {
+		return &IngestBatchResult{
+			Batch: batch, SavedCount: batch.AcceptedRows, FailedCount: batch.RejectedRows,
+			IdempotentReplay: true,
+		}, nil
+	}
+	envelope := Envelope{SourceSystem: spec.SourceSystem, ImportBatchID: batch.ID, AsOfAt: spec.AsOf}
+	report, err := s.Commit(ctx, spec.LegalEntityID, headers, rows, mapping, resolution, envelope, spec.IdempotencyKey)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrEnvelopeIncomplete):
+			return nil, &ImportError{Kind: FailureEnvelope, Message: err.Error(), Err: err}
+		case errors.Is(err, ErrNoValidRows):
+			_, _ = s.batches.FinalizeBatch(ctx, batch.ID, 0, report.RejectedRows, "failed", "unreconciled", ErrorsJSON(report))
+			return nil, &ImportError{Kind: FailureNoValidRows, Message: "every row failed validation", BatchID: batch.ID, Report: report}
+		default:
+			_, _ = s.batches.FinalizeBatch(ctx, batch.ID, report.AcceptedRows, report.RejectedRows, "failed", "unreconciled", ErrorsJSON(report))
+			return nil, &ImportError{Kind: FailureCommit, Message: err.Error(), Err: err}
+		}
+	}
+	batch, err = s.batches.FinalizeBatch(ctx, batch.ID, report.AcceptedRows, report.RejectedRows, "completed", "unreconciled", ErrorsJSON(report))
+	if err != nil {
+		return nil, failf(FailureSystem, err)
+	}
+	return &IngestBatchResult{
+		Batch: batch, Report: report,
+		SavedCount: report.AcceptedRows, FailedCount: report.RejectedRows,
+		IdempotentReplay: report.ReplayDetected,
+		Envelope:         envelope,
+	}, nil
+}
+
+// ErrorsJSON renders the per-row report for the batch row's error column,
+// as an empty array when there is nothing to record.
+func ErrorsJSON(report *ImportReport) json.RawMessage {
+	if report == nil || len(report.Errors) == 0 {
+		return json.RawMessage(`[]`)
+	}
+	encoded, err := json.Marshal(report.Errors)
+	if err != nil {
+		return json.RawMessage(`[]`)
+	}
+	return encoded
+}
+
+// confirmedMapping decodes the human-confirmed {column: field} object. An
+// empty raw means "no confirmation"; a malformed payload is a parse-class
+// failure with the exact copy the handler always wrote.
+func confirmedMapping(raw string) (Mapping, *ImportError) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	confirmed := Mapping{}
+	if err := json.Unmarshal([]byte(raw), &confirmed); err != nil {
+		return nil, &ImportError{Kind: FailureParse, Message: "mapping must be a JSON object of {column: field}"}
+	}
+	return confirmed, nil
+}
+
+func optionalString(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+// nowUTC is the engine's single wall clock, mirroring the handler helper the
+// orchestration used before the seam existed.
+func nowUTC() time.Time { return time.Now().UTC() }

@@ -16,8 +16,8 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	auditservice "github.com/lease-management-system/core-service/internal/services/audit"
-	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailingest"
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 )
 
 // maxRetailIngestFileSize caps the controlled template upload; POS exports
@@ -54,12 +54,22 @@ func (d retailIngestDirectory) Stores(ctx context.Context, legalEntityID string)
 // retailIngestSink adapts the atomic store-day writer (with entity scope,
 // user and audit wiring captured per request) to the importer's FactSink
 // seam. This is the second real adapter next to the test fake.
+// retailIngestSink also satisfies retailingest.BatchStorer: the batch row and
+// the facts share one store handle, as they did before the seam existed.
 type retailIngestSink struct {
 	store  retailIngestStore
 	entity access.EntityFilter
 	userID string
 	audit  retailStoreDayFactAuditor
 	ginCtx *gin.Context
+}
+
+func (s retailIngestSink) CreateBatch(ctx context.Context, batch *repository.OperatingFactBatch) (*repository.OperatingFactBatch, error) {
+	return s.store.CreateBatch(ctx, batch)
+}
+
+func (s retailIngestSink) FinalizeBatch(ctx context.Context, id string, accepted, rejected int, status, reconciliation string, errorsJSON json.RawMessage) (*repository.OperatingFactBatch, error) {
+	return s.store.FinalizeBatch(ctx, id, accepted, rejected, status, reconciliation, errorsJSON)
 }
 
 func (s retailIngestSink) ExistingState(ctx context.Context, legalEntityID, sourceSystem string, storeIDs, businessDates []string) (map[string]int, error) {
@@ -101,6 +111,11 @@ func NewRetailIngestHandler(population retailIngestPopulationReader, store retai
 // Preview runs the deterministic pipeline without writing: parse, suggest
 // (unless the client sends a corrected mapping), resolve stores, validate
 // rows, and estimate overlap with existing facts.
+// Preview runs the deterministic pipeline without writing: parse, suggest
+// (unless the client sends a corrected mapping), resolve stores, validate
+// rows, and estimate overlap with existing facts. Orchestration lives behind
+// the retailingest.PreviewBatch seam (C3); this handler keeps HTTP parsing,
+// port wiring and error-code translation.
 func (h *RetailIngestHandler) Preview(c *gin.Context) {
 	file, format, filename, err := retailIngestFile(c)
 	if err != nil {
@@ -116,54 +131,33 @@ func (h *RetailIngestHandler) Preview(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "source_system is required", nil)
 		return
 	}
-	headers, rows, err := retailingest.ParseTemplate(file, format)
-	if err != nil {
-		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
-		return
-	}
 	entity, _ := tenantEntity(c)
-	service := retailingest.NewService(retailIngestDirectory{reader: h.population}, retailIngestSink{store: h.store, entity: entity, userID: userIDFromContext(c), audit: h.audit, ginCtx: c}).WithMappingSuggester(h.mappingAI)
-	profiles := retailingest.ColumnProfiles(headers, rows)
-	suggested, suggestionSource := service.SuggestMappingAssisted(c.Request.Context(), headers, profiles)
-	mapping := suggested
-	if raw := strings.TrimSpace(c.PostForm("mapping")); raw != "" {
-		confirmed := retailingest.Mapping{}
-		if err := json.Unmarshal([]byte(raw), &confirmed); err != nil {
-			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "mapping must be a JSON object of {column: field}", nil)
-			return
-		}
-		mapping = confirmed
-	}
-	resolution, err := service.ResolveStores(c.Request.Context(), legalEntityID, mapping, headers, rows)
+	service := h.newService(entity, c)
+	result, err := service.PreviewBatch(c.Request.Context(), retailingest.PreviewSpec{
+		LegalEntityID: legalEntityID, Entity: entity, SourceSystem: sourceSystem,
+		File: file, Format: format, RawMapping: c.PostForm("mapping"),
+	})
 	if err != nil {
-		writeSystemFailure(c, http.StatusInternalServerError, err)
+		writeImportFailure(c, err)
 		return
-	}
-	report := retailingest.Validate(headers, rows, mapping, resolution)
-	coverage, err := service.EstimateOverlap(c.Request.Context(), legalEntityID, sourceSystem, report)
-	if err != nil {
-		writeSystemFailure(c, http.StatusInternalServerError, err)
-		return
-	}
-	report.Coverage = coverage
-	previewRows := rows
-	if len(previewRows) > 8 {
-		previewRows = previewRows[:8]
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"basis": "Working", "format": string(format), "source_file": filename,
-		"standard_fields":   retailingest.AllFields,
-		"headers":           headers,
-		"column_profiles":   retailingest.ColumnProfiles(headers, rows),
-		"suggested_mapping": suggested, "suggested_mapping_source": suggestionSource, "mapping": mapping, "rows_preview": previewRows,
-		"resolution": gin.H{"matched_count": len(resolution.RawToStoreID), "unmatched": resolution.Unmatched},
-		"report":     report,
+		"basis": "Working", "format": string(result.Format), "source_file": filename,
+		"standard_fields":   result.StandardFields,
+		"headers":           result.Headers,
+		"column_profiles":   result.ColumnProfiles,
+		"suggested_mapping": result.SuggestedMapping, "suggested_mapping_source": result.SuggestionSource, "mapping": result.Mapping, "rows_preview": result.RowsPreview,
+		"resolution": gin.H{"matched_count": result.ResolutionMatched, "unmatched": result.ResolutionUnmatched},
+		"report":     result.Report,
 	})
 }
 
 // Commit imports the file as production store-day facts: batch envelope,
 // deterministic re-validation, superseding fact versions, chunked atomic
 // writes with per-chunk idempotency derived from the Idempotency-Key.
+// The whole orchestration lives behind the retailingest.IngestBatch seam
+// (C3); the handler parses HTTP parameters, wires the per-request ports and
+// translates classified failures onto the error contract.
 func (h *RetailIngestHandler) Commit(c *gin.Context) {
 	file, format, filename, err := retailIngestFile(c)
 	if err != nil {
@@ -193,79 +187,63 @@ func (h *RetailIngestHandler) Commit(c *gin.Context) {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "Idempotency-Key exceeds 255 characters", nil)
 		return
 	}
-	headers, rows, err := retailingest.ParseTemplate(file, format)
-	if err != nil {
-		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
-		return
-	}
-	mapping := retailingest.SuggestMapping(headers, retailingest.ColumnProfiles(headers, rows))
-	if raw := strings.TrimSpace(c.PostForm("mapping")); raw != "" {
-		confirmed := retailingest.Mapping{}
-		if err := json.Unmarshal([]byte(raw), &confirmed); err != nil {
-			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "mapping must be a JSON object of {column: field}", nil)
-			return
-		}
-		mapping = confirmed
-	}
 	entity, entityOK := tenantEntity(c)
 	if !entityOK {
 		writeCodedError(c, http.StatusForbidden, errcontract.CodePermissionDenied, "legal entity scope is required", nil)
 		return
 	}
-	service := retailingest.NewService(retailIngestDirectory{reader: h.population}, retailIngestSink{store: h.store, entity: entity, userID: userIDFromContext(c), audit: h.audit, ginCtx: c})
-	resolution, err := service.ResolveStores(c.Request.Context(), legalEntityID, mapping, headers, rows)
-	if err != nil {
-		writeSystemFailure(c, http.StatusInternalServerError, err)
-		return
-	}
-	var legalEntityPayload *string
-	if scopedID, idErr := entity.LegalEntityID(); idErr == nil {
-		legalEntityPayload = &scopedID
-	}
-	batch, err := h.store.CreateBatch(c.Request.Context(), &repository.OperatingFactBatch{
-		LegalEntityID: legalEntityPayload, SourceSystem: sourceSystem, SourceFile: filename,
-		TotalRows: len(rows), AsOfAt: nowUTC(), CreatedBy: optionalString(userIDFromContext(c)),
-		ReconciliationStatus: "unreconciled", IdempotencyKey: idempotencyKey,
-		FactVersion: nowUTC().Format(time.RFC3339),
+	service := h.newService(entity, c)
+	result, err := service.IngestBatch(c.Request.Context(), retailingest.IngestSpec{
+		LegalEntityID: legalEntityID, Entity: entity, UserID: userIDFromContext(c),
+		Filename: filename, File: file, Format: format,
+		SourceSystem: sourceSystem, AsOf: asOf,
+		IdempotencyKey: idempotencyKey, RawMapping: c.PostForm("mapping"),
 	})
 	if err != nil {
-		writeSystemFailure(c, http.StatusInternalServerError, err)
+		writeImportFailure(c, err)
 		return
 	}
-	if (batch.Status == "completed" || batch.Status == "failed") && batch.AcceptedRows+batch.RejectedRows > 0 {
+	if result.IdempotentReplay && result.Report == nil {
 		c.JSON(http.StatusOK, gin.H{
-			"basis": "Working", "batch": batch, "saved_count": batch.AcceptedRows,
-			"failed_count": batch.RejectedRows, "idempotent_replay": true,
+			"basis": "Working", "batch": result.Batch, "saved_count": result.SavedCount,
+			"failed_count": result.FailedCount, "idempotent_replay": true,
 		})
 		return
 	}
-	envelope := retailingest.Envelope{SourceSystem: sourceSystem, ImportBatchID: batch.ID, AsOfAt: asOf}
-	report, err := service.Commit(c.Request.Context(), legalEntityID, headers, rows, mapping, resolution, envelope, idempotencyKey)
-	if err != nil {
-		if errors.Is(err, retailingest.ErrEnvelopeIncomplete) {
-			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
-			return
-		}
-		if errors.Is(err, retailingest.ErrNoValidRows) {
-			_, _ = h.store.FinalizeBatch(c.Request.Context(), batch.ID, 0, report.RejectedRows, "failed", "unreconciled", retailIngestErrorsJSON(report))
-			writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeInvalidArguments, "every row failed validation", gin.H{"report": report, "batch_id": batch.ID})
-			return
-		}
-		_, _ = h.store.FinalizeBatch(c.Request.Context(), batch.ID, report.AcceptedRows, report.RejectedRows, "failed", "unreconciled", retailIngestErrorsJSON(report))
-		writeCodedFailure(c, http.StatusUnprocessableEntity, err, nil)
-		return
-	}
-	batch, err = h.store.FinalizeBatch(c.Request.Context(), batch.ID, report.AcceptedRows, report.RejectedRows, "completed", "unreconciled", retailIngestErrorsJSON(report))
-	if err != nil {
+	c.JSON(http.StatusOK, gin.H{
+		"basis": "Working", "batch": result.Batch, "report": result.Report,
+		"saved_count": result.SavedCount, "failed_count": result.FailedCount,
+		"idempotent_replay": result.IdempotentReplay,
+		"envelope":          gin.H{"source_system": sourceSystem, "import_batch_id": result.Envelope.ImportBatchID, "as_of_at": result.Envelope.AsOfAt},
+	})
+}
+
+// newService wires the per-request adapters: the store population as the
+// master-data directory, the atomic store-day writer (with entity scope, user
+// and audit captured) as sink and batch store.
+func (h *RetailIngestHandler) newService(entity access.EntityFilter, c *gin.Context) *retailingest.Service {
+	sink := retailIngestSink{store: h.store, entity: entity, userID: userIDFromContext(c), audit: h.audit, ginCtx: c}
+	return retailingest.NewService(retailIngestDirectory{reader: h.population}, sink).WithMappingSuggester(h.mappingAI).WithBatchStore(sink)
+}
+
+// writeImportFailure is the single failure→HTTP translation for the ingest
+// seam: kinds map onto status/code families, messages pass through verbatim.
+func writeImportFailure(c *gin.Context, err error) {
+	var imp *retailingest.ImportError
+	if !errors.As(err, &imp) {
 		writeSystemFailure(c, http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"basis": "Working", "batch": batch, "report": report,
-		"saved_count": report.AcceptedRows, "failed_count": report.RejectedRows,
-		"idempotent_replay": report.ReplayDetected,
-		"envelope":          gin.H{"source_system": sourceSystem, "import_batch_id": envelope.ImportBatchID, "as_of_at": envelope.AsOfAt},
-	})
+	switch imp.Kind {
+	case retailingest.FailureParse, retailingest.FailureEnvelope:
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, imp.Message, nil)
+	case retailingest.FailureNoValidRows:
+		writeCodedError(c, http.StatusUnprocessableEntity, errcontract.CodeInvalidArguments, imp.Message, gin.H{"report": imp.Report, "batch_id": imp.BatchID})
+	case retailingest.FailureCommit:
+		writeCodedFailure(c, http.StatusUnprocessableEntity, imp.Err, nil)
+	default:
+		writeSystemFailure(c, http.StatusInternalServerError, imp.Err)
+	}
 }
 
 func retailIngestFile(c *gin.Context) ([]byte, retailingest.Format, string, error) {
@@ -313,15 +291,4 @@ func retailIngestAsOf(raw string) (time.Time, error) {
 		return parsed.UTC(), nil
 	}
 	return time.Time{}, errors.New("as_of_at must be RFC3339 or YYYY-MM-DD")
-}
-
-func retailIngestErrorsJSON(report *retailingest.ImportReport) json.RawMessage {
-	if report == nil || len(report.Errors) == 0 {
-		return json.RawMessage(`[]`)
-	}
-	encoded, err := json.Marshal(report.Errors)
-	if err != nil {
-		return json.RawMessage(`[]`)
-	}
-	return encoded
 }

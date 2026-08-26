@@ -366,7 +366,7 @@ DataTrustBar      分类 · 口径 · 覆盖率 · decision-ready · 展开全�
 
 ## 11. 可访问性
 
-- **焦点环用双环**：`0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent-interactive)`。现有单环 `2px solid var(--fg-primary)`（纯黑）在 `--admin-surface #001529` 和 `--code-surface #1E1E1E` 上**不可见**，属待修项。
+- **焦点环用双环**：`0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent-interactive)`。✅ **2026-08-26 复测关闭**（UIUX 任务书 T5）：双环已经落地（D13）——`:root` 定义 `--focus-ring`，全局 `:focus-visible` 及头部按钮、AntD 按钮/选择器、AI 会话项四条规则统一走它，输入框例外不叠环；暗色主题换亮强调色 `#64B5F6`，在 `--admin-surface #001529`（admin 页头）与 `--code-surface #1E1E1E`（代码块）上外环清晰可见。规则体逐条锁定在 `app/design-system/focus-ring.test.ts`（8 测试通过）。
 - 所有可交互元素必须键盘可达，且 `:focus-visible` 有可见反馈。
 - 用原生语义元素（`<button>`、`<a>`），不要给 `<div>` 挂 `onClick`。
 - 图标按钮必须有 `aria-label`。
@@ -430,7 +430,7 @@ DataTrustBar      分类 · 口径 · 覆盖率 · decision-ready · 展开全�
 | `tokens.ts` 与 `:root` 漂移 | 已消除 | 对齐测试守护 | ✅ 已解决 |
 | 三个零售页无 `t()` | 3 页 | **3 页均已接入** | ✅ 已解决 |
 | 无暗色模式 | 全站无 | **已有**（`ThemeToggle` + `darkColors` + `theme-dark.test.ts`，DARK-003 服务端决定主题） | ✅ 已解决 |
-| 单环 focus，深色面上不可见 | 全站 | 未复测 | ❓ |
+| 单环 focus，深色面上不可见 | 全站 | ✅ 已解决（2026-08-26 复测：双环已落地并有规则体测试守护，见 §11） | ✅ 已解决 |
 
 **前三行要认真对待。** 内联样式、字面量边框、JS hover 在这一轮 UI 升级中**不降反增**——§13 的守卫是 diff 级的（只拦新增行、放行存量），所以这些增量本应被拦住。要么是绕过了 `npm run lint`，要么是守卫的匹配规则有漏网。下次动前端前值得先查一次。
 
@@ -453,7 +453,7 @@ DataTrustBar      分类 · 口径 · 覆盖率 · decision-ready · 展开全�
 
 | 执行机制 | 状态 | 位置 |
 |---|---|---|
-| §13 止血条款自动拦截 | ✅ **CI 强制** | `web/scripts/enforce-design.mjs`（ENF-001），经 `npm run lint` 在 CI 跑。**已实现 9 条中的 7 条**：§13-1 `!important`、§13-2 内联样式（2026-08-22 起含**多行展开块**——此前逐行正则对 opener 换行的写法全盲，946→1032 的回潮由此漏入；新增 `styleBlockStaticProps` 块级计数）、§13-3 JS hover 改样式（2026-08-22 起窄规则：只拦事件处理器里直接改 `.style` 的形态，埋点等非样式用途放行；规则体测试在 `scripts/enforce-design.test.ts`）、§13-4 硬编码颜色（T5）、§13-6 字重、§13-7 硬编码 CJK、§13-8 `border: 1px solid`（T5）。**未覆盖**：§13-5 `<Tag color="red">`（AntD 预设色名，与 §13-4 的 token 规则重叠，可在下一轮并入）、§13-9 用 0 填补缺失数据（需要数据流语义，不在文本扫描范畴） |
+| §13 止血条款自动拦截 | ✅ **CI 强制** | `web/scripts/enforce-design.mjs`（ENF-001），经 `npm run lint` 在 CI 跑。**已实现 9 条中的 8 条**：§13-1 `!important`、§13-2 内联样式（2026-08-22 起含**多行展开块**——此前逐行正则对 opener 换行的写法全盲，946→1032 的回潮由此漏入；新增 `styleBlockStaticProps` 块级计数）、§13-3 JS hover 改样式（2026-08-22 起窄规则：只拦事件处理器里直接改 `.style` 的形态，埋点等非样式用途放行；规则体测试在 `scripts/enforce-design.test.ts`）、§13-4 硬编码颜色（T5）、§13-5 `<Tag color=…>`（2026-08-26 并入：拦「`<Tag` 元素带 `color` 属性」的单行形态，字面量与表达式都拦；规则体测试同上；存量 40 处已换 `<StatusTag kind>`，5 处 `bordered={false}` 静音元数据片按基线记账）、§13-6 字重、§13-7 硬编码 CJK、§13-8 `border: 1px solid`（T5）。**未覆盖**：§13-9 用 0 填补缺失数据（需要数据流语义，不在文本扫描范畴） |
 | §13 存量债务基线 | ✅ **测试守护** | `web/scripts/design-debt-baseline.json`（按「文件 × 规则」记允许数量，带日期）+ `web/scripts/design-debt-baseline.test.ts`；超出基线即 CI 失败（T6b） |
 | §1 `tokens.ts` ↔ `:root` 对齐 | ✅ 测试守护 | `app/design-system/tokens-alignment.test.ts` |
 | 暗色令牌完整性 | ✅ 测试守护 | `app/design-system/theme-dark.test.ts` |

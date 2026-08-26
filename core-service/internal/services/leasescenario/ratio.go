@@ -1,4 +1,4 @@
-// Package renttosales turns rent and sales into the ratio a retail lease
+// Rent-to-sales turns rent and sales into the ratio a retail lease
 // decision actually turns on.
 //
 // The measure is simple arithmetic; what earns its keep is refusing to state it
@@ -11,11 +11,11 @@
 //     trouble in a way no percentage conveys.
 //   - Sales and rent in different currencies. The division is meaningless, and
 //     translating it here would invent a rate nobody agreed to.
-package renttosales
+
+package leasescenario
 
 import (
 	"fmt"
-	"math"
 	"sort"
 )
 
@@ -89,8 +89,8 @@ type Result struct {
 	CoverageStatement string   `json:"coverage_statement"`
 }
 
-// Input is a period's rows and the thresholds to judge them by.
-type Input struct {
+// RatioInput is a period's rows and the thresholds to judge them by.
+type RatioInput struct {
 	Period         string
 	HealthyCeiling float64
 	WarningCeiling float64
@@ -98,7 +98,7 @@ type Input struct {
 }
 
 // Calculate produces the ratios and the warnings.
-func Calculate(input Input) (Result, error) {
+func Calculate(input RatioInput) (Result, error) {
 	if input.Period == "" {
 		return Result{}, fmt.Errorf("请指定期间")
 	}
@@ -222,8 +222,4 @@ func Calculate(input Input) (Result, error) {
 		len(result.Stores), rated)
 
 	return result, nil
-}
-
-func round2(value float64) float64 {
-	return math.Round(value*100) / 100
 }

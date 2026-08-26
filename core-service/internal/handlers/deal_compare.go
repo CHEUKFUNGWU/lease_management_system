@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lease-management-system/core-service/internal/services/dealcompare"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 )
 
 // DealCompareHandler answers "which of these offers is cheaper" without
@@ -17,13 +17,13 @@ func NewDealCompareHandler() *DealCompareHandler { return &DealCompareHandler{} 
 // Compare evaluates a set of proposed lease terms.
 // POST /deals/compare
 func (h *DealCompareHandler) Compare(c *gin.Context) {
-	var input dealcompare.Input
+	var input leasescenario.CompareInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	result, err := dealcompare.Compare(input)
+	result, err := leasescenario.Compare(input)
 	if err != nil {
 		// The engine's messages already name what is missing or contradictory,
 		// and they are written in the language the reader works in.

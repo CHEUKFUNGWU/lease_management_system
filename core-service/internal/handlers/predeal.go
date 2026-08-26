@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lease-management-system/core-service/internal/services/predeal"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 )
 
 // PreDealHandler prices a lease before it is signed. Nothing is read from or
@@ -42,7 +42,7 @@ func (h *PreDealHandler) Briefing(c *gin.Context) {
 		return
 	}
 
-	briefing, err := predeal.Build(predeal.Draft{
+	briefing, err := leasescenario.Build(leasescenario.Draft{
 		Name: req.Name, CommencementDate: commencement, TermMonths: req.TermMonths,
 		MonthlyRent: req.MonthlyRent, RentFreeMonths: req.RentFreeMonths,
 		AnnualEscalationPercent: req.AnnualEscalationPercent,

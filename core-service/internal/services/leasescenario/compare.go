@@ -1,4 +1,4 @@
-// Package dealcompare answers the question a business partner is pulled into
+// Deal comparison answers the question a business partner is pulled into
 // most often, and the one a spreadsheet gets wrong most often: two offers are
 // on the table — six months rent-free with 5% annual increases, or no free
 // period at flat rent — which is cheaper?
@@ -21,7 +21,8 @@
 // present value. When the two measures rank the offers differently, that is
 // the most useful thing this package has to say, so it says so rather than
 // quietly picking one.
-package dealcompare
+
+package leasescenario
 
 import (
 	"fmt"
@@ -112,8 +113,8 @@ type Comparison struct {
 	Conclusion string `json:"conclusion"`
 }
 
-// Input is a set of offers and the rate to discount them at.
-type Input struct {
+// CompareInput is a set of offers and the rate to discount them at.
+type CompareInput struct {
 	// DiscountRate is annual and required. There is no default: the ranking
 	// depends on it, and a rate the system invented would be a rate nobody
 	// agreed to.
@@ -123,7 +124,7 @@ type Input struct {
 }
 
 // Compare reduces every offer to the same numbers and says which wins.
-func Compare(input Input) (Comparison, error) {
+func Compare(input CompareInput) (Comparison, error) {
 	if len(input.Offers) < 2 {
 		return Comparison{}, fmt.Errorf("比价至少需要两组报价条款")
 	}
@@ -264,8 +265,4 @@ func conclude(comparison Comparison) string {
 	return fmt.Sprintf(
 		"「%s」在现值与有效租金两个口径下都更省，较次优方案现值低 %.2f。",
 		comparison.BestByPresentValue, saving)
-}
-
-func round2(value float64) float64 {
-	return math.Round(value*100) / 100
 }

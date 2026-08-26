@@ -13,8 +13,7 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/agenttools/tools"
-	"github.com/lease-management-system/core-service/internal/services/dealcompare"
-	"github.com/lease-management-system/core-service/internal/services/predeal"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
 	finpaper "github.com/lease-management-system/core-service/internal/workingpaper/finmodel"
 	retailpaper "github.com/lease-management-system/core-service/internal/workingpaper/retail"
@@ -172,7 +171,7 @@ func evaluateS1Consistency(c InvariantCase) (bool, string) {
 		return false, fmt.Sprintf("S1 paper must have no exploratory cells, got %v", refs)
 	}
 
-	direct, err := predeal.Build(in.Draft)
+	direct, err := leasescenario.Build(in.Draft)
 	if err != nil {
 		return false, fmt.Sprintf("direct predeal build failed: %v", err)
 	}
@@ -204,7 +203,7 @@ func evaluateS1Consistency(c InvariantCase) (bool, string) {
 		}
 	}
 	if len(in.Offers) >= 2 {
-		comparison, err := dealcompare.Compare(dealcompare.Input{DiscountRate: in.Draft.DiscountRate, Currency: in.Draft.Currency, Offers: in.Offers})
+		comparison, err := leasescenario.Compare(leasescenario.CompareInput{DiscountRate: in.Draft.DiscountRate, Currency: in.Draft.Currency, Offers: in.Offers})
 		if err != nil {
 			return false, fmt.Sprintf("direct compare failed: %v", err)
 		}
@@ -218,7 +217,7 @@ func evaluateS1Consistency(c InvariantCase) (bool, string) {
 	for _, shock := range in.ShocksPercent {
 		variant := in.Draft
 		variant.DiscountRate = in.Draft.DiscountRate * (1 + shock)
-		shocked, err := predeal.Build(variant)
+		shocked, err := leasescenario.Build(variant)
 		if err != nil {
 			return false, fmt.Sprintf("shock build failed: %v", err)
 		}

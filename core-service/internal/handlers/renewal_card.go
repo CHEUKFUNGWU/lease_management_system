@@ -13,9 +13,8 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
-	"github.com/lease-management-system/core-service/internal/services/dealcompare"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 	"github.com/lease-management-system/core-service/internal/services/renewaldecision"
-	"github.com/lease-management-system/core-service/internal/services/renttosales"
 )
 
 // RenewalCardHandler turns a critical date from a reminder into a decision.
@@ -139,10 +138,10 @@ func (h *RenewalCardHandler) Card(c *gin.Context) {
 	// nobody anything. It is what the landlord's asking uplift costs against
 	// holding the current rent, because that is the number being negotiated.
 	if lastRent > 0 && renewalMonths > 0 {
-		comparison, err := dealcompare.Compare(dealcompare.Input{
+		comparison, err := leasescenario.Compare(leasescenario.CompareInput{
 			DiscountRate: discountRate,
 			Currency:     contract.Currency,
-			Offers: []dealcompare.Offer{
+			Offers: []leasescenario.Offer{
 				{
 					Name: "按现租金续租", TermMonths: renewalMonths,
 					BaseMonthlyRent: lastRent,
@@ -319,11 +318,11 @@ func (h *RenewalCardHandler) storeHealth(ctx context.Context, storeID string, co
 	}
 	latest := metrics[0]
 
-	result, err := renttosales.Calculate(renttosales.Input{
+	result, err := leasescenario.Calculate(leasescenario.RatioInput{
 		Period:         latest.Period,
 		HealthyCeiling: h.rentToSalesThreshold(ctx, "rent_to_sales_healthy_ceiling"),
 		WarningCeiling: h.rentToSalesThreshold(ctx, "rent_to_sales_warning_ceiling"),
-Stores: []renttosales.StoreInput{{
+Stores: []leasescenario.StoreInput{{
 				StoreID: storeID, StoreCode: latest.StoreCode, StoreName: latest.StoreName,
 				CashRent: &monthlyRent, RentCurrency: contract.Currency,
 				Revenue: &latest.Revenue, RevenueCurrency: latest.Currency,

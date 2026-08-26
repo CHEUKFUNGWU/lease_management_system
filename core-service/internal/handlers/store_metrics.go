@@ -11,7 +11,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/audit"
-	"github.com/lease-management-system/core-service/internal/services/renttosales"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 )
 
 type StoreMetricsHandler struct {
@@ -142,9 +142,9 @@ func (h *StoreMetricsHandler) RentToSales(c *gin.Context) {
 		return
 	}
 
-	stores := make([]renttosales.StoreInput, 0, len(rows))
+	stores := make([]leasescenario.StoreInput, 0, len(rows))
 	for _, row := range rows {
-		stores = append(stores, renttosales.StoreInput{
+		stores = append(stores, leasescenario.StoreInput{
 			StoreID: row.StoreID, StoreCode: row.StoreCode, StoreName: row.StoreName,
 			Brand: row.Brand, Region: row.Region,
 			CashRent: row.CashRent, RentCurrency: row.RentCurrency,
@@ -165,7 +165,7 @@ func (h *StoreMetricsHandler) RentToSales(c *gin.Context) {
 		}
 	}
 
-	result, err := renttosales.Calculate(renttosales.Input{
+	result, err := leasescenario.Calculate(leasescenario.RatioInput{
 		Period: period, HealthyCeiling: healthy, WarningCeiling: warning, Stores: stores,
 	})
 	if err != nil {

@@ -1,4 +1,4 @@
-// Package predeal answers the questions finance is asked before a lease is
+// Package leasescenario answers the questions finance is asked before a lease is
 // signed, rather than the one it is asked after: not "how is this booked" but
 // "what does this decision do to us for the next five years".
 //
@@ -17,7 +17,7 @@
 //   - The exit cost curve. "What does it cost to walk away in year N" is the
 //     question asked when a strategy changes, and it is the one nobody has
 //     ready. The termination treatment already knows.
-package predeal
+package leasescenario
 
 import (
 	"fmt"

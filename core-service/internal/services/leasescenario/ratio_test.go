@@ -1,4 +1,4 @@
-package renttosales
+package leasescenario
 
 import (
 	"strings"
@@ -24,7 +24,7 @@ func storeNoRent(code string, sales *float64) StoreInput {
 	}
 }
 
-func policyInput(input Input) Input {
+func policyInput(input RatioInput) RatioInput {
 	if input.HealthyCeiling <= 0 {
 		input.HealthyCeiling = 15
 	}
@@ -46,7 +46,7 @@ func find(t *testing.T, result Result, code string) StoreRatio {
 }
 
 func TestCalculate_BandsTheRatioAgainstTheThresholds(t *testing.T) {
-	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		store("HEALTHY", 100000, revenue(1000000)), // 10%
 		store("WATCH", 180000, revenue(1000000)),   // 18%
 		store("OVER", 250000, revenue(1000000)),    // 25%
@@ -75,7 +75,7 @@ func TestCalculate_KeepsUnknownApartFromZeroAndFromMismatch(t *testing.T) {
 	mismatch := store("FX", 100000, revenue(1000000))
 	mismatch.RevenueCurrency = "USD"
 
-	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		store("UNREPORTED", 100000, nil),
 		store("ZERO", 100000, revenue(0)),
 		mismatch,
@@ -104,7 +104,7 @@ func TestCalculate_KeepsUnknownApartFromZeroAndFromMismatch(t *testing.T) {
 // A store with sales but no approved rent schedule is not a store paying zero
 // rent. Stating 0% would claim the rent schedule says something it does not.
 func TestCalculate_UnknownRentIsNotZeroRent(t *testing.T) {
-	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		storeNoRent("NORENT", revenue(1000000)),
 	}}))
 	if err != nil {
@@ -129,7 +129,7 @@ func TestCalculate_UnknownRentIsNotZeroRent(t *testing.T) {
 // A portfolio ratio computed over the stores that happen to have data reads as
 // though it covered them all.
 func TestCalculate_WithholdsThePortfolioRatioWhenCoverageIsPartial(t *testing.T) {
-	partial, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	partial, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		store("A", 100000, revenue(1000000)),
 		store("B", 100000, nil),
 	}}))
@@ -143,7 +143,7 @@ func TestCalculate_WithholdsThePortfolioRatioWhenCoverageIsPartial(t *testing.T)
 		t.Error("withholding the figure needs to be explained, not silent")
 	}
 
-	full, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	full, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		store("A", 100000, revenue(1000000)),
 		store("B", 300000, revenue(1000000)),
 	}}))
@@ -160,7 +160,7 @@ func TestCalculate_WithholdsThePortfolioRatioWhenCoverageIsPartial(t *testing.T)
 }
 
 func TestCalculate_SortsWorstFirstAndUnknownLast(t *testing.T) {
-	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		store("LOW", 50000, revenue(1000000)),
 		store("UNKNOWN", 90000, nil),
 		store("HIGH", 300000, revenue(1000000)),
@@ -182,7 +182,7 @@ func TestCalculate_SalesPerSqmOnlyWhenAreaIsKnown(t *testing.T) {
 	withArea := store("WITH", 100000, revenue(1000000))
 	withArea.AreaSqm = &area
 
-	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		withArea,
 		store("WITHOUT", 100000, revenue(1000000)),
 	}}))
@@ -200,7 +200,7 @@ func TestCalculate_SalesPerSqmOnlyWhenAreaIsKnown(t *testing.T) {
 func TestCalculate_ThresholdsAreOverridable(t *testing.T) {
 	// A jewellery counter carries a much higher rent-to-sales than a
 	// supermarket, so one fixed line cannot serve both.
-	result, err := Calculate(Input{
+	result, err := Calculate(RatioInput{
 		Period: "2026-06", HealthyCeiling: 25, WarningCeiling: 35,
 		Stores: []StoreInput{store("JEWELLERY", 300000, revenue(1000000))}, // 30%
 	})
@@ -213,10 +213,10 @@ func TestCalculate_ThresholdsAreOverridable(t *testing.T) {
 }
 
 func TestCalculate_RejectsInputItCannotJudge(t *testing.T) {
-	if _, err := Calculate(Input{Stores: []StoreInput{store("A", 1, revenue(1))}}); err == nil {
+	if _, err := Calculate(RatioInput{Stores: []StoreInput{store("A", 1, revenue(1))}}); err == nil {
 		t.Error("a ratio without a period is not attributable to anything")
 	}
-	if _, err := Calculate(Input{
+	if _, err := Calculate(RatioInput{
 		Period: "2026-06", HealthyCeiling: 30, WarningCeiling: 20,
 		Stores: []StoreInput{store("A", 1, revenue(1))},
 	}); err == nil {
@@ -225,7 +225,7 @@ func TestCalculate_RejectsInputItCannotJudge(t *testing.T) {
 }
 
 func TestCalculate_CoverageStatementNamesTheSourceOfTheNumbers(t *testing.T) {
-	result, err := Calculate(policyInput(Input{Period: "2026-06", Stores: []StoreInput{
+	result, err := Calculate(policyInput(RatioInput{Period: "2026-06", Stores: []StoreInput{
 		store("A", 100000, revenue(1000000)),
 		store("B", 100000, nil),
 	}}))

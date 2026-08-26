@@ -8,7 +8,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/lease-management-system/core-service/internal/services/predeal"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 )
 
 type Scenario struct {
@@ -107,7 +107,7 @@ func Evaluate(input Input) (Result, error) {
 		if scenario.TermMonths <= 0 {
 			return Result{}, fmt.Errorf("情景 %q 的租期月数必须大于零", scenario.Name)
 		}
-		briefing, err := predeal.Build(predeal.Draft{
+		briefing, err := leasescenario.Build(leasescenario.Draft{
 			Name: scenario.Name, CommencementDate: input.DecisionDate,
 			TermMonths: scenario.TermMonths, MonthlyRent: scenario.MonthlyRent,
 			RentFreeMonths:          scenario.RentFreeMonths,

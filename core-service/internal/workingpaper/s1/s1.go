@@ -10,8 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lease-management-system/core-service/internal/services/dealcompare"
-	"github.com/lease-management-system/core-service/internal/services/predeal"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
 )
 
@@ -26,8 +25,8 @@ const (
 // Input is everything the paper needs. Assumptions must be human-confirmed —
 // the discount rate is never guessed (AGENTS.md 人机协同红线).
 type Input struct {
-	Draft         predeal.Draft       `json:"draft"`
-	Offers        []dealcompare.Offer `json:"offers,omitempty"`
+	Draft         leasescenario.Draft       `json:"draft"`
+	Offers        []leasescenario.Offer `json:"offers,omitempty"`
 	ShocksPercent []float64           `json:"shocks_percent,omitempty"`
 	ConfirmedBy   string              `json:"confirmed_by"`
 	ConfirmedAt   string              `json:"confirmed_at"`
@@ -52,7 +51,7 @@ func Build(in Input) (workingpaper.Paper, error) {
 		engine = EnginePredeal
 	}
 
-	briefing, err := predeal.Build(in.Draft)
+	briefing, err := leasescenario.Build(in.Draft)
 	if err != nil {
 		return workingpaper.Paper{}, fmt.Errorf("s1: predeal engine: %w", err)
 	}
@@ -132,7 +131,7 @@ func assumptionsSection(in Input) workingpaper.Section {
 	return workingpaper.Section{ID: "assumptions", Title: "关键假设（人工确认）", Kind: workingpaper.KindAssumptionList, Cells: cells}
 }
 
-func ifrsSection(b predeal.Briefing, callID string) workingpaper.Section {
+func ifrsSection(b leasescenario.Briefing, callID string) workingpaper.Section {
 	cells := []workingpaper.Cell{
 		cell("IF-1", "初始租赁负债", "lease_liability", b.BalanceSheet.InitialLiability, "", b.Currency, certified(callID, EnginePredeal)),
 		cell("IF-2", "初始使用权资产", "rou_asset", b.BalanceSheet.InitialROU, "", b.Currency, certified(callID, EnginePredeal)),
@@ -152,7 +151,7 @@ func ifrsSection(b predeal.Briefing, callID string) workingpaper.Section {
 	return workingpaper.Section{ID: "ifrs16", Title: "IFRS 16 影响（确定性引擎）", Kind: workingpaper.KindTable, Cells: cells, Narrative: b.Headline}
 }
 
-func ebitdaBridgeSection(b predeal.Briefing, callID string) workingpaper.Section {
+func ebitdaBridgeSection(b leasescenario.Briefing, callID string) workingpaper.Section {
 	var cells []workingpaper.Cell
 	for _, r := range b.Bridge {
 		prefix := fmt.Sprintf("EB-%d-", r.Year)
@@ -167,7 +166,7 @@ func ebitdaBridgeSection(b predeal.Briefing, callID string) workingpaper.Section
 	return workingpaper.Section{ID: "ebitda_bridge", Title: "EBITDA 桥", Kind: workingpaper.KindTable, Cells: cells}
 }
 
-func exitCurveSection(b predeal.Briefing, callID string) workingpaper.Section {
+func exitCurveSection(b leasescenario.Briefing, callID string) workingpaper.Section {
 	var cells []workingpaper.Cell
 	for _, e := range b.ExitCurve {
 		prefix := fmt.Sprintf("EX-%d-", e.Year)
@@ -181,8 +180,8 @@ func exitCurveSection(b predeal.Briefing, callID string) workingpaper.Section {
 	return workingpaper.Section{ID: "exit_curve", Title: "退出曲线", Kind: workingpaper.KindTable, Cells: cells}
 }
 
-func dealCompareSection(offers []dealcompare.Offer, rate float64, currency, callID string) workingpaper.Section {
-	comparison, err := dealcompare.Compare(dealcompare.Input{DiscountRate: rate, Currency: currency, Offers: offers})
+func dealCompareSection(offers []leasescenario.Offer, rate float64, currency, callID string) workingpaper.Section {
+	comparison, err := leasescenario.Compare(leasescenario.CompareInput{DiscountRate: rate, Currency: currency, Offers: offers})
 	if err != nil {
 		return workingpaper.Section{ID: "deal_compare", Title: "可比报价对比", Kind: workingpaper.KindTable}
 	}
@@ -201,12 +200,12 @@ func dealCompareSection(offers []dealcompare.Offer, rate float64, currency, call
 	}
 }
 
-func sensitivitySection(draft predeal.Draft, shocks []float64, callID string) workingpaper.Section {
+func sensitivitySection(draft leasescenario.Draft, shocks []float64, callID string) workingpaper.Section {
 	var cells []workingpaper.Cell
 	for _, shock := range shocks {
 		variant := draft
 		variant.DiscountRate = draft.DiscountRate * (1 + shock)
-		b, err := predeal.Build(variant)
+		b, err := leasescenario.Build(variant)
 		if err != nil {
 			continue
 		}

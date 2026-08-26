@@ -1,4 +1,4 @@
-package dealcompare
+package leasescenario
 
 import (
 	"math"
@@ -32,7 +32,7 @@ func offerB() Offer {
 // A comparison that reported only one of these would confidently give the
 // opposite answer to the other, which is the mistake the spreadsheet makes.
 func TestCompare_RoadmapScenarioIsItselfADisagreement(t *testing.T) {
-	result, err := Compare(Input{DiscountRate: 0.05, Currency: "CNY", Offers: []Offer{offerA(), offerB()}})
+	result, err := Compare(CompareInput{DiscountRate: 0.05, Currency: "CNY", Offers: []Offer{offerA(), offerB()}})
 	if err != nil {
 		t.Fatalf("Compare: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestCompare_DeferredMoneyIsCheaperOnlyInPresentValue(t *testing.T) {
 		BaseMonthlyRent: 10000.0 * 24 / 18, RentFreeMonths: 6,
 	}
 
-	result, err := Compare(Input{DiscountRate: 0.08, Offers: []Offer{flat, deferred}})
+	result, err := Compare(CompareInput{DiscountRate: 0.08, Offers: []Offer{flat, deferred}})
 	if err != nil {
 		t.Fatalf("Compare: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestCompare_LandlordContributionReducesEffectiveRent(t *testing.T) {
 	plain := Offer{Name: "无补贴", TermMonths: 24, BaseMonthlyRent: 10000}
 	subsidised := Offer{Name: "装修补贴 48,000", TermMonths: 24, BaseMonthlyRent: 10000, LandlordContribution: 48000}
 
-	result, err := Compare(Input{DiscountRate: 0.05, Offers: []Offer{plain, subsidised}})
+	result, err := Compare(CompareInput{DiscountRate: 0.05, Offers: []Offer{plain, subsidised}})
 	if err != nil {
 		t.Fatalf("Compare: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestCompare_ServiceChargeIsNotWaivedByARentFreePeriod(t *testing.T) {
 		Name: "含物业费", TermMonths: 12, BaseMonthlyRent: 10000,
 		RentFreeMonths: 3, OtherMonthlyCost: 1500,
 	}
-	result, err := Compare(Input{DiscountRate: 0.05, Offers: []Offer{offer, offerB()}})
+	result, err := Compare(CompareInput{DiscountRate: 0.05, Offers: []Offer{offer, offerB()}})
 	if err != nil {
 		t.Fatalf("Compare: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestCompare_ServiceChargeIsNotWaivedByARentFreePeriod(t *testing.T) {
 
 func TestCompare_EscalationStepsOnTheAnniversary(t *testing.T) {
 	offer := Offer{Name: "年递增 10%", TermMonths: 24, BaseMonthlyRent: 10000, AnnualEscalationPercent: 10}
-	result, err := Compare(Input{DiscountRate: 0.05, Offers: []Offer{offer, offerB()}})
+	result, err := Compare(CompareInput{DiscountRate: 0.05, Offers: []Offer{offer, offerB()}})
 	if err != nil {
 		t.Fatalf("Compare: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestCompare_PerSqmOnlyWhenAreaIsKnown(t *testing.T) {
 	withArea := Offer{Name: "有面积", TermMonths: 12, BaseMonthlyRent: 50000, AreaSqm: 500}
 	without := Offer{Name: "无面积", TermMonths: 12, BaseMonthlyRent: 50000}
 
-	result, err := Compare(Input{DiscountRate: 0.05, Offers: []Offer{withArea, without}})
+	result, err := Compare(CompareInput{DiscountRate: 0.05, Offers: []Offer{withArea, without}})
 	if err != nil {
 		t.Fatalf("Compare: %v", err)
 	}
@@ -171,20 +171,20 @@ func TestCompare_PerSqmOnlyWhenAreaIsKnown(t *testing.T) {
 func TestCompare_RejectsInputItCannotAnswer(t *testing.T) {
 	cases := []struct {
 		name  string
-		input Input
+		input CompareInput
 	}{
-		{"one offer is not a comparison", Input{DiscountRate: 0.05, Offers: []Offer{offerA()}}},
-		{"no offers at all", Input{DiscountRate: 0.05}},
+		{"one offer is not a comparison", CompareInput{DiscountRate: 0.05, Offers: []Offer{offerA()}}},
+		{"no offers at all", CompareInput{DiscountRate: 0.05}},
 		// The ranking depends on the rate, so guessing one would be answering a
 		// different question than the one asked.
-		{"no discount rate", Input{Offers: []Offer{offerA(), offerB()}}},
-		{"zero term", Input{DiscountRate: 0.05, Offers: []Offer{
+		{"no discount rate", CompareInput{Offers: []Offer{offerA(), offerB()}}},
+		{"zero term", CompareInput{DiscountRate: 0.05, Offers: []Offer{
 			{Name: "x", TermMonths: 0, BaseMonthlyRent: 100}, offerB(),
 		}}},
-		{"free period longer than the term", Input{DiscountRate: 0.05, Offers: []Offer{
+		{"free period longer than the term", CompareInput{DiscountRate: 0.05, Offers: []Offer{
 			{Name: "x", TermMonths: 12, RentFreeMonths: 13, BaseMonthlyRent: 100}, offerB(),
 		}}},
-		{"negative rent", Input{DiscountRate: 0.05, Offers: []Offer{
+		{"negative rent", CompareInput{DiscountRate: 0.05, Offers: []Offer{
 			{Name: "x", TermMonths: 12, BaseMonthlyRent: -1}, offerB(),
 		}}},
 	}
@@ -199,7 +199,7 @@ func TestCompare_RejectsInputItCannotAnswer(t *testing.T) {
 }
 
 func TestCompare_ConclusionNamesTheWinnerAndTheGap(t *testing.T) {
-	result, err := Compare(Input{DiscountRate: 0.05, Offers: []Offer{offerA(), offerB()}})
+	result, err := Compare(CompareInput{DiscountRate: 0.05, Offers: []Offer{offerA(), offerB()}})
 	if err != nil {
 		t.Fatalf("Compare: %v", err)
 	}

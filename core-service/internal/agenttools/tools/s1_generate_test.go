@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/lease-management-system/core-service/internal/agenttools"
-	"github.com/lease-management-system/core-service/internal/services/predeal"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
 )
 
@@ -144,7 +144,7 @@ func TestS1GenerateToolRejectsBrokenDraft(t *testing.T) {
 // engine run.
 func engineConsistencyForTest(t *testing.T) {
 	t.Helper()
-	in := predeal.Draft{
+	in := leasescenario.Draft{
 		Name:                    "方案C",
 		CommencementDate:        time.Date(2027, 3, 1, 0, 0, 0, 0, time.UTC),
 		TermMonths:              36,
@@ -178,7 +178,7 @@ func engineConsistencyForTest(t *testing.T) {
 		t.Fatal(err)
 	}
 	paper := result.Data.(map[string]any)["paper"].(workingpaper.Paper)
-	direct, err := predeal.Build(in)
+	direct, err := leasescenario.Build(in)
 	if err != nil {
 		t.Fatal(err)
 	}

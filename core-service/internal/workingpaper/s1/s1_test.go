@@ -5,8 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lease-management-system/core-service/internal/services/dealcompare"
-	"github.com/lease-management-system/core-service/internal/services/predeal"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
 )
 
@@ -15,7 +14,7 @@ import (
 func sampleInput() Input {
 	commence := time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)
 	return Input{
-		Draft: predeal.Draft{
+		Draft: leasescenario.Draft{
 			Name:                    "方案A：某购物中心一层门店",
 			CommencementDate:        commence,
 			TermMonths:              36,
@@ -27,7 +26,7 @@ func sampleInput() Input {
 			InitialDirectCost:       80000,
 			EarlyExitPenaltyMonths:  3,
 		},
-		Offers: []dealcompare.Offer{
+		Offers: []leasescenario.Offer{
 			{Name: "店A", TermMonths: 36, BaseMonthlyRent: 50000, RentFreeMonths: 2, AnnualEscalationPercent: 3, AreaSqm: 120},
 			{Name: "店B", TermMonths: 36, BaseMonthlyRent: 48000, RentFreeMonths: 0, AnnualEscalationPercent: 5, AreaSqm: 110},
 		},
@@ -42,11 +41,11 @@ func sampleInput() Input {
 // direct output — the builder performs no arithmetic of its own.
 func TestBuildEngineConsistency(t *testing.T) {
 	in := sampleInput()
-	briefing, err := predeal.Build(in.Draft)
+	briefing, err := leasescenario.Build(in.Draft)
 	if err != nil {
 		t.Fatal(err)
 	}
-	comparison, err := dealcompare.Compare(dealcompare.Input{DiscountRate: in.Draft.DiscountRate, Currency: in.Draft.Currency, Offers: in.Offers})
+	comparison, err := leasescenario.Compare(leasescenario.CompareInput{DiscountRate: in.Draft.DiscountRate, Currency: in.Draft.Currency, Offers: in.Offers})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +89,7 @@ func TestBuildEngineConsistency(t *testing.T) {
 	for _, shock := range in.ShocksPercent {
 		variant := in.Draft
 		variant.DiscountRate = in.Draft.DiscountRate * (1 + shock)
-		shocked, err := predeal.Build(variant)
+		shocked, err := leasescenario.Build(variant)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -10,8 +10,7 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/lease-management-system/core-service/internal/repository"
-	"github.com/lease-management-system/core-service/internal/services/dealcompare"
-	"github.com/lease-management-system/core-service/internal/services/predeal"
+	"github.com/lease-management-system/core-service/internal/services/leasescenario"
 	"github.com/lease-management-system/core-service/internal/services/renewaldecision"
 )
 
@@ -68,11 +67,11 @@ func simulationDefinition(name, display, description, schema string, handler age
 }
 
 func dealSimulationHandler(_ context.Context, call agenttools.ToolCall) (agenttools.ToolResult, error) {
-	var input dealcompare.Input
+	var input leasescenario.CompareInput
 	if err := decodeDecisionStrict(call.Arguments, &input); err != nil {
 		return rejected(call.CallID, agenttools.ErrorInvalidArguments, "invalid deal simulation arguments"), nil
 	}
-	result, err := dealcompare.Compare(input)
+	result, err := leasescenario.Compare(input)
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, err.Error()), nil
 	}
@@ -80,7 +79,7 @@ func dealSimulationHandler(_ context.Context, call agenttools.ToolCall) (agentto
 }
 
 type preDealArguments struct {
-	Draft predeal.Draft `json:"draft"`
+	Draft leasescenario.Draft `json:"draft"`
 }
 
 func preDealSimulationHandler(_ context.Context, call agenttools.ToolCall) (agenttools.ToolResult, error) {
@@ -88,7 +87,7 @@ func preDealSimulationHandler(_ context.Context, call agenttools.ToolCall) (agen
 	if err := decodeDecisionStrict(call.Arguments, &input); err != nil {
 		return rejected(call.CallID, agenttools.ErrorInvalidArguments, "invalid pre-deal simulation arguments"), nil
 	}
-	result, err := predeal.Build(input.Draft)
+	result, err := leasescenario.Build(input.Draft)
 	if err != nil {
 		return rejected(call.CallID, agenttools.ErrorBusinessFailure, err.Error()), nil
 	}

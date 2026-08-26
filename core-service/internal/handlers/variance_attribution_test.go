@@ -33,8 +33,8 @@ func varianceFact(storeID string, day time.Time, footfall, tx, rev, gp, labor, r
 }
 
 type recordingReader struct {
-	set        *repository.RetailKPIFactSet
-	gotEntity  string
+	set         *repository.RetailKPIFactSet
+	gotEntity   string
 	gotStoreIDs []string
 }
 

@@ -27,16 +27,16 @@ type Promotion struct {
 }
 
 type PromotionCost struct {
-	ID           string    `json:"id"`
-	PromotionID  string    `json:"promotion_id"`
-	Period       string    `json:"period"`
-	CostCategory string    `json:"cost_category"`
-	Amount       float64   `json:"amount"`
-	Currency     string    `json:"currency"`
-	Notes        *string   `json:"notes,omitempty"`
-	SourceSystem string    `json:"source_system"`
-	ImportBatchID *string  `json:"import_batch_id,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            string    `json:"id"`
+	PromotionID   string    `json:"promotion_id"`
+	Period        string    `json:"period"`
+	CostCategory  string    `json:"cost_category"`
+	Amount        float64   `json:"amount"`
+	Currency      string    `json:"currency"`
+	Notes         *string   `json:"notes,omitempty"`
+	SourceSystem  string    `json:"source_system"`
+	ImportBatchID *string   `json:"import_batch_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type PromotionRepository struct {

@@ -15,7 +15,7 @@ import (
 // 双重过滤（底线 1）。
 
 type TenantBoundLeaseProjection struct {
-	db           DBTX
+	db            DBTX
 	legalEntityID string
 }
 

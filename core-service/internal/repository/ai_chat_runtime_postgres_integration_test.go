@@ -13,9 +13,9 @@ import (
 //
 //   - a scoped filter must exclude NULL rows — a session without a legal
 //     entity has no Legal Entity Access for a non-admin, exactly like the old
-//     COALESCE predicate ('' = LE is false);
+//     COALESCE predicate (” = LE is false);
 //   - a global (admin) filter must include NULL rows — the admin's "no
-//     clause" reads everything, exactly like the old `$2=''` short-circuit.
+//     clause" reads everything, exactly like the old `$2=”` short-circuit.
 func TestAIChatSessionTenantFilterNullLegalEntity(t *testing.T) {
 	pool := postgresTestPool(t)
 	ctx := context.Background()

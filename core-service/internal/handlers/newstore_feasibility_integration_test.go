@@ -112,11 +112,11 @@ func TestNewStoreFeasibilityIsolatedAcrossLegalEntities(t *testing.T) {
 	reqB.Header.Set("X-Tenant", entityB)
 	r.ServeHTTP(recB, reqB)
 	var resB struct {
-		Status       string `json:"status"`
-		Gaps         []struct {
+		Status string `json:"status"`
+		Gaps   []struct {
 			Kind string `json:"kind"`
 		} `json:"gaps"`
-		Monthly      []struct {
+		Monthly []struct {
 			LeaseCost   *float64 `json:"lease_cost"`
 			NetCashFlow *float64 `json:"net_cash_flow"`
 		} `json:"monthly_cash_flows"`
@@ -145,11 +145,11 @@ func TestNewStoreFeasibilityIsolatedAcrossLegalEntities(t *testing.T) {
 	reqA.Header.Set("X-Tenant", entityA)
 	r.ServeHTTP(recA, reqA)
 	var resA struct {
-		Status        string `json:"status"`
-		Gaps          []struct {
+		Status string `json:"status"`
+		Gaps   []struct {
 			Kind string `json:"kind"`
 		} `json:"gaps"`
-		Monthly       []struct {
+		Monthly []struct {
 			LeaseCost   *float64 `json:"lease_cost"`
 			NetCashFlow *float64 `json:"net_cash_flow"`
 		} `json:"monthly_cash_flows"`

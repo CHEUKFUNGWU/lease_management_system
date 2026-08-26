@@ -461,7 +461,9 @@ func (r *FinModelRepository) SaveAssumptionDrafts(ctx context.Context, legalEnti
 		}
 		return ids, nil
 	}
-	if beginner, ok := r.db.(interface{ Begin(ctx context.Context) (pgx.Tx, error) }); ok {
+	if beginner, ok := r.db.(interface {
+		Begin(ctx context.Context) (pgx.Tx, error)
+	}); ok {
 		tx, err := beginner.Begin(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("save assumption drafts: begin: %w", err)

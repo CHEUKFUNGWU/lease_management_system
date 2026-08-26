@@ -24,7 +24,6 @@ func TestReverseMessagesDoesNotMutateRepositoryOrder(t *testing.T) {
 	}
 }
 
-
 // CHAT-001: the user-facing session list defaults to user-initiated
 // sessions; ?include_system=true lifts the filter. Pins the handler
 // contract with a stub that records the filter, no database required.

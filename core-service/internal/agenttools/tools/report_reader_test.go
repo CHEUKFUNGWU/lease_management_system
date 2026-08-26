@@ -175,14 +175,14 @@ func TestUserOverlaysOnlyOnDraftBasis(t *testing.T) {
 	budgetPlan := &repository.FPnAPlanVersion{ID: "p-budget", ScenarioType: "budget", Status: "approved"}
 	approvedAssumption := &repository.FPnAAssumptionVersion{ID: "a-approved", Status: "approved"}
 	draftAssumption := &repository.FPnAAssumptionVersion{ID: "a-draft", Status: "draft"}
-	scenarioDraft := &repository.FPnAScenarioDraft{ID: "s-draft", Name:客流下降情景(), Status: "draft"}
+	scenarioDraft := &repository.FPnAScenarioDraft{ID: "s-draft", Name: 客流下降情景(), Status: "draft"}
 	reader.plans = []*repository.FPnAPlanVersion{customPlan, budgetPlan}
 	reader.assumptions = []*repository.FPnAAssumptionVersion{approvedAssumption, draftAssumption}
 	reader.drafts = []*repository.FPnAScenarioDraft{scenarioDraft}
 
 	def := NewReportUnitPriceDefinition(reader)
 	for _, tc := range []struct {
-		basis      string
+		basis       string
 		wantOverlay bool
 	}{
 		{"approved", false},

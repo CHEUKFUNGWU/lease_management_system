@@ -43,8 +43,8 @@ type Query struct {
 	// M4: attach the actual-vs-plan comparison for the calendar month of
 	// the current window end; the threshold comes from system settings via
 	// the handler (0 = service default of 5%).
-	PlanComparison               bool
-	PlanMaterialityThresholdPct  float64
+	PlanComparison              bool
+	PlanMaterialityThresholdPct float64
 	// M5: group the attention ranking — "" and "total" keep the per-store
 	// ranking (zero regression); "store" labels it; "region"/"brand" rank
 	// groups built from the same facts and signal rules.
@@ -53,11 +53,11 @@ type Query struct {
 	// through retailperiod it passes the four boundaries here; they override
 	// the rolling derivation below. WindowDays then carries the current
 	// window's day count for sizing, never for derivation.
-	DateFrom          time.Time
-	DateTo            time.Time
+	DateFrom           time.Time
+	DateTo             time.Time
 	ComparisonDateFrom time.Time
 	ComparisonDateTo   time.Time
-	PeriodLabel       string
+	PeriodLabel        string
 }
 
 type Period struct {
@@ -212,8 +212,8 @@ func (s *Service) WithPlanReader(reader retailkpi.PlanReader) *Service {
 }
 
 type Service struct {
-	reader FactReader
-	now    func() time.Time
+	reader     FactReader
+	now        func() time.Time
 	planReader retailkpi.PlanReader
 }
 
@@ -369,7 +369,7 @@ func (s *Service) attachPlanComparison(ctx context.Context, query Query, set *re
 	}
 	comparison, err := retailkpi.ComparePlan(set.Facts, planSet.Facts, retailkpi.ComparePlanRequest{
 		Period: planPeriod, ExpectedStoreCount: expectedStores,
-		ExpectedDaysInMonth:    inclusiveDays(monthWindow.From, monthWindow.To),
+		ExpectedDaysInMonth:     inclusiveDays(monthWindow.From, monthWindow.To),
 		MaterialityThresholdPct: query.PlanMaterialityThresholdPct,
 	})
 	if err != nil {
@@ -637,10 +637,10 @@ var signalRules = []signalRule{{"revenue_decline", "revenue", "down", "percent",
 // when the request groups the view (M5). The evaluation core below is
 // identical for both — suppression, signal rules, scoring and evidence.
 type attentionTarget struct {
-	groupBy, groupKey, groupLabel, sortKey string
+	groupBy, groupKey, groupLabel, sortKey       string
 	storeID, storeCode, storeName, brand, region string
-	expectedStores int
-	facts          []retailkpi.DailyFact
+	expectedStores                               int
+	facts                                        []retailkpi.DailyFact
 }
 
 func buildAttention(facts []retailkpi.DailyFact, currency string, query Query, limit int, currentStart, currentEnd, comparisonStart, comparisonEnd time.Time, set *repository.RetailKPIFactSet, lifecycles []retailcohort.StoreLifecycle) ([]Attention, []SuppressedAttention) {
@@ -834,6 +834,7 @@ func buildTrend(facts []retailkpi.DailyFact, currency string, from, to time.Time
 	}
 	return result
 }
+
 // FIX-031: gross_profit was missing here while the trend switcher offered
 // 毛利额 — picking it drew an empty chart directly under a KPI card showing
 // that very number. This whitelist must cover every code the switcher exposes.

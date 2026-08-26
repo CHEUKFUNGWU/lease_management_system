@@ -490,4 +490,3 @@ func TestLaborProductivityMetrics(t *testing.T) {
 		t.Fatalf("zero transactions should yield zero_denominator, got %+v", kpisZero["labor_hours_per_transaction"])
 	}
 }
-

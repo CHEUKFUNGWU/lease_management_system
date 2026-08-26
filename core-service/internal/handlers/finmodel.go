@@ -831,7 +831,7 @@ func (h *FinModelHandler) GroupRuns(c *gin.Context) {
 		}
 		run, err := h.repo.GetModelRun(c.Request.Context(), id)
 		if err != nil {
-			writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found: " + id, nil)
+			writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "run not found: "+id, nil)
 			return
 		}
 		lines, err := h.repo.ListRunLines(c.Request.Context(), id)

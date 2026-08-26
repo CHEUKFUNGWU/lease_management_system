@@ -53,6 +53,14 @@ jobs:
         working-directory: core-service
         run: go vet ./...
 
+      # T-A（测试债专项 2026-08-26）：gofmt 门禁。排除名单：
+      # - third_party/picoclaw：vendor 切片代码，改格式会给上游同步制造噪音
+      #   （5 个漂移文件是有意的）；
+      # - gomodcache：模块缓存若落在仓库内（本地开发常见）不是项目代码。
+      - name: gofmt 门禁
+        working-directory: core-service
+        run: test -z "$(gofmt -l . | grep -v third_party | grep -v gomodcache)" || { echo 'gofmt 漂移：'; gofmt -l . | grep -v third_party | grep -v gomodcache; exit 1; }
+
       # MONEY-002 守卫：新增金额字段不得是 float64（ADR-0020）。fetch-depth
       # 需要足够历史以计算 base 差异，与 web job 的 diff 检查同一模式。
       - name: 金额字段守卫

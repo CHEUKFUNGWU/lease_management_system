@@ -12,7 +12,7 @@ func ptr(v float64) *float64 { return &v }
 func TestCalculateLifecycleStatus(t *testing.T) {
 	asOf := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	openFuture := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
-	openRamp := time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC) // 8 months before asOf
+	openRamp := time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC)  // 8 months before asOf
 	openMature := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC) // 29 months before asOf
 	closePast := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 
@@ -42,8 +42,8 @@ func TestEvaluateComparableCohort(t *testing.T) {
 	}
 	policy := DefaultPolicy() // 12 months ramp-up
 
-	oldOpen := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)    // Mature before 2025-01-01 -> Included
-	recentOpen := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC) // Ramp finishes 2025-06-01 (after baseline start 2025-01-01) -> Excluded (too_new)
+	oldOpen := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)     // Mature before 2025-01-01 -> Included
+	recentOpen := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC)  // Ramp finishes 2025-06-01 (after baseline start 2025-01-01) -> Excluded (too_new)
 	closedStore := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC) // Closed during current period -> Excluded (closed)
 
 	stores := []StoreLifecycle{

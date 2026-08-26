@@ -126,7 +126,7 @@ func Calculate(input RatioInput) (Result, error) {
 		ratio := StoreRatio{
 			StoreID: store.StoreID, StoreCode: store.StoreCode, StoreName: store.StoreName,
 			Brand: store.Brand, Region: store.Region,
-			Revenue: store.Revenue,
+			Revenue:  store.Revenue,
 			Currency: store.RentCurrency, RevenueVersion: store.RevenueVersion,
 			RevenueSource: store.RevenueSource,
 		}

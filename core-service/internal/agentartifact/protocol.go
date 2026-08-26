@@ -23,13 +23,13 @@ const (
 	ArtifactReportExplanation    ArtifactType = "report_explanation"
 	ArtifactMonthlyCloseBlockers ArtifactType = "monthly_close_blockers"
 	ArtifactRetailActionProposal ArtifactType = "retail_action_proposal"
-	ArtifactWorkingPaper          ArtifactType = "working_paper"
-	ArtifactPageFill              ArtifactType = "page_fill"
+	ArtifactWorkingPaper         ArtifactType = "working_paper"
+	ArtifactPageFill             ArtifactType = "page_fill"
 	// ArtifactChartSVG 是 Ch1 的确定性图表 artifact（D-B0/D-B1）：Data 携带
 	// chart_svg / decomposition_order / data_classification。前端渲染前必须
 	// 经 sanitizeSvg 白名单消毒。
-	ArtifactChartSVG    ArtifactType = "chart_svg"
-	ArtifactGeneric     ArtifactType = "generic"
+	ArtifactChartSVG ArtifactType = "chart_svg"
+	ArtifactGeneric  ArtifactType = "generic"
 )
 
 type EvidenceLocator struct {

@@ -210,14 +210,14 @@ func (s *Service) PlFlow(ctx context.Context, q Query) (*PlFlowResult, error) {
 	}
 
 	return &PlFlowResult{
-		Nodes:    plFlowNodes(),
-		Links:    links,
-		Currency: targetCurrency,
-		Basis:    fmt.Sprintf("Working · %s", q.Classification),
-		Residual: round2(residual),
-		Status:   status,
+		Nodes:          plFlowNodes(),
+		Links:          links,
+		Currency:       targetCurrency,
+		Basis:          fmt.Sprintf("Working · %s", q.Classification),
+		Residual:       round2(residual),
+		Status:         status,
 		FormulaVersion: PlFlowVersion,
-		Missing:  missing,
+		Missing:        missing,
 	}, nil
 }
 

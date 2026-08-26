@@ -18,18 +18,18 @@ type DecompositionRequest struct {
 }
 
 type CategoryAttribution struct {
-	CategoryCode     string  `json:"category_code"`
-	CategoryName     string  `json:"category_name"`
-	BaseRevenue      float64 `json:"base_revenue"`
-	CurrentRevenue   float64 `json:"current_revenue"`
-	BaseMarginRate   float64 `json:"base_margin_rate"`
+	CategoryCode      string  `json:"category_code"`
+	CategoryName      string  `json:"category_name"`
+	BaseRevenue       float64 `json:"base_revenue"`
+	CurrentRevenue    float64 `json:"current_revenue"`
+	BaseMarginRate    float64 `json:"base_margin_rate"`
 	CurrentMarginRate float64 `json:"current_margin_rate"`
-	BaseGP           float64 `json:"base_gross_profit"`
-	CurrentGP        float64 `json:"current_gross_profit"`
-	GPVariance       float64 `json:"gross_profit_variance"`
-	VolumeEffect     float64 `json:"volume_effect"`
-	MixEffect        float64 `json:"mix_effect"`
-	RateEffect       float64 `json:"rate_effect"`
+	BaseGP            float64 `json:"base_gross_profit"`
+	CurrentGP         float64 `json:"current_gross_profit"`
+	GPVariance        float64 `json:"gross_profit_variance"`
+	VolumeEffect      float64 `json:"volume_effect"`
+	MixEffect         float64 `json:"mix_effect"`
+	RateEffect        float64 `json:"rate_effect"`
 }
 
 type DecompositionResult struct {

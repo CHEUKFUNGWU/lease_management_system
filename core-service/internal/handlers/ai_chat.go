@@ -114,17 +114,17 @@ type AgentRunAuditLinkReader interface {
 }
 
 type AIChatHandler struct {
-	agent         *aiagent.Agent
+	agent          *aiagent.Agent
 	contextMetrics *agenttools.ContextMetrics
-	runtimeRepo   aiChatRuntimeStore
-	contractRepo  *repository.ContractRepository
-	draftService  *draftapp.Service
-	auditRepo     AgentAuditReader
-	workerRuns    AgentWorkerRunStore
-	agentRuntime  *aichat.Runtime[aiagent.Response]
-	toolRuntime   *agenttools.Runtime
-	skillRegistry *agentskill.Registry
-	guard         *agentguard.Guard
+	runtimeRepo    aiChatRuntimeStore
+	contractRepo   *repository.ContractRepository
+	draftService   *draftapp.Service
+	auditRepo      AgentAuditReader
+	workerRuns     AgentWorkerRunStore
+	agentRuntime   *aichat.Runtime[aiagent.Response]
+	toolRuntime    *agenttools.Runtime
+	skillRegistry  *agentskill.Registry
+	guard          *agentguard.Guard
 }
 
 // SetDocumentParser injects the document parser seam (W5-1) into the inner Agent used by the chat/parse paths.

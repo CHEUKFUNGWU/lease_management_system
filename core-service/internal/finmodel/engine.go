@@ -75,7 +75,7 @@ type ModelInputs struct {
 	Schedules          ScheduleReader
 	Assumptions        AssumptionReader
 	Opening            OpeningBalanceReader
-	HumanZeros map[string]HumanZero
+	HumanZeros         map[string]HumanZero
 	Versions           VersionSet
 	DataClassification string
 }
@@ -195,11 +195,11 @@ type runState struct {
 	gaps           []DataGap
 	opening        *opening.OpeningBalance
 	openingMissing bool
-	openingValues  map[string]*float64             // synthetic prior period for lag across the model start
-	lagBasis       map[string]map[string]*float64  // period → row → the lag-1 carry basis the engine used (T11)
-	lagUsed        map[string]map[string]bool      // period → row → whether a lag-1 reference was resolved (T11, incl. nil)
-	leaseByPeriod  map[string]LeaseMonth     // engine projection cache (T7/T8/T9)
-	factByPeriod   map[string]OperatingFacts // fact cache (T13)
+	openingValues  map[string]*float64            // synthetic prior period for lag across the model start
+	lagBasis       map[string]map[string]*float64 // period → row → the lag-1 carry basis the engine used (T11)
+	lagUsed        map[string]map[string]bool     // period → row → whether a lag-1 reference was resolved (T11, incl. nil)
+	leaseByPeriod  map[string]LeaseMonth          // engine projection cache (T7/T8/T9)
+	factByPeriod   map[string]OperatingFacts      // fact cache (T13)
 }
 
 func expandPeriods(def ModelDef) ([]string, int, error) {

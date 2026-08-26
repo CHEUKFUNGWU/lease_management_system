@@ -94,8 +94,10 @@ func TestTrialBalanceImportContentIdentityAndReplay(t *testing.T) {
 		t.Fatalf("status=%d body=%s", first.Code, first.Body.String())
 	}
 	var response struct {
-		Version  struct{ ContentSHA256 string `json:"content_sha256"` } `json:"version"`
-		Accepted int `json:"accepted_rows"`
+		Version struct {
+			ContentSHA256 string `json:"content_sha256"`
+		} `json:"version"`
+		Accepted int  `json:"accepted_rows"`
 		Balanced bool `json:"balanced"`
 	}
 	if err := json.Unmarshal(first.Body.Bytes(), &response); err != nil {
@@ -124,7 +126,9 @@ func TestTrialBalanceImportContentIdentityAndReplay(t *testing.T) {
 	c.Set("access_scope", access.Scope{LegalEntityID: "legal-entity-a"})
 	c.Set("user_id", "user-a")
 	handler.Import(c)
-	var replay struct{ IdempotentReplay bool `json:"idempotent_replay"` }
+	var replay struct {
+		IdempotentReplay bool `json:"idempotent_replay"`
+	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &replay); err != nil {
 		t.Fatal(err)
 	}

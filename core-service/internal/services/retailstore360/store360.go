@@ -151,39 +151,39 @@ type Evidence struct {
 }
 
 type Response struct {
-	Basis               string                   `json:"basis"`
-	DiagnosticsVersion  string                   `json:"diagnostics_version"`
-	FormulaVersion      string                   `json:"formula_version"`
-	PulseVersion        string                   `json:"pulse_version"`
-	DataClassification  string                   `json:"data_classification"`
-	DatasetVersion      string                   `json:"dataset_version,omitempty"`
-	GeneratedAt         time.Time                `json:"generated_at"`
-	Store               StoreIdentity            `json:"store"`
-	Current             Period                   `json:"current"`
-	Comparison          Period                   `json:"comparison"`
-	TargetCoverage      retailkpi.Coverage       `json:"target_coverage"`
-	ComparisonCoverage  retailkpi.Coverage       `json:"comparison_coverage"`
-	DecisionReady       bool                     `json:"decision_ready"`
-	DecisionReadyReason string                   `json:"decision_ready_reason,omitempty"`
-	Envelope            sourceenvelope.Envelope  `json:"envelope"`
-	Currency            string                   `json:"currency"`
-	CurrencyStatus      string                   `json:"currency_status"`
-	Summary             map[string]SummaryMetric `json:"summary"`
-	DailyTrend          []DailyTrend             `json:"daily_trend"`
-	PeerDefinition      string                   `json:"peer_definition"`
-	MinimumPeerCount    int                      `json:"minimum_peer_count"`
-	PeerBenchmark       []PeerBenchmark          `json:"peer_benchmark"`
-	Bridges             []Bridge                 `json:"bridges"`
-	Observations        []Observation            `json:"observations"`
-	Evidence            Evidence                 `json:"evidence"`
+	Basis               string                    `json:"basis"`
+	DiagnosticsVersion  string                    `json:"diagnostics_version"`
+	FormulaVersion      string                    `json:"formula_version"`
+	PulseVersion        string                    `json:"pulse_version"`
+	DataClassification  string                    `json:"data_classification"`
+	DatasetVersion      string                    `json:"dataset_version,omitempty"`
+	GeneratedAt         time.Time                 `json:"generated_at"`
+	Store               StoreIdentity             `json:"store"`
+	Current             Period                    `json:"current"`
+	Comparison          Period                    `json:"comparison"`
+	TargetCoverage      retailkpi.Coverage        `json:"target_coverage"`
+	ComparisonCoverage  retailkpi.Coverage        `json:"comparison_coverage"`
+	DecisionReady       bool                      `json:"decision_ready"`
+	DecisionReadyReason string                    `json:"decision_ready_reason,omitempty"`
+	Envelope            sourceenvelope.Envelope   `json:"envelope"`
+	Currency            string                    `json:"currency"`
+	CurrencyStatus      string                    `json:"currency_status"`
+	Summary             map[string]SummaryMetric  `json:"summary"`
+	DailyTrend          []DailyTrend              `json:"daily_trend"`
+	PeerDefinition      string                    `json:"peer_definition"`
+	MinimumPeerCount    int                       `json:"minimum_peer_count"`
+	PeerBenchmark       []PeerBenchmark           `json:"peer_benchmark"`
+	Bridges             []Bridge                  `json:"bridges"`
+	Observations        []Observation             `json:"observations"`
+	Evidence            Evidence                  `json:"evidence"`
 	Plan                *retailkpi.PlanComparison `json:"plan,omitempty"`
-	SourceSystems       []string                 `json:"source_systems"`
-	DatasetVersions     []string                 `json:"dataset_versions"`
-	FactVersionMin      int                      `json:"fact_version_min"`
-	FactVersionMax      int                      `json:"fact_version_max"`
-	HighestAsOf         *time.Time               `json:"highest_as_of,omitempty"`
-	DataQualityIssues   []string                 `json:"data_quality_issues,omitempty"`
-	KPIDrilldownURL     string                   `json:"kpi_drilldown_url"`
+	SourceSystems       []string                  `json:"source_systems"`
+	DatasetVersions     []string                  `json:"dataset_versions"`
+	FactVersionMin      int                       `json:"fact_version_min"`
+	FactVersionMax      int                       `json:"fact_version_max"`
+	HighestAsOf         *time.Time                `json:"highest_as_of,omitempty"`
+	DataQualityIssues   []string                  `json:"data_quality_issues,omitempty"`
+	KPIDrilldownURL     string                    `json:"kpi_drilldown_url"`
 }
 
 type Service struct {
@@ -384,7 +384,7 @@ func (s *Service) attachPlanComparison(ctx context.Context, q Query, facts []ret
 	}
 	comparison, err := retailkpi.ComparePlan(facts, planSet.Facts, retailkpi.ComparePlanRequest{
 		Period: planPeriod, ExpectedStoreCount: 1,
-		ExpectedDaysInMonth:    inclusiveDays(monthWindow.From, monthWindow.To),
+		ExpectedDaysInMonth:     inclusiveDays(monthWindow.From, monthWindow.To),
 		MaterialityThresholdPct: q.PlanMaterialityThresholdPct,
 	})
 	if err != nil {

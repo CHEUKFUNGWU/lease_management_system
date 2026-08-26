@@ -7,24 +7,24 @@ import (
 )
 
 type StoreDayInventoryFact struct {
-	ID               string    `json:"id"`
-	LegalEntityID    string    `json:"legal_entity_id"`
-	StoreID          string    `json:"store_id"`
-	BusinessDate     string    `json:"business_date"`
-	Currency         string    `json:"currency"`
-	CategoryCode     *string   `json:"category_code,omitempty"`
-	SKUCode          *string   `json:"sku_code,omitempty"`
-	StockQty         float64   `json:"stock_qty"`
-	StockCost        float64   `json:"stock_cost"`
-	InTransitQty     float64   `json:"in_transit_qty"`
-	InTransitCost    float64   `json:"in_transit_cost"`
-	DaysOfInventory  *float64  `json:"days_of_inventory,omitempty"`
-	SourceSystem     string    `json:"source_system"`
-	ImportBatchID    *string   `json:"import_batch_id,omitempty"`
-	AsOfAt           *time.Time `json:"as_of_at,omitempty"`
-	Version          int       `json:"version"`
-	DataClassification string  `json:"data_classification"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID                 string     `json:"id"`
+	LegalEntityID      string     `json:"legal_entity_id"`
+	StoreID            string     `json:"store_id"`
+	BusinessDate       string     `json:"business_date"`
+	Currency           string     `json:"currency"`
+	CategoryCode       *string    `json:"category_code,omitempty"`
+	SKUCode            *string    `json:"sku_code,omitempty"`
+	StockQty           float64    `json:"stock_qty"`
+	StockCost          float64    `json:"stock_cost"`
+	InTransitQty       float64    `json:"in_transit_qty"`
+	InTransitCost      float64    `json:"in_transit_cost"`
+	DaysOfInventory    *float64   `json:"days_of_inventory,omitempty"`
+	SourceSystem       string     `json:"source_system"`
+	ImportBatchID      *string    `json:"import_batch_id,omitempty"`
+	AsOfAt             *time.Time `json:"as_of_at,omitempty"`
+	Version            int        `json:"version"`
+	DataClassification string     `json:"data_classification"`
+	CreatedAt          time.Time  `json:"created_at"`
 }
 
 type InventoryRepository struct {

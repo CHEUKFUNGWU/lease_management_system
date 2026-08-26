@@ -80,26 +80,25 @@ func RenderModelRunXLSX(tmpl *template.Template, rows []modelExportRow, buckets 
 		}
 		_ = f.SetCellStr(sheet, labelCell, label)
 		_ = f.SetCellStr(sheet, basisCell, row.Basis)
-			for j, bucket := range buckets {
-				cell, _ := excelize.CoordinatesToCellName(3+j, r)
-				if row.Kind == "subtotal" && len(row.Children) > 0 {
-					_ = f.SetCellFormula(sheet, cell, storepnl.SubtotalFormula(row.Children, row.Subtracted, 3+j, rowNumber))
-					continue
-				}
-				if value, ok := row.Values[bucket.Label]; ok && value != nil {
-					_ = f.SetCellValue(sheet, cell, *value)
-				} else {
-					_ = f.SetCellStr(sheet, cell, "—")
-				}
+		for j, bucket := range buckets {
+			cell, _ := excelize.CoordinatesToCellName(3+j, r)
+			if row.Kind == "subtotal" && len(row.Children) > 0 {
+				_ = f.SetCellFormula(sheet, cell, storepnl.SubtotalFormula(row.Children, row.Subtracted, 3+j, rowNumber))
+				continue
+			}
+			if value, ok := row.Values[bucket.Label]; ok && value != nil {
+				_ = f.SetCellValue(sheet, cell, *value)
+			} else {
+				_ = f.SetCellStr(sheet, cell, "—")
 			}
 		}
-		buffer, err := f.WriteToBuffer()
-		if err != nil {
-			return nil, err
-		}
-		return buffer.Bytes(), nil
 	}
-
+	buffer, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
 
 // orEmpty renders a missing version line as an em-dash in the 口径头.
 func orEmpty(value string) string {

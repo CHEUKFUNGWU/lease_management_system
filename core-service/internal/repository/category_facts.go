@@ -9,14 +9,14 @@ import (
 )
 
 type RetailCategory struct {
-	ID            string     `json:"id"`
-	LegalEntityID string     `json:"legal_entity_id"`
-	CategoryCode  string     `json:"category_code"`
-	Name          string     `json:"name"`
-	ParentCode    *string    `json:"parent_code,omitempty"`
-	EffectiveFrom string     `json:"effective_from"`
-	EffectiveTo   *string    `json:"effective_to,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID            string    `json:"id"`
+	LegalEntityID string    `json:"legal_entity_id"`
+	CategoryCode  string    `json:"category_code"`
+	Name          string    `json:"name"`
+	ParentCode    *string   `json:"parent_code,omitempty"`
+	EffectiveFrom string    `json:"effective_from"`
+	EffectiveTo   *string   `json:"effective_to,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type RetailStoreDayCategoryFact struct {

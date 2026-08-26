@@ -307,6 +307,6 @@ var (
 //   - ErrStoreScopeDenied: store outside caller dimension scope → scope_denied
 //   - ErrStoreNotFound: unknown store OR wrong tenant (no existence leak) → scope_denied wording
 //   - ErrStoreMasterDataUnavailable: master-data port not wired → unavailable
-func ErrStoreScopeDenied() error          { return errStoreScopeDenied }
-func ErrStoreNotFound() error             { return errStoreNotFound }
+func ErrStoreScopeDenied() error           { return errStoreScopeDenied }
+func ErrStoreNotFound() error              { return errStoreNotFound }
 func ErrStoreMasterDataUnavailable() error { return errStoreMasterDataUnavailable }

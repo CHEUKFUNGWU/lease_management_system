@@ -61,10 +61,10 @@ type PeriodFacts struct {
 
 type FactorContribution struct {
 	Factor             string  `json:"factor"`
-	Base               float64 `json:"base"`                 // 该因子基期取值（派生率为算出的比率）
-	Current            float64 `json:"current"`              // 该因子当期取值
-	Effect             float64 `json:"effect"`               // 本步替换的贡献 = 中间利润差
-	IntermediateProfit float64 `json:"intermediate_profit"`  // 该步替换后的利润（复核锚点）
+	Base               float64 `json:"base"`                // 该因子基期取值（派生率为算出的比率）
+	Current            float64 `json:"current"`             // 该因子当期取值
+	Effect             float64 `json:"effect"`              // 本步替换的贡献 = 中间利润差
+	IntermediateProfit float64 `json:"intermediate_profit"` // 该步替换后的利润（复核锚点）
 }
 
 type Result struct {
@@ -109,12 +109,12 @@ func Attribute(base, current PeriodFacts, currency string, order []Factor) (Resu
 	// 缺失检查：任一必需事实在任一期间为 nil 即整体不可用
 	missing := make([]string, 0)
 	raw := map[string][2]*float64{
-		"footfall":               {base.Footfall, current.Footfall},
-		"transactions":           {base.Transactions, current.Transactions},
-		"revenue":                {base.Revenue, current.Revenue},
-		"gross_profit":           {base.GrossProfit, current.GrossProfit},
-		"labor_cost":             {base.LaborCost, current.LaborCost},
-		"occupancy_cost":         {base.OccupancyCost, current.OccupancyCost},
+		"footfall":                {base.Footfall, current.Footfall},
+		"transactions":            {base.Transactions, current.Transactions},
+		"revenue":                 {base.Revenue, current.Revenue},
+		"gross_profit":            {base.GrossProfit, current.GrossProfit},
+		"labor_cost":              {base.LaborCost, current.LaborCost},
+		"occupancy_cost":          {base.OccupancyCost, current.OccupancyCost},
 		"other_controllable_cost": {base.OtherControllableCost, current.OtherControllableCost},
 	}
 	keys := make([]string, 0, len(raw))

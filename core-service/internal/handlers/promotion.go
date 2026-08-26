@@ -334,7 +334,7 @@ func (h *PromotionHandler) EvaluateROI(c *gin.Context) {
 // ─── RH3 投前保本（R2-1）─────────────────────────────────────────────
 
 type breakevenReq struct {
-	PromoID              string   `json:"promo_id"`               // 可选：给了则基线从活动前 14 天事实算（与投后复盘同一取数路径）
+	PromoID              string   `json:"promo_id"` // 可选：给了则基线从活动前 14 天事实算（与投后复盘同一取数路径）
 	Currency             string   `json:"currency"`
 	EventDays            int      `json:"event_days"`             // 手输模式必填；promo 模式从活动日期推导
 	BaselineDailyRevenue *float64 `json:"baseline_daily_revenue"` // 手输模式必填

@@ -20,7 +20,7 @@ func f1Sample() Waterfall {
 			{Label: "客单价", Delta: 6000},
 			{Label: "占用成本", Delta: -4500},
 		},
-		EndLabel:       "当期利润", EndValue: 128500,
+		EndLabel: "当期利润", EndValue: 128500,
 		Currency:       "CNY",
 		Classification: "production",
 		OrderNote:      "decomposition_order: footfall → conversion → atv → occupancy",

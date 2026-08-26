@@ -31,7 +31,7 @@ const (
 type BusinessDrivers struct {
 	DailyAreaFootfall float64 `json:"daily_area_footfall"`
 	OperatingDays     int     `json:"operating_days"`
-	EntryRate         float64 `json:"entry_rate"`     // 0-1
+	EntryRate         float64 `json:"entry_rate"`      // 0-1
 	ConversionRate    float64 `json:"conversion_rate"` // 0-1
 	AvgTicket         float64 `json:"avg_ticket"`
 	GrossMarginRate   float64 `json:"gross_margin_rate"` // 0-1
@@ -83,24 +83,24 @@ type Ports struct {
 }
 
 type MonthlyCashFlow struct {
-	Month        string   `json:"month"`
-	RampFactor   float64  `json:"ramp_factor"`
-	Revenue      *float64 `json:"revenue"`
-	GrossProfit  *float64 `json:"gross_profit"`
-	LeaseCost    *float64 `json:"lease_cost"`     // 端口未接线时为 nil
-	NetCashFlow  *float64 `json:"net_cash_flow"`  // 毛利 − 租赁成本
+	Month       string   `json:"month"`
+	RampFactor  float64  `json:"ramp_factor"`
+	Revenue     *float64 `json:"revenue"`
+	GrossProfit *float64 `json:"gross_profit"`
+	LeaseCost   *float64 `json:"lease_cost"`    // 端口未接线时为 nil
+	NetCashFlow *float64 `json:"net_cash_flow"` // 毛利 − 租赁成本
 }
 
 type Result struct {
-	Currency        string            `json:"currency,omitempty"`
+	Currency         string            `json:"currency,omitempty"`
 	MonthlyCashFlows []MonthlyCashFlow `json:"monthly_cash_flows"`
-	StaticPayback   *float64          `json:"static_payback_months,omitempty"`   // 月；不依赖折现率
-	DynamicPayback  *float64          `json:"dynamic_payback_months,omitempty"`  // 月；依赖折现率
-	IRR             *float64          `json:"irr_monthly,omitempty"`             // 月度内部收益率；依赖折现率语义下的求解
-	NPV             *float64          `json:"npv,omitempty"`                     // 期初投入 + 贴现月现金流
-	BreakEvenSales  *float64          `json:"break_even_sales,omitempty"`        // 月度盈亏平衡销售额；不依赖折现率
-	Gaps            []Gap             `json:"gaps"`
-	Status          string            `json:"status"`                            // complete | partial | unavailable
+	StaticPayback    *float64          `json:"static_payback_months,omitempty"`  // 月；不依赖折现率
+	DynamicPayback   *float64          `json:"dynamic_payback_months,omitempty"` // 月；依赖折现率
+	IRR              *float64          `json:"irr_monthly,omitempty"`            // 月度内部收益率；依赖折现率语义下的求解
+	NPV              *float64          `json:"npv,omitempty"`                    // 期初投入 + 贴现月现金流
+	BreakEvenSales   *float64          `json:"break_even_sales,omitempty"`       // 月度盈亏平衡销售额；不依赖折现率
+	Gaps             []Gap             `json:"gaps"`
+	Status           string            `json:"status"` // complete | partial | unavailable
 }
 
 // Evaluate 纯函数入口。IO 一律经 ports。

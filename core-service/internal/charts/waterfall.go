@@ -101,8 +101,8 @@ func Render(w Waterfall) (string, error) {
 		if next < cursor {
 			top, bottom = next, cursor
 		}
-		b.WriteString(`<rect class="`+class+`" id="`+id+`" x="`+f2(x)+`" y="`+f2(y(bottom))+
-			`" width="`+f2(width)+`" height="`+f2(y(top)-y(bottom))+`"/>`)
+		b.WriteString(`<rect class="` + class + `" id="` + id + `" x="` + f2(x) + `" y="` + f2(y(bottom)) +
+			`" width="` + f2(width) + `" height="` + f2(y(top)-y(bottom)) + `"/>`)
 		valueY := y(top) - 8
 		if next < cursor {
 			valueY = y(bottom) + 20
@@ -136,8 +136,8 @@ func writeTotalBar(b *strings.Builder, idSeed, label string, value float64, inde
 	if value < 0 {
 		top, bottom = 0, value
 	}
-	b.WriteString(`<rect class="wf-bar-total" id="`+id+`" x="`+f2(x)+`" y="`+f2(y(bottom))+
-		`" width="`+f2(width)+`" height="`+f2(y(top)-y(bottom))+`"/>`)
+	b.WriteString(`<rect class="wf-bar-total" id="` + id + `" x="` + f2(x) + `" y="` + f2(y(bottom)) +
+		`" width="` + f2(width) + `" height="` + f2(y(top)-y(bottom)) + `"/>`)
 	writeValueLabel(b, id+"-v", formatAmount(value), x+width/2, y(top)-8)
 	writeLabel(b, id+"-l", label, x+width/2)
 }

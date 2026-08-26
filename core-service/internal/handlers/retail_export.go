@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailexport"
+	"github.com/lease-management-system/core-service/internal/services/retailkpi"
 	"github.com/lease-management-system/core-service/internal/services/retailpulse"
 	"github.com/lease-management-system/core-service/internal/services/retailstore360"
 )
@@ -47,18 +47,18 @@ func PulseExportRows(response *retailpulse.Response) []retailexport.Row {
 				signals = append(signals, signal.SignalCode)
 			}
 			rows = append(rows, retailexport.Row{
-				"rank":            strconv.Itoa(item.Rank),
-				"identity":        identity,
-				"brand_region":    brandRegion,
-				"signals":         joinNonEmpty(signals, "、"),
-				"score":           strconv.FormatFloat(item.Score, 'f', 2, 64),
-				"severity":        item.Severity,
-				"revenue":         kpiText(item.CurrentKPIs["revenue"]),
-				"revenue_change":  changeText(item.CurrentKPIs["revenue"], item.ComparisonKPIs["revenue"]),
-				"store_contribution": kpiText(item.CurrentKPIs["store_contribution"]),
+				"rank":                strconv.Itoa(item.Rank),
+				"identity":            identity,
+				"brand_region":        brandRegion,
+				"signals":             joinNonEmpty(signals, "、"),
+				"score":               strconv.FormatFloat(item.Score, 'f', 2, 64),
+				"severity":            item.Severity,
+				"revenue":             kpiText(item.CurrentKPIs["revenue"]),
+				"revenue_change":      changeText(item.CurrentKPIs["revenue"], item.ComparisonKPIs["revenue"]),
+				"store_contribution":  kpiText(item.CurrentKPIs["store_contribution"]),
 				"contribution_change": changeText(item.CurrentKPIs["store_contribution"], item.ComparisonKPIs["store_contribution"]),
-				"source_systems":  joinNonEmpty(item.Evidence.SourceSystems, ","),
-				"currency":        item.Currency,
+				"source_systems":      joinNonEmpty(item.Evidence.SourceSystems, ","),
+				"currency":            item.Currency,
 			})
 		}
 	}

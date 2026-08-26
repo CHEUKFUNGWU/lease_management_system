@@ -13,7 +13,7 @@ func TestDecompose_StrictConservation(t *testing.T) {
 			{CategoryCode: "SNK", CategoryName: "Snacks", Revenue: 100000, GrossProfit: 30000},    // 30% margin
 		}, // Total base: Rev 200,000, GP 90,000, margin 45%
 		Current: []CategoryPeriodData{
-			{CategoryCode: "BEV", CategoryName: "Beverages", Revenue: 80000, GrossProfit: 44000},  // 55% margin (rate drop)
+			{CategoryCode: "BEV", CategoryName: "Beverages", Revenue: 80000, GrossProfit: 44000}, // 55% margin (rate drop)
 			{CategoryCode: "SNK", CategoryName: "Snacks", Revenue: 140000, GrossProfit: 42000},   // 30% margin (mix shift to snacks)
 		}, // Total current: Rev 220,000, GP 86,000, margin ~39.09%
 	}

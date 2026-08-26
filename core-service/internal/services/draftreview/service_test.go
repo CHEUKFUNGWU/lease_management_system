@@ -451,8 +451,8 @@ func TestApproveFailsOnMisalignedExtractionKeys(t *testing.T) {
 		// aiintake 的抽取键：lessee 而不是 lessee_name。盲 Unmarshal 会静默
 		// 产出承租方为空的正式合同——这里必须具名失败而不是静默通过。
 		"contract_number":   "CT-AI-1",
-		"lease_scope":      "in_scope",
-		"store_name":       "AI 店",
+		"lease_scope":       "in_scope",
+		"store_name":        "AI 店",
 		"lessee":            "AI 抽的承租方",
 		"lessor":            "AI 抽的出租方",
 		"currency":          "CNY",

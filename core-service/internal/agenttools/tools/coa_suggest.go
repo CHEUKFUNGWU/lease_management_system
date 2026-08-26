@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/google/uuid"
+	"github.com/lease-management-system/core-service/internal/agenttools"
 	"github.com/lease-management-system/core-service/internal/finmodel/template"
 	"github.com/lease-management-system/core-service/internal/repository"
 )
@@ -31,10 +31,10 @@ import (
 // CoaSuggestArguments is the strict input. Rows are the model-authored
 // subject tree; industry rides along as provenance metadata.
 type CoaSuggestArguments struct {
-	Industry       string             `json:"industry"`
-	Name           string             `json:"name"`
-	Rows           []template.RowDef  `json:"rows"`
-	BaseTemplateID string             `json:"base_template_id,omitempty"` // D-F10 重新生成的基线
+	Industry       string            `json:"industry"`
+	Name           string            `json:"name"`
+	Rows           []template.RowDef `json:"rows"`
+	BaseTemplateID string            `json:"base_template_id,omitempty"` // D-F10 重新生成的基线
 }
 
 // CoaTemplateDraftStore is the persistence seam: drafts only, never an
@@ -223,7 +223,9 @@ func rowsEqual(a, b template.RowDef) bool {
 
 // finModelCoaStore is the production persistence adapter over the statement
 // template repository: drafts only.
-type finModelCoaStore struct{ repo *repository.FinModelRepository }
+type finModelCoaStore struct {
+	repo *repository.FinModelRepository
+}
 
 // NewCoaTemplateStore builds the production store.
 func NewCoaTemplateStore(repo *repository.FinModelRepository) CoaTemplateDraftStore {

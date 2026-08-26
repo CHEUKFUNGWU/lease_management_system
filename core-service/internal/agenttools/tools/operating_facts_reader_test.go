@@ -182,7 +182,7 @@ func TestOperatingStoreDaysEchoEnvelopeFieldByField(t *testing.T) {
 			{
 				ID: "row-1", StoreID: "11111111-1111-4111-8111-111111111111", StoreCode: "S1",
 				BusinessDate: "2026-06-05", Currency: "CNY", Revenue: 100,
-				GrossProfit: nil, // 缺失是 nil，不填 0
+				GrossProfit:  nil, // 缺失是 nil，不填 0
 				SourceSystem: "agent-b3-fixture", ImportBatchID: &batchID,
 				AsOfAt: asOf, Version: 2, DataClassification: "production",
 			},

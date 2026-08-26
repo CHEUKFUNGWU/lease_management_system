@@ -304,40 +304,40 @@ func Parse(def TemplateDef) (*Template, error) {
 		if rows[i].Kind != RowSubtotal && len(rd.Children) > 0 {
 			return nil, fmt.Errorf("template: row %q declares children but is %s, not subtotal", rd.Key, rows[i].Kind)
 		}
-	switch rows[i].Kind {
-	case RowFormula, RowCheck:
-		if strings.TrimSpace(rd.Formula) == "" {
-			return nil, fmt.Errorf("template: row %q is %s but has no formula", rd.Key, rows[i].Kind)
+		switch rows[i].Kind {
+		case RowFormula, RowCheck:
+			if strings.TrimSpace(rd.Formula) == "" {
+				return nil, fmt.Errorf("template: row %q is %s but has no formula", rd.Key, rows[i].Kind)
+			}
+			expr, err := compile(rd.Formula, byKey, rd.Key)
+			if err != nil {
+				return nil, fmt.Errorf("template: row %q: %w", rd.Key, err)
+			}
+			rows[i].Formula = &Expr{node: expr}
+			// S1-9：声明文本必须存活于 Parse——页面编辑器按 def 重建行时依赖它。
+			rows[i].FormulaText = strings.TrimSpace(rd.Formula)
+		case RowLink:
+			if rows[i].Source == "" {
+				return nil, fmt.Errorf("template: link row %q must declare a source", rd.Key)
+			}
+		case RowInput:
+		case RowSubtotal:
+			if len(rd.Children) == 0 {
+				return nil, fmt.Errorf("template: subtotal row %q must declare children", rd.Key)
+			}
+		default:
+			return nil, fmt.Errorf("template: row %q has invalid kind %q", rd.Key, rd.Kind)
 		}
-		expr, err := compile(rd.Formula, byKey, rd.Key)
-		if err != nil {
-			return nil, fmt.Errorf("template: row %q: %w", rd.Key, err)
+		// actual_source 只能落在公式/校验行，且必须绑定事实源（PRD C7：Actual
+		// 冻结线左侧的行只读事实聚合，不得从假设推导）。
+		if rows[i].ActualSource != "" {
+			if rows[i].Kind != RowFormula && rows[i].Kind != RowCheck {
+				return nil, fmt.Errorf("template: row %q declares actual_source but is %s, not formula", rd.Key, rows[i].Kind)
+			}
+			if !strings.HasPrefix(rows[i].ActualSource, "fact.") {
+				return nil, fmt.Errorf("template: row %q actual_source must bind a fact.* source, got %q", rd.Key, rows[i].ActualSource)
+			}
 		}
-		rows[i].Formula = &Expr{node: expr}
-		// S1-9：声明文本必须存活于 Parse——页面编辑器按 def 重建行时依赖它。
-		rows[i].FormulaText = strings.TrimSpace(rd.Formula)
-	case RowLink:
-		if rows[i].Source == "" {
-			return nil, fmt.Errorf("template: link row %q must declare a source", rd.Key)
-		}
-	case RowInput:
-	case RowSubtotal:
-		if len(rd.Children) == 0 {
-			return nil, fmt.Errorf("template: subtotal row %q must declare children", rd.Key)
-		}
-	default:
-		return nil, fmt.Errorf("template: row %q has invalid kind %q", rd.Key, rd.Kind)
-	}
-	// actual_source 只能落在公式/校验行，且必须绑定事实源（PRD C7：Actual
-	// 冻结线左侧的行只读事实聚合，不得从假设推导）。
-	if rows[i].ActualSource != "" {
-		if rows[i].Kind != RowFormula && rows[i].Kind != RowCheck {
-			return nil, fmt.Errorf("template: row %q declares actual_source but is %s, not formula", rd.Key, rows[i].Kind)
-		}
-		if !strings.HasPrefix(rows[i].ActualSource, "fact.") {
-			return nil, fmt.Errorf("template: row %q actual_source must bind a fact.* source, got %q", rd.Key, rows[i].ActualSource)
-		}
-	}
 	}
 
 	if err := validateBasisMixing(def, byKey); err != nil {

@@ -25,13 +25,13 @@ const (
 // Input is everything the paper needs. Assumptions must be human-confirmed —
 // the discount rate is never guessed (AGENTS.md 人机协同红线).
 type Input struct {
-	Draft         leasescenario.Draft       `json:"draft"`
+	Draft         leasescenario.Draft   `json:"draft"`
 	Offers        []leasescenario.Offer `json:"offers,omitempty"`
-	ShocksPercent []float64           `json:"shocks_percent,omitempty"`
-	ConfirmedBy   string              `json:"confirmed_by"`
-	ConfirmedAt   string              `json:"confirmed_at"`
-	ToolCallID    string              `json:"tool_call_id,omitempty"`
-	EngineVersion string              `json:"engine_version,omitempty"`
+	ShocksPercent []float64             `json:"shocks_percent,omitempty"`
+	ConfirmedBy   string                `json:"confirmed_by"`
+	ConfirmedAt   string                `json:"confirmed_at"`
+	ToolCallID    string                `json:"tool_call_id,omitempty"`
+	EngineVersion string                `json:"engine_version,omitempty"`
 }
 
 // Build assembles the paper. It fails on engine validation errors and on

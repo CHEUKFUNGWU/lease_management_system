@@ -62,9 +62,10 @@ func TestSurfacesValidate(t *testing.T) {
 // 事实缺 labor_hours 时该行显式降级为 insufficient_peers / peer_count_below_minimum，
 // 而不是从列表里消失或填 0（retail-kpi-v1：同群样本不足必须显式降级）。
 // 两条断言分开写，别混成一条：
-//   1. 降级本身——sph 行的状态与原因、数值字段为 nil；
-//   2. 这不是授权失败——同一响应里 revenue 基准 PeerCount=4 且 complete，
-//      说明 peer 还在、没被范围过滤掉；降级是数据形状驱动的。
+//  1. 降级本身——sph 行的状态与原因、数值字段为 nil；
+//  2. 这不是授权失败——同一响应里 revenue 基准 PeerCount=4 且 complete，
+//     说明 peer 还在、没被范围过滤掉；降级是数据形状驱动的。
+//
 // 自检句：把降级逻辑改掉（比如把无值 code 从清单里剔掉），第 1 条红；
 // 把 peer 授权过滤改坏，第 2 条红。
 func TestPeerBenchmarkLaborHoursMissingDegradesExplicitly(t *testing.T) {

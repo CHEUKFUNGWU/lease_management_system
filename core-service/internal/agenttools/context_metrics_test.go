@@ -57,8 +57,8 @@ func TestContextMetricsPrometheusOmitsTenantIdentifiers(t *testing.T) {
 // (over_budget) and the post-hoc record (compacted) are separate counters.
 func TestContextMetricsOverBudgetAndCompactedAreDistinct(t *testing.T) {
 	m := NewContextMetrics()
-	m.ObserveContext("m1", 900, 100, 1000, false, true)  // count mode: would compact, did not
-	m.ObserveContext("m2", 920, 80, 1000, true, true)    // on mode: compacted
+	m.ObserveContext("m1", 900, 100, 1000, false, true) // count mode: would compact, did not
+	m.ObserveContext("m2", 920, 80, 1000, true, true)   // on mode: compacted
 	payload := m.Prometheus(time.Now().UTC())
 
 	overTotal := sumField(payload, "lease_agent_context_over_budget_total")

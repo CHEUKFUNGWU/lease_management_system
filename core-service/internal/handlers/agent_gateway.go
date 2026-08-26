@@ -26,18 +26,18 @@ import (
 // callers. It has no repository or database dependency; all business access
 // remains behind ToolRuntime's policy and scope seam.
 type AgentGatewayHandler struct {
-	runtime     agenttools.ToolRuntime
-	audit       agenttools.AuditRecorder
-	capability  *agentcapability.Issuer
-	skills      *agentskill.Registry
-	sessions    AgentSessionStore
-	contracts   AgentContractScopeReader
-	runs        AgentRunStore
-	checkpoints AgentRunCheckpointStore
-	queue       AgentRunQueueStore
-	workerRuns  AgentWorkerRunStore
-	alerts      AgentRunTerminalAlertStore
-	usage       AgentUsageReader
+	runtime        agenttools.ToolRuntime
+	audit          agenttools.AuditRecorder
+	capability     *agentcapability.Issuer
+	skills         *agentskill.Registry
+	sessions       AgentSessionStore
+	contracts      AgentContractScopeReader
+	runs           AgentRunStore
+	checkpoints    AgentRunCheckpointStore
+	queue          AgentRunQueueStore
+	workerRuns     AgentWorkerRunStore
+	alerts         AgentRunTerminalAlertStore
+	usage          AgentUsageReader
 	contextMetrics *agenttools.ContextMetrics
 	sessionOwner   aichat.SessionOwner
 }

@@ -63,15 +63,15 @@ type DayStoreResult struct {
 }
 
 type ReconciliationResult struct {
-	TotalStoreDays         int              `json:"total_store_days"`
-	TieCount               int              `json:"tie_count"`
-	WithinToleranceCount   int              `json:"within_tolerance_count"`
-	MismatchCount          int              `json:"mismatch_count"`
-	NoDetailCount          int              `json:"no_detail_count"`
-	IncompleteCount        int              `json:"incomplete_count"`
-	StoreDayResults        []DayStoreResult `json:"store_day_results"`
-	Mismatches             []DayStoreResult `json:"mismatches"`
-	OverallStatus          ReconciliationStatus `json:"overall_status"`
+	TotalStoreDays       int                  `json:"total_store_days"`
+	TieCount             int                  `json:"tie_count"`
+	WithinToleranceCount int                  `json:"within_tolerance_count"`
+	MismatchCount        int                  `json:"mismatch_count"`
+	NoDetailCount        int                  `json:"no_detail_count"`
+	IncompleteCount      int                  `json:"incomplete_count"`
+	StoreDayResults      []DayStoreResult     `json:"store_day_results"`
+	Mismatches           []DayStoreResult     `json:"mismatches"`
+	OverallStatus        ReconciliationStatus `json:"overall_status"`
 }
 
 // Reconcile performs pure store-day detail vs summary reconciliation.

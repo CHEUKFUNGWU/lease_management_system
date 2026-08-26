@@ -282,13 +282,13 @@ func (h *SourceFeedHandler) PushFacts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":         "accepted",
-		"batch_id":       batch.Envelope.ImportBatchID,
-		"source_system":  batch.Envelope.SourceSystem,
-		"records_count":  len(batch.Rows),
-		"headers":        batch.Headers,
-		"saved_count":    len(result.Facts),
+		"status":            "accepted",
+		"batch_id":          batch.Envelope.ImportBatchID,
+		"source_system":     batch.Envelope.SourceSystem,
+		"records_count":     len(batch.Rows),
+		"headers":           batch.Headers,
+		"saved_count":       len(result.Facts),
 		"idempotent_replay": result.Replayed,
-		"message":        "Facts batch received, mapped and persisted via the store-day fact pipeline",
+		"message":           "Facts batch received, mapped and persisted via the store-day fact pipeline",
 	})
 }

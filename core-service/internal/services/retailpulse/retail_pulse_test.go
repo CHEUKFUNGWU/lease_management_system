@@ -733,4 +733,3 @@ func TestPulseSSSGAndLifecycleBadges(t *testing.T) {
 		}
 	}
 }
-

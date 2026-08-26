@@ -56,24 +56,24 @@ type RunRate struct {
 }
 
 type AttributionResult struct {
-	PromoCode              string            `json:"promo_code"`
-	Name                   string            `json:"name"`
-	Currency               string            `json:"currency"`
-	EventDays              int               `json:"event_days"`
-	ActualRevenue          float64           `json:"actual_revenue"`
-	ActualGrossProfit      float64           `json:"actual_gross_profit"`
-	BaselineRevenue        float64           `json:"baseline_revenue"`
-	BaselineGrossProfit    float64           `json:"baseline_gross_profit"`
-	IncrementalRevenue     float64           `json:"incremental_revenue"`
-	IncrementalGrossProfit float64           `json:"incremental_gross_profit"`
-	TotalCost              float64           `json:"total_cost"`
-	BudgetAmount           float64           `json:"budget_amount"`
+	PromoCode              string             `json:"promo_code"`
+	Name                   string             `json:"name"`
+	Currency               string             `json:"currency"`
+	EventDays              int                `json:"event_days"`
+	ActualRevenue          float64            `json:"actual_revenue"`
+	ActualGrossProfit      float64            `json:"actual_gross_profit"`
+	BaselineRevenue        float64            `json:"baseline_revenue"`
+	BaselineGrossProfit    float64            `json:"baseline_gross_profit"`
+	IncrementalRevenue     float64            `json:"incremental_revenue"`
+	IncrementalGrossProfit float64            `json:"incremental_gross_profit"`
+	TotalCost              float64            `json:"total_cost"`
+	BudgetAmount           float64            `json:"budget_amount"`
 	CostBreakdown          map[string]float64 `json:"cost_breakdown"`
-	ROI                    *float64          `json:"roi,omitempty"` // Incremental GP / Total Cost
-	Status                 AttributionStatus `json:"status"`
-	IsSeparable            bool              `json:"is_separable"`
-	OverlapWarnings        []string          `json:"overlap_warnings"`
-	Disclaimers            []string          `json:"disclaimers"`
+	ROI                    *float64           `json:"roi,omitempty"` // Incremental GP / Total Cost
+	Status                 AttributionStatus  `json:"status"`
+	IsSeparable            bool               `json:"is_separable"`
+	OverlapWarnings        []string           `json:"overlap_warnings"`
+	Disclaimers            []string           `json:"disclaimers"`
 	// BaselineUnavailable 标记无法从真实经营事实得出基线（活动前无数据或基线查询失败）。
 	// 设置时 ROI 必须为 nil，增量数字不得作为决策依据。
 	BaselineUnavailable bool `json:"baseline_unavailable,omitempty"`

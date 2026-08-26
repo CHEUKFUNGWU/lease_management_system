@@ -91,7 +91,6 @@ func seedContinuationTenant(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 	return entityA, entityB, userID, sessionID, runID
 }
 
-
 // TestContinueCrossEntityRefusedWithScopeDenied is the SI1 gap test. It is
 // written at the layer where the CALLER's legal entity is expressible on the
 // existing API — the request context carries the resolved access.Scope the

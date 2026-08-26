@@ -67,7 +67,9 @@ func (s *draftReviewStubReader) ResolveOrCreateLandlordID(_ context.Context, _ s
 	return &id, nil
 }
 
-func (s *draftReviewStubReader) SaveDraftEdits(_ context.Context, _ string, _ json.RawMessage) error { return nil }
+func (s *draftReviewStubReader) SaveDraftEdits(_ context.Context, _ string, _ json.RawMessage) error {
+	return nil
+}
 
 // failingUOW rejects any approval write — the tests that reach it expect the
 // confidence gate to fail first.
@@ -171,7 +173,7 @@ func TestDraftReviewDecideLowConfidenceFailsServerSide(t *testing.T) {
 	entityA := "11111111-1111-1111-1111-111111111111"
 	reader := &draftReviewStubReader{rows: []repository.DraftReviewRow{{
 		ID: "d-low", Status: "pending", LegalEntityID: &entityA,
-		ContractData:   json.RawMessage(`{"contract_number":"CT-2","lessee_name":"甲","lessor_name":"乙","currency":"CNY","commencement_date":"2026-01-01","lease_start_date":"2026-01-01","lease_end_date":"2027-12-31"}`),
+		ContractData:     json.RawMessage(`{"contract_number":"CT-2","lessee_name":"甲","lessor_name":"乙","currency":"CNY","commencement_date":"2026-01-01","lease_start_date":"2026-01-01","lease_end_date":"2027-12-31"}`),
 		ConfidenceScores: json.RawMessage(`{"lessee_name":0.42}`),
 	}}}
 	recorder := doJSON(t, draftReviewRouter(t, reader, entityA, false), http.MethodPost, "/contracts/drafts/decide",

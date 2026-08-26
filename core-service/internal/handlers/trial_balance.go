@@ -3,9 +3,9 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
-	"io"
 	"encoding/hex"
 	"errors"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -36,7 +36,9 @@ type trialBalanceStore interface {
 	DeleteTrialBalanceVersion(ctx context.Context, id string) error
 }
 
-func NewTrialBalanceHandler(repo trialBalanceStore) *TrialBalanceHandler { return &TrialBalanceHandler{repo: repo} }
+func NewTrialBalanceHandler(repo trialBalanceStore) *TrialBalanceHandler {
+	return &TrialBalanceHandler{repo: repo}
+}
 
 var tbCurrencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 

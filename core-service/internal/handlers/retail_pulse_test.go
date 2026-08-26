@@ -118,7 +118,7 @@ func TestRetailPulseHandlerCalendarPeriod(t *testing.T) {
 		t.Fatalf("calendar period status=%d body=%s", calendar.Code, calendar.Body.String())
 	}
 	var response struct {
-		Current    struct {
+		Current struct {
 			DateFrom string `json:"date_from"`
 			DateTo   string `json:"date_to"`
 		} `json:"current"`

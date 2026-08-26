@@ -9,8 +9,8 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentkernel/governance"
-	"github.com/lease-management-system/core-service/internal/agenttools"
 	picoclawagent "github.com/lease-management-system/core-service/internal/agentkernel/third_party/picoclaw/agent"
+	"github.com/lease-management-system/core-service/internal/agenttools"
 )
 
 // RT1-D-1: ACORE-2 九控制的变异在 gateway 装配下重跑。

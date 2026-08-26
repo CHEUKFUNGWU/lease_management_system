@@ -91,15 +91,15 @@ func TestFPnAPlanImportPartialSuccessAndReplay(t *testing.T) {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 	var response struct {
-		Version   struct {
+		Version struct {
 			Name        string `json:"name"`
 			VersionType string `json:"version_type"`
 			IsOfficial  bool   `json:"is_official"`
 		} `json:"version"`
-		Accepted  int    `json:"accepted_rows"`
-		Rejected  int    `json:"rejected_rows"`
-		Replay    bool   `json:"idempotent_replay"`
-		Errors    []controlledintake.RowError `json:"errors"`
+		Accepted int                         `json:"accepted_rows"`
+		Rejected int                         `json:"rejected_rows"`
+		Replay   bool                        `json:"idempotent_replay"`
+		Errors   []controlledintake.RowError `json:"errors"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
@@ -130,7 +130,9 @@ func TestFPnAPlanImportPartialSuccessAndReplay(t *testing.T) {
 	c.Set("access_scope", access.Scope{LegalEntityID: "legal-entity-a"})
 	c.Set("user_id", "user-a")
 	handler.Import(c)
-	var replay struct{ IdempotentReplay bool `json:"idempotent_replay"` }
+	var replay struct {
+		IdempotentReplay bool `json:"idempotent_replay"`
+	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &replay); err != nil {
 		t.Fatal(err)
 	}

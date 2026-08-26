@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"mime/multipart"
 	"testing"
 
 	"github.com/gin-gonic/gin"

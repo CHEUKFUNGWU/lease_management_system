@@ -21,9 +21,9 @@ import (
 type ExportKind string
 
 const (
-	KindOperatingPulse    ExportKind = "operating_pulse"
-	KindStoreDiagnostics  ExportKind = "store_diagnostics"
-	KindScenario          ExportKind = "scenario"
+	KindOperatingPulse   ExportKind = "operating_pulse"
+	KindStoreDiagnostics ExportKind = "store_diagnostics"
+	KindScenario         ExportKind = "scenario"
 )
 
 // FormulaKind describes a spreadsheet formula the web workbook builder
@@ -58,21 +58,21 @@ type ColumnSpec struct {
 
 // ExportDescriptor is the full column contract of one export kind.
 type ExportDescriptor struct {
-	Kind    ExportKind    `json:"kind"`
-	Title   string        `json:"title"`
-	Columns []ColumnSpec  `json:"columns"`
+	Kind    ExportKind   `json:"kind"`
+	Title   string       `json:"title"`
+	Columns []ColumnSpec `json:"columns"`
 }
 
 // Envelope carries the provenance header values shared by every format.
 type Envelope struct {
-	Basis           string    // "Working" / "Official"
+	Basis              string // "Working" / "Official"
 	DataClassification string // production / simulated / mixed
-	DatasetVersion  string
-	PeriodLabel     string // "近 14 天" / "2026-07" / "2026-Q3"
-	AsOf            string
-	FormulaVersion  string
-	SourceSystems   []string
-	GeneratedAt     time.Time
+	DatasetVersion     string
+	PeriodLabel        string // "近 14 天" / "2026-07" / "2026-Q3"
+	AsOf               string
+	FormulaVersion     string
+	SourceSystems      []string
+	GeneratedAt        time.Time
 }
 
 // Descriptors returns every registered export descriptor. The web exporters

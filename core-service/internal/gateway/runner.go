@@ -43,14 +43,14 @@ type AgentDispatcher interface {
 // ChannelSettings carries one channel's credentials.
 type ChannelSettings struct {
 	Enabled           bool   `json:"enabled"`
-	AppID             string `json:"app_id,omitempty"`              // feishu
-	AppSecret         string `json:"app_secret,omitempty"`          // feishu
-	EncryptKey        string `json:"encrypt_key,omitempty"`         // feishu
-	VerificationToken string `json:"verification_token,omitempty"`  // feishu
-	IsLark            bool   `json:"is_lark,omitempty"`             // feishu
-	BotID             string `json:"bot_id,omitempty"`              // wecom
-	Secret            string `json:"secret,omitempty"`              // wecom
-	WebSocketURL      string `json:"websocket_url,omitempty"`       // wecom
+	AppID             string `json:"app_id,omitempty"`             // feishu
+	AppSecret         string `json:"app_secret,omitempty"`         // feishu
+	EncryptKey        string `json:"encrypt_key,omitempty"`        // feishu
+	VerificationToken string `json:"verification_token,omitempty"` // feishu
+	IsLark            bool   `json:"is_lark,omitempty"`            // feishu
+	BotID             string `json:"bot_id,omitempty"`             // wecom
+	Secret            string `json:"secret,omitempty"`             // wecom
+	WebSocketURL      string `json:"websocket_url,omitempty"`      // wecom
 }
 
 // Settings is the gateway configuration root. Enabled defaults to false;
@@ -321,8 +321,8 @@ func buildViaFactory(name string, cfg *config.Config, messageBus MessageBus) (ch
 // settings. Making the default-off gate a pure function keeps it testable:
 // zero-value Settings must plan nothing.
 type channelPlan struct {
-	name      string
-	settings  ChannelSettings
+	name       string
+	settings   ChannelSettings
 	skipReason error // ErrCredentialsMissing when credentials are incomplete
 }
 

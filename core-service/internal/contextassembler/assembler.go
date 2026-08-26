@@ -101,20 +101,20 @@ type ToolDef struct {
 // happened inside.
 type Prompt struct {
 	Messages        []Message
-	Tokens          int          // measured truth where available + tail estimates
-	EstimatedTokens int          // the portion that came from the tail estimator (observability)
-	Budget          int          // effective budget: window minus output reserve
-	Compacted       bool         // whether anything left the prompt
+	Tokens          int  // measured truth where available + tail estimates
+	EstimatedTokens int  // the portion that came from the tail estimator (observability)
+	Budget          int  // effective budget: window minus output reserve
+	Compacted       bool // whether anything left the prompt
 	// WouldCompact is the RT1-A pre-warning signal: true when the turn would
 	// have exceeded its budget and therefore would have compacted — set in
 	// count mode where compaction is deliberately deferred. It fires BEFORE
 	// any content is dropped (count mode drops nothing), and the compaction
 	// event (context_compacted) remains the post-hoc record when compaction
 	// actually runs. The two coexist; one is not a rename of the other.
-	WouldCompact   bool
-	Preserved      []MessageRef // audit-bearing content: never participated in compaction
-	Dropped        []MessageRef // content that left the prompt; still resolvable in storage
-	Summary        string       // summarizer output covering dropped content, when available
+	WouldCompact bool
+	Preserved    []MessageRef // audit-bearing content: never participated in compaction
+	Dropped      []MessageRef // content that left the prompt; still resolvable in storage
+	Summary      string       // summarizer output covering dropped content, when available
 }
 
 // MessageRef identifies a message that was preserved or dropped.

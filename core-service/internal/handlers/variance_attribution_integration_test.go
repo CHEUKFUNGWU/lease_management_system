@@ -58,16 +58,16 @@ func seedVarianceTenant(t *testing.T, ctx context.Context, pool *pgxpool.Pool, l
 	}
 	// 两个窗口各一天：基期利润 4000 的分布、当期利润 2900 的分布
 	days := []struct {
-		date    time.Time
-		foot    float64
-		tx      float64
-		rev     float64
-		gp      float64
-		labor   float64
-		fixed   float64
-		varRent float64
+		date     time.Time
+		foot     float64
+		tx       float64
+		rev      float64
+		gp       float64
+		labor    float64
+		fixed    float64
+		varRent  float64
 		nonLease float64
-		other   float64
+		other    float64
 	}{
 		{time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC), 1000, 100, 20000, 6000, 1000, 500, 200, 100, 200},
 		{time.Date(2026, 6, 27, 0, 0, 0, 0, time.UTC), 1100, 99, 24750, 4950, 1200, 450, 150, 100, 150},

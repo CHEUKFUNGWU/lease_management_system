@@ -309,4 +309,5 @@ func compareScopes(t *testing.T, label string, got, want access.Scope) {
 		join(got.ProductionLines) != join(want.ProductionLines) ||
 		join(got.EquipmentIDs) != join(want.EquipmentIDs) {
 		t.Fatalf("%s scope diverges:\n  channel: %+v\n  jwt:     %+v", label, got, want)
-	}}
+	}
+}

@@ -145,7 +145,7 @@ func TestResolveStoresByCodeNameAndUUID(t *testing.T) {
 func sampleResolution() StoreResolution {
 	return StoreResolution{
 		RawToStoreID: map[string]string{"s001": "11111111-1111-1111-1111-111111111111"},
-		StoreByID: map[string]StoreRef{"11111111-1111-1111-1111-111111111111": {StoreID: "11111111-1111-1111-1111-111111111111"}},
+		StoreByID:    map[string]StoreRef{"11111111-1111-1111-1111-111111111111": {StoreID: "11111111-1111-1111-1111-111111111111"}},
 	}
 }
 
@@ -153,12 +153,12 @@ func TestValidateReportsRowErrorsAndPartialSuccess(t *testing.T) {
 	headers := []string{"门店编号", "日期", "币种", "营业额"}
 	rows := [][]string{
 		{"S001", "2026-07-01", "CNY", "100"},
-		{"S001", "2026/07/02", "cny", "1,234.50"},  // slash date, lowercase currency, comma amount
-		{"S001", "31/07/2026", "CNY", "100"},       // bad date layout
-		{"S001", "2026-07-04", "CNY", "-5"},        // negative revenue
-		{"S001", "2026-07-01", "CNY", "100"},       // duplicate (store, date) in file
-		{"NOPE", "2026-07-06", "CNY", "100"},       // unmatched store
-		{"S001", "2026-07-07", "CNY", ""},          // missing revenue
+		{"S001", "2026/07/02", "cny", "1,234.50"}, // slash date, lowercase currency, comma amount
+		{"S001", "31/07/2026", "CNY", "100"},      // bad date layout
+		{"S001", "2026-07-04", "CNY", "-5"},       // negative revenue
+		{"S001", "2026-07-01", "CNY", "100"},      // duplicate (store, date) in file
+		{"NOPE", "2026-07-06", "CNY", "100"},      // unmatched store
+		{"S001", "2026-07-07", "CNY", ""},         // missing revenue
 	}
 	report := Validate(headers, rows, sampleMapping(), sampleResolution())
 	if report.TotalRows != 7 || report.ValidRows != 2 {
@@ -305,7 +305,10 @@ func TestParseTemplateXLSXRoundTrip(t *testing.T) {
 	}
 }
 
-type fakeMappingAI struct{ suggestions Mapping; err error }
+type fakeMappingAI struct {
+	suggestions Mapping
+	err         error
+}
 
 func (f fakeMappingAI) SuggestMapping(ctx context.Context, headers []string, columnProfiles []ColumnProfile) (Mapping, error) {
 	return f.suggestions, f.err

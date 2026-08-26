@@ -132,7 +132,6 @@ func TestCoaSuggestRequiresFoldOnCustomRows(t *testing.T) {
 	}
 }
 
-
 // D-F10：重新生成按 key 合并——base 保留并标冲突，generated 独有追加，
 // base 独有（用户自建行）不丢。
 func TestCoaSuggestRegenerateMergesWithoutClobbering(t *testing.T) {

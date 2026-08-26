@@ -11,9 +11,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/lease-management-system/core-service/internal/agentkernel/governance"
 	picoclawagent "github.com/lease-management-system/core-service/internal/agentkernel/third_party/picoclaw/agent"
 	"github.com/lease-management-system/core-service/internal/agentkernel/third_party/picoclaw/tools"
-	"github.com/lease-management-system/core-service/internal/agentkernel/governance"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 )
 
@@ -67,14 +67,16 @@ type governedGatewayGuard struct {
 	controls []governance.NamedControl
 	recorder *governance.AuditRecorder
 
-	replay            *gatewayReplayStore
+	replay             *gatewayReplayStore
 	requireDraftReview bool
 }
 
 // gatewayReplayStore is the nil-replay stand-in (unwired): Lookup never hits.
 type gatewayReplayStore struct{}
 
-func (gatewayReplayStore) Lookup(context.Context, string) (*agenttools.ToolResult, bool) { return nil, false }
+func (gatewayReplayStore) Lookup(context.Context, string) (*agenttools.ToolResult, bool) {
+	return nil, false
+}
 
 // newGovernedGatewayGuard assembles the nine controls with the gateway's Deps.
 // Deps decisions (per-surface, NOT a copy of chatexec):
@@ -105,7 +107,7 @@ func (gatewayReplayStore) Lookup(context.Context, string) (*agenttools.ToolResul
 //     (its own Observe in execute); wiring the control would double count.
 func newGovernedGatewayGuard() *governedGatewayGuard {
 	g := &governedGatewayGuard{
-		replay:            &gatewayReplayStore{},
+		replay:             &gatewayReplayStore{},
 		requireDraftReview: true,
 	}
 	deps := governance.Deps{

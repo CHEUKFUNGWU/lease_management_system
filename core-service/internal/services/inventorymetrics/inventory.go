@@ -5,19 +5,19 @@ import (
 )
 
 type InventorySummary struct {
-	Currency             string   `json:"currency"`
-	Days                 int      `json:"days"`
-	EndingStockCost      float64  `json:"ending_stock_cost"`
-	EndingStockQty       float64  `json:"ending_stock_qty"`
-	InTransitCost        float64  `json:"in_transit_cost"`
-	InTransitQty         float64  `json:"in_transit_qty"`
-	COGS                 float64  `json:"cogs"`
-	DOI                  *float64 `json:"doi,omitempty"`           // Days of Inventory: (Ending Stock / COGS) * Days
-	TurnoverRate         *float64 `json:"turnover_rate,omitempty"` // Turnover: COGS / Avg Stock
-	StockCarryingCost    float64  `json:"stock_carrying_cost"`     // Stock Cost * Annual Rate * (Days/365)
-	TransitCarryingCost  float64  `json:"transit_carrying_cost"`   // Transit Cost * Annual Rate * (Days/365)
-	TotalCarryingCost    float64  `json:"total_carrying_cost"`
-	CarryingCostRate     float64  `json:"carrying_cost_rate"`      // e.g. 0.08 (8% per annum)
+	Currency            string   `json:"currency"`
+	Days                int      `json:"days"`
+	EndingStockCost     float64  `json:"ending_stock_cost"`
+	EndingStockQty      float64  `json:"ending_stock_qty"`
+	InTransitCost       float64  `json:"in_transit_cost"`
+	InTransitQty        float64  `json:"in_transit_qty"`
+	COGS                float64  `json:"cogs"`
+	DOI                 *float64 `json:"doi,omitempty"`           // Days of Inventory: (Ending Stock / COGS) * Days
+	TurnoverRate        *float64 `json:"turnover_rate,omitempty"` // Turnover: COGS / Avg Stock
+	StockCarryingCost   float64  `json:"stock_carrying_cost"`     // Stock Cost * Annual Rate * (Days/365)
+	TransitCarryingCost float64  `json:"transit_carrying_cost"`   // Transit Cost * Annual Rate * (Days/365)
+	TotalCarryingCost   float64  `json:"total_carrying_cost"`
+	CarryingCostRate    float64  `json:"carrying_cost_rate"` // e.g. 0.08 (8% per annum)
 }
 
 func CalculateDOI(endingStockCost, cogs float64, days int) *float64 {

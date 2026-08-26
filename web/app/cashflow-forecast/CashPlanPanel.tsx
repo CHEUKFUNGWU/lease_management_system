@@ -5,7 +5,6 @@ import {
   Card,
   Table,
   Typography,
-  Tag,
   Space,
   Select,
   Segmented,
@@ -13,11 +12,8 @@ import {
   Spin,
   Alert,
 } from "antd";
-import {
-  CheckCircleOutlined,
-  WarningOutlined,
-  SyncOutlined,
-} from "@ant-design/icons";
+import { SyncOutlined } from "@ant-design/icons";
+import { StatusTag } from "../components/StatusTag";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { fmtMoney } from "../lib/format";
@@ -349,18 +345,16 @@ export function CashPlanPanel({
               <Space>
                 <span>{t("cashflow.plan.bridge_title", language)}</span>
                 {activePartition.bridge.is_conserved ? (
-                  <Tag color="success" icon={<CheckCircleOutlined />}>
-                    {t("cashflow.plan.conserved", language)}
-                  </Tag>
+                  <StatusTag kind="success">{t("cashflow.plan.conserved", language)}</StatusTag>
                 ) : (
-                  <Tag color="error" icon={<WarningOutlined />}>
+                  <StatusTag kind="error">
                     {t("cashflow.plan.unconserved", language)} ({t("cashflow.plan.residual", language)}: {activePartition.bridge.rounding_residual})
-                  </Tag>
+                  </StatusTag>
                 )}
                 {activePartition.weakest_coverage_ratio != null && activePartition.weakest_coverage_ratio < 100 && (
-                  <Tag color="warning">
+                  <StatusTag kind="warning">
                     {t("cashflow.plan.coverage", language)}: {activePartition.weakest_coverage_ratio.toFixed(0)}%
-                  </Tag>
+                  </StatusTag>
                 )}
               </Space>
             }

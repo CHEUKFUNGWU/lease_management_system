@@ -8,14 +8,13 @@ import {
   Statistic,
   Table,
   Typography,
-  Tag,
   Space,
   Alert,
   Spin,
   Button,
 } from "antd";
+import { StatusTag } from "../components/StatusTag";
 import {
-  CheckCircleOutlined,
   WarningOutlined,
   SyncOutlined,
   PieChartOutlined,
@@ -370,31 +369,31 @@ export function CategoryCompositionPanel({
             <span>{t("category.tab_composition", language)}</span>
             {reconciliation && (
               reconciliation.overall_status === "tie" ? (
-                <Tag color="success" icon={<CheckCircleOutlined />}>
+                <StatusTag kind="success">
                   {t("category.reconcile_tie", language)}
-                </Tag>
+                </StatusTag>
               ) : reconciliation.overall_status === "within_tolerance" ? (
-                <Tag color="cyan">
+                <StatusTag kind="processing">
                   {t("category.reconcile_within_tol", language)}
-                </Tag>
+                </StatusTag>
               ) : reconciliation.overall_status === "mismatch" ? (
-                <Tag color="error" icon={<WarningOutlined />}>
+                <StatusTag kind="error">
                   {t("category.reconcile_mismatch", language)}
-                </Tag>
+                </StatusTag>
               ) : reconciliation.overall_status === "incomplete" ? (
-                <Tag color="warning" icon={<WarningOutlined />}>
+                <StatusTag kind="warning">
                   {t("category.reconcile_incomplete", language)}
-                </Tag>
+                </StatusTag>
               ) : (
-                <Tag color="default">
+                <StatusTag>
                   {t("category.reconcile_no_detail", language)}
-                </Tag>
+                </StatusTag>
               )
             )}
             {decomposition?.is_conserved && (
-              <Tag color="blue">
+              <StatusTag kind="processing">
                 {t("category.conserved_residual", language, { value: String(decomposition.rounding_residual) })}
-              </Tag>
+              </StatusTag>
             )}
           </Space>
         }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Result, Row, Segmented, Select, Slider, Space, Spin, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Result, Row, Segmented, Select, Slider, Space, Spin, Table, Typography, message } from "antd";
 import { ArrowLeftOutlined, CheckCircleFilled, ControlOutlined, PlayCircleOutlined, SaveOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
@@ -548,9 +548,9 @@ function ScenarioPageInner() {
                               options={response.scenarios.map((item) => ({ label: item.name || item.key, value: item.key }))}
                             />
                           ) : (
-                            <Tag color="blue" style={{ margin: 0 }}>
+                            <StatusTag kind="processing">
                               {response.scenarios[0]?.name === "Plan" ? t("scenario.plan_title", language) : (response.scenarios[0]?.name || t("scenario.plan_title", language))}
-                            </Tag>
+                            </StatusTag>
                           )}
                         </Flex>
                       }

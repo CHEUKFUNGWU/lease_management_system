@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Table, Tabs, Input, Button, Tag, Space, Typography } from "antd";
+import { StatusTag } from "../../components/StatusTag";
 import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
 import { t, type Language } from "../../lib/i18n";
 import { tableScrollX } from "../../lib/tableScroll";
@@ -70,13 +71,13 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_grain", language),
       dataIndex: "grain",
       key: "grain",
-      render: (g: string) => <Tag color="blue">{g}</Tag>,
+      render: (g: string) => <StatusTag kind="processing">{g}</StatusTag>,
     },
     {
       title: t("fpna.col_currency_policy", language),
       dataIndex: "currency_policy",
       key: "currency_policy",
-      render: (cp: string) => <Tag color="purple">{cp}</Tag>,
+      render: (cp: string) => <StatusTag kind="neutral">{cp}</StatusTag>,
     },
     {
       title: t("fpna.col_fiscal_period_rule", language),
@@ -94,7 +95,7 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_status", language),
       dataIndex: "status",
       key: "status",
-      render: (st: string) => <Tag color={st === "active" ? "green" : "default"}>{st.toUpperCase()}</Tag>,
+      render: (st: string) => <StatusTag kind={st === "active" ? "success" : "neutral"}>{st.toUpperCase()}</StatusTag>,
     },
   ];
 
@@ -143,7 +144,7 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_mapping_type", language),
       dataIndex: "mapping_type",
       key: "mapping_type",
-      render: (mt: string) => <Tag color="geekblue">{mt}</Tag>,
+      render: (mt: string) => <StatusTag kind="neutral">{mt}</StatusTag>,
     },
     {
       title: t("fpna.col_external_system", language),
@@ -165,7 +166,7 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_target_code", language),
       dataIndex: "target_code",
       key: "target_code",
-      render: (code: string) => <Tag color="green">{code}</Tag>,
+      render: (code: string) => <StatusTag kind="neutral">{code}</StatusTag>,
     },
     {
       title: t("fpna.col_effective_range", language),

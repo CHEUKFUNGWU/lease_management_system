@@ -32,6 +32,11 @@ const IMPORTANT_RE = /!important/;
 const CJK_RE = /[\u4e00-\u9fff]/;
 const HARDCODED_COLOR_RE = /#[0-9a-fA-F]{3,8}\b|rgba?\(/;
 const BORDER_1PX_SOLID_RE = /border(?:-[a-z]+)?\s*:\s*["']?1px\s+solid/;
+// §13-5（UIUX 任务书 2026-08-26）：AntD <Tag> 的预设色属于大面积彩色填充。
+// 只看「<Tag 元素带 color 属性」这一种形态——单行内，与 §13-3 同样的窄域；
+// 字面量与表达式都拦（color={map[...] || "default"} 同样产出预设色）。
+const TAG_PRESET_COLOR_RE = /<Tag\b[^>]*\scolor=/;
+export { TAG_PRESET_COLOR_RE };
 const HARDCODED_TIMESTAMP_RE = /TIMESTAMPTZ\s*'\s*20\d\d-\d\d-\d\d|TIMESTAMP\s*'\s*20\d\d-\d\d-\d\d/;
 
 // t() 词典文件、测试文件里的中文是内容本身；守卫脚本自身也不扫描。
@@ -307,6 +312,11 @@ export function collectViolations(base = defaultBase) {
         // §13-8 字面量边框（T5）：DESIGN.md §6 要求走 --shadow-* 环形阴影。
         if (/\.(ts|tsx)$/.test(file) && !exempt && isNewViolation(BORDER_1PX_SOLID_RE, line, oldText)) {
           fail(file, number, "13-8", "新增 border: 1px solid（DESIGN.md §13-8）：用 --shadow-* 环形阴影");
+        }
+        // §13-5 AntD Tag 预设色（UIUX 任务书 2026-08-26）：换 <StatusTag kind>
+        // 或 <SeverityDot>，两者都是现成组件。
+        if (/\.tsx$/.test(file) && !exempt && isNewViolation(TAG_PRESET_COLOR_RE, line, oldText)) {
+          fail(file, number, "13-5", "新增 <Tag color=…>（DESIGN.md §13-5）：用 <StatusTag kind> 或 <SeverityDot>");
         }
       }
     }

@@ -7,11 +7,11 @@ import {
   Col,
   Statistic,
   Typography,
-  Tag,
   Space,
   Spin,
   Alert,
 } from "antd";
+import { StatusTag } from "../components/StatusTag";
 import {
   InboxOutlined,
   DollarOutlined,
@@ -88,7 +88,7 @@ export function InventoryTurnoverPanel({
           <Space>
             <InboxOutlined />
             <span>{t("inventory.panel_title", language)}</span>
-            <Tag color="blue">{t("inventory.measure_kind_tag", language)}</Tag>
+            <StatusTag kind="processing">{t("inventory.measure_kind_tag", language)}</StatusTag>
           </Space>
         }
       >
@@ -106,7 +106,7 @@ export function InventoryTurnoverPanel({
         <Space>
           <InboxOutlined />
           <span>{t("inventory.panel_title", language)}</span>
-          <Tag color="blue">{t("inventory.measure_kind_tag", language)}</Tag>
+          <StatusTag kind="processing">{t("inventory.measure_kind_tag", language)}</StatusTag>
         </Space>
       }
     >

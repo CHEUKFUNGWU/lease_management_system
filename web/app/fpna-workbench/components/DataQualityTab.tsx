@@ -96,7 +96,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_dimension", language),
       dataIndex: "dimension",
       key: "dimension",
-      render: (dim: string) => <Tag color="blue">{dim}</Tag>,
+      render: (dim: string) => <StatusTag kind="processing">{dim}</StatusTag>,
     },
     {
       title: t("fpna.col_period", language),

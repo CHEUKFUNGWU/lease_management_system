@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Card,
   Table,
-  Tag,
   Space,
   Statistic,
   Row,
@@ -13,6 +12,7 @@ import {
   Spin,
   Alert,
 } from "antd";
+import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 import {
   ShopOutlined,
   WarningOutlined,
@@ -96,7 +96,7 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
           <Space>
             <ShopOutlined />
             <span>{t("competitor.panel_title", language)}</span>
-            <Tag color="purple">{t("competitor.non_kpi_tag", language)}</Tag>
+            <StatusTag>{t("competitor.non_kpi_tag", language)}</StatusTag>
           </Space>
         }
       >
@@ -157,7 +157,7 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
       dataIndex: "promo_intensity",
       key: "promo_intensity",
       width: 110,
-      render: (st: string) => <Tag color={threatColors[st] || "default"}>{intensityLabel(st)}</Tag>,
+      render: (st: string) => <StatusTag kind={statusKindFromAntColor(threatColors[st])}>{intensityLabel(st)}</StatusTag>,
     },
     {
       title: t("competitor.col_footfall", language),
@@ -188,7 +188,7 @@ export function CompetitorBenchmarkPanel({ storeId }: Props) {
         <Space>
           <ShopOutlined />
           <span>{t("competitor.panel_title", language)}</span>
-          <Tag color="purple">{t("competitor.non_kpi_tag", language)}</Tag>
+          <StatusTag>{t("competitor.non_kpi_tag", language)}</StatusTag>
         </Space>
       }
     >

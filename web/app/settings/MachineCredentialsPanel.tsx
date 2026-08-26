@@ -5,7 +5,6 @@ import {
   Card,
   Table,
   Button,
-  Tag,
   Space,
   Modal,
   Form,
@@ -17,12 +16,11 @@ import {
   message,
   Popconfirm,
 } from "antd";
+import { StatusTag } from "../components/StatusTag";
 import {
   KeyOutlined,
   PlusOutlined,
   CopyOutlined,
-  CheckCircleOutlined,
-  StopOutlined,
   CodeOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
@@ -127,9 +125,9 @@ export function MachineCredentialsPanel() {
       render: (scopes: string[]) => (
         <Space wrap size={[4, 4]}>
           {(scopes || []).map((s) => (
-            <Tag color="blue" key={s}>
+            <StatusTag key={s}>
               {s}
-            </Tag>
+            </StatusTag>
           ))}
         </Space>
       ),
@@ -140,13 +138,13 @@ export function MachineCredentialsPanel() {
       width: 100,
       render: (_: any, r: MachineCredential) =>
         r.revoked_at ? (
-          <Tag color="error" icon={<StopOutlined />}>
+          <StatusTag kind="error">
             {t("machine_cred.status_revoked", language)}
-          </Tag>
+          </StatusTag>
         ) : (
-          <Tag color="success" icon={<CheckCircleOutlined />}>
+          <StatusTag kind="success">
             {t("machine_cred.status_active", language)}
-          </Tag>
+          </StatusTag>
         ),
     },
     {

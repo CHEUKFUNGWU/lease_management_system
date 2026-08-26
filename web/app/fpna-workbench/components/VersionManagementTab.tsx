@@ -158,9 +158,9 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
             <strong>{text}</strong>
           </a>
           {record.is_official && (
-            <Tag color="gold" icon={<CheckCircleOutlined />}>
+            <StatusTag kind="success">
               Official
-            </Tag>
+            </StatusTag>
           )}
         </Space>
       ),
@@ -170,14 +170,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
       dataIndex: "version_type",
       key: "version_type",
       render: (type: VersionType) => {
-        const colorMap: Record<VersionType, string> = {
-          actual: "blue",
-          prior_year: "cyan",
-          budget: "purple",
-          forecast: "orange",
-          scenario: "geekblue",
-        };
-        return <Tag color={colorMap[type] || "default"}>{type.toUpperCase()}</Tag>;
+        return <StatusTag kind="neutral">{type.toUpperCase()}</StatusTag>;
       },
     },
     {
@@ -273,13 +266,13 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
             <Space>
               {indent > 0 && <BranchesOutlined className="fpna-tree-icon" />}
               <Text strong>{node.version.name}</Text>
-              <Tag color={node.version.version_type === "budget" ? "purple" : "orange"}>
+              <StatusTag kind="neutral">
                 {node.version.version_type.toUpperCase()}
-              </Tag>
+              </StatusTag>
               <StatusTag kind={statusKindMap[node.version.status] || "neutral"}>
                 {node.version.status.toUpperCase()}
               </StatusTag>
-              {node.version.is_official && <Tag color="gold">Official</Tag>}
+              {node.version.is_official && <StatusTag kind="success">Official</StatusTag>}
               <Text type="secondary" className="fpna-font-12">
                 ({node.version.from_period} ~ {node.version.to_period})
               </Text>
@@ -493,7 +486,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               </StatusTag>
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.desc_official_status", language)}>
-              {selectedVersion.is_official ? <Tag color="gold">YES (Official)</Tag> : "NO (Working)"}
+              {selectedVersion.is_official ? <StatusTag kind="success">YES (Official)</StatusTag> : "NO (Working)"}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.form_as_of_period", language)}>{selectedVersion.as_of_period}</Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_period_range", language)}>

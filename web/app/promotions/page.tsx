@@ -5,7 +5,6 @@ import {
   Card,
   Table,
   Button,
-  Tag,
   Space,
   Modal,
   Form,
@@ -25,6 +24,7 @@ import {
   message,
   Spin,
 } from "antd";
+import { StatusTag } from "../components/StatusTag";
 import {
   PlusOutlined,
   DollarOutlined,
@@ -229,13 +229,13 @@ export default function PromotionsPage() {
       key: "promo_type",
       width: 110,
       render: (type: string) => {
-        const colors: Record<string, string> = {
-          discount: "blue",
-          coupon: "cyan",
-          gift: "purple",
-          member_day: "magenta",
+        const kinds: Record<string, "processing" | "neutral"> = {
+          discount: "processing",
+          coupon: "neutral",
+          gift: "neutral",
+          member_day: "neutral",
         };
-        return <Tag color={colors[type] || "default"}>{type}</Tag>;
+        return <StatusTag kind={kinds[type] || "neutral"}>{type}</StatusTag>;
       },
     },
     {
@@ -258,14 +258,14 @@ export default function PromotionsPage() {
       key: "approval_status",
       width: 110,
       render: (st: string) => {
-        const map: Record<string, { color: string; label: string }> = {
-          draft: { color: "default", label: t("promotion.status_draft", language) },
-          approved: { color: "processing", label: t("promotion.status_approved", language) },
-          completed: { color: "success", label: t("promotion.status_completed", language) },
-          cancelled: { color: "error", label: t("promotion.status_cancelled", language) },
+        const map: Record<string, { kind: "neutral" | "processing" | "success" | "error"; label: string }> = {
+          draft: { kind: "neutral", label: t("promotion.status_draft", language) },
+          approved: { kind: "processing", label: t("promotion.status_approved", language) },
+          completed: { kind: "success", label: t("promotion.status_completed", language) },
+          cancelled: { kind: "error", label: t("promotion.status_cancelled", language) },
         };
-        const conf = map[st] || { color: "default", label: st };
-        return <Tag color={conf.color}>{conf.label}</Tag>;
+        const conf = map[st] || { kind: "neutral" as const, label: st };
+        return <StatusTag kind={conf.kind}>{conf.label}</StatusTag>;
       },
     },
     {
@@ -522,7 +522,7 @@ export default function PromotionsPage() {
                       </div>
                       <div>
                         <Text type="secondary">{t("promotion.info_type", language)}: </Text>
-                        <Tag color="blue">{selectedPromo.promo_type}</Tag>
+                        <StatusTag kind="processing">{selectedPromo.promo_type}</StatusTag>
                       </div>
                       <div>
                         <Text type="secondary">{t("promotion.info_period", language)}: </Text>

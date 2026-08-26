@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-08-19",
+  "as_of": "2026-08-26",
   "note": "DESIGN.md §14 登记的分支存量债务。每个键是「文件 → 规则 → 允许数量」，超出即失败。债务清偿后相应数字应下调，见 DESIGN.md §14。",
   "files": {
     "web/app/agent-metrics/page.tsx": {
@@ -108,7 +108,8 @@
     "web/app/operating-pulse/page.tsx": {
       "13-2": 36,
       "13-4": 4,
-      "13-8": 1
+      "13-8": 1,
+      "13-5": 3
     },
     "web/app/performance/page.tsx": {
       "13-2": 24,
@@ -172,7 +173,8 @@
     },
     "web/app/store-360/page.tsx": {
       "13-2": 35,
-      "13-4": 1
+      "13-4": 1,
+      "13-5": 2
     }
   }
 }

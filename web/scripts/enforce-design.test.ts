@@ -13,7 +13,7 @@
  * 单行、正则放行 .style 赋值），对应用例立即变红。
  */
 import { describe, expect, it } from "vitest";
-import { JS_HOVER_STYLE_RE, staticStylePropCount, styleBlockStaticProps } from "./enforce-design.mjs";
+import { JS_HOVER_STYLE_RE, TAG_PRESET_COLOR_RE, staticStylePropCount, styleBlockStaticProps } from "./enforce-design.mjs";
 
 describe("多行内联样式块计数（§13-2 盲区修补）", () => {
   const multilineBlock = [
@@ -84,5 +84,24 @@ describe("§13-3 JS hover 改样式的窄匹配域", () => {
 
   it("放行：CSS 类名切换走 className，不属于本条", () => {
     expect(JS_HOVER_STYLE_RE.test('onMouseEnter={() => setHoverClass("is-hover")}')).toBe(false);
+  });
+});
+
+describe("§13-5 AntD Tag 预设色的匹配域（UIUX 任务书 2026-08-26）", () => {
+  it("命中：字面量预设色、表达式色、带其他属性的 Tag", () => {
+    expect(TAG_PRESET_COLOR_RE.test('<Tag color="blue">{x}</Tag>')).toBe(true);
+    expect(TAG_PRESET_COLOR_RE.test("<Tag color={conf.color}>{label}</Tag>")).toBe(true);
+    expect(TAG_PRESET_COLOR_RE.test('<Tag color={colors[type] || "default"}>{type}</Tag>')).toBe(true);
+    expect(TAG_PRESET_COLOR_RE.test('<Tag color="success" icon={<CheckCircleOutlined />}>ok</Tag>')).toBe(true);
+    expect(TAG_PRESET_COLOR_RE.test('<Tag key={s} color="blue">{s}</Tag>')).toBe(true);
+  });
+
+  it("放行：无 color 的 Tag 与非 AntD 组件", () => {
+    expect(TAG_PRESET_COLOR_RE.test("<Tag closable onClose={close}>x</Tag>")).toBe(false);
+    expect(TAG_PRESET_COLOR_RE.test('<StatusTag kind="processing">x</StatusTag>')).toBe(false);
+    expect(TAG_PRESET_COLOR_RE.test("<SeverityDot severity=\"high\" />")).toBe(false);
+    // \b 防前缀误伤：Tagged / TagsList 不是 <Tag 元素
+    expect(TAG_PRESET_COLOR_RE.test('<Tagged color="blue" />')).toBe(false);
+    expect(TAG_PRESET_COLOR_RE.test('<TagsList color="blue" />')).toBe(false);
   });
 });

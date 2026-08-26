@@ -9,7 +9,6 @@ import {
   Input,
   Button,
   Table,
-  Tag,
   Alert,
   Space,
   Typography,
@@ -18,6 +17,7 @@ import {
   Statistic,
   message,
 } from "antd";
+import { StatusTag } from "../../components/StatusTag";
 import {
   ThunderboltOutlined,
   CheckCircleOutlined,
@@ -143,9 +143,9 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
       dataIndex: "source_type",
       key: "source_type",
       render: (st: string, row: PeriodBlendSummary) => (
-        <Tag color={row.replaced ? "blue" : "purple"}>
+        <StatusTag kind={row.replaced ? "processing" : "neutral"}>
           {row.replaced ? t("fpna.source_actual_replaced", language) : t("fpna.source_forecast_retained", language)}
-        </Tag>
+        </StatusTag>
       ),
     },
     {
@@ -195,9 +195,9 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
       dataIndex: "bias",
       key: "bias",
       render: (b: number) => (
-        <Tag color={b > 0 ? "green" : b < 0 ? "volcano" : "default"}>
+        <StatusTag kind={b > 0 ? "success" : b < 0 ? "error" : "neutral"}>
           {b > 0 ? `+${b.toFixed(2)}` : b.toFixed(2)}
-        </Tag>
+        </StatusTag>
       ),
     },
   ];

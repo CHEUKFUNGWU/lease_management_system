@@ -10,10 +10,10 @@ import {
   Button,
   Table,
   Space,
-  Tag,
   Alert,
   Typography,
 } from "antd";
+import { StatusTag } from "../../components/StatusTag";
 import { SearchOutlined, AlertOutlined } from "@ant-design/icons";
 import { t, type Language } from "../../lib/i18n";
 import { fmtNum } from "../../lib/format";
@@ -104,9 +104,9 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
         const pctStr = (val * 100).toFixed(2) + "%";
         if (record.significant_change) {
           return (
-            <Tag color="volcano">
+            <StatusTag kind="error">
               <strong>{pctStr}</strong>
-            </Tag>
+            </StatusTag>
           );
         }
         return <span>{pctStr}</span>;
@@ -292,15 +292,15 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
           title={
             <Space>
               <span>{t("fpna.compare_result_title", language)}</span>
-              <Tag color="blue">{compareData.result.period}</Tag>
-              <Tag color="cyan">Basis: {compareData.basis}</Tag>
+              <StatusTag kind="processing">{compareData.result.period}</StatusTag>
+              <StatusTag kind="neutral">Basis: {compareData.basis}</StatusTag>
               {compareData.exchange_rate_version && (
-                <Tag color="purple">FX: {compareData.exchange_rate_version}</Tag>
+                <StatusTag kind="neutral">FX: {compareData.exchange_rate_version}</StatusTag>
               )}
               {compareData.coverage && (
-                <Tag color="green">
+                <StatusTag kind="success">
                   Coverage: {typeof compareData.coverage.ratio === "number" ? `${(compareData.coverage.ratio * 100).toFixed(0)}%` : compareData.coverage.status || "Complete"}
-                </Tag>
+                </StatusTag>
               )}
             </Space>
           }

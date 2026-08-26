@@ -108,6 +108,14 @@ func NewRetailIngestHandler(population retailIngestPopulationReader, store retai
 	return &RetailIngestHandler{population: population, store: store, audit: auditor, mappingAI: NewRetailMappingAI()}
 }
 
+// WithMappingAI overrides the suggester for tests. A zero-value
+// &RetailMappingAI{} (nil client) forces the deterministic rule path so
+// golden fixtures never depend on ambient LLM credentials.
+func (h *RetailIngestHandler) WithMappingAI(ai retailingest.MappingSuggester) *RetailIngestHandler {
+	h.mappingAI = ai
+	return h
+}
+
 // Preview runs the deterministic pipeline without writing: parse, suggest
 // (unless the client sends a corrected mapping), resolve stores, validate
 // rows, and estimate overlap with existing facts.

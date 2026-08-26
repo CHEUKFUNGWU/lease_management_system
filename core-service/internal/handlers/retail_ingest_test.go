@@ -100,7 +100,13 @@ func newIngestHandler() *RetailIngestHandler {
 	population := &fakeIngestPopulation{stores: []retailkpi.StorePopulation{
 		{StoreID: "11111111-1111-1111-1111-111111111111", StoreCode: "S001", StoreName: "一号店"},
 	}}
-	return NewRetailIngestHandler(population, &fakeIngestStore{}, nil)
+	// CI 事故（2026-08-26）：构造器默认 NewRetailMappingAI() 会从环境读
+	// DEEPSEEK_API_KEY——有 key 的机器上 golden 测试真实调用 LLM 并记下
+	// suggested_mapping_source="ai"，无 key 的 CI 回落 "rule" 而红。测试
+	// 一律注 nil-client suggester 强制走确定性 rule 路径；AI 建议路径由
+	// retail_mapping_ai_test.go 用假 client 单独覆盖。
+	return NewRetailIngestHandler(population, &fakeIngestStore{}, nil).
+		WithMappingAI(&RetailMappingAI{})
 }
 
 func TestRetailIngestPreviewContract(t *testing.T) {

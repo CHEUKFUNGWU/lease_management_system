@@ -40,7 +40,7 @@ The transformation is **additive**. Retail operations analytics was layered on t
 | 三表财务模型与单店利润表<br>Three-statement model & store P&L | ✅ S1–S5 全部编号功能项落地并有测试锁定（2026-08-20）；19 项评审修复已合并<br>Every numbered S1–S5 requirement is implemented and test-locked (2026-08-20); the 19 review fixes are merged |
 | 三表模型的真实 GL / 试算平衡表联调<br>Live GL / trial-balance integration | ⚠️ 未完成。引擎与四个生产适配器已接线，但只跑过构造数据；端口缺数据时诚实降级为缺口，不产出数字<br>Not done. The engine and its four production adapters are wired, but only exercised against constructed data; a port with no data degrades to an explicit gap rather than a number |
 | Python `ai-service` 退役（ADR-0023/0024）<br>Retiring the Python AI service | ✅ **已退役并删除（W6，2026-08-20）**。LLM/解析/上传/planner 全部迁入 Go（`internal/llm`、`internal/docparse`、`internal/aiintake` 生产侧、`miniostore`、`agentrunner.PlannerLLM`）；AGPL 版 PDF 依赖已随 ai-service 一起删除<br>**Retired and removed.** All LLM / parsing / upload / planner paths now run in Go; the `pymupdf` AGPL dependency is gone with the ai-service directory |
-| Agent Runtime 升级 C1（ADR-0027/0028）<br>Agent runtime overhaul | 🚧 **前两层完成（2026-08-25），第三层未开始**。治理链已移植到 vendored picoclaw 的 hook 挂点，**chat 与 gateway 两个平面的工具调用都经过它**（两次汇流，各带反向对照守卫）；ACORE-2 九项变异在两个平面的生产装配下分别重证。旧治理链实现（`agentcore/hooks`）已删除，**九个控制只剩一套实现**，未汇流的 base runtime 回落到内联 `Evaluate`（双路径错误码一致性有锚测试钉住）。会话管理器**三个平面全部接线**（chat / gateway / runner），索引 G9 已关闭。上下文装配器已接线、四项评审整改已验、可观测指标已交付，**但至今未在生产流量上打开过**——开关是 `CONTEXT_ASSEMBLER_MODE`（`off` / `count` 只计数不压缩 / `on`）。**第三层的六项能力（子任务委派、MCP、模型路由、定时触发、健康检查、跨会话记忆）一行未写**<br>**Layers one and two complete; layer three not started.** Tool calls on both the chat and gateway planes cross the ported governance chain, each convergence guarded by a reverse control, and the old chain implementation is deleted — nine controls, one implementation. The session manager owns session lifecycle on all three planes. The context assembler is wired, reviewed and instrumented, but has never been enabled against production traffic. The six layer-three capabilities are unwritten. |
+| Agent Runtime 升级 C1（ADR-0027/0028）<br>Agent runtime overhaul | 🚧 **前两层完成（2026-08-25）；第三层六项按 D44 裁剪为三项，三项已交付并复验，三项推迟（2026-08-26）**。治理链已移植到 vendored picoclaw 的 hook 挂点，**chat 与 gateway 两个平面的工具调用都经过它**（两次汇流，各带反向对照守卫）；ACORE-2 九项变异在两个平面的生产装配下分别重证。旧治理链实现（`agentcore/hooks`）已删除，**九个控制只剩一套实现**。会话管理器**三个平面全部接线**（chat / gateway / runner），索引 G9 已关闭。**第三层已做**：MCP 接入（第一方最小客户端，非取自 picoclaw；白名单出站边界 + 子进程 env 白名单，经两轮复验返工修掉客户端层七个缺陷）、定时触发（`internal/scheduler` 仅依赖标准库，lease recovery 首次有调用方）、健康检查（原 `/health` 探测失败仍返回 200+`status:ok`，已拆为 liveness/readiness）。**第三层推迟**：子任务委派（AR4）、模型路由、跨会话记忆（AR6），重开条件见索引 D44。**两处未完**：上下文装配器至今未在生产流量上打开过（`CONTEXT_ASSEMBLER_MODE=count` 的 ≥7 天观察窗口采集中，其数据是模型路由重开的前置判据）；「六项能力都必须有」这句尚未兑现。**因此这一格不是「C1 完成」**<br>**Layers one and two are complete. Layer three was cut from six capabilities to three (D44): MCP, scheduled triggers and health checks are delivered and independently re-verified; sub-task delegation, model routing and cross-session memory are deferred with stated reopen conditions.** Tool calls on both planes cross the ported governance chain — nine controls, one implementation — and the session manager owns session lifecycle on all three planes. Two things remain open: the context assembler has still never been enabled against production traffic (a ≥7-day counting window is collecting now), and the "all six capabilities" commitment is not met. This is **not** C1 complete. |
 | 跨法人上下文隔离（SI1 / SI2）<br>Cross-entity context isolation | ✅ **已关闭（2026-08-25）**。会话续接、run/artifact 直读与审批写路径三处都强制法人边界，拒绝保持 `scope_denied` 不软化。证据为带库集成测试（修复前红、修复后绿、删比对再红），复验用与实现方不同的输入独立跑过<br>**Closed.** Session continuation, run/artifact reads and the approval write path all enforce the legal-entity boundary; refusals keep their `scope_denied` reason. Evidence is database-backed integration tests, independently re-verified |
 | IM 渠道网关（飞书 / 企微，ADR-0026）<br>IM channel gateway | 🚧 **代码在，默认关闭**。`GATEWAY_ENABLED` 未设为 `true` 时零值配置完全禁用，不校验凭据也不建连接。**未接过真实渠道**，渠道身份到法人的绑定关系需人工登记<br>**Present but disabled by default.** Never exercised against a live channel; channel-identity-to-entity bindings must be registered by hand |
 | 第三方 vendor 代码（picoclaw，MIT）<br>Vendored third-party code | ℹ️ 仓库首次引入第三方源码，分两处：`internal/gateway/third_party/`（飞书 / 企微渠道）与 `internal/agentkernel/third_party/`（agent hook 内核切片）。均逐文件标注上游出处、按 commit 钉版、有架构守卫禁止其 import 第一方业务包<br>Two vendored slices, each with per-file upstream provenance, a pinned commit, and an architecture guard forbidding imports of first-party business packages |
@@ -555,18 +555,15 @@ English:
 
 - [Spec：Agent Runtime 完整升级（C1）](docs/specs/agent-runtime-overhaul-c1.md) — 三层范围与能力清单
 - [CodebaseDesign：Agent Runtime 升级模块深化](docs/CodebaseDesign_AgentRuntime升级_模块深化.md) — AR1–AR6 模块接口
-- [工单：C1 第三层（L3，四部分 · 范围已裁剪）](docs/specs/agent-runtime-c1-layer3.md) — **在途（2026-08-25 开票）**：三个尾巴（未决 #12 阻塞范围 / Story 18 会话迁移留痕 / AR3 打开到 `count` 并观察）+ MCP 接入 + 定时触发 + 健康检查
-> **C1 第三层六项能力已裁剪为三项。** 2026-08-25 裁决：做 MCP 接入 / 定时触发 / 健康检查；**推迟**子任务委派（AR4）、模型路由、跨会话记忆（AR6），理由与重开条件见 L3 工单「范围裁决」。推迟不是取消，模块接口设计保留。
+- [工单：C1 第三层（L3）](docs/specs/agent-runtime-c1-layer3.md) — **收尾中**：四部分（三个尾巴 / 健康检查 / 定时触发 / MCP 接入）全部交付并复验（2026-08-26），唯一未完项是 A-3 观察窗口出数据小结
+> **C1 第三层六项能力已裁剪为三项。** 2026-08-25 裁决：做 MCP 接入 / 定时触发 / 健康检查；**推迟**子任务委派（AR4）、模型路由、跨会话记忆（AR6）。推迟不是取消，模块接口设计保留；推迟日期与重开条件登记在文档索引 **D44**。
 
-- [工单：C1 批次收尾（RT1，四部分）](docs/specs/agent-runtime-c1-remaining-work.md) — 已交付并复验（2026-08-25）：可观测面 + 两级开关 / G9 剩余两平面 / streaming 登记订正 / 两套治理链合一
-- [工单：C1 批次评审整改（AF1–AF4）](docs/specs/agent-runtime-c1-review-fixes.md) — 已交付并复验（2026-08-24）
-- [工单：治理链拒绝的错误码保真（RC1）](docs/specs/agent-tool-rejection-code-fidelity.md) — 已交付并复验（2026-08-24）
-- [工单：跨法人会话续接 + AR2 接线（SI1）](docs/specs/session-cross-entity-isolation-and-ar2-wiring.md) — 已交付并复验（2026-08-25）
-- [工单：run / artifact 直读与写路径的法人边界（SI2）](docs/specs/agent-run-read-path-entity-boundary.md) — 已交付并复验（2026-08-25）
 - [Spec：FP&A 科目树灵活性（F1）](docs/specs/fpna-chart-of-accounts-flexibility-f1.md)
 - [Spec：词表收敛 V1](docs/specs/vocabulary-convergence-v1.md) — 审批状态统一为 Draft / Pending / Approved
 
-> 历史文档（已被取代或已完结）统一归档在 `docs/archive/`，均带 ARCHIVED 横幅，**不作为现行依据**。
+> **已完结的交付工单不留档。** C1 批次的 RT1 / AF1–AF4 / RC1 / SI1 / SI2 五份工单已于 2026-08-26 删除，结论先行吸收进文档索引的决策登记（D41 拒绝码保真 / D42 直读路径法人边界 / D43 实测与估算不得合并）。理由与先例见索引 §1.5：工单是流程产物不是推理产物，留着只增加误读面积。需要原文时从 git 历史取。
+>
+> 被取代但推理仍有价值的**方案**文档归档在 `docs/archive/`，均带 ARCHIVED 横幅，**不作为现行依据**。
 
 ---
 

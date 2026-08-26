@@ -34,7 +34,9 @@
 > 这一节是**易腐事实**。数字变了就改，不要在别处再抄一份。核对命令见本文末「验证」。
 
 - `db/init/01_init.sql`：91 张业务表 + `schema_migrations`（空库基线自动标记全部迁移已应用）；增量迁移到 `063_ai_chat_messages_tokens.sql`
-- `core-service/internal/`：34 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentkernel`（vendor picoclaw 切片 + `governance` 治理链 + `chatexec` 生产执行器）/ `agentcontext`（隔离键）/ `sessionmanager`（会话生命周期，三平面已接线）/ `contextassembler`（计数→预算→压缩，默认关）/ `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore`
+- `core-service/internal/`：36 个包。零售经营分析在 `services/retail*`（9 个）；**财务三表模型在 `finmodel/`**（子包 `template` / `opening` / `persist` / `adapter` / `suggestion` / `memo` / `view`），**单店利润表在 `storepnl/`**；Agent 侧为 `agentkernel`（vendor picoclaw 切片 + `governance` 治理链 + `chatexec` 生产执行器）/ `agentcontext`（隔离键）/ `sessionmanager`（会话生命周期，三平面已接线）/ `contextassembler`（计数→预算→压缩，默认关）/ `agenttools` / `agentskill` / `agentseval` / `workingpaper` / `docparse` / `pagefill` / `miniostore` / **`mcp`（外部 MCP 工具接入，默认关）** / **`scheduler`（定时触发，仅依赖标准库）**
+- **MCP 默认关闭**（C1 L3-D，2026-08-26）：`MCP_MANIFEST_PATH` 为空 = 零出口。配置后启动时 fail-fast（server 不可达/不应答/工具缺失/非只读条目均拒绝启动）。清单是 git 审核文件，**工具治理属性全来自清单，server 自报元数据不参与治理判定**；出站载荷按清单 schema 重建（白名单，未知形状默认拒绝），子进程 env 只传 `PATH` + 清单声明——`cmd.Env` 绝不为 nil，nil 会把 DB/JWT/MinIO/LLM 密钥交给外部进程。细节见文档索引 D40
+- **`/health` 已拆为 liveness / readiness**（C1 L3-B）。此前那个版本数据库探测失败仍返回 200 且 `status:"ok"`——**改动前请先读它为什么是错的**（文档索引 §3 与母 spec 能力清单），别把「总是 200」当成可用性优化再加回来
 
 - **治理链只有一套实现：`agentkernel/governance`**（RT1-D-2，2026-08-25）。旧实现 `agentcore/hooks` 已删除；新控制只有这一个挂点。`agentcore` 本体仍在，但只剩 loop / state / 事件被 `llm/stream.go` 使用，**不再承载任何治理逻辑**——别再往它那里加控制。未装 guard 的 base runtime 回落到 `agenttools.Evaluate`（内联策略评估），两条路径的错误码一致性由 `governance/dualpath_rc1_test.go` 钉住；该锚测试**不覆盖** ProtectedMeasure 与 BudgetGuard——`Evaluate` 里没有这两个控制
 - R 批次（2026-08-23）新增两个纯函数服务包：`services/varianceattribution`（利润差异归因，连环替代）、`services/newstorefeasibility`（新店可行性，纯函数 + Ports，**禁 import `ifrs16`**）；`services/promotionattribution` 增投前保本（同包，与投后共用 `RunRate`）

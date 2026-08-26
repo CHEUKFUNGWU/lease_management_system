@@ -37,9 +37,9 @@
 | AR1 ContextKey | 值类型 + 一个构造器 | 1 | **新增** |
 | AR2 Session Manager | `Acquire` / `Close` | 2 | **新增**（收拢六处） |
 | AR3 Context Assembler | `Assemble` | **1** | **新增** |
-| AR4 Subturn Delegator | `Delegate` | 1 | **新增** |
+| AR4 Subturn Delegator | `Delegate` | 1 | **新增** → ⏸ **推迟（D44）**，设计保留 |
 | AR5 Kernel Adapter | `Execute` | 1 | 替换 `agentcore` |
-| AR6 Memory | ContextKey 的消费者，无独立接缝 | — | 新增实现，复用 AR1 |
+| AR6 Memory | ContextKey 的消费者，无独立接缝 | — | 新增实现，复用 AR1 → ⏸ **推迟（D44）**，设计保留 |
 
 六个模块，接口方法合计 6 个。
 
@@ -275,11 +275,17 @@ func compact(compactable []Message, budget int) ([]Message, []MessageRef)
 
 ### 与 AR6 Memory 的关系
 
+> ⏸ **AR6 已推迟（2026-08-25 裁决，登记 D44）。** 理由：依赖 AR3 真正在生产流量上跑过（观察窗口采集中），且它是新的跨租户泄漏面。重开条件：AR3 观察窗口出数 **且** 隔离设计另过一轮评审。`ContextKey` 五维隔离键与 `narrow` 求交的设计保留。
+
 记忆是 `Assemble` 的一个输入源，不是独立接口。它按同一个 `ContextKey` 取——**因此 D-C12 的 scope 指纹与 D-C20 的分类自动覆盖记忆**，无需为记忆单独设计失效逻辑。这是把键做成类型的复利：加一个隔离维度，所有消费者一次性获得保护。
 
 ---
 
 ## 6. AR4 Subturn Delegator — 子任务委派
+
+> ⏸ **已推迟（2026-08-25 裁决，登记 D44）。本节是保留的设计，不是在途工作。**
+> 理由：新增能力同时新增攻击面（D-C8），且它是第三层六项里唯一需要 picoclaw 完整回合循环做地基的（`turn_coord` / `subturn` 在 `picoclaw_agent_core` build tag 后，未决 #12）；当前没有实际负载在等。
+> 重开条件：出现真实批量负载（如「逐店归因」）**且**未决 #12 已裁决。接口与 `narrow` 求交设计保留，重开时不用重画。
 
 ### 接口
 
@@ -385,7 +391,7 @@ type Executor interface {
 | 1 | **AR1 ContextKey** | 无。**必须最先做**——AR2/AR3/AR4/AR6 全部依赖它 |
 | 2 | AR5 内核置换 + 汇流 | ACORE-2 九项重锁；AR5-G1 汇流断言 |
 | 3 | AR2 Session Manager · AR3 Context Assembler | 依赖 AR1 与 AR5；两者可并行 |
-| 4 | AR4 Subturn · AR6 Memory · MCP · 路由 · 定时 · 健康检查 | 依赖 AR3（都要经 `Assemble`） |
+| 4 | ~~AR4 Subturn · AR6 Memory · MCP · 路由 · 定时 · 健康检查~~ **已分化（2026-08-26）**：MCP / 定时 / 健康检查**已交付**（C1 L3-B/C/D，且三者均**不经 `Assemble`**——本行原写的依赖对它们不成立）；AR4 / AR6 / 模型路由**按 D44 推迟**，重开条件见该条 | 原写「依赖 AR3」；实测仅 AR4/AR6 成立 |
 
 **AR1 先做的理由**：它是唯一一个「做晚了要返工全部调用点」的模块。先把键做成类型，后面每个模块自然带着保护长出来；后做则每个模块都会先长出裸字符串签名，再逐个改回去。
 

@@ -102,7 +102,7 @@ func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing
 		t.Fatalf("NewClient: %v", err)
 	}
 
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	agent := NewAgent(AgentPorts{})
 	agent.SetLLMClient(client)
 	agent.SetDocumentParser(textDocParser{})
 	agent.SetFileBytesReader(func(_ context.Context, objectName string) ([]byte, error) {

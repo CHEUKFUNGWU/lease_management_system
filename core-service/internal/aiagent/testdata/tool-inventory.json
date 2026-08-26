@@ -1,0 +1,673 @@
+[
+  {
+    "name": "fpna.actions.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fpna_actions",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.actions.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.assumptions.suggest",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fin_models",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.assumptions.suggest_batch",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fin_models",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.budget.variance.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.cashflow.scenario",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.coa.suggest_template",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "statement_templates",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.decision.summary",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.explanations.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fpna_actions",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.management.pre_read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.meeting_actions.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fpna_actions",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.memos.decision.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fpna_memos",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.memos.model_diff.draft",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fpna_memos",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.scenarios.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "fpna_actions",
+        "action": "write"
+      }
+    ]
+  },
+  {
+    "name": "fpna.statement_model.evaluate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.statement_model.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.store_pnl.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "fpna.working_paper.finmodel.generate",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.close.readiness",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "monthly_closing",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.contract.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "contracts",
+        "action": "create"
+      }
+    ]
+  },
+  {
+    "name": "lease.contract.get",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "contracts",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.contract.search",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "contracts",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.deal.simulate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.event.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "events",
+        "action": "create"
+      }
+    ]
+  },
+  {
+    "name": "lease.event.list",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "events",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.file.parse_contract",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "ai_chat",
+        "action": "use"
+      }
+    ]
+  },
+  {
+    "name": "lease.file.parse_contract_batch",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "ai_chat",
+        "action": "use"
+      }
+    ]
+  },
+  {
+    "name": "lease.file.parse_event",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "ai_chat",
+        "action": "use"
+      }
+    ]
+  },
+  {
+    "name": "lease.file.parse_payment_schedule",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "ai_chat",
+        "action": "use"
+      }
+    ]
+  },
+  {
+    "name": "lease.file.triage",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "ai_chat",
+        "action": "use"
+      }
+    ]
+  },
+  {
+    "name": "lease.journal.list",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "monthly_closing",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.measurement.list",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "calculations",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.monthly_closing.batches.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "monthly_closing",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.monthly_closing.entries.preview",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "monthly_closing",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.monthly_closing.lock_status.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "monthly_closing",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.monthly_closing.periods.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "monthly_closing",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.payment_schedule.draft.create",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "payment_schedules",
+        "action": "create"
+      }
+    ]
+  },
+  {
+    "name": "lease.portfolio.summary",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.predeal.simulate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.renewal.decisions",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.renewal.simulate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.report.contract_view.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.report.disclosure_package.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.report.schedule.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.report.sensitivity",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.report.tags.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.report.unit_price.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "lease.working_paper.s1.generate",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.equipment.performance.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.equipment.scenario.simulate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.kpis.store_days.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.operating_facts.store_days.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.operating_facts.stores.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.operating_pulse.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.rent_to_sales.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.store.performance.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.store.scenario.evaluate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.store.scenario.simulate",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.store_days.import.preview",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "master_data",
+        "action": "manage"
+      }
+    ]
+  },
+  {
+    "name": "retail.store_diagnostics.read",
+    "version": "v1",
+    "level": "read",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  },
+  {
+    "name": "retail.working_paper.store.generate",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "reports",
+        "action": "read"
+      }
+    ]
+  }
+]

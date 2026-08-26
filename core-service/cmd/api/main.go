@@ -14,6 +14,7 @@ import (
 	"github.com/lease-management-system/core-service/internal/agentreaders"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
+	"github.com/lease-management-system/core-service/internal/aiagent"
 	"github.com/lease-management-system/core-service/internal/config"
 	"github.com/lease-management-system/core-service/internal/contextassembler"
 	"github.com/lease-management-system/core-service/internal/db"
@@ -185,7 +186,25 @@ func main() {
 	// SI1 Part B: 生产 chat 的会话创建/加载经过 sessionmanager（AR2）——
 	// 独占租约让同一会话的两条消息串行。gateway/runner 平面仍挂 G9。
 	sessionManager := sessionmanager.New(sessionmanager.NewPostgresStore(database.Pool), sessionmanager.Policy{})
-	aiChatHandler := handlers.NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, aiChatRuntimeRepo, operatingFactsRepo, closeReadinessService, controlReaders, fpnaGovernanceRepo, retailKPIRepo, sensitivityReader, fillReader, storePnlAgentReader, finModelRepo, retailKPIRepo, fpnaGovernanceRepo, operatingFactsRepo, agenttooldefs.NewReportSnapshotReader(reportSnapshotBuilder, fpnaGovernanceRepo, operatingFactsRepo, closeControlRepo, mcRepo), draftService).WithSessionOwner(sessionManager).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
+	// C1（架构重构任务书 2026-08-26）：构造参数归组为 AgentPorts，每个仓库只传一次。
+	// 旧位置参数签名曾让 retailKPIRepo / fpnaGovernanceRepo / operatingFactsRepo 各传两遍。
+	aiChatHandler := handlers.NewAIChatHandler(aiChatRuntimeRepo, contractRepo, aiagent.AgentPorts{
+		Contracts:       contractRepo,
+		Closing:         mcRepo,
+		Events:          eventRepo,
+		DraftServices:   []*draftapp.Service{draftService},
+		FileIngest:      fillReader,
+		CloseReadiness:  closeReadinessService,
+		Reports:         agenttooldefs.NewReportSnapshotReader(reportSnapshotBuilder, fpnaGovernanceRepo, operatingFactsRepo, closeControlRepo, mcRepo),
+		RateSensitivity: sensitivityReader,
+		Governance:      fpnaGovernanceRepo,
+		Plans:           fpnaGovernanceRepo,
+		FinModelRepo:    finModelRepo,
+		Controls:        controlReaders,
+		StorePnl:        storePnlAgentReader,
+		OperatingFacts:  operatingFactsRepo,
+		RetailKPI:       retailKPIRepo,
+	}).WithSessionOwner(sessionManager).WithAuditRepository(auditRepo).WithWorkerRunStore(aiRunQueueRepo).WithGuard(agentguard.New(repository.NewAgentUsageStore(database.Pool, 12, 2.0), agentguard.Config{}))
 	// W5-1: document parser seam (ADR-0024 routing). AnyDoc binary is pinned
 	// in the runtime image (Dockerfile); OCR is enabled when a PaddleOCR token is configured.
 	ocrParser := docparse.NewPaddleOCR(docparse.PaddleOCRConfig{

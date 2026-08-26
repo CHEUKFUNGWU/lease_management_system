@@ -14,7 +14,6 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
-	"github.com/lease-management-system/core-service/internal/agentcontext"
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
@@ -22,11 +21,9 @@ import (
 	"github.com/lease-management-system/core-service/internal/aiintake"
 	"github.com/lease-management-system/core-service/internal/contextassembler"
 	"github.com/lease-management-system/core-service/internal/docparse"
-	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/llm"
 	"github.com/lease-management-system/core-service/internal/pagefill"
 	"github.com/lease-management-system/core-service/internal/repository"
-	"github.com/lease-management-system/core-service/internal/services/draftapp"
 	"github.com/lease-management-system/core-service/internal/workingpaper"
 )
 
@@ -142,11 +139,12 @@ func (h *Agent) SkillRegistry() *agentskill.Registry {
 	return h.skillRegistry
 }
 
-// NewWithOperationalReadersAndGovernanceAndRetail is the production
-// constructor: it wires the operating-facts / close-readiness / control /
-// governance / retail seams into the same governed Agent Tool Runtime.
-func NewWithOperationalReadersAndGovernanceAndRetail(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, reports agenttooldefs.ReportReader, draftServices ...*draftapp.Service) *Agent {
-	return newAgent(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, factsReader, reports, draftServices...)
+// NewAgent builds the production Agent from grouped ports (C1, 架构重构任务书
+// 2026-08-26). One field per capability role: main.go passes each repository
+// exactly once, where the old positional constructor took 17 arguments and
+// made three repositories travel through two positions each.
+func NewAgent(ports AgentPorts) *Agent {
+	return newAgent(ports)
 }
 
 // registerCollector is the single implementation of “attempt a tool
@@ -194,151 +192,21 @@ func (c *registerCollector) fail() error {
 		len(c.failed), c.attempted, strings.Join(lines, "\n"))
 }
 
-func newAgent(contractRepo *repository.ContractRepository, mcRepo *repository.MonthlyClosingRepository, eventRepo *repository.EventRepository, performance agenttooldefs.PerformanceReader, closeReadiness agenttooldefs.CloseReadinessReader, controls *agenttooldefs.ControlReaders, governance agenttooldefs.DecisionMemoDraftWriter, retail agenttooldefs.RetailOperationsReader, sensitivity agenttooldefs.SensitivityReader, fillReader agenttooldefs.IngestFileReader, storePnl agenttooldefs.StorePnlReader, finModelRepo *repository.FinModelRepository, facts finadapter.FactsSource, plans *repository.FPnAGovernanceRepository, factsReader agenttooldefs.OperatingFactsReader, reports agenttooldefs.ReportReader, draftServices ...*draftapp.Service) *Agent {
+func newAgent(ports AgentPorts) *Agent {
 	agent := &Agent{
-		contractRepo: contractRepo, mcRepo: mcRepo, eventRepo: eventRepo,
+		contractRepo:  ports.Contracts,
+		mcRepo:        ports.Closing,
+		eventRepo:     ports.Events,
 		skillRegistry: agentskill.ProductionRegistry(),
-		storePnl:      storePnl,
+		storePnl:      ports.StorePnl,
 	}
 	registry := agenttools.NewRegistry()
 	collector := &registerCollector{registry: registry}
-	if contractRepo != nil {
-		collector.add(agenttooldefs.NewContractSearchDefinition(contractRepo))
-		collector.add(agenttooldefs.NewContractGetDefinition(contractRepo))
-		if mcRepo != nil {
-			collector.add(agenttooldefs.NewMeasurementListDefinition(contractRepo, mcRepo))
-			collector.add(agenttooldefs.NewJournalListDefinition(contractRepo, mcRepo))
-		}
-		if eventRepo != nil {
-			collector.add(agenttooldefs.NewEventListDefinition(contractRepo, eventRepo))
-		}
-	}
-	for _, definition := range agent.fileParseDefinitions() {
-		collector.add(definition)
-	}
-	collector.add(agenttooldefs.NewDocTriageDefinition(nil))
-	collector.add(agenttooldefs.NewS1GenerateDefinition())
-	// The fill seam registers without a file reader for now (D-D2): the tool
-	// refuses honestly until W5 wires minio-go into core-service.
-	collector.add(agenttooldefs.NewRetailIngestPreviewDefinition(fillReader))
-	// B-2：月结只读面（跑批状态 / 期间级分录预览 / 有分录期间 / 锁账状态），
-	// 仅依赖 mcRepo。写口（生成、审批、过账、红冲、锁账、解锁、ERP 回写）
-	// 一律不开放给 Agent——那是审批与锁账控制的核心。
-	if mcRepo != nil {
-		collector.add(agenttooldefs.NewMonthlyClosingBatchesDefinition(mcRepo))
-		collector.add(agenttooldefs.NewMonthlyClosingEntriesPreviewDefinition(mcRepo))
-		collector.add(agenttooldefs.NewMonthlyClosingPeriodsDefinition(mcRepo))
-		collector.add(agenttooldefs.NewMonthlyClosingLockStatusDefinition(mcRepo))
-	}
-	// SM7：三表模型工具注册。生产接线在下面 finModelRepo 的 else 分支注册
-	// 真实端口；无仓库（测试/轻量适配器）时才注册 nil 版（工具诚实拒绝，
-	// 绝不让 nil 注册挡住生产端口——P0-8）。
-	if finModelRepo == nil {
-		collector.add(agenttooldefs.NewStatementModelReadDefinition(nil))
-		collector.add(agenttooldefs.NewStatementModelEvaluateDefinition(nil))
-		collector.add(agenttooldefs.NewFinModelPaperDefinition(nil))
-		// 假设建议等写口（S4）：未接线保持诚实拒绝。写入路径全部 draft-only。
-		collector.add(agenttooldefs.NewAssumptionSuggestionDefinition(nil))
-		collector.add(agenttooldefs.NewAssumptionSuggestionBatchDefinition(nil))
-		collector.add(agenttooldefs.NewModelDiffMemoDefinition(nil))
-		// F1：科目树草稿生成。未接线保持诚实拒绝。
-		collector.add(agenttooldefs.NewCoaSuggestTemplateDefinition(nil))
-	} else {
-		writer := finadapter.NewDraftWriter(finModelRepo)
-		var plansCapex finadapter.CapexSource
-		if plans != nil {
-			plansCapex = plans
-		}
-		ports := finadapter.NewPortsBuilder(finModelRepo, facts).WithSources(mcRepo, nil, plansCapex)
-		reader := finadapter.NewStatementReader(finModelRepo)
-		collector.add(agenttooldefs.NewStatementModelReadDefinition(reader))
-		collector.add(agenttooldefs.NewStatementModelEvaluateDefinition(ports))
-		collector.add(agenttooldefs.NewFinModelPaperDefinition(ports))
-		collector.add(agenttooldefs.NewAssumptionSuggestionDefinition(writer))
-		collector.add(agenttooldefs.NewAssumptionSuggestionBatchDefinition(writer))
-		// F1：科目树草稿生成，draft-only，source=ai_suggestion。
-		collector.add(agenttooldefs.NewCoaSuggestTemplateDefinition(agenttooldefs.NewCoaTemplateStore(finModelRepo)))
-		if plans != nil {
-			collector.add(agenttooldefs.NewModelDiffMemoDefinition(plans))
-		} else {
-			collector.add(agenttooldefs.NewModelDiffMemoDefinition(nil))
-		}
-	}
-	if len(draftServices) > 0 && draftServices[0] != nil {
-		collector.add(agenttooldefs.NewContractDraftDefinition(draftServices[0]))
-		collector.add(agenttooldefs.NewPaymentScheduleDraftDefinition(draftServices[0]))
-		if eventRepo != nil {
-			collector.add(agenttooldefs.NewEventDraftDefinition(draftServices[0]))
-		}
-	}
-	if performance != nil {
-		collector.add(agenttooldefs.NewPortfolioSummaryDefinition(performance))
-		collector.add(agenttooldefs.NewManagementPreReadDefinition(performance))
-		collector.add(agenttooldefs.NewStorePerformanceDefinition(performance))
-		collector.add(agenttooldefs.NewRentToSalesDefinition(performance))
-		collector.add(agenttooldefs.NewEquipmentPerformanceDefinition(performance))
-		collector.add(agenttooldefs.NewActionListDefinition(performance))
-		if writer, ok := performance.(agenttooldefs.ActionDraftWriter); ok {
-			collector.add(agenttooldefs.NewActionDraftDefinition(writer))
-			collector.add(agenttooldefs.NewExplanationDraftDefinition(writer))
-			collector.add(agenttooldefs.NewMeetingActionDraftDefinition(writer))
-		}
-		if writer, ok := performance.(agenttooldefs.ScenarioDraftWriter); ok {
-			collector.add(agenttooldefs.NewScenarioDraftDefinition(writer))
-		}
-	}
-	if governance != nil {
-		collector.add(agenttooldefs.NewDecisionMemoDraftDefinition(governance))
-	}
-	for _, definition := range []agenttools.ToolDefinition{
-		agenttooldefs.NewStoreScenarioDefinition(),
-		agenttooldefs.NewEquipmentScenarioDefinition(),
-		agenttooldefs.NewDealSimulationDefinition(),
-		agenttooldefs.NewPreDealSimulationDefinition(),
-		agenttooldefs.NewRenewalSimulationDefinition(),
-		agenttooldefs.NewDecisionSummaryDefinition(),
-	} {
-		collector.add(definition)
-	}
-	if closeReadiness != nil {
-		collector.add(agenttooldefs.NewCloseReadinessDefinition(closeReadiness))
-	}
-	if controls != nil {
-		collector.add(agenttooldefs.NewBudgetVarianceDefinition(controls.Budget))
-		collector.add(agenttooldefs.NewCashflowScenarioDefinition(controls.Cashflow))
-		collector.add(agenttooldefs.NewRenewalDecisionDefinition(controls.Renewal))
-	}
-	// B-3：经营事实只读面。事实写入走导入管线与审批，接口只有读方法。
-	if factsReader != nil {
-		collector.add(agenttooldefs.NewOperatingStoresDefinition(factsReader))
-		collector.add(agenttooldefs.NewOperatingStoreDaysDefinition(factsReader))
-	}
-	if retail != nil {
-		collector.add(agenttooldefs.NewRetailOperatingPulseDefinition(retail))
-		collector.add(agenttooldefs.NewRetailStoreDiagnosticsDefinition(retail))
-		collector.add(agenttooldefs.NewRetailScenarioEvaluateDefinition(retail))
-		collector.add(agenttooldefs.NewRetailPaperDefinition(retail))
-		// B-3：store-day 指标聚合视图，复用 retailKPIRepo 的 QueryFacts 接缝。
-		collector.add(agenttooldefs.NewKpiStoreDaysDefinition(retail))
-	}
-	// B-4：报表只读面（摊销/负债滚动/现金流预测、披露与关账包、合同汇总
-	// 与准则对比、单价对比、标签）。导出路由（reports:export）不包——文件类
-	// Artifact 走 LevelDraft + Review Gate，与只读报表不是一件事。
-	if reports != nil {
-		collector.add(agenttooldefs.NewReportScheduleDefinition(reports))
-		collector.add(agenttooldefs.NewReportDisclosurePackageDefinition(reports))
-		collector.add(agenttooldefs.NewReportContractViewDefinition(reports))
-		collector.add(agenttooldefs.NewReportUnitPriceDefinition(reports))
-		collector.add(agenttooldefs.NewReportTagsDefinition(reports))
-	}
-	if sensitivity != nil {
-		collector.add(agenttooldefs.NewSensitivityDefinition(sensitivity))
-	}
-	// B-1：单店利润表投影。P0-8：storePnl 未接线时不注册（诚实缺席，
-	// 绝不注册 nil 端口版挡住真实端口）；接线后只有读工具，零写入。
-	if storePnl != nil {
-		collector.add(agenttooldefs.NewStorePnlReadDefinition(storePnl))
-	}
+	// C1：注册面按 lease / fpna / retail 三命名空间拆成域 bundle（见
+	// tool_bundles.go），agent.go 只组装。fail-fast 语义在 registerCollector。
+	registerLeaseTools(agent, collector, ports)
+	registerFPnATools(collector, ports)
+	registerRetailTools(collector, ports)
 	agent.registrationAttempted = collector.attempted
 	agent.registrationFailed = len(collector.failed)
 	// Fail-fast: a tool that did not register is invisible to the Agent.
@@ -599,208 +467,6 @@ func hasGlobalPermission(permissions []string) bool {
 
 // confidencePointer carries the answer confidence forward for persistence;
 // a zero or unset confidence is treated as absent rather than fabricated.
-func confidencePointer(confidence float64) *float64 {
-	if confidence <= 0 {
-		return nil
-	}
-	return &confidence
-}
-
-// confidenceReasonFor derives the degradation reason from signals the agent
-// already produced. It explains why the confidence is what it is; the
-// confidence calculation itself is untouched.
-func confidenceReasonFor(response Response) *string {
-	if strings.EqualFold(response.Model, "fallback") {
-		reason := "AI 服务暂不可用，以下为系统数据摘要"
-		return &reason
-	}
-	if len(response.ReviewPrompts) > 0 {
-		reason := "部分内容需人工复核"
-		return &reason
-	}
-	return nil
-}
-
-func ProjectResult(response Response) aichat.Result {
-	result := aichat.Result{
-		Answer: response.Answer, Model: response.Model, Sources: response.Sources,
-		ToolCalls: response.ToolCalls, ReviewPrompts: response.ReviewPrompts,
-		ReviewRequired:   len(response.ReviewPrompts) > 0,
-		Confidence:       confidencePointer(response.Confidence),
-		ConfidenceReason: confidenceReasonFor(response),
-		MeasuredTokens:   response.MeasuredTokens,
-	}
-	if len(response.DraftContracts) > 0 {
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactContractDraft), Title: "合同草稿", ReviewRequired: true,
-			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: response.EvidenceRefs,
-			EvidenceComplete: response.BatchSummary != nil && response.BatchSummary.EvidenceComplete,
-			ReviewReasons:    batchReviewReasons(response.BatchSummary), ModelVersion: response.Model, RuleVersion: "lease-agent-rule.v1",
-			Data: map[string]any{"contracts": response.DraftContracts, "summary": response.BatchSummary},
-		})
-	}
-	if len(response.DraftPaymentSchedules) > 0 {
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactPaymentScheduleDraft), Title: "付款计划草稿", ReviewRequired: true,
-			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: response.EvidenceRefs,
-			EvidenceComplete: response.PaymentScheduleSummary != nil && response.PaymentScheduleSummary.EvidenceComplete,
-			ReviewReasons:    paymentReviewReasons(response.PaymentScheduleSummary), ModelVersion: response.Model, RuleVersion: "lease-agent-rule.v1",
-			Data: map[string]any{"schedules": response.DraftPaymentSchedules, "summary": response.PaymentScheduleSummary},
-		})
-	}
-	if response.AuditPack != nil {
-		reviewReasons := []string{"audit_scope_confirmation", "report_basis_confirmation"}
-		evidenceComplete := len(response.EvidenceRefs) > 0
-		if !evidenceComplete {
-			reviewReasons = append(reviewReasons, "evidence_incomplete")
-		}
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactAuditPack), Title: "审计包准备摘要", ReviewRequired: true,
-			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: response.EvidenceRefs,
-			EvidenceComplete: evidenceComplete, ReviewReasons: reviewReasons,
-			ModelVersion: response.Model, RuleVersion: "audit-pack-rule.v1",
-			Data: response.AuditPack,
-		})
-	}
-	if response.ProfitWaterfall != nil {
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type:          string(agentartifact.ArtifactChartSVG),
-			Title:         "利润差异瀑布图",
-			SchemaVersion: agentartifact.SchemaVersion,
-			Data: map[string]any{
-				"chart_svg":           response.ProfitWaterfall.SVG,
-				"decomposition_order": response.ProfitWaterfall.DecompositionOrder,
-				"data_classification": response.ProfitWaterfall.DataClassification,
-				"status":              response.ProfitWaterfall.Status,
-				"currency":            response.ProfitWaterfall.Currency,
-			},
-		})
-	}
-	if response.ReportExplanation != nil {
-		evidenceRefs := response.EvidenceRefs
-		if len(evidenceRefs) == 0 {
-			evidenceRefs = evidenceReferencesFromSources(response.Sources)
-		}
-		evidenceComplete := len(evidenceRefs) > 0
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactReportExplanation), Title: "报表解释摘要", ReviewRequired: true,
-			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
-			EvidenceComplete: evidenceComplete, ReviewReasons: []string{"report_basis_confirmation", "ai_explanation_review"},
-			ModelVersion: response.Model, RuleVersion: "report-explanation-rule.v1", Data: response.ReportExplanation,
-		})
-	}
-	if response.EventDraft != nil {
-		evidenceRefs := response.EvidenceRefs
-		if len(evidenceRefs) == 0 {
-			evidenceRefs = evidenceReferencesFromSources(response.Sources)
-		}
-		evidenceComplete := len(evidenceRefs) > 0
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactEventDraft), Title: "合同事件草稿", ReviewRequired: true,
-			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
-			EvidenceComplete: evidenceComplete, ReviewReasons: []string{"event_draft_review", "accounting_treatment_missing"},
-			ModelVersion: response.Model, RuleVersion: "event-draft-rule.v1",
-			Data: map[string]any{"event": response.EventDraft},
-		})
-	}
-	if response.PageFill != nil {
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactPageFill), Title: "零售导入预填",
-			ReviewRequired:   true,
-			SchemaVersion:    agentartifact.SchemaVersion,
-			EvidenceComplete: true,
-			ReviewReasons:    []string{"import_mapping_review"},
-			ModelVersion:     response.Model,
-			RuleVersion:      "page-fill-rule.v1",
-			Data:             response.PageFill,
-		})
-	}
-	if response.WorkingPaper != nil {
-		paper := *response.WorkingPaper
-		paper = workingpaper.Build(paper, time.Now())
-		evidenceRefs := response.EvidenceRefs
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactWorkingPaper), Title: paper.Title,
-			ReviewRequired:   true,
-			SchemaVersion:    agentartifact.SchemaVersion,
-			EvidenceRefs:     evidenceRefs,
-			EvidenceComplete: false,
-			ReviewReasons:    workingPaperReviewReasons(paper),
-			ModelVersion:     response.Model,
-			RuleVersion:      "s1-paper-rule.v1",
-			Data:             paper,
-		})
-	}
-	if response.RetailActionProposal != nil {
-		proposal := response.RetailActionProposal
-		evidenceRefs := response.EvidenceRefs
-		if len(evidenceRefs) == 0 {
-			evidenceRefs = evidenceReferencesFromSources(response.Sources)
-		}
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: "retail_action_proposal", Title: proposal.Title, ReviewRequired: true,
-			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
-			EvidenceComplete: proposal.EvidenceComplete && len(evidenceRefs) > 0,
-			ReviewReasons:    []string{"retail_action_review", "scenario_workbench_confirmation"},
-			ModelVersion:     response.Model, RuleVersion: "retail-operations-rule.v1", Data: proposal,
-		})
-	}
-	appendDataQualityArtifacts(&result, response)
-	return result
-}
-
-func appendDataQualityArtifacts(result *aichat.Result, response Response) {
-	if result == nil {
-		return
-	}
-	appendOne := func(title, source string, missingFields, warnings, reasons []string, intakeID string, evidenceComplete bool) {
-		if len(missingFields) == 0 && len(warnings) == 0 {
-			return
-		}
-		reviewReasons := append([]string{"data_quality_review"}, reasons...)
-		evidenceRefs := append([]agentartifact.EvidenceReference(nil), response.EvidenceRefs...)
-		if len(evidenceRefs) == 0 && strings.TrimSpace(intakeID) != "" {
-			evidenceRefs = []agentartifact.EvidenceReference{{
-				ReferenceID: intakeID, Complete: false, MissingReason: "解析任务未提供可定位的原文证据",
-			}}
-		}
-		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactDataQualityIssues), Title: title, ReviewRequired: true,
-			SchemaVersion: agentartifact.SchemaVersion, EvidenceRefs: evidenceRefs,
-			EvidenceComplete: evidenceComplete && len(evidenceRefs) > 0, ReviewReasons: reviewReasons,
-			ModelVersion: response.Model, RuleVersion: "agent-data-quality-rule.v1",
-			Data: map[string]any{
-				"source": source, "missing_fields": missingFields, "warnings": warnings,
-				"review_reasons": reviewReasons, "intake_id": intakeID,
-			},
-		})
-	}
-	if response.BatchSummary != nil {
-		appendOne("合同数据质量问题", "contract_batch", response.BatchSummary.MissingFields,
-			response.BatchSummary.Warnings, response.BatchSummary.ReviewReasons, response.BatchSummary.IntakeID,
-			response.BatchSummary.EvidenceComplete)
-	}
-	if response.PaymentScheduleSummary != nil {
-		appendOne("付款计划数据质量问题", "payment_schedule", response.PaymentScheduleSummary.MissingFields,
-			response.PaymentScheduleSummary.Warnings, response.PaymentScheduleSummary.ReviewReasons,
-			response.PaymentScheduleSummary.IntakeID, response.PaymentScheduleSummary.EvidenceComplete)
-	}
-}
-
-func batchReviewReasons(summary *BatchParseSummary) []string {
-	if summary == nil {
-		return []string{"assist_mode"}
-	}
-	return append([]string(nil), summary.ReviewReasons...)
-}
-
-func paymentReviewReasons(summary *PaymentScheduleParseSummary) []string {
-	if summary == nil {
-		return []string{"assist_mode"}
-	}
-	return append([]string(nil), summary.ReviewReasons...)
-}
-
 func requestFromRuntimeInput(input aichat.Input) Request {
 	return Request{
 		SessionID: input.SessionID, Message: input.Message,
@@ -2234,148 +1900,6 @@ var errAssemblerNotApplicable = errors.New("context assembler not applicable")
 // assembleTurnHistory runs the AR3 Assemble step for this chat turn: stored,
 // ownership-checked history plus this request's wire tool schemas, counted
 // and compacted against the model's budget.
-func (h *Agent) assembleTurnHistory(ctx context.Context, legalEntityID, userID string, req Request, toolDefs []contextassembler.ToolDef) (contextassembler.Prompt, error) {
-	if h == nil || h.ctxAssembler == nil || strings.TrimSpace(req.SessionID) == "" {
-		return contextassembler.Prompt{}, errAssemblerNotApplicable
-	}
-	client, err := h.llm()
-	if err != nil {
-		return contextassembler.Prompt{}, err
-	}
-	// AR1 D-C9b 消费方策略：global 上下文（无具体法人）没有可归属的记忆，
-	// AR3 拒绝 global 键。这里在 seam 处显式回落 legacy 路径（与 AR3 的
-	// Read 拒绝同源：记忆不跨法人搬运），而不是让 Assemble 硬报错。
-	if scope, ok := access.ScopeFromContext(ctx); ok && scope.Global {
-		return contextassembler.Prompt{}, errAssemblerNotApplicable
-	}
-	key, err := agentcontext.KeyFrom(agenttools.Principal{
-		UserID: userID,
-		Scope:  access.Scope{LegalEntityID: legalEntityID},
-	}, req.SessionID, agentcontext.ClassificationProduction)
-	if err != nil {
-		// An identity that cannot form a key cannot be checked against stored
-		// history; those requests keep the legacy path. Registered limitation:
-		// the chat plane persists every session as 'production' today (062
-		// column default), so the classification dimension is fixed until a
-		// simulated-context chat exists.
-		return contextassembler.Prompt{}, errAssemblerNotApplicable
-	}
-	turn := contextassembler.Turn{
-		Model:    client.Config().Model,
-		ToolDefs: toolDefs,
-		// AF1-b contract: the current user message is NOT placed here. It is
-		// persisted by aichat.prepare before execution and read back as the
-		// final history row, so Assemble returns it as the prompt's LAST
-		// message — exactly once. Turn.Messages stays a port for future
-		// fresh-message consumers (AR6); the chat plane keeps it empty.
-	}
-	prompt, err := h.ctxAssembler.Assemble(ctx, key, turn)
-	if err != nil {
-		return contextassembler.Prompt{}, err
-	}
-	// RT1-A: feed the observability sink from the returned Prompt. Measured
-	// and estimated travel as two separate series (AF1-a lesson: never merge
-	// truth and guess into one number). WouldCompact is the pre-warning
-	// signal that fires before any drop; Compacted is the post-hoc record.
-	if h.contextMetrics != nil {
-		h.contextMetrics.ObserveContext(turn.Model,
-			prompt.Tokens-prompt.EstimatedTokens,
-			prompt.EstimatedTokens,
-			prompt.Budget,
-			prompt.Compacted,
-			prompt.WouldCompact || prompt.Compacted,
-		)
-	}
-	// Defensive invariant: if a future path ever executes without persisting
-	// the trigger first, the current message would silently vanish from the
-	// wire. Refuse loudly instead.
-	if n := len(prompt.Messages); n == 0 || prompt.Messages[n-1].Role != "user" {
-		lastRole := ""
-		if n > 0 {
-			lastRole = prompt.Messages[n-1].Role
-		}
-		return contextassembler.Prompt{}, fmt.Errorf(
-			"assembled prompt for session %s does not end with the current user message (%d messages, last role %q)",
-			key.SessionID(), n, lastRole)
-	}
-	return prompt, nil
-}
-
-// fileParseToolDefs projects the static file-triage tool table onto the
-// assembler's ToolDef shape. These schemas ride the triage request's `tools`
-// param, so the provider counts them — they belong in the budget (AF4).
-func fileParseToolDefs() []contextassembler.ToolDef {
-	defs := make([]contextassembler.ToolDef, 0, len(fileParseTools))
-	for _, t := range fileParseTools {
-		fn, _ := t["function"].(map[string]interface{})
-		name, _ := fn["name"].(string)
-		desc, _ := fn["description"].(string)
-		paramsJSON, _ := json.Marshal(fn["parameters"])
-		defs = append(defs, contextassembler.ToolDef{Name: name, Description: desc, JSON: string(paramsJSON)})
-	}
-	return defs
-}
-
-// assembledConversation resolves the wire conversation for one LLM round:
-// the assembled prompt under the flag, the legacy history+current-message
-// fold otherwise. toolDefs carries ONLY the tool schemas that actually ride
-// THIS request's tools param — plain chat sends none (adjudication: budget
-// predicts provider-side overflow, and the provider counts what is sent;
-// counting absent schemas would be a typed number with guessed semantics).
-func (h *Agent) assembledConversation(ctx context.Context, legalEntityID, userIDStr string, req Request, toolDefs []contextassembler.ToolDef, emit func(context.Context, string, any) error) ([]ChatMessage, error) {
-	prompt, asmErr := h.assembleTurnHistory(ctx, legalEntityID, userIDStr, req, toolDefs)
-	switch {
-	case asmErr == nil:
-		// AF1-b invariant: the assembled prompt already ends with the current
-		// user message — pass it verbatim, never append again.
-		conversation := chatMessagesFromPrompt(prompt.Messages)
-		if prompt.Compacted {
-			// D-C16 evidence trail: what left the prompt is recorded as refs
-			// resolvable back to ai_chat_messages rows — compaction deleted
-			// nothing, and this event is the proof it happened.
-			if err := emitAgentEvent(ctx, emit, "context_compacted", map[string]interface{}{
-				"dropped":          prompt.Dropped,
-				"preserved":        prompt.Preserved,
-				"budget":           prompt.Budget,
-				"tokens":           prompt.Tokens,
-				"estimated_tokens": prompt.EstimatedTokens,
-			}); err != nil {
-				return nil, err
-			}
-		}
-		return conversation, nil
-	case errors.Is(asmErr, errAssemblerNotApplicable):
-		return withCurrentMessage(req.History, req.Message), nil
-	default:
-		// Assemble failures are real failures (unconfigured budget geometry,
-		// storage refusal). They stop the turn loudly instead of silently
-		// degrading to an unbounded prompt.
-		return nil, asmErr
-	}
-}
-
-// chatMessagesFromPrompt projects assembled messages back onto the wire
-// history shape. Kind never survives the projection because ai_chat_messages
-// stores only text today — the audit-bearing taxonomy activates when tool
-// messages enter history (registered future work, not silently dropped).
-func chatMessagesFromPrompt(messages []contextassembler.Message) []ChatMessage {
-	out := make([]ChatMessage, 0, len(messages))
-	for _, m := range messages {
-		out = append(out, ChatMessage{Role: m.Role, Content: m.Text})
-	}
-	return out
-}
-
-// measuredInputTokens extracts the provider-reported prompt tokens from a
-// chat round's usage metadata. A missing block or count yields 0 — the
-// "never measured" sentinel, never a fabricated number.
-func measuredInputTokens(usage *llm.UsageMetadata) int {
-	if usage == nil || usage.InputTokens == nil {
-		return 0
-	}
-	return *usage.InputTokens
-}
-
 // callLLMWithTools is the function-calling variant of callLLM. Same AF1-b
 // contract: conversation is the full post-system message list including the
 // current user message exactly once. It keeps the existing single-tool-call

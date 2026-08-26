@@ -85,7 +85,7 @@ func TestPlannerPrefersCurrentIntent(t *testing.T) {
 }
 
 func TestPlannerDoesNotBypassSkillRoleRestriction(t *testing.T) {
-	agent := NewWithOperationalReadersAndGovernanceAndRetail(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	agent := NewAgent(AgentPorts{})
 	plan := agent.Plan(aichat.Input{Message: "生成审计包", Role: "editor", SkillID: "audit_pack", SkillVersion: "v1"}, nil)
 	if plan.AgentMode || plan.SkillID != "" {
 		t.Fatalf("restricted explicit skill should not be selected: %+v", plan)

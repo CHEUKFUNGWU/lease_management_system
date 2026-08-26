@@ -47,6 +47,7 @@ func (registrationPerfStub) ListEquipmentFacts(context.Context, access.EntityFil
 func (registrationPerfStub) ListActions(context.Context, access.EntityFilter, string, string, string) ([]*repository.FPnAActionItem, error) {
 	return nil, nil
 }
+
 // OperatingFactsRepository 同时实现写口（main.go 把 operatingFactsRepo 传给
 // performance 参数），桩必须同样实现，否则全表面少 4 个 draft 工具，守卫量级不足。
 func (registrationPerfStub) CreateAction(context.Context, *repository.FPnAActionItem) (*repository.FPnAActionItem, error) {
@@ -54,6 +55,12 @@ func (registrationPerfStub) CreateAction(context.Context, *repository.FPnAAction
 }
 func (registrationPerfStub) CreateScenarioDraft(context.Context, *repository.FPnAScenarioDraft) (*repository.FPnAScenarioDraft, error) {
 	return nil, nil
+}
+
+// C1：OperatingFactsSource 合并了 performance 与 factsReader 两个角色
+// （生产里 operatingFactsRepo 一个仓库同时扮演），桩补上 B-3 读面的方法。
+func (registrationPerfStub) ListRetailStoreDayFactsPage(context.Context, access.EntityFilter, string, string, []string, string, int, int) (*repository.RetailStoreDayFactsPage, error) {
+	return &repository.RetailStoreDayFactsPage{}, nil
 }
 
 type registrationGovStub struct{}
@@ -69,7 +76,7 @@ func (registrationCloseStub) Evaluate(context.Context, closereadiness.Command) (
 }
 
 // registrationRetailStub 同时满足 RetailOperationsReader 与 finadapter.FactsSource
-//（两者 QueryFacts 签名相同；生产里 retailKPIRepo 同时扮演这两个端口）。
+// （两者 QueryFacts 签名相同；生产里 retailKPIRepo 同时扮演这两个端口）。
 type registrationRetailStub struct{}
 
 func (registrationRetailStub) QueryFacts(context.Context, string, string, string, string, string, string, []string) (*repository.RetailKPIFactSet, error) {
@@ -107,29 +114,27 @@ func (registrationRenewalStub) ReadDecisions(context.Context, access.EntityFilte
 // productionWire mirrors the cmd/api/main.go production wiring with every port
 // non-nil. Any silent registration drop in that surface must red the guard.
 func productionWire() *Agent {
-	return newAgent(
-		repository.NewContractRepository(nil),
-		repository.NewMonthlyClosingRepository(nil),
-		repository.NewEventRepository(nil),
-		registrationPerfStub{},
-		registrationCloseStub{},
-		&agenttooldefs.ControlReaders{
+	return newAgent(AgentPorts{
+		Contracts:      repository.NewContractRepository(nil),
+		Closing:        repository.NewMonthlyClosingRepository(nil),
+		Events:         repository.NewEventRepository(nil),
+		OperatingFacts: registrationPerfStub{},
+		CloseReadiness: registrationCloseStub{},
+		Controls: &agenttooldefs.ControlReaders{
 			Budget:   registrationBudgetStub{},
 			Cashflow: registrationCashflowStub{},
 			Renewal:  registrationRenewalStub{},
 		},
-		registrationGovStub{},
-		registrationRetailStub{},
-		registrationSensStub{},
-		registrationFillStub{},
-		registrationStorePnlStub{},
-		repository.NewFinModelRepository(nil),
-		registrationRetailStub{}, // facts
-		repository.NewFPnAGovernanceRepository(nil),
-		registrationFactsStub{},
-		registrationReportStub{},
-		draftapp.NewService(nil, nil),
-	)
+		Governance:      registrationGovStub{},
+		RetailKPI:       registrationRetailStub{},
+		RateSensitivity: registrationSensStub{},
+		FileIngest:      registrationFillStub{},
+		StorePnl:        registrationStorePnlStub{},
+		FinModelRepo:    repository.NewFinModelRepository(nil),
+		Plans:           repository.NewFPnAGovernanceRepository(nil),
+		Reports:         registrationReportStub{},
+		DraftServices:   []*draftapp.Service{draftapp.NewService(nil, nil)},
+	})
 }
 
 // registrationReportStub satisfies agenttooldefs.ReportReader so the full

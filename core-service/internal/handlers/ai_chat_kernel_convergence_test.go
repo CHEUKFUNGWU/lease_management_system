@@ -21,9 +21,7 @@ import (
 // 行为层证据（生产装配下工具调用真实穿越 HookManager 派发、九控制逐项
 // 红→绿→红）在 internal/agentkernel/chatexec 的 mutation_production_test.go。
 func TestProductionChatWiringRunsThroughKernelExecutor(t *testing.T) {
-	handler := NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
+	handler := NewAIChatHandler(nil, nil, aiagent.AgentPorts{})
 	if handler == nil || handler.agentRuntime == nil {
 		t.Fatal("production constructor produced no runtime")
 	}
@@ -37,9 +35,7 @@ func TestExecutorKindDiscriminatesLegacyWiring(t *testing.T) {
 	// The legacy shape — executor = the agent itself — is exactly what the
 	// production line looked like before AR5d. Feeding it to the same
 	// discriminator must NOT satisfy the kernel assertion.
-	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
+	agent := aiagent.NewAgent(aiagent.AgentPorts{})
 	legacyRuntime := aichat.NewRuntime[aiagent.Response](nil, agent, agent, aiagent.ProjectResult, aichat.Options{})
 	if got, kernel := legacyRuntime.ExecutorKind(), "*chatexec.Executor"; got == kernel {
 		t.Fatalf("legacy wiring reports %q — the G1 discriminator cannot distinguish old from new", got)

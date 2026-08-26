@@ -12,13 +12,11 @@ import (
 	"github.com/lease-management-system/core-service/internal/agentkernel/chatexec"
 	"github.com/lease-management-system/core-service/internal/agentskill"
 	"github.com/lease-management-system/core-service/internal/agenttools"
-	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
 	"github.com/lease-management-system/core-service/internal/aiagent"
 	"github.com/lease-management-system/core-service/internal/aichat"
 	"github.com/lease-management-system/core-service/internal/contextassembler"
 	"github.com/lease-management-system/core-service/internal/docparse"
 	"github.com/lease-management-system/core-service/internal/errcontract"
-	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
 	"github.com/lease-management-system/core-service/internal/middleware"
 	"github.com/lease-management-system/core-service/internal/repository"
 	"github.com/lease-management-system/core-service/internal/services/agentguard"
@@ -146,30 +144,18 @@ func (h *AIChatHandler) SetFileBytesReader(f aiagent.FileBytesReader) {
 	h.agent.SetFileBytesReader(f)
 }
 
-// NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail is the
-// production constructor used by cmd/api wiring.
-func NewAIChatHandlerWithOperationalReadersAndGovernanceAndRetail(
-	contractRepo *repository.ContractRepository,
-	mcRepo *repository.MonthlyClosingRepository,
-	eventRepo *repository.EventRepository,
-	runtimeRepo *repository.AIChatRuntimeRepository,
-	performance agenttooldefs.PerformanceReader,
-	closeReadiness agenttooldefs.CloseReadinessReader,
-	controls *agenttooldefs.ControlReaders,
-	governance agenttooldefs.DecisionMemoDraftWriter,
-	retail agenttooldefs.RetailOperationsReader,
-	sensitivity agenttooldefs.SensitivityReader,
-	fillReader agenttooldefs.IngestFileReader,
-	storePnl agenttooldefs.StorePnlReader,
-	finModelRepo *repository.FinModelRepository,
-	facts finadapter.FactsSource,
-	plans *repository.FPnAGovernanceRepository,
-	factsReader agenttooldefs.OperatingFactsReader,
-	reports agenttooldefs.ReportReader,
-	draftServices ...*draftapp.Service,
-) *AIChatHandler {
-	agent := aiagent.NewWithOperationalReadersAndGovernanceAndRetail(contractRepo, mcRepo, eventRepo, performance, closeReadiness, controls, governance, retail, sensitivity, fillReader, storePnl, finModelRepo, facts, plans, factsReader, reports, draftServices...)
-	handler := &AIChatHandler{agent: agent, runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: firstDraftService(draftServices), toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
+// NewAIChatHandler is the production constructor used by cmd/api wiring
+// (C1, 架构重构任务书 2026-08-26). The agent tool surface takes grouped
+// ports: one field per capability role, so each production repository is
+// passed exactly once — the previous positional constructor made main.go
+// pass retailKPIRepo / fpnaGovernanceRepo / operatingFactsRepo twice each.
+func NewAIChatHandler(runtimeRepo *repository.AIChatRuntimeRepository, contractRepo *repository.ContractRepository, ports aiagent.AgentPorts) *AIChatHandler {
+	agent := aiagent.NewAgent(ports)
+	var draftService *draftapp.Service
+	if len(ports.DraftServices) > 0 {
+		draftService = ports.DraftServices[0]
+	}
+	handler := &AIChatHandler{agent: agent, runtimeRepo: runtimeRepo, contractRepo: contractRepo, draftService: draftService, toolRuntime: agent.ToolRuntime(), skillRegistry: agent.SkillRegistry()}
 	// AR5d convergence (ADR-0028 §5): the chat plane's executor is the kernel
 	// adapter. Persistence, planning and projection keep their previous
 	// injections; only the executor changes. The guarded convergence assertion

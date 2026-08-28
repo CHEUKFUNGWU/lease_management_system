@@ -37,7 +37,8 @@
       "version": "v1",
       "allowed_tools": [
         "lease.file.parse_payment_schedule",
-        "lease.payment_schedule.draft.create"
+        "lease.payment_schedule.draft.create",
+        "lease.payment_schedule.fill.draft"
       ],
       "artifact_types": [
         "payment_schedule_draft"
@@ -103,7 +104,8 @@
       "role": "editor",
       "expected_tools": [
         "lease.file.parse_payment_schedule",
-        "lease.payment_schedule.draft.create"
+        "lease.payment_schedule.draft.create",
+        "lease.payment_schedule.fill.draft"
       ],
       "expected_artifact_types": [
         "payment_schedule_draft"

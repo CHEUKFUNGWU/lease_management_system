@@ -118,8 +118,13 @@ func ProjectResult(response Response) aichat.Result {
 		})
 	}
 	if response.PageFill != nil {
+		// 卡片标题跟目标页走：合同工作台的付款计划预填不能冒充零售导入。
+		title := "零售导入预填"
+		if response.PageFill.TargetPage == "contract-workspace" {
+			title = "付款计划预填"
+		}
 		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
-			Type: string(agentartifact.ArtifactPageFill), Title: "零售导入预填",
+			Type: string(agentartifact.ArtifactPageFill), Title: title,
 			ReviewRequired:   true,
 			SchemaVersion:    agentartifact.SchemaVersion,
 			EvidenceComplete: true,

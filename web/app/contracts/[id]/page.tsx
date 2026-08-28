@@ -2,6 +2,7 @@
 
 import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
 
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -19,6 +20,7 @@ import {
   Tabs,
   Timeline,
   Alert,
+  message,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -50,6 +52,8 @@ import type {
   PaymentSchedule,
 } from "./workspace/types";
 import { useContractWorkspace } from "./workspace/useContractWorkspace";
+import { applyScheduleFill, type ScheduleFillSummary } from "./workspace/scheduleFill";
+import { apiRequest } from "../../lib/api";
 import { tableScrollX } from "../../lib/tableScroll";
 
 export default function ContractDetailPage() {
@@ -85,6 +89,49 @@ export default function ContractDetailPage() {
     activeTab,
     loading: workspaceLoading,
   } = state;
+
+  // agent-universal-pagefill-v1 P0-B①：Agent 产出的付款计划预填经
+  // ?schedule_fill=<artifactId> 深链落到本页。payload 只含人提供的信封字段，
+  // first_row 建议进表单前先过 applyScheduleFill 的 target_page/合同校验；
+  // 预填永远只是表单默认值，提交（写库）仍由人点「保存」触发。
+  const [scheduleFillNotice, setScheduleFillNotice] = useState<ScheduleFillSummary | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const fillId = searchParams.get("schedule_fill");
+    if (!fillId) return;
+    let active = true;
+    (async () => {
+      try {
+        const body = await apiRequest<{ artifact?: { data?: unknown } }>(
+          `/api/v1/ai/chat/artifacts/${encodeURIComponent(fillId)}`,
+          { token },
+        );
+        if (!active) return;
+        const result = applyScheduleFill(body?.artifact?.data, contractId);
+        if (!result.ok) {
+          message.warning(t("contract.schedule_fill_refused", language));
+          return;
+        }
+        form.setFieldsValue({
+          due_date: result.formValues.due_date ? dayjs(result.formValues.due_date) : undefined,
+          amount: result.formValues.amount,
+          currency: result.formValues.currency,
+          payment_timing: result.formValues.payment_timing,
+          effective_start_date: result.formValues.effective_start_date ? dayjs(result.formValues.effective_start_date) : undefined,
+          effective_end_date: result.formValues.effective_end_date ? dayjs(result.formValues.effective_end_date) : undefined,
+        });
+        setScheduleFillNotice(result.summary);
+        dispatch({ type: "dialog.open", dialog: "schedule" });
+      } catch {
+        if (active) message.warning(t("contract.schedule_fill_refused", language));
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 深链只在挂载时消费一次；form/dispatch 随首挂稳定。
+  }, [token, contractId]);
 
   const loading = workspaceLoading.initial;
   const calcLoading = workspaceLoading.calculation;
@@ -633,6 +680,24 @@ export default function ContractDetailPage() {
                       </Space>
                     }
                   >
+                    {scheduleFillNotice && (
+                      <Alert
+                        className="contract-block-gap"
+                        type="warning"
+                        showIcon
+                        closable
+                        onClose={() => setScheduleFillNotice(null)}
+                        message={t("contract.schedule_fill_title", language)}
+                        description={t("contract.schedule_fill_desc", language, {
+                          valid: String(scheduleFillNotice.valid_rows),
+                          total: scheduleFillNotice.total_amount != null ? scheduleFillNotice.total_amount.toFixed(2) : "—",
+                          range:
+                            scheduleFillNotice.min_due_date && scheduleFillNotice.max_due_date
+                              ? `${scheduleFillNotice.min_due_date} ~ ${scheduleFillNotice.max_due_date}`
+                              : "—",
+                        })}
+                      />
+                    )}
                     <Table
                       columns={scheduleColumns}
                       dataSource={schedules}

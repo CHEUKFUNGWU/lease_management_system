@@ -87,7 +87,7 @@ func ProductionRegistry() *Registry {
 			IntentExamples: []string{"导入付款计划", "解析租金表", "检查租金付款时点"},
 			MatchTerms:     []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"},
 			AllowedRoles:   []string{"admin", "editor", "reviewer"}, RequiredInputs: []string{"file_or_contract"}, RequiredContext: []string{"contract_or_file"},
-			AllowedTools:  []string{"lease.file.parse_payment_schedule", "lease.payment_schedule.draft.create"},
+			AllowedTools:  []string{"lease.file.parse_payment_schedule", "lease.payment_schedule.draft.create", "lease.payment_schedule.fill.draft"},
 			ArtifactTypes: []agentartifact.ArtifactType{agentartifact.ArtifactPaymentScheduleDraft},
 			Review:        ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "payment_classification"}, Blocking: []string{"missing_period", "currency_missing", "variable_rent", "non_lease_component", "payment_timing_uncertain"}, Completion: []string{"evidence_reviewed", "draft_confirmed"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "import_draft"},
 		},

@@ -462,6 +462,17 @@
     ]
   },
   {
+    "name": "lease.payment_schedule.fill.draft",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "payment_schedules",
+        "action": "create"
+      }
+    ]
+  },
+  {
     "name": "lease.portfolio.summary",
     "version": "v1",
     "level": "read",

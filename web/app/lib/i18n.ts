@@ -4329,6 +4329,22 @@ export const dict: TranslationDict = {
     "zh-HK": "手動添加",
     en: "Manual Add",
   },
+  // agent-universal-pagefill-v1 P0-B①：付款计划 Agent 预填的页面态文案。
+  "contract.schedule_fill_title": {
+    "zh-CN": "来自 AI 预填 · 待人工确认",
+    "zh-HK": "來自 AI 預填 · 待人工確認",
+    en: "AI prefill · pending your confirmation",
+  },
+  "contract.schedule_fill_desc": {
+    "zh-CN": "AI 从租金表识别到 {valid} 行付款计划（合计 {total}，应付日 {range}）。第 1 行已预填进表单，请逐行核对后提交；其余行需人工继续录入。Agent 不直接写库。",
+    "zh-HK": "AI 從租金表識別到 {valid} 行付款計劃（合計 {total}，應付日 {range}）。第 1 行已預填進表單，請逐行核對後提交；其餘行需人工繼續錄入。Agent 不直接寫庫。",
+    en: "AI recognized {valid} payment schedule rows in the rent sheet (total {total}, due dates {range}). Row 1 is prefilled in the form — review and submit it yourself; remaining rows need manual entry. The agent never writes directly.",
+  },
+  "contract.schedule_fill_refused": {
+    "zh-CN": "AI 预填与当前页面或合同不匹配，已忽略",
+    "zh-HK": "AI 預填與當前頁面或合同不匹配，已忽略",
+    en: "The AI prefill does not match this page or contract and was ignored",
+  },
   "contract.register_event": {
     "zh-CN": "登记事件",
     "zh-HK": "登記事件",

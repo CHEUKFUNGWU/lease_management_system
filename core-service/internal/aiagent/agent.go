@@ -723,6 +723,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		selectedTool := fallbackTool
 		toolExecutionChain := []AgentToolCall{}
 		contractID := effectiveContractID
+		// P0-B①：租金表文件 + 明确的预填请求 → 页面预填接缝（确定性窄触发）；
+		// 其余租金表上传继续走下方 parse/草稿卡路径，行为不变。
+		if triage.DocClass == agenttooldefs.DocRentSchedule && wantsScheduleFill(req.Message) {
+			return h.executePaymentScheduleFill(ctx, req, triage, emit, toolRuntime, contractID)
+		}
 		// 双路径共用的响应模型名：loop 成功 = lease-agent；legacy 单轮 =
 		// 提供商返回名；全失败 = deterministic-router。
 		modelName := "deterministic-router"
@@ -2689,6 +2694,80 @@ func fileTriageRefusalWithHint(req Request, triage agenttooldefs.TriageResult, h
 	resp := fileTriageRefusal(req, triage)
 	resp.Answer = hint
 	return resp
+}
+
+// wantsScheduleFill is the narrow deterministic gate for the payment
+// schedule page-fill seam: only an explicit prefill request routes there —
+// ordinary rent-schedule uploads keep flowing to the parse/draft-card path.
+func wantsScheduleFill(message string) bool {
+	lower := strings.ToLower(message)
+	for _, marker := range []string{"预填", "填进表单", "填入表单", "帮我填", "prefill", "fill in the form", "fill the form"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// executePaymentScheduleFill handles an explicit prefill request on a
+// rent-schedule upload by asking the fill tool to prefill the contract
+// workspace's payment schedule form (P0-B①). The tool runs through the same
+// governed Runtime.Execute as every other call; a missing contract binding
+// or an unwired reader degrades to an honest hint, never a fabricated fill.
+func (h *Agent) executePaymentScheduleFill(ctx context.Context, req Request, triage agenttooldefs.TriageResult, emit func(context.Context, string, any) error, toolRuntime *agenttools.Runtime, contractID string) (Response, error) {
+	if contractID == "" {
+		return fileTriageRefusalWithHint(req, triage, "付款计划必须挂在具体合同上才能预填：请在合同详情页进入 AI Chat 后重试（自动携带合同），或直接在合同工作台手动录入。"), nil
+	}
+
+	if err := emitAgentEvent(ctx, emit, "tool_start", map[string]interface{}{
+		"tool": "lease.payment_schedule.fill.draft", "status": "running",
+	}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+	args := map[string]any{
+		"file_id": req.FileID, "object_name": req.ObjectName,
+		"content_type": req.ContentType, "contract_id": contractID,
+	}
+	result, durationMs, err := h.executeToolCall(ctx, toolRuntime, "lease.payment_schedule.fill.draft", args, "tool:schedule-fill:"+req.FileID+":"+contractID)
+	if err != nil || result.Data == nil {
+		_ = emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+			"tool": "lease.payment_schedule.fill.draft", "status": "failed",
+			"output_summary": errorSummary(err, result), "requires_review": false,
+		}})
+		return fileTriageRefusalWithHint(req, triage, "付款计划预填暂不可用（文件读取通道尚未接通）。请直接在合同工作台手动录入付款计划。"), nil
+	}
+	summary := ""
+	if result.Error != nil {
+		summary = result.Error.Message
+	}
+	if err := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+		"tool": "lease.payment_schedule.fill.draft", "status": string(result.Status),
+		"input_summary": "付款计划预填", "output_summary": summary,
+		"requires_review": result.Review.Required, "duration_ms": durationMs,
+	}}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接在合同工作台手动录入付款计划。"), nil
+	}
+	fill, ok := data["page_fill"].(*pagefill.Fill)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接在合同工作台手动录入付款计划。"), nil
+	}
+	return Response{
+		Answer:     "已在合同工作台为你预填付款计划表单（第 1 行）。行级数值以建议形式呈现，请逐行核对后自行提交——Agent 无权写库。",
+		Model:      "deterministic-router",
+		Confidence: 0.8,
+		PageFill:   fill,
+		FileTriage: &triage,
+		ReviewPrompts: []AgentReviewPrompt{{
+			ID: "schedule_fill_review", Title: "确认付款计划预填",
+			Description: "预填行尚未确认；请核对后提交。Agent 无权 commit，入库由你完成。",
+			Severity:    "warning", Action: "review_confirm",
+		}},
+	}, nil
 }
 
 func errorSummary(err error, result agenttools.ToolResult) string {

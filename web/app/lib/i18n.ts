@@ -2908,6 +2908,18 @@ export const dict: TranslationDict = {
   "plan.actual": { "zh-CN": "实际", "zh-HK": "實際", en: "Actual" },
   "plan.not_ready": { "zh-CN": "对比不可决策", "zh-HK": "對比不可決策", en: "Comparison not decision-ready" },
   "plan_import.title": { "zh-CN": "预算 / 计划版本导入", "zh-HK": "預算 / 計劃版本導入", en: "Budget / plan version import" },
+  // agent-universal-pagefill-v1 P0-B①：预算计划行 Agent 预填的页面态文案。
+  "plan_fill.title": { "zh-CN": "来自 AI 预填 · 待人工确认", "zh-HK": "來自 AI 預填 · 待人工確認", en: "AI prefill · pending your confirmation" },
+  "plan_fill.desc": {
+    "zh-CN": "AI 从预算文件识别到 {valid} 行计划（{stores} 家门店，期间 {range}）。版本信封已填进上方表单，请核对后自行导入；行级数值以文件为准。Agent 不直接写库。",
+    "zh-HK": "AI 從預算文件識別到 {valid} 行計劃（{stores} 家門店，期間 {range}）。版本信封已填進上方表單，請核對後自行導入；行級數值以文件為準。Agent 不直接寫庫。",
+    en: "AI recognized {valid} plan lines in the budget file ({stores} stores, periods {range}). The version envelope is filled into the form above — review and import it yourself; row values follow the file. The agent never writes directly.",
+  },
+  "plan_fill.refused": {
+    "zh-CN": "AI 预填与当前页面不匹配或信封不完整，已忽略",
+    "zh-HK": "AI 預填與當前頁面不匹配或信封不完整，已忽略",
+    en: "The AI prefill does not match this page or has an incomplete envelope and was ignored",
+  },
   "portfolio.go_settings": { "zh-CN": "前往参数配置", "zh-HK": "前往參數配置", en: "Open settings" },
   // I18N regression: /portfolio shipped with every string hardcoded in
   // simplified Chinese, same as /performance.

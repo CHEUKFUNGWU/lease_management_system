@@ -124,7 +124,7 @@ func ProductionRegistry() *Registry {
 				"fpna.settlement.read", "fpna.settlement_recon_draft.create", "fpna.site_pnl.read",
 				"fpna.statement_model.read", "fpna.statement_model.evaluate", "fpna.working_paper.finmodel.generate",
 				"lease.report.sensitivity", "lease.working_paper.s1.generate",
-				"fpna.trial_balance.fill.preview"},
+				"fpna.trial_balance.fill.preview", "fpna.plan_lines.fill.draft"},
 			ArtifactTypes: []agentartifact.ArtifactType{agentartifact.ArtifactReportExplanation},
 			Review:        ReviewPolicy{Required: true, Reasons: []string{"evidenced_management_explanation", "assist_mode"}, Blocking: []string{"insufficient_evidence", "out_of_scope"}, Completion: []string{"sources_reviewed", "human_confirmation"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_explanation"},
 		},

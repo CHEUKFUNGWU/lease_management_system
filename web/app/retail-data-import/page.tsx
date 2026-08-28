@@ -13,6 +13,7 @@ import { StatusTag } from "../components/StatusTag";
 import { UploadGlyph, DownloadGlyph, SourceCircleGlyph } from "../components/MonochromeGlyphs";
 import { apiErrorMessage, apiRequest, fpnaPlanImportApi, operatingFactsApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
 import { usePageFill, type PageFillPayload } from "../lib/usePageFill";
+import { applyPlanFill, type PlanFillSummary } from "./planFill";
 import { tableScrollX } from "../lib/tableScroll";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -114,6 +115,47 @@ export default function RetailDataImportPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tbFillId, token]);
+
+  // agent-universal-pagefill-v1 P0-B①：预算/计划版本的 Agent 预填，
+  // 经 ?plan_fill=<artifactId> 深链加载；信封字段（版本名/类型/覆盖期间）
+  // 进表单，行级计划数值只在摘要提示里呈现——提交永远由人点「导入」。
+  const searchParams = new URLSearchParams(window.location.search);
+  const planFillId = searchParams.get("plan_fill");
+  const [planFillSummary, setPlanFillSummary] = useState<PlanFillSummary | null>(null);
+  useEffect(() => {
+    if (!planFillId || !token) return;
+    let active = true;
+    (async () => {
+      try {
+        const body = await apiRequest<{ artifact?: { data?: unknown } }>(
+          `/api/v1/ai/chat/artifacts/${encodeURIComponent(planFillId)}`,
+          { token },
+        );
+        if (!active) return;
+        const result = applyPlanFill(body?.artifact?.data);
+        if (!result.ok) {
+          message.warning(t("plan_fill.refused", language));
+          return;
+        }
+        const values = result.formValues;
+        if (values.name) setPlanName(values.name);
+        if (values.version_type) setPlanType(values.version_type);
+        if (values.source) setPlanSource(values.source);
+        if (values.as_of_period) setPlanAsOf(values.as_of_period);
+        if (values.from_period) setPlanFrom(values.from_period);
+        if (values.to_period) setPlanTo(values.to_period);
+        if (values.is_official !== undefined) setPlanOfficial(values.is_official);
+        setPlanFillSummary(result.summary);
+        message.info(t("retail_import.fill_loaded", language));
+      } catch {
+        // Best-effort prefill: a failed load must never block the human path.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planFillId, token]);
 
   const downloadStoreTemplate = async () => {
     if (!token) return;
@@ -457,6 +499,24 @@ export default function RetailDataImportPage() {
 
           {/* 第二部分：FP&A 计划版本导入 */}
           <Card size="small" className="retail-import-block-gap" title={t("plan_import.title", language)}>
+            {planFillSummary && (
+              <Alert
+                className="retail-import-block-gap"
+                type="warning"
+                showIcon
+                closable
+                onClose={() => setPlanFillSummary(null)}
+                message={t("plan_fill.title", language)}
+                description={t("plan_fill.desc", language, {
+                  valid: String(planFillSummary.valid_rows),
+                  stores: String(planFillSummary.store_count ?? 0),
+                  range:
+                    planFillSummary.min_period && planFillSummary.max_period
+                      ? `${planFillSummary.min_period} ~ ${planFillSummary.max_period}`
+                      : "—",
+                })}
+              />
+            )}
             <Flex gap={12} wrap="wrap" align="center">
               <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input" style={{ width: 140 }} value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder={t("plan_import.name", language)} />
               <select aria-label={t("plan_import.version_type", language)} className="retail-import-type-select" value={planType} onChange={(event) => setPlanType(event.target.value)}>

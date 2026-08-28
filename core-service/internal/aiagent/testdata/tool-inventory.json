@@ -154,6 +154,17 @@
     ]
   },
   {
+    "name": "fpna.plan_lines.fill.draft",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "master_data",
+        "action": "manage"
+      }
+    ]
+  },
+  {
     "name": "fpna.scenarios.draft.create",
     "version": "v1",
     "level": "draft",

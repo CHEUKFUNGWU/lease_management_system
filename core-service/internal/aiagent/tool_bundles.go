@@ -92,6 +92,8 @@ func registerLeaseTools(h *Agent, collector *registerCollector, p AgentPorts) {
 	collector.add(agenttooldefs.NewTrialBalanceFillDefinition(p.FileIngest))
 	// agent-universal-pagefill-v1 P0-B①：付款计划预填（租金表 → 合同工作台表单）。
 	collector.add(agenttooldefs.NewPaymentScheduleFillDefinition(p.FileIngest))
+	// agent-universal-pagefill-v1 P0-B①：预算计划行预填（预算 Excel → 导入表单）。
+	collector.add(agenttooldefs.NewPlanLinesFillDefinition(p.FileIngest))
 	// B-2：月结只读面（跑批状态 / 期间级分录预览 / 有分录期间 / 锁账状态），
 	// 仅依赖 mcRepo。写口（生成、审批、过账、红冲、锁账、解锁、ERP 回写）
 	// 一律不开放给 Agent——那是审批与锁账控制的核心。

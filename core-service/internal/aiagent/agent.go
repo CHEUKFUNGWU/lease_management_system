@@ -728,6 +728,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		if triage.DocClass == agenttooldefs.DocRentSchedule && wantsScheduleFill(req.Message) {
 			return h.executePaymentScheduleFill(ctx, req, triage, emit, toolRuntime, contractID)
 		}
+		// P0-B①：预算/计划版本文件 + 明确的预填请求 → 计划行预填接缝
+		//（确定性窄触发；版本类型与期间必须来自用户消息，缺了就引导而不是猜）。
+		if wantsPlanFill(req.Message) {
+			return h.executePlanLinesFill(ctx, req, triage, emit, toolRuntime)
+		}
 		// 双路径共用的响应模型名：loop 成功 = lease-agent；legacy 单轮 =
 		// 提供商返回名；全失败 = deterministic-router。
 		modelName := "deterministic-router"
@@ -2690,16 +2695,31 @@ func (h *Agent) executeRetailIngestFill(ctx context.Context, req Request, triage
 	}, nil
 }
 
-func fileTriageRefusalWithHint(req Request, triage agenttooldefs.TriageResult, hint string) Response {
-	resp := fileTriageRefusal(req, triage)
-	resp.Answer = hint
-	return resp
-}
-
 // wantsScheduleFill is the narrow deterministic gate for the payment
 // schedule page-fill seam: only an explicit prefill request routes there —
 // ordinary rent-schedule uploads keep flowing to the parse/draft-card path.
 func wantsScheduleFill(message string) bool {
+	return messageWantsFormFill(message)
+}
+
+// wantsPlanFill gates the plan-lines fill on an explicit prefill request
+// plus a budget/plan version hint in the message.
+func wantsPlanFill(message string) bool {
+	if !messageWantsFormFill(message) {
+		return false
+	}
+	lower := strings.ToLower(message)
+	for _, marker := range []string{"预算", "计划版本", "plan version", "budget", "forecast", "预测"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// messageWantsFormFill matches explicit "prefill the form for me" phrasings.
+// It must stay narrow: broad matching would hijack ordinary parse requests.
+func messageWantsFormFill(message string) bool {
 	lower := strings.ToLower(message)
 	for _, marker := range []string{"预填", "填进表单", "填入表单", "帮我填", "prefill", "fill in the form", "fill the form"} {
 		if strings.Contains(lower, marker) {
@@ -2707,6 +2727,113 @@ func wantsScheduleFill(message string) bool {
 		}
 	}
 	return false
+}
+
+// extractVersionType picks the plan version type out of the message.
+// Scenario is matched before forecast because "情景预测" names a scenario.
+func extractVersionType(message string) string {
+	lower := strings.ToLower(message)
+	for _, pair := range [][2]string{
+		{"scenario", "scenario"}, {"情景", "scenario"},
+		{"budget", "budget"}, {"预算", "budget"},
+		{"forecast", "forecast"}, {"预测", "forecast"}, {"滚动", "forecast"},
+	} {
+		if strings.Contains(lower, pair[0]) {
+			return pair[1]
+		}
+	}
+	return ""
+}
+
+// extractPlanPeriods picks the coverage range out of the message: the first
+// YYYY-MM is the start, the last is the end; a single month pins both.
+func extractPlanPeriods(message string) (from, to string) {
+	matches := planPeriodRe.FindAllString(message, -1)
+	if len(matches) == 0 {
+		return "", ""
+	}
+	if len(matches) == 1 {
+		return matches[0], matches[0]
+	}
+	return matches[0], matches[len(matches)-1]
+}
+
+var planPeriodRe = regexp.MustCompile(`20\d{2}-(0[1-9]|1[0-2])`)
+
+// executePlanLinesFill handles an explicit prefill request on a budget/plan
+// upload by asking the plan-lines fill tool to prefill the budget import
+// block (P0-B①). The tool runs through the same governed Runtime.Execute as
+// every other call; a missing version type / coverage range degrades to an
+// honest hint, never a guessed envelope.
+func (h *Agent) executePlanLinesFill(ctx context.Context, req Request, triage agenttooldefs.TriageResult, emit func(context.Context, string, any) error, toolRuntime *agenttools.Runtime) (Response, error) {
+	versionType := extractVersionType(req.Message)
+	fromPeriod, toPeriod := extractPlanPeriods(req.Message)
+	if versionType == "" || fromPeriod == "" {
+		return fileTriageRefusalWithHint(req, triage, "生成预算预填需要你提供版本类型与覆盖期间，例如「预填预算 2026-08 到 2026-12」。也可以直接前往「零售数据导入」页的预算导入区上传。"), nil
+	}
+
+	if err := emitAgentEvent(ctx, emit, "tool_start", map[string]interface{}{
+		"tool": "fpna.plan_lines.fill.draft", "status": "running",
+	}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+	args := map[string]any{
+		"file_id": req.FileID, "object_name": req.ObjectName, "content_type": req.ContentType,
+		"name":        fmt.Sprintf("%s %s ~ %s", versionType, fromPeriod, toPeriod),
+		"version_type": versionType,
+		"as_of_period": fromPeriod,
+		"from_period":  fromPeriod,
+		"to_period":    toPeriod,
+	}
+	if strings.Contains(strings.ToLower(req.Message), "正式") || strings.Contains(strings.ToLower(req.Message), "official") {
+		args["is_official"] = true
+	}
+	result, durationMs, err := h.executeToolCall(ctx, toolRuntime, "fpna.plan_lines.fill.draft", args, "tool:plan-fill:"+req.FileID+":"+versionType+":"+fromPeriod+"-"+toPeriod)
+	if err != nil || result.Data == nil {
+		_ = emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+			"tool": "fpna.plan_lines.fill.draft", "status": "failed",
+			"output_summary": errorSummary(err, result), "requires_review": false,
+		}})
+		return fileTriageRefusalWithHint(req, triage, "预算预填暂不可用（文件读取通道尚未接通）。请直接前往「零售数据导入」页的预算导入区上传。"), nil
+	}
+	summary := ""
+	if result.Error != nil {
+		summary = result.Error.Message
+	}
+	if err := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+		"tool": "fpna.plan_lines.fill.draft", "status": string(result.Status),
+		"input_summary": "预算计划行预填", "output_summary": summary,
+		"requires_review": result.Review.Required, "duration_ms": durationMs,
+	}}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页的预算导入区上传。"), nil
+	}
+	fill, ok := data["page_fill"].(*pagefill.Fill)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页的预算导入区上传。"), nil
+	}
+	return Response{
+		Answer:     "已在「零售数据导入」页为你预填预算版本导入表单（版本名、类型与覆盖期间）。行级计划数值以建议形式呈现，请核对后自行导入——导入动作由你在页面上完成。",
+		Model:      "deterministic-router",
+		Confidence: 0.8,
+		PageFill:   fill,
+		FileTriage: &triage,
+		ReviewPrompts: []AgentReviewPrompt{{
+			ID: "plan_fill_review", Title: "确认预算版本预填",
+			Description: "版本信封与行级数值尚未确认；请核对后提交。Agent 无权 commit，入库由你完成。",
+			Severity:    "warning", Action: "review_confirm",
+		}},
+	}, nil
+}
+
+func fileTriageRefusalWithHint(req Request, triage agenttooldefs.TriageResult, hint string) Response {
+	resp := fileTriageRefusal(req, triage)
+	resp.Answer = hint
+	return resp
 }
 
 // executePaymentScheduleFill handles an explicit prefill request on a

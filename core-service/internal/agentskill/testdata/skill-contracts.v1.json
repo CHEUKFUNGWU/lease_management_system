@@ -127,7 +127,8 @@
       "fpna.working_paper.finmodel.generate",
       "lease.report.sensitivity",
       "lease.working_paper.s1.generate",
-      "fpna.trial_balance.fill.preview"
+      "fpna.trial_balance.fill.preview",
+      "fpna.plan_lines.fill.draft"
     ],
     "artifact_types": [
       "report_explanation"

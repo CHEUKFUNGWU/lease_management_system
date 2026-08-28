@@ -90,7 +90,7 @@ export default function GlobalSearch() {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await contractApi.list(token, { search: query, page: 1, page_size: 8 });
+        const res = await contractApi.list<{ data?: SearchableContract[] }>(token, { search: query, page: 1, page_size: 8 });
         if (!cancelled) setContracts(res.data || []);
       } catch {
         if (!cancelled) setContracts([]);

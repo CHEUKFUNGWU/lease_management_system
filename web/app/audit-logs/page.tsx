@@ -142,7 +142,7 @@ export default function AuditLogsPage() {
       if (p.toolName) params.tool_name = p.toolName;
       if (p.startDate) params.start_date = p.startDate;
       if (p.endDate) params.end_date = p.endDate;
-      return auditApi.list(params, t);
+      return auditApi.list<{ data?: unknown[]; total?: number }>(params, t);
     },
   });
   const logs = logsState.kind === "ready" ? logsState.data?.data ?? [] : [];

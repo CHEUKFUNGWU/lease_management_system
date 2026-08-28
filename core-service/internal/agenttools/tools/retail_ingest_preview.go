@@ -64,7 +64,7 @@ func NewRetailIngestPreviewDefinition(reader IngestFileReader) agenttools.ToolDe
 			MaxRows:             1000,
 			TimeoutSeconds:      60,
 		},
-		SkillIDs: []string{retailIngestFillSkill},
+		SkillIDs: []string{ecommerceSkill}, // agent-universal-pagefill-v1 P0-A①：同零售运营技能族（旧值指向从未注册的 retail_ingest_fill）
 		Handler: func(ctx context.Context, call agenttools.ToolCall) (agenttools.ToolResult, error) {
 			execution, err := agenttools.RequireExecutionContext(ctx)
 			if err != nil {
@@ -136,8 +136,6 @@ func NewRetailIngestPreviewDefinition(reader IngestFileReader) agenttools.ToolDe
 		},
 	}
 }
-
-const retailIngestFillSkill = "retail_ingest_fill"
 
 func formatFromName(name string) string {
 	lower := strings.ToLower(name)

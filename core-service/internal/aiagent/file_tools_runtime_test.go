@@ -2,6 +2,7 @@ package aiagent
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -81,14 +82,35 @@ func TestFileParseToolRejectsURLObjectNameBeforeCallingAIService(t *testing.T) {
 
 func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing.T) {
 	text, ct, llmR, _ := loadCorr2(t, "payment-full")
-	// The legacy file route makes TWO LLM calls: the routing call (with tools,
-	// returns parse_payment_schedule) and the intake call (no tools, returns
-	// the recorded payment response). Branch on whether the body carries tools.
+	// The multi-round file pipeline (P0-A③) makes its own LLM calls: the
+	// first round(s) carry the parse tool schemas and must select
+	// lease.file.parse_payment_schedule; any later round that also carries
+	// schemas is treated as terminal-answer because the scripted client keeps
+	// answering with tool calls otherwise (the 4-round budget would stall).
+	// The final main chat round carries no tools and returns the recorded
+	// payment response.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		if strings.Contains(string(body), `"tools"`) {
-			_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"parse_payment_schedule","arguments":"{}"}}]}}]}`))
+			var req struct {
+				Messages []struct {
+					Role    string `json:"role"`
+					Content string `json:"content"`
+				} `json:"messages"`
+			}
+			_ = json.Unmarshal(body, &req)
+			sawToolResult := false
+			for _, m := range req.Messages {
+				if m.Role == "tool" {
+					sawToolResult = true
+				}
+			}
+			if sawToolResult {
+				_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"租金表解析完成"}}],"usage":{"prompt_tokens":10,"completion_tokens":1,"total_tokens":11}}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"lease.file.parse_payment_schedule","arguments":"{\"file_id\":\"file-001\",\"object_name\":\"rent-schedule.pdf\",\"content_type\":\"application/pdf\"}"}}]}}]}`))
 			return
 		}
 		_, _ = w.Write([]byte(`{"choices":[{"index":0,"message":{"role":"assistant","content":` + mustJSONString(llmR) + `}}]}`))
@@ -124,8 +146,12 @@ func TestLegacyAIChatFileRouteKeepsDraftResponseAfterRuntimeMigration(t *testing
 	if err != nil {
 		t.Fatalf("execute legacy AI Chat file route: %v", err)
 	}
-	if !response.AgentMode || response.Model != "deepseek/deepseek-v4-flash" || len(response.DraftPaymentSchedules) != 2 {
-		t.Fatalf("compat response = %#v", response)
+	// P0-A③: the multi-round file pipeline owns tool selection now; the
+	// response Model names the loop ("lease-agent") instead of the last
+	// single-round provider name. Everything the contract cares about —
+	// AgentMode, two draft schedules, review summary — must be unchanged.
+	if !response.AgentMode || response.Model != "lease-agent" || len(response.DraftPaymentSchedules) != 2 {
+		t.Fatalf("compat response model=%q agentMode=%v schedules=%d", response.Model, response.AgentMode, len(response.DraftPaymentSchedules))
 	}
 	if response.PaymentScheduleSummary == nil || !response.PaymentScheduleSummary.RequiresHumanConfirm {
 		t.Fatalf("compat review summary = %#v", response.PaymentScheduleSummary)

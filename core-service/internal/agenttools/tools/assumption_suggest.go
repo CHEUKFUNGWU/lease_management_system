@@ -53,7 +53,7 @@ func NewAssumptionSuggestionDefinition(writer AssumptionDraftWriter) agenttools.
 			MaxRows:             100,
 			TimeoutSeconds:      30,
 		},
-		SkillIDs: []string{retailIngestFillSkill}, // placeholder; the fin skill family registers at the workbench stage
+		SkillIDs: []string{"fpna_copilot"}, // agent-universal-pagefill-v1 P0-A①：绑定真实技能（旧值指向从未注册的 retail_ingest_fill）
 		Handler: func(ctx context.Context, call agenttools.ToolCall) (agenttools.ToolResult, error) {
 			if writer == nil {
 				return agenttools.ToolResult{}, errors.New("assumption draft writer unavailable")

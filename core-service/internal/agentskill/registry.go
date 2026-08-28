@@ -66,7 +66,7 @@ func ProductionRegistry() *Registry {
 			IntentExamples: []string{"导入合同台账", "批量创建合同草稿", "检查 Excel 台账"},
 			MatchTerms:     []string{"excel 台账", "excel台账", "合同台账", "批量导入", "批量创建", "ledger import", "contract ledger"},
 			AllowedRoles:   []string{"admin", "editor", "reviewer"}, RequiredInputs: []string{"file"},
-			AllowedTools:  []string{"lease.file.parse_contract_batch", "lease.contract.draft.create"},
+			AllowedTools:  []string{"lease.file.triage", "lease.file.parse_contract_batch", "lease.contract.draft.create"},
 			ArtifactTypes: []agentartifact.ArtifactType{agentartifact.ArtifactContractDraft},
 			Review:        ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "accounting_judgement"}, Blocking: []string{"missing_fields", "currency_missing", "discount_rate_missing", "low_confidence"}, Completion: []string{"evidence_reviewed", "draft_confirmed"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "create_draft"},
 		},
@@ -117,7 +117,14 @@ func ProductionRegistry() *Registry {
 			IntentExamples: []string{"为什么本月偏离 forecast", "生成经营日报", "哪些门店需要处理", "经营异常", "FP&A copilot", "finance business partner"},
 			MatchTerms:     []string{"经营日报", "经营驾驶舱", "经营异常", "经营决策", "偏离 forecast", "偏离预算", "fp&a", "finance bp", "四墙", "租售比", "经营 copilot", "经营copilot"},
 			AllowedRoles:   []string{"admin", "editor", "reviewer", "approver", "auditor", "readonly"}, RequiredInputs: []string{"message"}, RequiredContext: []string{"portfolio"},
-			AllowedTools:  []string{"lease.portfolio.summary", "fpna.management.pre_read", "retail.store.performance.read", "retail.rent_to_sales.read", "retail.equipment.performance.read", "fpna.actions.read", "lease.close.readiness", "fpna.budget.variance.read", "fpna.cashflow.scenario", "lease.renewal.decisions", "retail.store.scenario.simulate", "retail.equipment.scenario.simulate", "lease.deal.simulate", "lease.predeal.simulate", "lease.renewal.simulate", "fpna.decision.summary", "fpna.actions.draft.create", "fpna.explanations.draft.create", "fpna.meeting_actions.draft.create", "fpna.memos.decision.draft.create", "fpna.scenarios.draft.create", "lease.contract.search", "fpna.store_pnl.read", "lease.monthly_closing.batches.read", "lease.monthly_closing.entries.preview", "lease.monthly_closing.periods.read", "lease.monthly_closing.lock_status.read", "retail.operating_facts.stores.read", "retail.operating_facts.store_days.read", "retail.kpis.store_days.read", "lease.report.schedule.read", "lease.report.disclosure_package.read", "lease.report.contract_view.read", "lease.report.unit_price.read", "lease.report.tags.read", "fpna.coa.suggest_template"},
+			AllowedTools: []string{"lease.portfolio.summary", "fpna.management.pre_read", "retail.store.performance.read", "retail.rent_to_sales.read", "retail.equipment.performance.read", "fpna.actions.read", "lease.close.readiness", "fpna.budget.variance.read", "fpna.cashflow.scenario", "lease.renewal.decisions", "retail.store.scenario.simulate", "retail.equipment.scenario.simulate", "lease.deal.simulate", "lease.predeal.simulate", "lease.renewal.simulate", "fpna.decision.summary", "fpna.actions.draft.create", "fpna.explanations.draft.create", "fpna.meeting_actions.draft.create", "fpna.memos.decision.draft.create", "fpna.scenarios.draft.create", "lease.contract.search", "fpna.store_pnl.read", "lease.monthly_closing.batches.read", "lease.monthly_closing.entries.preview", "lease.monthly_closing.periods.read", "lease.monthly_closing.lock_status.read", "retail.operating_facts.stores.read", "retail.operating_facts.store_days.read", "retail.kpis.store_days.read", "lease.report.schedule.read", "lease.report.disclosure_package.read", "lease.report.contract_view.read", "lease.report.unit_price.read", "lease.report.tags.read", "fpna.coa.suggest_template",
+				// agent-universal-pagefill-v1 P0-A①：此前不在任何 skill 白名单上
+				// （审计 §B 的「自然语言不可达」清单）。写类全部只落草稿层。
+				"fpna.assumptions.suggest", "fpna.assumptions.suggest_batch", "fpna.memos.model_diff.draft",
+				"fpna.settlement.read", "fpna.settlement_recon_draft.create", "fpna.site_pnl.read",
+				"fpna.statement_model.read", "fpna.statement_model.evaluate", "fpna.working_paper.finmodel.generate",
+				"lease.report.sensitivity", "lease.working_paper.s1.generate",
+				"fpna.trial_balance.fill.preview"},
 			ArtifactTypes: []agentartifact.ArtifactType{agentartifact.ArtifactReportExplanation},
 			Review:        ReviewPolicy{Required: true, Reasons: []string{"evidenced_management_explanation", "assist_mode"}, Blocking: []string{"insufficient_evidence", "out_of_scope"}, Completion: []string{"sources_reviewed", "human_confirmation"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "confirm_explanation"},
 		},
@@ -133,7 +140,13 @@ func ProductionRegistry() *Registry {
 			MatchTerms:     []string{"经营脉搏", "门店诊断", "门店分析", "经营情景", "零售经营", "客流", "转化", "客单", "人工", "占用现金成本", "门店经营利润", "门店贡献", "四墙利润", "同群", "门店异常", "行动草稿", "毛利", "毛利下滑", "为什么下滑", "为何下滑", "为咩", "下滑原因", "闭店", "门店续租", "续租测算", "续租决策", "租金谈判", "retail operations", "store diagnostics", "operating pulse"},
 			AllowedRoles:   []string{"admin", "editor", "reviewer", "approver", "auditor", "readonly"},
 			RequiredInputs: []string{"message"}, RequiredContext: []string{"retail_filters"},
-			AllowedTools:  []string{"retail.operating_pulse.read", "retail.store_diagnostics.read", "retail.store.scenario.evaluate"},
+			AllowedTools: []string{"retail.operating_pulse.read", "retail.store_diagnostics.read", "retail.store.scenario.evaluate",
+				// agent-universal-pagefill-v1 P0-A①：电商读类三件套 + 零售写类
+				//（底稿生成、导入预填——pagefill 唯一生产者）。写类只落草稿层，
+				// 本 skill 的 ReviewPolicy 已 Required。
+				"retail.site_pulse.read", "retail.site_diagnostics.read", "retail.site.scenario.evaluate",
+				"fpna.ecom_assumption.suggest",
+				"retail.working_paper.store.generate", "retail.store_days.import.preview"},
 			ArtifactTypes: []agentartifact.ArtifactType{agentartifact.ArtifactRetailActionProposal},
 			Review:        ReviewPolicy{Required: true, Reasons: []string{"assist_mode", "retail_data_confirmation"}, Blocking: []string{"missing_context", "insufficient_evidence", "source_conflict"}, Completion: []string{"sources_reviewed", "scenario_confirmed_in_workbench"}, AllowedRoles: []string{"reviewer", "approver"}, ConfirmAction: "open_scenario_workbench"},
 		},
@@ -206,6 +219,15 @@ func (r *Registry) Select(intent Intent) (Definition, bool) {
 		}
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
+		// agent-universal-pagefill-v1 P0-A②（路由去遮蔽）：当问句明确是
+		// 草稿/建议类请求时，声明了写工具的技能优先于只读技能——否则
+		// Priority 最高的只读零售技能会压住唯一带写工具的 FP&A 技能，
+		// 「生成行动草稿/假设建议」等请求实际不可达（FP&A 反馈 2026-08-27
+		// §7.4.11 实测 4/4 失败）。判定是纯文本规则、确定性可复演。
+		writeA, writeB := hasDraftCapability(candidates[i]), hasDraftCapability(candidates[j])
+		if intentRequestsDraft(intent.Message) && writeA != writeB {
+			return writeA
+		}
 		if candidates[i].Priority != candidates[j].Priority {
 			return candidates[i].Priority > candidates[j].Priority
 		}
@@ -356,4 +378,49 @@ func roleAllowed(allowed []string, role string) bool {
 		role = "editor"
 	}
 	return slices.ContainsFunc(allowed, func(v string) bool { return strings.EqualFold(strings.TrimSpace(v), strings.TrimSpace(role)) })
+}
+
+// hasDraftCapability reports whether the skill declares any draft-level
+// (write-class) tool. Tool names ending in ".draft.*" / ".suggest" /
+// ".suggest_batch" / ".preview" / ".generate" follow the naming convention
+// in AGENTS.md's tool taxonomy; the list is closed — an unknown suffix does
+// NOT count as a write capability (fail-closed).
+func hasDraftCapability(definition Definition) bool {
+	for _, tool := range definition.AllowedTools {
+		if isDraftToolName(tool) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDraftToolName(name string) bool {
+	name = strings.TrimSpace(name)
+	for _, suffix := range []string{
+		".draft.create", ".draft.generate", ".suggest", ".suggest_batch",
+		".import.preview", ".paper.s1.generate", ".coa.suggest_template",
+	} {
+		if strings.HasSuffix(name, suffix) {
+			return true
+		}
+	}
+	return strings.Contains(name, ".working_paper.") && strings.HasSuffix(name, ".generate")
+}
+
+// intentRequestsDraft matches the deterministic phrasings of "produce a draft
+// for me" requests. It must stay narrow: broad write detection would flip
+// ordinary read questions toward skills they did not mean to address.
+func intentRequestsDraft(message string) bool {
+	message = strings.ToLower(strings.TrimSpace(message))
+	for _, phrase := range []string{
+		"生成草稿", "创建草稿", "起草", "生成行动草稿", "行动草稿",
+		"提交假设建议", "假设建议草稿", "生成建议草稿", "写个草稿",
+		"给我一份…草稿", "帮我生成草稿", "生成决策备忘录", "备忘录草稿",
+		"draft a", "create a draft", "generate a draft",
+	} {
+		if strings.Contains(message, phrase) {
+			return true
+		}
+	}
+	return false
 }

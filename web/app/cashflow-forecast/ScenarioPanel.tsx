@@ -70,8 +70,8 @@ export function ScenarioPanel({ token }: { token: string | null }) {
         },
         token
       );
-      setResults(response.results || []);
-      setWarning(response.currency_warning || null);
+      setResults(((response as { results?: ScenarioResult[] }).results) || []);
+      setWarning((response as { currency_warning?: string | null }).currency_warning || null);
     } catch (error: any) {
       notifyError(error?.message || "情景测算失败");
       setResults([]);

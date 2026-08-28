@@ -387,6 +387,8 @@ make migrate-status   # 看哪些已应用、哪些待应用，不做任何修�
 make migrate          # 按序应用尚未执行的迁移 / apply what is pending
 ```
 
+> `make up` 已内置这一步：等待 postgres 就绪后自动执行 `scripts/migrate.sh`，既有开发卷不会再因 schema 落后于 HEAD 而「打开即 500」。`make migrate` 仍可对运行中的栈单独补迁移 / `make up` now waits for postgres and applies pending migrations automatically, so a stale dev volume no longer surfaces as runtime 500s. `make migrate` still works standalone against a running stack.
+
 其余两个相关命令 / The other two:
 
 ```bash
@@ -461,7 +463,7 @@ make test-integration            # 可选 ARGS= 传 go test 参数 / optional AR
 
 ```bash
 make help                 # 查看命令 / list commands
-make up                   # 启动服务 / start
+make up                   # 启动服务并自动补齐增量迁移 / start (auto-applies pending migrations)
 make down                 # 停止服务 / stop
 make restart              # 重启 / restart
 make logs                 # 日志 / logs

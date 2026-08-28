@@ -125,7 +125,7 @@ function CashflowForecastPage() {
     token,
     params: {},
     paramsKey: "cashflow-tags",
-    fetcher: async (_p, t) => ({ tags: (await reportApi.tags(t)).tags || [] }),
+    fetcher: async (_p, t) => ({ tags: (await reportApi.tags<{ tags?: string[] }>(t)).tags || [] }),
   });
   const availableTags = tagsQuery.state.kind === "ready" ? tagsQuery.state.data?.tags ?? [] : [];
   const tagLoading = tagsQuery.loading;
@@ -156,9 +156,9 @@ function CashflowForecastPage() {
         },
         token,
       );
-      setData(res.data || []);
+      setData((res as unknown as { data?: unknown[] }).data || []);
       setFetched(true);
-      message.success(t("cashflow.query_success", language, { total: String(res.total || 0) }));
+      message.success(t("cashflow.query_success", language, { total: String((res as unknown as { total?: number }).total || 0) }));
     } catch (error: any) {
       console.error("Failed to fetch cashflow forecast:", error);
       notifyError(error?.message || t("cashflow.query_failed", language));

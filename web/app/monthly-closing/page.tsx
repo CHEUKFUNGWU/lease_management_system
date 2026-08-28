@@ -192,7 +192,7 @@ function MonthlyClosingPage() {
       if (!token || !period) return;
       setLockStatusLoading(true);
       try {
-        const data = await monthlyClosingApi.getLockStatus(period, token);
+        const data = await monthlyClosingApi.getLockStatus<{ is_locked: boolean }>(period, token);
         setIsLocked(data.is_locked);
       } catch {
         setIsLocked(false);
@@ -212,7 +212,7 @@ function MonthlyClosingPage() {
     }
     setLoading(true);
     try {
-      const data = await monthlyClosingApi.generate(
+      const data = await monthlyClosingApi.generate<{ processed_contracts: number }>(
         {
           accounting_period: period,
           discount_rate: values.discount_rate,
@@ -245,8 +245,7 @@ function MonthlyClosingPage() {
       if (!token) return;
       setEntriesLoading(true);
       try {
-        const data = await monthlyClosingApi.getEntries(
-          {
+        const data = await monthlyClosingApi.getEntries<{ data?: unknown[]; summary?: unknown }>({
             period,
             status: overrides?.status ?? entryStatus,
             entry_type: overrides?.entryType ?? entryType,
@@ -255,8 +254,8 @@ function MonthlyClosingPage() {
           },
           token
         );
-        setEntries(data.data || []);
-        setEntrySummary(data.summary || null);
+        setEntries((data.data ?? []) as unknown[]);
+        setEntrySummary((data.summary ?? null) as EntrySummary | null);
         setEntriesLoaded(true);
       } catch (error: any) {
         notifyError(error.message || t("monthly.load_entries_failed", language));
@@ -272,7 +271,7 @@ function MonthlyClosingPage() {
   const loadEntryPeriods = useCallback(async () => {
     if (!token) return [] as EntryPeriod[];
     try {
-      const data = await monthlyClosingApi.listPeriods(token);
+      const data = await monthlyClosingApi.listPeriods<{ data?: EntryPeriod[] }>(token);
       const list: EntryPeriod[] = data.data || [];
       setEntryPeriods(list);
       return list;
@@ -308,7 +307,7 @@ function MonthlyClosingPage() {
     if (!token) return;
     setBatchesLoading(true);
     try {
-      const data = await monthlyClosingApi.listBatches(period, token);
+      const data = await monthlyClosingApi.listBatches<{ data?: unknown[] }>(period, token);
       setBatches(data.data || []);
       setBatchesLoaded(true);
     } catch (error: any) {
@@ -408,7 +407,7 @@ function MonthlyClosingPage() {
 
     setWritebackLoading(true);
     try {
-      const res = await monthlyClosingApi.applyERPWriteback(items, token);
+      const res = await monthlyClosingApi.applyERPWriteback<{ applied_count?: number; failed_count?: number }>(items, token);
       message.success(`已回写 ${res.applied_count || 0} 条，失败 ${res.failed_count || 0} 条`);
       setWritebackModalOpen(false);
       setWritebackText("");
@@ -424,7 +423,7 @@ function MonthlyClosingPage() {
     if (!token) return;
     setActionLoading((prev) => ({ ...prev, [`batch_${batchId}`]: true }));
     try {
-      const data = await monthlyClosingApi.approveBatch(batchId, token);
+      const data = await monthlyClosingApi.approveBatch<{ approved_count: number }>(batchId, token);
       message.success(t("monthly.batch_approve_success", language, { count: String(data.approved_count) }));
       refresh();
     } catch (error: any) {
@@ -438,7 +437,7 @@ function MonthlyClosingPage() {
     if (!token) return;
     setActionLoading((prev) => ({ ...prev, [`postbatch_${batchId}`]: true }));
     try {
-      const data = await monthlyClosingApi.postBatch(batchId, token);
+      const data = await monthlyClosingApi.postBatch<{ posted_count: number }>(batchId, token);
       message.success(t("monthly.batch_post_success", language, { count: String(data.posted_count) }));
       refresh();
     } catch (error: any) {

@@ -268,6 +268,41 @@ func (r *FinModelRepository) GetModelDefinition(ctx context.Context, id string) 
 	return &d, err
 }
 
+// FindModelDefinitionByName resolves the (entity, name, version) unique key
+// — the idempotent-replay lookup behind CreateDefinition.
+func (r *FinModelRepository) FindModelDefinitionByName(ctx context.Context, tenantID *string, name string, version int) (*FinModelDefinition, error) {
+	var d FinModelDefinition
+	err := r.db.QueryRow(ctx, `SELECT id, legal_entity_id, name, version, template_id, actual_cutoff_period, policy, source_bindings, status, created_by, created_at, updated_at
+		FROM fin_model_definitions WHERE legal_entity_id=$1 AND name=$2 AND version=$3
+		ORDER BY created_at DESC LIMIT 1`, tenantID, name, version).
+		Scan(&d.ID, &d.LegalEntityID, &d.Name, &d.Version, &d.TemplateID, &d.ActualCutoffPeriod, &d.Policy, &d.SourceBindings, &d.Status, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt)
+	return &d, err
+}
+
+// ListModelDefinitions is the definitions listing surface. Rows are
+// tenant-scoped: a nil tenantID (admin) sees every entity, anything else is
+// filtered to that legal entity — definitions carry no personal visibility,
+// unlike fin_statement_templates.
+func (r *FinModelRepository) ListModelDefinitions(ctx context.Context, tenantID *string) ([]*FinModelDefinition, error) {
+	rows, err := r.db.Query(ctx, `SELECT id, legal_entity_id, name, version, template_id, actual_cutoff_period, policy, source_bindings, status, created_by, created_at, updated_at
+		FROM fin_model_definitions
+		WHERE ($1::uuid IS NULL OR legal_entity_id=$1)
+		ORDER BY created_at DESC LIMIT 200`, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*FinModelDefinition{}
+	for rows.Next() {
+		var d FinModelDefinition
+		if err := rows.Scan(&d.ID, &d.LegalEntityID, &d.Name, &d.Version, &d.TemplateID, &d.ActualCutoffPeriod, &d.Policy, &d.SourceBindings, &d.Status, &d.CreatedBy, &d.CreatedAt, &d.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, &d)
+	}
+	return out, rows.Err()
+}
+
 func (r *FinModelRepository) CreateModelRun(ctx context.Context, run *FinModelRun) error {
 	_, err := r.db.Exec(ctx, `INSERT INTO fin_model_runs
 		(id, legal_entity_id, model_definition_id, model_definition_version, data_version, assumption_version, exchange_rate_version, metric_definition_version, data_classification, status, tie_out_status, input_snapshot, idempotency_key, created_by)

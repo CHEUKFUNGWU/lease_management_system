@@ -692,6 +692,12 @@ function OperatingPulseInner() {
                 detailExtra={latestMetadata ? <span>{t("trust.generator_version", language)}: {latestMetadata.generator_version || "—"}</span> : undefined}
               />
               {response.plan && <PlanComparisonPanel plan={response.plan} currency={partition.currency || response.currency || ""} language={language} />}
+              {!response.plan && !noFacts && (
+                <Alert className="pulse-block-gap" type="info" showIcon
+                  message={t("plan.absent_title", language)}
+                  description={t("plan.absent_desc", language)}
+                />
+              )}
               {noFacts ? (
                 <div className="pulse-block-gap">
                   <StateBlock

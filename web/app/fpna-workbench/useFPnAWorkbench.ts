@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { performanceApi, apiErrorMessage } from "../lib/api";
 import { buildVersionTree, canFreeze, canPromoteToOfficial } from "./logic";
 import type {
+  PeriodBlendSummary,
   AccuracyTrendResult,
   CompareParams,
   CompareResult,
@@ -57,7 +58,7 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     setVersionsLoading(true);
     setError(null);
     try {
-      const res = await performanceApi.planVersions(undefined, token);
+      const res = await performanceApi.planVersions<{ data?: FPnAPlanVersion[] }>(undefined, token);
       const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
       setVersions(list);
     } catch (err: unknown) {
@@ -76,7 +77,7 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
         status: filter?.status,
         severity: filter?.severity,
       };
-      const res = await performanceApi.dataQuality(params, token);
+      const res = await performanceApi.dataQuality<{ data?: FPnADataQualityItem[] }>(params, token);
       const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
       setDataQualityItems(list);
     } catch (err: unknown) {
@@ -91,9 +92,9 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     setGovernanceLoading(true);
     try {
       const [assumpRes, metricsRes, mapRes] = await Promise.all([
-        performanceApi.assumptions(undefined, token).catch(() => ({ data: [] })),
-        performanceApi.metricDefinitions(undefined, token).catch(() => ({ data: [] })),
-        performanceApi.mappings({}, token).catch(() => ({ data: [] })),
+        performanceApi.assumptions<{ data?: FPnAAssumption[] }>(undefined, token).catch(() => ({ data: [] })),
+        performanceApi.metricDefinitions<{ data?: FPnAMetricDefinition[] }>(undefined, token).catch(() => ({ data: [] })),
+        performanceApi.mappings<{ data?: FPnAMasterDataMapping[] }>({}, token).catch(() => ({ data: [] })),
       ]);
       setAssumptions(Array.isArray(assumpRes?.data) ? assumpRes.data : Array.isArray(assumpRes) ? assumpRes : []);
       setMetrics(Array.isArray(metricsRes?.data) ? metricsRes.data : Array.isArray(metricsRes) ? metricsRes : []);
@@ -123,8 +124,8 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
       metric_definition_version: input.metric_definition_version || "",
       lines: input.lines || [],
     };
-    const res = await performanceApi.createPlanVersion(payload, token);
-    const created: FPnAPlanVersion = res?.data || res;
+    const res = await performanceApi.createPlanVersion<{ data?: FPnAPlanVersion }>(payload, token);
+    const created: FPnAPlanVersion = res?.data ?? (res as unknown as FPnAPlanVersion);
     await refreshVersions();
     return created;
   }, [token, refreshVersions]);
@@ -149,7 +150,7 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     setCompareLoading(true);
     setCompareResult(null);
     try {
-      const res = await performanceApi.comparePlanVersions({
+      const res = await performanceApi.comparePlanVersions<CompareResult>({
         left_id: params.left_id,
         right_id: params.right_id,
         period: params.period,
@@ -192,7 +193,7 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     setForecastLoading(true);
     setError(null);
     try {
-      const res = await performanceApi.hybridForecast({
+      const res = await performanceApi.hybridForecast<{ data?: { period?: string }[]; proposed?: ProposedForecast; version?: FPnAPlanVersion; period_blends?: PeriodBlendSummary[]; coverage?: { expected: number; observed: number; percent: number; complete: boolean } }>({
         ...input,
         persist: false,
       }, token);
@@ -229,13 +230,12 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     setForecastLoading(true);
     setError(null);
     try {
-      const res = await performanceApi.hybridForecast({
+      const res = await performanceApi.hybridForecast<{ version?: FPnAPlanVersion }>({
         ...input,
         persist: true,
       }, token);
-      const ver: FPnAPlanVersion = res?.version;
       await refreshVersions();
-      return ver;
+      return res?.version ?? null;
     } catch (err: unknown) {
       const msg = apiErrorMessage(err);
       setError(msg);
@@ -249,7 +249,7 @@ export function useFPnAWorkbench(scope: FPnAScope = {}): {
     if (!token) return;
     setAccuracyLoading(true);
     try {
-      const res = await performanceApi.forecastAccuracyTrend({
+      const res = await performanceApi.forecastAccuracyTrend<{ trend?: AccuracyTrendResult }>({
         forecast_id: forecastId,
         actual_id: actualId,
       }, token);

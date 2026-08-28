@@ -123,7 +123,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
     params: renewalParams,
     paramsKey: renewalKey,
     fetcher: (p, t) =>
-      contractApi.renewalCard(p.contractId, {
+      contractApi.renewalCard<Card>(p.contractId, {
         renewal_term_months: p.term, uplift_percent: p.uplift, rent_free_months: p.rentFreeMonths,
         annual_escalation_percent: p.annualEscalation, early_exit_penalty_months: p.exitPenaltyMonths,
       }, t),

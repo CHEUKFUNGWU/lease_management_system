@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
-import { Alert, Button, Card, Checkbox, DatePicker, Input, Modal, Popover, Select, Space, Spin, Table, Tooltip, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, DatePicker, Input, Modal, Popover, Segmented, Select, Space, Spin, Table, Tooltip, Typography } from "antd";
 import { DownloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -11,7 +11,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 
 import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
-import { apiErrorMessage, financialModelApi, operatingFactsApi, storePnlApi } from "../lib/api";
+import { apiErrorMessage, financialModelApi, retailAnalyticsApi, storePnlApi, type RetailDataClassification, type RetailSimulationDatasetData } from "../lib/api";
 import { fmtNum } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
@@ -20,8 +20,44 @@ import { useRetailQuery } from "../retail/useRetailQuery";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { storePnlHelpContent } from "../components/help-content";
 import { STORE_PNL_SECONDARY_COLUMNS, peerStatusLabel, type StorePnlSecondaryColumn } from "./options";
+import { latestAnomalyDate } from "../operating-pulse/logic";
+
+const TODAY = dayjs().format("YYYY-MM-DD");
+const validWindowDays = (value: number) => Number.isInteger(value) && value >= 1 && value <= 365;
 
 type StoreRef = { id: string; code: string; name: string };
+// 数据环境（classification/dataset_version）与经营脉搏、门店 360 同轴：
+// URL 是唯一真相，页面在缺失时按最新模拟数据集补默认值，但绝不自动生成数据。
+type PnlQuery = {
+  classification: "production" | "simulated" | "";
+  datasetVersion: string;
+  asOf: string;
+  windowDays: number;
+  storeID: string;
+};
+
+function pnlQueryFromURL(searchParams: URLSearchParams): PnlQuery {
+  const classificationRaw = searchParams.get("data_classification") || "";
+  const rawWindow = Number(searchParams.get("window_days") || 7);
+  return {
+    classification: classificationRaw === "production" || classificationRaw === "simulated" ? classificationRaw : "",
+    datasetVersion: searchParams.get("dataset_version") || "",
+    asOf: searchParams.get("as_of") || "",
+    windowDays: validWindowDays(rawWindow) ? rawWindow : 7,
+    storeID: searchParams.get("store_id") || "",
+  };
+}
+
+function writePnlQuery(router: ReturnType<typeof useRouter>, value: PnlQuery & { classification: "production" | "simulated" }) {
+  const query = new URLSearchParams();
+  query.set("data_classification", value.classification);
+  if (value.classification === "simulated" && value.datasetVersion) query.set("dataset_version", value.datasetVersion);
+  query.set("as_of", value.asOf);
+  if (validWindowDays(value.windowDays)) query.set("window_days", String(value.windowDays));
+  if (value.storeID) query.set("store_id", value.storeID);
+  router.replace(`/store-pnl?${query.toString()}`);
+}
+
 type RowValue = {
   key: string; label: string; kind: string; basis: string; children?: string[]; subtracted?: string[];
   source?: string; formula_text?: string;
@@ -62,14 +98,18 @@ type PnlResponse = {
   gaps?: string[];
 };
 
-export default function StorePnlPage() {
+function StorePnlInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { token } = useAuth();
   const { language } = useLanguage();
+  const query = useMemo(() => pnlQueryFromURL(searchParams), [searchParams]);
+  const [latest, setLatest] = useState<RetailSimulationDatasetData | null | undefined>(undefined);
+  const [discoveryRetry, setDiscoveryRetry] = useState(0);
   const [stores, setStores] = useState<StoreRef[]>([]);
-  const [storeId, setStoreId] = useState<string>("");
-  // S1-3/P2-3：as_of 不再是硬编码日期，用户可在表头选；默认今天。
-  const [asOf, setAsOf] = useState<string>(dayjs().format("YYYY-MM-DD"));
+  const [storesLoading, setStoresLoading] = useState(false);
+  const [storesError, setStoresError] = useState<string | null>(null);
+  // S1-3/P2-3：as_of 不再是硬编码日期，用户可在表头选；默认随数据环境走。
   const [error, setError] = useState<string | null>(null);
   // S1-9/S3-5：行显隐、分组合并与个人视图。视图只改呈现，不改数据。
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
@@ -87,23 +127,57 @@ export default function StorePnlPage() {
   const [editorFormula, setEditorFormula] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
 
+  const discoveryLoading = latest === undefined;
+
   useEffect(() => {
     if (!token) return;
     let active = true;
-    // store list is advisory; the projection fetch reports its own errors
-    operatingFactsApi
-      .listStores({}, token)
-      .then((body) => {
-        if (!active) return;
-        const payload = (body as { stores?: unknown }).stores || body;
-        const list: StoreRef[] = (Array.isArray(payload) ? payload : []).map((item: any) => ({
-          id: item.id, code: item.store_code || item.code, name: item.store_name || item.name,
-        }));
-        setStores(list);
-      })
-      .catch(() => {});
+    retailAnalyticsApi.latestSimulationDataset(token)
+      .then((result) => { if (active) setLatest(result.data); })
+      .catch(() => { if (active) setLatest(null); });
     return () => { active = false; };
-  }, [token]);
+  }, [token, discoveryRetry]);
+
+  const change = (next: Partial<PnlQuery>) => {
+    if (latest === undefined) return;
+    const classification = next.classification || query.classification || "simulated";
+    // 与门店 360 一致：切口径绝不造数据。production 不需要数据集；无可用
+    // 模拟集时 simulated 保持空版本并渲染引导态。
+    writePnlQuery(router, {
+      classification,
+      datasetVersion: classification === "production" ? "" : (next.datasetVersion || query.datasetVersion || latest?.dataset_version || ""),
+      asOf: next.asOf || query.asOf || (latest ? latestAnomalyDate(latest) : TODAY),
+      windowDays: next.windowDays ?? query.windowDays,
+      storeID: next.storeID ?? query.storeID,
+    });
+  };
+
+  // FP&A 反馈 P0-1：URL 未带数据环境时回落到最新模拟数据集；latest 为空则
+  // 渲染引导态，绝不自动生成数据（与门店 360 / 脉搏同一纪律）。
+  useEffect(() => {
+    if (query.classification !== "" || latest === undefined || !router) return;
+    writePnlQuery(router, {
+      classification: "simulated",
+      datasetVersion: latest?.dataset_version ?? "",
+      asOf: query.asOf || (latest ? latestAnomalyDate(latest) : TODAY),
+      windowDays: query.windowDays,
+      storeID: query.storeID,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 与 store-360 同一守卫式写法：写入后守卫条件即翻转，不会循环。
+  }, [query.classification, query.asOf, query.windowDays, query.storeID, latest, router]);
+
+  // simulated 且缺 dataset_version 时按最新数据集补齐（保留用户已选 as_of）。
+  useEffect(() => {
+    if (query.classification !== "simulated" || query.datasetVersion || latest === undefined || !router) return;
+    writePnlQuery(router, {
+      classification: "simulated",
+      datasetVersion: latest?.dataset_version ?? "",
+      asOf: query.asOf || (latest ? latestAnomalyDate(latest) : TODAY),
+      windowDays: query.windowDays,
+      storeID: query.storeID,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- 守卫式：写入后 dataset_version 非空，条件翻转。
+  }, [query.classification, query.datasetVersion, query.asOf, query.windowDays, query.storeID, latest, router]);
 
   useEffect(() => {
     if (!token) return;
@@ -116,13 +190,44 @@ export default function StorePnlPage() {
     return () => { active = false; };
   }, [token]);
 
+  // 门店下拉与脉搏/门店 360 同源：retail/store-options 按数据环境出可选项。
+  // 旧 operating-facts/stores 读的是月粒度旧表，模拟数据不在其中（P0-1 根因）。
+  useEffect(() => {
+    if (!token || query.classification === "") return;
+    if (query.classification === "simulated" && !query.datasetVersion) return;
+    let active = true;
+    setStoresLoading(true);
+    setStoresError(null);
+    retailAnalyticsApi
+      .storeOptions({ data_classification: query.classification as RetailDataClassification, dataset_version: query.datasetVersion || undefined }, token)
+      .then((body) => {
+        if (!active) return;
+        setStores((body.data || []).map((item) => ({
+          id: item.store_id, code: item.store_code, name: item.store_name,
+        })));
+      })
+      .catch((err) => { if (active) setStoresError(apiErrorMessage(err)); })
+      .finally(() => { if (active) setStoresLoading(false); });
+    return () => { active = false; };
+  }, [token, query.classification, query.datasetVersion]);
+
   // P2-3 主取数接缝：走 useRetailQuery（loading / 竞态 / token 注入统一），
-  // 错误态由 StateBlock 呈现（failed / scope_denied / empty）。as_of 从所选
-  // 日期取，不再硬编码。
-  const pnlParams = storeId
-    ? { store_id: storeId, as_of: asOf, window_days: 7, basis: "side_by_side", secondary, template_id: templateId ?? undefined }
+  // 错误态由 StateBlock 呈现（failed / scope_denied / empty）。数据环境参数
+  // 显式透传——缺省时后端默认 production，模拟店会以 not visible 拒绝。
+  const queryReady = Boolean(
+    query.storeID && query.classification && query.asOf &&
+    (query.classification !== "simulated" || query.datasetVersion),
+  );
+  const pnlParams = queryReady
+    ? {
+        store_id: query.storeID, as_of: query.asOf, window_days: query.windowDays,
+        basis: "side_by_side", secondary,
+        template_id: templateId ?? undefined,
+        data_classification: query.classification as RetailDataClassification,
+        dataset_version: query.datasetVersion || undefined,
+      }
     : null;
-  const pnlKey = `${storeId}|${asOf}|7|side_by_side|${secondary}|${templateId ?? ""}`;
+  const pnlKey = `${query.storeID}|${query.classification}|${query.datasetVersion}|${query.asOf}|${query.windowDays}|side_by_side|${secondary}|${templateId ?? ""}`;
   const { loading, state: pnlState, retry } = useRetailQuery({
     token,
     params: pnlParams,
@@ -290,7 +395,7 @@ export default function StorePnlPage() {
       : pnl.columns?.[1] || t("storepnl.col_other", language);
     const lines: string[] = [
       "data_classification,dataset_version,as_of",
-      `${pnl.data_classification},${pnl.dataset_version ?? ""},${asOf}`,
+      `${pnl.data_classification},${pnl.dataset_version ?? ""},${query.asOf}`,
       `row label,actual,${comparisonLabel},variance,pct,basis`,
     ];
     for (const block of [pnl.operating, pnl.ifrs16]) {
@@ -302,10 +407,13 @@ export default function StorePnlPage() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `store-pnl-${storeId}.csv`;
+    anchor.download = `store-pnl-${query.storeID}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
+
+  const simulatedWithoutDataset =
+    query.classification === "simulated" && !query.datasetVersion && !discoveryLoading && !latest;
 
   return (
     <ProtectedRoute>
@@ -316,10 +424,27 @@ export default function StorePnlPage() {
           meta={t("storepnl.basis_note", language)}
           primaryAction={
             <Space>
+              <Segmented
+                size="small"
+                value={query.classification || "simulated"}
+                onChange={(val) => {
+                  const next = val as RetailDataClassification;
+                  if (next === "production") change({ classification: next, datasetVersion: "" });
+                  else change({ classification: next });
+                }}
+                options={[
+                  { label: t("retail.classification.simulated", language), value: "simulated" },
+                  { label: t("retail.classification.production", language), value: "production" },
+                ]}
+              />
               <Select
                 placeholder={t("storepnl.select_store", language)}
-                value={storeId || undefined}
-                onChange={setStoreId}
+                value={query.storeID || undefined}
+                showSearch
+                optionFilterProp="label"
+                loading={storesLoading}
+                notFoundContent={storesLoading ? t("storepnl.loading_stores", language) : t("storepnl.no_selectable_stores", language)}
+                onChange={(value) => change({ storeID: value })}
                 options={stores.map((store) => ({
                   value: store.id,
                   label: `${store.code} ${store.name}`,
@@ -336,8 +461,8 @@ export default function StorePnlPage() {
               />
               <DatePicker
                 allowClear={false}
-                value={dayjs(asOf)}
-                onChange={(date) => setAsOf(date ? date.format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"))}
+                value={dayjs(query.asOf || TODAY)}
+                onChange={(date) => change({ asOf: date ? date.format("YYYY-MM-DD") : TODAY })}
                 placeholder={t("storepnl.as_of", language)}
               />
               <Button disabled={!pnl} onClick={() => setEditorOpen(true)}>
@@ -381,14 +506,26 @@ export default function StorePnlPage() {
             </Space>
           }
         />
-        {!storeId && (
+        {simulatedWithoutDataset && (
+          <div className="store360-block-margin">
+            <StateBlock
+              state={{ kind: "actionable", message: t("storepnl.no_dataset_title", language), reason: t("storepnl.no_dataset_desc", language) }}
+              language={language}
+              onAction={() => router.push("/operating-pulse")}
+            />
+          </div>
+        )}
+        {!query.storeID && (
           <Card>
             <Typography.Text type="secondary">{t("storepnl.select_hint", language)}</Typography.Text>
           </Card>
         )}
+        {storesError && (
+          <Alert type="warning" showIcon message={t("storepnl.options_error", language)} description={storesError} />
+        )}
         {error && <Alert type="error" message={t("storepnl.failed", language)} description={error} showIcon />}
         {loading && <Card><Spin tip={t("storepnl.loading", language)} /></Card>}
-        {storeId && !loading && <StateBlock state={pnlState} language={language} onRetry={retry} />}
+        {query.storeID && !loading && <StateBlock state={pnlState} language={language} onRetry={() => { setDiscoveryRetry((value) => value + 1); retry(); }} />}
         {pnl && !loading && (
           <Space direction="vertical" size="middle">
             <Space wrap>
@@ -466,5 +603,13 @@ export default function StorePnlPage() {
         </Modal>
       </AppLayout>
     </ProtectedRoute>
+  );
+}
+
+export default function StorePnlPage() {
+  return (
+    <Suspense fallback={<Card><Spin /></Card>}>
+      <StorePnlInner />
+    </Suspense>
   );
 }

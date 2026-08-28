@@ -86,10 +86,10 @@ export default function PerformancePage() {
     paramsKey: `cockpit-${period}`,
     fetcher: async (p, t) => {
       const [overviewResult, storeResult, equipmentResult, actionResult] = await Promise.all([
-        performanceApi.overview(p.period, t),
-        performanceApi.storePerformance(p.period, t),
-        performanceApi.equipmentPerformance(p.period, t),
-        performanceApi.actions({ period: p.period }, t),
+        performanceApi.overview<Overview>(p.period, t),
+        performanceApi.storePerformance<{ data?: any[] }>(p.period, t),
+        performanceApi.equipmentPerformance<{ data?: any[] }>(p.period, t),
+        performanceApi.actions<{ data?: any[] }>({ period: p.period }, t),
       ]);
       return {
         overview: overviewResult,
@@ -145,7 +145,7 @@ export default function PerformancePage() {
   const simulateStore = async () => {
     if (!token) return;
     try {
-      const response = await performanceApi.storeScenario([
+      const response = await performanceApi.storeScenario<{ data?: any[] }>([
         { name: "续约谈判", decision: "renew", currency: "CNY", horizon_months: 36, discount_rate: scenarioInput.discount, monthly_sales: scenarioInput.sales, gross_margin_pct: scenarioInput.margin, monthly_labor: scenarioInput.sales * 0.1, monthly_other_cost: scenarioInput.sales * 0.05, monthly_rent: scenarioInput.rent, variable_rent_pct: 2 },
         { name: "提前解约", decision: "close", currency: "CNY", horizon_months: 36, discount_rate: scenarioInput.discount, monthly_sales: scenarioInput.sales, gross_margin_pct: scenarioInput.margin, monthly_labor: scenarioInput.sales * 0.1, monthly_other_cost: scenarioInput.sales * 0.05, monthly_rent: scenarioInput.rent, exit_cost: scenarioInput.rent * 3 },
       ], token);

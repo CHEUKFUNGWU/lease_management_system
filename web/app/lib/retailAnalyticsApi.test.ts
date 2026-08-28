@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { retailAnalyticsApi } from "./api";
+import { retailAnalyticsApi, storePnlApi } from "./api";
 
 describe("retailAnalyticsApi", () => {
   beforeEach(() => {
@@ -69,5 +69,23 @@ describe("retailAnalyticsApi", () => {
     expect((second[1]?.headers as Record<string, string>)["Idempotency-Key"]).toBe("scenario-key");
     expect(() => retailAnalyticsApi.evaluateStoreScenario({ store_id: "s", data_classification: "production", dataset_version: "bad", as_of: "2026-06-05", window_days: 7 }, body, "token")).toThrow("cannot include dataset_version");
     expect(() => retailAnalyticsApi.saveStoreScenarioAction({ store_id: "s", data_classification: "simulated", as_of: "2026-06-05", window_days: 7 }, { horizon_months: 12, selected_scenario: body.scenarios[1], title: "T", planned_action: "A" }, "scenario-key", "token")).toThrow("requires dataset_version");
+  });
+
+  // FP&A 反馈 2026-08-27（P0-1）：store-pnl 过去不带数据环境参数，后端默认
+  // production，模拟店一律 not visible。透传后与脉搏/门店 360 同一套互斥纪律。
+  it("store pnl carries the data environment and keeps classification/dataset exclusive", async () => {
+    await storePnlApi.getPnl({ store_id: "st/7", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", secondary: "budget", data_classification: "simulated", dataset_version: "plan A/v1" }, "token");
+    const url = new URL(String(vi.mocked(fetch).mock.calls[0][0]));
+    expect(url.pathname).toContain("/stores/st%2F7/pnl");
+    expect(url.searchParams.get("data_classification")).toBe("simulated");
+    expect(url.searchParams.get("dataset_version")).toBe("plan A/v1");
+    expect(url.searchParams.get("window_days")).toBe("7");
+
+    await storePnlApi.getPnl({ store_id: "s", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", data_classification: "production" }, "token");
+    const prodURL = new URL(String(vi.mocked(fetch).mock.calls[1][0]));
+    expect(prodURL.searchParams.has("dataset_version")).toBe(false);
+
+    expect(() => storePnlApi.getPnl({ store_id: "s", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", data_classification: "simulated" }, "token")).toThrow("requires dataset_version");
+    expect(() => storePnlApi.getPnl({ store_id: "s", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", data_classification: "production", dataset_version: "v1" }, "token")).toThrow("cannot include dataset_version");
   });
 });

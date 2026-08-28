@@ -110,7 +110,7 @@ export default function PreDealPage() {
     setLoading(true);
     try {
       setBriefing(
-        await dealApi.briefing(
+        await dealApi.briefing<Briefing>(
           {
             name: values.name,
             commencement_date: values.commencement_date.format("YYYY-MM-DD"),

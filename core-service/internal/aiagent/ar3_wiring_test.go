@@ -406,20 +406,23 @@ func TestFileTriageTurnCountsFileParseToolDefs(t *testing.T) {
 	if stub.calledN == 0 {
 		t.Fatal("triage round must go through the assembler when wired")
 	}
-	// The parse_contract branch folds its result into the main chat round
-	// instead of returning early, so one request assembles TWICE: the triage
-	// round carries the file-parse schemas riding its tools param, the main
-	// chat round carries none.
+	// P0-A③ multi-round semantics: EVERY loop round is a wire turn carrying
+	// the parse-tool schemas it selects from, and every round goes through the
+	// assembler (AF4 unchanged: schemas actually sent are what gets counted).
+	// The assembled-history invariant (first turn projects fileParseTools,
+	// defs non-empty with name+json) stays pinned.
 	if len(stub.turnDefs[0]) != len(fileParseTools) {
-		t.Fatalf("triage round ToolDefs = %d; want %d (the schemas riding this request)", len(stub.turnDefs[0]), len(fileParseTools))
+		t.Fatalf("first round ToolDefs = %d; want %d (the schemas riding this request)", len(stub.turnDefs[0]), len(fileParseTools))
 	}
-	for _, def := range stub.turnDefs[0] {
-		if def.Name == "" || def.JSON == "" {
-			t.Fatalf("tool def not projected from fileParseTools: %+v", def)
+	for _, defs := range stub.turnDefs {
+		if len(defs) == 0 {
+			t.Fatalf("a loop round rode no tool schemas: AF4 under-counts budget")
 		}
-	}
-	if len(stub.turnDefs[len(stub.turnDefs)-1]) != 0 {
-		t.Fatalf("main chat round ToolDefs = %d; want 0", len(stub.turnDefs[len(stub.turnDefs)-1]))
+		for _, def := range defs {
+			if def.Name == "" || def.JSON == "" {
+				t.Fatalf("tool def not projected from fileParseTools: %+v", def)
+			}
+		}
 	}
 	_ = body
 }

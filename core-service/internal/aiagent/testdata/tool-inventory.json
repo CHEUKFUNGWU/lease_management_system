@@ -231,6 +231,17 @@
     ]
   },
   {
+    "name": "fpna.trial_balance.fill.preview",
+    "version": "v1",
+    "level": "draft",
+    "permissions": [
+      {
+        "resource": "master_data",
+        "action": "manage"
+      }
+    ]
+  },
+  {
     "name": "fpna.working_paper.finmodel.generate",
     "version": "v1",
     "level": "draft",

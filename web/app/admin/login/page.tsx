@@ -30,13 +30,13 @@ export default function AdminLoginPage() {
   const handleLogin = async (values: any) => {
     setLoading(true);
     try {
-      const data = await authApi.login(values.username, values.password);
+      const data = await authApi.login<{ token?: string; user_id?: string; username: string; role: string; roles?: string[]; legal_entity_id?: string | null }>(values.username, values.password);
       if (!(data.roles || [data.role]).includes("admin")) {
         notifyError(t("admin_login.not_admin", language));
         setLoading(false);
         return;
       }
-      login(data.token, {
+      login(data.token ?? "", {
         id: data.user_id || "",
         username: data.username,
         role: data.role,

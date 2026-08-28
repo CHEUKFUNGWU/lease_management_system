@@ -159,3 +159,33 @@ func TestRetailSkillNaturalPhrasingRouting(t *testing.T) {
 		t.Fatalf("lease why-question captured by retail skill: %+v", definition)
 	}
 }
+
+// agent-universal-pagefill-v1 P0-A②：写意图去遮蔽。FP&A 反馈 2026-08-27
+// §7.4.11 实测：含零售词（门店/毛利/人工成本率）的写请求被 Priority 70 的
+// 只读 retail_operations 压住，唯一带写工具的 fpna_copilot（Priority 45）
+// 永远选不中。修法是确定性的 tie-break：问句明确要草稿时，声明了写工具的
+// 技能优先。
+func TestSelectPrefersDraftCapableSkillOnDraftIntent(t *testing.T) {
+	registry := ProductionRegistry()
+	cases := []string{
+		"请为经营利润下滑的门店生成行动草稿",
+		"基于当前毛利表现帮我生成草稿",
+		"针对人工成本率偏高的门店起草改进方案",
+		"生成决策备忘录：门店经营利润连续下滑",
+	}
+	for _, message := range cases {
+		definition, ok := registry.Select(Intent{Message: message, Role: "editor"})
+		if !ok {
+			t.Fatalf("%q matched no skill", message)
+		}
+		if !hasDraftCapability(definition) {
+			t.Fatalf("%q routed to %s which has no draft tools", message, definition.ID)
+		}
+	}
+	// 反向守卫：普通只读问句不受偏置影响——"哪些门店需要关注"仍走
+	// retail_operations（确定性事实管道），不能被拉进写技能。
+	readDefinition, ok := registry.Select(Intent{Message: "当前经营脉搏中哪些门店需要关注？", Role: "readonly"})
+	if !ok || readDefinition.ID != "retail_operations" {
+		t.Fatalf("plain read question changed routing: %v %v", readDefinition.ID, ok)
+	}
+}

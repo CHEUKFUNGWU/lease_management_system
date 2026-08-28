@@ -104,7 +104,7 @@ export default function SettingsPage() {
     if (!token) return;
     setAuthSessionsLoading(true);
     try {
-      const response = await authApi.listSessions(token);
+      const response = await authApi.listSessions<{ sessions?: AuthSession[] }>(token);
       setAuthSessions(response.sessions || []);
     } catch (error: any) {
       notifyError(error?.message || t("settings.sessions_load_failed", language));
@@ -175,7 +175,14 @@ export default function SettingsPage() {
     if (!token) return;
     setDiscountRateLoading(true);
     settingsApi
-      .getGlobal(token)
+      .getGlobal<{
+        global_discount_rate?: number;
+        rent_to_sales_healthy_ceiling?: number | null;
+        rent_to_sales_warning_ceiling?: number | null;
+        budget_variance_materiality_threshold?: number | null;
+        budget_tie_out_tolerance?: number | null;
+        journal_entry_materiality_threshold?: number | null;
+      }>(token)
       .then((res) => {
         const raw: number = res.global_discount_rate ?? 0;
         const percent = raw > 1 ? raw : raw * 100;
@@ -281,7 +288,7 @@ export default function SettingsPage() {
     setTagLoadError(null);
     reportApi
       .tagSummary(token)
-      .then((res) => setData(res.data || []))
+      .then((res) => setData(((res as { data?: TagSummaryRow[] }).data) || []))
       .catch((err) => {
         // STATE-001：标签统计被折现率缺失阻塞（422 data_unavailable）是
         // 「用户能自己解决」——inline 呈现下一步，而不是红色 toast。

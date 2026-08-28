@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lease-management-system/core-service/internal/errcontract"
 	"github.com/lease-management-system/core-service/internal/finmodel"
 	finadapter "github.com/lease-management-system/core-service/internal/finmodel/adapter"
@@ -940,8 +943,139 @@ func runCurrency(run *repository.FinModelRun) string {
 	return "CNY"
 }
 
+// ListDefinitions serves the definitions listing surface. The route has been
+// registered since the run path landed, but the handler stayed a stub (empty
+// array) so the workbench rendered nothing and told users to paste IDs by
+// hand; it now reads the real tenant-scoped rows.
 func (h *FinModelHandler) ListDefinitions(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"definitions": []any{}}) // 列表 UI 逐步填充；创建与运行已是真实路径
+	if h.repo == nil {
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
+		return
+	}
+	tenant := middleware.GetTenantID(c)
+	var tenantPtr *string
+	if tenant != "" {
+		tenantPtr = &tenant
+	}
+	rows, err := h.repo.ListModelDefinitions(c.Request.Context(), tenantPtr)
+	if err != nil {
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"definitions": rows})
+}
+
+// createDefinitionRequest is the body of POST /financial-model/definitions.
+// The seed flow (FP&A 反馈 2026-08-27 P1) persists the factory three-statement
+// template under an entity-local name and binds a draft definition to it —
+// the "from zero to runnable" path; source_bindings carry the fact bindings
+// the engine's Ports read through.
+type createDefinitionRequest struct {
+	Name           string          `json:"name"`
+	ActualCutoff   string          `json:"actual_cutoff_period"`
+	Policy         json.RawMessage `json:"policy"`
+	SourceBindings json.RawMessage `json:"source_bindings"`
+}
+
+const factoryDefinitionPrefix = "三表模型 · "
+
+// CreateDefinition materializes a runnable definition from the factory
+// template (name optional; defaults to 三表模型 · <entity short id>): the
+// statement template row is persisted first (an existing same-name+version
+// template is reused, never overwritten), then a draft model definition
+// references it. Both writes stay inside the caller's legal entity — bottom
+// line 1. Definition status starts at draft: running it does not require
+// approval, but publishing (计划版本) keeps its own gate.
+func (h *FinModelHandler) CreateDefinition(c *gin.Context) {
+	if h.repo == nil {
+		writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "repository unavailable", nil)
+		return
+	}
+	userID, ok := userID(c)
+	if !ok {
+		return
+	}
+	tenant := middleware.GetTenantID(c)
+	if tenant == "" {
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "a legal entity context is required to create a model definition", nil)
+		return
+	}
+	var req createDefinitionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		name = factoryDefinitionPrefix + tenant[:8]
+	} else if strings.HasPrefix(name, factoryDefinitionPrefix) || strings.Contains(name, "·") {
+		// 工厂种子谱系的名字形状（三表模型 · …）留给种子路径，防止用户
+		// 命名与后续模板复用判定撞车。
+		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "definition name must not contain '·' or the reserved factory prefix", nil)
+		return
+	}
+	var cutoff *string
+	if req.ActualCutoff != "" {
+		if !regexp.MustCompile(`^[0-9]{4}-[0-9]{2}$`).MatchString(req.ActualCutoff) {
+			writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, "actual_cutoff_period must be YYYY-MM", nil)
+			return
+		}
+		cutoff = &req.ActualCutoff
+	}
+	policy := req.Policy
+	if len(policy) == 0 {
+		policy = json.RawMessage("{}")
+	}
+	bindings := req.SourceBindings
+	if len(bindings) == 0 {
+		bindings = json.RawMessage("{}")
+	}
+
+	def := template.DefaultStatementTemplateDef()
+	tmplName := factoryDefinitionPrefix + def.Name
+	ctx := c.Request.Context()
+	tmplRow, err := h.repo.FindStatementTemplate(ctx, &tenant, tmplName, def.Version)
+	switch {
+	case err == nil:
+		// 已存在：复用，不覆盖（SaveStatementTemplate 会拒绝冻结版本改写）。
+	case errors.Is(err, pgx.ErrNoRows):
+		tmplID := uuid.NewString()
+		if _, saveErr := h.repo.SaveStatementTemplate(ctx, template.TemplateDef{
+			Name: tmplName, Version: def.Version, Rows: def.Rows,
+		}, &tenant, &userID, tmplID); saveErr != nil {
+			writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, saveErr.Error(), nil)
+			return
+		}
+		tmplRow = &repository.FinStatementTemplate{ID: tmplID}
+	default:
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
+		return
+	}
+
+	id := uuid.NewString()
+	version := 1
+	status := "draft"
+	inserted := &repository.FinModelDefinition{
+		ID: id, LegalEntityID: tenant, Name: name, Version: version,
+		TemplateID: tmplRow.ID, ActualCutoffPeriod: cutoff,
+		Policy: policy, SourceBindings: bindings, Status: status,
+		CreatedBy: &userID,
+	}
+	if err := h.repo.CreateModelDefinition(ctx, inserted); err != nil {
+		var pgErr *pgconn.PgError
+		// UNIQUE (legal_entity_id, name, version)：同名重放返回既有定义（幂等），
+		// 其余唯一冲突按系统错误处理。
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			existing, findErr := h.repo.FindModelDefinitionByName(ctx, &tenant, name, version)
+			if findErr == nil {
+				c.JSON(http.StatusOK, gin.H{"definition": existing, "reused_template": tmplRow != nil, "idempotent_replay": true})
+				return
+			}
+		}
+		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"definition": inserted})
 }
 
 // assumptionOverlay reads approved values first, then overlays the request's

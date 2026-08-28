@@ -98,7 +98,10 @@ export default function FinancialModelPage() {
     [wb.definitionId, assumptionsText, classification],
   );
 
-  // 定义列表：后端当前是桩（返回空数组），空态必须诚实呈现而不是藏起输入。
+  // 定义列表：来自 GET /financial-model/definitions（按法人过滤）。空态
+  // 提供「一键创建定义」种子路径（P1，FP&A 反馈 2026-08-27），不再只能手贴 ID。
+  const [definitionRetry, setDefinitionRetry] = useState(0);
+  const [creatingDefinition, setCreatingDefinition] = useState(false);
   useEffect(() => {
     if (!token) return;
     financialModelApi
@@ -108,7 +111,22 @@ export default function FinancialModelPage() {
         setDefinitionOptions(defs.filter((d) => typeof d.id === "string") as { id: string; title?: string }[]);
       })
       .catch(() => setDefinitionOptions([]));
-  }, [token]);
+  }, [token, definitionRetry]);
+
+  const createSeedDefinition = async () => {
+    if (!token) return;
+    setCreatingDefinition(true);
+    try {
+      const body = await financialModelApi.createDefinition({}, token);
+      message.success(t("finmodel.definition_created", language));
+      if (body.definition?.id) dispatch({ t: "select_definition", id: body.definition.id });
+      setDefinitionRetry((value) => value + 1);
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    } finally {
+      setCreatingDefinition(false);
+    }
+  };
 
   // 异步 run 轮询：phase 离开 polling 时清理定时器；瞬态查询失败继续轮询。
   const polling = wb.phase === "polling";
@@ -449,7 +467,16 @@ export default function FinancialModelPage() {
                       options={definitionOptions.map((d) => ({ value: d.id, label: d.title ? `${d.title} (${d.id})` : d.id }))}
                     />
                   ) : (
-                    <Alert type="info" showIcon message={t("finmodel.definition_empty", language)} />
+                    <Alert
+                      type="info"
+                      showIcon
+                      message={t("finmodel.definition_empty", language)}
+                      action={
+                        <Button size="small" icon={<PlusOutlined />} loading={creatingDefinition} onClick={createSeedDefinition}>
+                          {t("finmodel.create_definition", language)}
+                        </Button>
+                      }
+                    />
                   )}
                   <Input
                     placeholder={t("finmodel.definition_manual", language)}

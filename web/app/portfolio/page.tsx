@@ -109,14 +109,14 @@ function PortfolioPage() {
     token,
     params: { mode },
     paramsKey: `portfolio-summary-${mode}`,
-    fetcher: (p, t) => reportApi.portfolioSummary(p.mode, t).then((res) => res.data ?? []),
+    fetcher: (p, t) => reportApi.portfolioSummary<{ data?: PortfolioRow[] }>(p.mode, t).then((res) => res.data ?? []),
   });
   const unitPriceQuery = useRetailQuery({
     token,
     params: { mode, grouping },
     paramsKey: `portfolio-unitprice-${mode}-${grouping}`,
     fetcher: async (p, t) => {
-      const res = await reportApi.unitPrice({ mode: p.mode, group_by: p.grouping }, t);
+      const res = await reportApi.unitPrice<{ data?: UnitPriceRow[]; contracts_without_area?: number }>({ mode: p.mode, group_by: p.grouping }, t);
       return { rows: res.data || [], contractsWithoutArea: res.contracts_without_area || 0 };
     },
   });

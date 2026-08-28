@@ -62,7 +62,7 @@ export default function NewContractPage() {
   useEffect(() => {
     if (!token) return;
     settingsApi
-      .getGlobal(token)
+      .getGlobal<{ global_discount_rate?: number }>(token)
       .then((res) => {
         const raw = Number(res.global_discount_rate);
         if (Number.isFinite(raw) && raw > 0) {
@@ -78,7 +78,10 @@ export default function NewContractPage() {
   useEffect(() => {
     if (!token) return;
     setMasterDataLoading(true);
-    Promise.all([legalEntityApi.list(token), masterDataApi.listLandlords(token)])
+    Promise.all([
+          legalEntityApi.list<{ legal_entities?: LegalEntityOption[] }>(token),
+          masterDataApi.listLandlords<{ landlords?: LandlordOption[] }>(token),
+        ])
       .then(([entitiesResponse, landlordsResponse]) => {
         setLegalEntities(entitiesResponse.legal_entities || []);
         setLandlords(landlordsResponse.landlords || []);
@@ -100,7 +103,7 @@ export default function NewContractPage() {
     }
     setStoresLoading(true);
     masterDataApi
-      .listStores(token, selectedLegalEntityId)
+      .listStores<{ stores?: StoreOption[] }>(token, selectedLegalEntityId)
       .then((response) => {
         const nextStores: StoreOption[] = response.stores || [];
         setStores(nextStores);

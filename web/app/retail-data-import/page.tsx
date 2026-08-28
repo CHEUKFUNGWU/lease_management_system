@@ -12,6 +12,7 @@ import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
 import { UploadGlyph, DownloadGlyph, SourceCircleGlyph } from "../components/MonochromeGlyphs";
 import { apiErrorMessage, apiRequest, fpnaPlanImportApi, operatingFactsApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
+import { usePageFill, type PageFillPayload } from "../lib/usePageFill";
 import { tableScrollX } from "../lib/tableScroll";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -58,8 +59,8 @@ export default function RetailDataImportPage() {
     (async () => {
       try {
         // T2 (UIUX 任务书 2026-08-26)：裸 fetch 换 apiRequest（401 自动刷新 + 错误契约）。
-        const body = await apiRequest(`/api/v1/ai/chat/artifacts/${encodeURIComponent(fillId)}`, { token });
-        const data = body?.artifact?.data || {};
+        const body = await apiRequest<{ artifact?: { data?: PageFillPayload } }>(`/api/v1/ai/chat/artifacts/${encodeURIComponent(fillId)}`, { token });
+        const data: PageFillPayload = body?.artifact?.data ?? {};
         const payload = data.payload || {};
         if (typeof payload.source_system?.value === "string" && payload.source_system.value) {
           setSourceSystem(payload.source_system.value);
@@ -77,6 +78,42 @@ export default function RetailDataImportPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // agent-universal-pagefill-v1 P0-B①：GL 试算平衡表的 Agent 预填，
+  // 经 ?tb_fill=<artifactId> 深链加载；payload 只含人提供的信封字段，
+  // 列结构建议仅作展示——提交永远由人点「导入试算平衡表」。
+  const tbFillId = new URLSearchParams(window.location.search).get("tb_fill");
+  useEffect(() => {
+    if (!tbFillId || !token) return;
+    let active = true;
+    (async () => {
+      try {
+        const body = await apiRequest<{ artifact?: { data?: PageFillPayload } }>(
+          `/api/v1/ai/chat/artifacts/${encodeURIComponent(tbFillId)}`,
+          { token },
+        );
+        const data = body?.artifact?.data;
+        if (!active || !data) return;
+        const applyString = (key: string, setter: (value: string) => void, pattern?: RegExp) => {
+          const entry = data.payload?.[key];
+          if (entry && typeof entry.value === "string" && (!pattern || pattern.test(entry.value))) {
+            setter(entry.value);
+          }
+        };
+        applyString("name", setTbName);
+        applyString("source_system", setTbSource);
+        applyString("period", setTbPeriod, /^\d{4}-\d{2}$/);
+        applyString("functional_currency", setTbCurrency, /^[A-Za-z]{3}$/);
+        message.info(t("retail_import.fill_loaded", language));
+      } catch {
+        // Best-effort prefill: a failed load must never block the human path.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tbFillId, token]);
 
   const downloadStoreTemplate = async () => {
     if (!token) return;

@@ -550,6 +550,12 @@ function Store360Inner() {
             />
           )}
           {response && response.plan && <PlanComparisonPanel plan={response.plan} currency={response.currency || ""} language={language} />}
+          {response && !response.plan && !(response.evidence && response.evidence.observed_store_days === 0) && (
+            <Alert className="store360-block-margin" type="info" showIcon
+              message={t("plan.absent_title", language)}
+              description={t("plan.absent_desc", language)}
+            />
+          )}
           {noQuery && (
             <div className="store360-block-margin">
               <StateBlock

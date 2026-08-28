@@ -196,8 +196,8 @@ function ReportsPageContent() {
     paramsKey: `ledger-${activeTab}-${reportMode}`,
     fetcher: async (p, t) => {
       const [liabilityRes, summaryRes] = await Promise.all([
-        reportApi.liabilityRolling(p.mode, t, language),
-        reportApi.contractSummary(p.mode, t, language),
+        reportApi.liabilityRolling<{ data?: unknown[] }>(p.mode, t, language),
+        reportApi.contractSummary<Record<string, unknown>>(p.mode, t, language),
       ]);
       return { data: liabilityRes.data || [], summary: summaryRes };
     },
@@ -301,7 +301,7 @@ function ReportsPageContent() {
     token,
     params: {},
     paramsKey: "reports-tags",
-    fetcher: async (_p, t) => ({ tags: (await reportApi.tags(t)).tags || [] }),
+    fetcher: async (_p, t) => ({ tags: (await reportApi.tags<{ tags?: string[] }>(t)).tags || [] }),
   });
   const availableTags = tagsQuery.state.kind === "ready" ? tagsQuery.state.data?.tags ?? [] : [];
   const tagLoading = tagsQuery.loading;

@@ -171,7 +171,7 @@ export function ContractWorkspaceDialogs({
     setClauseDraftLoading(true);
     setClauseDraftError(null);
     try {
-      const response = await eventApi.previewPayments(
+      const response = await eventApi.previewPayments<{ draft?: Record<string, unknown> }>(
         contract.id,
         {
           effective_date: effectiveDate.format ? effectiveDate.format("YYYY-MM-DD") : effectiveDate,

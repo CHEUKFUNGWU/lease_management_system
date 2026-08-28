@@ -489,6 +489,7 @@ func main() {
 		protected.Handle(http.MethodGet, "/financial-model/runs/:id", permission("fin_models", "read"), finModelHandler.GetRun)
 		protected.Handle(http.MethodPost, "/financial-model/runs/:id/cancel", permission("fin_models", "write"), finModelHandler.CancelRun)
 		protected.Handle(http.MethodGet, "/financial-model/definitions", permission("fin_models", "write"), finModelHandler.ListDefinitions)
+		protected.Handle(http.MethodPost, "/financial-model/definitions", permission("fin_models", "write"), finModelHandler.CreateDefinition)
 		protected.Handle(http.MethodGet, "/financial-model/group", permission("reports", "read"), finModelHandler.GroupRuns)
 		protected.Handle(http.MethodGet, "/financial-model/saved-views", permission("fin_views", "read"), savedViewHandler.List)
 		protected.Handle(http.MethodPost, "/financial-model/saved-views", permission("fin_views", "write"), savedViewHandler.Create)

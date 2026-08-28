@@ -2664,6 +2664,12 @@ export const dict: TranslationDict = {
   "storepnl.select_store": { "zh-CN": "选择门店", "zh-HK": "選擇門店", en: "Select a store" },
   "storepnl.select_hint": { "zh-CN": "从右上角选择门店后查看其利润表。Actual 列来自 store-day 事实聚合（retail-kpi-v1 语义），对比列来自计划版本；缺失行显示为「—」而非 0。", "zh-HK": "從右上角選擇門店後查看其利潤表。Actual 列來自 store-day 事實聚合（retail-kpi-v1 語義），對比列來自計劃版本；缺失行顯示為「—」而非 0。", en: "Select a store above to render its P&L. Actual comes from the store-day semantic layer, the comparison column from plan versions; missing rows stay dashed, never zero." },
   "storepnl.as_of": { "zh-CN": "截止日期", "zh-HK": "截止日期", en: "As-of date" },
+  // FP&A 反馈 2026-08-27（P0-1）：数据环境与脉搏/门店 360 同轴后的页面态文案。
+  "storepnl.no_dataset_title": { "zh-CN": "还没有可用的模拟数据集", "zh-HK": "還沒有可用的模擬數據集", en: "No simulated dataset available yet" },
+  "storepnl.no_dataset_desc": { "zh-CN": "请先在经营脉搏由管理员生成演示数据，或切换到正式口径后选择门店；本页不会自动写入数据。", "zh-HK": "請先在經營脈搏由管理員生成演示數據，或切換到正式口徑後選擇門店；本頁不會自動寫入數據。", en: "Generate the demo dataset in Operating Pulse first, or switch to the production basis and pick a store; this page never writes data." },
+  "storepnl.loading_stores": { "zh-CN": "门店列表加载中", "zh-HK": "門店列表加載中", en: "Loading stores" },
+  "storepnl.no_selectable_stores": { "zh-CN": "当前数据环境下没有可选门店", "zh-HK": "當前數據環境下沒有可選門店", en: "No selectable stores in this data environment" },
+  "storepnl.options_error": { "zh-CN": "门店列表加载失败", "zh-HK": "門店列表加載失敗", en: "Store list failed to load" },
   "storepnl.failed": { "zh-CN": "利润表加载失败", "zh-HK": "利潤表加載失敗", en: "P&L failed to load" },
   "storepnl.loading": { "zh-CN": "利润表加载中", "zh-HK": "利潤表加載中", en: "Loading P&L" },
   "storepnl.ready": { "zh-CN": "decision_ready", "zh-HK": "decision_ready", en: "decision_ready" },
@@ -2692,7 +2698,9 @@ export const dict: TranslationDict = {
   "finmodel.assumptions_title": { "zh-CN": "定义与假设（唯一硬输入区）", "zh-HK": "定義與假設（唯一硬輸入區）", en: "Definition & assumptions (the only hard inputs)" },
   "finmodel.definition_select": { "zh-CN": "选择模型定义", "zh-HK": "選擇模型定義", en: "Select a model definition" },
   "finmodel.definition_manual": { "zh-CN": "或手动粘贴定义 ID", "zh-HK": "或手動粘貼定義 ID", en: "Or paste a definition ID manually" },
-  "finmodel.definition_empty": { "zh-CN": "暂无模型定义：后端列表尚未开放，可手动粘贴定义 ID 运行", "zh-HK": "暫無模型定義：後端列表尚未開放，可手動粘貼定義 ID 運行", en: "No model definitions yet: the backend list is not live; paste a definition ID to run" },
+  "finmodel.definition_empty": { "zh-CN": "暂无模型定义：本法人还没有可运行的定义；列表来自 GET /financial-model/definitions（按法人过滤），创建或导入后自动出现", "zh-HK": "暫無模型定義：本法人還沒有可運行的定義；列表來自 GET /financial-model/definitions（按法人過濾），創建或導入後自動出現", en: "No model definitions yet: this entity has nothing to run; the list comes from GET /financial-model/definitions (tenant-scoped) and fills in once one is created or imported" },
+  "finmodel.create_definition": { "zh-CN": "一键创建定义", "zh-HK": "一鍵創建定義", en: "Create definition from factory template" },
+  "finmodel.definition_created": { "zh-CN": "已从出厂模板创建草稿定义，可直接运行", "zh-HK": "已從出廠模板創建草稿定義，可直接運行", en: "Draft definition created from the factory template; ready to run" },
   "finmodel.run_async_hint": { "zh-CN": "运行将异步排队，完成后自动展示结果，期间可取消", "zh-HK": "運行將異步排隊，完成後自動展示結果，期間可取消", en: "Runs queue asynchronously; results appear automatically and you can cancel while pending" },
   "finmodel.cancel_run": { "zh-CN": "取消运行", "zh-HK": "取消運行", en: "Cancel run" },
   "finmodel.cancelled": { "zh-CN": "运行已取消", "zh-HK": "運行已取消", en: "Run cancelled" },
@@ -2893,6 +2901,10 @@ export const dict: TranslationDict = {
     en: "Agent Operations",
   },
   "plan.title": { "zh-CN": "计划对比", "zh-HK": "計劃對比", en: "Plan comparison" },
+  "plan.absent_title": { "zh-CN": "本法人当前月份没有可对比的计划版本", "zh-HK": "本法人當前月份沒有可對比的計劃版本", en: "No plan version covers this month for this legal entity" },
+  "plan.absent_desc": { "zh-CN": "实际 vs 预算对比需要覆盖该月的 BUDGET 或 FORECAST 计划行（可在 /fpna-workbench 创建、或经 /retail-data-import 导入）。没有计划时不构造对比数字。", "zh-HK": "實際 vs 預算對比需要覆蓋該月的 BUDGET 或 FORECAST 計劃行（可在 /fpna-workbench 創建、或經 /retail-data-import 導入）。沒有計劃時不構造對比數字。", en: "Actual-vs-budget needs a BUDGET or FORECAST plan covering the month (create it in /fpna-workbench or import via /retail-data-import). Without a plan no comparison numbers are constructed." },
+  // 缺席提示只在有事实数据时展示：连事实都没有的页面本来就整体降级。
+  "plan.absent_when": { "zh-CN": "仅在当前窗口存在经营事实时显示", "zh-HK": "僅在當前視窗存在經營事實時顯示", en: "Shown only when the current window has operating facts" },
   "plan.actual": { "zh-CN": "实际", "zh-HK": "實際", en: "Actual" },
   "plan.not_ready": { "zh-CN": "对比不可决策", "zh-HK": "對比不可決策", en: "Comparison not decision-ready" },
   "plan_import.title": { "zh-CN": "预算 / 计划版本导入", "zh-HK": "預算 / 計劃版本導入", en: "Budget / plan version import" },
@@ -3451,9 +3463,9 @@ export const dict: TranslationDict = {
 
   // AI Chat
   "ai.welcome": {
-    "zh-CN": "你好！我是零售经营分析助手。我可以读取经营数据并调用内置 skill 帮你完成任务：\n\n1. 读取经营脉搏，定位需要关注的门店与异常信号\n2. 对关注门店做门店 360 诊断，解释营收与贡献变化\n3. 评估确定性经营情景，生成待确认的行动建议\n4. 解析合同与台账文件并生成草稿（租赁与 IFRS 16 计量保留）\n\n上传文件或直接提问后，我会先生成草稿和工具执行轨迹，确认后才进入正式流程。",
-    "zh-HK": "你好！我是零售經營分析助手。我可以讀取經營數據並調用內置 skill 幫你完成任務：\n\n1. 讀取經營脈搏，定位需要關注的門店與異常訊號\n2. 對關注門店做門店 360 診斷，解釋營收與貢獻變化\n3. 評估確定性經營情景，生成待確認的行動建議\n4. 解析合同與台賬文件並生成草稿（租賃與 IFRS 16 計量保留）\n\n上傳文件或直接提問後，我會先生成草稿和工具執行軌跡，確認後才進入正式流程。",
-    en: "Hello! I am the Retail Performance Assistant. I read operating data and call built-in skills to help you:\n\n1. Read the operating pulse and surface stores that need attention\n2. Diagnose attention stores with Store 360, explaining revenue and contribution changes\n3. Evaluate deterministic operating scenarios and draft actions for confirmation\n4. Parse contracts and ledger files into drafts (lease and IFRS 16 measurement remain)\n\nAfter you upload a file or ask a question, I first produce drafts and a tool execution trace; only confirmed items enter the formal flow.",
+    "zh-CN": "你好！我是零售经营分析助手。我可以读取经营数据并调用内置 skill 帮你完成任务：\n\n1. 读取经营脉搏，定位需要关注的门店与异常信号\n2. 对关注门店做门店 360 诊断，解释营收与贡献变化\n3. 评估确定性经营情景，生成待确认的行动建议\n4. 解析合同与台账文件并生成草稿（租赁与 IFRS 16 计量保留）\n\n💡 提示：从经营脉搏、门店 360、情景台或 FP&A 工作台页面的「交给 AI 分析」按钮进入，会自动携带当前页面的数据范围（基准日期/窗口/数据环境），无需手动指定。\n\n上传文件或直接提问后，我会先生成草稿和工具执行轨迹，确认后才进入正式流程。",
+    "zh-HK": "你好！我是零售經營分析助手。我可以讀取經營數據並調用內置 skill 幫你完成任務：\n\n1. 讀取經營脈搏，定位需要關注的門店與異常訊號\n2. 對關注門店做門店 360 診斷，解釋營收與貢獻變化\n3. 評估確定性經營情景，生成待確認的行動建議\n4. 解析合同與台賬文件並生成草稿（租賃與 IFRS 16 計量保留）\n\n💡 提示：從經營脈搏、門店 360、情景台或 FP&A 工作台頁面的「交給 AI 分析」按鈕進入，會自動攜帶當前頁面的數據範圍（基準日期/視窗/數據環境），無需手動指定。\n\n上傳文件或直接提問後，我會先生成草稿和工具執行軌跡，確認後才進入正式流程。",
+    en: "Hello! I am the Retail Performance Assistant. I read operating data and call built-in skills to help you:\n\n1. Read the operating pulse and surface stores that need attention\n2. Diagnose attention stores with Store 360, explaining revenue and contribution changes\n3. Evaluate deterministic operating scenarios and draft actions for confirmation\n4. Parse contracts and ledger files into drafts (lease and IFRS 16 measurement remain)\n\n💡 Tip: entering via the \"Ask AI\" button on Operating Pulse, Store 360, Scenario Workbench or the FP&A Workbench carries the page's data scope automatically (as-of / window / data environment) — no manual setup needed.\n\nAfter you upload a file or ask a question, I first produce drafts and a tool execution trace; only confirmed items enter the formal flow.",
   },
   "ai.welcome_subtitle": {
     "zh-CN": "连接门店销售、毛利、客流、占用成本与租赁合同，驱动「发现问题 — 解释原因 — 模拟方案 — 形成行动」闭环。",

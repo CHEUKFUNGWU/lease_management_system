@@ -4,7 +4,7 @@ help: ## 显示帮助信息
 	@echo "零售经营分析工作站 — 常用命令"
 	@echo ""
 	@echo "  make setup      复制 .env.example 到 .env 并初始化项目"
-	@echo "  make up         启动所有 Docker 服务"
+	@echo "  make up         启动所有 Docker 服务（自动等待 postgres 就绪并补齐增量迁移）"
 	@echo "  make down       停止所有 Docker 服务"
 	@echo "  make restart    重启所有服务"
 	@echo "  make logs       查看所有服务日志"
@@ -23,8 +23,15 @@ setup: ## 初始化项目环境
 	@if [ ! -f .env ]; then cp .env.example .env; echo "已创建 .env"; fi
 	@echo "初始化完成。请编辑 .env 文件配置环境变量，然后运行 make up"
 
-up: ## 启动所有服务
+up: ## 启动所有服务并自动补齐既有库的增量迁移（防 schema 漂移「打开即坏」）
 	docker-compose up -d
+	@echo "等待 PostgreSQL 就绪..."
+	@ok=0; for i in $$(seq 1 60); do \
+	  if docker compose exec -T postgres pg_isready -q -U "$${DB_USER:-lease}" -d "$${DB_NAME:-lease}" >/dev/null 2>&1; then ok=1; break; fi; \
+	  sleep 2; \
+	done; \
+	if [ "$$ok" != "1" ]; then echo "PostgreSQL 未在 120s 内就绪；服务已启动但未做迁移检查，请稍后手动执行 make migrate" >&2; exit 1; fi
+	@scripts/migrate.sh
 
 down: ## 停止所有服务
 	docker-compose down

@@ -16,11 +16,11 @@ package aiagent
 // 不与 collector 自比（风险红线 12：恒真的勾稽不算检查）。
 
 import (
-	"time"
 	"context"
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agenttools"

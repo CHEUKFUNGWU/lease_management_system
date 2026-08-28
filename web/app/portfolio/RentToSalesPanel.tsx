@@ -63,7 +63,7 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
     setLoading(true);
     try {
       setResult(
-        await storeMetricsApi.rentToSales(
+        await storeMetricsApi.rentToSales<RentToSales>(
           { period, ...(healthy != null ? { healthy_ceiling: healthy } : {}), ...(warning != null ? { warning_ceiling: warning } : {}) },
           token
         )

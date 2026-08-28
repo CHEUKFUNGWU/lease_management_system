@@ -138,12 +138,12 @@ export default function HomePage() {
       setLoading(true);
       try {
         const [queueRes, datesRes, readinessRes] = await Promise.all([
-          workQueueApi.get(token),
-          leaseAdminApi.listUpcomingCriticalDates(token, { days: 90, limit: 8 }),
-          monthlyClosingApi.getReadiness(period, token),
+          workQueueApi.get<Record<string, unknown>>(token),
+          leaseAdminApi.listUpcomingCriticalDates<{ data?: DashboardUpcomingDate[] }>(token, { days: 90, limit: 8 }),
+          monthlyClosingApi.getReadiness<{ status?: string; blocking_count?: number; evaluated_at?: string }>(period, token),
         ]);
         if (cancelled) return;
-        const source = queueRes || {};
+        const source: Record<string, unknown> = queueRes ?? {};
         setQueue({
           ...emptyQueue,
           total: Number(source.total || 0),

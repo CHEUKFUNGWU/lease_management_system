@@ -436,10 +436,12 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-export async function apiRequest(
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-generics -- the
+// caller declares the wire shape; the implementation returns parsed JSON.
+export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestOptions = {}
-) {
+): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
   const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -528,8 +530,8 @@ export async function downloadBlob(endpoint: string, token: string): Promise<Blo
 
 // Auth APIs
 export const authApi = {
-  login: (username: string, password: string) =>
-    apiRequest("/api/v1/auth/login", {
+  login: <T = unknown>(username: string, password: string) =>
+    apiRequest<T>("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
@@ -549,8 +551,8 @@ export const authApi = {
   me: (token: string) =>
     apiRequest("/api/v1/me", { token }),
 
-  listSessions: (token: string) =>
-    apiRequest("/api/v1/auth/sessions", { token }),
+  listSessions: <T = unknown>(token: string) =>
+    apiRequest<T>("/api/v1/auth/sessions", { token }),
 
   revokeSession: (sessionId: string, token: string) =>
     apiRequest(`/api/v1/auth/sessions/${encodeURIComponent(sessionId)}`, {
@@ -567,8 +569,8 @@ export const authApi = {
 
 // Admin APIs
 export const adminApi = {
-  listUsers: (token: string) =>
-    apiRequest("/api/v1/admin/users", { token }),
+  listUsers: <T = unknown>(token: string) =>
+    apiRequest<T>("/api/v1/admin/users", { token }),
 
   createUser: (data: any, token: string) =>
     apiRequest("/api/v1/admin/users", {
@@ -580,24 +582,24 @@ export const adminApi = {
 
 // Legal Entity APIs
 export const legalEntityApi = {
-  list: (token: string) =>
-    apiRequest("/api/v1/master-data/legal-entities", { token }),
+  list: <T = unknown>(token: string) =>
+    apiRequest<T>("/api/v1/master-data/legal-entities", { token }),
 };
 
 export const masterDataApi = {
-  listStores: (token: string, legalEntityId?: string) => {
+  listStores: <T = unknown>(token: string, legalEntityId?: string) => {
     const query = legalEntityId
       ? `?legal_entity_id=${encodeURIComponent(legalEntityId)}`
       : "";
-    return apiRequest(`/api/v1/master-data/stores${query}`, { token });
+    return apiRequest<T>(`/api/v1/master-data/stores${query}`, { token });
   },
-  listLandlords: (token: string) =>
-    apiRequest("/api/v1/master-data/landlords", { token }),
+  listLandlords: <T = unknown>(token: string) =>
+    apiRequest<T>("/api/v1/master-data/landlords", { token }),
 };
 
 // Contract APIs
 export const contractApi = {
-  list: (
+  list: <T = unknown>(
     token: string,
     params?: {
       search?: string;
@@ -624,11 +626,11 @@ export const contractApi = {
     if (params?.page) qs.append("page", String(params.page));
     if (params?.page_size) qs.append("page_size", String(params.page_size));
     const queryString = qs.toString();
-    return apiRequest(`/api/v1/contracts${queryString ? `?${queryString}` : ""}`, { token });
+    return apiRequest<T>(`/api/v1/contracts${queryString ? `?${queryString}` : ""}`, { token });
   },
   
-  get: (id: string, token: string) =>
-    apiRequest(`/api/v1/contracts/${id}`, { token }),
+  get: <T = unknown>(id: string, token: string) =>
+    apiRequest<T>(`/api/v1/contracts/${id}`, { token }),
   
   create: (data: any, token: string) =>
     apiRequest("/api/v1/contracts", {
@@ -651,8 +653,8 @@ export const contractApi = {
       token,
     }),
     
-  calculate: (id: string, discountRate: number | null | undefined, token: string) =>
-    apiRequest(`/api/v1/contracts/${id}/calculate`, {
+  calculate: <T = unknown>(id: string, discountRate: number | null | undefined, token: string) =>
+    apiRequest<T>(`/api/v1/contracts/${id}/calculate`, {
       method: "POST",
       body: JSON.stringify({
         contract_id: id,
@@ -697,7 +699,7 @@ export const contractApi = {
     
   // Turns a critical date into a decision: remaining commitment, what the
   // landlord's asking uplift costs, and how the store is actually trading.
-  renewalCard: (
+  renewalCard: <T = unknown>(
     id: string,
     params: { renewal_term_months?: number; uplift_percent?: number; rent_free_months?: number; annual_escalation_percent?: number; early_exit_penalty_months?: number },
     token: string
@@ -708,7 +710,7 @@ export const contractApi = {
     if (params.rent_free_months != null) qs.append("rent_free_months", String(params.rent_free_months));
     if (params.annual_escalation_percent != null) qs.append("annual_escalation_percent", String(params.annual_escalation_percent));
     if (params.early_exit_penalty_months != null) qs.append("early_exit_penalty_months", String(params.early_exit_penalty_months));
-    return apiRequest(`/api/v1/contracts/${id}/renewal-card?${qs.toString()}`, { token });
+    return apiRequest<T>(`/api/v1/contracts/${id}/renewal-card?${qs.toString()}`, { token });
   },
   createRenewalDecision: (id: string, data: any, token: string) =>
     apiRequest(`/api/v1/contracts/${id}/renewal-decisions`, { method: "POST", body: JSON.stringify(data), token }),
@@ -792,18 +794,18 @@ export const paymentScheduleApi = {
       token,
     }),
   
-  list: (contractId: string, token: string) =>
-    apiRequest(`/api/v1/contracts/${contractId}/payment-schedules`, { token }),
+  list: <T = unknown>(contractId: string, token: string) =>
+    apiRequest<T>(`/api/v1/contracts/${contractId}/payment-schedules`, { token }),
 };
 
 // Deal comparison. The offers are hypothetical terms, not stored contracts, so
 // nothing is read from or written to the ledger.
 export const dealApi = {
-  compare: (
+  compare: <T = unknown>(
     data: { discount_rate: number; currency?: string; offers: Record<string, unknown>[] },
     token: string
   ) =>
-    apiRequest(`/api/v1/deals/compare`, {
+    apiRequest<T>(`/api/v1/deals/compare`, {
       method: "POST",
       body: JSON.stringify(data),
       token,
@@ -811,8 +813,8 @@ export const dealApi = {
 
   // Prices a lease before it exists. The terms travel with the request, so
   // nothing is read from or written to the ledger.
-  briefing: (data: Record<string, unknown>, token: string) =>
-    apiRequest(`/api/v1/deals/briefing`, {
+  briefing: <T = unknown>(data: Record<string, unknown>, token: string) =>
+    apiRequest<T>(`/api/v1/deals/briefing`, {
       method: "POST",
       body: JSON.stringify(data),
       token,
@@ -837,14 +839,14 @@ export const storeMetricsApi = {
     return apiRequest(`/api/v1/store-metrics?${qs.toString()}`, { token });
   },
 
-  rentToSales: (
+  rentToSales: <T = unknown>(
     params: { period: string; healthy_ceiling?: number; warning_ceiling?: number },
     token: string
   ) => {
     const qs = new URLSearchParams({ period: params.period });
     if (params.healthy_ceiling) qs.append("healthy_ceiling", String(params.healthy_ceiling));
     if (params.warning_ceiling) qs.append("warning_ceiling", String(params.warning_ceiling));
-    return apiRequest(`/api/v1/reports/rent-to-sales?${qs.toString()}`, { token });
+    return apiRequest<T>(`/api/v1/reports/rent-to-sales?${qs.toString()}`, { token });
   },
 };
 
@@ -857,17 +859,17 @@ export const eventApi = {
       token,
     }),
   
-  list: (contractId: string, token: string) =>
-    apiRequest(`/api/v1/contracts/${contractId}/events`, { token }),
+  list: <T = unknown>(contractId: string, token: string) =>
+    apiRequest<T>(`/api/v1/contracts/${contractId}/events`, { token }),
 
   // Derives the payment schedule a clause implies. It writes nothing, so the
   // revised rent can be read and agreed before the event is recorded.
-  previewPayments: (
+  previewPayments: <T = unknown>(
     contractId: string,
     data: { effective_date: string; revision_parameters: Record<string, unknown> },
     token: string
   ) =>
-    apiRequest(`/api/v1/contracts/${contractId}/events/preview-payments`, {
+    apiRequest<T>(`/api/v1/contracts/${contractId}/events/preview-payments`, {
       method: "POST",
       body: JSON.stringify(data),
       token,
@@ -906,16 +908,16 @@ export const eventApi = {
 
 // Lease Administration APIs
 export const leaseAdminApi = {
-  listUpcomingCriticalDates: (token: string, params?: { days?: number; limit?: number }) => {
+  listUpcomingCriticalDates: <T = unknown>(token: string, params?: { days?: number; limit?: number }) => {
     const qs = new URLSearchParams();
     if (params?.days) qs.append("days", String(params.days));
     if (params?.limit) qs.append("limit", String(params.limit));
     const queryString = qs.toString();
-    return apiRequest(`/api/v1/lease-admin/critical-dates/upcoming${queryString ? `?${queryString}` : ""}`, { token });
+    return apiRequest<T>(`/api/v1/lease-admin/critical-dates/upcoming${queryString ? `?${queryString}` : ""}`, { token });
   },
 
-  listCriticalDates: (contractId: string, token: string) =>
-    apiRequest(`/api/v1/contracts/${contractId}/critical-dates`, { token }),
+  listCriticalDates: <T = unknown>(contractId: string, token: string) =>
+    apiRequest<T>(`/api/v1/contracts/${contractId}/critical-dates`, { token }),
 
   createCriticalDate: (contractId: string, data: any, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/critical-dates`, {
@@ -931,8 +933,8 @@ export const leaseAdminApi = {
       token,
     }),
 
-  listDocuments: (contractId: string, token: string) =>
-    apiRequest(`/api/v1/contracts/${contractId}/documents`, { token }),
+  listDocuments: <T = unknown>(contractId: string, token: string) =>
+    apiRequest<T>(`/api/v1/contracts/${contractId}/documents`, { token }),
 
   createDocument: (contractId: string, data: any, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/documents`, {
@@ -941,8 +943,8 @@ export const leaseAdminApi = {
       token,
     }),
 
-  listObligations: (contractId: string, token: string) =>
-    apiRequest(`/api/v1/contracts/${contractId}/obligations`, { token }),
+  listObligations: <T = unknown>(contractId: string, token: string) =>
+    apiRequest<T>(`/api/v1/contracts/${contractId}/obligations`, { token }),
 
   createObligation: (contractId: string, data: any, token: string) =>
     apiRequest(`/api/v1/contracts/${contractId}/obligations`, {
@@ -961,10 +963,10 @@ export const leaseAdminApi = {
 
 // Monthly Closing APIs
 export const monthlyClosingApi = {
-  getReadiness: (period: string, token: string) =>
-    apiRequest(`/api/v1/monthly-closing/readiness?period=${encodeURIComponent(period)}`, { token }),
-  listExceptions: (period: string, token: string) =>
-    apiRequest(`/api/v1/monthly-closing/periods/${encodeURIComponent(period)}/exceptions`, { token }),
+  getReadiness: <T = unknown>(period: string, token: string) =>
+    apiRequest<T>(`/api/v1/monthly-closing/readiness?period=${encodeURIComponent(period)}`, { token }),
+  listExceptions: <T = unknown>(period: string, token: string) =>
+    apiRequest<T>(`/api/v1/monthly-closing/periods/${encodeURIComponent(period)}/exceptions`, { token }),
   detectExceptions: (period: string, token: string) =>
     apiRequest(`/api/v1/monthly-closing/periods/${encodeURIComponent(period)}/exceptions/detect`, {
       method: "POST",
@@ -976,15 +978,15 @@ export const monthlyClosingApi = {
       body: JSON.stringify(data),
       token,
     }),
-  generate: (data: any, token: string) =>
-    apiRequest("/api/v1/monthly-closing/generate", {
+  generate: <T = any>(data: any, token: string) =>
+    apiRequest<T>("/api/v1/monthly-closing/generate", {
       method: "POST",
       body: JSON.stringify(data),
       token,
     }),
-  listBatches: (period: string, token: string) =>
-    apiRequest(`/api/v1/monthly-closing/batches?period=${period}`, { token }),
-  getEntries: (
+  listBatches: <T = unknown>(period: string, token: string) =>
+    apiRequest<T>(`/api/v1/monthly-closing/batches?period=${period}`, { token }),
+  getEntries: <T = unknown>(
     params: {
       contract_id?: string;
       period?: string;
@@ -1002,12 +1004,12 @@ export const monthlyClosingApi = {
     if (params.entry_type) qs.append("entry_type", params.entry_type);
     if (params.page) qs.append("page", String(params.page));
     if (params.page_size) qs.append("page_size", String(params.page_size));
-    return apiRequest(`/api/v1/monthly-closing/entries?${qs.toString()}`, { token });
+    return apiRequest<T>(`/api/v1/monthly-closing/entries?${qs.toString()}`, { token });
   },
   // The periods the ledger actually holds entries for — this is what lets a
   // period be reviewed without first running a close over it.
-  listPeriods: (token: string) =>
-    apiRequest(`/api/v1/monthly-closing/periods`, { token }),
+  listPeriods: <T = unknown>(token: string) =>
+    apiRequest<T>(`/api/v1/monthly-closing/periods`, { token }),
   exportEntries: async (params: { period?: string; status?: string; template?: string }, token: string) => {
     const qs = new URLSearchParams();
     if (params.period) qs.append("period", params.period);
@@ -1044,12 +1046,12 @@ export const monthlyClosingApi = {
       }),
       token,
     }),
-  approveBatch: (batchId: string, token: string) =>
-    apiRequest(`/api/v1/monthly-closing/batches/${batchId}/approve`, { method: "POST", token }),
-  postBatch: (batchId: string, token: string) =>
-    apiRequest(`/api/v1/monthly-closing/batches/${batchId}/post`, { method: "POST", token }),
-  applyERPWriteback: (items: Array<{ entry_id: string; erp_reference?: string; voucher_number?: string }>, token: string) =>
-    apiRequest("/api/v1/monthly-closing/erp-writeback", {
+  approveBatch: <T = unknown>(batchId: string, token: string) =>
+    apiRequest<T>(`/api/v1/monthly-closing/batches/${batchId}/approve`, { method: "POST", token }),
+  postBatch: <T = unknown>(batchId: string, token: string) =>
+    apiRequest<T>(`/api/v1/monthly-closing/batches/${batchId}/post`, { method: "POST", token }),
+  applyERPWriteback: <T = unknown>(items: Array<{ entry_id: string; erp_reference?: string; voucher_number?: string }>, token: string) =>
+    apiRequest<T>("/api/v1/monthly-closing/erp-writeback", {
       method: "POST",
       body: JSON.stringify({ items }),
       token,
@@ -1058,8 +1060,8 @@ export const monthlyClosingApi = {
     apiRequest(`/api/v1/monthly-closing/periods/${period}/lock`, { method: "POST", token }),
   unlockPeriod: (period: string, token: string) =>
     apiRequest(`/api/v1/monthly-closing/periods/${period}/unlock`, { method: "POST", token }),
-  getLockStatus: (period: string, token: string) =>
-    apiRequest(`/api/v1/monthly-closing/periods/${period}/lock-status`, { token }),
+  getLockStatus: <T = unknown>(period: string, token: string) =>
+    apiRequest<T>(`/api/v1/monthly-closing/periods/${period}/lock-status`, { token }),
 };
 
 // AI Chat APIs
@@ -1245,35 +1247,35 @@ export const agentUsageApi = {
 
 // Report APIs
 export const reportApi = {
-  liabilityRolling: (mode: "working" | "official", token: string, language?: string) =>
-    apiRequest(`/api/v1/reports/liability-rolling?mode=${mode}${language ? `&language=${language}` : ""}`, { token }),
+  liabilityRolling: <T = unknown>(mode: "working" | "official", token: string, language?: string) =>
+    apiRequest<T>(`/api/v1/reports/liability-rolling?mode=${mode}${language ? `&language=${language}` : ""}`, { token }),
 
-  contractSummary: (mode: "working" | "official", token: string, language?: string) =>
-    apiRequest(`/api/v1/reports/contract-summary?mode=${mode}${language ? `&language=${language}` : ""}`, { token }),
+  contractSummary: <T = unknown>(mode: "working" | "official", token: string, language?: string) =>
+    apiRequest<T>(`/api/v1/reports/contract-summary?mode=${mode}${language ? `&language=${language}` : ""}`, { token }),
 
-  portfolioSummary: (mode: "working" | "official", token: string) =>
-    apiRequest(`/api/v1/reports/portfolio-summary?mode=${mode}`, { token }),
+  portfolioSummary: <T = unknown>(mode: "working" | "official", token: string) =>
+    apiRequest<T>(`/api/v1/reports/portfolio-summary?mode=${mode}`, { token }),
 
-  sensitivity: (params: { contract_id: string; base_rate?: number; shocks?: string }, token: string) => {
+  sensitivity: <T = unknown>(params: { contract_id: string; base_rate?: number; shocks?: string }, token: string) => {
     const qs = new URLSearchParams();
     qs.append("contract_id", params.contract_id);
     if (params.base_rate !== undefined) qs.append("base_rate", String(params.base_rate));
     if (params.shocks) qs.append("shocks", params.shocks);
-    return apiRequest(`/api/v1/reports/sensitivity?${qs.toString()}`, { token });
+    return apiRequest<T>(`/api/v1/reports/sensitivity?${qs.toString()}`, { token });
   },
 
-  standardComparison: (params: { contract_id: string; discount_rate?: number }, token: string) => {
+  standardComparison: <T = unknown>(params: { contract_id: string; discount_rate?: number }, token: string) => {
     const qs = new URLSearchParams();
     qs.append("contract_id", params.contract_id);
     if (params.discount_rate !== undefined) qs.append("discount_rate", String(params.discount_rate));
-    return apiRequest(`/api/v1/reports/standard-comparison?${qs.toString()}`, { token });
+    return apiRequest<T>(`/api/v1/reports/standard-comparison?${qs.toString()}`, { token });
   },
 
-  tags: (token: string) =>
-    apiRequest(`/api/v1/reports/tags`, { token }),
+  tags: <T = unknown>(token: string) =>
+    apiRequest<T>(`/api/v1/reports/tags`, { token }),
 
-  tagSummary: (token: string) =>
-    apiRequest(`/api/v1/reports/tags/summary`, { token }),
+  tagSummary: <T = unknown>(token: string) =>
+    apiRequest<T>(`/api/v1/reports/tags/summary`, { token }),
 
   amortization: (params: {
     mode: "working" | "official";
@@ -1299,14 +1301,14 @@ export const reportApi = {
         qs.append(k, String(v));
       }
     });
-    return apiRequest(`/api/v1/reports/amortization?${qs.toString()}`, { token });
+    return apiRequest<{ data?: any[]; total?: number }>(`/api/v1/reports/amortization?${qs.toString()}`, { token });
   },
 
-  unitPrice: (params: { mode: "working" | "official"; group_by?: "store" | "brand" | "region" }, token: string) => {
+  unitPrice: <T = unknown>(params: { mode: "working" | "official"; group_by?: "store" | "brand" | "region" }, token: string) => {
     const qs = new URLSearchParams();
     qs.append("mode", params.mode);
     if (params.group_by) qs.append("group_by", params.group_by);
-    return apiRequest(`/api/v1/reports/unit-price?${qs.toString()}`, { token });
+    return apiRequest<T>(`/api/v1/reports/unit-price?${qs.toString()}`, { token });
   },
 
   disclosure: (params: {
@@ -1328,11 +1330,11 @@ export const reportApi = {
 
   // Projects portfolio outflow under an estates plan. The baseline is always
   // run alongside, because a scenario means nothing without what it moved from.
-  cashflowScenario: (
+  cashflowScenario: <T = unknown>(
     data: { as_of?: string; horizon_months?: number; scenarios: Record<string, unknown>[] },
     token: string
   ) =>
-    apiRequest(`/api/v1/reports/cashflow-scenario`, {
+    apiRequest<T>(`/api/v1/reports/cashflow-scenario`, {
       method: "POST",
       body: JSON.stringify(data),
       token,
@@ -1365,7 +1367,7 @@ export const reportApi = {
 
 // Audit APIs
 export const auditApi = {
-  list: (params: {
+  list: <T = unknown>(params: {
     table_name?: string;
     record_id?: string;
     action?: string;
@@ -1383,29 +1385,29 @@ export const auditApi = {
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== "") qs.append(k, String(v));
     });
-    return apiRequest(`/api/v1/audit-logs?${qs.toString()}`, { token });
+    return apiRequest<T>(`/api/v1/audit-logs?${qs.toString()}`, { token });
   },
 };
 
 // Settings APIs
 export const budgetApi = {
-  listVersions: (token: string) => apiRequest("/api/v1/budget-versions", { token }),
-  createVersion: (data: { name: string; version_type?: string; source?: string; coverage_scope?: string; is_official?: boolean; from_period: string; to_period: string }, token: string) =>
-    apiRequest("/api/v1/budget-versions", { method: "POST", body: JSON.stringify(data), token }),
-  variance: (versionId: string, period: string, token: string) =>
-    apiRequest(`/api/v1/budget-versions/${versionId}/variance?period=${encodeURIComponent(period)}`, { token }),
-  compare: (leftId: string, rightId: string, period: string, token: string) =>
-    apiRequest(`/api/v1/budget-versions/compare?left_id=${encodeURIComponent(leftId)}&right_id=${encodeURIComponent(rightId)}&period=${encodeURIComponent(period)}`, { token }),
-  managementBrief: (budgetId: string, forecastId: string, period: string, token: string) =>
-    apiRequest(`/api/v1/budget-versions/management-brief?budget_id=${encodeURIComponent(budgetId)}&forecast_id=${encodeURIComponent(forecastId)}&period=${encodeURIComponent(period)}`, { token }),
+  listVersions: <T = unknown>(token: string) => apiRequest<T>("/api/v1/budget-versions", { token }),
+  createVersion: <T = unknown>(data: { name: string; version_type?: string; source?: string; coverage_scope?: string; is_official?: boolean; from_period: string; to_period: string }, token: string) =>
+    apiRequest<T>("/api/v1/budget-versions", { method: "POST", body: JSON.stringify(data), token }),
+  variance: <T = unknown>(versionId: string, period: string, token: string) =>
+    apiRequest<T>(`/api/v1/budget-versions/${versionId}/variance?period=${encodeURIComponent(period)}`, { token }),
+  compare: <T = unknown>(leftId: string, rightId: string, period: string, token: string) =>
+    apiRequest<T>(`/api/v1/budget-versions/compare?left_id=${encodeURIComponent(leftId)}&right_id=${encodeURIComponent(rightId)}&period=${encodeURIComponent(period)}`, { token }),
+  managementBrief: <T = unknown>(budgetId: string, forecastId: string, period: string, token: string) =>
+    apiRequest<T>(`/api/v1/budget-versions/management-brief?budget_id=${encodeURIComponent(budgetId)}&forecast_id=${encodeURIComponent(forecastId)}&period=${encodeURIComponent(period)}`, { token }),
   saveVarianceActions: (versionId: string, data: { period: string; items: Array<{ contract_id: string; explanation: string; owner_name: string; due_date?: string; status: string }> }, token: string) =>
     apiRequest(`/api/v1/budget-versions/${versionId}/variance-actions`, { method: "PUT", body: JSON.stringify(data), token }),
 };
 
 export const workQueueApi = {
-  get: (token: string, criticalDateDays?: number) => {
+  get: <T = unknown>(token: string, criticalDateDays?: number) => {
     const query = criticalDateDays ? `?critical_date_days=${criticalDateDays}` : "";
-    return apiRequest(`/api/v1/me/work-queue${query}`, { token });
+    return apiRequest<T>(`/api/v1/me/work-queue${query}`, { token });
   },
 };
 
@@ -1413,16 +1415,16 @@ export const workQueueApi = {
 // basis, source version and coverage metadata; the UI must not turn missing
 // operating facts into zeroes.
 export const performanceApi = {
-  overview: (period: string | undefined, token: string) => {
+  overview: <T = unknown>(period: string | undefined, token: string) => {
     const qs = period ? `?period=${encodeURIComponent(period)}` : "";
-    return apiRequest(`/api/v1/performance/overview${qs}`, { token });
+    return apiRequest<T>(`/api/v1/performance/overview${qs}`, { token });
   },
   managementBrief: (period: string, cadence: "wbr" | "mbr" | "qbr", token: string) =>
     apiRequest(`/api/v1/performance/brief?period=${encodeURIComponent(period)}&cadence=${cadence}`, { token }),
-  actions: (params: { period?: string; status?: string; category?: string }, token: string) => {
+  actions: <T = unknown>(params: { period?: string; status?: string; category?: string }, token: string) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
-    return apiRequest(`/api/v1/performance/actions${qs.toString() ? `?${qs}` : ""}`, { token });
+    return apiRequest<T>(`/api/v1/performance/actions${qs.toString() ? `?${qs}` : ""}`, { token });
   },
   createAction: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/actions`, { method: "POST", body: JSON.stringify(data), token }),
@@ -1435,16 +1437,16 @@ export const performanceApi = {
     Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
     return downloadBlob(`/api/v1/performance/actions/export?${qs}`, token);
   },
-  assumptions: (key: string | undefined, token: string) => {
+  assumptions: <T = unknown>(key: string | undefined, token: string) => {
     const qs = key ? `?key=${encodeURIComponent(key)}` : "";
-    return apiRequest(`/api/v1/performance/assumptions${qs}`, { token });
+    return apiRequest<T>(`/api/v1/performance/assumptions${qs}`, { token });
   },
   createAssumption: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/assumptions`, { method: "POST", body: JSON.stringify(data), token }),
-  storePerformance: (period: string, token: string, storeId?: string) => {
+  storePerformance: <T = unknown>(period: string, token: string, storeId?: string) => {
     const qs = new URLSearchParams({ period });
     if (storeId) qs.set("store_id", storeId);
-    return apiRequest(`/api/v1/reports/store-performance?${qs}`, { token });
+    return apiRequest<T>(`/api/v1/reports/store-performance?${qs}`, { token });
   },
   storeBenchmarks: (period: string, token: string) =>
     apiRequest(`/api/v1/reports/store-performance/benchmarks?period=${encodeURIComponent(period)}`, { token }),
@@ -1452,17 +1454,17 @@ export const performanceApi = {
     apiRequest(`/api/v1/reports/store-performance/cohorts?period=${encodeURIComponent(period)}`, { token }),
   storePromotionROI: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/reports/store-promotion-roi`, { method: "POST", body: JSON.stringify(data), token }),
-  equipmentPerformance: (period: string, token: string, plant?: string) => {
+  equipmentPerformance: <T = unknown>(period: string, token: string, plant?: string) => {
     const qs = new URLSearchParams({ period });
     if (plant) qs.set("plant", plant);
-    return apiRequest(`/api/v1/reports/equipment-performance?${qs}`, { token });
+    return apiRequest<T>(`/api/v1/reports/equipment-performance?${qs}`, { token });
   },
   equipmentCandidates: (period: string, token: string, withinDays?: number) => {
     const qs = new URLSearchParams({ period }); if (withinDays) qs.set("within_days", String(withinDays));
     return apiRequest(`/api/v1/reports/equipment-candidates?${qs}`, { token });
   },
-  storeScenario: (scenarios: Record<string, unknown>[], token: string) =>
-    apiRequest(`/api/v1/reports/store-decision-scenario`, { method: "POST", body: JSON.stringify({ scenarios }), token }),
+  storeScenario: <T = unknown>(scenarios: Record<string, unknown>[], token: string) =>
+    apiRequest<T>(`/api/v1/reports/store-decision-scenario`, { method: "POST", body: JSON.stringify({ scenarios }), token }),
   storeDecisionEventDraft: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/reports/store-decision-event-draft`, { method: "POST", body: JSON.stringify(data), token }),
   equipmentScenario: (scenarios: Record<string, unknown>[], token: string) =>
@@ -1471,7 +1473,7 @@ export const performanceApi = {
     apiRequest(`/api/v1/performance/actions/${encodeURIComponent(id)}/realizations`, { token }),
   createActionRealization: (id: string, data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/actions/${encodeURIComponent(id)}/realizations`, { method: "POST", body: JSON.stringify(data), token }),
-  planVersions: (params: string | { version_type?: string; status?: string; as_of_period?: string } | undefined, token: string) => {
+  planVersions: <T = unknown>(params: string | { version_type?: string; status?: string; as_of_period?: string } | undefined, token: string) => {
     let query = "";
     if (typeof params === "string") {
       query = params ? `?version_type=${encodeURIComponent(params)}` : "";
@@ -1482,37 +1484,37 @@ export const performanceApi = {
       if (params.as_of_period) qs.set("as_of_period", params.as_of_period);
       query = qs.toString() ? `?${qs.toString()}` : "";
     }
-    return apiRequest(`/api/v1/performance/plan-versions${query}`, { token });
+    return apiRequest<T>(`/api/v1/performance/plan-versions${query}`, { token });
   },
-  createPlanVersion: (data: Record<string, unknown>, token: string) =>
-    apiRequest(`/api/v1/performance/plan-versions`, { method: "POST", body: JSON.stringify(data), token }),
+  createPlanVersion: <T = unknown>(data: Record<string, unknown>, token: string) =>
+    apiRequest<T>(`/api/v1/performance/plan-versions`, { method: "POST", body: JSON.stringify(data), token }),
   freezePlanVersion: (id: string, official: boolean, token: string) =>
     apiRequest(`/api/v1/performance/plan-versions/${encodeURIComponent(id)}/freeze?official=${official ? "true" : "false"}`, { method: "POST", token }),
-  comparePlanVersions: (params: { left_id: string; right_id: string; period: string; left_basis?: string; right_basis?: string; grain?: string; business_segment?: string; brand?: string; region?: string; store_id?: string; plant?: string; line?: string; equipment_id?: string; asset_type?: string; currency?: string; exchange_rate_version?: string; reporting_currency?: string }, token: string) => {
+  comparePlanVersions: <T = unknown>(params: { left_id: string; right_id: string; period: string; left_basis?: string; right_basis?: string; grain?: string; business_segment?: string; brand?: string; region?: string; store_id?: string; plant?: string; line?: string; equipment_id?: string; asset_type?: string; currency?: string; exchange_rate_version?: string; reporting_currency?: string }, token: string) => {
     const qs = new URLSearchParams(params as Record<string, string>);
-    return apiRequest(`/api/v1/performance/plan-versions/compare?${qs}`, { token });
+    return apiRequest<T>(`/api/v1/performance/plan-versions/compare?${qs}`, { token });
   },
   forecastAccuracy: (params: { forecast_id: string; actual_id: string; period?: string; grain?: string }, token: string) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
     return apiRequest(`/api/v1/performance/forecast-accuracy?${qs}`, { token });
   },
-  forecastAccuracyTrend: (params: { forecast_id: string; actual_id: string }, token: string) => {
+  forecastAccuracyTrend: <T = unknown>(params: { forecast_id: string; actual_id: string }, token: string) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
-    return apiRequest(`/api/v1/performance/forecast-accuracy/trend?${qs}`, { token });
+    return apiRequest<T>(`/api/v1/performance/forecast-accuracy/trend?${qs}`, { token });
   },
-  hybridForecast: (data: Record<string, unknown>, token: string) =>
-    apiRequest(`/api/v1/performance/forecast/hybrid`, { method: "POST", body: JSON.stringify(data), token }),
-  mappings: (params: { mapping_type?: string; effective_date?: string }, token: string) => {
+  hybridForecast: <T = unknown>(data: Record<string, unknown>, token: string) =>
+    apiRequest<T>(`/api/v1/performance/forecast/hybrid`, { method: "POST", body: JSON.stringify(data), token }),
+  mappings: <T = unknown>(params: { mapping_type?: string; effective_date?: string }, token: string) => {
     const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
-    return apiRequest(`/api/v1/performance/mappings${qs.toString() ? `?${qs}` : ""}`, { token });
+    return apiRequest<T>(`/api/v1/performance/mappings${qs.toString() ? `?${qs}` : ""}`, { token });
   },
   createMapping: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/mappings`, { method: "POST", body: JSON.stringify(data), token }),
-  metricDefinitions: (metricKey: string | undefined, token: string) => {
+  metricDefinitions: <T = unknown>(metricKey: string | undefined, token: string) => {
     const query = metricKey ? `?metric_key=${encodeURIComponent(metricKey)}` : "";
-    return apiRequest(`/api/v1/performance/metrics${query}`, { token });
+    return apiRequest<T>(`/api/v1/performance/metrics${query}`, { token });
   },
   createMetricDefinition: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/metrics`, { method: "POST", body: JSON.stringify(data), token }),
@@ -1522,9 +1524,9 @@ export const performanceApi = {
   },
   createAgentSignal: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/agent-signals`, { method: "POST", body: JSON.stringify(data), token }),
-  dataQuality: (params: { period?: string; status?: string; severity?: string }, token: string) => {
+  dataQuality: <T = unknown>(params: { period?: string; status?: string; severity?: string }, token: string) => {
     const qs = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value) qs.set(key, value); });
-    return apiRequest(`/api/v1/performance/data-quality${qs.toString() ? `?${qs}` : ""}`, { token });
+    return apiRequest<T>(`/api/v1/performance/data-quality${qs.toString() ? `?${qs}` : ""}`, { token });
   },
   createDataQuality: (data: Record<string, unknown>, token: string) =>
     apiRequest(`/api/v1/performance/data-quality`, { method: "POST", body: JSON.stringify(data), token }),
@@ -2091,10 +2093,16 @@ export interface StorePnlQueryParams {
   basis: string;
   secondary?: string;
   template_id?: string;
+  // 数据环境与脉搏/门店 360 同轴；缺省时后端默认 production，
+  // 模拟店会以 not visible 拒绝——页面必须显式携带。
+  data_classification?: RetailDataClassification;
+  dataset_version?: string;
 }
 
 export const storePnlApi = {
   getPnl: (params: StorePnlQueryParams, token: string) => {
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated store pnl requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production store pnl cannot include dataset_version");
     const query = new URLSearchParams({
       as_of: params.as_of,
       window_days: String(params.window_days),
@@ -2102,6 +2110,8 @@ export const storePnlApi = {
     });
     if (params.secondary) query.set("secondary", params.secondary);
     if (params.template_id) query.set("template_id", params.template_id);
+    if (params.data_classification) query.set("data_classification", params.data_classification);
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
     return apiRequest(`/api/v1/stores/${encodeURIComponent(params.store_id)}/pnl?${query.toString()}`, { token }) as Promise<{ pnl: unknown }>;
   },
 };
@@ -2129,6 +2139,10 @@ export const financialModelApi = {
     apiRequest(`/api/v1/financial-model/definitions/${encodeURIComponent(definitionId)}/runs`, { method: "POST", body: JSON.stringify(input), token }) as Promise<{ run: unknown; persisted?: boolean } | { run_id: string; status: string }>,
   listDefinitions: (token: string) =>
     apiRequest("/api/v1/financial-model/definitions", { token }) as Promise<{ definitions: unknown[] }>,
+  // P1 演示路径（FP&A 反馈 2026-08-27）：从工厂模板一键物化「模板 + 草稿定义」，
+  // 后端幂等（同法人同名额返回既有定义），成功后刷新列表即可运行。
+  createDefinition: (data: { name?: string; actual_cutoff_period?: string }, token: string) =>
+    apiRequest("/api/v1/financial-model/definitions", { method: "POST", body: JSON.stringify(data), token }) as Promise<{ definition: { id: string; name: string; status: string; template_id: string }; idempotent_replay?: boolean }>,
   getRun: (runId: string, token: string) =>
     apiRequest(`/api/v1/financial-model/runs/${encodeURIComponent(runId)}`, { token }) as Promise<{ run: unknown; line_count?: number }>,
   cancelRun: (runId: string, token: string) =>
@@ -2218,7 +2232,7 @@ export const exchangeRateApi = {
     if (params?.from_currency) qs.append("from_currency", params.from_currency);
     if (params?.to_currency) qs.append("to_currency", params.to_currency);
     const query = qs.toString();
-    return apiRequest(`/api/v1/exchange-rates${query ? `?${query}` : ""}`, { token });
+    return apiRequest<{ data?: any[] }>(`/api/v1/exchange-rates${query ? `?${query}` : ""}`, { token });
   },
   listVersions: (token: string): Promise<{ versions: ExchangeRateVersion[] }> => {
     return apiRequest(`/api/v1/exchange-rates/versions`, { token });
@@ -2599,8 +2613,8 @@ export const cashPlanApi = {
 };
 
 export const settingsApi = {
-  getGlobal: (token: string) =>
-    apiRequest(`/api/v1/settings/global`, { token }),
+  getGlobal: <T = unknown>(token: string) =>
+    apiRequest<T>(`/api/v1/settings/global`, { token }),
   updateGlobal: (data: { global_discount_rate?: number; rent_to_sales_healthy_ceiling?: number; rent_to_sales_warning_ceiling?: number; budget_variance_materiality_threshold?: number; budget_tie_out_tolerance?: number; journal_entry_materiality_threshold?: number }, token: string) =>
     apiRequest(`/api/v1/settings/global`, {
       method: "PUT",

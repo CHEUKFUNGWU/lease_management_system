@@ -1664,7 +1664,7 @@ function AIChatPageContent() {
     try {
       // T2 (UIUX 任务书 2026-08-26)：裸 fetch（同源 rewrite 路径）换 apiRequest
       // 直连 core 路由，401 处理与错误契约映射与其他上传口一致。
-      const data = await apiRequest("/api/v1/ai/files/upload", { method: "POST", body: formData, token });
+      const data = await apiRequest<{ file_id: string; original_name: string; content_type: string; object_name: string }>("/api/v1/ai/files/upload", { method: "POST", body: formData, token });
       const uploadedFile: UploadedFile = {
         file_id: data.file_id,
         original_name: data.original_name,

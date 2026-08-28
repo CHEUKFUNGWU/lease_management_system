@@ -38,11 +38,20 @@ func DefaultStorePnlTemplate() (*Template, error) {
 // S2-2 appendix A). The engine (SM2) evaluates it; tie-outs T1–T16 run on
 // the evaluated result, not as template check rows.
 func DefaultStatementTemplate() (*Template, error) {
-	return Parse(TemplateDef{
+	return Parse(DefaultStatementTemplateDef())
+}
+
+// DefaultStatementTemplateDef is the parseable declaration of the factory
+// template — the single source both the in-memory engine template and the
+// persisted seed (一键创建定义 / POST /financial-model/definitions) flow
+// through. Name stays unique per legal entity: the create path versions it
+// instead of overwriting.
+func DefaultStatementTemplateDef() TemplateDef {
+	return TemplateDef{
 		Name:    "三表财务模型 · 出厂模板",
 		Version: 1,
 		Rows:    statementRows(),
-	})
+	}
 }
 
 func statementRows() []RowDef {

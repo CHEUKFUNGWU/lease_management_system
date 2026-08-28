@@ -122,11 +122,11 @@ export default function TodoPage() {
     fetcher: async (p, t) => {
       const [queueRes, readinessRes, exceptionsRes] = await Promise.all([
         workQueueApi.get(t),
-        monthlyClosingApi.getReadiness(p.period, t),
-        monthlyClosingApi.listExceptions(p.period, t),
+        monthlyClosingApi.getReadiness<CloseReadiness | null>(p.period, t),
+        monthlyClosingApi.listExceptions<{ data?: CloseException[]; scope_complete?: boolean }>(p.period, t),
       ]);
       return {
-        queue: { ...emptyQueue, ...queueRes },
+        queue: { ...emptyQueue, ...(queueRes as Partial<WorkQueue>) },
         readiness: readinessRes,
         exceptions: exceptionsRes.data || [],
         exceptionsScopeComplete: exceptionsRes.scope_complete !== false,

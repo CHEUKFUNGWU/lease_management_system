@@ -56,7 +56,7 @@ func NewAssumptionSuggestionBatchDefinition(writer AssumptionDraftWriter) agentt
 			MaxRows:             200,
 			TimeoutSeconds:      30,
 		},
-		SkillIDs: []string{retailIngestFillSkill},
+		SkillIDs: []string{"fpna_copilot"}, // P0-A①：同 suggest 单条；旧值指向从未注册的 retail_ingest_fill
 		Handler: func(ctx context.Context, call agenttools.ToolCall) (agenttools.ToolResult, error) {
 			if writer == nil {
 				return agenttools.ToolResult{}, errors.New("assumption batch writer unavailable")

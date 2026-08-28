@@ -78,7 +78,7 @@ function SensitivityPage() {
     token,
     params: { status: "approved" as const, sort_by: "created_at" as const, sort_order: "desc" as const },
     paramsKey: "approved-contracts",
-    fetcher: (p, t) => contractApi.list(t, p).then((res) => res.data ?? []),
+    fetcher: (p, t) => contractApi.list<{ data?: ContractOption[] }>(t, p).then((res) => res.data ?? []),
   });
   const contracts: ContractOption[] = contractsState.kind === "ready" ? (contractsState.data ?? []) : [];
 
@@ -90,7 +90,7 @@ function SensitivityPage() {
       setContractParam(values.contract_id || "");
       setBaseRateParam(values.base_rate_percent == null ? "" : String(values.base_rate_percent));
       setShockParam(values.shock_percent == null ? "1" : String(values.shock_percent));
-      const res = await reportApi.sensitivity(
+      const res = await reportApi.sensitivity<{ data?: ScenarioRow[] }>(
         {
           contract_id: values.contract_id,
           base_rate: values.base_rate_percent ? values.base_rate_percent / 100 : undefined,

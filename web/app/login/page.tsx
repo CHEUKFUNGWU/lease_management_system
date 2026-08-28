@@ -22,8 +22,9 @@ export default function LoginPage() {
   const handleLogin = async (values: any) => {
     setLoading(true);
     try {
-      const data = await authApi.login(values.username, values.password);
-      login(data.token, {
+      const data = await authApi.login<{ token?: string; user_id?: string; username: string; role: string; roles?: string[]; legal_entity_id?: string | null; refresh_token?: string }>(
+        values.username, values.password);
+      login(data.token ?? "", {
         id: data.user_id || "",
         username: data.username,
         role: data.role,

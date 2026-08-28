@@ -96,7 +96,7 @@ export default function DealComparePage() {
     setLoading(true);
     try {
       setResult(
-        await dealApi.compare(
+        await dealApi.compare<Comparison>(
           {
             discount_rate: values.discount_rate,
             currency: values.currency,

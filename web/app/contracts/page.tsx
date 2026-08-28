@@ -183,7 +183,7 @@ function ContractsPage() {
     params: listParams,
     paramsKey: listParamsKey,
     fetcher: (p, t) =>
-      contractApi.list(t, {
+      contractApi.list<{ data?: Contract[]; total?: number; page?: number; page_size?: number }>(t, {
         search: p.search || undefined,
         status: p.status || undefined,
         discount_rate_missing: p.risk === "discount_rate_missing" || undefined,

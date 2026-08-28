@@ -61,7 +61,10 @@ export default function StandardsPage() {
     token,
     params: { status: "approved" as const, sort_by: "created_at" as const, sort_order: "desc" as const },
     paramsKey: "approved-contracts",
-    fetcher: (p, t) => contractApi.list(t, p).then((res) => res.data ?? []),
+    fetcher: (p, t) =>
+      contractApi
+        .list<{ data?: ContractOption[] }>(t, p)
+        .then((res) => res.data ?? []),
   });
   const contracts: ContractOption[] = contractsState.kind === "ready" ? (contractsState.data ?? []) : [];
 
@@ -76,7 +79,7 @@ export default function StandardsPage() {
         },
         token
       );
-      setRows(res.data || []);
+      setRows(((res as unknown as { data?: StandardRow[] }).data) || []);
       setMeta(res);
       message.success("多准则对比已生成");
     } catch (error: any) {

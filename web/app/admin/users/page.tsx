@@ -63,7 +63,7 @@ export default function AdminUsersPage() {
     token,
     params: { all: true as const },
     paramsKey: "admin-users",
-    fetcher: (p, t) => adminApi.listUsers(t).then((res) => res.data ?? []),
+    fetcher: (p, t) => adminApi.listUsers<{ data?: User[] }>(t).then((res) => res.data ?? []),
   });
   const users: User[] = usersQuery.state.kind === "ready" ? (usersQuery.state.data ?? []) : [];
   const loading = usersQuery.loading;
@@ -74,7 +74,7 @@ export default function AdminUsersPage() {
   const fetchLegalEntities = async () => {
     if (!token) return;
     try {
-      const data = await legalEntityApi.list(token);
+      const data = await legalEntityApi.list<{ legal_entities?: { id: string; name?: string }[] }>(token);
       setLegalEntities(data.legal_entities || []);
     } catch {
       setLegalEntities([]);

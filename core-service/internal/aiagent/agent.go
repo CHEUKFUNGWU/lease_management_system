@@ -63,6 +63,9 @@ type Agent struct {
 	// disease (62db083). White-box tests read them; the runtime never does.
 	registrationAttempted int
 	registrationFailed    int
+	// fileLoop is the multi-round file pipeline (P0-A③), built lazily on
+	// first use so SetLLMClient ordering never matters.
+	fileLoop *AgentLLMLoop
 }
 
 // SetLLMClient injects the LLM client used by the chat paths. Tests and the
@@ -710,11 +713,6 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 
 用户消息: %s`, req.ObjectName, req.ContentType, req.Message)
 
-		conversation, asmErr := h.assembledConversation(ctx, legalEntityID, userIDStr, req, fileParseToolDefs(), emit)
-		if asmErr != nil {
-			return Response{Answer: "AI agent context assembly failed", Model: "runtime"}, asmErr
-		}
-		_, modelName, toolCalls, err := h.callLLMWithTools(ctx, fileSystemPrompt, conversation, req.Language, fileParseTools)
 		triage := agenttooldefs.DeterministicTriage(agenttooldefs.TriageRequest{
 			FileID:      req.FileID,
 			ObjectName:  req.ObjectName,
@@ -725,12 +723,58 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		selectedTool := fallbackTool
 		toolExecutionChain := []AgentToolCall{}
 		contractID := effectiveContractID
+		// 双路径共用的响应模型名：loop 成功 = lease-agent；legacy 单轮 =
+		// 提供商返回名；全失败 = deterministic-router。
+		modelName := "deterministic-router"
 
-		if err == nil && len(toolCalls) > 0 && toolCalls[0].Tool != "" {
-			selectedTool = toolCalls[0].Tool
-			toolExecutionChain = toolCalls
-		} else if fallbackTool != "" {
-			modelName = "deterministic-router"
+		// P0-A③/P0-B: the multi-round loop (分诊→解析→建议目标页) replaces
+		// the single function-calling round for TOOL SELECTION only. When it
+		// yields a parse tool the deterministic dispatch below executes it via
+		// its existing plumbing; when no LLM is configured or the loop fails,
+		// the deterministic triage router keeps serving (fallbackTool above).
+		if h.fileLoopFor() != nil {
+			modelName = "lease-agent"
+			loopConversation, asmErr := h.assembledConversation(ctx, legalEntityID, userIDStr, req, fileParseToolDefs(), emit)
+			if asmErr != nil {
+				return Response{Answer: "AI agent context assembly failed", Model: "runtime"}, asmErr
+			}
+			if _, loopChain, loopErr := h.fileLoopFor().Run(ctx, fileSystemPrompt, loopConversation, req.Message); loopErr == nil {
+				for _, call := range loopChain {
+					switch {
+					case strings.HasSuffix(call.Tool, "parse_contract_batch"):
+						selectedTool = "parse_contract_batch"
+					case strings.HasSuffix(call.Tool, "parse_payment_schedule"):
+						selectedTool = "parse_payment_schedule"
+					case strings.HasSuffix(call.Tool, "parse_event"):
+						selectedTool = "parse_event"
+					case strings.HasSuffix(call.Tool, "parse_contract"):
+						if selectedTool == "" || fallbackTool == "" {
+							selectedTool = "parse_contract"
+						}
+					}
+				}
+				if len(loopChain) > 0 {
+					toolExecutionChain = loopChain
+				}
+			}
+		} else {
+			conversation, asmErr := h.assembledConversation(ctx, legalEntityID, userIDStr, req, fileParseToolDefs(), emit)
+			if asmErr != nil {
+				return Response{Answer: "AI agent context assembly failed", Model: "runtime"}, asmErr
+			}
+			_, legacyModel, toolCalls, err := h.callLLMWithTools(ctx, fileSystemPrompt, conversation, req.Language, fileParseTools)
+			if err == nil {
+				modelName = legacyModel
+				if len(toolCalls) > 0 && toolCalls[0].Tool != "" {
+					selectedTool = toolCalls[0].Tool
+					toolExecutionChain = toolCalls
+				}
+			}
+		}
+		if selectedTool == "lease.file.triage" {
+			// 模型只跑完分诊没选解析工具：等同没有选择，走下方 R3 拒绝/
+			// 导入预填分支，绝不静默猜测。
+			selectedTool = ""
 		}
 
 		if selectedTool == "" {

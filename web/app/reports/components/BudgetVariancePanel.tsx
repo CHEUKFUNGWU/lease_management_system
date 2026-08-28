@@ -120,7 +120,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
   const loadVersions = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await budgetApi.listVersions(token);
+      const res = await budgetApi.listVersions<{ data?: BudgetVersion[] }>(token);
       const list: BudgetVersion[] = res.data || [];
       setVersions(list);
       setVersionId((current) => current || list[0]?.id);
@@ -142,16 +142,16 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
     setLoading(true);
     try {
       if (rightId === "actual") {
-        const payload = await budgetApi.variance(versionId, period, token);
-        setResult(payload.result || payload);
+        const payload = await budgetApi.variance<{ result?: VarianceResult }>(versionId, period, token);
+        setResult(payload.result ?? (payload as unknown as VarianceResult));
       } else {
-        const payload = await budgetApi.compare(versionId, rightId, period, token);
+        const payload = await budgetApi.compare<{ comparison: { period: string; left_total: number; right_total: number; variance?: number | null; ties_out: boolean; by_contract: ContractVariance[] } }>(versionId, rightId, period, token);
         const comparison = payload.comparison;
         setResult({
           period: comparison.period,
           budget_total: comparison.left_total,
           actual_total: comparison.right_total,
-          variance: comparison.variance,
+          variance: comparison.variance ?? 0,
           bridge: [],
           by_contract: comparison.by_contract || [],
           bridge_ties_out: comparison.ties_out,
@@ -165,7 +165,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
       const budgetVersion = versions.find((version) => version.version_type === "budget");
       const forecastVersion = versions.find((version) => version.version_type === "forecast");
       if (budgetVersion && forecastVersion) {
-        setBrief(await budgetApi.managementBrief(budgetVersion.id, forecastVersion.id, period, token));
+        setBrief(await budgetApi.managementBrief<ManagementBrief>(budgetVersion.id, forecastVersion.id, period, token));
       } else {
         setBrief(null);
       }
@@ -188,7 +188,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
         setCreating(false);
         return;
       }
-      const res = await budgetApi.createVersion(
+      const res = await budgetApi.createVersion<{ data?: { id?: string; contract_count?: number }; line_count?: number }>(
         { name: newName.trim(), version_type: newType, source: newSource.trim(), coverage_scope: coverageScope.trim(), from_period: fromPeriod, to_period: toPeriod },
         token
       );

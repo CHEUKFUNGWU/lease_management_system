@@ -733,6 +733,11 @@ func (h *Agent) executeChatRequest(ctx context.Context, authHeader string, req R
 		if wantsPlanFill(req.Message) {
 			return h.executePlanLinesFill(ctx, req, triage, emit, toolRuntime)
 		}
+		// P0-B①：试算平衡表文件 + 明确的预填请求 → GL 试算平衡表预填接缝
+		//（来源系统与期间必须来自用户消息，缺了就引导而不是猜）。
+		if wantsTrialBalanceFill(req.Message) {
+			return h.executeTrialBalanceFill(ctx, req, triage, emit, toolRuntime)
+		}
 		// 双路径共用的响应模型名：loop 成功 = lease-agent；legacy 单轮 =
 		// 提供商返回名；全失败 = deterministic-router。
 		modelName := "deterministic-router"
@@ -2695,9 +2700,10 @@ func (h *Agent) executeRetailIngestFill(ctx context.Context, req Request, triage
 	}, nil
 }
 
-// wantsScheduleFill is the narrow deterministic gate for the payment
-// schedule page-fill seam: only an explicit prefill request routes there —
-// ordinary rent-schedule uploads keep flowing to the parse/draft-card path.
+// wantsScheduleFill checks only the prefill wording; the rent-schedule
+// context comes from the DocRentSchedule triage check at the call site, so
+// a terse "预填一下" alongside a rent-sheet file still routes to the seam
+// while ordinary parse phrasings keep flowing to the draft-card path.
 func wantsScheduleFill(message string) bool {
 	return messageWantsFormFill(message)
 }
@@ -2710,6 +2716,22 @@ func wantsPlanFill(message string) bool {
 	}
 	lower := strings.ToLower(message)
 	for _, marker := range []string{"预算", "计划版本", "plan version", "budget", "forecast", "预测"} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// wantsTrialBalanceFill gates the GL trial-balance fill on an explicit
+// prefill request plus a trial-balance hint. "TB" alone is too loose to
+// match on; the file must be named or described as a 试算平衡表.
+func wantsTrialBalanceFill(message string) bool {
+	if !messageWantsFormFill(message) {
+		return false
+	}
+	lower := strings.ToLower(message)
+	for _, marker := range []string{"试算平衡表", "trial balance", "trial_balance"} {
 		if strings.Contains(lower, marker) {
 			return true
 		}
@@ -2825,6 +2847,69 @@ func (h *Agent) executePlanLinesFill(ctx context.Context, req Request, triage ag
 		ReviewPrompts: []AgentReviewPrompt{{
 			ID: "plan_fill_review", Title: "确认预算版本预填",
 			Description: "版本信封与行级数值尚未确认；请核对后提交。Agent 无权 commit，入库由你完成。",
+			Severity:    "warning", Action: "review_confirm",
+		}},
+	}, nil
+}
+
+// executeTrialBalanceFill handles an explicit prefill request on a GL trial
+// balance upload by asking the trial-balance fill tool to prefill the import
+// block (P0-B①). Source system and period must come from the human's
+// message; without them the response degrades to guidance, never a guessed
+// envelope.
+func (h *Agent) executeTrialBalanceFill(ctx context.Context, req Request, triage agenttooldefs.TriageResult, emit func(context.Context, string, any) error, toolRuntime *agenttools.Runtime) (Response, error) {
+	sourceSystem := extractSourceSystem(req.Message)
+	period := planPeriodRe.FindString(req.Message)
+	if sourceSystem == "" || period == "" {
+		return fileTriageRefusalWithHint(req, triage, "生成试算平衡表预填需要你提供来源系统与期间，例如「预填试算平衡表 来源系统 gl-export 2026-07」。也可以直接前往「零售数据导入」页上传。"), nil
+	}
+
+	if err := emitAgentEvent(ctx, emit, "tool_start", map[string]interface{}{
+		"tool": "fpna.trial_balance.fill.preview", "status": "running",
+	}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+	args := map[string]any{
+		"file_id": req.FileID, "object_name": req.ObjectName, "content_type": req.ContentType,
+		"source_system": sourceSystem, "period": period,
+	}
+	result, durationMs, err := h.executeToolCall(ctx, toolRuntime, "fpna.trial_balance.fill.preview", args, "tool:tb-fill:"+req.FileID+":"+sourceSystem+":"+period)
+	if err != nil || result.Data == nil {
+		_ = emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+			"tool": "fpna.trial_balance.fill.preview", "status": "failed",
+			"output_summary": errorSummary(err, result), "requires_review": false,
+		}})
+		return fileTriageRefusalWithHint(req, triage, "试算平衡表预填暂不可用（文件读取通道尚未接通）。请直接前往「零售数据导入」页上传并确认映射。"), nil
+	}
+	summary := ""
+	if result.Error != nil {
+		summary = result.Error.Message
+	}
+	if err := emitAgentEvent(ctx, emit, "tool_end", []map[string]interface{}{{
+		"tool": "fpna.trial_balance.fill.preview", "status": string(result.Status),
+		"input_summary": "试算平衡表预填", "output_summary": summary,
+		"requires_review": result.Review.Required, "duration_ms": durationMs,
+	}}); err != nil {
+		return Response{Answer: "AI agent event persistence failed", Model: "runtime"}, err
+	}
+
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页上传。"), nil
+	}
+	fill, ok := data["page_fill"].(*pagefill.Fill)
+	if !ok {
+		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页上传。"), nil
+	}
+	return Response{
+		Answer:     "已在「零售数据导入」页为你预填试算平衡表导入表单（来源系统、期间）。列结构以建议形式呈现，请确认后入库——导入动作由你在页面上完成。",
+		Model:      "deterministic-router",
+		Confidence: 0.8,
+		PageFill:   fill,
+		FileTriage: &triage,
+		ReviewPrompts: []AgentReviewPrompt{{
+			ID: "tb_fill_review", Title: "确认试算平衡表预填",
+			Description: "预填页的列映射尚未确认；请核对后提交。Agent 无权 commit，入库由你完成。",
 			Severity:    "warning", Action: "review_confirm",
 		}},
 	}, nil

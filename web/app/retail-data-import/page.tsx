@@ -53,32 +53,49 @@ export default function RetailDataImportPage() {
 
   // page_fill deep link (appendix A): an Agent-produced import prefill
   // loads into the form. Payload fields prefill directly; the mapping is a
-  // SUGGESTION the human confirms — commit stays human-driven (I5).
+  // agent-universal-pagefill-v1 P0-C：零售导入预填经共享 usePageFill 消费——
+  // fetch、target_page 校验、apply 一次都在 hook 里；这里只提供 apply 回调
+  // 并把 mismatch 提示给到用户。建议列映射从 suggestions 区取（黄标呈现），
+  // 绝不静默混进 payload；提交由人触发。
+  const retailFillId = new URLSearchParams(window.location.search).get("fill");
+  const retailFill = usePageFill({
+    artifactId: retailFillId,
+    page: "retail-data-import",
+    token: token ?? undefined,
+    apply: (payload) => {
+      const readString = (key: string, pattern?: RegExp): string | undefined => {
+        const entry = payload[key];
+        if (!entry || typeof entry !== "object") return undefined;
+        const value = (entry as { value?: unknown }).value;
+        if (typeof value !== "string" || value === "") return undefined;
+        if (pattern && !pattern.test(value)) return undefined;
+        return value;
+      };
+      const source = readString("source_system");
+      if (source) setSourceSystem(source);
+      const asOf = readString("as_of", /^\d{4}-\d{2}-\d{2}$/);
+      if (asOf) setAsOf(asOf);
+    },
+  });
+  // mapping 是建议不是确认值：只在进入 ready 时取一次；成功与跨页误投
+  // 都对用户可见，不静默。
   useEffect(() => {
-    const fillId = new URLSearchParams(window.location.search).get("fill");
-    if (!fillId || !token) return;
-    (async () => {
-      try {
-        // T2 (UIUX 任务书 2026-08-26)：裸 fetch 换 apiRequest（401 自动刷新 + 错误契约）。
-        const body = await apiRequest<{ artifact?: { data?: PageFillPayload } }>(`/api/v1/ai/chat/artifacts/${encodeURIComponent(fillId)}`, { token });
-        const data: PageFillPayload = body?.artifact?.data ?? {};
-        const payload = data.payload || {};
-        if (typeof payload.source_system?.value === "string" && payload.source_system.value) {
-          setSourceSystem(payload.source_system.value);
-        }
-        if (typeof payload.as_of?.value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(payload.as_of.value)) {
-          setAsOf(payload.as_of.value);
-        }
-        if (data.suggestions?.mapping?.value) {
-          setMapping(data.suggestions.mapping.value as Record<string, string>);
-        }
-        message.info(t("retail_import.fill_loaded", language));
-      } catch {
-        // Best-effort prefill: a failed load must never block the human path.
+    if (retailFill.status !== "ready") return;
+    const mapping = retailFill.suggestions.mapping;
+    if (mapping && typeof mapping === "object" && mapping !== null) {
+      const value = (mapping as { value?: unknown }).value;
+      if (value && typeof value === "object" && value !== null) {
+        setMapping(value as Record<string, string>);
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+    }
+    message.info(t("retail_import.fill_loaded", language));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 每次进入 ready 提示一次即可
+  }, [retailFill.status]);
+  useEffect(() => {
+    if (retailFill.status === "mismatch") {
+      message.warning(t("retail_import.fill_mismatch", language));
+    }
+  }, [retailFill.status]);
 
   // agent-universal-pagefill-v1 P0-B①：GL 试算平衡表的 Agent 预填，
   // 经 ?tb_fill=<artifactId> 深链加载；payload 只含人提供的信封字段，

@@ -436,8 +436,10 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-generics -- the
-// caller declares the wire shape; the implementation returns parsed JSON.
+// The generic belongs to the caller: it declares the wire shape, the
+// implementation returns parsed JSON. (A former eslint-disable here named a
+// rule this project never installed; ESLint treats that as an error and
+// fails `next build`'s lint gate.)
 export async function apiRequest<T = unknown>(
   endpoint: string,
   options: RequestOptions = {}

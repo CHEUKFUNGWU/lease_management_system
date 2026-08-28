@@ -79,7 +79,7 @@ export function usePageFill(options: { artifactId?: string | null; page: string;
 		return () => {
 			active = false;
 		};
-	}, [artifactId, token]);
+	}, [artifactId, token, page]);
 
 	// Confirmed payload applies once per successful load; the effect re-runs
 	// safely because appliedRef pins the artifact id that was already applied.

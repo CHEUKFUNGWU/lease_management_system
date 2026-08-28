@@ -3294,6 +3294,11 @@ export const dict: TranslationDict = {
     "zh-HK": "已從 AI 預填充載入導入參數與映射建議；請核對後提交，入庫由你完成",
     en: "Agent prefill loaded. Verify the mapping and commit yourself; the import is yours to confirm",
   },
+  "retail_import.fill_mismatch": {
+    "zh-CN": "AI 预填与当前页面不匹配，已忽略",
+    "zh-HK": "AI 預填與當前頁面不匹配，已忽略",
+    en: "The AI prefill does not match this page and was ignored",
+  },
   "retail_import.upload_hint": {
     "zh-CN": "受控模板：第一行为表头；支持 .csv 与 .xlsx，单文件 ≤10MB；重复上传同一内容将以新事实版本取代旧行",
     "zh-HK": "受控模板：第一行為表頭；支持 .csv 與 .xlsx，單文件 ≤10MB；重複上傳同一內容將以新事實版本取代舊行",

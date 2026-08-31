@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Card, Flex, Spin, Table, Tooltip, Typography } from "antd";
+import { Alert, Card, Flex, Spin, Switch, Table, Tooltip, Typography } from "antd";
+import { useEffect, useState } from "react";
 import type { ColumnsType } from "antd/es/table";
 import {
   storePnlApi,
@@ -11,6 +12,7 @@ import {
   type StorePnlRowValue,
 } from "../lib/api";
 import { t, type Language } from "../lib/i18n";
+import { translateReason } from "../operating-pulse/logic";
 import { fmtMoney } from "../lib/format";
 import { tableScrollX } from "../lib/tableScroll";
 import { useRetailQuery } from "../retail/useRetailQuery";
@@ -47,11 +49,9 @@ export interface PlanComparisonPanelProps {
   groupBy?: string;
 }
 
-export function PlanComparisonUnavailable({ period, currency, language, dataClassification, reason, actual }: {
-  period?: string;
+export function PlanComparisonUnavailable({ currency, language, reason, actual }: {
   currency?: string;
   language: Language;
-  dataClassification: RetailDataClassification;
   reason: string;
   actual?: Record<string, number | null | undefined>;
 }) {
@@ -64,29 +64,20 @@ export function PlanComparisonUnavailable({ period, currency, language, dataClas
     variancePct: null,
     reason,
   }));
+  const displayReason = comparisonReason(reason, language);
   const columns: ColumnsType<ComparisonRow> = [
     { title: t("plan.metric", language), dataIndex: "label", key: "label" },
-    { title: t("plan.actual", language), dataIndex: "actual", key: "actual", align: "right", render: (value: number | null) => value == null ? <Tooltip title={reason}>—</Tooltip> : money(value, currency || "") },
-    { title: t("plan.budget", language), dataIndex: "budget", key: "budget", align: "right", render: () => <Tooltip title={reason}>—</Tooltip> },
-    { title: t("plan.variance_amount", language), dataIndex: "variance", key: "variance", align: "right", render: () => <Tooltip title={reason}>—</Tooltip> },
-    { title: t("plan.variance_rate", language), dataIndex: "variancePct", key: "variancePct", align: "right", render: () => <Tooltip title={reason}>—</Tooltip> },
+    { title: t("plan.actual", language), dataIndex: "actual", key: "actual", align: "right", render: (value: number | null) => value == null ? <Tooltip title={displayReason}>—</Tooltip> : money(value, currency || "") },
+    { title: t("plan.budget", language), dataIndex: "budget", key: "budget", align: "right", render: () => <Tooltip title={displayReason}>—</Tooltip> },
+    { title: t("plan.variance_amount", language), dataIndex: "variance", key: "variance", align: "right", render: () => <Tooltip title={displayReason}>—</Tooltip> },
+    { title: t("plan.variance_rate", language), dataIndex: "variancePct", key: "variancePct", align: "right", render: () => <Tooltip title={displayReason}>—</Tooltip> },
   ];
   return (
-    <Card size="small" className="plan-comparison-card plan-block-gap" title={
-      <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
-        <span>{t("plan.title", language)}</span>
-        <Flex gap={6} wrap="wrap" align="center">
-          <StatusTag kind={dataClassification === "simulated" ? "warning" : "neutral"}>{t("plan.actual_classification", language)}: {dataClassification}</StatusTag>
-          <StatusTag kind="neutral">{t("plan.budget_classification", language)}: —</StatusTag>
-          <StatusTag kind="neutral">{period || "—"}</StatusTag>
-          <StatusTag kind="neutral">{currency || "—"}</StatusTag>
-        </Flex>
-      </Flex>
-    }>
+    <Card size="small" className="plan-comparison-card plan-block-gap" title={t("plan.title", language)}>
       <Flex gap={8} wrap="wrap" align="center" className="plan-comparison-meta">
         <Typography.Text>{t("plan.budget_version_missing", language)}</Typography.Text>
       </Flex>
-      <Alert type="warning" showIcon message={t("plan.not_available", language)} description={reason} className="plan-block-gap-sm" />
+      <Alert type="warning" showIcon message={t("plan.not_available", language)} description={displayReason} className="plan-block-gap-sm" />
       <Table rowKey="key" size="small" pagination={false} columns={columns} dataSource={rows} scroll={tableScrollX(rows.length, 820)} />
     </Card>
   );
@@ -156,6 +147,14 @@ function daysInMonth(period: string): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+function comparisonReason(reason: string | undefined, language: Language): string {
+  if (!reason) return "";
+  if (reason.startsWith("actual_day_coverage_insufficient")) return t("reason.incomplete_store_day_coverage", language);
+  if (reason === "budget_missing") return t("plan.missing_budget_reason", language);
+  if (reason === "budget_zero_or_rate_unavailable") return t("plan.unavailable_reason", language);
+  return translateReason(reason, language);
+}
+
 export function PlanComparisonPanel(props: PlanComparisonPanelProps) {
   const { plan, currency, language, token, dataClassification, datasetVersion, asOf, storeId, groupBy } = props;
   const mode = groupBy === "region" || groupBy === "brand" ? "aggregate" : storeId ? "store" : "summary";
@@ -164,6 +163,8 @@ export function PlanComparisonPanel(props: PlanComparisonPanelProps) {
   // include future days relative to as_of); keep the honest downgraded view
   // with actuals and dashes until the user selects a comparable period.
   const periodMismatch = plan.downgrade_reason?.includes("actual_day_coverage_insufficient") ?? false;
+  const [comparisonExpanded, setComparisonExpanded] = useState(!periodMismatch);
+  useEffect(() => setComparisonExpanded(!periodMismatch), [periodMismatch]);
   const params = mode === "summary" || !plan.plan_version_id || periodMismatch ? null : {
     store_id: storeId || "",
     group_by: groupBy,
@@ -201,14 +202,13 @@ export function PlanComparisonPanel(props: PlanComparisonPanelProps) {
       : mode === "summary" ? summaryRows(plan, language) : [];
   const mixedCurrency = !periodMismatch && result?.kind === "aggregate" && result.aggregate.groups.some((group) => group.mixed_currency);
   const showGroup = !periodMismatch && result?.kind === "aggregate";
-  const budgetClassification = plan.plan_data_classification || "—";
   const columns: ColumnsType<ComparisonRow> = [
     ...(showGroup ? [{ title: groupBy === "brand" ? t("plan.brand", language) : t("plan.region", language), dataIndex: "group", key: "group" }] : []),
     { title: t("plan.metric", language), dataIndex: "label", key: "label" },
     { title: t("plan.actual", language), dataIndex: "actual", key: "actual", align: "right", render: (value: number | null, row) => money(value, row.currency || currency || "") },
-    { title: t("plan.budget", language), dataIndex: "budget", key: "budget", align: "right", render: (value: number | null, row) => value == null ? <Tooltip title={row.reason || t("plan.missing_budget_reason", language)}>—</Tooltip> : money(value, row.currency || currency || "") },
-    { title: t("plan.variance_amount", language), dataIndex: "variance", key: "variance", align: "right", render: (value: number | null, row) => value == null ? <Tooltip title={row.reason || t("plan.unavailable_reason", language)}>—</Tooltip> : money(value, row.currency || currency || "") },
-    { title: t("plan.variance_rate", language), dataIndex: "variancePct", key: "variancePct", align: "right", render: (value: number | null, row) => value == null ? <Tooltip title={row.reason || t("plan.unavailable_reason", language)}>—</Tooltip> : `${value.toFixed(2)}%` },
+    { title: t("plan.budget", language), dataIndex: "budget", key: "budget", align: "right", render: (value: number | null, row) => value == null ? <Tooltip title={comparisonReason(row.reason, language) || t("plan.missing_budget_reason", language)}>—</Tooltip> : money(value, row.currency || currency || "") },
+    { title: t("plan.variance_amount", language), dataIndex: "variance", key: "variance", align: "right", render: (value: number | null, row) => value == null ? <Tooltip title={comparisonReason(row.reason, language) || t("plan.unavailable_reason", language)}>—</Tooltip> : money(value, row.currency || currency || "") },
+    { title: t("plan.variance_rate", language), dataIndex: "variancePct", key: "variancePct", align: "right", render: (value: number | null, row) => value == null ? <Tooltip title={comparisonReason(row.reason, language) || t("plan.unavailable_reason", language)}>—</Tooltip> : `${value.toFixed(2)}%` },
   ];
 
   return (
@@ -216,37 +216,38 @@ export function PlanComparisonPanel(props: PlanComparisonPanelProps) {
       size="small"
       className="plan-comparison-card plan-block-gap"
       title={
-        <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
+        <Flex justify="space-between" align="center" className="plan-comparison-heading">
           <span>{t("plan.title", language)}</span>
-          <Flex gap={6} wrap="wrap" align="center">
-            <StatusTag kind={dataClassification === "simulated" ? "warning" : "neutral"}>
-              {t("plan.actual_classification", language)}: {dataClassification}
-            </StatusTag>
-            <StatusTag kind={budgetClassification === "simulated" ? "warning" : "neutral"}>
-              {t("plan.budget_classification", language)}: {budgetClassification}
-            </StatusTag>
-            <StatusTag kind="neutral">{plan.period}</StatusTag>
-            <StatusTag kind="neutral">{currency || plan.currency || "—"}</StatusTag>
+          <Flex gap={8} align="center" className="plan-comparison-toggle">
+            <Typography.Text type="secondary">{comparisonExpanded ? t("plan.hide_comparison", language) : t("plan.show_comparison", language)}</Typography.Text>
+            <Switch
+              size="small"
+              checked={comparisonExpanded}
+              onChange={setComparisonExpanded}
+              aria-label={t("plan.toggle_comparison", language)}
+            />
           </Flex>
         </Flex>
       }
     >
-      <Flex gap={8} wrap="wrap" align="center" className="plan-comparison-meta">
-        <Typography.Text>{plan.plan_version_name || plan.plan_version_id || "—"}</Typography.Text>
-        <Typography.Text type="secondary">{plan.plan_version_type || "budget"} · {plan.plan_source || "—"}</Typography.Text>
-        {plan.plan_is_official && <StatusTag kind="processing">{t("plan_import.official", language)}</StatusTag>}
-      </Flex>
-      {!plan.decision_ready && plan.downgrade_reason && (
-        <Alert className="plan-block-gap-sm" type="warning" showIcon message={t("plan.not_ready", language)} description={plan.downgrade_reason} />
+      {comparisonExpanded && (
+        <>
+          {(plan.plan_version_name || plan.plan_is_official) && (
+            <Flex gap={8} wrap="wrap" align="center" className="plan-comparison-meta">
+              {plan.plan_version_name && <Typography.Text>{plan.plan_version_name}</Typography.Text>}
+              {plan.plan_is_official && <StatusTag kind="processing">{t("plan_import.official", language)}</StatusTag>}
+            </Flex>
+          )}
+          {mixedCurrency && (
+            <Alert className="plan-block-gap-sm" type="warning" showIcon message={t("plan.mixed_currency_title", language)} description={`${t("plan.cross_currency_total", language)}: — · ${t("plan.mixed_currency_reason", language)}`} />
+          )}
+          {loading ? <Flex justify="center" className="plan-comparison-loading"><Spin /></Flex> : null}
+          {mode !== "summary" && !periodMismatch && !loading ? <StateBlock state={state} language={language} onRetry={retry} /> : null}
+          {!loading ? (
+            <Table rowKey="key" size="small" pagination={false} columns={columns} dataSource={rows} scroll={tableScrollX(rows.length, showGroup ? 960 : 820)} locale={{ emptyText: t("plan.no_comparable_rows", language) }} />
+          ) : null}
+        </>
       )}
-      {mixedCurrency && (
-        <Alert className="plan-block-gap-sm" type="warning" showIcon message={t("plan.mixed_currency_title", language)} description={`${t("plan.cross_currency_total", language)}: — · ${t("plan.mixed_currency_reason", language)}`} />
-      )}
-      {loading ? <Flex justify="center" className="plan-comparison-loading"><Spin /></Flex> : null}
-      {mode !== "summary" && !periodMismatch && !loading ? <StateBlock state={state} language={language} onRetry={retry} /> : null}
-      {!loading ? (
-        <Table rowKey="key" size="small" pagination={false} columns={columns} dataSource={rows} scroll={tableScrollX(rows.length, showGroup ? 960 : 820)} locale={{ emptyText: t("plan.no_comparable_rows", language) }} />
-      ) : null}
     </Card>
   );
 }

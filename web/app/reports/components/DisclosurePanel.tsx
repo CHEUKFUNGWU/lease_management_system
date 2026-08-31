@@ -137,9 +137,9 @@ function assetTypeLabel(assetType: string, language: Language): string {
 function SectionCard({ title, extra, children }: { title: string; extra?: React.ReactNode; children: React.ReactNode }) {
   return (
     <Card
-      title={<span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>{title}</span>}
+      title={<span className="reports-section-card-title">{title}</span>}
       extra={extra}
-      style={{ borderRadius: 10, marginBottom: 16 }}
+      className="reports-section-card"
     >
       {children}
     </Card>
@@ -152,19 +152,10 @@ function StatRow({ items }: { items: { label: string; value: number; strong?: bo
       {items.map((item) => (
         <Col xs={12} sm={8} lg={6} key={item.label}>
           <Statistic
-            title={
-              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.02em" }}>
-                {item.label}
-              </span>
-            }
+            title={<span className="reports-stat-label">{item.label}</span>}
             value={item.value}
             precision={2}
-            valueStyle={{
-              fontSize: item.strong ? 20 : 16,
-              fontWeight: item.strong ? 700 : 600,
-              letterSpacing: "-0.02em",
-              color: "var(--fg-primary)",
-            }}
+            className={`reports-statistic${item.strong ? " is-strong" : ""}`}
           />
         </Col>
       ))}
@@ -440,9 +431,9 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
   return (
     <>
       {/* controls */}
-      <Card style={{ borderRadius: 10, marginBottom: 16 }} styles={{ body: { padding: "16px 20px" } }}>
+      <Card className="disclosure-controls-card">
         <Space wrap size={12}>
-          <span style={{ fontSize: 13, color: "var(--fg-tertiary)" }}>{t("reports.disclosure_period", language)}</span>
+          <span className="disclosure-period-label">{t("reports.disclosure_period", language)}</span>
           <RangePicker
             value={range}
             allowClear={false}
@@ -457,7 +448,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
             {t("reports.disclosure_export", language)}
           </Button>
         </Space>
-        <div style={{ marginTop: 8, fontSize: 12, color: "var(--fg-muted)" }}>
+        <div className="disclosure-as-of-hint">
           {t("reports.disclosure_as_of_hint", language, { date: range[1].format("YYYY-MM-DD") })}
         </div>
       </Card>
@@ -466,7 +457,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
         <Alert
           type="warning"
           showIcon
-          style={{ marginBottom: 16 }}
+          className="disclosure-currency-alert"
           message={t("reports.disclosure_multi_currency_caveat", language, {
             currencies: (data.currencies || []).join(", "),
           })}
@@ -474,15 +465,15 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
       )}
 
       {data && (
-        <Card size="small" style={{ borderRadius: 10, marginBottom: 16 }}>
-          <Space direction="vertical" size={4} style={{ width: "100%" }}>
+        <Card size="small" className="disclosure-basis-card">
+          <Space direction="vertical" size={4} className="disclosure-basis-content">
             <Space wrap>
               <StatusTag kind={statusKindFromAntColor(data.report_basis.is_official ? "blue" : "gold")}>{data.report_basis.mode}</StatusTag>
               <span>{t("reports.disclosure_snapshot", language)}: {data.report_basis.snapshot_id}</span>
               <span>{t("reports.disclosure_policy_version", language)}: {data.report_basis.policy_version}</span>
               <span>{t("reports.disclosure_generated_at", language)}: {new Date(data.report_basis.generated_at).toLocaleString()}</span>
             </Space>
-            <span style={{ color: "var(--fg-tertiary)", fontSize: 12 }}>
+            <span className="disclosure-basis-detail">
               {t("reports.disclosure_population", language)} {data.report_basis.population_count} · {t("reports.disclosure_computed", language)} {data.report_basis.computed_contract_count} · {t("reports.disclosure_skipped", language)} {data.report_basis.skipped_contract_count}
             </span>
           </Space>
@@ -493,10 +484,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
         {data && (
           <>
             {/* 1. Maturity analysis */}
-            <SectionCard
-              title={t("reports.disclosure_maturity_title", language)}
-              extra={<StatusTag style={{ fontSize: 11 }}>{t("reports.disclosure_as_of", language)} {data.as_of}</StatusTag>}
-            >
+            <SectionCard title={t("reports.disclosure_maturity_title", language)}>
               <StatRow
                 items={[
                   { label: t("reports.disclosure_total_undiscounted", language), value: data.maturity_analysis.totals.total_undiscounted, strong: true },
@@ -505,7 +493,7 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
                 ]}
               />
               <Table
-                style={{ marginTop: 16 }}
+                className="disclosure-maturity-table"
                 columns={maturityColumns as any}
                 dataSource={data.maturity_analysis.rows || []}
                 rowKey="contract_id"
@@ -619,14 +607,11 @@ export function DisclosurePanel({ reportMode, token, language }: DisclosurePanel
             </SectionCard>
 
             {/* 6. Contract-level audit workpaper */}
-            <SectionCard
-              title={t("reports.disclosure_audit_title", language)}
-              extra={<StatusTag>{data.audit_workpaper.totals.row_count} {t("reports.disclosure_rows", language)}</StatusTag>}
-            >
+            <SectionCard title={t("reports.disclosure_audit_title", language)}>
               <Alert
                 type="info"
                 showIcon
-                style={{ marginBottom: 12 }}
+                className="disclosure-audit-alert"
                 message={t("reports.disclosure_audit_hint", language)}
               />
               <Table

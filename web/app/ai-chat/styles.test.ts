@@ -4,10 +4,8 @@
  * 背景：本页曾是全仓最大内联样式单点（118 处，占全仓 11%）。2026-08-22
  * 整体迁移到 globals.css 的「AI Chat Page」区段。本文件锁三件事：
  *
- * 1. 残留的 style={{ 只允许是 antd Avatar 的主题覆盖（cssinjs 运行时注入
- *    与同特异性类名竞争时后者胜出，必须走 style prop），且值全部为 var()
- *    引用、无字面量——这是 §5.3 认可的动态残留，除此之外新增任何静态
- *    内联样式都会让 count 断言变红。
+ * 1. 页面样式全部走 globals.css；SyntaxHighlighter 的主题对象是组件 API，
+ *    不属于页面 CSS 内联样式。新增静态内联样式应让 count 断言变红。
  * 2. 页面内不再有 JS 改样式的 hover/focus 处理器（§13-3）。
  * 3. 关键类的规则体存在且值正确（class-coverage.test.ts 只验证「类有规
  *    则」，这里验证「规则是对的」——FIX-021 教训：不能只靠覆盖率）。
@@ -27,16 +25,15 @@ function ruleBody(selectorSource: string): string {
   return match[1];
 }
 
-/** 允许残留的内联样式：antd Avatar 主题覆盖（行内含 backgroundColor 且
- *  值全部走 var()）。出现第三种形态即失败。 */
+/** 页面不保留 CSS 内联样式；组件主题对象不计入 style={{ ... }}。 */
 describe("ai-chat/page.tsx 内联样式残留清单", () => {
   const openerMatches = page.match(/style=\{\{/g) || [];
 
-  it("内联样式总量锁定在 2（两处 Avatar 主题覆盖）", () => {
-    expect(openerMatches.length).toBe(2);
+  it("页面不保留 CSS 内联样式", () => {
+    expect(openerMatches.length).toBe(0);
   });
 
-  it("每个残留块都是 var()-based 的 Avatar 覆盖，无字面量", () => {
+  it("样式对象不会回到页面 JSX", () => {
     const blocks: string[] = [];
     const re = /style=\{\{([^}]*)\}\}/g;
     let m: RegExpExecArray | null;

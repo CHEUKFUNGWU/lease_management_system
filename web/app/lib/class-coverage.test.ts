@@ -55,6 +55,14 @@ const KNOWN_MARKERS = new Set([
 describe("FIX-034: class names resolve to rules", () => {
   const css = readFileSync(join(appDir, "globals.css"), "utf8");
 
+  function ruleBody(selector: string): string {
+    const start = css.indexOf(`${selector} {`);
+    if (start < 0) return "";
+    const open = css.indexOf("{", start);
+    const close = css.indexOf("}", open);
+    return close > open ? css.slice(open + 1, close) : "";
+  }
+
   it("no className in the app is left without a stylesheet rule", () => {
     const missing = new Map<string, string>();
     for (const file of walk(appDir)) {
@@ -70,5 +78,15 @@ describe("FIX-034: class names resolve to rules", () => {
     }
     const report = Array.from(missing).map(([cls, file]) => `  ${cls}  (${file})`).join("\n");
     expect(missing.size, `these classes have no rule — the element renders unstyled:\n${report}`).toBe(0);
+  });
+
+  it("semantic replacements keep their key geometry", () => {
+    expect(ruleBody(".dashboard-recent-contracts-card .dashboard-list-item")).toMatch(/padding:\s*14px 24px/);
+    expect(ruleBody(".notification-dropdown")).toMatch(/width:\s*360px/);
+    expect(ruleBody(".cash-plan-kpi-grid")).toMatch(/repeat\(5,\s*minmax\(0,\s*1fr\)\)/);
+    expect(ruleBody(".store-cashflow-card")).toMatch(/flex-direction:\s*column/);
+    expect(ruleBody(".chart-tooltip")).toMatch(/box-shadow:\s*var\(--shadow-dropdown\)/);
+    expect(ruleBody(".bento-tile")).toMatch(/grid-column:\s*span var\(--bento-span/);
+    expect(ruleBody(".help-flow-card")).toMatch(/padding:\s*6px 12px/);
   });
 });

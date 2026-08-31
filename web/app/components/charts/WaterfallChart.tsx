@@ -11,6 +11,8 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
+import { useLanguage } from "../../context/LanguageContext";
+import { t } from "../../lib/i18n";
 import { fmtMoney } from "../../lib/format";
 
 export interface WaterfallItem {
@@ -36,8 +38,10 @@ export default function WaterfallChart({
   items,
   currency = "CNY",
   height = 280,
-  emptyText = "暂无瀑布图数据",
+  emptyText,
 }: WaterfallChartProps) {
+  const { language } = useLanguage();
+  const resolvedEmptyText = emptyText || t("chart.waterfall.empty", language);
   const chartData = useMemo(() => {
     let runningTotal = 0;
     return items.map((item, index) => {
@@ -79,13 +83,13 @@ export default function WaterfallChart({
         className="chart-empty-state"
         style={{ height }}
       >
-        {emptyText}
+        {resolvedEmptyText}
       </div>
     );
   }
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div className="chart-container" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={chartData}
@@ -113,24 +117,13 @@ export default function WaterfallChart({
               const point = payload[0]?.payload;
               if (!point) return null;
               return (
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    boxShadow: "var(--shadow-dropdown, 0 4px 12px rgba(0,0,0,0.08))",
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    fontSize: 12,
-                    border: "1px solid var(--border-default)",
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
-                    {point.label}
+                <div className="chart-tooltip is-compact">
+                  <div className="chart-tooltip-title">{point.label}</div>
+                  <div className={`chart-tooltip-series ${point.displayValue >= 0 ? "is-positive" : "is-negative"}`}>
+                    {point.isTotal ? t("chart.waterfall.total", language) : t("chart.waterfall.change", language)}: <strong>{fmtMoney(point.displayValue, currency)}</strong>
                   </div>
-                  <div style={{ color: point.displayValue >= 0 ? "var(--state-success-text)" : "var(--state-error-text)" }}>
-                    {point.isTotal ? "结算总额" : "变动金额"}: <strong>{fmtMoney(point.displayValue, currency)}</strong>
-                  </div>
-                  <div style={{ color: "var(--fg-tertiary)", marginTop: 2 }}>
-                    累计净额: {fmtMoney(point.runningTotal, currency)}
+                  <div className="chart-tooltip-secondary">
+                    {t("chart.waterfall.running_total", language)}: {fmtMoney(point.runningTotal, currency)}
                   </div>
                 </div>
               );

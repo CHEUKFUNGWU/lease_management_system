@@ -9,6 +9,7 @@ import { storeMetricsApi } from "../lib/api";
 import { fmtMoney, fmtNum } from "../lib/format";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
+import { t, type Language } from "../lib/i18n";
 
 interface StoreRatio {
   store_id: string;
@@ -41,17 +42,17 @@ interface RentToSales {
 // Each status is shown as itself. Collapsing "we have no sales figure" into a
 // blank cell, or into 0%, would let a store with unknown performance read as a
 // healthy one.
-const STATUS_META: Record<string, { label: string; color: string }> = {
-  healthy: { label: "健康", color: "green" },
-  watch: { label: "关注", color: "gold" },
-  over_threshold: { label: "超预警线", color: "red" },
-  no_revenue: { label: "缺营收", color: "default" },
-  zero_revenue: { label: "营收为零", color: "volcano" },
-  currency_mismatch: { label: "币种不一致", color: "purple" },
-  no_rent: { label: "缺租金", color: "default" },
+const STATUS_META: Record<string, { labelKey: string; color: string }> = {
+  healthy: { labelKey: "renewal.health_healthy", color: "green" },
+  watch: { labelKey: "renewal.health_watch", color: "gold" },
+  over_threshold: { labelKey: "renewal.health_over_threshold", color: "red" },
+  no_revenue: { labelKey: "renewal.health_no_revenue", color: "default" },
+  zero_revenue: { labelKey: "renewal.health_zero_revenue", color: "volcano" },
+  currency_mismatch: { labelKey: "renewal.health_currency_mismatch", color: "purple" },
+  no_rent: { labelKey: "renewal.health_no_rent", color: "default" },
 };
 
-export function RentToSalesPanel({ token }: { token: string | null }) {
+export function RentToSalesPanel({ token, language = "zh-CN" }: { token: string | null; language?: Language }) {
   const [period, setPeriod] = useState(dayjs().format("YYYY-MM"));
   const [healthy, setHealthy] = useState<number | null>(null);
   const [warning, setWarning] = useState<number | null>(null);
@@ -69,12 +70,12 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
         )
       );
     } catch (error: any) {
-      notifyError(error?.message || "租售比加载失败");
+      notifyError(error?.message || t("portfolio.rent_to_sales_load_failed", language));
       setResult(null);
     } finally {
       setLoading(false);
     }
-  }, [token, period, healthy, warning]);
+  }, [token, period, healthy, warning, language]);
 
   useEffect(() => {
     load();
@@ -88,28 +89,28 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
 
   return (
     <Card
-      title="租售比"
-      style={{ borderRadius: 10, marginTop: 16 }}
+      title={t("perf.col.rent_to_sales", language)}
+      className="rent-to-sales-card"
       extra={
-        <Space size={8}>
+        <Space size={8} className="rent-to-sales-controls">
           <Input
-            style={{ width: 110 }}
+            className="rent-to-sales-period"
             value={period}
             onChange={(event) => setPeriod(event.target.value)}
             placeholder="YYYY-MM"
           />
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>健康线</span>
+          <span className="rent-to-sales-threshold-label">{t("settings.ratio_healthy", language)}</span>
           <InputNumber
-            style={{ width: 80 }}
+            className="rent-to-sales-threshold"
             value={healthy}
             min={1}
             max={100}
             onChange={(value) => setHealthy(value == null ? null : Number(value))}
             suffix="%"
           />
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>预警线</span>
+          <span className="rent-to-sales-threshold-label">{t("settings.ratio_warning", language)}</span>
           <InputNumber
-            style={{ width: 80 }}
+            className="rent-to-sales-threshold"
             value={warning}
             min={1}
             max={100}
@@ -119,9 +120,8 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
         </Space>
       }
     >
-      <div style={{ color: "var(--fg-tertiary)", marginBottom: 12, fontSize: 13 }}>
-        租售比 = 当期应付固定租金 ÷ 当期营收。分母用的是提成租金所依据的营收，因此提成租金本身不计入分子，
-        否则这个指标会自己追自己。
+      <div className="rent-to-sales-note">
+        {t("portfolio.rent_to_sales_note", language)}
       </div>
 
       {result && (
@@ -129,42 +129,42 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
           <Alert
             type="info"
             showIcon
-            style={{ marginBottom: 16 }}
+            className="rent-to-sales-alert"
             message={result.coverage_statement}
             description={result.portfolio_caveat || undefined}
           />
 
-          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+          <Row gutter={[12, 12]} className="rent-to-sales-summary">
             <Col xs={24} sm={8}>
-              <Card size="small" style={{ borderRadius: 10 }}>
+              <Card size="small" className="rent-to-sales-stat-card">
                 <Statistic
-                  title="组合租售比"
+                  title={t("portfolio.rent_to_sales_ratio", language)}
                   value={result.portfolio_rent_to_sales_percent ?? undefined}
                   precision={2}
                   suffix={result.portfolio_rent_to_sales_percent != null ? "%" : undefined}
                   formatter={
                     result.portfolio_rent_to_sales_percent == null
-                      ? () => <span style={{ fontSize: 20, color: "var(--fg-muted)" }}>覆盖不全，不给出</span>
+                      ? () => <span className="rent-to-sales-unavailable">{t("portfolio.rent_to_sales_unavailable", language)}</span>
                       : undefined
                   }
                 />
               </Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card size="small" style={{ borderRadius: 10 }}>
+              <Card size="small" className="rent-to-sales-stat-card">
                 <Statistic
-                  title="超预警线门店"
+                  title={t("portfolio.rent_to_sales_over_line", language)}
                   value={result.stores_over_line}
-                  valueStyle={{ color: result.stores_over_line ? "var(--state-error-text)" : undefined }}
+                  className={result.stores_over_line ? "is-error" : ""}
                 />
               </Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card size="small" style={{ borderRadius: 10 }}>
+              <Card size="small" className="rent-to-sales-stat-card">
                 <Statistic
-                  title="缺营收门店"
+                  title={t("portfolio.rent_to_sales_no_revenue", language)}
                   value={result.stores_without_revenue}
-                  valueStyle={{ color: result.stores_without_revenue ? "var(--state-warning-text)" : undefined }}
+                  className={result.stores_without_revenue ? "is-warning" : ""}
                 />
               </Card>
             </Col>
@@ -178,58 +178,58 @@ export function RentToSalesPanel({ token }: { token: string | null }) {
             pagination={{ pageSize: 10 }}
             scroll={tableScrollX((result.stores || []).length, 900)}
             columns={[
-              { title: "门店", dataIndex: "store_name", render: (name: string, row: StoreRatio) => (
+              { title: t("pf.dim.store", language), dataIndex: "store_name", render: (name: string, row: StoreRatio) => (
                 <span>
                   <strong>{name}</strong>
-                  <span style={{ color: "var(--fg-muted)", marginLeft: 8, fontSize: 12 }}>{row.store_code}</span>
+                  <span className="rent-to-sales-store-code">{row.store_code}</span>
                 </span>
               ) },
-              { title: "品牌", dataIndex: "brand", width: 100, render: (value: string) => value || "—" },
-              { title: "区域", dataIndex: "region", width: 100, render: (value: string) => value || "—" },
+              { title: t("pf.dim.brand", language), dataIndex: "brand", width: 100, render: (value: string) => value || "—" },
+              { title: t("pf.dim.region", language), dataIndex: "region", width: 100, render: (value: string) => value || "—" },
               {
-                title: "当期租金",
+                title: t("portfolio.rent_to_sales_current_rent", language),
                 dataIndex: "cash_rent",
                 align: "right" as const,
                 render: (value: number, row: StoreRatio) => fmtMoney(value, row.currency),
               },
               {
-                title: "当期营收",
+                title: t("portfolio.rent_to_sales_current_revenue", language),
                 dataIndex: "revenue",
                 align: "right" as const,
                 render: (value: number | null) => (value == null ? "—" : fmtNum(value)),
               },
               {
-                title: "坪效（营收/㎡）",
+                title: t("retail.kpi.sales_per_sqm", language),
                 dataIndex: "sales_per_sqm",
                 align: "right" as const,
                 render: (value: number | null) => (value == null ? "—" : fmtNum(value)),
               },
               {
-                title: "租售比",
+                title: t("perf.col.rent_to_sales", language),
                 dataIndex: "rent_to_sales_percent",
                 align: "right" as const,
                 sorter: (a: StoreRatio, b: StoreRatio) =>
                   (a.rent_to_sales_percent ?? -1) - (b.rent_to_sales_percent ?? -1),
                 render: (value: number | null, row: StoreRatio) =>
                   value == null ? (
-                    <span style={{ color: "var(--fg-muted)" }}>—</span>
+                    <span className="rent-to-sales-missing">—</span>
                   ) : (
-                    <strong style={{ color: row.status === "over_threshold" ? "var(--state-error-text)" : undefined }}>
+                    <strong className={row.status === "over_threshold" ? "rent-to-sales-over" : ""}>
                       {value.toFixed(2)}%
                     </strong>
                   ),
               },
               {
-                title: "状态",
+                title: t("portfolio.rent_to_sales_status", language),
                 dataIndex: "status",
                 width: 200,
                 render: (status: string, row: StoreRatio) => {
-                  const meta = STATUS_META[status] || { label: status, color: "default" };
+                  const meta = STATUS_META[status];
                   return (
                     <Space size={4} direction="vertical">
-                      <StatusTag kind={statusKindFromAntColor(meta.color)}>{meta.label}</StatusTag>
+                      <StatusTag kind={statusKindFromAntColor(meta?.color)}>{t(meta?.labelKey || "reports.status_unknown", language)}</StatusTag>
                       {row.status_reason && (
-                        <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{row.status_reason}</span>
+                        <span className="rent-to-sales-status-reason">{row.status_reason}</span>
                       )}
                     </Space>
                   );

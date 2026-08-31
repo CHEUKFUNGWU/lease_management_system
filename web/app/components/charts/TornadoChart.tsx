@@ -12,6 +12,8 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
+import { useLanguage } from "../../context/LanguageContext";
+import { t } from "../../lib/i18n";
 import { fmtMoney } from "../../lib/format";
 
 export interface TornadoFactor {
@@ -40,8 +42,10 @@ export default function TornadoChart({
   baseValue = 0,
   currency = "CNY",
   height = 260,
-  emptyText = "暂无敏感度数据",
+  emptyText,
 }: TornadoChartProps) {
+  const { language } = useLanguage();
+  const resolvedEmptyText = emptyText || t("sensitivity.empty", language);
   const chartData = useMemo(() => {
     const sorted = [...factors].sort((a, b) => {
       const swingA = Math.abs(a.highValue - a.lowValue);
@@ -58,25 +62,22 @@ export default function TornadoChart({
         highDelta,
         lowValue: f.lowValue,
         highValue: f.highValue,
-        lowLabel: f.lowLabel || "悲观/下调",
-        highLabel: f.highLabel || "乐观/上调",
+        lowLabel: f.lowLabel || t("sensitivity.low_scenario", language),
+        highLabel: f.highLabel || t("sensitivity.high_scenario", language),
       };
     });
-  }, [factors, baseValue]);
+  }, [factors, baseValue, language]);
 
   if (!factors || factors.length === 0) {
     return (
-      <div
-        className="chart-empty-state"
-        style={{ height }}
-      >
-        {emptyText}
+      <div className="chart-empty-state" style={{ height }}>
+        {resolvedEmptyText}
       </div>
     );
   }
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div className="chart-container" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           layout="vertical"
@@ -106,25 +107,14 @@ export default function TornadoChart({
               const point = payload[0]?.payload;
               if (!point) return null;
               return (
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    boxShadow: "var(--shadow-dropdown, 0 4px 12px rgba(0,0,0,0.08))",
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    fontSize: 12,
-                    border: "1px solid var(--border-default)",
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
-                    {point.name}
-                  </div>
-                  <div style={{ color: "var(--fg-error, #A8071A)", marginBottom: 2 }}>
+                <div className="chart-tooltip is-compact">
+                  <div className="chart-tooltip-title">{point.name}</div>
+                  <div className="chart-tooltip-series is-negative">
                     {point.lowLabel}: {fmtMoney(point.lowValue, currency)} (
                     {point.lowDelta >= 0 ? "+" : ""}
                     {fmtMoney(point.lowDelta, currency)})
                   </div>
-                  <div style={{ color: "var(--fg-success, #216E39)" }}>
+                  <div className="chart-tooltip-series is-positive">
                     {point.highLabel}: {fmtMoney(point.highValue, currency)} (
                     {point.highDelta >= 0 ? "+" : ""}
                     {fmtMoney(point.highDelta, currency)})
@@ -139,15 +129,15 @@ export default function TornadoChart({
             iconType="circle"
             wrapperStyle={{ fontSize: 11, paddingBottom: 6 }}
             formatter={(value) => (
-              <span style={{ color: "var(--fg-secondary)", marginRight: 8 }}>
-                {value === "lowDelta" ? "悲观/下调冲击" : "乐观/上调收益"}
+              <span className="chart-legend-label">
+                {value === "lowDelta" ? t("sensitivity.low_impact", language) : t("sensitivity.high_impact", language)}
               </span>
             )}
           />
           <Bar
             dataKey="lowDelta"
             name="lowDelta"
-            fill="var(--fg-error, #A8071A)"
+            fill="var(--state-error-text)"
             opacity={0.85}
             radius={[2, 0, 0, 2]}
             isAnimationActive={false}
@@ -155,7 +145,7 @@ export default function TornadoChart({
           <Bar
             dataKey="highDelta"
             name="highDelta"
-            fill="var(--fg-success, #216E39)"
+            fill="var(--state-success-text)"
             opacity={0.85}
             radius={[0, 2, 2, 0]}
             isAnimationActive={false}

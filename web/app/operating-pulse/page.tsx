@@ -20,7 +20,6 @@ import ConfidenceBandChart from "../components/charts/ConfidenceBandChart";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
-import ScopeNote from "../components/ScopeNote";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { pulseHelpContent } from "../components/help-content";
@@ -53,9 +52,9 @@ function updateQuery(router: ReturnType<typeof useRouter>, params: { classificat
   router.replace(`/operating-pulse?${query.toString()}`);
 }
 
-function coverageText(coverage: RetailCoverage): string {
+function coverageText(coverage: RetailCoverage, language: Language): string {
   const rate = coverage.coverage_rate == null ? "—" : `${coverage.coverage_rate.toFixed(1)}%`;
-  return `${coverage.observed_store_days}/${coverage.expected_store_days} store-days · ${rate}`;
+  return `${coverage.observed_store_days}/${coverage.expected_store_days} ${t("trust.store_days", language)} · ${rate}`;
 }
 
 function effectivePartition(response: RetailPulseResponse, selectedCurrency: string): RetailPulsePartition | null {
@@ -66,7 +65,7 @@ function effectivePartition(response: RetailPulseResponse, selectedCurrency: str
 function KPIValueCard({ code, metric, currency, notReady, language }: { code: PulseMetricCode; metric?: RetailPulseResponse["summary"] extends infer T ? T extends Record<string, infer M> ? M : never : never; currency: string; notReady?: boolean; language: Language }) {
   if (!metric) return (
     <div className="pulse-kpi-card" data-testid={`pulse-kpi-${code}`}>
-      <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{kpiLabel(code, language)}</span>
+      <span className="pulse-kpi-label">{kpiLabel(code, language)}</span>
       <div className="pulse-kpi-null">—</div>
     </div>
   );
@@ -78,7 +77,7 @@ function KPIValueCard({ code, metric, currency, notReady, language }: { code: Pu
   return (
     <div className="pulse-kpi-card" data-testid={`pulse-kpi-${code}`}>
       <Flex justify="space-between" align="center">
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{kpiLabel(code, language)}</span>
+        <span className="pulse-kpi-label">{kpiLabel(code, language)}</span>
         <Flex align="center" gap={4}>
           {notReady && <KPIReadyBadge />}
           {status.status !== "complete" && (
@@ -89,7 +88,7 @@ function KPIValueCard({ code, metric, currency, notReady, language }: { code: Pu
         </Flex>
       </Flex>
       <Typography.Title level={3} className="pulse-kpi-value" ellipsis={{ tooltip: display }}>{display}</Typography.Title>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, overflow: "hidden", whiteSpace: "nowrap" }}>
+      <div className="pulse-kpi-footer">
         <Typography.Text className={`pulse-change pulse-change-${tone}`}>
           {arrow} {formatChange(metric)}
         </Typography.Text>
@@ -107,17 +106,17 @@ function AuxiliaryMetricRow({ code, metric, currency, language }: { code: PulseM
   return (
     <div className="pulse-aux-row">
       <div>
-        <Typography.Text style={{ fontSize: 13, color: "var(--fg-secondary)", fontWeight: 500 }}>{kpiLabel(code, language)}</Typography.Text>
+        <Typography.Text className="pulse-aux-label">{kpiLabel(code, language)}</Typography.Text>
         {status.status !== "complete" && (
-          <div className="pulse-aux-status" style={{ fontSize: 11, color: "var(--state-warning-text)" }}>
+          <div className="pulse-aux-status">
             <span>{status.label}</span>
-            {status.reason && <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>· {status.reason}</Typography.Text>}
+            {status.reason && <Typography.Text type="secondary" className="pulse-aux-reason">· {status.reason}</Typography.Text>}
           </div>
         )}
       </div>
       <div className="pulse-aux-values font-tabular">
-        <strong style={{ fontSize: 13, color: "var(--fg-primary)" }}>{formatKPIValue(metric?.current, currency, language)}</strong>
-        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+        <strong className="pulse-aux-value">{formatKPIValue(metric?.current, currency, language)}</strong>
+        <Typography.Text type="secondary" className="pulse-aux-comparison">
           {t("common.contrast", language)} {formatKPIValue(metric?.comparison, currency, language)}
         </Typography.Text>
       </div>
@@ -157,7 +156,7 @@ function TrendChartSection({ trend, code, currency, onMetricChange, language }: 
       bordered={false}
       title={
         <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)" }}>{t("pulse.trend_title", language)}</span>
+          <span className="pulse-panel-title">{t("pulse.trend_title", language)}</span>
           <Segmented
             size="small"
             className="precision-segmented"
@@ -167,7 +166,7 @@ function TrendChartSection({ trend, code, currency, onMetricChange, language }: 
           />
         </Flex>
       }
-      style={{ height: "100%", background: "transparent" }}
+      className="pulse-chart-card"
     >
       <ConfidenceBandChart
         data={points}
@@ -183,18 +182,18 @@ function TrendChartSection({ trend, code, currency, onMetricChange, language }: 
 function SignalMix({ attention, language }: { attention: RetailAttention[]; language: Language }) {
   const rows = signalMix(attention, language);
   return (
-    <Card title={t("pulse.signal_mix_title", language)} style={{ height: "100%" }}>
-      <div style={{ width: "100%", height: 270 }}>
+    <Card title={t("pulse.signal_mix_title", language)} className="pulse-chart-card">
+      <div className="pulse-signal-chart">
         {rows.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} style={{ paddingTop: 60 }} />
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("pulse.no_signals", language)} className="pulse-signal-empty" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 16, left: 16, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle, #EAECF0)" opacity={0.6} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle, #F1F0ED)" opacity={0.6} />
               <XAxis type="number" tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={140} interval={0} />
               <ChartTooltip formatter={(value, _name, item) => [`${Number(value).toFixed(2)} · ${t("pulse.signal_mix_stores", language, { count: String(item?.payload?.stores ?? 0) })}`, t("pulse.signal_mix_weight", language)]} />
-              <Bar dataKey="weight" fill="#1E293B" radius={2} maxBarSize={28} />
+              <Bar dataKey="weight" fill="var(--chart-primary)" radius={2} maxBarSize={28} />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -205,29 +204,29 @@ function SignalMix({ attention, language }: { attention: RetailAttention[]; lang
 
 function AttentionTable({ attention, onSelect, onStore360, language }: { attention: RetailAttention[]; onSelect: (storeID: string) => void; onStore360: (storeID: string) => void; language: Language }) {
   const columns = [
-    { title: t("pulse.col.priority", language), dataIndex: "rank", width: 56, render: (value: number) => <strong style={{ color: "var(--fg-primary)" }}>#{value}</strong> },
+    { title: t("pulse.col.priority", language), dataIndex: "rank", width: 56, render: (value: number) => <strong className="pulse-priority">#{value}</strong> },
     { title: t("pulse.col.store", language), key: "store", width: 260, render: (_: unknown, row: RetailAttention) => row.group_by === "region" || row.group_by === "brand"
       ? <Space direction="vertical" size={0}><strong>{row.group_label}</strong><Typography.Text type="secondary">{row.group_by === "region" ? t("pulse.group_region", language) : t("pulse.group_brand", language)}</Typography.Text></Space>
       : <Space direction="vertical" size={2}>
           <Flex align="center" gap={6} wrap="wrap">
             <strong>{row.store_code}</strong>
             {row.lifecycle_status && (
-              <Tag bordered={false} color={row.lifecycle_status === "mature" ? "blue" : row.lifecycle_status === "ramp_up" ? "cyan" : "default"} style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+              <span className="pulse-meta-chip">
                 {lifecycleStatusLabel(row.lifecycle_status, language)}
-              </Tag>
+              </span>
             )}
             {row.store_format && (
-              <Tag bordered={false} color="purple" style={{ margin: 0, fontSize: 10, lineHeight: "16px", padding: "0 4px" }}>
+              <span className="pulse-meta-chip">
                 {storeFormatLabel(row.store_format, language)}
-              </Tag>
+              </span>
             )}
           </Flex>
           <Typography.Text>{row.store_name}</Typography.Text>
-          <Typography.Text type="secondary">{row.brand} · {row.region}</Typography.Text>
+          <Typography.Text type="secondary">{row.brand || "—"} · {row.region || "—"}</Typography.Text>
         </Space> },
-    { title: t("pulse.col.signal", language), key: "signals", width: 160, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signal.signal_code} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><span className="severity-label"><SeverityDot severity={toSeverity(row.severity)} />{signalLabel(signal.signal_code, language)}</span></Tooltip>)}</Space> },
+    { title: t("pulse.col.signal", language), key: "signals", width: 160, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${signalLabel(signal.signal_code, language)} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><span className="severity-label"><SeverityDot severity={toSeverity(row.severity)} />{signalLabel(signal.signal_code, language)}</span></Tooltip>)}</Space> },
     { title: t("pulse.col.change", language), key: "change", width: 340, render: (_: unknown, row: RetailAttention) => <Space direction="vertical" size={4}>{row.observed_signals.map((signal) => <Tooltip key={signal.signal_code} title={`${t("common.current", language)} ${formatSignalValue(signal.current, signal.unit, row.currency, language)} · ${t("common.contrast", language)} ${formatSignalValue(signal.comparison, signal.unit, row.currency, language)} · ${t("common.threshold", language)} ${formatSignalValue(signal.threshold, signal.unit, row.currency, language)}`}><Typography.Text className="pulse-change-bad">{signalLabel(signal.signal_code, language)} {formatSignalValue(signal.observed_change, signal.unit, row.currency, language)} · {t("common.threshold", language)} {formatSignalValue(signal.threshold, signal.unit, row.currency, language)}</Typography.Text></Tooltip>)}</Space> },
-    { title: t("pulse.col.score", language), key: "score", width: 112, render: (_: unknown, row: RetailAttention) => <Flex align="center" gap={6} wrap={false}><SeverityDot severity={toSeverity(row.severity)} /><span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-primary)" }}>{row.score.toFixed(2)}</span></Flex> },
+    { title: t("pulse.col.score", language), key: "score", width: 112, render: (_: unknown, row: RetailAttention) => <Flex align="center" gap={6} wrap={false}><SeverityDot severity={toSeverity(row.severity)} /><span className="pulse-score">{row.score.toFixed(2)}</span></Flex> },
     { title: t("pulse.col.source", language), key: "source", width: 150, render: (_: unknown, row: RetailAttention) => <Typography.Text type="secondary" ellipsis={{ tooltip: row.evidence.source_systems.map((s) => formatSourceSystem(s, language)).join(", ") }}>{row.evidence.source_systems.map((s) => formatSourceSystem(s, language)).join(", ") || "—"}</Typography.Text> },
     { title: t("pulse.col.action", language), key: "action", width: 220, render: (_: unknown, row: RetailAttention) => row.store_id
       ? <Space><Button size="small" icon={<EyeOutlined />} onClick={() => onSelect(row.store_id)}>{t("pulse.view_store_pulse", language)}</Button><Button size="small" onClick={() => onStore360(row.store_id)}>{t("common.store360", language)}</Button></Space>
@@ -266,7 +265,7 @@ function SuppressedPanel({ items, language }: { items: RetailSuppressedAttention
                 { title: t("pulse.col.store", language), render: (_: unknown, row: RetailSuppressedAttention) => row.group_label || `${row.store_code} · ${row.store_name}` },
                 { title: t("pulse.col.brand_region", language), render: (_: unknown, row: RetailSuppressedAttention) => row.group_label ? (row.group_by === "region" ? t("pulse.group_region", language) : t("pulse.group_brand", language)) : `${row.brand || "—"} · ${row.region || "—"}` },
                 { title: t("pulse.col.reason", language), render: (_: unknown, row: RetailSuppressedAttention) => <Space wrap>{(row.reasons || [row.reason]).map((reason) => <Tag key={reason}>{translateReason(reason, language)}</Tag>)}</Space> },
-                { title: t("pulse.col.coverage", language), render: (_: unknown, row: RetailSuppressedAttention) => `${coverageText(row.current_coverage)} · ${coverageText(row.comparison_coverage)}` },
+                { title: t("pulse.col.coverage", language), render: (_: unknown, row: RetailSuppressedAttention) => `${coverageText(row.current_coverage, language)} · ${coverageText(row.comparison_coverage, language)}` },
               ]}
             />
           ),
@@ -486,12 +485,10 @@ function OperatingPulseInner() {
               </Space>
             }
           />
-          {/* R0-3: scope note — how this page differs from /performance */}
-          <ScopeNote noteKey="pulse.scope_note" className="pulse-scope-note" language={language} />
           {/* ─── Precision Engineering Filter Bar (Linear/Attio style) ─── */}
           <div className="precision-filter-bar pulse-block-margin">
             {/* Primary Business Dimension & Time Filters */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, width: "100%", paddingBottom: 10, borderBottom: "1px solid var(--border-subtle, #F1F5F9)" }}>
+            <div className="pulse-filter-primary-row">
               <Space size={16} wrap align="center">
                 {/* 1. Dimension */}
                 <div className="precision-filter-group">
@@ -528,7 +525,7 @@ function OperatingPulseInner() {
                     size="small"
                     aria-label={t("pulse.period_mode", language)}
                     value={periodMode}
-                    style={{ width: 110 }}
+                    className="pulse-period-select"
                     options={[
                       { label: t("pulse.period_rolling", language), value: "rolling" },
                       { label: t("pulse.period_last_month", language), value: "last-month" },
@@ -550,7 +547,7 @@ function OperatingPulseInner() {
                 )}
 
                 {periodMode === "rolling" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <div className="pulse-window-controls">
                     <Segmented
                       size="small"
                       aria-label={t("pulse.window", language)}
@@ -574,7 +571,7 @@ function OperatingPulseInner() {
                       value={customWindowInput}
                       onChange={(value) => setCustomWindowInput(value ?? DEFAULT_WINDOW_DAYS)}
                       onPressEnter={applyCustomWindow}
-                      style={{ width: 100 }}
+                      className="pulse-window-input"
                     />
                     {customWindowInput !== windowDays && (
                       <Button size="small" onClick={applyCustomWindow}>{t("pulse.apply_window", language)}</Button>
@@ -588,7 +585,7 @@ function OperatingPulseInner() {
                 {isScoped ? (
                   <Button size="small" onClick={clearStore}>{t("pulse.back_all_stores", language)}</Button>
                 ) : (
-                  <span style={{ fontSize: 11, color: "var(--fg-muted)", padding: "2px 8px", background: "var(--bg-inset)", borderRadius: 4, border: "1px solid var(--border-subtle)" }}>
+                  <span className="pulse-all-stores-label">
                     {t("pulse.all_authorized_stores", language)}
                   </span>
                 )}
@@ -596,7 +593,7 @@ function OperatingPulseInner() {
             </div>
 
             {/* Secondary Row: Data Environment & Advanced Controls */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, width: "100%", paddingTop: 8 }}>
+            <div className="pulse-filter-secondary-row">
               <Space size={18} wrap align="center">
                 {/* Data Environment */}
                 <div className="precision-filter-group">
@@ -621,7 +618,7 @@ function OperatingPulseInner() {
                       size="small"
                       aria-label={t("pulse.anomaly_select", language)}
                       value={currentAnomaly?.id || "all"}
-                      style={{ minWidth: 240 }}
+                      className="pulse-anomaly-select"
                       options={[
                         { label: t("pulse.all_anomalies", language), value: "all" },
                         ...anomalies.map((item) => ({ label: `${item.store_code} · ${signalLabel(item.type, language)}`, value: item.id })),
@@ -645,7 +642,7 @@ function OperatingPulseInner() {
                     value={sourceInput}
                     onChange={(event) => setSourceInput(event.target.value)}
                     onPressEnter={applySourceFilter}
-                    style={{ width: 140 }}
+                    className="pulse-source-input"
                   />
                   {sourceInput !== (sourceSystem || "") && (
                     <Button size="small" onClick={applySourceFilter}>{t("pulse.apply_source", language)}</Button>
@@ -706,10 +703,8 @@ function OperatingPulseInner() {
               )}
               {!response.plan && !noFacts && (
                 <PlanComparisonUnavailable
-                  period={partition.current.date_to.slice(0, 7)}
                   currency={partition.currency || response.currency || ""}
                   language={language}
-                  dataClassification={currentClassification}
                   reason={t("plan.absent_desc", language)}
                   actual={Object.fromEntries(Object.entries(partition.summary || {}).map(([key, metric]) => [key, metric.current.value]))}
                 />
@@ -738,35 +733,35 @@ function OperatingPulseInner() {
 
                   {/* SSSG Same-Store Sales Growth Card */}
                   {partition.sssg && (
-                    <Card size="small" className="pulse-block-gap" style={{ marginTop: 12, background: "var(--bg-elevated)", borderColor: "var(--border-subtle)" }}>
+                    <Card size="small" className="pulse-block-gap pulse-sssg-card">
                       <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
                         <Space size={12} align="center">
-                          <Typography.Text strong style={{ fontSize: 13, color: "var(--fg-primary)" }}>
+                          <Typography.Text strong className="pulse-panel-title">
                             {t("retail.sssg.title", language)}
                           </Typography.Text>
-                          <span className="font-tabular" style={{ fontSize: 18, fontWeight: 600, color: partition.sssg.sssg != null && partition.sssg.sssg >= 0 ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)" }}>
+                          <span className={`font-tabular pulse-sssg-value ${partition.sssg.sssg != null && partition.sssg.sssg >= 0 ? "is-positive" : "is-negative"}`}>
                             {partition.sssg.sssg != null ? `${partition.sssg.sssg > 0 ? "+" : ""}${partition.sssg.sssg.toFixed(2)}%` : "—"}
                           </span>
                         </Space>
                         <Space size={16} wrap align="center">
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            {t("retail.sssg.comparable_stores", language)}: <strong style={{ color: "var(--fg-primary)" }}>{partition.sssg.cohort.included_count}</strong> / {partition.sssg.cohort.total_stores}
+                          <Typography.Text type="secondary" className="pulse-sssg-meta">
+                            {t("retail.sssg.comparable_stores", language)}: <strong>{partition.sssg.cohort.included_count}</strong> / {partition.sssg.cohort.total_stores}
                           </Typography.Text>
                           {partition.sssg.cohort.excluded_count > 0 && (
                             <Tooltip
                               title={
                                 <Space direction="vertical" size={2}>
                                   {partition.sssg.cohort.excluded_stores?.map((s) => (
-                                    <div key={s.store_id} style={{ fontSize: 11 }}>
+                                    <div key={s.store_id} className="pulse-sssg-excluded-store">
                                       {s.store_code} {s.store_name} ({sssgReasonLabel(s.reason, language)})
                                     </div>
                                   ))}
                                 </Space>
                               }
                             >
-                              <Tag bordered={false} color="default" style={{ cursor: "pointer", fontSize: 11, margin: 0 }}>
+                              <span className="pulse-meta-chip is-interactive">
                                 {t("retail.sssg.excluded_stores", language)}: {partition.sssg.cohort.excluded_count}
-                              </Tag>
+                              </span>
                             </Tooltip>
                           )}
                         </Space>
@@ -775,14 +770,14 @@ function OperatingPulseInner() {
                   )}
 
                   {/* Stripe-style Unified Metric Strip */}
-                  <div className="pulse-block-gap" style={{ marginTop: 16 }}>
+                  <div className="pulse-block-gap pulse-section-gap">
                     <div className="stripe-metric-grid">
                       {kpiCards}
                     </div>
                   </div>
 
                   {/* Bento Layout: Hero Trends & Priority Signals */}
-                  <div className="pulse-block-gap" style={{ marginTop: 16 }}>
+                  <div className="pulse-block-gap pulse-section-gap">
                     <BentoGrid columns={12} gap={16}>
                       <BentoTile
                         span={8}
@@ -807,7 +802,7 @@ function OperatingPulseInner() {
                         subtitle={`${PULSE_AUXILIARY_CODES.length} ${t("pulse.kpi_count_unit", language)}`}
                         bodyStyle={{ justifyContent: "space-around" }}
                       >
-                        <Space direction="vertical" size={0} className="pulse-full-width" style={{ flex: 1, justifyContent: "space-around" }}>
+                        <Space direction="vertical" size={0} className="pulse-full-width pulse-aux-column">
                           {aux}
                         </Space>
                       </BentoTile>
@@ -826,7 +821,7 @@ function OperatingPulseInner() {
                             {isScoped ? `${t("pulse.store_pulse_title", language)} · ${scopedTitle}` : t("pulse.priority_stores", language)}
                           </span>
                         }
-                        action={<Typography.Text type="secondary" style={{ fontSize: 12 }}>{t("pulse.api_order", language)}</Typography.Text>}
+                        action={<Typography.Text type="secondary" className="pulse-api-order">{t("pulse.api_order", language)}</Typography.Text>}
                         noPadding
                       >
                         <AttentionTable

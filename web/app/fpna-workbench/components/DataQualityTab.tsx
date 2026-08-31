@@ -7,7 +7,6 @@ import {
   Space,
   Button,
   Select,
-  Tag,
   Modal,
   Descriptions,
   message,
@@ -20,6 +19,7 @@ import { StatusTag } from "../../components/StatusTag";
 import { SeverityDot } from "../../components/SeverityDot";
 import { t, type Language } from "../../lib/i18n";
 import { tableScrollX } from "../../lib/tableScroll";
+import { statusLabel } from "../labels";
 import type {
   DataQualityCategory,
   DataQualitySeverity,
@@ -31,6 +31,31 @@ import type {
 import { DQ_SEVERITIES, DQ_STATUSES } from "../types";
 
 const { Text } = Typography;
+
+const DQ_CATEGORY_KEYS: Record<string, string> = {
+  unmapped: "fpna.dq_category_unmapped",
+  ambiguous_mapping: "fpna.dq_category_ambiguous_mapping",
+  missing: "fpna.dq_category_missing",
+  low_confidence: "fpna.dq_category_low_confidence",
+  reconciliation: "fpna.dq_category_reconciliation",
+  duplicate: "fpna.dq_category_duplicate",
+  invalid: "fpna.dq_category_invalid",
+};
+
+const DQ_SEVERITY_KEYS: Record<string, string> = {
+  critical: "fpna.dq_severity_critical",
+  high: "fpna.dq_severity_high",
+  medium: "fpna.dq_severity_medium",
+  low: "fpna.dq_severity_low",
+};
+
+function dqCategoryLabel(value: string, language: Language): string {
+  return DQ_CATEGORY_KEYS[value] ? t(DQ_CATEGORY_KEYS[value], language) : value;
+}
+
+function dqSeverityLabel(value: string, language: Language): string {
+  return DQ_SEVERITY_KEYS[value] ? t(DQ_SEVERITY_KEYS[value], language) : value;
+}
 
 interface Props {
   snapshot: WorkbenchSnapshot;
@@ -82,7 +107,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
       render: (sev: DataQualitySeverity) => (
         <Space size={6}>
           <SeverityDot severity={sev} />
-          <span>{sev.toUpperCase()}</span>
+          <span>{dqSeverityLabel(sev, language)}</span>
         </Space>
       ),
     },
@@ -90,7 +115,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_category", language),
       dataIndex: "category",
       key: "category",
-      render: (cat: DataQualityCategory) => <Tag>{cat}</Tag>,
+      render: (cat: DataQualityCategory) => <StatusTag kind="neutral">{dqCategoryLabel(cat, language)}</StatusTag>,
     },
     {
       title: t("fpna.col_dimension", language),
@@ -102,7 +127,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_period", language),
       dataIndex: "period",
       key: "period",
-      render: (p: string) => p || "-",
+      render: (p: string) => p || "—",
     },
     {
       title: t("fpna.col_description", language),
@@ -139,7 +164,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
       key: "status",
       render: (st: DataQualityStatus) => (
         <StatusTag kind={statusKindMap[st] || "neutral"}>
-          {st.toUpperCase()}
+          {statusLabel(st, language)}
         </StatusTag>
       ),
     },
@@ -199,7 +224,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
                 <Select.Option value="">{t("common.all", language)}</Select.Option>
                 {DQ_STATUSES.map((st) => (
                   <Select.Option key={st} value={st}>
-                    {st.toUpperCase()}
+                    {statusLabel(st, language)}
                   </Select.Option>
                 ))}
               </Select>
@@ -213,7 +238,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
                 <Select.Option value="">{t("common.all", language)}</Select.Option>
                 {DQ_SEVERITIES.map((sev) => (
                   <Select.Option key={sev} value={sev}>
-                    {sev.toUpperCase()}
+                    {dqSeverityLabel(sev, language)}
                   </Select.Option>
                 ))}
               </Select>
@@ -270,7 +295,7 @@ export function DataQualityTab({ snapshot, commands, language }: Props) {
               <code>{selectedItem.source_record_id}</code>
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.desc_data_version", language)}>
-              {selectedItem.data_version || <Text type="secondary">N/A</Text>}
+              {selectedItem.data_version || <Text type="secondary">—</Text>}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.desc_validation_desc", language)}>
               {selectedItem.description}

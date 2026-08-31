@@ -18,6 +18,7 @@ import { SearchOutlined, AlertOutlined } from "@ant-design/icons";
 import { t, type Language } from "../../lib/i18n";
 import { fmtNum } from "../../lib/format";
 import { tableScrollX } from "../../lib/tableScroll";
+import { basisLabel, grainLabel, versionTypeLabel } from "../labels";
 import type {
   CompareParams,
   GrainType,
@@ -72,14 +73,14 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
       render: (key: string) => <strong>{key}</strong>,
     },
     {
-      title: `${leftVersion?.name || "Left"} (${compareData?.result?.left_basis || "Left"})`,
+      title: `${leftVersion?.name || t("fpna.label_left_version", language)} · ${basisLabel(compareData?.result?.left_basis || "", language)}`,
       dataIndex: "left_amount",
       key: "left_amount",
       align: "right" as const,
       render: (val: number) => fmtNum(val),
     },
     {
-      title: `${rightVersion?.name || "Right"} (${compareData?.result?.right_basis || "Right"})`,
+      title: `${rightVersion?.name || t("fpna.label_right_version", language)} · ${basisLabel(compareData?.result?.right_basis || "", language)}`,
       dataIndex: "right_amount",
       key: "right_amount",
       align: "right" as const,
@@ -132,7 +133,7 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
               >
                 {snapshot.versions.map((v) => (
                   <Select.Option key={v.id} value={v.id}>
-                    {v.name} ({v.version_type})
+                    {v.name} · {versionTypeLabel(v.version_type, language)}
                   </Select.Option>
                 ))}
               </Select>
@@ -152,7 +153,7 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
               >
                 {snapshot.versions.map((v) => (
                   <Select.Option key={v.id} value={v.id}>
-                    {v.name} ({v.version_type})
+                    {v.name} · {versionTypeLabel(v.version_type, language)}
                   </Select.Option>
                 ))}
               </Select>
@@ -180,7 +181,7 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
               <Select className="fpna-full-width" value={grain} onChange={setGrain}>
                 {GRAIN_TYPES.map((g) => (
                   <Select.Option key={g} value={g}>
-                    {g}
+                    {grainLabel(g, language)}
                   </Select.Option>
                 ))}
               </Select>
@@ -243,7 +244,11 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
           type="info"
           showIcon
           className="fpna-margin-bottom-16"
-          message={`跨币种折算视图已启用 · 汇率版本: ${compareData.exchange_rate_version} · 报告币种: ${compareData.reporting_currency || reportingCurrency}`}
+          message={t("fpna.translation.banner", language, {
+            version: compareData.exchange_rate_version,
+            type: basisLabel(compareData.basis, language),
+            currency: compareData.reporting_currency || reportingCurrency,
+          })}
         />
       )}
 
@@ -289,22 +294,20 @@ export function VersionCompareTab({ snapshot, commands, language }: Props) {
       {compareData?.result && (
         <Card
           size="small"
-          title={
-            <Space>
-              <span>{t("fpna.compare_result_title", language)}</span>
-              <StatusTag kind="processing">{compareData.result.period}</StatusTag>
-              <StatusTag kind="neutral">Basis: {compareData.basis}</StatusTag>
-              {compareData.exchange_rate_version && (
-                <StatusTag kind="neutral">FX: {compareData.exchange_rate_version}</StatusTag>
-              )}
-              {compareData.coverage && (
-                <StatusTag kind="success">
-                  Coverage: {typeof compareData.coverage.ratio === "number" ? `${(compareData.coverage.ratio * 100).toFixed(0)}%` : compareData.coverage.status || "Complete"}
-                </StatusTag>
-              )}
-            </Space>
-          }
+          title={t("fpna.compare_result_title", language)}
         >
+          <div className="card-context fpna-compare-context">
+            <span>{compareData.result.period}</span>
+            <span>{t("fpna.basis_label", language)}: {basisLabel(compareData.basis, language)}</span>
+            {compareData.exchange_rate_version && (
+              <span>{t("fpna.translation.version_label", language)}: {compareData.exchange_rate_version}</span>
+            )}
+            {compareData.coverage && (
+              <span className={compareData.coverage.status === "complete" ? "is-ready" : "is-not-ready"}>
+                {t("fpna.coverage_label", language)}: {typeof compareData.coverage.ratio === "number" ? `${(compareData.coverage.ratio * 100).toFixed(0)}%` : compareData.coverage.status || t("fpna.coverage_complete", language)}
+              </span>
+            )}
+          </div>
           <Table
             dataSource={varianceLines}
             columns={columns}

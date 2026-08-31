@@ -5,7 +5,7 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { motion } from "framer-motion";
 import {
-  Card, Segmented, Tag, Typography, Table, Spin, Statistic, Empty,
+  Card, Segmented, Typography, Table, Spin, Statistic, Empty,
   Row, Col, Button, Tabs, DatePicker, Select, Input, Space, message,
 } from "antd";
 import {
@@ -31,7 +31,6 @@ import { notifyError } from "../lib/notify";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { tableScrollX } from "../lib/tableScroll";
 
-const { Title } = Typography;
 const { RangePicker } = DatePicker;
 
 /* ──────────────── shared helpers ──────────────── */
@@ -131,28 +130,17 @@ const buildAmortColumns = (view: string, granularity: string, lang: string) => {
 function KPIStatCard({ title, value, loading }: { title: string; value: number; loading: boolean }) {
   return (
     <motion.div variants={staggerItem}>
-      <Card
-        styles={{ body: { padding: "20px 24px" } }}
-        className="sty-80333e75"
-      >
+      <Card className="reports-kpi-card">
         {loading ? (
           <Spin />
         ) : (
           <Statistic
             title={
-              <span
-                className="sty-1f723465"
-              >
+              <span className="reports-kpi-title">
                 {title}
               </span>
             }
             value={value}
-            valueStyle={{
-              fontSize: 26,
-              fontWeight: 600,
-              letterSpacing: "-0.03em",
-              color: "var(--fg-primary)",
-            }}
           />
         )}
       </Card>
@@ -165,7 +153,7 @@ function KPIStatCard({ title, value, loading }: { title: string; value: number; 
 
 export default function ReportsPage() {
   return (
-    <Suspense fallback={<Spin size="large" className="sty-f44aea36" />}>
+    <Suspense fallback={<Spin size="large" className="reports-loading" />}>
       <ReportsPageContent />
     </Suspense>
   );
@@ -325,8 +313,8 @@ function ReportsPageContent() {
   };
 
   const reportEmptyState = (description: string) => (
-    <div className="sty-3f98b05a">
-      <div className="sty-7f21e1ba">{description}</div>
+    <div className="reports-empty-state">
+      <div className="reports-empty-copy">{description}</div>
       <Space>
         <Button size="small" icon={<FileTextOutlined />} onClick={() => router.push("/contracts/new")}>
           {t("contracts.add_contract", language)}
@@ -380,54 +368,21 @@ function ReportsPageContent() {
           />
 
           {/* ─── Unified Professional Toolbar ─── */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 16,
-              padding: "12px 16px",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border-default)",
-              borderRadius: 10,
-              marginBottom: 16,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-secondary)" }}>
-                {t("reports.mode", language)}:
-              </span>
+          <div className="reports-toolbar">
+            <div className="reports-mode-controls">
+              <span className="reports-mode-label">{t("reports.mode", language)}:</span>
               <Segmented
                 className="precision-segmented"
                 value={reportMode}
                 onChange={(val) => setReportMode(val as "working" | "official")}
                 options={[
-                  { label: <span><FileTextOutlined style={{ marginRight: 4 }} />{t("reports.working", language)}</span>, value: "working" },
-                  { label: <span><SafetyOutlined style={{ marginRight: 4 }} />{t("reports.official", language)}</span>, value: "official" },
+                  { label: <span><FileTextOutlined className="reports-mode-icon" />{t("reports.working", language)}</span>, value: "working" },
+                  { label: <span><SafetyOutlined className="reports-mode-icon" />{t("reports.official", language)}</span>, value: "official" },
                 ]}
               />
-
-              <span
-                style={{
-                  fontSize: 12,
-                  color: reportMode === "working" ? "var(--state-warning-text)" : "var(--state-success-text)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                {reportMode === "working" ? (
-                  <>
-                    <span>⚠</span>
-                    <span>{t("reports.working_hint", language)}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>✓</span>
-                    <span>{t("reports.official_hint", language)}</span>
-                  </>
-                )}
+              <span className={`reports-mode-hint is-${reportMode}`}>
+                <span aria-hidden="true">{reportMode === "working" ? "⚠" : "✓"}</span>
+                <span>{reportMode === "working" ? t("reports.working_hint", language) : t("reports.official_hint", language)}</span>
               </span>
             </div>
 
@@ -452,7 +407,6 @@ function ReportsPageContent() {
                   notifyError(apiErrorMessage(error));
                 }
               }}
-              style={{ borderRadius: 6 }}
             >
               {t("reports.export_csv", language)}
             </Button>
@@ -505,27 +459,19 @@ function ReportsPageContent() {
                     )}
 
                     {/* contract ledger table */}
-                    <div
-                      style={{
-                        background: "var(--bg-elevated)",
-                        border: "1px solid var(--border-default)",
-                        borderRadius: 10,
-                        overflow: "hidden",
-                        marginTop: summary ? 16 : 0,
-                      }}
-                    >
+                    <div className={`reports-table-shell${summary ? " has-summary" : ""}`}>
                       <Spin spinning={loading}>
                         {ledgerData.length === 0 && !loading ? (
-                          <div style={{ padding: "48px 24px", textAlign: "center" }}>
+                          <div className="reports-empty-panel">
                             <Empty
                               image={Empty.PRESENTED_IMAGE_SIMPLE}
                               description={
-                                <span style={{ color: "var(--fg-secondary)", fontSize: 13 }}>
+                                <span className="reports-empty-description">
                                   {t("reports.empty_hint", language)}
                                 </span>
                               }
                             >
-                              <Space size={12} style={{ marginTop: 8 }}>
+                              <Space size={12} className="reports-empty-actions">
                                 <Button type="primary" size="small" icon={<FileTextOutlined />} onClick={() => router.push("/contracts/new")}>
                                   {t("contracts.add_contract", language)}
                                 </Button>
@@ -546,7 +492,7 @@ function ReportsPageContent() {
                                 width: 120,
                                 render: (s: string) => (
                                   <StatusTag kind={statusKindFromAntColor(statusColor[s] || "default")}>
-                                    {getStatusText(language)[s] || s}
+                                    {getStatusText(language)[s] || t("reports.status_unknown", language)}
                                   </StatusTag>
                                 ),
                               },
@@ -657,14 +603,14 @@ function ReportsPageContent() {
                         </Col>
                         <Col>
                           <Space size={8} align="center">
-                            <span style={{ fontSize: 13, color: "var(--fg-secondary)", whiteSpace: "nowrap" }}>
+                            <span className="reports-date-label">
                               {t("reports.date_range", language)}
                             </span>
                             <RangePicker
                               value={amortDateRange}
                               onChange={(dates) => { setAmortDateRange(dates as any); setAmortFetched(false); }}
                               allowClear={false}
-                              style={{ width: 250 }}
+                              className="reports-date-range"
                             />
                           </Space>
                         </Col>
@@ -758,11 +704,11 @@ function ReportsPageContent() {
                       </Row>
 
                       {/* advanced filters toggle */}
-                      <div style={{ marginTop: 8 }}>
+                      <div className="reports-advanced-toggle-wrap">
                         <Button
                           type="link"
                           onClick={() => setShowFilters(!showFilters)}
-                          style={{ padding: 0, fontSize: 12 }}
+                          className="reports-advanced-toggle"
                         >
                           {showFilters
                             ? t("reports.collapse_filters", language)
@@ -771,12 +717,12 @@ function ReportsPageContent() {
                       </div>
 
                       {showFilters && (
-                        <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--border-default)" }}>
+                        <div className="reports-advanced-filters">
                           <Row gutter={[16, 12]}>
                             {amortView !== "contract" && (
                               <Col xs={24} sm={12} md={8}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                                <div className="reports-filter-field">
+                                  <span className="reports-filter-label">
                                     {t("reports.contract_id", language)}
                                   </span>
                                   <Input
@@ -791,8 +737,8 @@ function ReportsPageContent() {
                             )}
                             {amortView !== "store" && (
                               <Col xs={24} sm={12} md={8}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                                <div className="reports-filter-field">
+                                  <span className="reports-filter-label">
                                     {t("reports.store", language)}
                                   </span>
                                   <Input
@@ -806,8 +752,8 @@ function ReportsPageContent() {
                               </Col>
                             )}
                             <Col xs={24} sm={12} md={8}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                              <div className="reports-filter-field">
+                                <span className="reports-filter-label">
                                   {t("reports.tags", language)}
                                 </span>
                                 <Select
@@ -818,13 +764,13 @@ function ReportsPageContent() {
                                   placeholder={t("reports.filter_tags", language)}
                                   loading={tagLoading}
                                   options={availableTags.map((tg) => ({ value: tg, label: tg }))}
-                                  style={{ width: "100%" }}
+                                  className="reports-filter-control"
                                 />
                               </div>
                             </Col>
                             <Col xs={24} sm={12} md={8}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                              <div className="reports-filter-field">
+                                <span className="reports-filter-label">
                                   {t("reports.discount_rate_override", language)}
                                 </span>
                                 <Input
@@ -837,8 +783,8 @@ function ReportsPageContent() {
                               </div>
                             </Col>
                             <Col xs={24} sm={12} md={8}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                              <div className="reports-filter-field">
+                                <span className="reports-filter-label">
                                   {t("reports.report_currency", language)}
                                 </span>
                                 <Input
@@ -851,8 +797,8 @@ function ReportsPageContent() {
                               </div>
                             </Col>
                             <Col xs={24} sm={12} md={8}>
-                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+                              <div className="reports-filter-field">
+                                <span className="reports-filter-label">
                                   {t("reports.exchange_rate", language)}
                                 </span>
                                 <Input
@@ -896,95 +842,39 @@ function ReportsPageContent() {
 
                     {/* roll‑forward summary bar */}
                     {amortSummary && (
-                      <Row gutter={[12, 12]} className="sty-9c9b5eff">
+                      <Row gutter={[12, 12]} className="reports-amort-summary">
                         <Col xs={24} sm={12} lg={6}>
-                          <Card
-                            styles={{ body: { padding: "16px 20px" } }}
-                            className="sty-dc5ff6d2"
-                          >
-                            <Statistic
-                              title={
-                                <span className="sty-9c9b5eff">
-                                  {t("reports.closing_liability", language)}
-                                </span>
-                              }
-                              value={amortSummary.closingLiability}
-                              precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
-                            />
+                          <Card className="reports-amort-summary-card">
+                            <Statistic className="reports-amort-stat" title={t("reports.closing_liability", language)} value={amortSummary.closingLiability} precision={2} />
                           </Card>
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
-                          <Card
-                            styles={{ body: { padding: "16px 20px" } }}
-                            className="sty-dc5ff6d2"
-                          >
-                            <Statistic
-                              title={
-                                <span className="sty-9c9b5eff">
-                                  {t("reports.closing_rou", language)}
-                                </span>
-                              }
-                              value={amortSummary.closingROU}
-                              precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
-                            />
+                          <Card className="reports-amort-summary-card">
+                            <Statistic className="reports-amort-stat" title={t("reports.closing_rou", language)} value={amortSummary.closingROU} precision={2} />
                           </Card>
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
-                          <Card
-                            styles={{ body: { padding: "16px 20px" } }}
-                            className="sty-dc5ff6d2"
-                          >
-                            <Statistic
-                              title={
-                                <span className="sty-9c9b5eff">
-                                  {t("reports.total_interest", language)}
-                                </span>
-                              }
-                              value={amortSummary.totalInterest}
-                              precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
-                            />
+                          <Card className="reports-amort-summary-card">
+                            <Statistic className="reports-amort-stat" title={t("reports.total_interest", language)} value={amortSummary.totalInterest} precision={2} />
                           </Card>
                         </Col>
                         <Col xs={24} sm={12} lg={6}>
-                          <Card
-                            styles={{ body: { padding: "16px 20px" } }}
-                            className="sty-dc5ff6d2"
-                          >
-                            <Statistic
-                              title={
-                                <span className="sty-db94ac11">
-                                  {t("reports.total_depreciation", language)}
-                                </span>
-                              }
-                              value={amortSummary.totalDepreciation}
-                              precision={2}
-                              valueStyle={{ fontSize: 18, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}
-                            />
+                          <Card className="reports-amort-summary-card">
+                            <Statistic className="reports-amort-stat" title={t("reports.total_depreciation", language)} value={amortSummary.totalDepreciation} precision={2} />
                           </Card>
                         </Col>
                       </Row>
                     )}
 
                     {/* result table */}
-                    <div
-                      style={{
-                        background: "var(--bg-elevated)",
-                        border: "1px solid var(--border-default)",
-                        borderRadius: 10,
-                        overflow: "hidden",
-                        marginTop: 16,
-                      }}
-                    >
+                    <div className="reports-table-shell amortization-table-shell">
                       <Spin spinning={amortLoading}>
                         {amortData.length === 0 && !amortLoading ? (
-                          <div style={{ padding: "48px 24px", textAlign: "center" }}>
+                          <div className="reports-empty-panel">
                             <Empty
                               image={Empty.PRESENTED_IMAGE_SIMPLE}
                               description={
-                                <span style={{ color: "var(--fg-secondary)", fontSize: 13 }}>
+                                <span className="reports-empty-description">
                                   {amortFetched ? t("reports.empty_hint", language) : t("reports.no_data_hint", language)}
                                 </span>
                               }

@@ -1996,10 +1996,10 @@ function AIChatPageContent() {
                     </StatusTag>
                   )}
                   {pageContext.filters?.classification && <StatusTag kind={pageContext.filters.classification === "simulated" ? "warning" : "processing"}>{t(pageContext.filters.classification === "simulated" ? "trust.classification_simulated" : "trust.classification_production", language)}</StatusTag>}
-                  {pageContext.filters?.dataset_version && <StatusTag className="sty-31eb049e">dataset: {pageContext.filters.dataset_version}</StatusTag>}
-                  {pageContext.filters?.source_system && <StatusTag className="sty-31eb049e">source: {pageContext.filters.source_system}</StatusTag>}
-                  {pageContext.filters?.as_of && <StatusTag className="sty-31eb049e">as of: {pageContext.filters.as_of}</StatusTag>}
-                  {pageContext.filters?.window_days && <StatusTag className="sty-c53970c1">window: {pageContext.filters.window_days}天</StatusTag>}
+                  {pageContext.filters?.dataset_version && <StatusTag className="sty-31eb049e">{t("ecom.common.dataset_version", language)}: {pageContext.filters.dataset_version}</StatusTag>}
+                  {pageContext.filters?.source_system && <StatusTag className="sty-31eb049e">{t("common.source_system", language)}: {pageContext.filters.source_system}</StatusTag>}
+                  {pageContext.filters?.as_of && <StatusTag className="sty-31eb049e">{t("ecom.common.as_of", language)}: {pageContext.filters.as_of}</StatusTag>}
+                  {pageContext.filters?.window_days && <StatusTag className="sty-c53970c1">{t("ecom.common.window_days", language)}: {pageContext.filters.window_days}{t("common.days_suffix", language)}</StatusTag>}
                 </motion.div>
               )}
 
@@ -2097,10 +2097,7 @@ function AIChatPageContent() {
                     >
                       <Avatar
                         icon={msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
-                        style={{
-                          backgroundColor: msg.role === "user" ? "var(--fg-secondary)" : "var(--fg-primary)",
-                          flexShrink: 0,
-                        }}
+                        className={`ai-avatar ${msg.role === "user" ? "ai-avatar-user" : "ai-avatar-assistant"}`}
                         size={32}
                       />
 
@@ -2443,10 +2440,7 @@ function AIChatPageContent() {
                   <Space align="start" className="ai-msg-space">
                     <Avatar
                       icon={<RobotOutlined />}
-                      style={{
-                        backgroundColor: "var(--fg-primary)",
-                        flexShrink: 0,
-                      }}
+                      className="ai-avatar ai-avatar-assistant"
                       size={32}
                     />
                     <div className="ai-bubble is-loading">

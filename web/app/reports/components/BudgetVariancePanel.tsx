@@ -2,7 +2,7 @@
 
 import { StatusTag, statusKindFromAntColor } from "../../components/StatusTag";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, Col, Input, Row, Select, Space, Statistic, Table, Tag, message } from "antd";
 import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -99,6 +99,10 @@ const causeColors: Record<string, string> = {
   exchange_rate: "magenta",
   other: "default",
 };
+
+function versionTypeLabel(versionType: BudgetVersion["version_type"], language: Language) {
+  return t(`budget.type_${versionType}`, language);
+}
 
 export function BudgetVariancePanel({ token, language }: { token: string | null; language: Language }) {
   const [versions, setVersions] = useState<BudgetVersion[]>([]);
@@ -239,11 +243,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
     setResult((current) => current ? { ...current, by_contract: current.by_contract.map((row) => row.contract_id === contractId ? { ...row, ...patch } : row) } : current);
   };
 
-  const varianceColor = useMemo(() => {
-    if (!result) return undefined;
-    // An overspend is what a reader needs to notice, so only that is coloured.
-    return result.variance > 0 ? "var(--state-error-text)" : undefined;
-  }, [result]);
+  const varianceTone = result && result.variance > 0 ? "is-negative" : "is-neutral";
 
   return (
     <>
@@ -267,11 +267,11 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
       />
 
       {/* 1. Comparison Parameters Bar */}
-      <Card styles={{ body: { padding: "16px 20px" } }} style={{ marginBottom: 16 }}>
+      <Card className="budget-parameters-card">
         <Row gutter={[16, 12]} align="middle">
           <Col xs={24} sm={12} md={7}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.version", language)}
               </span>
               <Select
@@ -280,16 +280,16 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                 placeholder={t("budget.pick_version", language)}
                 options={versions.map((v) => ({
                   value: v.id,
-                  label: `${v.name}（${v.version_type}, ${v.from_period}~${v.to_period}）`,
+                  label: `${v.name}（${versionTypeLabel(v.version_type, language)}, ${v.from_period}~${v.to_period}）`,
                 }))}
-                style={{ width: "100%" }}
+                className="budget-field-control"
                 size="small"
               />
             </div>
           </Col>
           <Col xs={24} sm={12} md={7}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.compare_to", language)}
               </span>
               <Select
@@ -299,16 +299,16 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   { value: "actual", label: t("budget.actual_measurement_readonly", language) },
                   ...versions
                     .filter((v) => v.id !== versionId)
-                    .map((v) => ({ value: v.id, label: `${v.name}（${v.version_type}）` })),
+                    .map((v) => ({ value: v.id, label: `${v.name}（${versionTypeLabel(v.version_type, language)}）` })),
                 ]}
-                style={{ width: "100%" }}
+                className="budget-field-control"
                 size="small"
               />
             </div>
           </Col>
           <Col xs={24} sm={12} md={5}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.period", language)}
               </span>
               <Input
@@ -320,9 +320,9 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             </div>
           </Col>
           <Col xs={24} sm={12} md={5}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, justifyContent: "flex-end", height: "100%" }}>
-              <span style={{ fontSize: 12, visibility: "hidden" }}>Action</span>
-              <Button type="primary" icon={<SearchOutlined />} loading={loading} onClick={runVariance} size="small" style={{ width: "100%" }}>
+            <div className="budget-field budget-field-action">
+              <span className="budget-field-spacer" aria-hidden="true" />
+              <Button type="primary" icon={<SearchOutlined />} loading={loading} onClick={runVariance} size="small" className="budget-action-button">
                 {t("budget.compare", language)}
               </Button>
             </div>
@@ -333,18 +333,13 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
       {/* 2. Create & Freeze Budget Version Section */}
       <Card
         size="small"
-        title={
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)" }}>
-            {t("budget.freeze_section_title", language)}
-          </span>
-        }
-        styles={{ body: { padding: "14px 20px" } }}
-        style={{ marginBottom: 16 }}
+        title={<span className="budget-freeze-title">{t("budget.freeze_section_title", language)}</span>}
+        className="budget-freeze-card"
       >
         <Row gutter={[16, 12]}>
           <Col xs={24} sm={12} md={8}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.version_name", language)}
               </span>
               <Input
@@ -356,8 +351,8 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             </div>
           </Col>
           <Col xs={24} sm={12} md={4}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.version_type", language)}
               </span>
               <Select
@@ -369,13 +364,13 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   { value: "forecast", label: t("budget.type_forecast", language) },
                   { value: "scenario", label: t("budget.type_scenario", language) },
                 ]}
-                style={{ width: "100%" }}
+                className="budget-field-control"
               />
             </div>
           </Col>
           <Col xs={24} sm={12} md={6}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.source_label", language)}
               </span>
               <Input
@@ -387,21 +382,21 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             </div>
           </Col>
           <Col xs={24} sm={12} md={6}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.period_range", language)}
               </span>
-              <Space.Compact style={{ width: "100%" }}>
+              <Space.Compact className="budget-period-range">
                 <Input
                   size="small"
-                  style={{ width: "50%" }}
+                  className="budget-period-input"
                   value={fromPeriod}
                   onChange={(e) => setFromPeriod(e.target.value)}
                   placeholder={t("budget.from_period", language)}
                 />
                 <Input
                   size="small"
-                  style={{ width: "50%" }}
+                  className="budget-period-input"
                   value={toPeriod}
                   onChange={(e) => setToPeriod(e.target.value)}
                   placeholder={t("budget.to_period", language)}
@@ -410,8 +405,8 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             </div>
           </Col>
           <Col xs={24} sm={16} md={16}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+            <div className="budget-field">
+              <span className="budget-field-label">
                 {t("budget.coverage_scope_label", language)}
               </span>
               <Input
@@ -423,15 +418,15 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             </div>
           </Col>
           <Col xs={24} sm={8} md={8}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4, justifyContent: "flex-end", height: "100%" }}>
-              <span style={{ fontSize: 12, visibility: "hidden" }}>Action</span>
-              <Button icon={<PlusOutlined />} loading={creating} onClick={createVersion} size="small" type="dashed" style={{ width: "100%" }}>
+            <div className="budget-field budget-field-action">
+              <span className="budget-field-spacer" aria-hidden="true" />
+              <Button icon={<PlusOutlined />} loading={creating} onClick={createVersion} size="small" type="dashed" className="budget-action-button">
                 {t("budget.freeze", language)}
               </Button>
             </div>
           </Col>
         </Row>
-        <div style={{ marginTop: 8, fontSize: 11, color: "var(--fg-muted)" }}>
+        <div className="budget-freeze-hint">
           {t("budget.freeze_hint", language)}
         </div>
       </Card>
@@ -442,59 +437,58 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             <Alert
               type="error"
               showIcon
-              className="sty-7f21e1ba"
+              className="budget-variance-alert"
               message={t("budget.bridge_broken", language)}
             />
           )}
 
-          <Row gutter={[12, 12]} className="sty-9c9b5eff">
+          <Row gutter={[12, 12]} className="budget-results-grid">
             <Col xs={24} sm={8}>
-              <Card className="sty-9c9b5eff" styles={{ body: { padding: "16px 20px" } }}>
+              <Card className="budget-result-card">
                 <Statistic title={t("budget.budget_total", language)} value={result.budget_total} precision={2} />
               </Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card className="sty-9c9b5eff" styles={{ body: { padding: "16px 20px" } }}>
+              <Card className="budget-result-card">
                 <Statistic title={t("budget.actual_total", language)} value={result.actual_total} precision={2} />
               </Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card className="sty-5ab5e82b" styles={{ body: { padding: "16px 20px" } }}>
+              <Card className={`budget-result-card budget-result-card-variance ${varianceTone}`}>
                 <Statistic
                   title={t("budget.variance", language)}
                   value={result.variance}
                   precision={2}
-                  valueStyle={{ color: varianceColor }}
                 />
               </Card>
             </Col>
           </Row>
 
           {brief && (
-            <Card title={t("budget.brief_title", language, { period: brief.period })} className="sty-3aa6bafa">
+            <Card title={t("budget.brief_title", language, { period: brief.period })} className="budget-brief-card">
               <Row gutter={[12, 12]}>
                 <Col xs={24} sm={8}><Statistic title={t("budget.brief_budget", language, { name: brief.budget.version.name })} value={brief.budget.total} precision={2} /></Col>
                 <Col xs={24} sm={8}><Statistic title={t("budget.brief_forecast", language, { name: brief.forecast.version.name })} value={brief.forecast.total} precision={2} /></Col>
                 <Col xs={24} sm={8}><Statistic title={t("budget.brief_actual", language)} value={brief.actual.total} precision={2} /></Col>
               </Row>
-              <div className="sty-7f21e1ba">
+              <div className="budget-brief-variance">
                 {t("budget.brief_variance", language, { forecastBudget: fmtNum(brief.forecast_vs_budget), actualBudget: fmtNum(brief.actual_vs_budget), actualForecast: fmtNum(brief.actual_vs_forecast) })}
               </div>
             </Card>
           )}
 
-          <Row gutter={[12, 12]} className="sty-9c9b5eff">
-            <Col xs={12} sm={6}><Card className="sty-9c9b5eff" styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.explanation_coverage", language)} value={(result.explanation_coverage || 0) * 100} precision={1} suffix="%" /></Card></Col>
-            <Col xs={12} sm={6}><Card className="sty-9c9b5eff" styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.open_actions", language)} value={result.open_action_count || 0} /></Card></Col>
-            <Col xs={12} sm={6}><Card className="sty-9c9b5eff" styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.open_action_amount", language)} value={result.open_action_amount || 0} precision={2} /></Card></Col>
-            <Col xs={12} sm={6}><Card className="sty-5ab5e82b" styles={{ body: { padding: "12px 16px" } }}><Statistic title={t("budget.comparison_basis", language)} value={rightId === "actual" ? t("budget.plan_actual", language) : t("budget.plan_plan", language)} valueStyle={{ fontSize: 18 }} /></Card></Col>
+          <Row gutter={[12, 12]} className="budget-summary-grid">
+            <Col xs={12} sm={6}><Card className="budget-summary-card"><Statistic title={t("budget.explanation_coverage", language)} value={(result.explanation_coverage || 0) * 100} precision={1} suffix="%" /></Card></Col>
+            <Col xs={12} sm={6}><Card className="budget-summary-card"><Statistic title={t("budget.open_actions", language)} value={result.open_action_count || 0} /></Card></Col>
+            <Col xs={12} sm={6}><Card className="budget-summary-card"><Statistic title={t("budget.open_action_amount", language)} value={result.open_action_amount || 0} precision={2} /></Card></Col>
+            <Col xs={12} sm={6}><Card className="budget-summary-card budget-summary-basis-card"><Statistic title={t("budget.comparison_basis", language)} value={rightId === "actual" ? t("budget.plan_actual", language) : t("budget.plan_plan", language)} /></Card></Col>
           </Row>
 
           <Card
             title={t("budget.bridge_title", language)}
-            className="sty-33239bd4"
+            className="budget-bridge-card"
           >
-            <div className="sty-c0dde518">
+            <div className="budget-bridge-description">
               {t("budget.bridge_desc", language)}
             </div>
             <Table
@@ -517,7 +511,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   dataIndex: "amount",
                   align: "right" as const,
                   render: (value: number) => (
-                    <span className="sty-9c9b5eff">{fmtNum(value)}</span>
+                    <span className="budget-amount">{fmtNum(value)}</span>
                   ),
                 },
                 {
@@ -541,8 +535,8 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
             />
           </Card>
 
-          <Card title={t("budget.by_contract_title", language)} className="sty-c0dde518">
-            {rightId === "actual" && <div className="sty-72ff3588"><Button loading={savingActions} onClick={saveActions}>{t("budget.save_actions", language)}</Button></div>}
+          <Card title={t("budget.by_contract_title", language)} className="budget-contract-card">
+            {rightId === "actual" && <div className="budget-actions"><Button loading={savingActions} onClick={saveActions}>{t("budget.save_actions", language)}</Button></div>}
             <Table
               dataSource={result.by_contract}
               rowKey="contract_id"
@@ -571,7 +565,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                   align: "right" as const,
                   sorter: (a: ContractVariance, b: ContractVariance) => a.variance - b.variance,
                   render: (value: number) => (
-                    <strong className="sty-72ff3588">{fmtNum(value)}</strong>
+                    <strong className="budget-contract-variance">{fmtNum(value)}</strong>
                   ),
                 },
                 {
@@ -607,7 +601,7 @@ export function BudgetVariancePanel({ token, language }: { token: string | null;
                     title: t("budget.status", language),
                     dataIndex: "action_status",
                     width: 130,
-                    render: (_: string, row: ContractVariance) => <Select value={row.action_status || "open"} style={{ width: 120 }} onChange={(value) => updateRow(row.contract_id, { action_status: value })} options={[{ value: "open", label: t("budget.status_open", language) }, { value: "in_progress", label: t("budget.status_in_progress", language) }, { value: "resolved", label: t("budget.status_resolved", language) }, { value: "accepted", label: t("budget.status_accepted", language) }]} />,
+                    render: (_: string, row: ContractVariance) => <Select value={row.action_status || "open"} className="budget-action-status" onChange={(value) => updateRow(row.contract_id, { action_status: value })} options={[{ value: "open", label: t("budget.status_open", language) }, { value: "in_progress", label: t("budget.status_in_progress", language) }, { value: "resolved", label: t("budget.status_resolved", language) }, { value: "accepted", label: t("budget.status_accepted", language) }]} />,
                   },
                 ] : []),
               ]}

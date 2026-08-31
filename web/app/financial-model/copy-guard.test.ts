@@ -13,13 +13,10 @@ import { join } from "node:path";
 const page = readFileSync(join(import.meta.dirname, "page.tsx"), "utf8");
 
 describe("① 文案层：步骤化与人话化", () => {
-  it("PageHeader meta 同时承载「页面做什么」与口径句", () => {
-    const metaStart = page.indexOf("meta={");
-    expect(metaStart).toBeGreaterThan(-1);
-    const metaRegion = page.slice(metaStart, page.indexOf("primaryAction", metaStart));
-    expect(metaRegion).toContain("finmodel.page_intro");
-    // 口径句不许被人话副标挤掉（DESIGN.md：meta 是口径句的存身之处）
-    expect(metaRegion).toContain("finmodel.basis_note");
+  it("PageHeader 只保留标题与动作区，不再堆叠副标题", () => {
+    expect(page).not.toContain("meta={");
+    expect(page).toContain('title={t("nav.financial_model", language)}');
+    expect(page).toContain('primaryAction={');
   });
 
   it("五个步骤标题全部被引用：选模型/填假设/校期初/运行/发布导出", () => {

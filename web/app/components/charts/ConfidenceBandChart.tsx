@@ -12,6 +12,8 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { useLanguage } from "../../context/LanguageContext";
+import { t } from "../../lib/i18n";
 import { fmtMoney, fmtPct } from "../../lib/format";
 
 export interface ConfidenceBandPoint {
@@ -34,7 +36,7 @@ export interface ConfidenceBandChartProps {
 /**
  * 深度模块：置信安全带趋势图 (Confidence Band Trend Chart)
  * - 封装同群 P25~P75 灰色正常波动区间（安全带）
- * - 呈现基准中位数虚线与本店真实走势渐变主线
+ * - 呈现基准中位数虚线与本店真实走势主线
  * - 严格保留数据缺口（null 隔离），杜绝虚假连线
  */
 export default function ConfidenceBandChart({
@@ -43,8 +45,10 @@ export default function ConfidenceBandChart({
   unit = "currency",
   height = 300,
   currency = "CNY",
-  emptyText = "暂无走势数据",
+  emptyText,
 }: ConfidenceBandChartProps) {
+  const { language } = useLanguage();
+  const resolvedEmptyText = emptyText || t("chart.confidence.empty", language);
   const chartData = useMemo(() => {
     return data.map((d) => {
       const hasBand = d.p25 != null && d.p75 != null && d.p75 >= d.p25;
@@ -67,28 +71,19 @@ export default function ConfidenceBandChart({
 
   if (!data || data.length === 0) {
     return (
-      <div
-        className="chart-empty-state"
-        style={{ height }}
-      >
-        {emptyText}
+      <div className="chart-empty-state" style={{ height }}>
+        {resolvedEmptyText}
       </div>
     );
   }
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div className="chart-container" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={chartData}
           margin={{ top: 12, right: 24, bottom: 8, left: 12 }}
         >
-          <defs>
-            <linearGradient id="trendLineGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--chart-accent)" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="var(--chart-fill)" stopOpacity={0.0} />
-            </linearGradient>
-          </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.6} />
           <XAxis
             dataKey="date"
@@ -110,30 +105,15 @@ export default function ConfidenceBandChart({
               const point = payload[0]?.payload as ConfidenceBandPoint | undefined;
               if (!point) return null;
               return (
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-                    borderRadius: 8,
-                    padding: "10px 14px",
-                    fontSize: 12,
-                    border: "1px solid var(--border-default)",
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
-                    {label}
-                  </div>
-                  <div style={{ color: "var(--fg-primary)", fontWeight: 500, marginBottom: 2 }}>
+                <div className="chart-tooltip">
+                  <div className="chart-tooltip-title">{label}</div>
+                  <div className="chart-tooltip-value">
                     {metricLabel}: <strong>{formatValue(point.value)}</strong>
                   </div>
-                  {point.median != null && (
-                    <div style={{ color: "var(--fg-secondary)", marginBottom: 2 }}>
-                      同群中位数: {formatValue(point.median)}
-                    </div>
-                  )}
+                  {point.median != null && <div className="chart-tooltip-secondary">{t("chart.confidence.peer_median", language)}: {formatValue(point.median)}</div>}
                   {point.p25 != null && point.p75 != null && (
-                    <div style={{ color: "var(--fg-muted)", fontSize: 11 }}>
-                      正常波动带 (P25~P75): {formatValue(point.p25)} ~ {formatValue(point.p75)}
+                    <div className="chart-tooltip-note">
+                      {t("chart.confidence.band", language)}: {formatValue(point.p25)} ~ {formatValue(point.p75)}
                     </div>
                   )}
                 </div>
@@ -146,11 +126,11 @@ export default function ConfidenceBandChart({
             iconType="circle"
             wrapperStyle={{ fontSize: 11, paddingBottom: 8 }}
             formatter={(value) => (
-              <span style={{ color: "var(--fg-secondary)", fontWeight: 500, marginRight: 8 }}>
+              <span className="chart-legend-label">
                 {value === "bandRange"
-                  ? "同群置信安全带 (P25~P75)"
+                  ? t("chart.confidence.band", language)
                   : value === "median"
-                  ? "基准中位数"
+                  ? t("chart.confidence.baseline_median", language)
                   : metricLabel}
               </span>
             )}

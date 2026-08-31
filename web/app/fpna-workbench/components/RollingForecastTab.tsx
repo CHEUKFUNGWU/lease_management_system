@@ -29,6 +29,7 @@ import {
 } from "@ant-design/icons";
 import { t, type Language } from "../../lib/i18n";
 import { tableScrollX } from "../../lib/tableScroll";
+import { scenarioTypeLabel, versionTypeLabel } from "../labels";
 import type {
   AccuracyTrendPoint,
   HybridForecastInput,
@@ -226,15 +227,10 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
 
   return (
     <div className="fpna-tab-content">
-      {/* Overview Alert */}
-      <Alert
-        type="info"
-        showIcon
-        icon={<ThunderboltOutlined />}
-        className="fpna-margin-bottom-16"
-        message={t("fpna.rolling_forecast_notice_title", language)}
-        description={t("fpna.rolling_forecast_notice_desc", language)}
-      />
+      <div className="fpna-forecast-note" role="note">
+        <strong>{t("fpna.rolling_forecast_notice_title", language)}</strong>
+        <div>{t("fpna.rolling_forecast_notice_desc", language)}</div>
+      </div>
 
       {/* Composition Wizard Card */}
       <Card
@@ -267,7 +263,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
                 onChange={setBaselineId}
                 options={snapshot.versions.map((v) => ({
                   value: v.id,
-                  label: `${v.name} (${v.version_type.toUpperCase()}${v.is_official ? " / Official" : ""})`,
+                  label: `${v.name} · ${versionTypeLabel(v.version_type, language)}${v.is_official ? ` · ${t("fpna.status_published", language)}` : ""}`,
                 }))}
               />
             </Col>
@@ -280,7 +276,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
                 onChange={setActualId}
                 options={snapshot.versions.map((v) => ({
                   value: v.id,
-                  label: `${v.name} (${v.version_type.toUpperCase()})`,
+                  label: `${v.name} · ${versionTypeLabel(v.version_type, language)}`,
                 }))}
               />
             </Col>
@@ -309,38 +305,30 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
 
         {currentStep === 1 && snapshot.proposedForecast && (
           <div>
-            <div className="stripe-metric-grid fpna-margin-bottom-16" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_from_period", language)}</span>
-                <div style={{ margin: "6px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {snapshot.proposedForecast.from_period}
-                  </Typography.Text>
-                </div>
+            <div className="stripe-metric-grid fpna-margin-bottom-16 fpna-forecast-summary-grid">
+              <div className="pulse-kpi-card fpna-forecast-summary-card">
+                <span className="fpna-forecast-summary-label">{t("fpna.card_from_period", language)}</span>
+                <Typography.Text className="font-tabular fpna-forecast-summary-value">
+                  {snapshot.proposedForecast.from_period}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_to_period", language)}</span>
-                <div style={{ margin: "6px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {snapshot.proposedForecast.to_period}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card fpna-forecast-summary-card">
+                <span className="fpna-forecast-summary-label">{t("fpna.card_to_period", language)}</span>
+                <Typography.Text className="font-tabular fpna-forecast-summary-value">
+                  {snapshot.proposedForecast.to_period}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_actual_cutoff", language)}</span>
-                <div style={{ margin: "6px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {snapshot.proposedForecast.actual_cutoff_period}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card fpna-forecast-summary-card">
+                <span className="fpna-forecast-summary-label">{t("fpna.card_actual_cutoff", language)}</span>
+                <Typography.Text className="font-tabular fpna-forecast-summary-value">
+                  {snapshot.proposedForecast.actual_cutoff_period}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("fpna.card_total_plan_lines", language)}</span>
-                <div style={{ margin: "6px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {snapshot.proposedForecast.lines.length}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card fpna-forecast-summary-card">
+                <span className="fpna-forecast-summary-label">{t("fpna.card_total_plan_lines", language)}</span>
+                <Typography.Text className="font-tabular fpna-forecast-summary-value">
+                  {snapshot.proposedForecast.lines.length}
+                </Typography.Text>
               </div>
             </div>
 
@@ -373,9 +361,9 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
                   value={scenarioType}
                   onChange={setScenarioType}
                   options={[
-                    { value: "baseline", label: t("fpna.scenario_baseline", language) },
-                    { value: "upside", label: t("fpna.scenario_upside", language) },
-                    { value: "downside", label: t("fpna.scenario_downside", language) },
+                    { value: "baseline", label: scenarioTypeLabel("baseline", language) },
+                    { value: "upside", label: scenarioTypeLabel("upside", language) },
+                    { value: "downside", label: scenarioTypeLabel("downside", language) },
                   ]}
                 />
               </Col>
@@ -445,7 +433,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
               onChange={setTrendForecastId}
               options={snapshot.versions.map((v) => ({
                 value: v.id,
-                label: `${v.name} (${v.version_type.toUpperCase()})`,
+                label: `${v.name} · ${versionTypeLabel(v.version_type, language)}`,
               }))}
             />
           </Col>
@@ -458,7 +446,7 @@ export function RollingForecastTab({ snapshot, commands, language }: Props) {
               onChange={setTrendActualId}
               options={snapshot.versions.map((v) => ({
                 value: v.id,
-                label: `${v.name} (${v.version_type.toUpperCase()})`,
+                label: `${v.name} · ${versionTypeLabel(v.version_type, language)}`,
               }))}
             />
           </Col>

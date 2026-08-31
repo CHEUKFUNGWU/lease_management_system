@@ -152,7 +152,7 @@ export function CategoryCompositionPanel({
         setDecomposition(null);
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to load category facts");
+      setError(err?.message || t("category.load_failed", language));
     } finally {
       setLoading(false);
     }
@@ -188,7 +188,7 @@ export function CategoryCompositionPanel({
         <Space direction="vertical" size={2}>
           <Text strong>{code}</Text>
           {record.category_name && record.category_name !== code && (
-            <Text type="secondary" style={{ fontSize: 11 }}>{record.category_name}</Text>
+            <Text type="secondary" className="category-name-detail">{record.category_name}</Text>
           )}
         </Space>
       ),
@@ -209,7 +209,7 @@ export function CategoryCompositionPanel({
         v == null ? (
           "—"
         ) : (
-          <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-error, #ff4d4f)" }}>
+          <span className={v >= 0 ? "category-value-positive" : "category-value-negative"}>
             {fmtMoney(v, currency)}
           </span>
         ),
@@ -230,7 +230,7 @@ export function CategoryCompositionPanel({
         v == null ? (
           "—"
         ) : (
-          <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-error, #ff4d4f)" }}>
+          <span className={v >= 0 ? "category-value-positive" : "category-value-negative"}>
             {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
           </span>
         ),
@@ -244,7 +244,7 @@ export function CategoryCompositionPanel({
         v == null ? (
           "—"
         ) : (
-          <span style={{ color: v >= 0 ? "var(--color-primary, #1890ff)" : "var(--color-error, #ff4d4f)" }}>
+          <span className={v >= 0 ? "category-value-info" : "category-value-negative"}>
             {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
           </span>
         ),
@@ -258,7 +258,7 @@ export function CategoryCompositionPanel({
         v == null ? (
           "—"
         ) : (
-          <span style={{ color: v >= 0 ? "var(--color-success, #52c41a)" : "var(--color-warning, #faad14)" }}>
+          <span className={v >= 0 ? "category-value-positive" : "category-value-warning"}>
             {v >= 0 ? "+" : ""}{fmtMoney(v, currency)}
           </span>
         ),
@@ -266,7 +266,7 @@ export function CategoryCompositionPanel({
   ];
 
   return (
-    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+    <Space direction="vertical" size={16} className="category-composition-panel">
       {/* Reconciliation Guard Alert */}
       {reconciliation && reconciliation.overall_status === "mismatch" && (
         <Alert
@@ -290,7 +290,7 @@ export function CategoryCompositionPanel({
       {error && <Alert type="error" message={error} showIcon closable />}
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "40px 0" }}>
+        <div className="category-loading-state">
           <Spin size="large" />
         </div>
       ) : decomposition ? (
@@ -303,7 +303,7 @@ export function CategoryCompositionPanel({
                   title={t("category.stat_total_revenue", language)}
                   value={decomposition.current_total_revenue}
                   formatter={(v) => fmtMoney(Number(v), currency)}
-                  valueStyle={{ fontSize: 18 }}
+                  className="category-kpi-stat category-kpi-stat-total"
                 />
               </Card>
             </Col>
@@ -313,7 +313,7 @@ export function CategoryCompositionPanel({
                   title={t("category.stat_total_gp", language)}
                   value={decomposition.current_total_gross_profit}
                   formatter={(v) => fmtMoney(Number(v), currency)}
-                  valueStyle={{ fontSize: 18, color: decomposition.current_total_gross_profit >= 0 ? "#52c41a" : "#ff4d4f" }}
+                  className={`category-kpi-stat category-kpi-stat-total ${decomposition.current_total_gross_profit >= 0 ? "is-positive" : "is-negative"}`}
                 />
               </Card>
             </Col>
@@ -323,7 +323,7 @@ export function CategoryCompositionPanel({
                   title={t("category.volume_effect", language)}
                   value={decomposition.volume_effect}
                   formatter={(v) => `${Number(v) >= 0 ? "+" : ""}${fmtMoney(Number(v), currency)}`}
-                  valueStyle={{ fontSize: 16, color: decomposition.volume_effect >= 0 ? "#52c41a" : "#ff4d4f" }}
+                  className={`category-kpi-stat ${decomposition.volume_effect >= 0 ? "is-positive" : "is-negative"}`}
                 />
               </Card>
             </Col>
@@ -333,7 +333,7 @@ export function CategoryCompositionPanel({
                   title={t("category.mix_effect", language)}
                   value={decomposition.mix_effect}
                   formatter={(v) => `${Number(v) >= 0 ? "+" : ""}${fmtMoney(Number(v), currency)}`}
-                  valueStyle={{ fontSize: 16, color: decomposition.mix_effect >= 0 ? "#1890ff" : "#ff4d4f" }}
+                  className={`category-kpi-stat ${decomposition.mix_effect >= 0 ? "is-info" : "is-negative"}`}
                 />
               </Card>
             </Col>
@@ -343,7 +343,7 @@ export function CategoryCompositionPanel({
                   title={t("category.rate_effect", language)}
                   value={decomposition.rate_effect}
                   formatter={(v) => `${Number(v) >= 0 ? "+" : ""}${fmtMoney(Number(v), currency)}`}
-                  valueStyle={{ fontSize: 16, color: decomposition.rate_effect >= 0 ? "#52c41a" : "#faad14" }}
+                  className={`category-kpi-stat ${decomposition.rate_effect >= 0 ? "is-positive" : "is-warning"}`}
                 />
               </Card>
             </Col>
@@ -413,8 +413,8 @@ export function CategoryCompositionPanel({
             scroll={tableScrollX(categoryTableData.length, 800)}
           />
         ) : (
-          <div style={{ textAlign: "center", padding: "30px 0", color: "var(--fg-muted)" }}>
-            <PieChartOutlined style={{ fontSize: 32, marginBottom: 8 }} />
+          <div className="category-empty-state">
+            <PieChartOutlined className="category-empty-icon" />
             <div>{t("category.reconcile_no_detail", language)}</div>
           </div>
         )}

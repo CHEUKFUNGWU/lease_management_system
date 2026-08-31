@@ -13,12 +13,10 @@ import {
   Input,
   Select,
   message,
-  Tag,
   Space,
 } from "antd";
 import {
   PlusOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
 import { hasRole, useAuth } from "../../context/AuthContext";
 import { useLanguage } from "../../context/LanguageContext";
@@ -115,11 +113,11 @@ export default function AdminUsersPage() {
 
   const roleLabelMap: Record<string, string> = {
     admin: t("admin_users.role_admin", language),
-    editor: "Finance Editor",
+    editor: t("admin_users.role_editor", language),
     reviewer: t("admin_users.role_reviewer", language),
     approver: t("admin_users.role_approver", language),
-    auditor: "Auditor Readonly",
-    readonly: "Business Readonly",
+    auditor: t("admin_users.role_auditor", language),
+    readonly: t("admin_users.role_readonly", language),
     user: t("admin_users.role_user", language),
   };
 
@@ -142,7 +140,7 @@ export default function AdminUsersPage() {
         <Space size={[4, 4]} wrap>
           {(record.roles?.length ? record.roles : [role]).map((assignedRole) => (
             <StatusTag key={assignedRole} kind={statusKindFromAntColor(roleColorMap[assignedRole] || "default")}>
-              {roleLabelMap[assignedRole] || assignedRole}
+              {roleLabelMap[assignedRole] || t("admin_users.role_unknown", language)}
             </StatusTag>
           ))}
         </Space>
@@ -154,7 +152,7 @@ export default function AdminUsersPage() {
       key: "legal_entity_id",
       render: (id: string) => {
         const entity = legalEntities.find((e) => e.id === id);
-        return entity ? `${entity.code} - ${entity.name}` : id || "-";
+        return entity ? `${entity.code} - ${entity.name}` : id || "—";
       },
     },
     {
@@ -171,14 +169,14 @@ export default function AdminUsersPage() {
       title: t("admin_users.col_created_at", language),
       dataIndex: "created_at",
       key: "created_at",
-      render: (date: string) => new Date(date).toLocaleString("zh-CN"),
+      render: (date: string) => date ? new Date(date).toLocaleString(language) : "—",
     },
   ];
 
   return (
     <div>
       <PageHeader
-        title={<><UserOutlined /> {t("admin_users.title", language)}<span className="page-header-count">{t("admin_users.subtitle", language, { count: String(users.length) })}</span></>}
+        title={t("admin_users.title", language)}
         primaryAction={
           <Button
             type="primary"
@@ -255,11 +253,11 @@ export default function AdminUsersPage() {
             rules={[{ required: true, message: t("admin_users.role_placeholder", language) }]}
           >
             <Select mode="multiple" placeholder={t("admin_users.role_placeholder", language)}>
-              <Select.Option value="editor">Finance Editor</Select.Option>
+              <Select.Option value="editor">{t("admin_users.role_editor", language)}</Select.Option>
               <Select.Option value="reviewer">{t("admin_users.role_reviewer", language)}</Select.Option>
               <Select.Option value="approver">{t("admin_users.role_approver", language)}</Select.Option>
-              <Select.Option value="auditor">Auditor Readonly</Select.Option>
-              <Select.Option value="readonly">Business Readonly</Select.Option>
+              <Select.Option value="auditor">{t("admin_users.role_auditor", language)}</Select.Option>
+              <Select.Option value="readonly">{t("admin_users.role_readonly", language)}</Select.Option>
               <Select.Option value="admin">{t("admin_users.role_admin", language)}</Select.Option>
             </Select>
           </Form.Item>
@@ -279,7 +277,7 @@ export default function AdminUsersPage() {
           </Form.Item>
 
           <Form.Item>
-            <Space style={{ width: "100%", justifyContent: "flex-end" }}>
+            <Space className="admin-user-modal-actions">
               <Button onClick={() => setModalVisible(false)}>{t("admin_users.cancel", language)}</Button>
               <Button type="primary" htmlType="submit">
                 {t("admin_users.create", language)}

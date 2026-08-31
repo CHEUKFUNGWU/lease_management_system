@@ -33,6 +33,8 @@ describe("StateBlock four-state presentation", () => {
     );
     expect(html).toContain("先导入正式数据");
     expect(html).toContain("切换到模拟数据");
+    expect(html).toContain("state-block-actionable");
+    expect(html).not.toContain("ant-alert");
     expect(html).toContain("<button");
   });
 
@@ -45,6 +47,8 @@ describe("StateBlock four-state presentation", () => {
   it("failed: error plus retry when onRetry is given, none when absent", () => {
     const withRetry = render({ kind: "failed", message: "网络连接失败" }, { onRetry: () => undefined });
     expect(withRetry).toContain("网络连接失败");
+    expect(withRetry).toContain("state-block-failed");
+    expect(withRetry).not.toContain("ant-alert");
     // antd inserts a space in two-character button text (重 试)
     expect(withRetry.replace(/\s/g, "")).toContain("重试");
     expect(withRetry).toContain("<button");
@@ -60,6 +64,8 @@ describe("StateBlock four-state presentation", () => {
     );
     expect(html).toContain("该数据不在你的法人权限范围内");
     expect(html).toContain("法人 A 无权访问");
+    expect(html).toContain("state-block-scope_denied");
+    expect(html).not.toContain("ant-alert");
     // must be distinguishable from failed: no retry affordance, ever
     expect(html).not.toContain("重试");
     expect(html).not.toContain("<button");

@@ -7,7 +7,7 @@ import { Avatar } from "antd";
 import dayjs from "dayjs";
 import ConfidenceBadge from "../components/ConfidenceBadge";
 import SourceCitation from "../components/SourceCitation";
-import ThinkingTrace from "../components/ThinkingTrace";
+import MarkdownText from "../ai-chat/MarkdownText";
 import ToolChip from "../components/ToolChip";
 import { apiErrorMessage, retailAnalyticsApi } from "../lib/api";
 import { t, type Language } from "../lib/i18n";
@@ -121,7 +121,7 @@ function ChatMessage({
             ))}
           </ol>
         )}
-        {content && <ThinkingTrace thinking={content} />}
+        {content && <div className="home-chat-answer"><MarkdownText content={content} /></div>}
         {sources && sources.length > 0 && (
           <div className="ai-tool-row">
             {sources.map((source, index) => <SourceCitation key={index} source={source} />)}

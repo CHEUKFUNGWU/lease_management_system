@@ -55,11 +55,12 @@ export function ScenarioPanel({ token }: { token: string | null }) {
           // The do-nothing case is always run alongside the plan: a scenario
           // means nothing without the baseline it moved away from.
           scenarios: [
-            { name: "基准（不做假设）" },
+            { name: t("cashflow.scenario.baseline_name", language) },
             {
-              name: `${Math.round((values.renewal_rate || 0) * 100)}% 续租、${Math.round(
-                (values.closure_rate || 0) * 100
-              )}% 关店`,
+              name: t("cashflow.scenario.assumption_name", language, {
+                renewal: String(Math.round((values.renewal_rate || 0) * 100)),
+                closure: String(Math.round((values.closure_rate || 0) * 100)),
+              }),
               renewal_rate: values.renewal_rate || 0,
               renewal_term_months: values.renewal_term_months,
               renewal_uplift_percent: values.renewal_uplift_percent,
@@ -73,7 +74,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
       setResults(((response as { results?: ScenarioResult[] }).results) || []);
       setWarning((response as { currency_warning?: string | null }).currency_warning || null);
     } catch (error: any) {
-      notifyError(error?.message || "情景测算失败");
+      notifyError(error?.message || t("cashflow.scenario.load_failed", language));
       setResults([]);
     } finally {
       setLoading(false);
@@ -97,14 +98,14 @@ export function ScenarioPanel({ token }: { token: string | null }) {
   return (
     <Card
       title={t("cashflow.scenario.title", language)}
-      style={{ borderRadius: 10, marginTop: 16 }}
+      className="scenario-panel-card"
       extra={
         <Button type="primary" icon={<ExperimentOutlined />} loading={loading} onClick={() => form.submit()}>
           {t("cashflow.scenario.btn_run", language)}
         </Button>
       }
     >
-      <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 16 }}>
+      <div className="scenario-panel-intro">
         {t("cashflow.scenario.intro", language)}
       </div>
 
@@ -116,45 +117,45 @@ export function ScenarioPanel({ token }: { token: string | null }) {
         <Row gutter={12}>
           <Col xs={12} md={4}>
             <Form.Item label={t("cashflow.scenario.horizon_months", language)} name="horizon_months" rules={[{ required: true, message: t("cashflow.scenario.req_horizon", language) }]}>
-              <InputNumber style={{ width: "100%" }} min={12} max={120} />
+              <InputNumber className="scenario-field-control" min={12} max={120} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
             <Form.Item label={t("cashflow.scenario.renewal_rate", language)} name="renewal_rate" extra="0–1">
-              <InputNumber style={{ width: "100%" }} min={0} max={1} step={0.05} />
+              <InputNumber className="scenario-field-control" min={0} max={1} step={0.05} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
             <Form.Item label={t("cashflow.scenario.renewal_term_months", language)} name="renewal_term_months" rules={[{ required: true, message: t("cashflow.scenario.req_term", language) }]}>
-              <InputNumber style={{ width: "100%" }} min={1} />
+              <InputNumber className="scenario-field-control" min={1} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
             <Form.Item label={t("cashflow.scenario.renewal_uplift", language)} name="renewal_uplift_percent">
-              <InputNumber style={{ width: "100%" }} precision={1} />
+              <InputNumber className="scenario-field-control" precision={1} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
             <Form.Item label={t("cashflow.scenario.closure_rate", language)} name="closure_rate" extra={t("cashflow.scenario.rate_helper", language)}>
-              <InputNumber style={{ width: "100%" }} min={0} max={1} step={0.05} />
+              <InputNumber className="scenario-field-control" min={0} max={1} step={0.05} />
             </Form.Item>
           </Col>
           <Col xs={12} md={4}>
             <Form.Item label={t("cashflow.scenario.closure_cost", language)} name="closure_cost_months">
-              <InputNumber style={{ width: "100%" }} min={0} precision={1} />
+              <InputNumber className="scenario-field-control" min={0} precision={1} />
             </Form.Item>
           </Col>
         </Row>
       </Form>
 
-      {warning && <Alert type="warning" showIcon message={warning} style={{ marginBottom: 16 }} />}
+      {warning && <Alert type="warning" showIcon message={warning} className="scenario-warning-alert" />}
 
       {results.length > 0 && (
         <>
           <Alert
             type="info"
             showIcon
-            style={{ marginBottom: 16 }}
+            className="scenario-expiring-alert"
             message={t("cashflow.scenario.expiring_msg", language).replace("{count}", String(results[0].expiring_leases))}
             description={results[results.length - 1].caveat}
           />
@@ -164,7 +165,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
             rowKey={(row) => row.scenario.name}
             pagination={false}
             size="small"
-            style={{ marginBottom: 16 }}
+            className="scenario-results-table"
             scroll={tableScrollX((results || []).length, 700)}
             columns={[
               {
@@ -173,7 +174,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
                 render: (name: string, row: ScenarioResult) => (
                   <Space>
                     <strong>{name}</strong>
-                    {row.renewal_total === 0 && row.closure_total === 0 && <StatusTag>{t("scenario.baseline", language) || "基准"}</StatusTag>}
+                    {row.renewal_total === 0 && row.closure_total === 0 && <StatusTag>{t("scenario.baseline", language)}</StatusTag>}
                   </Space>
                 ),
               },
@@ -204,7 +205,7 @@ export function ScenarioPanel({ token }: { token: string | null }) {
             ]}
           />
 
-          <div style={{ width: "100%", height: 300 }}>
+          <div className="scenario-chart">
             <ResponsiveContainer>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />

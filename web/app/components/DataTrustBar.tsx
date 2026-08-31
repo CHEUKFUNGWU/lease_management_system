@@ -37,16 +37,19 @@ function reasonLabel(reason: string | undefined, language: ReturnType<typeof use
 }
 
 // D3: coverage rate null renders "—" — a missing signal is never zero-filled.
-function coverageText(coverage: SourceEnvelopeCoverage | undefined, language: ReturnType<typeof useLanguage>["language"]): string {
+function coverageText(coverage: SourceEnvelopeCoverage | undefined): string {
   if (!coverage) return "—";
   const rate = coverage.coverage_rate == null ? "—" : `${coverage.coverage_rate.toFixed(1)}%`;
-  return `${coverage.observed_store_days ?? 0}/${coverage.expected_store_days ?? 0} ${t("trust.store_days", language)} · ${rate}`;
+  return `${coverage.observed_store_days ?? 0}/${coverage.expected_store_days ?? 0} · ${rate}`;
 }
 
 function formatBasis(basis: string | undefined, language: ReturnType<typeof useLanguage>["language"]): string | undefined {
   if (!basis) return undefined;
-  if (basis.toLowerCase() === "working") return t("trust.basis_working", language);
-  if (basis.toLowerCase() === "official") return t("trust.basis_official", language);
+  const normalized = basis.trim().toLowerCase();
+  if (normalized === "working") return t("trust.basis_working", language);
+  if (normalized === "official") return t("trust.basis_official", language);
+  if (normalized === "operating" || normalized === "operating / gl") return t("trust.basis_operating", language);
+  if (normalized === "scenario") return t("trust.basis_scenario", language);
   return basis;
 }
 
@@ -90,7 +93,7 @@ export default function DataTrustBar({
   const degraded = !envelope.decision_ready;
   const reason = reasonLabel(envelope.decision_ready_reason, language);
   const comparison = envelope.comparison_coverage && (envelope.comparison_coverage.expected_store_days ?? 0) > 0
-    ? coverageText(envelope.comparison_coverage, language)
+    ? coverageText(envelope.comparison_coverage)
     : null;
   const displayBasis = formatBasis(basis, language);
   return (
@@ -102,7 +105,7 @@ export default function DataTrustBar({
             {classificationLabel(envelope.data_classification, language)}
           </span>
           {displayBasis && <span>{displayBasis}</span>}
-          <span>{coverageText(envelope.current_coverage, language)}</span>
+          <span>{coverageText(envelope.current_coverage)}</span>
           {!hideComparison && comparison && <span>{t("trust.comparison", language)} {comparison}</span>}
           <span className={degraded ? "is-not-ready" : "is-ready"}>
             {degraded ? t("trust.not_ready", language) : t("trust.ready", language)}

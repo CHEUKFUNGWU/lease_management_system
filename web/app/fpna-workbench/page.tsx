@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Tabs, Card, Alert, Space, Typography, Button } from "antd";
-import { InfoCircleOutlined, ArrowRightOutlined, CalculatorOutlined } from "@ant-design/icons";
+import { Tabs, Card, Button } from "antd";
+import { ArrowRightOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import AppLayout from "../components/AppLayout";
+import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -18,7 +19,6 @@ import { GovernanceRegistryTab } from "./components/GovernanceRegistryTab";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { fpnaWorkbenchHelpContent } from "../components/help-content";
 
-const { Text, Title, Paragraph } = Typography;
 
 export default function FPnAWorkbenchPage() {
   const { language } = useLanguage();
@@ -30,56 +30,30 @@ export default function FPnAWorkbenchPage() {
     <ProtectedRoute>
       <AppLayout>
         <div className="fpna-page-container">
-          {/* Header Area */}
-          <div className="fpna-header-row">
-            <div>
-              <Space align="center">
-                <Title level={3} className="fpna-header-title">
-                  <CalculatorOutlined className="fpna-tree-icon" />
-                  {t("fpna.workbench_title", language)}
-                </Title>
-                <HelpTrigger content={fpnaWorkbenchHelpContent(language)} language={language} />
-              </Space>
-              <Paragraph type="secondary" className="fpna-header-subtitle">
-                {t("fpna.workbench_subtitle", language)}
-              </Paragraph>
-            </div>
-
-            <Link href="/reports?tab=budget">
-              <Button icon={<ArrowRightOutlined />}>
-                {t("fpna.link_lease_budget", language)}
-              </Button>
-            </Link>
-          </div>
-
-          {/* Operating vs Lease Budget Notice */}
-          <Alert
-            type="info"
-            showIcon
-            icon={<InfoCircleOutlined />}
-            className="fpna-margin-bottom-16"
-            message={
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                <span style={{ fontWeight: 600, fontSize: 13 }}>
-                  {t("fpna.operating_scope_badge", language)}
-                </span>
-                <Link
-                  href="/reports?tab=budget"
-                  style={{ fontSize: 12, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
-                >
-                  {t("fpna.link_lease_budget", language)} <ArrowRightOutlined style={{ fontSize: 10 }} />
-                </Link>
-              </div>
-            }
-            description={
-              <div style={{ marginTop: 4, color: "var(--fg-secondary)", fontSize: 12, lineHeight: 1.6 }}>
-                {t("fpna.operating_scope_desc", language)}
-              </div>
+          <PageHeader
+            title={t("fpna.workbench_title", language)}
+            help={<HelpTrigger content={fpnaWorkbenchHelpContent(language)} language={language} />}
+            secondaryAction={
+              <Link href="/reports?tab=budget">
+                <Button icon={<ArrowRightOutlined />}>
+                  {t("fpna.link_lease_budget", language)}
+                </Button>
+              </Link>
             }
           />
 
+          <div className="fpna-scope-notice" role="note">
+            <div className="fpna-scope-notice-head">
+              <strong>{t("fpna.operating_scope_badge", language)}</strong>
+              <Link href="/reports?tab=budget">
+                {t("fpna.link_lease_budget", language)} <ArrowRightOutlined />
+              </Link>
+            </div>
+            <div className="fpna-scope-notice-copy">{t("fpna.operating_scope_desc", language)}</div>
+          </div>
+
           {/* Main Tabs */}
-          <Card styles={{ body: { padding: "16px 20px" } }}>
+          <Card className="fpna-workbench-tabs-card">
             <Tabs
               activeKey={activeTab}
               onChange={setActiveTab}

@@ -163,37 +163,37 @@ export function RenewalCard({ contractId }: { contractId: string }) {
 
   const currency = card?.currency;
   const health = card?.store_health;
-  const healthMeta = health ? HEALTH_META[health.status] || { label: health.status, color: "default" } : null;
+  const healthMeta = health ? HEALTH_META[health.status] || { label: "reports.status_unknown", color: "default" } : null;
   const scenarioLabel = (name: string) => {
     const keys: Record<string, string> = {
       renew_current_terms: "renewal.scenario_current_terms",
       renegotiate_terms: "renewal.scenario_renegotiate",
       terminate_no_renewal: "renewal.scenario_terminate",
     };
-    return keys[name] ? t(keys[name], language) : name;
+    return keys[name] ? t(keys[name], language) : t("renewal.scenario_unknown", language);
   };
 
   return (
     <Card
       title={t("renewal.title", language)}
       loading={loading}
-      style={{ borderRadius: 10, marginTop: 16 }}
+      className="renewal-card"
       extra={
         <Space size={8}>
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.term", language)}</span>
-          <InputNumber style={{ width: 90 }} min={1} value={term} onChange={(v) => setTerm(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.uplift", language)}</span>
-          <InputNumber style={{ width: 90 }} value={uplift} onChange={(v) => setUplift(v == null ? null : Number(v))} addonAfter="%" />
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.rent_free", language)}</span>
-          <InputNumber style={{ width: 90 }} min={0} value={rentFreeMonths} onChange={(v) => setRentFreeMonths(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.escalation", language)}</span>
-          <InputNumber style={{ width: 90 }} value={annualEscalation} onChange={(v) => setAnnualEscalation(v == null ? null : Number(v))} addonAfter="%" />
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("renewal.exit_penalty", language)}</span>
-          <InputNumber style={{ width: 90 }} min={0} value={exitPenaltyMonths} onChange={(v) => setExitPenaltyMonths(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
+          <span className="renewal-control-label">{t("renewal.term", language)}</span>
+          <InputNumber className="renewal-control-input" min={1} value={term} onChange={(v) => setTerm(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
+          <span className="renewal-control-label">{t("renewal.uplift", language)}</span>
+          <InputNumber className="renewal-control-input" value={uplift} onChange={(v) => setUplift(v == null ? null : Number(v))} addonAfter="%" />
+          <span className="renewal-control-label">{t("renewal.rent_free", language)}</span>
+          <InputNumber className="renewal-control-input" min={0} value={rentFreeMonths} onChange={(v) => setRentFreeMonths(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
+          <span className="renewal-control-label">{t("renewal.escalation", language)}</span>
+          <InputNumber className="renewal-control-input" value={annualEscalation} onChange={(v) => setAnnualEscalation(v == null ? null : Number(v))} addonAfter="%" />
+          <span className="renewal-control-label">{t("renewal.exit_penalty", language)}</span>
+          <InputNumber className="renewal-control-input" min={0} value={exitPenaltyMonths} onChange={(v) => setExitPenaltyMonths(v == null ? null : Number(v))} addonAfter={t("renewal.month", language)} />
         </Space>
       }
     >
-      <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 16 }}>
+      <div className="renewal-intro">
         {t("renewal.intro", language)}
       </div>
 
@@ -201,13 +201,13 @@ export function RenewalCard({ contractId }: { contractId: string }) {
 
       {card && (
         <>
-          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+          <Row gutter={[12, 12]} className="renewal-summary">
             <Col xs={12} md={6}>
               <Statistic
                 title={t("renewal.expiry_date", language)}
                 value={card.lease_end_date}
-                valueStyle={{ fontSize: 18 }}
-                suffix={<span style={{ fontSize: 12, color: "var(--fg-muted)" }}>（{card.days_to_expiry} {t("renewal.day", language)}）</span>}
+                className="renewal-expiry-stat"
+                suffix={<span className="renewal-expiry-detail">（{card.days_to_expiry} {t("renewal.day", language)}）</span>}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -228,7 +228,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
               <Statistic
                 title={t("renewal.uplift_cost", language, { percent: String(uplift ?? 0) })}
                 value={card.uplift_cost_over_term ?? 0}
-                valueStyle={{ color: (card.uplift_cost_over_term ?? 0) > 0 ? "var(--state-error-text)" : undefined }}
+                className={(card.uplift_cost_over_term ?? 0) > 0 ? "renewal-uplift-stat is-negative" : "renewal-uplift-stat"}
                 formatter={() => fmtMoney(card.uplift_cost_over_term ?? 0, currency)}
               />
             </Col>
@@ -241,7 +241,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                 rowKey="name"
                 pagination={false}
                 size="small"
-                style={{ marginBottom: 12 }}
+                className="renewal-offers-table"
                 scroll={tableScrollX((card.renewal_comparison.offers || []).length, 600)}
                 columns={[
                   { title: t("renewal.offer", language), dataIndex: "name", render: (name: string) => <strong>{scenarioLabel(name)}</strong> },
@@ -271,7 +271,7 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                   },
                 ]}
               />
-              <Alert type="info" showIcon message={card.renewal_comparison.conclusion} style={{ marginBottom: 16 }} />
+              <Alert type="info" showIcon message={card.renewal_comparison.conclusion} className="renewal-comparison-alert" />
             </>
           )}
 
@@ -279,9 +279,9 @@ export function RenewalCard({ contractId }: { contractId: string }) {
             <Card
               type="inner"
               title={t("renewal.scenarios", language)}
-              extra={<StatusTag kind="warning">{t("renewal.scenario_notice", language)}</StatusTag>}
-              style={{ marginBottom: 16 }}
+              className="renewal-scenarios-card"
             >
+              <div className="card-context">{t("renewal.scenario_notice", language)}</div>
               <Table
                 dataSource={card.decision_scenarios.scenarios}
                 rowKey="name"
@@ -331,15 +331,15 @@ export function RenewalCard({ contractId }: { contractId: string }) {
                   { title: t("renewal.term", language), dataIndex: "term_months", align: "right" as const, render: (value: number) => value ? `${value} ${t("renewal.month", language)}` : "—" },
                   { title: t("renewal.total_cash_outflow", language), dataIndex: "total_cash_outflow", align: "right" as const, render: (value: number) => <strong>{fmtMoney(value, currency)}</strong> },
                   { title: t("renewal.total_ifrs16_expense", language), dataIndex: "total_ifrs16_expense", align: "right" as const, render: (value: number) => fmtMoney(value, currency) },
-                  { title: t("renewal.source", language), dataIndex: "assumption_source", render: (value: string) => <StatusTag>{value === "scenario_assumption" ? t("renewal.scenario_assumption", language) : value}</StatusTag> },
+                  { title: t("renewal.source", language), dataIndex: "assumption_source", render: (value: string) => <StatusTag>{value === "scenario_assumption" ? t("renewal.scenario_assumption", language) : t("renewal.assumption_unknown", language)}</StatusTag> },
                 ]}
               />
-              <Row gutter={[12, 12]} style={{ marginTop: 14 }}>
+              <Row gutter={[12, 12]} className="renewal-decision-fields">
                 <Col xs={24} md={8}><Input value={ownerName} onChange={(event) => setOwnerName(event.target.value)} placeholder={t("renewal.owner_placeholder", language)} /></Col>
                 <Col xs={24} md={8}><Input value={businessOpinion} onChange={(event) => setBusinessOpinion(event.target.value)} placeholder={t("renewal.opinion_placeholder", language)} /></Col>
                 <Col xs={24} md={8}><Input value={evidence} onChange={(event) => setEvidence(event.target.value)} placeholder={t("renewal.evidence_placeholder", language)} /></Col>
               </Row>
-              <Space style={{ marginTop: 12 }}>
+              <Space className="renewal-decision-actions">
                 <Button type="primary" loading={savingDecision} onClick={saveDecision}>{t("renewal.save_snapshot", language)}</Button>
                 {historyCount > 0 && <StatusTag kind="processing">{t("renewal.saved_count", language, { count: String(historyCount) })}</StatusTag>}
               </Space>
@@ -352,16 +352,12 @@ export function RenewalCard({ contractId }: { contractId: string }) {
               showIcon
               message={
                 <Space wrap>
-                  <span>
-                    <strong>{health.store_name}</strong> {health.period} 营收 {fmtNum(health.revenue)}
-                  </span>
+                  <span>{t("renewal.health_revenue", language, { store: health.store_name, period: health.period, value: fmtNum(health.revenue) })}</span>
                   {health.rent_to_sales_percent != null && (
-                    <span>
-                      租售比 <strong>{health.rent_to_sales_percent.toFixed(2)}%</strong>
-                    </span>
+                    <span>{t("renewal.health_rent_to_sales", language, { value: health.rent_to_sales_percent.toFixed(2) })}</span>
                   )}
-                  {health.gross_profit != null && <span>毛利 {fmtNum(health.gross_profit)}</span>}
-                  {health.sales_per_sqm != null && <span>坪效 {fmtNum(health.sales_per_sqm)}</span>}
+                  {health.gross_profit != null && <span>{t("renewal.health_gross_profit", language, { value: fmtNum(health.gross_profit) })}</span>}
+                  {health.sales_per_sqm != null && <span>{t("renewal.health_sales_per_sqm", language, { value: fmtNum(health.sales_per_sqm) })}</span>}
                   {healthMeta && <StatusTag kind={statusKindFromAntColor(healthMeta.color)}>{t(healthMeta.label, language)}</StatusTag>}
                 </Space>
               }

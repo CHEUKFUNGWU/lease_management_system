@@ -1,15 +1,13 @@
 "use client";
 
-import { StatusTag } from "../components/StatusTag";
-
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useMemo } from "react";
 import {
-  Card, Radio, Alert, Tag, Typography, Table, Spin, Statistic,
+  Card, Typography, Table, Spin, Statistic,
   Row, Col, Button, Select, Segmented, Input, Space, message, DatePicker,
 } from "antd";
 import {
   FileTextOutlined, SafetyOutlined, DownloadOutlined,
-  SearchOutlined, ClearOutlined, LineChartOutlined,
+  SearchOutlined, ClearOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -30,7 +28,6 @@ import type { Dayjs } from "dayjs";
 import { useUrlState } from "../hooks/useUrlState";
 import { notifyError } from "../lib/notify";
 
-const { Title } = Typography;
 const { RangePicker } = DatePicker;
 
 
@@ -219,7 +216,7 @@ function CashflowForecastPage() {
       <AppLayout>
         {/* ─── page heading ─── */}
         <PageHeader
-          title={<><LineChartOutlined style={{ marginRight: 8 }} />{t("cashflow.title", language)}</>}
+          title={t("cashflow.title", language)}
           primaryAction={
             <Segmented
               className="precision-segmented"
@@ -241,10 +238,10 @@ function CashflowForecastPage() {
         ) : (
           <>
             {/* ─── report mode card ─── */}
-            <Card style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Card className="cashflow-mode-card">
+              <div className="cashflow-mode-row">
                 <Space size={12}>
-                  <span style={{ fontWeight: 600 }}>{t("cashflow.report_mode", language)}</span>
+                  <span className="cashflow-mode-label">{t("cashflow.report_mode", language)}</span>
                   <Segmented
                     className="precision-segmented"
                     value={reportMode}
@@ -273,28 +270,14 @@ function CashflowForecastPage() {
                 </Space>
               </div>
 
-              {reportMode === "working" && (
-                <Alert
-                  message={t("reports.working_alert_title", language)}
-                  description={t("reports.working_alert_desc", language)}
-                  type="warning"
-                  showIcon
-                  style={{ marginTop: 12 }}
-                />
-              )}
-              {reportMode === "official" && (
-                <Alert
-                  message={t("reports.official_alert_title", language)}
-                  description={t("reports.official_alert_desc", language)}
-                  type="success"
-                  showIcon
-                  style={{ marginTop: 12 }}
-                />
-              )}
+              <div className={`cashflow-basis-note is-${reportMode}`} role="note">
+                <strong>{reportMode === "working" ? t("reports.working_alert_title", language) : t("reports.official_alert_title", language)}</strong>
+                <span>{reportMode === "working" ? t("reports.working_alert_desc", language) : t("reports.official_alert_desc", language)}</span>
+              </div>
             </Card>
 
         {/* ─── filter controls ─── */}
-        <Card style={{ marginBottom: 16 }}>
+        <Card className="cashflow-filter-card">
           <Row gutter={[16, 12]} align="middle">
             <Col>
               <Space>
@@ -302,7 +285,7 @@ function CashflowForecastPage() {
                 <Select
                   value={view}
                   onChange={(v) => { setViewParam(v); setFetched(false); }}
-                  style={{ width: 120 }}
+                  className="cashflow-view-select"
                   options={[
                     { value: "contract", label: t("cashflow.dimension_contract", language) },
                     { value: "store", label: t("cashflow.dimension_store", language) },
@@ -317,7 +300,7 @@ function CashflowForecastPage() {
                 <Select
                   value={granularity}
                   onChange={(v) => { setGranularityParam(v); setFetched(false); }}
-                  style={{ width: 100 }}
+                  className="cashflow-granularity-select"
                   options={[
                     { value: "month", label: t("cashflow.granularity_month", language) },
                     { value: "quarter", label: t("cashflow.granularity_quarter", language) },
@@ -338,7 +321,7 @@ function CashflowForecastPage() {
                   }}
                   allowClear={false}
                   picker={granularity === "year" ? "year" : granularity === "quarter" ? "quarter" : "month"}
-                  style={{ width: 260 }}
+                  className="cashflow-date-range"
                 />
               </Space>
             </Col>
@@ -377,15 +360,15 @@ function CashflowForecastPage() {
           <Button
             type="link"
             onClick={() => setShowFilters(!showFilters)}
-            style={{ marginTop: 8, padding: 0 }}
+            className="cashflow-advanced-toggle"
           >
             {showFilters ? `${t("cashflow.toggle_collapse", language)} ▲` : `${t("cashflow.toggle_expand", language)} ▼`}
           </Button>
 
           {showFilters && (
-            <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
+            <Row gutter={[16, 12]} className="cashflow-advanced-filters">
               <Col span={8}>
-                <Space direction="vertical" style={{ width: "100%" }}>
+                <Space direction="vertical" className="cashflow-filter-field">
                   <span>{t("cashflow.filter_contract_id", language)}</span>
                   <Input
                     value={contractId}
@@ -397,7 +380,7 @@ function CashflowForecastPage() {
               </Col>
               {view !== "store" && (
                 <Col span={8}>
-                  <Space direction="vertical" style={{ width: "100%" }}>
+                  <Space direction="vertical" className="cashflow-filter-field">
                     <span>{t("cashflow.filter_store", language)}</span>
                     <Input
                       value={store}
@@ -409,13 +392,13 @@ function CashflowForecastPage() {
                 </Col>
               )}
               <Col span={8}>
-                <Space direction="vertical" style={{ width: "100%" }}>
+                <Space direction="vertical" className="cashflow-filter-field">
                   <span>{t("cashflow.filter_tags", language)}</span>
                   <Select
                     mode="tags"
                     value={selectedTags}
                     onChange={(v) => { setSelectedTags(v); setFetched(false); }}
-                    style={{ width: "100%" }}
+                    className="cashflow-filter-control"
                     placeholder={t("cashflow.filter_tags_placeholder", language)}
                     loading={tagLoading}
                     options={availableTags.map((t) => ({ value: t, label: t }))}
@@ -428,73 +411,39 @@ function CashflowForecastPage() {
 
         {/* ─── summary cards ─── */}
         {summary && (
-          <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Row gutter={16} className="cashflow-summary-row">
             <Col span={6}>
               <Card size="small">
-                <Statistic
-                  title={t("cashflow.stat_total_outflow", language)}
-                  value={summary.totalOutflow}
-                  precision={2}
-                  valueStyle={{ fontSize: 16, color: "var(--chart-blue)" }}
-                />
+                <Statistic className="cashflow-stat is-total" title={t("cashflow.stat_total_outflow", language)} value={summary.totalOutflow} precision={2} />
               </Card>
             </Col>
             <Col span={6}>
               <Card size="small">
-                <Statistic
-                  title={t("cashflow.stat_fixed_rent", language)}
-                  value={summary.fixedRent}
-                  precision={2}
-                  valueStyle={{ fontSize: 16 }}
-                />
+                <Statistic className="cashflow-stat" title={t("cashflow.stat_fixed_rent", language)} value={summary.fixedRent} precision={2} />
               </Card>
             </Col>
             <Col span={6}>
               <Card size="small">
-                <Statistic
-                  title={t("cashflow.stat_variable_rent", language)}
-                  value={summary.variableRent}
-                  precision={2}
-                  valueStyle={{ fontSize: 16, color: "var(--state-warning-text)" }}
-                />
+                <Statistic className="cashflow-stat is-variable" title={t("cashflow.stat_variable_rent", language)} value={summary.variableRent} precision={2} />
               </Card>
             </Col>
             <Col span={6}>
               <Card size="small">
-                <Statistic
-                  title={t("cashflow.stat_non_lease", language)}
-                  value={summary.nonLease}
-                  precision={2}
-                  valueStyle={{ fontSize: 16, color: "var(--chart-purple)" }}
-                />
+                <Statistic className="cashflow-stat is-non-lease" title={t("cashflow.stat_non_lease", language)} value={summary.nonLease} precision={2} />
               </Card>
             </Col>
           </Row>
         )}
 
         {chartData.length > 0 && (
-          <Card size="small" title="现金流出结构堆叠图" style={{ marginBottom: 16 }}>
+          <Card size="small" title={t("cashflow.chart_title", language)} className="cashflow-chart-card">
             <StackedCashflowChart data={chartData} currency={data[0]?.currency || "CNY"} height={260} />
           </Card>
         )}
 
         {/* ─── result table ─── */}
         <Card
-          title={
-            <span>
-              {t("cashflow.table_title", language)}
-              {reportMode === "working" && (
-                <StatusTag kind="warning" style={{ marginLeft: 8 }}>
-                  {t("cashflow.table_working_hint", language)}
-                </StatusTag>
-              )}
-              {reportMode === "official" && (
-                <StatusTag kind="success" style={{ marginLeft: 8 }}>
-                  {t("cashflow.table_official_hint", language)}
-                </StatusTag>
-              )}
-            </span>
-          }
+          title={t("cashflow.table_title", language)}
         >
           <Spin spinning={loading}>
             <Table
@@ -535,7 +484,7 @@ function CashflowForecastPage() {
 
 export default function CashflowForecastPageWithUrlState() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+    <Suspense fallback={<div className="cashflow-loading" />}>
       <CashflowForecastPage />
     </Suspense>
   );

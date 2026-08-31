@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   Table,
@@ -58,6 +58,33 @@ const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
+const PROMOTION_TYPE_KEYS: Record<string, string> = {
+  discount: "promotion.type_discount",
+  coupon: "promotion.type_coupon",
+  gift: "promotion.type_gift",
+  member_day: "promotion.type_member_day",
+  other: "promotion.type_other",
+};
+const PROMOTION_COST_KEYS: Record<string, string> = {
+  subsidy: "promotion.cost_type_subsidy",
+  materials: "promotion.cost_type_materials",
+  labor: "promotion.cost_type_labor",
+  marketing: "promotion.cost_type_marketing",
+  other: "promotion.cost_type_other",
+};
+
+function promotionTypeLabel(type: string, language: Parameters<typeof t>[1]): string {
+  return PROMOTION_TYPE_KEYS[type] ? t(PROMOTION_TYPE_KEYS[type], language) : t("promotion.type_unknown", language);
+}
+
+function promotionCostLabel(type: string, language: Parameters<typeof t>[1]): string {
+  return PROMOTION_COST_KEYS[type] ? t(PROMOTION_COST_KEYS[type], language) : t("promotion.cost_type_unknown", language);
+}
+
+function promotionScopeLabel(scope: string | undefined, language: Parameters<typeof t>[1]): string {
+  return scope === "all" ? t("promotion.scope_all", language) : scope ? t("promotion.scope_unknown", language) : "—";
+}
+
 export default function PromotionsPage() {
   const { language } = useLanguage();
   const { token, user } = useAuth();
@@ -112,7 +139,7 @@ export default function PromotionsPage() {
       const res = await promotionApi.list(token, statusFilter || undefined);
       setPromotions(res.promotions || []);
     } catch (err: any) {
-      message.error(err?.message || "Failed to load promotions");
+      message.error(err?.message || t("promotion.msg_load_failed", language));
     } finally {
       setLoading(false);
     }
@@ -136,7 +163,7 @@ export default function PromotionsPage() {
       setRoiResult(roiData);
       setCosts(costData.costs || []);
     } catch (err: any) {
-      message.error(err?.message || "Failed to evaluate promotion ROI");
+      message.error(err?.message || t("promotion.msg_roi_failed", language));
     } finally {
       setRoiLoading(false);
     }
@@ -196,7 +223,7 @@ export default function PromotionsPage() {
 
   const handleCreateActionItem = () => {
     if (!selectedPromo || !roiResult) return;
-    const summary = `${t("promotion.action_item_prefix", language)} ${selectedPromo.name} (ROI: ${roiResult.roi != null ? (roiResult.roi * 100).toFixed(1) + "%" : "N/A"})\n` +
+    const summary = `${t("promotion.action_item_prefix", language)} ${selectedPromo.name} (ROI: ${roiResult.roi != null ? (roiResult.roi * 100).toFixed(1) + "%" : "—"})\n` +
       `${t("promotion.code_label", language)}: ${selectedPromo.promo_code}\n` +
       `${t("promotion.inc_gross_profit_label", language)}: ${fmtMoney(roiResult.incremental_gross_profit, roiResult.currency)}\n` +
       `${t("promotion.total_cost_label", language)}: ${fmtMoney(roiResult.total_cost, roiResult.currency)}\n` +
@@ -236,7 +263,7 @@ export default function PromotionsPage() {
           gift: "neutral",
           member_day: "neutral",
         };
-        return <StatusTag kind={kinds[type] || "neutral"}>{type}</StatusTag>;
+        return <StatusTag kind={kinds[type] || "neutral"}>{promotionTypeLabel(type, language)}</StatusTag>;
       },
     },
     {
@@ -265,7 +292,7 @@ export default function PromotionsPage() {
           completed: { kind: "success", label: t("promotion.status_completed", language) },
           cancelled: { kind: "error", label: t("promotion.status_cancelled", language) },
         };
-        const conf = map[st] || { kind: "neutral" as const, label: st };
+        const conf = map[st] || { kind: "neutral" as const, label: t("promotion.status_unknown", language) };
         return <StatusTag kind={conf.kind}>{conf.label}</StatusTag>;
       },
     },
@@ -286,7 +313,6 @@ export default function PromotionsPage() {
       <AppLayout>
         <PageHeader
           title={t("promotion.title", language)}
-          meta={t("promotion.page_meta", language)}
           primaryAction={
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
               {t("promotion.create", language)}
@@ -299,8 +325,9 @@ export default function PromotionsPage() {
           }
         />
 
-        <div style={{ padding: 24 }}>
+        <div className="promotions-content">
           <Card
+            className="promotions-list-card"
             title={
               <Space>
                 <AuditOutlined />
@@ -356,11 +383,11 @@ export default function PromotionsPage() {
               <Tabs defaultActiveKey="roi">
                 <Tabs.TabPane tab={t("promotion.tab_roi_attribution", language)} key="roi">
                   {roiLoading ? (
-                    <div style={{ textAlign: "center", padding: "40px 0" }}>
+                    <div className="promotion-roi-loading">
                       <Spin size="large" />
                     </div>
                   ) : roiResult ? (
-                    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                    <Space direction="vertical" size={16} className="promotion-roi-stack">
                       {/* Overlap Non-separable Alert */}
                       {!roiResult.is_separable ? (
                         <Alert
@@ -387,72 +414,43 @@ export default function PromotionsPage() {
                       )}
 
                       {/* Top Metric Grid */}
-                      <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.roi", language)}</span>
-                          <div style={{ margin: "6px 0 2px" }}>
-                            <Typography.Text
-                              className="font-tabular"
-                              style={{
-                                fontSize: 22,
-                                fontWeight: 600,
-                                color: (roiResult.roi ?? 0) >= 1.0 ? "var(--state-success-text, #216E39)" : "var(--state-warning-text, #9A6700)",
-                              }}
-                            >
-                              {roiResult.roi != null ? `${(roiResult.roi * 100).toFixed(1)}%` : "—"}
-                            </Typography.Text>
-                          </div>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
+                      <div className="stripe-metric-grid promotion-roi-grid">
+                        <div className="pulse-kpi-card promotion-roi-card">
+                          <span className="promotion-metric-label">{t("promotion.roi", language)}</span>
+                          <Typography.Text className={`font-tabular promotion-roi-value ${roiResult.roi != null && roiResult.roi >= 1 ? "is-positive" : "is-warning"}`}>
+                            {roiResult.roi != null ? `${(roiResult.roi * 100).toFixed(1)}%` : "—"}
+                          </Typography.Text>
+                          <Text type="secondary" className="promotion-metric-note">
                             {t("promotion.metric_roi_formula", language)}
                           </Text>
                         </div>
 
-                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.field_actual_cost", language)}</span>
-                          <div style={{ margin: "6px 0 2px" }}>
-                            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
-                              {fmtMoney(roiResult.total_cost, roiResult.currency)}
-                            </Typography.Text>
-                          </div>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
+                        <div className="pulse-kpi-card promotion-roi-card">
+                          <span className="promotion-metric-label">{t("promotion.field_actual_cost", language)}</span>
+                          <Typography.Text className="font-tabular promotion-money-value">
+                            {fmtMoney(roiResult.total_cost, roiResult.currency)}
+                          </Typography.Text>
+                          <Text type="secondary" className="promotion-metric-note">
                             {t("promotion.metric_budget_label", language, { amount: fmtMoney(roiResult.budget_amount, roiResult.currency) })}
                           </Text>
                         </div>
 
-                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.inc_revenue", language)}</span>
-                          <div style={{ margin: "6px 0 2px" }}>
-                            <Typography.Text
-                              className="font-tabular"
-                              style={{
-                                fontSize: 20,
-                                fontWeight: 600,
-                                color: roiResult.incremental_revenue >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
-                              }}
-                            >
-                              {`${Number(roiResult.incremental_revenue) >= 0 ? "+" : ""}${fmtMoney(Number(roiResult.incremental_revenue), roiResult.currency)}`}
-                            </Typography.Text>
-                          </div>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
+                        <div className="pulse-kpi-card promotion-roi-card">
+                          <span className="promotion-metric-label">{t("promotion.inc_revenue", language)}</span>
+                          <Typography.Text className={`font-tabular promotion-money-value ${roiResult.incremental_revenue >= 0 ? "is-positive" : "is-negative"}`}>
+                            {`${Number(roiResult.incremental_revenue) >= 0 ? "+" : ""}${fmtMoney(Number(roiResult.incremental_revenue), roiResult.currency)}`}
+                          </Typography.Text>
+                          <Text type="secondary" className="promotion-metric-note">
                             {t("promotion.metric_actual_days_label", language, { days: String(roiResult.event_days), amount: fmtMoney(roiResult.actual_revenue, roiResult.currency) })}
                           </Text>
                         </div>
 
-                        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "14px 18px" }}>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("promotion.inc_gross_profit", language)}</span>
-                          <div style={{ margin: "6px 0 2px" }}>
-                            <Typography.Text
-                              className="font-tabular"
-                              style={{
-                                fontSize: 20,
-                                fontWeight: 600,
-                                color: roiResult.incremental_gross_profit >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
-                              }}
-                            >
-                              {`${Number(roiResult.incremental_gross_profit) >= 0 ? "+" : ""}${fmtMoney(Number(roiResult.incremental_gross_profit), roiResult.currency)}`}
-                            </Typography.Text>
-                          </div>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
+                        <div className="pulse-kpi-card promotion-roi-card">
+                          <span className="promotion-metric-label">{t("promotion.inc_gross_profit", language)}</span>
+                          <Typography.Text className={`font-tabular promotion-money-value ${roiResult.incremental_gross_profit >= 0 ? "is-positive" : "is-negative"}`}>
+                            {`${Number(roiResult.incremental_gross_profit) >= 0 ? "+" : ""}${fmtMoney(Number(roiResult.incremental_gross_profit), roiResult.currency)}`}
+                          </Typography.Text>
+                          <Text type="secondary" className="promotion-metric-note">
                             {t("promotion.metric_baseline_gp_label", language, { amount: fmtMoney(roiResult.baseline_gross_profit, roiResult.currency) })}
                           </Text>
                         </div>
@@ -467,7 +465,7 @@ export default function PromotionsPage() {
                             size="small"
                             pagination={false}
                             columns={[
-                              { title: t("promotion.col_cost_category", language), dataIndex: "cost_category", key: "cost_category" },
+                              { title: t("promotion.col_cost_category", language), dataIndex: "cost_category", key: "cost_category", render: (value: string) => promotionCostLabel(value, language) },
                               { title: t("promotion.col_cost_period", language), dataIndex: "period", key: "period" },
                               {
                                 title: t("promotion.col_cost_amount", language),
@@ -480,18 +478,18 @@ export default function PromotionsPage() {
                             ]}
                           />
                         ) : (
-                          <div style={{ textAlign: "center", padding: "16px 0", color: "var(--fg-muted)" }}>
+                          <div className="promotion-cost-empty">
                             {t("promotion.cost_empty", language)}
                           </div>
                         )}
                       </Card>
 
                       {/* Disclaimers & Integrity */}
-                      <Card size="small" style={{ background: "var(--bg-subtle, #fafafa)" }}>
-                        <Text strong style={{ fontSize: 12 }}>
+                      <Card size="small" className="promotion-disclaimer-card">
+                        <Text strong className="promotion-disclaimer-title">
                           {t("promotion.disclaimer", language)}:
                         </Text>
-                        <ul style={{ margin: "4px 0 0 16px", padding: 0, fontSize: 11, color: "var(--fg-muted)" }}>
+                        <ul className="promotion-disclaimer-list">
                           {roiResult.disclaimers.map((d, i) => (
                             <li key={i}>{d}</li>
                           ))}
@@ -515,7 +513,7 @@ export default function PromotionsPage() {
                 </Tabs.TabPane>
                 <Tabs.TabPane tab={t("promotion.tab_budget_review", language)} key="budget">
                   <Card size="small" bordered={false}>
-                    <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                    <Space direction="vertical" size={12} className="promotion-budget-stack">
                       <div>
                         <Text type="secondary">{t("promotion.info_name", language)}: </Text>
                         <Text strong>{selectedPromo.name}</Text>
@@ -526,7 +524,7 @@ export default function PromotionsPage() {
                       </div>
                       <div>
                         <Text type="secondary">{t("promotion.info_type", language)}: </Text>
-                        <StatusTag kind="processing">{selectedPromo.promo_type}</StatusTag>
+                        <StatusTag kind="processing">{promotionTypeLabel(selectedPromo.promo_type, language)}</StatusTag>
                       </div>
                       <div>
                         <Text type="secondary">{t("promotion.info_period", language)}: </Text>
@@ -534,11 +532,11 @@ export default function PromotionsPage() {
                       </div>
                       <div>
                         <Text type="secondary">{t("promotion.info_scope", language)}: </Text>
-                        <Text>{selectedPromo.target_scope}</Text>
+                        <Text>{promotionScopeLabel(selectedPromo.target_scope, language)}</Text>
                       </div>
                       <div>
                         <Text type="secondary">{t("promotion.info_budget", language)}: </Text>
-                        <Text strong style={{ fontSize: 16, color: "var(--color-primary, #1890ff)" }}>
+                        <Text strong className="promotion-budget-value">
                           {fmtMoney(selectedPromo.budget_amount, selectedPromo.currency)}
                         </Text>
                       </div>
@@ -548,7 +546,7 @@ export default function PromotionsPage() {
                       </div>
                       <div>
                         <Text type="secondary">{t("promotion.info_desc", language)}: </Text>
-                        <Paragraph style={{ marginTop: 4 }}>
+                        <Paragraph className="promotion-description">
                           {selectedPromo.description || t("promotion.info_no_desc", language)}
                         </Paragraph>
                       </div>
@@ -572,14 +570,14 @@ export default function PromotionsPage() {
                 label={t("promotion.field_code", language)}
                 rules={[{ required: true, message: t("promotion.rule_code_required", language) }]}
               >
-                <Input placeholder="例: PROMO_2026_MEMBER_06" />
+                <Input placeholder={t("promotion.placeholder_code", language)} />
               </Form.Item>
               <Form.Item
                 name="name"
                 label={t("promotion.field_name", language)}
                 rules={[{ required: true, message: t("promotion.rule_name_required", language) }]}
               >
-                <Input placeholder="例: 6月夏日狂欢会员日" />
+                <Input placeholder={t("promotion.placeholder_name", language)} />
               </Form.Item>
               <Row gutter={16}>
                 <Col span={12}>
@@ -605,7 +603,7 @@ export default function PromotionsPage() {
                     rules={[{ required: true, message: t("promotion.rule_budget_required", language) }]}
                     initialValue={10000}
                   >
-                    <InputNumber style={{ width: "100%" }} min={0} />
+                    <InputNumber className="promotion-full-width" min={0} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -614,7 +612,7 @@ export default function PromotionsPage() {
                 label={t("promotion.field_period", language)}
                 rules={[{ required: true, message: t("promotion.rule_dates_required", language) }]}
               >
-                <RangePicker style={{ width: "100%" }} />
+                <RangePicker className="promotion-full-width" />
               </Form.Item>
               <Form.Item name="description" label={t("promotion.label_desc_assumptions", language)}>
                 <Input.TextArea rows={3} placeholder={t("promotion.placeholder_desc", language)} />
@@ -649,7 +647,7 @@ export default function PromotionsPage() {
                 label={t("promotion.col_cost_amount", language)}
                 rules={[{ required: true, message: t("promotion.rule_cost_amount_required", language) }]}
               >
-                <InputNumber style={{ width: "100%" }} min={0} />
+                <InputNumber className="promotion-full-width" min={0} />
               </Form.Item>
               <Form.Item name="notes" label={t("promotion.label_cost_notes", language)}>
                 <Input placeholder={t("promotion.placeholder_cost_notes", language)} />

@@ -65,6 +65,12 @@ function parseURL(params: { get(name: string): string | null }) {
   };
 }
 
+function scenarioStatusLabel(status: string | undefined, language: Language) {
+  if (status === "complete") return t("retail.status.complete", language);
+  if (status === "partial") return t("retail.status.partial", language);
+  return t("retail.status_reason.unavailable", language);
+}
+
 function MetricTable({ response, selectedKey, notReady, language }: { response: RetailScenarioResponse; selectedKey: string; notReady?: boolean; language: Language }) {
   const selected = response.scenarios.find((item) => item.key === selectedKey);
   if (!selected) return null;
@@ -87,7 +93,7 @@ function MetricTable({ response, selectedKey, notReady, language }: { response: 
             const isNeg = delta != null && delta < 0;
             const colorClass = isPos ? "color-pos" : isNeg ? "color-neg" : "";
             return (
-              <span className={`font-tabular ${colorClass}`} style={{ color: isPos ? "var(--state-success-text)" : isNeg ? "var(--state-error-text)" : undefined }}>
+              <span className={`font-tabular ${colorClass}`}>
                 {formatScenarioValue(delta, row.result?.unit || "", response.currency, language)}
               </span>
             );
@@ -99,10 +105,10 @@ function MetricTable({ response, selectedKey, notReady, language }: { response: 
             <Flex align="center" gap={4}>
               {notReady && <KPIReadyBadge />}
               {row.result?.status === "complete" ? (
-                <CheckCircleFilled style={{ color: "#166534", fontSize: 13 }} />
+                <CheckCircleFilled className="scenario-complete-icon" />
               ) : (
-                <span style={{ fontSize: 11, color: "var(--state-warning-text)" }}>
-                  {row.result?.status || "unavailable"}{row.result?.reason ? ` · ${row.result.reason}` : ""}
+                <span className="scenario-status-warning">
+                  {scenarioStatusLabel(row.result?.status, language)}{row.result?.reason ? ` · ${row.result.reason}` : ""}
                 </span>
               )}
             </Flex>
@@ -373,7 +379,6 @@ function ScenarioPageInner() {
         <div className="scenario-workbench-page">
           <PageHeader
             title={t("scenario.title", language)}
-            meta={t("scenario.scope_note", language)}
             help={<HelpTrigger content={scenarioHelpContent(language)} language={language} />}
             primaryAction={
               <Button type="primary" icon={<PlayCircleOutlined />} loading={loading} onClick={evaluate}>
@@ -401,15 +406,15 @@ function ScenarioPageInner() {
             <DataTrustBar
               envelope={response.envelope}
               basis="Scenario"
-              detailExtra={latestMatches ? <span>generator: {latestMatches.generator_version} · anomaly: {latestAnomalyDate(latestMatches)}</span> : undefined}
+              detailExtra={latestMatches ? <span>{t("trust.generator_version", language)}: {latestMatches.generator_version} · {t("trust.as_of", language)}: {latestAnomalyDate(latestMatches)}</span> : undefined}
             />
           )}
 
-          <Row gutter={[16, 16]} style={{ marginTop: 12 }}>
+          <Row gutter={[16, 16]} className="scenario-workbench-grid">
             <Col xs={24} lg={10}>
-              <Space direction="vertical" style={{ width: "100%" }} size={12}>
+              <Space direction="vertical" className="scenario-full-width-stack" size={12}>
                 <Card size="small" title={<Space><ControlOutlined /><span>{t("scenario.controls", language)}</span></Space>}>
-                  <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                  <Space direction="vertical" className="scenario-full-width-stack" size={10}>
                     <Segmented
                       className="precision-segmented"
                       value={query.classification}
@@ -430,7 +435,7 @@ function ScenarioPageInner() {
                       value={query.storeID || undefined}
                       placeholder={t("store360.select_store", language)}
                       loading={optionsLoading}
-                      style={{ width: "100%" }}
+                      className="scenario-full-width-control"
                       options={options.map((item) => ({
                         label: `${item.store_code} · ${item.store_name} (${item.brand || "—"})`,
                         value: item.store_id,
@@ -439,14 +444,14 @@ function ScenarioPageInner() {
                       optionFilterProp="search"
                       onChange={(value) => setQuery({ storeID: value || "" })}
                     />
-                    <Flex gap={8}>
+                    <Flex gap={8} className="scenario-date-range">
                       <DatePicker
-                        style={{ width: "50%" }}
+                        className="scenario-half-control"
                         value={dayjs(query.asOf)}
                         onChange={(value) => value && setQuery({ asOf: value.format("YYYY-MM-DD") })}
                       />
                       <Select
-                        style={{ width: "50%" }}
+                        className="scenario-half-control"
                         value={WINDOW_OPTIONS.includes(query.windowDays as (typeof WINDOW_OPTIONS)[number]) ? query.windowDays : undefined}
                         placeholder={t("pulse.custom_window", language)}
                         options={WINDOW_OPTIONS.map((val) => ({
@@ -484,17 +489,17 @@ function ScenarioPageInner() {
                     </Flex>
                   }
                 >
-                  <Space direction="vertical" style={{ width: "100%" }} size={12}>
+                  <Space direction="vertical" className="scenario-full-width-stack" size={12}>
                     {DELTA_FIELDS.map((field) => (
-                      <div key={field.key} style={{ padding: "4px 0", borderBottom: "1px dashed var(--border-subtle)" }}>
+                      <div key={field.key} className="scenario-assumption-row">
                         <Flex justify="space-between" align="center">
-                          <Typography.Text style={{ fontSize: 13, fontWeight: 500 }}>
+                          <Typography.Text className="scenario-assumption-label">
                             {t(field.labelKey, language)}
                           </Typography.Text>
                           <Space size={4}>
                             <InputNumber
                               size="small"
-                              style={{ width: 80 }}
+                              className="scenario-assumption-input"
                               value={assumptions[field.key]}
                               min={field.min}
                               max={field.max}
@@ -505,7 +510,7 @@ function ScenarioPageInner() {
                                 setQuery({ assumptions: next });
                               }}
                             />
-                            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                            <Typography.Text type="secondary" className="scenario-assumption-unit">
                               {field.unit === "pp" ? "pp" : "%"}
                             </Typography.Text>
                           </Space>
@@ -529,15 +534,9 @@ function ScenarioPageInner() {
             </Col>
 
             <Col xs={24} lg={14}>
-              <Space direction="vertical" style={{ width: "100%" }} size={12}>
+              <Space direction="vertical" className="scenario-full-width-stack" size={12}>
                 {error && (
-                  <Card
-                    style={{
-                      border: "1px solid var(--border-default)",
-                      background: "var(--bg-elevated)",
-                      borderRadius: 12,
-                    }}
-                  >
+                  <Card className="scenario-error-card">
                     <Result
                       status="warning"
                       title={query.classification === "production" ? t("scenario.no_production_facts", language) : t("scenario.unavailable", language)}
@@ -561,11 +560,7 @@ function ScenarioPageInner() {
                                 setQuery({ classification: "simulated" });
                               }
                             }}
-                            style={{
-                              background: "var(--fg-primary)",
-                              borderColor: "var(--fg-primary)",
-                              borderRadius: 6,
-                            }}
+                            className="scenario-switch-button"
                           >
                             {t("scenario.switch_to_simulated", language)}
                           </Button>
@@ -576,7 +571,7 @@ function ScenarioPageInner() {
                 )}
                 {loading && (
                   <Card>
-                    <Flex justify="center" align="center" style={{ minHeight: 200 }}>
+                    <Flex justify="center" align="center" className="scenario-loading-state">
                       <Spin tip={t("scenario.loading", language)} />
                     </Flex>
                   </Card>
@@ -587,16 +582,16 @@ function ScenarioPageInner() {
                     <Row gutter={[12, 12]}>
                       <Col xs={24} sm={12}>
                         <Card size="small">
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>{t("scenario.table.monthly_diff", language)}</Typography.Text>
-                          <Typography.Title level={3} className="font-tabular" style={{ margin: "4px 0 0", color: (response.scenarios.find((s) => s.key === selectedKey)?.monthly_contribution_change || 0) >= 0 ? "var(--state-success-text)" : "var(--state-error-text)" }}>
+                          <Typography.Text type="secondary" className="scenario-metric-label">{t("scenario.table.monthly_diff", language)}</Typography.Text>
+                          <Typography.Title level={3} className={`font-tabular scenario-metric-value ${(response.scenarios.find((s) => s.key === selectedKey)?.monthly_contribution_change || 0) >= 0 ? "color-pos" : "color-neg"}`}>
                             {formatScenarioValue(response.scenarios.find((s) => s.key === selectedKey)?.monthly_contribution_change, "currency", response.currency, language)}
                           </Typography.Title>
                         </Card>
                       </Col>
                       <Col xs={24} sm={12}>
                         <Card size="small">
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>{responseHorizonLabel(response, language)} {t("scenario.table.horizon_diff", language)}</Typography.Text>
-                          <Typography.Title level={3} className="font-tabular" style={{ margin: "4px 0 0", color: (response.scenarios.find((s) => s.key === selectedKey)?.horizon_contribution_change || 0) >= 0 ? "var(--state-success-text)" : "var(--state-error-text)" }}>
+                          <Typography.Text type="secondary" className="scenario-metric-label">{responseHorizonLabel(response, language)} {t("scenario.table.horizon_diff", language)}</Typography.Text>
+                          <Typography.Title level={3} className={`font-tabular scenario-metric-value ${(response.scenarios.find((s) => s.key === selectedKey)?.horizon_contribution_change || 0) >= 0 ? "color-pos" : "color-neg"}`}>
                             {formatScenarioValue(response.scenarios.find((s) => s.key === selectedKey)?.horizon_contribution_change, "currency", response.currency, language)}
                           </Typography.Title>
                         </Card>
@@ -637,7 +632,7 @@ function ScenarioPageInner() {
                     </Card>
 
                     <Card size="small" title={t("scenario.draft.title", language)}>
-                      <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                      <Space direction="vertical" className="scenario-full-width-stack" size={10}>
                         <Input
                           value={title}
                           onChange={(event) => setTitle(event.target.value)}
@@ -663,7 +658,7 @@ function ScenarioPageInner() {
                         </Flex>
                         <Flex justify="space-between" align="center">
                           <Input
-                            style={{ width: 180 }}
+                            className="scenario-verification-period"
                             value={verificationPeriod}
                             onChange={(event) => setVerificationPeriod(event.target.value)}
                             placeholder={t("scenario.draft.period_placeholder", language)}

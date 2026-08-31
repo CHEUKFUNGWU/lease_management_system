@@ -2,13 +2,12 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card, DatePicker, Empty, Select, Space, Spin, Table, Tag, Typography, message } from "antd";
+import { Button, Card, DatePicker, Empty, Select, Space, Spin, Table, Typography, message } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
-import ScopeNote from "../components/ScopeNote";
 import { StateBlock } from "../components/StateBlock";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { ecomHelpContent } from "../components/help-content";
@@ -17,6 +16,15 @@ import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
 import { ecomApi, EcomImportTemplate, type EcomReserveResponse, type EcomSettlementRun, type EcomStorefront } from "../lib/api";
 import { tableScrollX } from "../lib/tableScroll";
+import { StatusTag } from "../components/StatusTag";
+
+const STATUS_KEYS: Record<string, string> = {
+  draft: "status.draft",
+  prepared: "draftreview.status_prepared",
+  pending: "status.pending_approval",
+  approved: "status.approved",
+  rejected: "status.rejected",
+};
 
 const CATEGORY_KEYS: Record<string, string> = {
   fee: "ecom.settlement.category_fee",
@@ -26,6 +34,18 @@ const CATEGORY_KEYS: Record<string, string> = {
   adjustment: "ecom.settlement.category_adjustment",
   reserve: "ecom.settlement.category_reserve",
 };
+
+function statusLabel(status: string, language: Language): string {
+  return STATUS_KEYS[status] ? t(STATUS_KEYS[status], language) : status;
+}
+
+function statusKind(status: string): "success" | "processing" | "warning" | "error" | "neutral" {
+  if (status === "approved") return "success";
+  if (status === "rejected") return "error";
+  if (status === "pending") return "warning";
+  if (status === "prepared") return "processing";
+  return "neutral";
+}
 
 function SettlementWorkbenchInner() {
   const { token } = useAuth();
@@ -97,7 +117,7 @@ function SettlementWorkbenchInner() {
         `ecom-settlement-${storefrontId}-${period}-${Date.now()}`,
         token,
       );
-      message.success(`${t("ecom.settlement.recon_done", language)}：${created.matched_count} ${t("ecom.settlement.matched", language)} / ${created.difference_count} ${t("ecom.settlement.difference", language)} · gate=${created.gate_verdict}`);
+      message.success(`${t("ecom.settlement.recon_done", language)}：${created.matched_count} ${t("ecom.settlement.matched", language)} / ${created.difference_count} ${t("ecom.settlement.difference", language)} · ${created.gate_verdict === "allow" ? t("ecom.settlement.gate_allow", language) : t("ecom.settlement.gate_deny", language)}`);
       setRefreshNonce((n) => n + 1);
     } catch (err) {
       message.error(err instanceof Error ? err.message : String(err));
@@ -111,7 +131,7 @@ function SettlementWorkbenchInner() {
     setTransitioning(runId + action);
     try {
       const updated = await ecomApi.transitionSettlementRun(runId, action, "", token);
-      message.success(`${t("ecom.settlement.status_changed", language)} ${updated.status}`);
+      message.success(`${t("ecom.settlement.status_changed", language)} ${statusLabel(updated.status, language)}`);
       setRuns((prev) => prev.map((r) => (r.id === runId ? updated : r)));
     } catch (err) {
       message.error(err instanceof Error ? err.message : String(err));
@@ -137,7 +157,6 @@ function SettlementWorkbenchInner() {
               </Button>
             }
           />
-          <ScopeNote noteKey="ecom.settlement.subtitle" language={language as any} />
           <div className="precision-filter-bar pulse-block-margin">
             <div className="precision-filter-group">
               <span className="precision-filter-label">{t("ecom.common.site", language)}</span>
@@ -170,12 +189,12 @@ function SettlementWorkbenchInner() {
                     columns={[
                       { title: t("ecom.settlement.period_label", language), dataIndex: "period", key: "period" },
                       {
-                        title: t("ecom.settlement.status_changed", language).replace(" →", ""), dataIndex: "status", key: "status",
-                        render: (s: string) => <Tag>{s}</Tag>,
+                        title: t("finmodel.status", language), dataIndex: "status", key: "status",
+                        render: (s: string) => <StatusTag kind={statusKind(s)}>{statusLabel(s, language)}</StatusTag>,
                       },
                       {
                         title: t("ecom.settlement.gate", language), dataIndex: "gate_verdict", key: "gate_verdict",
-                        render: (v: string | null | undefined) => (v === "allow" ? <Tag>{t("ecom.settlement.gate_allow", language)}</Tag> : v === "deny" ? <Tag>{t("ecom.settlement.gate_deny", language)}</Tag> : "—"),
+                        render: (v: string | null | undefined) => (v === "allow" ? <StatusTag kind="success">{t("ecom.settlement.gate_allow", language)}</StatusTag> : v === "deny" ? <StatusTag kind="error">{t("ecom.settlement.gate_deny", language)}</StatusTag> : "—"),
                       },
                       { title: t("ecom.settlement.matched", language), dataIndex: "matched_count", key: "matched_count" },
                       { title: t("ecom.settlement.difference", language), dataIndex: "difference_count", key: "difference_count" },
@@ -216,7 +235,7 @@ function SettlementWorkbenchInner() {
                       { title: t("ecom.settlement.held_open", language), dataIndex: "held_open", key: "held_open", align: "right" as const, render: (v: number) => v.toFixed(2) },
                       { title: t("ecom.settlement.released", language), dataIndex: "released", key: "released", align: "right" as const, render: (v: number) => v.toFixed(2) },
                       { title: t("ecom.settlement.net_frozen", language), dataIndex: "net_frozen", key: "net_frozen", align: "right" as const, render: (v: number) => <Typography.Text strong>{v.toFixed(2)}</Typography.Text> },
-                      { title: t("ecom.settlement.issues", language), dataIndex: "issues", key: "issues", render: (issues: string[] | undefined) => issues && issues.length ? <Tag>{issues.join("; ")}</Tag> : "—" },
+                      { title: t("ecom.settlement.issues", language), dataIndex: "issues", key: "issues", render: (issues: string[] | undefined) => issues && issues.length ? issues.join("; ") : "—" },
                     ]}
                   />
                 ) : (
@@ -233,7 +252,7 @@ function SettlementWorkbenchInner() {
                   scroll={tableScrollX(templates.length, 900)}
                   dataSource={templates}
                   columns={[
-                    { title: t("ecom.settlement.source_system", language), dataIndex: "source", key: "source", render: (s: string) => <Tag>{s}</Tag> },
+                    { title: t("ecom.settlement.source_system", language), dataIndex: "source", key: "source" },
                     { title: t("ecom.settlement.import_version", language), dataIndex: "version", key: "version" },
                     { title: t("ecom.settlement.import_grain", language), dataIndex: "grain", key: "grain" },
                     { title: t("ecom.settlement.import_columns", language), dataIndex: "columns", key: "columns", render: (cols: string[]) => <Typography.Text type="secondary">{cols.join(", ")}</Typography.Text> },
@@ -280,7 +299,7 @@ function RunDetail({ run, language }: { run: EcomSettlementRun; language: Langua
           columns={[
             {
               title: t("ecom.settlement.category_label", language), dataIndex: "category", key: "category",
-              render: (c: string) => <Tag>{CATEGORY_KEYS[c] ? t(CATEGORY_KEYS[c], language) : c}</Tag>,
+              render: (c: string) => <StatusTag>{CATEGORY_KEYS[c] ? t(CATEGORY_KEYS[c], language) : c}</StatusTag>,
             },
             { title: t("ecom.settlement.amount_label", language), dataIndex: "amount", key: "amount", align: "right" as const, render: (v: number) => v.toFixed(2) },
             { title: "payout", dataIndex: ["evidence", "payout_id"], key: "payout", render: (v: string | undefined) => v || "—" },

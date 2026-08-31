@@ -2,14 +2,13 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card, DatePicker, Empty, Segmented, Select, Space, Spin, Table, Tag, Typography } from "antd";
+import { Button, Card, DatePicker, Empty, Segmented, Select, Spin, Table, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import DataTrustBar from "../components/DataTrustBar";
 import ProtectedRoute from "../components/ProtectedRoute";
-import ScopeNote from "../components/ScopeNote";
 import { StateBlock } from "../components/StateBlock";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { ecomHelpContent } from "../components/help-content";
@@ -20,6 +19,8 @@ import { useRetailQuery } from "../retail/useRetailQuery";
 import { ecomApi, type EcomPnlBlock, type EcomPnlResponse, type EcomPnlRow, type EcomStorefront } from "../lib/api";
 import { ecomTrustEnvelope } from "../lib/ecom-trust";
 import { tableScrollX } from "../lib/tableScroll";
+import { StatusTag } from "../components/StatusTag";
+import { translateReason } from "../operating-pulse/logic";
 
 function SitePnlInner() {
   const { token } = useAuth();
@@ -80,7 +81,6 @@ function SitePnlInner() {
             help={<HelpTrigger content={ecomHelpContent(language as any)} language={language as any} />}
             primaryAction={<Button icon={<ReloadOutlined />} onClick={() => setRefreshNonce((n) => n + 1)}>{t("common.refresh", language as any)}</Button>}
           />
-          <ScopeNote noteKey="ecom.pnl.subtitle" language={language as any} />
           <div className="precision-filter-bar pulse-block-margin">
             <div className="precision-filter-group">
               <span className="precision-filter-label">{t("ecom.common.site", language)}</span>
@@ -113,7 +113,7 @@ function SitePnlInner() {
                   const next = v as "production" | "simulated";
                   updateQuery({ data_classification: next, dataset_version: next === "production" ? null : datasetVersion });
                 }}
-                options={[{ label: "Production", value: "production" }, { label: "Simulated", value: "simulated" }]}
+                options={[{ label: t("trust.classification_production", language), value: "production" }, { label: t("trust.classification_simulated", language), value: "simulated" }]}
               />
             </div>
           </div>
@@ -133,20 +133,21 @@ function SitePnlInner() {
                   generated_at: new Date().toISOString(),
                 }, { storefrontCount: response.blocks.length, allReady, observedDays: 0, expectedDays: 0 })}
                 basis="operating / gl"
-                detailExtra={response.gaps.length > 0 ? <Space>{response.gaps.map((g) => <Tag key={g}>{g}</Tag>)}</Space> : null}
+                detailExtra={response.gaps.length > 0 ? <span>{response.gaps.map((g) => translateReason(g, language)).join(" · ")}</span> : null}
               />
 
               {response.blocks.length === 0 && <Card className="pulse-block-margin"><Empty description={t("ecom.common.no_data_reason", language)} /></Card>}
 
               {response.blocks.map((block: EcomPnlBlock) => (
                 <Card key={block.currency} className="pulse-block-margin" size="small"
-                  title={<Space>{t("ecom.pnl.operating_block", language)} · {block.currency}
+                  title={`${t("ecom.pnl.operating_block", language)} · ${block.currency}`}>
+                  <div className="card-context">
                     {block.break_even.status === "achieved" ? (
-                      <Tag>{t("ecom.diagnostics.break_even_mer", language)} {block.break_even.break_even_mer?.toFixed(2)} · {t("ecom.diagnostics.break_even_roas", language)} {block.break_even.break_even_roas?.toFixed(2)}</Tag>
+                      <StatusTag kind="success">{t("ecom.diagnostics.break_even_mer", language)} {block.break_even.break_even_mer?.toFixed(2)} · {t("ecom.diagnostics.break_even_roas", language)} {block.break_even.break_even_roas?.toFixed(2)}</StatusTag>
                     ) : (
-                      <Tag>{t("ecom.diagnostics.unachievable", language)}{block.break_even.reason ? `（${block.break_even.reason}）` : ""}</Tag>
+                      <StatusTag kind="warning">{t("ecom.diagnostics.unachievable", language)}{block.break_even.reason ? `（${translateReason(block.break_even.reason, language)}）` : ""}</StatusTag>
                     )}
-                  </Space>}>
+                  </div>
                   <Table
                     size="small"
                     rowKey="key"

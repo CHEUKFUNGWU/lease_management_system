@@ -10,7 +10,6 @@ import {
   Input,
   DatePicker,
   Button,
-  Tag,
   message,
   Row,
   Col,
@@ -192,7 +191,7 @@ export default function AuditLogsPage() {
       dataIndex: "changed_by_name",
       key: "changed_by_name",
       width: 120,
-      render: (val: string, record: any) => val || (record.changed_by ? record.changed_by.substring(0, 8) : "-"),
+      render: (val: string, record: any) => val || (record.changed_by ? record.changed_by.substring(0, 8) : "—"),
     },
     {
       title: t("audit.col_action", language),
@@ -218,8 +217,8 @@ export default function AuditLogsPage() {
       key: "record_id",
       width: 130,
       render: (val: string) => (
-        <span style={{ fontFamily: "monospace", fontSize: 12 }}>
-          {val ? val.substring(0, 8) + "..." : "-"}
+        <span className="audit-record-id">
+          {val ? val.substring(0, 8) + "..." : "—"}
         </span>
       ),
     },
@@ -229,7 +228,7 @@ export default function AuditLogsPage() {
       key: "old_values",
       width: 60,
       render: (val: string) => {
-        if (!val || val === "null" || val === "{}") return <span style={{ color: "var(--fg-muted)" }}>{t("audit.none", language)}</span>;
+        if (!val || val === "null" || val === "{}") return <span className="audit-empty-value">{t("audit.none", language)}</span>;
         const text = formatJsonContent(val);
         return (
           <Button
@@ -240,7 +239,7 @@ export default function AuditLogsPage() {
               Modal.info({
                 title: t("audit.view_old", language),
                 width: 600,
-                content: <pre style={{ maxHeight: 400, overflow: "auto", fontSize: 12 }}>{text}</pre>,
+                content: <pre className="audit-json-preview">{text}</pre>,
               });
             }}
           >
@@ -255,7 +254,7 @@ export default function AuditLogsPage() {
       key: "new_values",
       width: 60,
       render: (val: string) => {
-        if (!val || val === "null" || val === "{}") return <span style={{ color: "var(--fg-muted)" }}>{t("audit.none", language)}</span>;
+        if (!val || val === "null" || val === "{}") return <span className="audit-empty-value">{t("audit.none", language)}</span>;
         const text = formatJsonContent(val);
         return (
           <Button
@@ -266,7 +265,7 @@ export default function AuditLogsPage() {
               Modal.info({
                 title: t("audit.view_new", language),
                 width: 600,
-                content: <pre style={{ maxHeight: 400, overflow: "auto", fontSize: 12 }}>{text}</pre>,
+                content: <pre className="audit-json-preview">{text}</pre>,
               });
             }}
           >
@@ -280,38 +279,36 @@ export default function AuditLogsPage() {
   return (
     <ProtectedRoute>
       <AppLayout>
-        <div style={{ padding: 0 }}>
-          <PageHeader
-            title={<>{t("audit.title", language)}<span className="page-header-count">{t("audit.subtitle", language, { total: String(total) })}</span></>}
-          />
+        <div className="audit-page">
+          <PageHeader title={t("audit.title", language)} />
 
           {/* Filters */}
-          <Card size="small" style={{ marginBottom: 16 }}>
+          <Card size="small" className="audit-filter-card">
             <Row gutter={[12, 12]}>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_table", language)}</span>
+                <span className="audit-filter-label">{t("audit.filter_table", language)}</span>
                 <Select
                   size="small"
                   value={tableName}
                   onChange={setTableName}
                   options={TABLE_NAME_OPTIONS}
-                  style={{ width: "100%" }}
+                  className="audit-filter-control"
                   allowClear
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_action", language)}</span>
+                <span className="audit-filter-label">{t("audit.filter_action", language)}</span>
                 <Select
                   size="small"
                   value={action}
                   onChange={setAction}
                   options={ACTION_OPTIONS}
-                  style={{ width: "100%" }}
+                  className="audit-filter-control"
                   allowClear
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_record_id", language)}</span>
+                <span className="audit-filter-label">{t("audit.filter_record_id", language)}</span>
                 <Input
                   size="small"
                   value={recordId}
@@ -321,7 +318,7 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_run_id", language)}</span>
+                <span className="audit-filter-label">{t("audit.filter_run_id", language)}</span>
                 <Input
                   size="small"
                   value={runId}
@@ -331,7 +328,7 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_tool_name", language)}</span>
+                <span className="audit-filter-label">{t("audit.filter_tool_name", language)}</span>
                 <Input
                   size="small"
                   value={toolName}
@@ -341,16 +338,16 @@ export default function AuditLogsPage() {
                 />
               </Col>
               <Col xs={24} sm={6}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4, display: "block" }}>{t("audit.filter_time_range", language)}</span>
+                <span className="audit-filter-label">{t("audit.filter_time_range", language)}</span>
                 <RangePicker
                   size="small"
                   value={dateRange as any}
                   onChange={(dates) => setDateRange(dates as any)}
-                  style={{ width: "100%" }}
+                  className="audit-filter-control"
                 />
               </Col>
             </Row>
-            <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+            <div className="audit-filter-actions">
               <Button size="small" type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
                 {t("audit.query", language)}
               </Button>
@@ -361,7 +358,8 @@ export default function AuditLogsPage() {
           </Card>
 
           {/* Table */}
-          <Card>
+          <Card title={t("audit.entries", language)}>
+            <div className="card-context audit-result-count">{t("audit.subtitle", language, { total: String(total) })}</div>
             <Table
               dataSource={logs}
               columns={columns}

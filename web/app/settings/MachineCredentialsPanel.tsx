@@ -186,9 +186,9 @@ export function MachineCredentialsPanel() {
           {t("machine_cred.issue_btn", language)}
         </Button>
       }
-      style={{ marginBottom: 16 }}
+      className="machine-credentials-card"
     >
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Space direction="vertical" size={16} className="machine-credentials-content">
         {newlyIssued && (
           <Alert
             type="warning"
@@ -197,9 +197,9 @@ export function MachineCredentialsPanel() {
             onClose={() => setNewlyIssued(null)}
             message={t("machine_cred.secret_alert_msg", language)}
             description={
-              <Space direction="vertical" style={{ width: "100%", marginTop: 8 }}>
+              <Space direction="vertical" className="machine-credential-secret-details">
                 <div>
-                  <Text strong>Client ID: </Text>
+                  <Text strong>{t("machine_cred.col_client_id", language)}: </Text>
                   <Text code>{newlyIssued.client_id}</Text>
                   <Button
                     size="small"
@@ -209,7 +209,7 @@ export function MachineCredentialsPanel() {
                   />
                 </div>
                 <div>
-                  <Text strong>Client Secret: </Text>
+                  <Text strong>{t("machine_cred.client_secret", language)}: </Text>
                   <Text code copyable>{newlyIssued.client_secret}</Text>
                 </div>
               </Space>
@@ -229,10 +229,10 @@ export function MachineCredentialsPanel() {
 
         {/* Push API curl example */}
         <Card size="small" title={<Space><CodeOutlined /><span>{t("machine_cred.curl_example_title", language)}</span></Space>}>
-          <Paragraph style={{ fontSize: 12, marginBottom: 8 }}>
+          <Paragraph className="machine-credentials-description">
             {t("machine_cred.curl_example_desc", language)}
           </Paragraph>
-          <pre style={{ background: "var(--bg-subtle, #f5f5f5)", padding: 12, borderRadius: 4, fontSize: 11, overflowX: "auto" }}>
+          <pre className="machine-credentials-code">
 {`curl -X POST https://<domain>/api/v1/retail/push/facts \\
   -H "X-Client-ID: <your_client_id>" \\
   -H "X-Client-Secret: <your_client_secret>" \\
@@ -283,7 +283,7 @@ export function MachineCredentialsPanel() {
             label={t("machine_cred.label_expires", language)}
             initialValue={365}
           >
-            <InputNumber style={{ width: "100%" }} min={1} />
+            <InputNumber className="machine-credential-expiry" min={1} />
           </Form.Item>
         </Form>
       </Modal>

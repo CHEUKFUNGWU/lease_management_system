@@ -15,11 +15,8 @@ export function buildTheme(palette: typeof colors | typeof darkColors) {
     // STY-007: primary-button hover used to be painted foreground.secondary by CSS; antd
     // derives the hover fill from colorPrimaryHover.
     colorPrimaryHover: palette.foreground.secondary,
-    // DARK-003: the text antd paints on a solid primary surface. It defaults to
-    // white, which is right while colorPrimary is black — but the dark theme's
-    // primary IS white, so the login button rendered white-on-#DCDCDC at 1.37:1.
-    // Tying it to the page canvas keeps it the inverse of the primary surface in
-    // both themes.
+    // Keep text on solid primary surfaces opposite to the page canvas so the
+    // same control remains legible in both themes.
     colorTextLightSolid: palette.background.page,
     colorInfo: palette.state.info,
     // STY-007: antd's Statistic title renders with colorTextDescription;
@@ -80,14 +77,14 @@ export function buildTheme(palette: typeof colors | typeof darkColors) {
   components: {
     // ── Button ──
     Button: {
-      borderRadius: radius.full,
+      borderRadius: radius.md,
       controlHeight: 36,
       controlHeightSM: 28,
       controlHeightLG: 44,
       // STY-007: the global override used to force 500 via CSS; the token
       // must match what the UI actually rendered, not the old 600 intent.
       fontWeight: typography.weights.medium,
-      defaultBg: palette.background.page,
+      defaultBg: palette.background.inset,
       defaultBorderColor: palette.border.default,
       defaultColor: palette.foreground.primary,
       defaultHoverBg: palette.background.surface,
@@ -413,8 +410,6 @@ export function buildTheme(palette: typeof colors | typeof darkColors) {
 
     // ── Skeleton ──
     Skeleton: {
-      gradientFromColor: palette.background.inset,
-      gradientToColor: palette.background.surface,
       paragraphLiHeight: 22,
       titleHeight: 16,
     },

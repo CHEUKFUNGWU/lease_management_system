@@ -22,9 +22,9 @@ export default function ThinkingTrace({ thinking }: { thinking: string }) {
         className="ai-thinking-trace-toggle"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        icon={expanded ? <DownOutlined style={{ fontSize: 10 }} /> : <RightOutlined style={{ fontSize: 10 }} />}
+        icon={expanded ? <DownOutlined className="ai-thinking-trace-arrow" /> : <RightOutlined className="ai-thinking-trace-arrow" />}
       >
-        <span style={{ marginLeft: 4 }}>{t("ai.thinking_process", language)}</span>
+        <span className="ai-thinking-trace-label">{t("ai.thinking_process", language)}</span>
       </Button>
       {expanded && <pre className="ai-thinking-trace-body">{thinking}</pre>}
     </div>

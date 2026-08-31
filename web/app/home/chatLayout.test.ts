@@ -90,6 +90,11 @@ describe("HOME-004 layout contract (L1–L8)", () => {
     expect(briefColumn).toContain("scrollIntoView");
   });
 
+  it("renders assistant replies as answers, not collapsed thinking traces", () => {
+    expect(briefColumn).toContain("<MarkdownText content={content} />");
+    expect(briefColumn).not.toContain("<ThinkingTrace thinking={content} />");
+  });
+
   it("§5: role branching and right-column wiring unchanged", () => {
     expect(homePage).toContain("canViewHomeBrief(user)");
     expect(homePage).toContain("<BriefColumn token={token} language={language} onProposal={handleProposal} />");
@@ -144,7 +149,7 @@ describe("FIX-007: the conversation column is the scroll container, composer out
 
 describe("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
   it("FIX-008: chip radius has a unit, user row reverses, starters send directly", () => {
-    expect(ruleBody(".home-chat-starter-chip")).toMatch(/border-radius:\s*(9999px|50px)/);
+    expect(ruleBody(".home-chat-starter-chip")).toMatch(/border-radius:\s*6px/);
     expect(ruleBody(".home-msg.is-user")).toMatch(/row-reverse/);
     expect(briefColumn).toMatch(/sendText\(t\(key, language\)\)/);
     expect(briefColumn).not.toMatch(/askStarter/);

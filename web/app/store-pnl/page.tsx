@@ -10,8 +10,8 @@ import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
 
 import { StateBlock } from "../components/StateBlock";
-import { StatusTag } from "../components/StatusTag";
-import { apiErrorMessage, financialModelApi, retailAnalyticsApi, storePnlApi, type RetailDataClassification, type RetailSimulationDatasetData } from "../lib/api";
+import DataTrustBar from "../components/DataTrustBar";
+import { apiErrorMessage, financialModelApi, retailAnalyticsApi, storePnlApi, type RetailDataClassification, type RetailSimulationDatasetData, type SourceEnvelope } from "../lib/api";
 import { fmtNum } from "../lib/format";
 import { t } from "../lib/i18n";
 import { useAuth } from "../context/AuthContext";
@@ -88,13 +88,7 @@ type PnlResponse = {
   dataset_version?: string;
   currency?: string;
   period_label?: string; period_kind?: string; peer_status?: string;
-  envelope?: {
-    data_classification?: string; source_systems?: string[];
-    fact_version_min?: number; fact_version_max?: number;
-    highest_as_of?: string; formula_version?: string;
-    semantic_version?: string; pulse_version?: string;
-    decision_ready?: boolean; decision_ready_reason?: string;
-  } | null;
+  envelope?: SourceEnvelope | null;
   gaps?: string[];
 };
 
@@ -421,7 +415,6 @@ function StorePnlInner() {
         <PageHeader
           title={t("nav.store_pnl", language)}
           help={<HelpTrigger content={storePnlHelpContent(language)} language={language} />}
-          meta={t("storepnl.basis_note", language)}
           primaryAction={
             <Space>
               <Segmented
@@ -528,30 +521,14 @@ function StorePnlInner() {
         {query.storeID && !loading && <StateBlock state={pnlState} language={language} onRetry={() => { setDiscoveryRetry((value) => value + 1); retry(); }} />}
         {pnl && !loading && (
           <Space direction="vertical" size="middle">
-            <Space wrap>
-              <StatusTag kind={pnl.decision_ready ? "success" : "warning"}>
-                {pnl.decision_ready ? t("storepnl.ready", language) : t("storepnl.not_ready", language)}
-              </StatusTag>
-              <StatusTag kind={pnl.data_classification === "simulated" ? "warning" : "neutral"}>
-                {pnl.data_classification}
-              </StatusTag>
-              {pnl.dataset_version && <Typography.Text type="secondary">{pnl.dataset_version}</Typography.Text>}
+            {pnl.envelope && <DataTrustBar envelope={pnl.envelope} />}
+            <Space wrap className="storepnl-context">
+              {pnl.period_label && <Typography.Text type="secondary">{pnl.period_label}</Typography.Text>}
               {pnl.currency && <Typography.Text type="secondary">{pnl.currency}</Typography.Text>}
-              {pnl.period_label && <StatusTag kind="neutral">{pnl.period_label}</StatusTag>}
               {pnl.peer_status && pnl.peer_status !== "complete" && (
-                <StatusTag kind="warning">{`${t("storepnl.peer_col", language)}：${peerStatusLabel(pnl.peer_status, language)}`}</StatusTag>
-              )}
-              {pnl.decision_ready_reason && (
-                <Typography.Text type="warning">{pnl.decision_ready_reason}</Typography.Text>
+                <Typography.Text type="warning">{`${t("storepnl.peer_col", language)}：${peerStatusLabel(pnl.peer_status, language)}`}</Typography.Text>
               )}
             </Space>
-            {pnl.envelope && (
-              <Card size="small" title={t("storepnl.source_envelope", language)}>
-                <Typography.Text type="secondary">
-                  {`${t("storepnl.formula_version", language)} ${pnl.envelope.formula_version || "—"} · ${t("storepnl.semantic_version", language)} ${pnl.envelope.semantic_version || "—"} · ${t("storepnl.source_systems", language)}: ${(pnl.envelope.source_systems || []).join(", ") || "—"} · fact v${pnl.envelope.fact_version_min ?? "?"}–${pnl.envelope.fact_version_max ?? "?"} · as_of ${pnl.envelope.highest_as_of || "—"}`}
-                </Typography.Text>
-              </Card>
-            )}
             {(pnl.gaps || []).length > 0 && (
               <Card size="small">
                 <Typography.Text type="warning">

@@ -3,7 +3,7 @@
 import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { useEffect, useState } from "react";
-import { Alert, Badge, Button, Card, Empty, Input, List, Space, Spin, Tag, Typography, message } from "antd";
+import { Alert, Badge, Button, Card, Empty, Input, List, Space, Spin, Typography, message } from "antd";
 import { ReloadOutlined, RightOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -105,6 +105,10 @@ interface TodoQueryData {
   exceptionsScopeComplete: boolean;
 }
 
+function exceptionStateLabel(state: CloseException["exception_state"], language: Parameters<typeof t>[1]) {
+  return t(`todo.exception_state_${state}`, language);
+}
+
 export default function TodoPage() {
   const { token } = useAuth();
   const { language } = useLanguage();
@@ -164,12 +168,15 @@ export default function TodoPage() {
       key={titleKey}
       title={
         <Space>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>{t(titleKey, language)}</span>
-          <Badge count={items.length} showZero style={{ backgroundColor: items.length ? "var(--fg-primary)" : "var(--border-strong)" }} />
+          <span className="todo-section-title">{t(titleKey, language)}</span>
+          <Badge
+            count={items.length}
+            showZero
+            className={`todo-count-badge ${items.length ? "" : "todo-count-badge--empty"}`}
+          />
         </Space>
       }
-      style={{ borderRadius: 10, marginBottom: 16 }}
-      styles={{ body: { padding: items.length ? "0 8px" : 24 } }}
+      className={`todo-section-card ${items.length ? "todo-section-card--has-items" : "todo-section-card--empty"}`}
     >
       {items.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("todo.section_clear", language)} />
@@ -178,23 +185,23 @@ export default function TodoPage() {
           dataSource={items}
           renderItem={(item) => (
             <List.Item
-              style={{ cursor: "pointer" }}
+              className="todo-clickable-item"
               onClick={() => onOpen(item)}
-              actions={[<RightOutlined key="open" style={{ color: "var(--fg-muted)" }} />]}
+              actions={[<RightOutlined key="open" className="todo-open-icon" />]}
             >
               <List.Item.Meta
                 title={
                   <Space size={8} wrap>
-                    <span style={{ fontWeight: 500 }}>{item.title}</span>
+                    <span className="todo-item-title">{item.title}</span>
                     {dueTag(item)}
                     {item.amount != null && (
-                      <span style={{ color: "var(--fg-tertiary)", fontSize: 13 }}>
+                      <span className="todo-item-amount">
                         {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} {item.currency}
                       </span>
                     )}
                   </Space>
                 }
-                description={<span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{item.subtitle || hint}</span>}
+                description={<span className="todo-item-description">{item.subtitle || hint || "—"}</span>}
               />
             </List.Item>
           )}
@@ -228,16 +235,16 @@ export default function TodoPage() {
             onChange={(event) => setPeriod(event.target.value)}
             onPressEnter={retry}
             placeholder="YYYY-MM"
-            style={{ width: 110 }}
+            className="todo-period-input"
           />
           <Button size="small" onClick={retry} loading={loading}>
             {t("todo.readiness_refresh", language)}
           </Button>
         </Space>
       }
-      style={{ borderRadius: 10, marginBottom: 16 }}
+      className="todo-readiness-card"
     >
-      <Space wrap size={16} style={{ marginBottom: 12 }}>
+      <Space wrap size={16} className="todo-readiness-summary">
         <span>{t("todo.readiness_period", language)}: <strong>{readiness.accounting_period}</strong></span>
         <span>{t("todo.readiness_population", language)}: <strong>{readiness.population_count}</strong></span>
         <span>{t("todo.readiness_blocking", language)}: <strong>{readiness.blocking_count}</strong></span>
@@ -253,7 +260,7 @@ export default function TodoPage() {
         <Alert
           type="warning"
           showIcon
-          style={{ marginBottom: 12 }}
+          className="todo-inline-alert"
           message={t("todo.readiness_scope_warning", language)}
         />
       )}
@@ -266,22 +273,22 @@ export default function TodoPage() {
           dataSource={readiness.findings}
           renderItem={(finding) => (
             <List.Item
-              style={{ cursor: "pointer" }}
+              className="todo-clickable-item"
               onClick={() => router.push(finding.target_path)}
-              actions={[<RightOutlined key="open" style={{ color: "var(--fg-muted)" }} />]}
+              actions={[<RightOutlined key="open" className="todo-open-icon" />]}
             >
               <List.Item.Meta
                 title={
                   <Space size={8} wrap>
                     <StatusTag kind={statusKindFromAntColor(finding.severity === "blocking" ? "error" : "warning")}>
-                      {finding.severity === "blocking" ? t("todo.readiness_blocking_tag", language) : finding.severity}
+                      {finding.severity === "blocking" ? t("todo.readiness_blocking_tag", language) : t("todo.readiness_warning_tag", language)}
                     </StatusTag>
-                    <span style={{ fontWeight: 500 }}>{finding.title}</span>
+                    <span className="todo-item-title">{finding.title}</span>
                     {finding.contract_number && <span>{finding.contract_number}</span>}
                   </Space>
                 }
                 description={
-                  <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
+                  <span className="todo-item-description">
                     {finding.reason}；{finding.remediation}
                   </span>
                 }
@@ -344,9 +351,9 @@ export default function TodoPage() {
     <Card
       title={<Space><span>{t("todo.exceptions_title", language)}</span><Badge count={exceptions.filter((item) => item.exception_state !== "closed").length} showZero /></Space>}
       extra={<Button size="small" onClick={detectExceptions}>{t("todo.exceptions_detect", language)}</Button>}
-      style={{ borderRadius: 10, marginBottom: 16 }}
+      className="todo-exceptions-card"
     >
-      {!exceptionsScopeComplete && <Alert type="warning" showIcon style={{ marginBottom: 12 }} message={t("todo.exceptions_scope_warning", language)} />}
+      {!exceptionsScopeComplete && <Alert type="warning" showIcon className="todo-inline-alert" message={t("todo.exceptions_scope_warning", language)} />}
       {exceptions.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("todo.exceptions_empty", language)} />
       ) : (
@@ -357,11 +364,11 @@ export default function TodoPage() {
             <List.Item actions={[exceptionAction(exception)]}>
               <List.Item.Meta
                 title={<Space size={8} wrap>
-                  <StatusTag kind={statusKindFromAntColor(exception.exception_state === "closed" ? "default" : "error")}>{exception.exception_state}</StatusTag>
+                  <StatusTag kind={statusKindFromAntColor(exception.exception_state === "closed" ? "default" : "error")}>{exceptionStateLabel(exception.exception_state, language)}</StatusTag>
                   <StatusTag>{exception.rule_code} · {exception.rule_version}</StatusTag>
                   <span>{exception.contract_number || exception.batch_number || exception.subject_id}</span>
                 </Space>}
-                description={<span style={{ fontSize: 12, color: "var(--fg-muted)" }}>
+                description={<span className="todo-item-description">
                   {t("todo.exceptions_disposition", language)}: {exception.closing_disposition} · {t("todo.exceptions_detected_at", language)}: {dayjs(exception.last_detected_at).format("YYYY-MM-DD HH:mm")}
                 </span>}
               />
@@ -389,7 +396,7 @@ export default function TodoPage() {
             {readinessPanel}
             {exceptionPanel}
             {!loading && queue.total === 0 && exceptions.length === 0 && (
-              <Card style={{ borderRadius: 10, marginBottom: 16 }}>
+              <Card className="todo-all-clear-card">
                 <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("todo.all_clear", language)}>
                   <Space>
                     <Button type="primary" size="small" onClick={() => router.push("/contracts/new")}>{t("todo.start_contract", language)}</Button>
@@ -406,7 +413,7 @@ export default function TodoPage() {
             {section("todo.critical_dates_due", queue.critical_dates_due, openContract)}
           </Spin>
 
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 8 }}>
+          <Typography.Paragraph type="secondary" className="todo-scope-note">
             {t("todo.scope_note", language)}
           </Typography.Paragraph>
         </motion.div>

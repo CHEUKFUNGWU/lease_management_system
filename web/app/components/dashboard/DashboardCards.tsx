@@ -18,32 +18,19 @@ interface KPICardProps {
 export function KPICard({ title, value, prefix, loading }: KPICardProps) {
   return (
     <motion.div variants={staggerItem}>
-      <Card styles={{ body: { padding: "20px 24px" } }} style={{ borderRadius: 10, height: "100%" }}>
+      <Card className="dashboard-kpi-card">
         {loading ? (
           <Skeleton active paragraph={false} title={{ width: "60%" }} />
         ) : (
           <Statistic
             title={
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "var(--fg-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.02em",
-                }}
-              >
+              <span className="dashboard-kpi-label">
                 {title}
               </span>
             }
             value={value}
-            prefix={<span style={{ marginRight: 8, display: "inline-flex" }}>{prefix}</span>}
-            valueStyle={{
-              fontSize: 28,
-              fontWeight: 600,
-              letterSpacing: "-0.03em",
-              color: "var(--fg-primary)",
-            }}
+            prefix={<span className="dashboard-kpi-prefix">{prefix}</span>}
+            className="dashboard-kpi-stat"
           />
         )}
       </Card>
@@ -61,37 +48,28 @@ interface MoneyKPICardProps {
 export function MoneyKPICard({ title, value, subtitle, loading }: MoneyKPICardProps) {
   return (
     <motion.div variants={staggerItem}>
-      <Card styles={{ body: { padding: "20px 24px" } }} style={{ borderRadius: 10, height: "100%" }}>
+      <Card className="dashboard-money-card">
         {loading ? (
           <Skeleton active paragraph={false} title={{ width: "60%" }} />
         ) : (
           <>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--fg-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.02em",
-                marginBottom: 4,
-              }}
-            >
+            <div className="dashboard-money-label">
               {title}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div className="dashboard-money-stack">
               {value.length === 0 ? (
-                <div style={{ fontSize: 26, fontWeight: 600, color: "var(--fg-primary)" }}>—</div>
+                <div className="dashboard-money-empty">—</div>
               ) : value.map((slice) => (
-                <div key={slice.currency} title={fmtMoney(slice.value, slice.currency)} className="money-kpi-value-line" style={{ display: "flex", alignItems: "baseline", gap: 8, fontVariantNumeric: "tabular-nums" }}>
-                  <span style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.03em", color: "var(--fg-primary)" }}>
+                <div key={slice.currency} title={fmtMoney(slice.value, slice.currency)} className="money-kpi-value-line">
+                  <span className="dashboard-money-value">
                     {slice.value === 0 ? "0.00" : compactMoney(slice.value, slice.currency)}
                   </span>
-                  <span style={{ fontSize: 12, color: "var(--fg-tertiary)", fontWeight: 600 }}>{slice.currency || "—"}</span>
+                  <span className="dashboard-money-currency">{slice.currency || "—"}</span>
                 </div>
               ))}
             </div>
             {subtitle && (
-              <div style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 2 }}>{subtitle}</div>
+              <div className="dashboard-money-subtitle">{subtitle}</div>
             )}
           </>
         )}
@@ -115,10 +93,9 @@ interface ChartCardProps {
 export function ChartCard({ title, children, extra }: ChartCardProps) {
   return (
     <Card
-      title={<span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>{title}</span>}
+      title={<span className="dashboard-chart-title">{title}</span>}
       extra={extra}
-      styles={{ body: { padding: "20px 24px 24px" } }}
-      style={{ borderRadius: 10, height: "100%" }}
+      className="dashboard-chart-card"
     >
       {children}
     </Card>

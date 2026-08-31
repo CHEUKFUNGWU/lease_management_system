@@ -12,7 +12,6 @@ import {
   Select,
   message,
   Alert,
-  Tag,
   Space,
 } from "antd";
 import { ArrowLeftOutlined, SaveOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
@@ -195,7 +194,7 @@ export default function NewContractPage() {
               type="warning"
               showIcon
               icon={<ExclamationCircleOutlined />}
-              style={{ marginBottom: 16 }}
+              className="contract-new-alert"
             />
           )}
 
@@ -297,7 +296,7 @@ export default function NewContractPage() {
               <InputNumber
                 min={0}
                 step={10}
-                style={{ width: "100%" }}
+                className="contract-new-full-width"
                 placeholder={t("contract_new.area_sqm_placeholder", language)}
                 addonAfter="㎡"
               />
@@ -324,7 +323,7 @@ export default function NewContractPage() {
               name="commencement_date"
               rules={[{ required: true, message: t("contract_new.please_select_date", language) }]}
             >
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker className="contract-new-full-width" />
             </Form.Item>
 
             <Form.Item
@@ -332,7 +331,7 @@ export default function NewContractPage() {
               name="lease_start_date"
               rules={[{ required: true, message: t("contract_new.please_select_start", language) }]}
             >
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker className="contract-new-full-width" />
             </Form.Item>
 
             <Form.Item
@@ -340,11 +339,11 @@ export default function NewContractPage() {
               name="lease_end_date"
               rules={[{ required: true, message: t("contract_new.please_select_end", language) }]}
             >
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker className="contract-new-full-width" />
             </Form.Item>
 
-            <Card title={t("contract_new.discount_rate_section", language)} size="small" style={{ marginBottom: 16 }}>
-              <Space direction="vertical" style={{ width: "100%" }}>
+            <Card title={t("contract_new.discount_rate_section", language)} size="small" className="contract-new-section-card">
+              <Space direction="vertical" className="contract-new-full-width">
                 <Alert
                   message={t("contract_new.discount_rate_tip", language)}
                   description={t("contract_new.discount_rate_tip_desc", language)}
@@ -358,7 +357,7 @@ export default function NewContractPage() {
                   help={t("contract_new.discount_rate_help", language)}
                 >
                   <InputNumber
-                    style={{ width: "100%" }}
+                    className="contract-new-full-width"
                     min={0}
                     step={0.01}
                     placeholder={t("contract_new.discount_rate_placeholder", language)}
@@ -386,28 +385,28 @@ export default function NewContractPage() {
               </Space>
             </Card>
 
-            <Card title="IFRS 16 范围判定" size="small" style={{ marginBottom: 16 }}>
-              <Space direction="vertical" style={{ width: "100%" }}>
+            <Card title={t("contract_new.scope_section", language)} size="small" className="contract-new-section-card">
+              <Space direction="vertical" className="contract-new-full-width">
                 <Alert
-                  message="范围闸门"
-                  description="先判断合同是否需要资本化。短期租赁、低价值资产和非租赁合同不会生成 ROU 与租赁负债。"
+                  message={t("contract_new.scope_gate", language)}
+                  description={t("contract_new.scope_gate_desc", language)}
                   type="info"
                   showIcon
                 />
                 <Form.Item
-                  label="计量范围"
+                  label={t("contract_new.scope_label", language)}
                   name="lease_scope"
-                  rules={[{ required: true, message: "请选择 IFRS 16 计量范围" }]}
+                  rules={[{ required: true, message: t("contract_new.scope_required", language) }]}
                 >
                   <Select>
-                    <Select.Option value="in_scope">资本化租赁（ROU + 租赁负债）</Select.Option>
-                    <Select.Option value="short_term_exempt">短期租赁豁免（直线法费用化）</Select.Option>
-                    <Select.Option value="low_value_exempt">低价值资产豁免（直线法费用化）</Select.Option>
-                    <Select.Option value="not_a_lease">非租赁合同（不入 IFRS 16）</Select.Option>
+                    <Select.Option value="in_scope">{t("contract_new.scope_in_scope", language)}</Select.Option>
+                    <Select.Option value="short_term_exempt">{t("contract_new.scope_short_term", language)}</Select.Option>
+                    <Select.Option value="low_value_exempt">{t("contract_new.scope_low_value", language)}</Select.Option>
+                    <Select.Option value="not_a_lease">{t("contract_new.scope_not_lease", language)}</Select.Option>
                   </Select>
                 </Form.Item>
-                <Form.Item label="豁免/排除依据" name="exemption_reason">
-                  <Input.TextArea rows={2} placeholder="例如：租期 10 个月且无续租意图；未识别特定资产；低价值 IT 设备" />
+                <Form.Item label={t("contract_new.exemption_reason", language)} name="exemption_reason">
+                  <Input.TextArea rows={2} placeholder={t("contract_new.exemption_reason_placeholder", language)} />
                 </Form.Item>
               </Space>
             </Card>

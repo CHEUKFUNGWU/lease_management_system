@@ -1,5 +1,4 @@
 import { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import { AuthProvider } from "./context/AuthContext";
@@ -8,16 +7,8 @@ import ThemeProvider from "./components/ThemeProvider";
 import { THEME_COOKIE, parseTheme, type AppTheme } from "./lib/theme-cookie";
 import "./globals.css";
 
-// 自托管 Inter（STY-004）：CSS @import 渲染阻塞且依赖 Google 运行时；
-// next/font 构建期内联字体文件，display: swap 避免首屏字体跳动。
-// 中文字形不走 Inter，回退栈在 globals.css / tokens.ts / tailwind 保留。
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  display: "swap",
-  variable: "--font-inter",
-});
-
+// Typography is intentionally local-first: the interface uses the operating
+// system's SF Pro / Helvetica stack and falls back to installed CJK fonts.
 export const metadata: Metadata = {
   title: "零售经营分析工作站",
   description: "线下零售经营分析工作站：经营脉搏、门店 360、租金谈判测算与承租合同分析",
@@ -57,7 +48,7 @@ export default async function RootLayout({
   const theme: AppTheme = parseTheme(cookieStore.get(THEME_COOKIE)?.value);
 
   return (
-    <html lang="zh-CN" className={inter.variable} data-theme={theme}>
+    <html lang="zh-CN" data-theme={theme}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>

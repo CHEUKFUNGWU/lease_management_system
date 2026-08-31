@@ -11,7 +11,6 @@ import {
   Flex,
   Tooltip,
   Checkbox,
-  Tag,
   Empty,
   Spin,
 } from "antd";
@@ -24,9 +23,10 @@ import {
   CheckOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
-import type { EnterpriseColumn, EnterpriseTableProps, FilterCondition, SyncState } from "./types";
+import type { EnterpriseColumn, EnterpriseTableProps, SyncState } from "./types";
 import { useEnterpriseTable } from "./useEnterpriseTable";
 import { tableScrollX } from "../../lib/tableScroll";
+import { t, type Language } from "../../lib/i18n";
 
 const { Text } = Typography;
 
@@ -40,8 +40,9 @@ export function EnterpriseTable<T extends object = any>({
   onSaveInLineEdit,
   onBatchAction,
   batchActions = [],
-  searchPlaceholder = "快速过滤...",
-  emptyText = "暂无数据",
+  searchPlaceholder,
+  emptyText,
+  language = "zh-CN",
   scrollMaxHeight = "calc(100vh - 280px)",
 }: EnterpriseTableProps<T>) {
   const {
@@ -74,17 +75,19 @@ export function EnterpriseTable<T extends object = any>({
   });
 
   const [newViewName, setNewViewName] = useState("");
+  const resolvedSearchPlaceholder = searchPlaceholder ?? t("enterprise.quick_filter", language);
+  const resolvedEmptyText = emptyText ?? t("enterprise.no_data", language);
 
   const isAllSelected = filteredData.length > 0 && selectedRowKeys.size >= filteredData.length;
   const isIndeterminate = selectedRowKeys.size > 0 && selectedRowKeys.size < filteredData.length;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%" }}>
+    <div className="enterprise-table">
       {/* ─── Top Views & Filter Bar ─── */}
       <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
         {/* Saved Views Tabs */}
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <Text style={{ fontSize: 12, color: "var(--fg-muted)", marginRight: 4 }}>已保存视图:</Text>
+        <div className="enterprise-table-views">
+          <Text className="enterprise-table-views-label">{t("enterprise.saved_views", language)}</Text>
           {allViews.map((v) => {
             const isActive = v.id === activeViewId;
             const count = viewCounts[v.id] ?? 0;
@@ -93,33 +96,11 @@ export function EnterpriseTable<T extends object = any>({
                 key={v.id}
                 type="button"
                 onClick={() => setActiveViewId(v.id)}
-                style={{
-                  height: 28,
-                  padding: "0 10px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: isActive ? "var(--bg-surface)" : "transparent",
-                  boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.08), inset 0 0 0 1px var(--border-default)" : "none",
-                  color: isActive ? "var(--fg-primary)" : "var(--fg-tertiary)",
-                  fontWeight: isActive ? 600 : 400,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  transition: "all 0.15s ease",
-                }}
+                className={`enterprise-table-view-tab${isActive ? " is-active" : ""}`}
               >
                 <span>{v.name}</span>
                 <span
-                  style={{
-                    fontSize: 11,
-                    color: isActive ? "var(--fg-primary)" : "var(--fg-muted)",
-                    background: isActive ? "var(--bg-inset)" : "transparent",
-                    padding: "0 5px",
-                    borderRadius: 9999,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
+                  className={`enterprise-table-view-count${isActive ? " is-active" : ""}`}
                 >
                   {count}
                 </span>
@@ -131,40 +112,31 @@ export function EnterpriseTable<T extends object = any>({
         {/* Quick Search & Filter Drawer Trigger */}
         <Space size={8}>
           <Input
-            placeholder={searchPlaceholder}
+            placeholder={resolvedSearchPlaceholder}
             value={quickSearch}
             onChange={(e) => setQuickSearch(e.target.value)}
             allowClear
             size="small"
-            style={{ width: 220, borderRadius: 6 }}
+            className="enterprise-table-search-input"
           />
           <Button
             size="small"
             icon={<FilterOutlined />}
             onClick={() => setFilterDrawerOpen(true)}
-            style={{ borderRadius: 6 }}
+            className="enterprise-table-filter-button"
           >
-            高级筛选 {advancedFilters.length > 0 && `(${advancedFilters.length})`}
+            {t("enterprise.advanced_filters", language)} {advancedFilters.length > 0 && `(${advancedFilters.length})`}
           </Button>
         </Space>
       </Flex>
 
       {/* ─── Floating Bulk Actions Bar ─── */}
       {selectedRowKeys.size > 0 && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "8px 16px",
-            background: "var(--bg-inset)",
-            boxShadow: "var(--shadow-static), 0 0 0 1px var(--border-default)",
-            borderRadius: 8,
-            fontSize: 13,
-          }}
-        >
-          <Text style={{ fontWeight: 600 }}>已选中 {selectedRowKeys.size} 项</Text>
-          <div style={{ flex: 1 }} />
+        <div className="enterprise-table-bulk-actions">
+          <Text className="enterprise-table-selected-count">
+            {t("enterprise.selected_count", language, { count: String(selectedRowKeys.size) })}
+          </Text>
+          <div className="enterprise-table-bulk-spacer" />
           {batchActions.map((action) => (
             <Button
               key={action.key}
@@ -172,7 +144,7 @@ export function EnterpriseTable<T extends object = any>({
               danger={action.danger}
               icon={action.icon}
               onClick={() => onBatchAction?.(action.key, selectedRecords)}
-              style={{ borderRadius: 6 }}
+              className="enterprise-table-action-button"
             >
               {action.label}
             </Button>
@@ -182,48 +154,21 @@ export function EnterpriseTable<T extends object = any>({
             type="text"
             icon={<CloseOutlined />}
             onClick={clearSelection}
-            style={{ color: "var(--fg-muted)" }}
+            className="enterprise-table-clear-selection"
           >
-            取消选择
+            {t("enterprise.clear_selection", language)}
           </Button>
         </div>
       )}
 
       {/* ─── Enterprise Data Table Body ─── */}
-      <div
-        style={{
-          boxShadow: "var(--shadow-static), 0 0 0 1px var(--border-default)",
-          borderRadius: 8,
-          background: "var(--bg-surface)",
-          overflow: "auto",
-          maxHeight: scrollMaxHeight,
-          width: "100%",
-        }}
-      >
+      <div className="enterprise-table-shell" style={{ maxHeight: scrollMaxHeight }}>
         <Spin spinning={loading}>
-          <table
-            style={{
-              width: "100%",
-              minWidth: 1000,
-              borderCollapse: "collapse",
-              fontSize: 13,
-              textAlign: "left",
-            }}
-          >
+          <table className="enterprise-table-grid">
             <thead>
-              <tr style={{ background: "var(--bg-inset)", position: "sticky", top: 0, zIndex: 10 }}>
+              <tr className="enterprise-table-header-row">
                 {/* Select All Checkbox Column */}
-                <th
-                  style={{
-                    width: 44,
-                    padding: "10px 12px",
-                    borderBottom: "1px solid var(--border-default)",
-                    position: "sticky",
-                    left: 0,
-                    background: "var(--bg-inset)",
-                    zIndex: 11,
-                  }}
-                >
+                <th className="enterprise-table-checkbox-header">
                   <Checkbox
                     checked={isAllSelected}
                     indeterminate={isIndeterminate}
@@ -236,20 +181,8 @@ export function EnterpriseTable<T extends object = any>({
                   return (
                     <th
                       key={col.key}
-                      style={{
-                        padding: "10px 14px",
-                        fontWeight: 600,
-                        color: "var(--fg-secondary)",
-                        borderBottom: "1px solid var(--border-default)",
-                        textAlign: col.align || "left",
-                        width: col.width,
-                        minWidth: col.minWidth,
-                        position: isFirstCol ? "sticky" : undefined,
-                        left: isFirstCol ? 44 : undefined,
-                        background: isFirstCol ? "var(--bg-inset)" : undefined,
-                        zIndex: isFirstCol ? 11 : undefined,
-                        boxShadow: isFirstCol ? "2px 0 4px rgba(0,0,0,0.03)" : undefined,
-                      }}
+                      className={`enterprise-table-header-cell${isFirstCol ? " is-fixed-first" : ""}`}
+                      style={{ textAlign: col.align || "left", width: col.width, minWidth: col.minWidth }}
                     >
                       {col.title}
                     </th>
@@ -260,8 +193,8 @@ export function EnterpriseTable<T extends object = any>({
             <tbody>
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + 1} style={{ padding: "40px 0", textAlign: "center" }}>
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} />
+                  <td colSpan={columns.length + 1} className="enterprise-table-empty-cell">
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={resolvedEmptyText} />
                   </td>
                 </tr>
               ) : (
@@ -270,25 +203,9 @@ export function EnterpriseTable<T extends object = any>({
                   const isSelected = selectedRowKeys.has(id);
 
                   return (
-                    <tr
-                      key={id}
-                      style={{
-                        background: isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface)",
-                        transition: "background 0.15s ease",
-                      }}
-                    >
+                    <tr key={id} className={`enterprise-table-data-row${isSelected ? " is-selected" : ""}`}>
                       {/* Row Checkbox */}
-                      <td
-                        style={{
-                          width: 44,
-                          padding: "8px 12px",
-                          borderBottom: "1px solid var(--border-subtle)",
-                          position: "sticky",
-                          left: 0,
-                          background: isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface)",
-                          zIndex: 5,
-                        }}
-                      >
+                      <td className={`enterprise-table-checkbox-cell${isSelected ? " is-selected" : ""}`}>
                         <Checkbox
                           checked={isSelected}
                           onChange={(e) => handleSelectRow(id, e.target.checked)}
@@ -304,16 +221,8 @@ export function EnterpriseTable<T extends object = any>({
                         return (
                           <td
                             key={col.key}
-                            style={{
-                              padding: "8px 14px",
-                              borderBottom: "1px solid var(--border-subtle)",
-                              textAlign: col.align || "left",
-                              position: isFirstCol ? "sticky" : undefined,
-                              left: isFirstCol ? 44 : undefined,
-                              background: isFirstCol ? (isSelected ? "var(--bg-hover, #FAFAFA)" : "var(--bg-surface)") : undefined,
-                              zIndex: isFirstCol ? 5 : undefined,
-                              boxShadow: isFirstCol ? "2px 0 4px rgba(0,0,0,0.03)" : undefined,
-                            }}
+                            className={`enterprise-table-data-cell${isFirstCol ? " is-fixed-first" : ""}${isSelected ? " is-selected" : ""}`}
+                            style={{ textAlign: col.align || "left" }}
                           >
                             {col.editable ? (
                               <EditableCell
@@ -321,6 +230,7 @@ export function EnterpriseTable<T extends object = any>({
                                 type={col.editType || "text"}
                                 syncState={syncState}
                                 options={col.selectOptions}
+                                language={language}
                                 onSave={(newVal) => handleCellEdit(record, fieldKey, newVal)}
                               />
                             ) : col.render ? (
@@ -342,7 +252,7 @@ export function EnterpriseTable<T extends object = any>({
 
       {/* ─── Slide-Out Advanced Filter Drawer ─── */}
       <Drawer
-        title="高级筛选"
+        title={t("enterprise.filter_title", language)}
         placement="right"
         width={400}
         open={filterDrawerOpen}
@@ -353,23 +263,23 @@ export function EnterpriseTable<T extends object = any>({
             size="small"
             onClick={() => setAdvancedFilters([])}
           >
-            清空条件
+            {t("enterprise.clear_conditions", language)}
           </Button>
         }
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Text style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-            组合多个过滤条件，筛选结果实时在背景表格中更新。
+        <div className="enterprise-filter-drawer">
+          <Text className="enterprise-filter-hint">
+            {t("enterprise.filter_hint", language)}
           </Text>
 
           {/* Filter Rows */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="enterprise-filter-rows">
             {advancedFilters.map((cond, idx) => (
               <Flex key={cond.id} gap={8} align="center">
                 <Select
                   size="small"
                   value={cond.field}
-                  style={{ width: 110 }}
+                  className="enterprise-filter-field"
                   options={columns.map((c) => ({ label: c.title, value: String(c.dataIndex || c.key) }))}
                   onChange={(val) => {
                     const next = [...advancedFilters];
@@ -380,13 +290,13 @@ export function EnterpriseTable<T extends object = any>({
                 <Select
                   size="small"
                   value={cond.operator}
-                  style={{ width: 90 }}
+                  className="enterprise-filter-operator"
                   options={[
-                    { label: "等于", value: "equals" },
-                    { label: "不等于", value: "not_equals" },
-                    { label: "包含", value: "contains" },
-                    { label: "大于", value: "gt" },
-                    { label: "小于", value: "lt" },
+                    { label: t("enterprise.filter_equals", language), value: "equals" },
+                    { label: t("enterprise.filter_not_equals", language), value: "not_equals" },
+                    { label: t("enterprise.filter_contains", language), value: "contains" },
+                    { label: t("enterprise.filter_greater_than", language), value: "gt" },
+                    { label: t("enterprise.filter_less_than", language), value: "lt" },
                   ]}
                   onChange={(val) => {
                     const next = [...advancedFilters];
@@ -397,8 +307,8 @@ export function EnterpriseTable<T extends object = any>({
                 <Input
                   size="small"
                   value={cond.value}
-                  placeholder="值"
-                  style={{ flex: 1 }}
+                  placeholder={t("enterprise.filter_value", language)}
+                  className="enterprise-filter-value"
                   onChange={(e) => {
                     const next = [...advancedFilters];
                     next[idx].value = e.target.value;
@@ -426,21 +336,21 @@ export function EnterpriseTable<T extends object = any>({
                   { id: `cond_${Date.now()}`, field: String(columns[0]?.dataIndex || columns[0]?.key), operator: "contains", value: "" },
                 ]);
               }}
-              style={{ alignSelf: "flex-start", borderRadius: 6 }}
+              className="enterprise-filter-add-button"
             >
-              增加条件
+              {t("enterprise.add_condition", language)}
             </Button>
           </div>
 
-          <hr style={{ border: "none", borderTop: "1px solid var(--border-subtle)", margin: "8px 0" }} />
+          <hr className="enterprise-filter-divider" />
 
           {/* Save as Custom View */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <Text style={{ fontSize: 13, fontWeight: 600 }}>存为常用视图</Text>
+          <div className="enterprise-save-view">
+            <Text className="enterprise-save-view-label">{t("enterprise.save_common_view", language)}</Text>
             <Flex gap={8}>
               <Input
                 size="small"
-                placeholder="例如：大额待复核合同"
+                placeholder={t("enterprise.view_name_placeholder", language)}
                 value={newViewName}
                 onChange={(e) => setNewViewName(e.target.value)}
               />
@@ -455,7 +365,7 @@ export function EnterpriseTable<T extends object = any>({
                   setFilterDrawerOpen(false);
                 }}
               >
-                保存
+                {t("enterprise.save", language)}
               </Button>
             </Flex>
           </div>
@@ -472,12 +382,14 @@ function EditableCell({
   type = "text",
   syncState,
   options = [],
+  language = "zh-CN",
   onSave,
 }: {
   value: any;
   type?: "text" | "number" | "select" | "date";
   syncState?: SyncState;
   options?: Array<{ label: string; value: any }>;
+  language?: Language;
   onSave: (newVal: any) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -516,27 +428,10 @@ function EditableCell({
     }
   };
 
-  const syncBorderColor =
-    syncState?.status === "syncing"
-      ? "var(--state-info-text)"
-      : syncState?.status === "synced"
-      ? "var(--state-success-text)"
-      : syncState?.status === "error"
-      ? "var(--state-error-text)"
-      : "transparent";
+  const syncClass = syncState?.status ? ` has-sync-state is-${syncState.status}` : "";
 
   return (
-    <div
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        alignItems: "center",
-        width: "100%",
-        paddingLeft: syncState?.status ? 6 : 0,
-        borderLeft: syncState?.status ? `3px solid ${syncBorderColor}` : "3px solid transparent",
-        transition: "all 0.2s ease",
-      }}
-    >
+    <div className={`enterprise-edit-wrapper${syncClass}`}>
       {editing ? (
         type === "select" ? (
           <Select
@@ -550,7 +445,7 @@ function EditableCell({
               setEditing(false);
             }}
             onBlur={handleCommit}
-            style={{ width: "100%" }}
+            className="enterprise-edit-input"
           />
         ) : (
           <Input
@@ -560,11 +455,11 @@ function EditableCell({
             onChange={(e) => setDraft(type === "number" ? Number(e.target.value) || 0 : e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleCommit}
-            style={{ width: "100%", padding: "2px 6px", fontSize: 13 }}
+            className="enterprise-edit-input"
           />
         )
       ) : (
-        <Tooltip title={syncState?.error || (syncState?.status === "syncing" ? "同步中..." : "点击可直接行内修改")}>
+        <Tooltip title={syncState?.error || (syncState?.status === "syncing" ? t("enterprise.syncing", language) : t("enterprise.edit_hint", language))}>
           <div
             className="enterprise-inline-edit-cell"
             role="button"
@@ -576,21 +471,10 @@ function EditableCell({
                 setEditing(true);
               }
             }}
-            style={{
-              cursor: "pointer",
-              padding: "2px 6px",
-              borderRadius: 4,
-              width: "100%",
-              minHeight: 24,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              background: "transparent",
-            }}
           >
             <span>{value !== undefined && value !== null ? String(value) : "—"}</span>
-            {syncState?.status === "syncing" && <LoadingOutlined style={{ fontSize: 11, color: "var(--state-info-text)" }} />}
-            {syncState?.status === "synced" && <CheckOutlined style={{ fontSize: 11, color: "var(--state-success-text)" }} />}
+            {syncState?.status === "syncing" && <LoadingOutlined className="enterprise-sync-icon is-syncing" />}
+            {syncState?.status === "synced" && <CheckOutlined className="enterprise-sync-icon is-synced" />}
           </div>
         </Tooltip>
       )}

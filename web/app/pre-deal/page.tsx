@@ -11,7 +11,6 @@ import {
   Input,
   InputNumber,
   Row,
-  Statistic,
   Table,
   Typography,
   message,
@@ -142,7 +141,7 @@ export default function PreDealPage() {
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
           <PageHeader
-            title={<>{t("pre_deal.title", language)}<span className="page-header-count">{t("pre_deal.header_count", language, { currency: currency || "—", count: String(briefing?.yearly?.length ?? 0) })}</span></>}
+            title={t("pre_deal.title", language)}
           />
 
           <Form
@@ -151,7 +150,7 @@ export default function PreDealPage() {
             initialValues={{ discount_rate: DEFAULT_DISCOUNT_RATE }}
             onFinish={handleBuild}
           >
-            <Card title={t("pre_deal.card_terms", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
+            <Card title={t("pre_deal.card_terms", language)} className="pre-deal-terms-card">
               <Row gutter={16}>
                 <Col xs={24} md={6}>
                   <Form.Item label={t("pre_deal.label_name", language)} name="name" rules={[{ required: true, message: t("pre_deal.err_name", language) }]}>
@@ -160,17 +159,17 @@ export default function PreDealPage() {
                 </Col>
                 <Col xs={12} md={4}>
                   <Form.Item label={t("pre_deal.label_start", language)} name="commencement_date" rules={[{ required: true, message: t("pre_deal.err_start", language) }]}>
-                    <DatePicker style={{ width: "100%" }} />
+                    <DatePicker className="pre-deal-full-width" />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={3}>
                   <Form.Item label={t("pre_deal.label_term", language)} name="term_months" rules={[{ required: true, message: t("pre_deal.err_term", language) }]}>
-                    <InputNumber style={{ width: "100%" }} min={1} />
+                    <InputNumber className="pre-deal-full-width" min={1} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
                   <Form.Item label={t("pre_deal.label_rent", language)} name="monthly_rent" rules={[{ required: true, message: t("pre_deal.err_rent", language) }]}>
-                    <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                    <InputNumber className="pre-deal-full-width" min={0} precision={2} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={3}>
@@ -184,7 +183,7 @@ export default function PreDealPage() {
                       </span>
                     }
                   >
-                    <InputNumber style={{ width: "100%" }} min={0.0001} max={1} step={0.005} precision={4} />
+                    <InputNumber className="pre-deal-full-width" min={0.0001} max={1} step={0.005} precision={4} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
@@ -196,22 +195,22 @@ export default function PreDealPage() {
               <Row gutter={16}>
                 <Col xs={12} md={4}>
                   <Form.Item label={t("pre_deal.label_free", language)} name="rent_free_months">
-                    <InputNumber style={{ width: "100%" }} min={0} />
+                    <InputNumber className="pre-deal-full-width" min={0} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
                   <Form.Item label={t("pre_deal.label_escalation", language)} name="annual_escalation_percent">
-                    <InputNumber style={{ width: "100%" }} precision={2} />
+                    <InputNumber className="pre-deal-full-width" precision={2} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={5}>
                   <Form.Item label={t("pre_deal.label_direct_cost", language)} name="initial_direct_cost" extra={t("pre_deal.hint_direct_cost", language)}>
-                    <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                    <InputNumber className="pre-deal-full-width" min={0} precision={2} />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={5}>
                   <Form.Item label={t("pre_deal.label_exit_penalty", language)} name="early_exit_penalty_months" extra={t("pre_deal.hint_exit_penalty", language)}>
-                    <InputNumber style={{ width: "100%" }} min={0} precision={1} />
+                    <InputNumber className="pre-deal-full-width" min={0} precision={1} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={6}>
@@ -235,51 +234,43 @@ export default function PreDealPage() {
               <Alert
                 type="info"
                 showIcon
-                style={{ marginBottom: 16, borderRadius: 10 }}
+                className="pre-deal-alert"
                 message={t("pre_deal.alert_title", language)}
                 description={briefing.headline}
               />
 
-              <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", marginBottom: 16 }}>
-                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_liability", language)}</span>
-                  <div style={{ margin: "8px 0 0" }}>
-                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                      {fmtMoney(briefing.balance_sheet.initial_liability, currency)}
-                    </Typography.Text>
-                  </div>
+              <div className="stripe-metric-grid pre-deal-summary-grid">
+                <div className="pulse-kpi-card pre-deal-summary-card">
+                  <span className="pre-deal-summary-label">{t("pre_deal.stat_liability", language)}</span>
+                  <Typography.Text className="font-tabular pre-deal-summary-value">
+                    {fmtMoney(briefing.balance_sheet.initial_liability, currency)}
+                  </Typography.Text>
                 </div>
-                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_rou", language)}</span>
-                  <div style={{ margin: "8px 0 0" }}>
-                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                      {fmtMoney(briefing.balance_sheet.initial_rou, currency)}
-                    </Typography.Text>
-                  </div>
+                <div className="pulse-kpi-card pre-deal-summary-card">
+                  <span className="pre-deal-summary-label">{t("pre_deal.stat_rou", language)}</span>
+                  <Typography.Text className="font-tabular pre-deal-summary-value">
+                    {fmtMoney(briefing.balance_sheet.initial_rou, currency)}
+                  </Typography.Text>
                 </div>
-                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_commitment", language)}</span>
-                  <div style={{ margin: "8px 0 0" }}>
-                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                      {fmtMoney(briefing.balance_sheet.undiscounted_commitment, currency)}
-                    </Typography.Text>
-                  </div>
+                <div className="pulse-kpi-card pre-deal-summary-card">
+                  <span className="pre-deal-summary-label">{t("pre_deal.stat_commitment", language)}</span>
+                  <Typography.Text className="font-tabular pre-deal-summary-value">
+                    {fmtMoney(briefing.balance_sheet.undiscounted_commitment, currency)}
+                  </Typography.Text>
                 </div>
-                <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pre_deal.stat_discount_effect", language)}</span>
-                  <div style={{ margin: "8px 0 0" }}>
-                    <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                      {fmtMoney(briefing.balance_sheet.discounting_effect, currency)}
-                    </Typography.Text>
-                  </div>
+                <div className="pulse-kpi-card pre-deal-summary-card">
+                  <span className="pre-deal-summary-label">{t("pre_deal.stat_discount_effect", language)}</span>
+                  <Typography.Text className="font-tabular pre-deal-summary-value">
+                    {fmtMoney(briefing.balance_sheet.discounting_effect, currency)}
+                  </Typography.Text>
                 </div>
               </div>
 
-              <Card title={t("pre_deal.card_expense_curve", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
-                <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
+              <Card title={t("pre_deal.card_expense_curve", language)} className="pre-deal-chart-card">
+                <div className="pre-deal-chart-note">
                   {t("pre_deal.expense_curve_note", language, { years: String(briefing.front_loaded_years) })}
                 </div>
-                <div style={{ width: "100%", height: 300 }}>
+                <div className="pre-deal-expense-chart">
                   <ResponsiveContainer>
                     <LineChart data={briefing.yearly}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -295,11 +286,11 @@ export default function PreDealPage() {
                 </div>
               </Card>
 
-              <Card title={t("pre_deal.card_ebitda", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
-                <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
+              <Card title={t("pre_deal.card_ebitda", language)} className="pre-deal-chart-card">
+                <div className="pre-deal-chart-note">
                   {t("pre_deal.ebitda_note", language)}
                 </div>
-                <div style={{ width: "100%", height: 280 }}>
+                <div className="pre-deal-ebitda-chart">
                   <ResponsiveContainer>
                     <BarChart data={briefing.ebitda_bridge}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -317,8 +308,8 @@ export default function PreDealPage() {
                 </div>
               </Card>
 
-              <Card title={t("pre_deal.card_exit", language)} style={{ borderRadius: 10 }}>
-                <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
+              <Card title={t("pre_deal.card_exit", language)}>
+                <div className="pre-deal-chart-note">
                   {t("pre_deal.exit_note", language)}
                 </div>
                 <Table
@@ -358,7 +349,7 @@ export default function PreDealPage() {
                       dataIndex: "pnl_impact",
                       align: "right" as const,
                       render: (value: number) => (
-                        <strong style={{ color: value > 0 ? "var(--state-error-text)" : "var(--state-success-text)" }}>
+                        <strong className={value > 0 ? "pre-deal-pnl is-negative" : "pre-deal-pnl is-positive"}>
                           {fmtMoney(value, currency)}
                         </strong>
                       ),

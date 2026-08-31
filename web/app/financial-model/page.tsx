@@ -439,13 +439,6 @@ export default function FinancialModelPage() {
         <PageHeader
           title={t("nav.financial_model", language)}
           help={<HelpTrigger content={financialModelHelpContent(language)} language={language} />}
-          meta={
-            <>
-              {t("finmodel.page_intro", language)}
-              {" · "}
-              {t("finmodel.basis_note", language)}
-            </>
-          }
           primaryAction={
             <Button type="primary" loading={wb.phase === "dispatching" || wb.phase === "polling"} disabled={!canRun} onClick={startRun}>
               {t("finmodel.run", language)}

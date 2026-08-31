@@ -4,7 +4,7 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Card, Col, Empty, Row, Segmented, Space, Statistic, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Empty, Row, Segmented, Space, Table, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -180,7 +180,7 @@ function PortfolioPage() {
     <ProtectedRoute>
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <div className="portfolio-page-stack">
             <PageHeader
               title={t("pf.title", language)}
               help={<HelpTrigger content={portfolioHelpContent(language)} language={language} />}
@@ -192,8 +192,8 @@ function PortfolioPage() {
                     value={mode}
                     onChange={(value) => setModeParam(value as string)}
                     options={[
-                      { label: "Working", value: "working" },
-                      { label: "Official", value: "official" },
+                      { label: t("trust.basis_working", language), value: "working" },
+                      { label: t("trust.basis_official", language), value: "official" },
                     ]}
                   />
                   <Button icon={<ReloadOutlined />} onClick={summaryQuery.retry} loading={loading}>
@@ -212,46 +212,36 @@ function PortfolioPage() {
               />
             )}
 
-            <Alert
-              type={mode === "official" ? "success" : "info"}
-              showIcon
-              message={mode === "official" ? t("pf.mode_official", language) : t("pf.mode_working", language)}
-            />
+            <div className="card-context portfolio-basis-note">
+              {mode === "official" ? t("pf.mode_official", language) : t("pf.mode_working", language)}
+            </div>
 
-            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pf.kpi.contracts", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {totals.contracts}
-                  </Typography.Text>
-                </div>
+            <div className="stripe-metric-grid portfolio-summary-grid">
+              <div className="pulse-kpi-card portfolio-summary-card">
+                <span className="portfolio-summary-label">{t("pf.kpi.contracts", language)}</span>
+                <Typography.Text className="font-tabular portfolio-summary-value">
+                  {totals.contracts}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pf.kpi.active", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {totals.active}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card portfolio-summary-card">
+                <span className="portfolio-summary-label">{t("pf.kpi.active", language)}</span>
+                <Typography.Text className="font-tabular portfolio-summary-value">
+                  {totals.active}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
+              <div className="pulse-kpi-card portfolio-summary-card">
+                <span className="portfolio-summary-label">
                   {totalsCurrency ? t("pf.kpi.fixed_commitment", language) : t("pf.kpi.fixed_commitment_multi", language)}
                 </span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {fmtMoney(totals.fixed, totalsCurrency)}
-                  </Typography.Text>
-                </div>
+                <Typography.Text className="font-tabular portfolio-summary-value">
+                  {fmtMoney(totals.fixed, totalsCurrency)}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("pf.kpi.missing_rate", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: totals.missingRates ? "var(--state-error-text)" : "var(--fg-primary)" }}>
-                    {totals.missingRates}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card portfolio-summary-card">
+                <span className="portfolio-summary-label">{t("pf.kpi.missing_rate", language)}</span>
+                <Typography.Text className={`font-tabular portfolio-summary-value${totals.missingRates ? " is-warning" : ""}`}>
+                  {totals.missingRates}
+                </Typography.Text>
               </div>
             </div>
 
@@ -269,14 +259,14 @@ function PortfolioPage() {
                 />
               }
             >
-              <div style={{ color: "var(--fg-tertiary)", marginBottom: 12, fontSize: 13 }}>
+              <div className="portfolio-rent-note">
                 {t("pf.rent_per_sqm_note", language)}
               </div>
               {contractsWithoutArea > 0 && (
                 <Alert
                   type="warning"
                   showIcon
-                  style={{ marginBottom: 12 }}
+                  className="portfolio-area-warning"
                   message={t("pf.missing_area_warning", language).replace("{count}", String(contractsWithoutArea))}
                   description={t("pf.missing_area_desc", language)}
                 />
@@ -335,7 +325,7 @@ function PortfolioPage() {
               />
             </Card>
 
-            <RentToSalesPanel token={token} />
+            <RentToSalesPanel token={token} language={language} />
 
             <Card title={t("pf.card.detail", language)}>
               <Table
@@ -398,7 +388,7 @@ function PortfolioPage() {
                 ]}
               />
             </Card>
-          </Space>
+          </div>
         </motion.div>
       </AppLayout>
     </ProtectedRoute>
@@ -407,7 +397,7 @@ function PortfolioPage() {
 
 export default function PortfolioPageWithUrlState() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+    <Suspense fallback={<div className="portfolio-loading" />}>
       <PortfolioPage />
     </Suspense>
   );

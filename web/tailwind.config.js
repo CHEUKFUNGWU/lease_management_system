@@ -9,37 +9,44 @@ module.exports = {
       colors: {
         // Monochrome scale: only levels consumed by the application
         mono: {
-          0: "#000000",   // Primary text, key actions
-          20: "#262626",  // Secondary text, hover on dark
-          40: "#595959",  // Body text, descriptions
-          60: "#737373",  // Muted text, placeholders
-          70: "#A6A6A6",  // Strong borders, scrollbar hover
-          90: "#D9D9D9",  // Hover borders, active borders
-          95: "#F0F0F0",  // Secondary backgrounds, table headers
-          98: "#F7F7F7",  // Card backgrounds, subtle surfaces
-          100: "#FFFFFF", // Page background, input backgrounds
+          0: "#111111",
+          20: "#2F3437",
+          40: "#5C605D",
+          60: "#787774",
+          70: "#A4A6A2",
+          90: "#EAEAEA",
+          95: "#F7F6F3",
+          98: "#FBFBFA",
+          100: "#FFFFFF",
         },
         // Semantic colors — paired with labels/icons and AA-safe text colors.
-        success: "#216E39",
-        warning: "#8A5300",
-        error: "#A8071A",
-        info: "#1F4E9C",
+        success: "#45604C",
+        warning: "#6B5A39",
+        error: "#744C4C",
+        info: "#465A6C",
       },
       fontFamily: {
+        display: [
+          '"Instrument Serif"',
+          '"Iowan Old Style"',
+          '"Baskerville"',
+          '"Noto Serif SC"',
+          "Georgia",
+          "serif",
+        ],
         sans: [
-          'var(--font-inter)',
           "-apple-system",
           "BlinkMacSystemFont",
-          '"Segoe UI"',
-          "Roboto",
+          '"Helvetica Neue"',
+          '"SF Pro Display"',
           '"Noto Sans SC"',
           '"PingFang SC"',
           '"Microsoft YaHei"',
           "sans-serif",
         ],
         mono: [
+          '"SF Mono"',
           '"JetBrains Mono"',
-          '"Fira Code"',
           "ui-monospace",
           "SFMono-Regular",
           "monospace",
@@ -151,10 +158,6 @@ module.exports = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.6" },
         },
-        "shimmer": {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
-        },
       },
       animation: {
         "fade-in": "fade-in 0.2s ease-out forwards",
@@ -163,7 +166,6 @@ module.exports = {
         "scale-in": "scale-in 0.2s ease-out forwards",
         "slide-in-right": "slide-in-right 0.2s ease-out forwards",
         "pulse-subtle": "pulse-subtle 2s ease-in-out infinite",
-        "shimmer": "shimmer 2s linear infinite",
       },
     },
   },

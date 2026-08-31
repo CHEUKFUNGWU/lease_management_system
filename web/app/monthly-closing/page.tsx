@@ -117,11 +117,11 @@ function CloseProcessRail({
   const current = isLocked ? 5 : summary?.posted_count ? 4 : summary?.approved_count ? 3 : summary?.total ? 2 : result ? 1 : 0;
   const nextLabel = current === 0 ? t("monthly.process_generate", language) : current === 1 ? t("monthly.process_review", language) : current === 2 ? t("monthly.process_approve", language) : current === 3 ? t("monthly.process_post", language) : current === 4 ? t("monthly.process_lock", language) : t("monthly.process_complete", language);
   return (
-    <Card style={{ marginBottom: 16, borderRadius: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+    <Card className="monthly-process-card">
+      <div className="monthly-process-header">
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--fg-primary)" }}>{period || t("monthly.process_select_period", language)}</div>
-          <div style={{ fontSize: 12, color: "var(--fg-muted)" }}>{t("monthly.process_title", language)}</div>
+          <div className="monthly-process-period">{period || t("monthly.process_select_period", language)}</div>
+          <div className="monthly-process-title">{t("monthly.process_title", language)}</div>
         </div>
         <Button type="primary" onClick={onNext} disabled={!period && current > 0}>{nextLabel}</Button>
       </div>
@@ -1055,6 +1055,7 @@ function MonthlyClosingPage() {
               columns={entryColumns as any}
               rowKey={(r) => r.id}
               loading={entriesLoading && entriesLoaded}
+              language={language}
               savedViews={[
                 { id: "pending_review", name: "待复核草稿", predicate: (e: any) => e.posting_status === "draft" },
                 { id: "pending_post", name: "待过账", predicate: (e: any) => e.posting_status === "approved" },
@@ -1270,22 +1271,6 @@ function MonthlyClosingPage() {
           <PageHeader
             title={t("monthly.title", language)}
             help={<HelpTrigger content={monthlyClosingHelpContent(language)} language={language} />}
-
-            meta={selectedPeriod ? (
-              <Space size={12} className="sty-b8bb6f7b">
-                <span className="sty-73be230f">
-                  {t("monthly.current_period", language)}：<strong className="sty-60d6ce74">{selectedPeriod}</strong>
-                </span>
-                <span className="sty-c6e381ce">·</span>
-                <span className="sty-7f21e1ba">
-                  {t("monthly.status_summary", language, {
-                    draftCount: String(entrySummary?.draft_count ?? 0),
-                    approvedCount: String(entrySummary?.approved_count ?? 0),
-                    postedCount: String(entrySummary?.posted_count ?? 0),
-                  })}
-                </span>
-              </Space>
-            ) : undefined}
           />
 
           <CloseProcessRail

@@ -92,7 +92,7 @@ export default function ProfitFlowPanel({
 
   return (
     <>
-      <div className="chart-frame" style={{ minHeight: 280 }}>
+      <div className="chart-frame profit-flow-chart">
         <ResponsiveContainer width="100%" height={280}>
           <Sankey
             data={data}

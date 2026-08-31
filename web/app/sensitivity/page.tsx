@@ -1,9 +1,9 @@
 "use client";
 
-import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
+import { StatusTag } from "../components/StatusTag";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
+import { Suspense, useMemo, useState } from "react";
+import { Button, Card, Col, Form, InputNumber, Row, Select, Table, Typography, message } from "antd";
 import { CalculatorOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -13,6 +13,8 @@ import { useRetailQuery } from "../retail/useRetailQuery";
 import TornadoChart from "../components/charts/TornadoChart";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 import { motion } from "framer-motion";
 import { useUrlState } from "../hooks/useUrlState";
 import { notifyError } from "../lib/notify";
@@ -38,6 +40,7 @@ const fmt = (value: number) => value.toLocaleString(undefined, { maximumFraction
 
 function SensitivityPage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const [form] = Form.useForm();
   const [contractParam, setContractParam] = useUrlState("contract_id", "");
   const [baseRateParam, setBaseRateParam] = useUrlState("base_rate", "");
@@ -47,8 +50,8 @@ function SensitivityPage() {
   const [loading, setLoading] = useState(false);
 
   const summary = useMemo(() => {
-    if (!rows.length) return { base: 0, maxUp: 0, maxDown: 0 };
-    const base = rows.find((row) => Math.abs(row.rate_delta) < 0.0000001)?.initial_liability || rows[0].initial_liability;
+    if (!rows.length) return { base: null, maxUp: null, maxDown: null };
+    const base = rows.find((row) => Math.abs(row.rate_delta) < 0.0000001)?.initial_liability ?? rows[0].initial_liability;
     return rows.reduce(
       (acc, row) => {
         acc.maxUp = Math.max(acc.maxUp, row.liability_delta);
@@ -65,12 +68,12 @@ function SensitivityPage() {
       const upRow = rows.find((r) => Math.abs(r.rate_delta - mag) < 0.0001);
       const downRow = rows.find((r) => Math.abs(r.rate_delta + mag) < 0.0001);
       return {
-        name: `利率冲击 ±${(mag * 100).toFixed(1)}%`,
-        lowValue: downRow?.initial_liability ?? summary.base,
-        highValue: upRow?.initial_liability ?? summary.base,
+        name: t("sensitivity.rate_shock", language, { percent: (mag * 100).toFixed(1) }),
+        lowValue: downRow?.initial_liability ?? summary.base ?? 0,
+        highValue: upRow?.initial_liability ?? summary.base ?? 0,
       };
     });
-  }, [rows, summary.base]);
+  }, [rows, summary.base, language]);
 
   // FETCH-003: the approved-contract dropdown runs through the shared
   // fetch seam (race gate / token injection / error exit).
@@ -100,9 +103,9 @@ function SensitivityPage() {
       );
       setRows(res.data || []);
       setMeta(res);
-      message.success("敏感性分析已生成");
+      message.success(t("sensitivity.generated", language));
     } catch (error: any) {
-      notifyError(error.message || "敏感性分析失败");
+      notifyError(error.message || t("sensitivity.failed", language));
     } finally {
       setLoading(false);
     }
@@ -112,11 +115,8 @@ function SensitivityPage() {
     <ProtectedRoute>
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            <PageHeader
-              title="敏感性分析"
-
-            />
+          <div className="sensitivity-page-stack">
+            <PageHeader title={t("sensitivity.title", language)} />
 
             <Card>
               <Form
@@ -129,74 +129,70 @@ function SensitivityPage() {
                   shock_percent: Number(shockParam) || 1,
                 }}
               >
-                <Form.Item name="contract_id" rules={[{ required: true, message: "请选择合同" }]} style={{ minWidth: 320 }}>
+                <Form.Item name="contract_id" rules={[{ required: true, message: t("sensitivity.contract_required", language) }]}>
                   <Select
                     showSearch
-                    placeholder="选择已审批合同"
+                    className="sensitivity-contract-select"
+                    placeholder={t("sensitivity.select_approved", language)}
                     optionFilterProp="label"
                     options={contracts.map((contract) => ({
                       value: contract.id,
-                      label: `${contract.contract_number} - ${contract.contract_name}`,
+                      label: `${contract.contract_number} · ${contract.contract_name}`,
                     }))}
                   />
                 </Form.Item>
-                <Form.Item name="base_rate_percent" label="基准折现率">
-                  <InputNumber min={0} max={50} precision={2} addonAfter="%" placeholder="默认合同/系统利率" />
+                <Form.Item name="base_rate_percent" label={t("sensitivity.base_rate", language)}>
+                  <InputNumber min={0} max={50} precision={2} addonAfter="%" placeholder={t("sensitivity.rate_placeholder", language)} />
                 </Form.Item>
-                <Form.Item name="shock_percent" label="冲击幅度" rules={[{ required: true, message: "请填写冲击幅度" }]}>
+                <Form.Item name="shock_percent" label={t("sensitivity.shock", language)} rules={[{ required: true, message: t("sensitivity.shock_required", language) }]}>
                   <InputNumber min={0.1} max={10} precision={2} addonAfter="%" />
                 </Form.Item>
                 <Form.Item>
                   <Button type="primary" htmlType="submit" loading={loading} icon={<CalculatorOutlined />}>
-                    生成分析
+                    {t("sensitivity.generate", language)}
                   </Button>
                 </Form.Item>
               </Form>
             </Card>
 
             {meta && (
-              <Alert
-                type="info"
-                showIcon
-                message={`${meta.contract_number} / ${meta.contract_name}`}
-                description={`基准折现率 ${(meta.base_rate * 100).toFixed(2)}%，范围判定 ${meta.lease_scope}，币种 ${meta.currency}`}
-              />
+              <div className="card-context sensitivity-result-meta" role="status">
+                <strong>{meta.contract_number}</strong>
+                <span>{meta.contract_name}</span>
+                <span>{t("sensitivity.base_rate", language)}: {typeof meta.base_rate === "number" ? `${(meta.base_rate * 100).toFixed(2)}%` : "—"}</span>
+                <span>{t("sensitivity.scope", language)}: {meta.lease_scope || "—"}</span>
+                <span>{t("sensitivity.currency", language)}: {meta.currency || "—"}</span>
+              </div>
             )}
 
-            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>基准初始负债</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {fmtMoney(summary.base, meta?.currency)}
-                  </Typography.Text>
-                </div>
+            <div className="stripe-metric-grid sensitivity-summary-grid">
+              <div className="pulse-kpi-card sensitivity-summary-card">
+                <span className="sensitivity-summary-label">{t("sensitivity.base_liability", language)}</span>
+                <Typography.Text className="font-tabular sensitivity-summary-value">
+                  {fmtMoney(summary.base, meta?.currency)}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>最大上行影响</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: summary.maxUp > 0 ? "var(--state-error-text)" : "var(--fg-primary)" }}>
-                    {fmtMoney(summary.maxUp, meta?.currency)}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card sensitivity-summary-card">
+                <span className="sensitivity-summary-label">{t("sensitivity.max_up", language)}</span>
+                <Typography.Text className={`font-tabular sensitivity-summary-value${summary.maxUp != null && summary.maxUp > 0 ? " is-negative" : ""}`}>
+                  {fmtMoney(summary.maxUp, meta?.currency)}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>最大下行影响</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: summary.maxDown < 0 ? "var(--state-success-text)" : "var(--fg-primary)" }}>
-                    {fmtMoney(summary.maxDown, meta?.currency)}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card sensitivity-summary-card">
+                <span className="sensitivity-summary-label">{t("sensitivity.max_down", language)}</span>
+                <Typography.Text className={`font-tabular sensitivity-summary-value${summary.maxDown != null && summary.maxDown < 0 ? " is-positive" : ""}`}>
+                  {fmtMoney(summary.maxDown, meta?.currency)}
+                </Typography.Text>
               </div>
             </div>
 
             {rows.length > 0 && (
-              <Card title="利率敏感性龙卷风图 (Tornado Sensitivity)">
-                <TornadoChart factors={tornadoFactors} baseValue={summary.base} currency={meta?.currency || "CNY"} height={280} />
+              <Card title={t("sensitivity.chart_title", language)}>
+                <TornadoChart factors={tornadoFactors} baseValue={summary.base ?? 0} currency={meta?.currency || "CNY"} height={280} />
               </Card>
             )}
 
-            <Card title="场景明细">
+            <Card title={t("sensitivity.detail_title", language)}>
               <Table
                 loading={loading}
                 dataSource={rows}
@@ -204,16 +200,16 @@ function SensitivityPage() {
                 pagination={false}
                 size="small"
                 columns={[
-                  { title: "场景", dataIndex: "scenario_name", width: 100, render: (v: string) => <StatusTag kind={statusKindFromAntColor(v === "+0.00%" ? "success" : "processing")}>{v}</StatusTag> },
-                  { title: "折现率", dataIndex: "discount_rate", width: 100, render: (v: number) => `${(v * 100).toFixed(2)}%` },
-                  { title: "初始负债", dataIndex: "initial_liability", align: "right" as const, render: (v: number) => fmt(v) },
-                  { title: "ROU 资产", dataIndex: "initial_rou_asset", align: "right" as const, render: (v: number) => fmt(v) },
-                  { title: "负债变动", dataIndex: "liability_delta", align: "right" as const, render: (v: number) => fmt(v) },
-                  { title: "变动比例", dataIndex: "liability_delta_percent", align: "right" as const, render: (v: number) => `${(v * 100).toFixed(2)}%` },
+                  { title: t("sensitivity.scenario", language), dataIndex: "scenario_name", width: 100, render: (v: string) => <StatusTag kind={v === "+0.00%" ? "success" : "processing"}>{v}</StatusTag> },
+                  { title: t("sensitivity.rate", language), dataIndex: "discount_rate", width: 100, render: (v: number) => `${(v * 100).toFixed(2)}%` },
+                  { title: t("sensitivity.initial_liability", language), dataIndex: "initial_liability", align: "right" as const, render: (v: number) => fmt(v) },
+                  { title: t("sensitivity.rou_asset", language), dataIndex: "initial_rou_asset", align: "right" as const, render: (v: number) => fmt(v) },
+                  { title: t("sensitivity.liability_delta", language), dataIndex: "liability_delta", align: "right" as const, render: (v: number) => fmt(v) },
+                  { title: t("sensitivity.delta_percent", language), dataIndex: "liability_delta_percent", align: "right" as const, render: (v: number) => `${(v * 100).toFixed(2)}%` },
                 ]}
               />
             </Card>
-          </Space>
+          </div>
         </motion.div>
       </AppLayout>
     </ProtectedRoute>
@@ -222,7 +218,7 @@ function SensitivityPage() {
 
 export default function SensitivityPageWithUrlState() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "var(--bg-page)" }} />}>
+    <Suspense fallback={<div className="sensitivity-loading" />}>
       <SensitivityPage />
     </Suspense>
   );

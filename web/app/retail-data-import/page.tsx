@@ -24,7 +24,7 @@ const REQUIRED_FIELDS = ["store", "business_date", "currency", "revenue"];
 function FieldHint({ text }: { text: string }) {
   return (
     <Tooltip title={text}>
-      <InfoCircleOutlined className="retail-import-field-hint" style={{ color: "var(--text-secondary, #8C8C8C)", cursor: "pointer" }} />
+      <InfoCircleOutlined className="retail-import-field-hint" />
     </Tooltip>
   );
 }
@@ -332,7 +332,6 @@ export default function RetailDataImportPage() {
         <div className="retail-import-page">
           <PageHeader
             title={t("retail_import.title", language)}
-            meta={t("retail_import.scope_note", language)}
             primaryAction={
               <Button
                 type="primary"
@@ -352,14 +351,14 @@ export default function RetailDataImportPage() {
           />
 
           {/* 3步导入向导导航栏 */}
-          <Card size="small" style={{ marginBottom: 16 }}>
+          <Card size="small" className="retail-import-step-card">
             <Steps
               current={currentStep}
               size="small"
               items={[
-                { title: "下载模板与准备数据", description: "获取标准格式" },
-                { title: "文件上传与智能映射", description: "校验必填项与字段" },
-                { title: "预审报告与安全入库", description: "幂等入账与数据治理" },
+                { title: t("retail_import.step_prepare", language), description: t("retail_import.step_prepare_desc", language) },
+                { title: t("retail_import.step_upload", language), description: t("retail_import.step_upload_desc", language) },
+                { title: t("retail_import.step_commit", language), description: t("retail_import.step_commit_desc", language) },
               ]}
             />
           </Card>
@@ -367,7 +366,7 @@ export default function RetailDataImportPage() {
           {/* 第一步：门店日粒度经营事实标准上载 */}
           <Card
             size="small"
-            title={<Space><SourceCircleGlyph size={14} /><span>门店日粒度经营事实导入 (Store-Day Facts)</span></Space>}
+            title={<Space><SourceCircleGlyph size={14} /><span>{t("retail_import.store_facts_title", language)}</span></Space>}
             className="retail-import-block-gap"
             extra={
               <Button
@@ -379,13 +378,12 @@ export default function RetailDataImportPage() {
               </Button>
             }
           >
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+            <div className="retail-import-facts-toolbar">
               <div className="precision-filter-group">
                 <span className="precision-filter-label">{t("retail_import.source_system", language)}:</span>
                 <Input
                   size="small"
-                  className="retail-import-source-input"
-                  style={{ width: 140 }}
+                  className="retail-import-source-input retail-import-facts-source-input"
                   value={sourceSystem}
                   onChange={(event) => setSourceSystem(event.target.value.trim())}
                   onPressEnter={() => file && runPreview(file, null, sourceSystem || "pos")}
@@ -408,15 +406,15 @@ export default function RetailDataImportPage() {
               maxCount={1}
               showUploadList={false}
               beforeUpload={(selected) => { void onFileSelected(selected); return false; }}
-              style={{ padding: "16px 0", background: "var(--bg-subtle, #FAFAFA)", border: "1px dashed var(--border-default, #D9D9D9)", borderRadius: 6 }}
+              className="retail-import-dropzone"
             >
-              <p className="ant-upload-drag-icon" style={{ marginBottom: 8 }}>
+              <p className="ant-upload-drag-icon retail-import-dropzone-icon">
                 <UploadGlyph size={28} />
               </p>
-              <p className="ant-upload-text" style={{ fontSize: 14, fontWeight: 500, margin: "0 0 4px" }}>
-                {file ? file.name : "点击或将门店经营事实文件 (.csv / .xlsx) 拖拽至此处"}
+              <p className="ant-upload-text retail-import-dropzone-title">
+                {file ? file.name : t("retail_import.dropzone_title", language)}
               </p>
-              <p className="ant-upload-hint" style={{ fontSize: 12, color: "var(--text-secondary, #8C8C8C)", margin: 0 }}>
+              <p className="ant-upload-hint retail-import-dropzone-hint">
                 {t("retail_import.upload_hint", language)}
               </p>
             </Upload.Dragger>
@@ -512,7 +510,7 @@ export default function RetailDataImportPage() {
                   <Descriptions.Item label={t("retail_import.total_rows", language)}>{report.total_rows}</Descriptions.Item>
                   <Descriptions.Item label={t("retail_import.valid_rows", language)}>{report.valid_rows}</Descriptions.Item>
                   <Descriptions.Item label={t("retail_import.store_count", language)}>{report.coverage.store_count}</Descriptions.Item>
-                  <Descriptions.Item label="基准期间">{report.coverage.date_from || "—"} ~ {report.coverage.date_to || "—"}</Descriptions.Item>
+                  <Descriptions.Item label={t("retail_import.base_period", language)}>{report.coverage.date_from || "—"} ~ {report.coverage.date_to || "—"}</Descriptions.Item>
                   <Descriptions.Item label={t("retail_import.overlap", language)}>{report.coverage.overlap_store_days}</Descriptions.Item>
                   <Descriptions.Item label={t("retail_import.new_days", language)}>{report.coverage.new_store_days}</Descriptions.Item>
                 </Descriptions>
@@ -555,13 +553,13 @@ export default function RetailDataImportPage() {
               />
             )}
             <Flex gap={12} wrap="wrap" align="center">
-              <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input" style={{ width: 140 }} value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder={t("plan_import.name", language)} />
+              <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input retail-import-plan-name-input" value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder={t("plan_import.name", language)} />
               <select aria-label={t("plan_import.version_type", language)} className="retail-import-type-select" value={planType} onChange={(event) => setPlanType(event.target.value)}>
-                <option value="budget">预算版本 (Budget)</option>
-                <option value="forecast">滚动预测 (Forecast)</option>
-                <option value="scenario">测算方案 (Scenario)</option>
+                <option value="budget">{t("plan_import.type_budget", language)}</option>
+                <option value="forecast">{t("plan_import.type_forecast", language)}</option>
+                <option value="scenario">{t("plan_import.type_scenario", language)}</option>
               </select>
-              <Input aria-label={t("plan_import.source", language)} className="retail-import-source-input" style={{ width: 120 }} value={planSource} onChange={(event) => setPlanSource(event.target.value)} />
+              <Input aria-label={t("plan_import.source", language)} className="retail-import-source-input retail-import-plan-source-input" value={planSource} onChange={(event) => setPlanSource(event.target.value)} />
               <span>{t("plan_import.from_period", language)}</span>
               <DatePicker picker="month" allowClear={false} value={dayjs(planFrom)} onChange={(value) => value && setPlanFrom(value.format("YYYY-MM"))} />
               <span>{t("plan_import.to_period", language)}</span>
@@ -571,7 +569,7 @@ export default function RetailDataImportPage() {
               <Upload accept=".csv,.xlsx" maxCount={1} showUploadList={false} beforeUpload={(selected) => { setPlanFile(selected); return false; }}>
                 <Button icon={<UploadGlyph size={13} />}>{planFile ? planFile.name : t("plan_import.title", language)}</Button>
               </Upload>
-              <span><input type="checkbox" checked={planOfficial} onChange={(event) => setPlanOfficial(event.target.checked)} /> {t("plan_import.official", language)}</span>
+              <label className="retail-import-checkbox"><input type="checkbox" checked={planOfficial} onChange={(event) => setPlanOfficial(event.target.checked)} /> {t("plan_import.official", language)}</label>
               <Button type="primary" loading={planImporting} disabled={!planFile || !planName.trim()} onClick={() => { void importPlanVersion(); }}>{t("plan_import.commit", language)}</Button>
             </Flex>
             <Typography.Text type="secondary" className="retail-import-hint">{t("plan_import.hint_plain", language)} <FieldHint text={t("plan_import.hint", language)} /></Typography.Text>
@@ -596,12 +594,12 @@ export default function RetailDataImportPage() {
               />
             )}
             <Flex gap={12} wrap="wrap" align="center">
-              <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input" style={{ width: 140 }} value={tbName} onChange={(event) => setTbName(event.target.value)} placeholder={t("plan_import.name", language)} />
-              <Input aria-label={t("tb_import.source_system", language)} className="retail-import-source-input" style={{ width: 120 }} value={tbSource} onChange={(event) => setTbSource(event.target.value)} />
+              <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input retail-import-plan-name-input" value={tbName} onChange={(event) => setTbName(event.target.value)} placeholder={t("plan_import.name", language)} />
+              <Input aria-label={t("tb_import.source_system", language)} className="retail-import-source-input retail-import-plan-source-input" value={tbSource} onChange={(event) => setTbSource(event.target.value)} />
               <span>{t("tb_import.period", language)}</span>
               <DatePicker picker="month" allowClear={false} value={dayjs(tbPeriod)} onChange={(value) => value && setTbPeriod(value.format("YYYY-MM"))} />
               <span>{t("tb_import.currency", language)}</span>
-              <Input aria-label={t("tb_import.currency", language)} className="retail-import-source-input" style={{ width: 80 }} value={tbCurrency} onChange={(event) => setTbCurrency(event.target.value.toUpperCase())} maxLength={3} />
+              <Input aria-label={t("tb_import.currency", language)} className="retail-import-source-input retail-import-currency-input" value={tbCurrency} onChange={(event) => setTbCurrency(event.target.value.toUpperCase())} maxLength={3} />
               <Upload accept=".csv" maxCount={1} showUploadList={false} beforeUpload={(selected) => { setTbFile(selected); return false; }}>
                 <Button icon={<UploadGlyph size={13} />}>{tbFile ? tbFile.name : t("tb_import.title", language)}</Button>
               </Upload>

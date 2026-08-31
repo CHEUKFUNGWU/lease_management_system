@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { Button, Input, Modal, Space, Tag } from "antd";
+import { Button, Input, Modal, Space } from "antd";
 import type { InputRef } from "antd";
 import { ArrowRightOutlined, FileTextOutlined, SearchOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
@@ -65,6 +65,7 @@ export default function GlobalSearch() {
     { id: "action-ai-entry", label: t("search.action_ai_entry", language), path: "/ai-chat", kind: "action" },
     { id: "action-todo", label: t("search.action_todo", language), path: "/todo", kind: "action" },
     { id: "action-reports", label: t("search.action_reports", language), path: "/reports", kind: "action" },
+    { id: "action-forecast", label: t("search.action_forecast", language), path: "/cashflow-forecast", kind: "action" },
   ], [language]);
 
   useEffect(() => {
@@ -203,7 +204,7 @@ export default function GlobalSearch() {
           onChange={(event) => setKeyword(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t("search.command_placeholder", language)}
-          prefix={<SearchOutlined style={{ color: "var(--fg-muted)" }} />}
+          prefix={<SearchOutlined className="global-search-icon" />}
           suffix={loading ? t("search.loading", language) : <kbd>↑↓ Enter</kbd>}
           size="large"
         />
@@ -225,7 +226,7 @@ export default function GlobalSearch() {
                 <strong>{item.label}</strong>
                 {item.description && <span>{item.description}</span>}
               </span>
-              <Tag>{kindLabel(item.kind)}</Tag>
+              <span className="command-palette-item-kind">{kindLabel(item.kind)}</span>
               <ArrowRightOutlined className="command-palette-item-arrow" />
             </button>
           ))}

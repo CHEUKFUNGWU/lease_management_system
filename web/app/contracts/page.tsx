@@ -18,7 +18,6 @@ import {
   Badge,
   Flex,
   Typography,
-  Tag,
 } from "antd";
 import {
   PlusOutlined,
@@ -265,18 +264,18 @@ function ContractsPage() {
       sorter: true,
       width: 240,
       render: (_: unknown, record: Contract) => (
-        <Space direction="vertical" size={2} style={{ maxWidth: 220 }}>
+        <Space direction="vertical" size={2} className="contracts-identity-stack">
           <a
             className="contract-number-link"
             onClick={() => router.push(`/contracts/${record.id}`)}
           >
             {record.contract_number}
           </a>
-          <Typography.Text type="secondary" ellipsis style={{ fontSize: 12, maxWidth: 220 }} title={record.contract_name}>
+          <Typography.Text type="secondary" ellipsis className="contracts-identity-name" title={record.contract_name}>
             {record.contract_name}
           </Typography.Text>
           {record.discount_rate_missing && (
-            <StatusTag kind="error" style={{ fontSize: 10 }}>
+            <StatusTag kind="error">
               {t("contracts.discount_rate_missing", language)}
             </StatusTag>
           )}
@@ -288,25 +287,21 @@ function ContractsPage() {
       dataIndex: "currency",
       key: "currency",
       width: 80,
-      render: (text: string) => (
-        <Tag style={{ borderRadius: 4, margin: 0, fontSize: 11 }}>
-          {text}
-        </Tag>
-      ),
+      render: (text: string) => <Typography.Text type="secondary" className="font-tabular">{text}</Typography.Text>,
     },
     {
       title: t("contracts.col_liability", language),
       key: "latest_liability",
       width: 140,
       align: "right" as const,
-      render: (_: unknown, record: Contract) => <span className="font-tabular" style={{ fontWeight: 500 }}>{fmtMoney(record.latest_liability, record.currency)}</span>,
+      render: (_: unknown, record: Contract) => <span className="font-tabular contracts-money-value">{fmtMoney(record.latest_liability, record.currency)}</span>,
     },
     {
       title: t("contracts.col_rou", language),
       key: "latest_rou_asset",
       width: 140,
       align: "right" as const,
-      render: (_: unknown, record: Contract) => <span className="font-tabular" style={{ fontWeight: 500 }}>{fmtMoney(record.latest_rou_asset, record.currency)}</span>,
+      render: (_: unknown, record: Contract) => <span className="font-tabular contracts-money-value">{fmtMoney(record.latest_rou_asset, record.currency)}</span>,
     },
     {
       title: t("contracts.col_current_rent", language),
@@ -314,12 +309,12 @@ function ContractsPage() {
       width: 170,
       align: "right" as const,
       render: (_: unknown, record: Contract) => (
-        <div style={{ textAlign: "right" }}>
-          <div className="font-tabular" style={{ fontWeight: 500 }}>
+        <div className="contracts-current-rent">
+          <div className="font-tabular contracts-money-value">
             {fmtMoney(record.current_rent, record.current_rent_currency ?? record.currency)}
           </div>
           {record.current_rent_coverage_start && record.current_rent_coverage_end && (
-            <Typography.Text type="secondary" style={{ fontSize: 11 }} className="font-tabular">
+            <Typography.Text type="secondary" className="font-tabular contracts-coverage-date">
               {dayjs(record.current_rent_coverage_start).format("YYYY-MM-DD")} ~ {dayjs(record.current_rent_coverage_end).format("YYYY-MM-DD")}
             </Typography.Text>
           )}
@@ -333,7 +328,7 @@ function ContractsPage() {
       sorter: true,
       width: 120,
       render: (text: string) => (
-        <span className="font-tabular" style={{ fontSize: 12 }}>
+        <span className="font-tabular contracts-date-value">
           {fmtDate(text)}
         </span>
       ),
@@ -345,7 +340,7 @@ function ContractsPage() {
       sorter: true,
       width: 120,
       render: (text: string) => (
-        <span className="font-tabular" style={{ fontSize: 12 }}>
+        <span className="font-tabular contracts-date-value">
           {fmtDate(text)}
         </span>
       ),
@@ -367,11 +362,11 @@ function ContractsPage() {
             {record.is_official_version && (
               <Badge
                 count={t("contracts.official", language)}
-                style={{ backgroundColor: "var(--fg-primary)", color: "var(--fg-inverse)", fontSize: 10 }}
+                className="contracts-official-badge"
               />
             )}
             {!record.is_official_version && status !== "draft" && (
-              <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+              <Typography.Text type="secondary" className="contracts-working-label">
                 {t("contracts.working", language)}
               </Typography.Text>
             )}
@@ -395,7 +390,7 @@ function ContractsPage() {
       key: "asset_type",
       width: 100,
       render: (_: any, record: Contract) => (
-        <span style={{ fontSize: 12, color: "var(--fg-secondary)" }}>
+        <span className="contracts-asset-label">
           {t(ASSET_TYPE_KEYS[record.asset_type || "real_estate"] || "contracts.asset_other", language)}
         </span>
       ),
@@ -409,7 +404,7 @@ function ContractsPage() {
         <Button
           type="text"
           size="small"
-          icon={<ArrowRightOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
+          icon={<ArrowRightOutlined className="contracts-open-icon" />}
           onClick={() => router.push(`/contracts/${record.id}`)}
         />
       ),
@@ -426,7 +421,7 @@ function ContractsPage() {
       render: (num: string, record: Contract) => (
         <a
           onClick={() => router.push(`/contracts/${record.id}`)}
-          style={{ fontWeight: 600, color: "var(--fg-primary)", cursor: "pointer" }}
+          className="contracts-number-link"
         >
           {num}
         </a>
@@ -450,14 +445,14 @@ function ContractsPage() {
       title: t("contracts.col_start_date", language),
       dataIndex: "lease_start_date",
       width: 110,
-      render: (d: string) => <span className="font-tabular" style={{ fontSize: 12 }}>{fmtDate(d)}</span>,
+      render: (d: string) => <span className="font-tabular contracts-date-value">{fmtDate(d)}</span>,
     },
     {
       key: "lease_end_date",
       title: t("contracts.col_end_date", language),
       dataIndex: "lease_end_date",
       width: 110,
-      render: (d: string) => <span className="font-tabular" style={{ fontSize: 12 }}>{fmtDate(d)}</span>,
+      render: (d: string) => <span className="font-tabular contracts-date-value">{fmtDate(d)}</span>,
     },
     {
       key: "latest_liability",
@@ -466,7 +461,7 @@ function ContractsPage() {
       align: "right",
       width: 130,
       render: (val: number, record: Contract) => (
-        <span className="font-tabular" style={{ fontSize: 12 }}>{val ? fmtMoney(val, record.currency) : "—"}</span>
+        <span className="font-tabular contracts-table-money">{val ? fmtMoney(val, record.currency) : "—"}</span>
       ),
     },
     {
@@ -476,7 +471,7 @@ function ContractsPage() {
       align: "right",
       width: 130,
       render: (val: number, record: Contract) => (
-        <span className="font-tabular" style={{ fontSize: 12 }}>{val ? fmtMoney(val, record.currency) : "—"}</span>
+        <span className="font-tabular contracts-table-money">{val ? fmtMoney(val, record.currency) : "—"}</span>
       ),
     },
     {
@@ -492,7 +487,7 @@ function ContractsPage() {
           {record.is_official_version && (
             <Badge
               count={t("contracts.official", language)}
-              style={{ backgroundColor: "var(--fg-primary)", color: "var(--fg-inverse)", fontSize: 10 }}
+              className="contracts-official-badge"
             />
           )}
         </Space>
@@ -518,7 +513,7 @@ function ContractsPage() {
         <Button
           type="text"
           size="small"
-          icon={<ArrowRightOutlined style={{ fontSize: 12, color: "var(--fg-muted)" }} />}
+          icon={<ArrowRightOutlined className="contracts-open-icon" />}
           onClick={() => router.push(`/contracts/${record.id}`)}
         />
       ),
@@ -585,12 +580,13 @@ function ContractsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.05 }}
         >
-          <div className="contracts-desktop-table" style={{ marginTop: 8 }}>
+          <div className="contracts-desktop-table contracts-desktop-table-shell">
             <EnterpriseTable<Contract>
               data={contracts}
               columns={enterpriseColumns}
               rowKey={(r) => r.id}
               loading={loading}
+              language={language}
               savedViews={savedViews}
               searchPlaceholder={t("contracts.search_placeholder", language)}
               emptyText={hasFilters ? t("contracts.no_search_results", language) : t("contracts.no_data", language)}
@@ -606,10 +602,10 @@ function ContractsPage() {
               onSaveInLineEdit={async (id, field, newValue) => {
                 try {
                   await contractApi.update(id, { [field]: newValue }, token || "");
-                  message.success("已更新");
+                  message.success(t("contract_detail.contract_updated", language));
                   return true;
                 } catch (e: any) {
-                  message.error(e?.message || "更新失败");
+                  message.error(e?.message || t("contract_detail.update_failed", language));
                   return false;
                 }
               }}
@@ -618,7 +614,7 @@ function ContractsPage() {
 
           <div className="contracts-mobile-list">
             {contracts.length === 0 ? (
-              <Card styles={{ body: { padding: 24 } }}>
+              <Card className="contracts-mobile-empty-card">
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description={hasFilters ? t("contracts.no_search_results", language) : t("contracts.no_data", language)}
@@ -638,7 +634,7 @@ function ContractsPage() {
                   return (
                     <div className="contract-mobile-card" key={record.id}>
                       <div className="contract-mobile-card-header">
-                        <div className="sty-dc0fa432">
+                        <div className="contract-mobile-identity">
                           <div className="contract-mobile-number">{record.contract_number}</div>
                           <div className="contract-mobile-name" title={record.contract_name}>{record.contract_name}</div>
                         </div>
@@ -661,7 +657,7 @@ function ContractsPage() {
                           <span>{t("contracts.col_current_rent", language)}</span>
                           <strong>{fmtMoney(record.current_rent, record.current_rent_currency ?? record.currency)}</strong>
                           {record.current_rent_coverage_start && record.current_rent_coverage_end && (
-                            <small className="sty-8d9ffc18">
+                            <small className="contract-mobile-coverage-date">
                               {dayjs(record.current_rent_coverage_start).format("YYYY-MM-DD")}
                               {" ~ "}
                               {dayjs(record.current_rent_coverage_end).format("YYYY-MM-DD")}
@@ -692,7 +688,7 @@ function ContractsPage() {
 
 export default function ContractsPageWithUrlState() {
   return (
-    <Suspense fallback={<div className="sty-8d9ffc18" />}>
+    <Suspense fallback={<div className="contracts-suspense-fallback" />}>
       <ContractsPage />
     </Suspense>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Radio, Row, Select, Segmented, Space, Spin, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Radio, Row, Select, Segmented, Space, Spin, Table, Typography } from "antd";
 import { ArrowLeftOutlined, CheckCircleFilled, ReloadOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
@@ -76,14 +76,14 @@ function MetricCard({ code, metric, currency, notReady, language }: { code: Puls
   return (
     <div className="store-360-kpi-card" data-testid={`store360-kpi-${code}`}>
       <Flex justify="space-between" align="center">
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{kpiLabel(code, language)}</span>
+        <span className="store-360-kpi-label">{kpiLabel(code, language)}</span>
         <Flex align="center" gap={4}>
           {notReady && <KPIReadyBadge />}
           <Status metric={metric} language={language} />
         </Flex>
       </Flex>
       <Typography.Title level={3} className="pulse-kpi-value" ellipsis={{ tooltip: display }}>{display}</Typography.Title>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6, overflow: "hidden", whiteSpace: "nowrap" }}>
+      <div className="store-360-kpi-footer">
         <Typography.Text className={`pulse-change pulse-change-${tone}`}>
           {formatChange(metric as RetailSummaryMetric | undefined)} {reason ? `· ${reason}` : ""}
         </Typography.Text>
@@ -132,7 +132,7 @@ function Trend({ response, language }: { response: RetailStoreDiagnosticsRespons
       bordered={false}
       title={
         <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)" }}>{t("store360.trend_title", language)}</span>
+          <span className="store-360-panel-title">{t("store360.trend_title", language)}</span>
           <Segmented
             size="small"
             className="precision-segmented"
@@ -142,7 +142,7 @@ function Trend({ response, language }: { response: RetailStoreDiagnosticsRespons
           />
         </Flex>
       }
-      style={{ height: "100%", background: "transparent" }}
+      className="store-360-chart-card"
     >
       <ConfidenceBandChart
         data={chartData}
@@ -169,7 +169,7 @@ function BridgeWaterfall({ bridges, currency, language, plFlow, plFlowError }: {
   const bridge = complete.find((item) => item.code === code) || complete[0];
   const steps = bridge ? bridgeWaterfall(bridge, { start: t("store360.bridge.start", language), end: t("store360.bridge.end", language), residual: t("store360.bridge.residual", language) }) : [];
   const options = [
-    ...complete.map((item) => ({ label: kpiLabel(item.code as PulseMetricCode, language) || item.code, value: item.code })),
+    ...complete.map((item) => ({ label: kpiLabel(item.code as PulseMetricCode, language) || t("store360.bridge.unavailable", language), value: item.code })),
     { label: t("store360.pl_flow.title", language), value: PL_FLOW_OPTION },
   ];
   return (
@@ -177,7 +177,7 @@ function BridgeWaterfall({ bridges, currency, language, plFlow, plFlowError }: {
       bordered={false}
       title={
         <Flex justify="space-between" align="center" wrap="wrap" gap={8}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)" }}>{showPlFlow ? t("store360.pl_flow.title", language) : t("store360.bridge.chart_title", language)}</span>
+          <span className="store-360-panel-title">{showPlFlow ? t("store360.pl_flow.title", language) : t("store360.bridge.chart_title", language)}</span>
           {options.length > 1 && (
             <Segmented
               size="small"
@@ -189,12 +189,12 @@ function BridgeWaterfall({ bridges, currency, language, plFlow, plFlowError }: {
           )}
         </Flex>
       }
-      style={{ height: "100%", background: "transparent" }}
+      className="store-360-chart-card"
     >
       {showPlFlow ? (
         <ProfitFlowPanel flow={plFlow} error={plFlowError} currency={currency} language={language} />
       ) : (
-        <div className="chart-frame" style={{ width: "100%", height: 270 }}>
+        <div className="chart-frame store-360-bridge-chart">
           {steps.length === 0 ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("store360.bridge.no_complete", language)} />
           ) : (
@@ -226,9 +226,9 @@ function BridgePanel({ bridges, currency, language }: { bridges: RetailStoreDiag
             key={bridge.code}
             title={
               <Flex justify="space-between" align="center">
-                <span style={{ fontWeight: 600, fontSize: 13, color: "var(--fg-primary)" }}>{bridge.code}</span>
+                <span className="store-360-bridge-title">{kpiLabel(bridge.code as PulseMetricCode, language) || t("store360.bridge.unavailable", language)}</span>
                 {bridge.status !== "complete" && (
-                  <span style={{ fontSize: 11, color: "var(--state-warning-text)" }}>
+                  <span className="store-360-bridge-status">
                     {t("store360.bridge.unavailable", language)}
                   </span>
                 )}
@@ -239,12 +239,12 @@ function BridgePanel({ bridges, currency, language }: { bridges: RetailStoreDiag
               <Typography.Text type="secondary">{bridge.reason || t("store360.bridge.reason_default", language)}</Typography.Text>
             ) : (
               <>
-                <Flex wrap="wrap" gap={16} style={{ marginBottom: 10, fontSize: 12, color: "var(--fg-secondary)" }}>
+                <Flex wrap="wrap" gap={16} className="store-360-bridge-summary">
                   <span>{t("store360.bridge.contrast", language)}: <strong>{formatBridgeItem(bridge.comparison, "currency", currency, language)}</strong></span>
                   <span>{t("store360.bridge.current", language)}: <strong>{formatBridgeItem(bridge.current, "currency", currency, language)}</strong></span>
                   <span>{t("store360.bridge.change", language)}: <strong className={`store-360-bridge-${bridgeTone(bridge.total_change)}`}>{formatBridgeItem(bridge.total_change, "currency", currency, language)}</strong></span>
                   {bridge.rounding_residual != null && (
-                    <span style={{ color: "var(--fg-muted)" }}>{t("store360.bridge.residual", language)}: {formatBridgeItem(bridge.rounding_residual, "currency", currency, language)}</span>
+                    <span className="store-360-bridge-residual">{t("store360.bridge.residual", language)}: {formatBridgeItem(bridge.rounding_residual, "currency", currency, language)}</span>
                   )}
                 </Flex>
                 <Table
@@ -396,7 +396,6 @@ function Store360Inner() {
         <div className="store-360-page">
           <PageHeader
             title={t("store360.title", language)}
-            meta={t("store360.scope_note", language)}
             help={<HelpTrigger content={store360HelpContent(language)} language={language} />}
             primaryAction={
               <Button icon={<ReloadOutlined />} loading={loading || discoveryLoading} onClick={() => setRetry((value) => value + 1)}>
@@ -521,7 +520,7 @@ function Store360Inner() {
                   value={windowInput}
                   onChange={(value) => setWindowInput(value ?? 14)}
                   onPressEnter={applyCustomWindow}
-                  style={{ width: 100 }}
+                  className="store360-window-input"
                 />
               )}
               {periodMode === "rolling" && windowInput !== query.windowDays && (
@@ -535,7 +534,7 @@ function Store360Inner() {
                 onChange={(event) => setSourceInput(event.target.value)}
                 onPressEnter={() => change({ sourceSystem: sourceInput.trim() })}
                 placeholder={t("common.source_system_optional", language)}
-                style={{ width: 150 }}
+                className="store360-source-input"
               />
               {sourceInput !== (query.sourceSystem || "") && (
                 <Button size="small" onClick={() => change({ sourceSystem: sourceInput.trim() })}>{t("store360.apply_source", language)}</Button>
@@ -546,7 +545,7 @@ function Store360Inner() {
             <DataTrustBar
               envelope={response.envelope}
               basis={response.basis}
-              detailExtra={latestMatches ? <span>generator: {latestMatches.generator_version} · anomaly: {latestAnomalyDate(latestMatches)}</span> : undefined}
+              detailExtra={latestMatches ? <span>{t("trust.generator_version", language)}: {latestMatches.generator_version} · {t("trust.as_of", language)}: {latestAnomalyDate(latestMatches)}</span> : undefined}
             />
           )}
           {response && response.plan && (
@@ -563,10 +562,8 @@ function Store360Inner() {
           )}
           {response && !response.plan && !(response.evidence && response.evidence.observed_store_days === 0) && (
             <PlanComparisonUnavailable
-              period={response.current.date_to.slice(0, 7)}
               currency={response.currency || ""}
               language={language}
-              dataClassification={query.classification as RetailDataClassification}
               reason={t("plan.absent_desc", language)}
               actual={Object.fromEntries(Object.entries(response.summary || {}).map(([key, metric]) => [key, metric.current.value]))}
             />
@@ -627,46 +624,46 @@ function Store360Inner() {
           {response && (
             <>
               {/* 12-Column Bento Grid Layout for Store 360 Diagnostics */}
-              <div className="store360-block-gap" style={{ marginTop: 16 }}>
+              <div className="store360-block-gap store360-diagnostics-grid">
                 <BentoGrid columns={12} gap={16}>
                   <BentoTile span={12} rows={1} variant="feature" noPadding>
-                    <div style={{ padding: "14px 18px" }}>
-                      <Flex justify="space-between" align="center" wrap="wrap" gap={16} style={{ marginBottom: 12 }}>
+                    <div className="store360-bento-content">
+                      <Flex justify="space-between" align="center" wrap="wrap" gap={16} className="store360-identity-row">
                         <Space size={8} align="center" wrap>
-                          <Typography.Title level={4} className="store360-identity-title" style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "var(--fg-primary)" }}>
+                          <Typography.Title level={4} className="store360-identity-title">
                             {response.store.store_code} · {response.store.store_name}
                           </Typography.Title>
                           {response.store.lifecycle_status && (
-                            <Tag bordered={false} color={response.store.lifecycle_status === "mature" ? "blue" : response.store.lifecycle_status === "ramp_up" ? "cyan" : "default"} style={{ margin: 0, fontSize: 11 }}>
+                            <span className="pulse-meta-chip">
                               {lifecycleStatusLabel(response.store.lifecycle_status, language)}
-                            </Tag>
+                            </span>
                           )}
                           {response.store.store_format && (
-                            <Tag bordered={false} color="purple" style={{ margin: 0, fontSize: 11 }}>
+                            <span className="pulse-meta-chip">
                               {storeFormatLabel(response.store.store_format, language)}
-                            </Tag>
+                            </span>
                           )}
                           {(response.store.brand || response.store.region) && (
-                            <span style={{ fontSize: 12, color: "var(--fg-secondary)", fontWeight: 500, marginLeft: 4 }}>
+                            <span className="store360-identity-meta">
                               · {[response.store.brand, response.store.region].filter(Boolean).join(" · ")}
                             </span>
                           )}
                           {response.store.opening_date && (
-                            <span style={{ fontSize: 11, color: "var(--fg-muted)", marginLeft: 4 }}>
+                            <span className="store360-opening-date">
                               ({t("retail.store.opening_date", language)}: {response.store.opening_date})
                             </span>
                           )}
                         </Space>
                         <Space size={16}>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          <Typography.Text type="secondary" className="store360-meta-text">
                             {t("store360.field.currency", language)}: <strong>{response.currency || "—"}</strong> ({currencyStatusLabel(response.currency_status, language)})
                           </Typography.Text>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          <Typography.Text type="secondary" className="store360-meta-text">
                             {t("store360.field.fact_version", language)}: <strong>v{response.fact_version_min}–v{response.fact_version_max}</strong>
                           </Typography.Text>
                         </Space>
                       </Flex>
-                      <div className="stripe-metric-grid" style={{ marginTop: 12 }}>
+                      <div className="stripe-metric-grid store360-primary-metrics">
                         {STORE360_CODES.map((code) => (
                           <MetricCard
                             language={language}
@@ -714,21 +711,21 @@ function Store360Inner() {
                     variant="feature"
                     noPadding
                   >
-                    <div style={{ padding: "14px 18px" }}>
-                      <Flex justify="space-between" align="center" style={{ marginBottom: 12 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-primary)" }}>
+                    <div className="store360-bento-content">
+                      <Flex justify="space-between" align="center" className="store360-aux-header">
+                        <span className="store-360-panel-title">
                           {t("store360.aux_metrics", language)}
                         </span>
-                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                        <Typography.Text type="secondary" className="store360-aux-note">
                           {t("store360.cash_basis_desc", language)}
                         </Typography.Text>
                       </Flex>
-                      <div className="stripe-metric-grid" style={{ gridTemplateColumns: `repeat(${STORE360_AUX_CODES.length}, minmax(0, 1fr))` }}>
+                      <div className="stripe-metric-grid store360-aux-metrics">
                         {STORE360_AUX_CODES.map((code) => (
-                          <div key={code} className="store-360-kpi-card" style={{ height: "auto", minHeight: 80, padding: "14px 18px", borderBottom: "none", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 6 }}>{kpiLabel(code, language)}</span>
-                            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                              <Typography.Text className="font-tabular" style={{ fontSize: 19, fontWeight: 600, color: "var(--fg-primary)" }}>
+                          <div key={code} className="store-360-kpi-card store360-aux-metric">
+                            <span className="store-360-kpi-label store360-aux-label">{kpiLabel(code, language)}</span>
+                            <div className="store360-aux-value-row">
+                              <Typography.Text className="font-tabular store360-aux-value">
                                 {displayMetric(response.summary[code], response.currency, language)}
                               </Typography.Text>
                               <Status metric={response.summary[code]} language={language} />
@@ -742,7 +739,7 @@ function Store360Inner() {
               </div>
 
               <Card title={t("store360.peer_benchmark", language)} className="store360-block-gap">
-                <Typography.Text type="secondary" style={{ display: "block", marginBottom: 8, fontSize: 12 }}>
+                <Typography.Text type="secondary" className="store360-peer-definition">
                   {formatPeerDefinition(response.peer_definition, language)} · {t("store360.peer_definition", language).replace("{n}", String(response.minimum_peer_count))}
                 </Typography.Text>
                 <Table
@@ -752,16 +749,16 @@ function Store360Inner() {
                   rowKey="code"
                   dataSource={response.peer_benchmark}
                   columns={[
-                    { title: t("store360.col.metric", language), render: (_: unknown, row: RetailStoreDiagnosticsResponse["peer_benchmark"][number]) => kpiLabel(row.code as PulseMetricCode, language) || row.code },
+                    { title: t("store360.col.metric", language), render: (_: unknown, row: RetailStoreDiagnosticsResponse["peer_benchmark"][number]) => kpiLabel(row.code as PulseMetricCode, language) || t("ecom.common.unavailable", language) },
                     { title: t("store360.col.target", language), render: (_: unknown, row) => formatKPIValue({ value: row.target, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language) },
                     { title: t("store360.col.quartiles", language), render: (_: unknown, row) => `${formatKPIValue({ value: row.p25, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)} / ${formatKPIValue({ value: row.median, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)} / ${formatKPIValue({ value: row.p75, unit: row.unit, status: "complete", formula_version: "", required_fields: [], available_fact_count: 0, fact_count: 0 }, response.currency, language)}` },
                     { title: t("store360.col.sample_percentile", language), render: (_: unknown, row) => `${row.peer_count} · ${row.percentile == null ? "—" : `${row.percentile.toFixed(1)}%`}` },
                     {
                       title: t("store360.col.status", language),
                       render: (_: unknown, row) => row.status === "complete" || row.status === "available" ? (
-                        <CheckCircleFilled style={{ color: "#166534", fontSize: 13 }} />
+                        <CheckCircleFilled className="store360-peer-success" />
                       ) : (
-                        <span style={{ fontSize: 11, color: "var(--state-warning-text)" }}>
+                        <span className="store360-peer-status">
                           {formatPeerBenchmarkStatus(row.status, row.reason, language)}
                         </span>
                       ),

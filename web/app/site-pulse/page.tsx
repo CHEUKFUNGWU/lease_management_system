@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card, DatePicker, Empty, InputNumber, Segmented, Select, Space, Spin, Table, Tag, Typography } from "antd";
+import { Button, Card, DatePicker, Empty, Segmented, Select, Spin, Table, Typography } from "antd";
 import { ArrowDownOutlined, ArrowUpOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
@@ -10,7 +10,6 @@ import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import DataTrustBar from "../components/DataTrustBar";
 import ProtectedRoute from "../components/ProtectedRoute";
-import ScopeNote from "../components/ScopeNote";
 import { StateBlock } from "../components/StateBlock";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { ecomHelpContent } from "../components/help-content";
@@ -18,9 +17,10 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
 import { useRetailQuery } from "../retail/useRetailQuery";
-import { ecomApi, type EcomSitePulseResponse, type EcomStorefront } from "../lib/api";
+import { ecomApi, type EcomSitePulseResponse } from "../lib/api";
 import { ecomTrustEnvelope } from "../lib/ecom-trust";
 import { tableScrollX } from "../lib/tableScroll";
+import { translateReason } from "../operating-pulse/logic";
 
 const WINDOW_OPTIONS = [7, 14, 30, 90] as const;
 const KPI_ORDER = ["net_revenue", "cm1_rate", "mer", "refund_rate"] as const;
@@ -30,9 +30,7 @@ function SitePulseInner() {
   const { language } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [sites, setSites] = useState<EcomStorefront[]>([]);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const loaded = useRef(false);
 
   const classification = (searchParams.get("data_classification") || "simulated") as "production" | "simulated";
   const datasetVersion = searchParams.get("dataset_version") || "";
@@ -47,13 +45,6 @@ function SitePulseInner() {
     });
     router.replace(`/site-pulse?${next.toString()}`);
   };
-
-  // 站点列表（首次加载一次）
-  useEffect(() => {
-    if (!token || loaded.current) return;
-    loaded.current = true;
-    ecomApi.listStorefronts(token).then((res) => setSites(res.data)).catch(() => undefined);
-  }, [token]);
 
   const pulseKey = `${classification}|${datasetVersion}|${asOf}|${windowDays}|${refreshNonce}`;
   const pulseParams =
@@ -70,9 +61,9 @@ function SitePulseInner() {
 
   const chartData = (response?.storefronts || []).map((row) => ({
     name: row.code,
-    netRevenue: row.current.net_revenue?.value ?? 0,
-    cm1Rate: row.current.cm1_rate?.value ?? 0,
-    MER: row.current.mer?.value ?? 0,
+    netRevenue: row.current.net_revenue?.value ?? null,
+    cm1Rate: row.current.cm1_rate?.value ?? null,
+    MER: row.current.mer?.value ?? null,
   }));
 
   return (
@@ -88,7 +79,6 @@ function SitePulseInner() {
               </Button>
             }
           />
-          <ScopeNote noteKey="ecom.pulse.subtitle" language={language as any} />
           <div className="precision-filter-bar pulse-block-margin">
             <div className="precision-filter-group">
               <span className="precision-filter-label">{t("ecom.common.classification", language)}</span>
@@ -100,8 +90,8 @@ function SitePulseInner() {
                   updateQuery({ data_classification: next, dataset_version: next === "production" ? null : datasetVersion });
                 }}
                 options={[
-                  { label: "Production", value: "production" },
-                  { label: "Simulated", value: "simulated" },
+                  { label: t("trust.classification_production", language), value: "production" },
+                  { label: t("trust.classification_simulated", language), value: "simulated" },
                 ]}
               />
             </div>
@@ -111,10 +101,10 @@ function SitePulseInner() {
                 <Select
                   size="small"
                   className="ecom-filter-select"
-                  placeholder="e.g. ecom-sim-v1"
+                  placeholder={t("ecom.common.dataset_version", language)}
                   value={datasetVersion || undefined}
                   onChange={(v) => updateQuery({ dataset_version: v })}
-                  options={[{ label: "ecom-sim-v1", value: "ecom-sim-v1" }]}
+                  options={[{ label: t("trust.classification_simulated", language), value: "ecom-sim-v1" }]}
                   allowClear
                 />
               </div>
@@ -134,7 +124,7 @@ function SitePulseInner() {
                 className="precision-segmented"
                 value={windowDays}
                 onChange={(v) => updateQuery({ window_days: String(v) })}
-                options={WINDOW_OPTIONS.map((d) => ({ label: `${d}d`, value: d }))}
+                options={WINDOW_OPTIONS.map((d) => ({ label: `${d}${t("common.days_suffix", language)}`, value: d }))}
               />
             </div>
           </div>
@@ -180,7 +170,7 @@ function SitePulseInner() {
 
               {response.storefronts.map((row) => (
                 <Card key={row.storefront_id} className="pulse-block-margin" size="small"
-                  title={<Space>{row.name}（{row.code}）{!row.decision_ready && <Tag>Decision Ready = false</Tag>}{row.restated_days && row.restated_days.length > 0 && <Tag>{t("ecom.pulse.restated", language)}</Tag>}</Space>}>
+                  title={`${row.name}（${row.code}）`}>
                   <div className="stripe-metric-grid">
                     {KPI_ORDER.map((code) => {
                       const v = row.current[code];
@@ -188,14 +178,14 @@ function SitePulseInner() {
                       const delta = row.deltas[code];
                       return (
                         <div className="stripe-metric-card" key={code}>
-                          <div className="stripe-metric-label">{v?.name ?? code}</div>
+                          <div className="stripe-metric-label">{v?.name ?? t("ecom.common.unavailable", language)}</div>
                           <div className="stripe-metric-value">
-                            {v?.value != null ? formatValue(v.value, v.unit) : v?.reason ? `— ${v.reason}` : "—"}
+                            {v?.value != null ? formatValue(v.value, v.unit, language) : v?.reason ? `— ${translateReason(v.reason, language)}` : "—"}
                           </div>
                           <div className="stripe-metric-delta">
                             {prev?.value != null && v?.value != null && delta != null ? (
                               <span className={delta >= 0 ? "delta-up" : "delta-down"}>
-                                {delta >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{formatValue(delta, v.unit)}<span className="delta-sub">{t("ecom.pulse.vs_previous", language)}</span>
+                                {delta >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{formatValue(delta, v.unit, language)}<span className="delta-sub">{t("ecom.pulse.vs_previous", language)}</span>
                               </span>
                             ) : prev ? <Typography.Text type="secondary">{t("ecom.common.unavailable", language)}</Typography.Text> : null}
                           </div>
@@ -216,7 +206,7 @@ function SitePulseInner() {
                         { title: t("ecom.pnl.metric", language), dataIndex: "label", key: "label" },
                         {
                           title: t("ecom.pnl.direction", language), dataIndex: "direction", key: "direction",
-                          render: (d: string) => (d === "up" ? <Tag>↑</Tag> : <Tag>↓</Tag>),
+                          render: (d: string) => d === "up" ? <span className="delta-up">↑</span> : <span className="delta-down">↓</span>,
                         },
                         { title: t("ecom.pnl.net_revenue", language), dataIndex: "impact", key: "impact", render: (v: number | null) => (v == null ? "—" : v.toFixed(2)) },
                       ]}
@@ -245,7 +235,7 @@ function stateBlockState({ loading, response, emptyReason }: { loading: boolean;
   return { kind: "ready" as const, data: response };
 }
 
-function formatValue(value: number, unit: string): string {
+function formatValue(value: number, unit: string, language: Parameters<typeof t>[1]): string {
   if (unit === "ratio") return `${value.toFixed(2)}`;
   if (unit === "count") return Math.round(value).toLocaleString();
   return currency(value);

@@ -22,82 +22,78 @@
 // ─── Color Tokens ──────────────────────────────────────────────
 
 export const colors = {
-  // Coastal Navy & Emerald Palette (Professional High-Trust SaaS)
+  // Warm neutral palette — quiet, editorial, and deliberately low-chroma.
   background: {
-    page: "#F8FAFC",        // Cool slate canvas (clean, crisp, modern foundation)
-    surface: "#FFFFFF",     // Crisp pure white card surface
-    elevated: "#FFFFFF",    // Modal, dropdown
-    inset: "#F1F5F9",       // Table headers, secondary panels
-    code: "#F8FAFC",        // Code blocks, diff backgrounds
-    // DARK-003: the login brand slab is an identity surface, not a foreground.
-    // It used var(--fg-primary), so the dark theme flipped it white — the black
-    // slab is the brand, and it stays black in both themes. Its text is pinned
-    // the same way: `--fg-inverse` follows the theme and went dark-on-black.
-    brandSlab: "#000000",
+    page: "#FFFFFF",
+    surface: "#FFFFFF",
+    elevated: "#FFFFFF",
+    inset: "#F7F6F3",
+    code: "#FBFBFA",
+    // Identity surface: dark enough to anchor the login mark without pure black.
+    brandSlab: "#111111",
     onBrandSlab: "#FFFFFF",
   },
 
   foreground: {
-    primary: "#0F172A",     // Deep Coastal Obsidian Navy (rich high-contrast authority)
-    secondary: "#1E293B",   // Slate 800 (high contrast body text, important labels)
-    tertiary: "#334155",    // Slate 700 (descriptions, metadata, labels)
-    muted: "#64748B",       // Slate 500 (hints, placeholders, comparison baseline)
-    inverse: "#FFFFFF",     // Text on dark backgrounds
+    primary: "#111111",
+    secondary: "#2F3437",
+    tertiary: "#5C605D",
+    muted: "#787774",
+    inverse: "#FFFFFF",
   },
 
   border: {
-    default: "#E2E8F0",     // Standard dividers, card borders (--mono-90)
-    strong: "#64748B",      // Hover states, active borders (--mono-70)
-    subtle: "#F1F5F9",      // Internal dividers, table rows (--mono-95)
-    inverse: "rgba(255,255,255,0.12)", // Borders on dark elements
+    default: "#EAEAEA",
+    strong: "#A4A6A2",
+    subtle: "#F1F0ED",
+    inverse: "rgba(255,255,255,0.12)",
   },
 
-  // State colors — crisp, vibrant semantic accents with high contrast
+  // Semantic accents stay small: status dots, icons, and restrained labels.
   state: {
-    success: "#059669",     // Crisp Emerald Green
-    warning: "#D97706",     // Amber Ochre
-    error: "#E11D48",       // Ruby Rose Red
-    info: "#2563EB",        // Royal Cobalt Blue
+    success: "#5C7863",
+    warning: "#826A38",
+    error: "#9A5F5F",
+    info: "#5A6F87",
   },
 
   status: {
-    success: { bg: "#ECFDF5", text: "#065F46", border: "#A7F3D0" },
-    processing: { bg: "#EFF6FF", text: "#1E40AF", border: "#BFDBFE" },
-    warning: { bg: "#FFFBEB", text: "#92400E", border: "#FDE68A" },
-    error: { bg: "#FFF1F2", text: "#9F1239", border: "#FECDD3" },
-    neutral: { bg: "#F1F5F9", text: "#475569", border: "#E2E8F0" },
+    success: { bg: "#EEF3EE", text: "#45604C", border: "#CCD9CD" },
+    processing: { bg: "#EEF1F4", text: "#465A6C", border: "#CCD6DF" },
+    warning: { bg: "#FFFFFF", text: "#6B5A39", border: "#E2D7BB" },
+    error: { bg: "#F6EEEE", text: "#744C4C", border: "#E3D0D0" },
+    neutral: { bg: "#F7F6F3", text: "#5C605D", border: "#EAEAEA" },
   },
 
-  // Morandi legacy mappings preserved for backwards compatibility
+  // Legacy names stay for compatibility; their values follow the new neutral system.
   morandi: {
-    slate: "#0F172A",
-    cream: "#EFF6FF",
-    sand: "#10B981",
-    greige: "#64748B",
-    terracotta: "#E11D48",
+    slate: "#111111",
+    cream: "#F7F6F3",
+    sand: "#5C7863",
+    greige: "#787774",
+    terracotta: "#8A5D5D",
   },
 
-  // Chart series — Ascetic & high-clarity financial data palette
+  // Chart series — neutral first, with restrained positive / negative accents.
   chart: {
-    blue: "#1E293B",        // Deep Charcoal Slate / Midnight Blue-Black
-    purple: "#334155",      // Dark Slate
-    primary: "#0F172A",     // Obsidian Navy
-    accent: "#2D4B46",      // Deep Ascetic Pine
-    secondary: "#64748B",   // Cool Slate
-    negative: "#7F473E",    // Deep Muted Rust
-    fill: "#E2E8F0",        // Subtle Gray Slate
+    blue: "#2F3437",
+    purple: "#5C605D",
+    primary: "#111111",
+    accent: "#5C7863",
+    secondary: "#787774",
+    negative: "#8A5D5D",
+    fill: "#EAEAEA",
   },
 
-  // Brand mark (BrandIcon) — graphic-specific values, not UI semantics.
-  // Dark mode keeps the same mark; only the inverse variant flips.
+  // Brand mark values are graphic-specific, not UI semantics.
   brand: {
-    frame: "#111827",
-    bar: "#1F2937",
-    arrow: "#4B5563",
-    arrowHighlight: "#9CA3AF",
-    ring: "#6B7280",
-    hub: "#374151",
-    node: "#1F2937",
+    frame: "#111111",
+    bar: "#2F3437",
+    arrow: "#787774",
+    arrowHighlight: "#A4A6A2",
+    ring: "#8D918C",
+    hub: "#5C605D",
+    node: "#2F3437",
     inverse: {
       frame: "#FFFFFF",
       bar: "#E5E7EB",
@@ -118,11 +114,10 @@ export const colors = {
     },
   },
 
-  // Dark-only surfaces (admin sider, code blocks) — kept as explicit
-  // semantic slots so a theme can override them independently.
+  // Dark surfaces remain explicit so admin and code areas can be themed independently.
   surface: {
-    admin: "#001529",
-    code: "#1E1E1E",
+    admin: "#2F3437",
+    code: "#2F3437",
   },
 } as const;
 
@@ -130,13 +125,14 @@ export const colors = {
 
 export const typography = {
   fontFamily: {
-    sans: 'var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
-    mono: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    display: '"Instrument Serif", "Iowan Old Style", "Baskerville", "Noto Serif SC", Georgia, serif',
+    sans: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", "SF Pro Display", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif',
+    mono: '"SF Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
   },
 
   // Scale: 8 levels, tight tracking for headings
   sizes: {
-    display: { size: 28, lineHeight: 36, weight: 600, tracking: -0.04 },    // Page titles
+    display: { size: 28, lineHeight: 36, weight: 400, tracking: -0.02 },    // Editorial page titles
     h1: { size: 24, lineHeight: 32, weight: 600, tracking: -0.03 },         // Section headers
     h2: { size: 18, lineHeight: 28, weight: 600, tracking: -0.02 },         // Card titles, tabs
     h3: { size: 15, lineHeight: 24, weight: 600, tracking: -0.01 },         // Subsection, form groups
@@ -188,9 +184,8 @@ export const depth = {
     shadow: "0 0 0 1px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.08)",
   },
 
-  // Halo behind a focused control. Ant Design derives this from colorPrimary,
-  // which is pure black here — left alone it paints a 75%-black slab around
-  // every focused input.
+  // Halo behind a focused control. Keep the ring quiet; the shared CSS focus
+  // token provides the visible keyboard affordance.
   focus: {
     outline: "rgba(0, 0, 0, 0.08)",
   },
@@ -222,7 +217,7 @@ export const darkColors = {
     elevated: "#1E1E1E",
     inset: "#262626",
     code: "#1E1E1E",
-    brandSlab: "#000000",
+    brandSlab: "#111111",
     onBrandSlab: "#FFFFFF",
   },
   foreground: {
@@ -270,7 +265,7 @@ export const darkColors = {
   // Brand mark stays the same in both themes; only the inverse variant
   // flips. Surface slots (admin sider / code) are the same dark values.
   surface: {
-    admin: "#001529",
+    admin: "#2F3437",
     code: "#1E1E1E",
   },
 } as const;

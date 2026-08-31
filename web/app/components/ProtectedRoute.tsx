@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Spin } from "antd";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 
 export default function ProtectedRoute({
   children,
@@ -11,6 +13,7 @@ export default function ProtectedRoute({
   children: React.ReactNode;
 }) {
   const { user, isLoading } = useAuth();
+  const { language } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
@@ -21,18 +24,9 @@ export default function ProtectedRoute({
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <>
-          <Spin size="large" />
-          <span className="sr-only">加载中...</span>
-        </>
+      <div className="protected-route-loading" aria-busy="true">
+        <Spin size="large" />
+        <span className="sr-only">{t("common.loading", language)}</span>
       </div>
     );
   }

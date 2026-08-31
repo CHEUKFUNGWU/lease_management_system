@@ -36,13 +36,7 @@ export function BentoGrid({
   return (
     <div
       className={`bento-grid ${className}`}
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-        gap,
-        width: "100%",
-        ...style,
-      }}
+      style={{ "--bento-columns": columns, "--bento-gap": `${gap}px`, ...style } as CSSProperties}
     >
       {children}
     </div>
@@ -67,84 +61,24 @@ export function BentoTile({
 
   return (
     <div
-      className={`bento-tile bento-tile--${variant} ${className}`}
-      style={{
-        gridColumn: `span ${span} / span ${span}`,
-        gridRow: `span ${rows} / span ${rows}`,
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        background: isAccent ? "var(--accent-bg, #FAF8F5)" : "var(--bg-surface)",
-        border: "1px solid var(--border-default)",
-        borderRadius: isHero ? 12 : 10,
-        boxShadow: isHero ? "0 4px 12px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)" : "0 1px 3px rgba(0,0,0,0.02)",
-        overflow: "hidden",
-        ...style,
-      }}
+      className={`bento-tile bento-tile--${variant}${isHero ? " is-hero" : ""}${isAccent ? " is-accent" : ""} ${className}`}
+      style={{ "--bento-span": span, "--bento-rows": rows, ...style } as CSSProperties}
     >
-      {/* Corner Wash Accent for Hero */}
-      {isHero && (
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            width: 140,
-            height: 140,
-            background: "radial-gradient(circle at top right, var(--chart-accent) 0%, transparent 70%)",
-            opacity: 0.12,
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
-      )}
-
       {/* Header if title or action is provided */}
       {(title || action) && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 18px",
-            borderBottom: "1px solid var(--border-subtle)",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
+        <div className="bento-tile-header">
           <div>
-            {title && (
-              <div
-                style={{
-                  fontSize: isHero ? 16 : 14,
-                  fontWeight: 600,
-                  color: "var(--fg-primary)",
-                }}
-              >
-                {title}
-              </div>
-            )}
-            {subtitle && (
-              <div style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 2 }}>
-                {subtitle}
-              </div>
-            )}
+            {title && <div className={`bento-tile-title${isHero ? " is-hero" : ""}`}>{title}</div>}
+            {subtitle && <div className="bento-tile-subtitle">{subtitle}</div>}
           </div>
-          {action && <div>{action}</div>}
+          {action && <div className="bento-tile-action">{action}</div>}
         </div>
       )}
 
       {/* Body Content */}
       <div
-        style={{
-          flex: 1,
-          padding: noPadding ? 0 : "16px 18px",
-          position: "relative",
-          zIndex: 1,
-          display: "flex",
-          flexDirection: "column",
-          ...bodyStyle,
-        }}
+        className={`bento-tile-body${noPadding ? " is-no-padding" : ""}`}
+        style={bodyStyle}
       >
         {children}
       </div>

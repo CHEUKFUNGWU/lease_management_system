@@ -1,8 +1,18 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EnterpriseTable } from "./EnterpriseTable";
 import type { EnterpriseColumn, SavedView } from "./types";
+
+const css = readFileSync(path.join(import.meta.dirname, "../../globals.css"), "utf8");
+
+function ruleBody(selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\/g, "\\");
+  const match = new RegExp(`${escaped}(?![\\w-])[^{}]*\\{([^}]*)\\}`).exec(css);
+  return match?.[1] || "";
+}
 
 interface TestContract {
   id: string;
@@ -43,8 +53,11 @@ describe("EnterpriseTable Deep Module", () => {
       />
     );
 
-    // Saved Views rendered
+    // Saved Views rendered with the semantic styling hooks.
     expect(html).toContain("已保存视图:");
+    expect(html).toContain("enterprise-table-view-tab is-active");
+    expect(html).toContain("enterprise-table-grid");
+    expect(html).toContain("enterprise-table-shell");
     expect(html).toContain("全部");
     expect(html).toContain("待复核");
     expect(html).toContain("大额(&gt;500万)");
@@ -56,6 +69,29 @@ describe("EnterpriseTable Deep Module", () => {
     expect(html).toContain("上海淮海中路店");
     expect(html).toContain("C002");
     expect(html).toContain("C003");
+  });
+
+  it("keeps the shared table layout in semantic CSS rules", () => {
+    expect(ruleBody(".enterprise-table")).toMatch(/display:\s*flex/);
+    expect(ruleBody(".enterprise-table-shell")).toMatch(/overflow:\s*auto/);
+    expect(ruleBody(".enterprise-table-grid")).toMatch(/min-width:\s*1000px/);
+    expect(ruleBody(".enterprise-table-view-tab.is-active")).toMatch(/box-shadow:\s*var\(--shadow-hover\)/);
+    expect(ruleBody(".enterprise-inline-edit-cell")).toMatch(/min-height:\s*24px/);
+  });
+
+  it("localizes the shared controls", () => {
+    const html = renderToStaticMarkup(
+      <EnterpriseTable<TestContract>
+        data={mockData}
+        columns={mockColumns}
+        rowKey={(r) => r.id}
+        language="en"
+      />
+    );
+
+    expect(html).toContain("Saved views:");
+    expect(html).toContain("Advanced filters");
+    expect(html).toContain("Quick filter…");
   });
 
   it("renders empty state markup when dataset is empty", () => {

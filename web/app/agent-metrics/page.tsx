@@ -7,22 +7,14 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   Empty,
-  Row,
   Select,
   Space,
   Spin,
-  Statistic,
   Table,
-  Tag,
   Typography,
 } from "antd";
 import {
-  BarChartOutlined,
-  ClockCircleOutlined,
-  DollarOutlined,
-  DatabaseOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
@@ -35,7 +27,7 @@ import { agentUsageApi } from "../lib/api";
 import { t } from "../lib/i18n";
 import { tableScrollX } from "../lib/tableScroll";
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 type RangeKey = "24h" | "7d" | "31d";
 
@@ -65,7 +57,7 @@ interface UsageSummary {
 }
 
 function formatNumber(value: number | undefined) {
-  return (value || 0).toLocaleString("zh-CN");
+  return value == null ? "—" : value.toLocaleString("zh-CN");
 }
 
 function formatCost(micros: number | undefined, available: boolean) {
@@ -138,7 +130,7 @@ export default function AgentMetricsPage() {
       key: "cost_status",
       render: (value: string) => (
         <StatusTag kind={statusKindFromAntColor(value === "measured" || value === "calculated" ? "green" : "orange")}>
-          {value || "unavailable"}
+          {value === "measured" ? t("agent_metrics.status_measured", language) : value === "calculated" ? t("agent_metrics.status_calculated", language) : t("agent_metrics.status_unavailable", language)}
         </StatusTag>
       ),
     },
@@ -169,7 +161,7 @@ export default function AgentMetricsPage() {
                   { value: "7d", label: t("agent_metrics.range_7d", language) },
                   { value: "31d", label: t("agent_metrics.range_31d", language) },
                 ]}
-                style={{ minWidth: 130 }}
+                className="agent-metrics-range-select"
               />
               <Button icon={<ReloadOutlined />} onClick={() => void loadSummary()} loading={loading}>
                 {t("agent_metrics.refresh", language)}
@@ -183,7 +175,7 @@ export default function AgentMetricsPage() {
             type="warning"
             showIcon
             message={t("agent_metrics.permission_required", language)}
-            style={{ marginBottom: 16 }}
+            className="agent-metrics-permission-alert"
           />
         )}
         {error && <StateBlock state={{ kind: "failed", message: error }} language={language} />}
@@ -192,38 +184,30 @@ export default function AgentMetricsPage() {
           <Card><Spin /></Card>
         ) : (
           <>
-            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.calls", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {formatNumber(summary?.planner_calls)}
-                  </Typography.Text>
-                </div>
+            <div className="stripe-metric-grid agent-metrics-summary-grid">
+              <div className="pulse-kpi-card agent-metrics-summary-card">
+                <span className="agent-metrics-summary-label">{t("agent_metrics.calls", language)}</span>
+                <Typography.Text className="font-tabular agent-metrics-summary-value">
+                  {formatNumber(summary?.planner_calls)}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.input_tokens", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {formatNumber(summary?.input_tokens)}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card agent-metrics-summary-card">
+                <span className="agent-metrics-summary-label">{t("agent_metrics.input_tokens", language)}</span>
+                <Typography.Text className="font-tabular agent-metrics-summary-value">
+                  {formatNumber(summary?.input_tokens)}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.output_tokens", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {formatNumber(summary?.output_tokens)}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card agent-metrics-summary-card">
+                <span className="agent-metrics-summary-label">{t("agent_metrics.output_tokens", language)}</span>
+                <Typography.Text className="font-tabular agent-metrics-summary-value">
+                  {formatNumber(summary?.output_tokens)}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("agent_metrics.cost", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {formatCost(summary?.cost_micros, summary?.cost_accounting_available === true)}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card agent-metrics-summary-card">
+                <span className="agent-metrics-summary-label">{t("agent_metrics.cost", language)}</span>
+                <Typography.Text className="font-tabular agent-metrics-summary-value">
+                  {formatCost(summary?.cost_micros, summary?.cost_accounting_available === true)}
+                </Typography.Text>
               </div>
             </div>
 
@@ -233,11 +217,11 @@ export default function AgentMetricsPage() {
                 showIcon
                 message={t("agent_metrics.cost_unavailable", language)}
                 description={t("agent_metrics.cost_unavailable_desc", language)}
-                style={{ margin: "16px 0" }}
+                className="agent-metrics-cost-alert"
               />
             )}
 
-            <Card title={t("agent_metrics.breakdown", language)} style={{ marginTop: 16 }}>
+            <Card title={t("agent_metrics.breakdown", language)} className="agent-metrics-breakdown-card">
               {summary?.rollups?.length ? (
                 <Table<UsageRollup>
                   rowKey={(item) => `${item.provider}:${item.model}:${item.pricing_version}:${item.cost_status}`}
@@ -252,7 +236,7 @@ export default function AgentMetricsPage() {
               )}
             </Card>
 
-            <Text type="secondary" style={{ display: "block", marginTop: 16 }}>
+            <Text type="secondary" className="agent-metrics-audit-note">
               {t("agent_metrics.audit_note", language)}
             </Text>
           </>

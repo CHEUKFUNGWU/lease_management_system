@@ -96,13 +96,7 @@ export function CashPlanPanel({
       width: 160,
       align: "right" as const,
       render: (v: number) => (
-        <span
-          className="font-tabular"
-          style={{
-            color: v >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
-            fontWeight: 500,
-          }}
-        >
+        <span className={`font-tabular cash-plan-table-value ${v >= 0 ? "is-positive" : "is-negative"}`}>
           {fmtMoney(v, activePartition?.currency || "CNY")}
         </span>
       ),
@@ -114,7 +108,7 @@ export function CashPlanPanel({
       width: 150,
       align: "right" as const,
       render: (v: number) => (
-        <span className="font-tabular" style={{ color: "var(--fg-secondary)" }}>
+        <span className="font-tabular cash-plan-table-value is-offset">
           +{fmtMoney(v, activePartition?.currency || "CNY")}
         </span>
       ),
@@ -126,7 +120,7 @@ export function CashPlanPanel({
       width: 150,
       align: "right" as const,
       render: (v: number) => (
-        <span className="font-tabular" style={{ color: "var(--chart-negative, #DC2626)" }}>
+        <span className="font-tabular cash-plan-table-value is-negative">
           -{fmtMoney(v, activePartition?.currency || "CNY")}
         </span>
       ),
@@ -138,7 +132,7 @@ export function CashPlanPanel({
       width: 150,
       align: "right" as const,
       render: (v: number) => (
-        <span className="font-tabular" style={{ color: v > 0 ? "var(--state-warning-text, #9A6700)" : "var(--fg-muted)" }}>
+        <span className={`font-tabular cash-plan-table-value ${v > 0 ? "is-warning" : "is-muted"}`}>
           -{fmtMoney(v, activePartition?.currency || "CNY")}
         </span>
       ),
@@ -150,12 +144,7 @@ export function CashPlanPanel({
       width: 160,
       align: "right" as const,
       render: (v: number) => (
-        <strong
-          className="font-tabular"
-          style={{
-            color: v >= 0 ? "var(--fg-primary)" : "var(--state-error-text, #C93B2B)",
-          }}
-        >
+        <strong className={`font-tabular cash-plan-table-value ${v >= 0 ? "is-primary" : "is-negative"}`}>
           {fmtMoney(v, activePartition?.currency || "CNY")}
         </strong>
       ),
@@ -163,30 +152,16 @@ export function CashPlanPanel({
   ];
 
   return (
-    <div style={{ width: "100%" }}>
+    <div className="cash-plan-panel">
       {/* Precision Filter Bar */}
-      <div
-        className="precision-filter-bar"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "12px 16px",
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-default)",
-          borderRadius: 8,
-          marginBottom: 16,
-        }}
-      >
+      <div className="precision-filter-bar cash-plan-filter-bar">
         <Space wrap size={16} align="center">
           <Space size={8} align="center">
-            <Text strong style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.plan.period_range", language)}:</Text>
+            <Text strong className="cash-plan-filter-label">{t("cashflow.plan.period_range", language)}:</Text>
             <Select
               value={fromPeriod}
               onChange={setFromPeriod}
-              style={{ width: 110 }}
+              className="cash-plan-period-select"
               options={[
                 { label: "2026-01", value: "2026-01" },
                 { label: "2026-04", value: "2026-04" },
@@ -198,7 +173,7 @@ export function CashPlanPanel({
             <Select
               value={toPeriod}
               onChange={setToPeriod}
-              style={{ width: 110 }}
+              className="cash-plan-period-select"
               options={[
                 { label: "2026-03", value: "2026-03" },
                 { label: "2026-06", value: "2026-06" },
@@ -209,7 +184,7 @@ export function CashPlanPanel({
           </Space>
 
           <Space size={8} align="center">
-            <Text strong style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.plan.data_classification", language)}:</Text>
+            <Text strong className="cash-plan-filter-label">{t("cashflow.plan.data_classification", language)}:</Text>
             <Segmented
               className="precision-segmented"
               value={dataClassification}
@@ -223,11 +198,11 @@ export function CashPlanPanel({
 
           {planData && planData.partitions.length > 1 && (
             <Space size={8} align="center">
-              <Text strong style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.plan.currency_partition", language)}:</Text>
+              <Text strong className="cash-plan-filter-label">{t("cashflow.plan.currency_partition", language)}:</Text>
               <Select
                 value={selectedCurrency}
                 onChange={setSelectedCurrency}
-                style={{ width: 90 }}
+                className="cash-plan-currency-select"
                 options={planData.partitions.map((p) => ({
                   label: p.currency,
                   value: p.currency,
@@ -242,105 +217,71 @@ export function CashPlanPanel({
         </Button>
       </div>
 
-      {error && <Alert type="error" message={error} showIcon closable style={{ marginBottom: 16 }} />}
+      {error && <Alert type="error" message={error} showIcon closable className="cash-plan-error" />}
 
       {loading && !planData ? (
-        <div style={{ textAlign: "center", padding: "40px 0" }}>
+        <div className="cash-plan-loading">
           <Spin size="large" />
         </div>
       ) : activePartition ? (
         <>
           {/* Top KPI Metric Grid */}
-          <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))", marginBottom: 16 }}>
-            <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-                {t("cashflow.plan.operating_cash", language)}
-              </span>
-              <div style={{ margin: "6px 0 2px" }}>
-                <Typography.Text
-                  className="font-tabular"
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 600,
-                    color: activePartition.total_operating_cash >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
-                  }}
-                >
+          <div className="stripe-metric-grid cash-plan-kpi-grid">
+            <div className="pulse-kpi-card cash-plan-kpi-card">
+              <span className="cash-plan-kpi-label">{t("cashflow.plan.operating_cash", language)}</span>
+              <div className="cash-plan-kpi-value-wrap">
+                <Typography.Text className={`font-tabular cash-plan-kpi-value ${activePartition.total_operating_cash >= 0 ? "is-positive" : "is-negative"}`}>
                   {fmtMoney(activePartition.total_operating_cash, activePartition.currency)}
                 </Typography.Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {t("cashflow.plan.sub_operating", language)}
-              </Text>
+              <Text type="secondary" className="cash-plan-kpi-subtext">{t("cashflow.plan.sub_operating", language)}</Text>
             </div>
 
-            <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-                {t("cashflow.plan.rent_offset", language)}
-              </span>
-              <div style={{ margin: "6px 0 2px" }}>
-                <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
+            <div className="pulse-kpi-card cash-plan-kpi-card">
+              <span className="cash-plan-kpi-label">{t("cashflow.plan.rent_offset", language)}</span>
+              <div className="cash-plan-kpi-value-wrap">
+                <Typography.Text className="font-tabular cash-plan-kpi-value is-primary">
                   +{fmtMoney(activePartition.total_rent_offset, activePartition.currency)}
                 </Typography.Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {t("cashflow.plan.sub_offset", language)}
-              </Text>
+              <Text type="secondary" className="cash-plan-kpi-subtext">{t("cashflow.plan.sub_offset", language)}</Text>
             </div>
 
-            <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-                {t("cashflow.plan.lease_outflow", language)}
-              </span>
-              <div style={{ margin: "6px 0 2px" }}>
-                <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--chart-negative, #DC2626)" }}>
+            <div className="pulse-kpi-card cash-plan-kpi-card">
+              <span className="cash-plan-kpi-label">{t("cashflow.plan.lease_outflow", language)}</span>
+              <div className="cash-plan-kpi-value-wrap">
+                <Typography.Text className="font-tabular cash-plan-kpi-value is-negative">
                   -{fmtMoney(activePartition.total_lease_outflow, activePartition.currency)}
                 </Typography.Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {t("cashflow.plan.sub_lease", language)}
-              </Text>
+              <Text type="secondary" className="cash-plan-kpi-subtext">{t("cashflow.plan.sub_lease", language)}</Text>
             </div>
 
-            <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-                {t("cashflow.plan.capex_outflow", language)}
-              </span>
-              <div style={{ margin: "6px 0 2px" }}>
-                <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--state-warning-text, #9A6700)" }}>
+            <div className="pulse-kpi-card cash-plan-kpi-card">
+              <span className="cash-plan-kpi-label">{t("cashflow.plan.capex_outflow", language)}</span>
+              <div className="cash-plan-kpi-value-wrap">
+                <Typography.Text className="font-tabular cash-plan-kpi-value is-warning">
                   -{fmtMoney(activePartition.total_capex_outflow, activePartition.currency)}
                 </Typography.Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {t("cashflow.plan.sub_capex", language)}
-              </Text>
+              <Text type="secondary" className="cash-plan-kpi-subtext">{t("cashflow.plan.sub_capex", language)}</Text>
             </div>
 
-            <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-                {t("cashflow.plan.net_cash", language)}
-              </span>
-              <div style={{ margin: "6px 0 2px" }}>
-                <Typography.Text
-                  className="font-tabular"
-                  style={{
-                    fontSize: 20,
-                    fontWeight: 600,
-                    color: activePartition.total_net_cash_plan >= 0 ? "var(--fg-primary)" : "var(--state-error-text, #C93B2B)",
-                  }}
-                >
+            <div className="pulse-kpi-card cash-plan-kpi-card">
+              <span className="cash-plan-kpi-label">{t("cashflow.plan.net_cash", language)}</span>
+              <div className="cash-plan-kpi-value-wrap">
+                <Typography.Text className={`font-tabular cash-plan-kpi-value ${activePartition.total_net_cash_plan >= 0 ? "is-primary" : "is-negative"}`}>
                   {fmtMoney(activePartition.total_net_cash_plan, activePartition.currency)}
                 </Typography.Text>
               </div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {t("cashflow.plan.sub_net", language)}
-              </Text>
+              <Text type="secondary" className="cash-plan-kpi-subtext">{t("cashflow.plan.sub_net", language)}</Text>
             </div>
           </div>
 
           {/* Conservation Bridge Card */}
           <Card
             size="small"
-            style={{ marginBottom: 16 }}
+            className="cash-plan-bridge-card"
             title={
               <Space>
                 <span>{t("cashflow.plan.bridge_title", language)}</span>
@@ -359,46 +300,21 @@ export function CashPlanPanel({
               </Space>
             }
           >
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${activePartition.bridge.steps.length + 1}, minmax(0, 1fr))`, gap: 8 }}>
+            <div
+              className="cash-plan-bridge-grid"
+              style={{ gridTemplateColumns: `repeat(${activePartition.bridge.steps.length + 1}, minmax(0, 1fr))` }}
+            >
               {activePartition.bridge.steps.map((step, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: "10px 12px",
-                    background: "var(--bg-subtle, #F8FAFC)",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: 6,
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ fontSize: 11, color: "var(--fg-secondary)", marginBottom: 4 }}>
-                    {step.label}
-                  </div>
-                  <div
-                    className="font-tabular"
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: step.is_deduction ? "var(--state-error-text, #C93B2B)" : "var(--state-success-text, #216E39)",
-                    }}
-                  >
+                <div key={idx} className={`cash-plan-bridge-step ${step.is_deduction ? "is-deduction" : "is-addition"}`}>
+                  <div className="cash-plan-bridge-label">{step.label}</div>
+                  <div className="font-tabular cash-plan-bridge-value">
                     {step.is_deduction ? "-" : "+"}{fmtMoney(step.amount, activePartition.currency)}
                   </div>
                 </div>
               ))}
-              <div
-                style={{
-                  padding: "10px 12px",
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border-strong, #CBD5E1)",
-                  borderRadius: 6,
-                  textAlign: "center",
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 500, color: "var(--fg-secondary)", marginBottom: 4 }}>
-                  {t("cashflow.plan.net_cash", language)}
-                </div>
-                <div className="font-tabular" style={{ fontSize: 15, fontWeight: 600, color: "var(--fg-primary)" }}>
+              <div className="cash-plan-bridge-total">
+                <div className="cash-plan-bridge-label">{t("cashflow.plan.net_cash", language)}</div>
+                <div className="font-tabular cash-plan-bridge-total-value">
                   {fmtMoney(activePartition.total_net_cash_plan, activePartition.currency)}
                 </div>
               </div>

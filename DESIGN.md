@@ -12,6 +12,19 @@
 - 判断标准很简单：**你写的这一行，一年后别人照着抄会不会把系统带偏？** 会，就按本文改。
 - 本文与代码不一致时，**以本文为准并修代码**；如果确实是本文错了，改本文，不要在代码里开特例。
 
+### 0.1 暂停前的现行 UI/UX 调整方向
+
+以下是本轮审计暂停时用户明确拍板的方向，优先级高于本文较早的页面示例；恢复工作时先按这组规则做 PC（1440×900）审计：
+
+- **先做 PC，后做移动端。** 移动端暂只保留键盘/触控可用、无页面级横向溢出等基础回归，不继续做视觉精修。
+- **默认用纯白表面。** 现有偏黄、黄棕、土色的大面积底色与普通卡片/提示气泡看起来脏，下一轮优先改为白底；警告语义保留在图标、文字或细边界上，不用大面积黄棕填充。
+- **禁止大号「感叹号 + 一段文字」气泡作为常规提示。** 非阻塞信息改为紧凑的上下文文字或状态行；只有真正阻塞任务的错误才可突出展示，并必须说明下一步动作。
+- **清理卡片右上角标签。** 删除装饰性、重复性、工程状态类徽章；一个区块只保留用户确实需要做决定的状态，优先放在标题旁或可信度区域，不要在页面右上角堆标签。
+- **页面标题下不再放副标题/说明句。** `PageHeader` 只保留标题与动作区；口径、来源、覆盖率等必要信息移到筛选条、`DataTrustBar`、区块标题或按需展开的详情中。
+- **做一次全站文案减法。** 删除重复免责声明、内部路线图编号、模块名、接口名、枚举值和其他工程黑话；保留用户完成任务所需的词，改成普通用户能直接理解的动作、对象和结果。审计/版本细节只能渐进披露，不能占据首屏。
+
+本轮已落地的页面壳与状态展示遵循以上方向；存量页面仍按 PC 审计逐步收敛。
+
 三条最常被问到的判定：
 
 | 想做的事 | 答案 |
@@ -56,25 +69,25 @@
 
 ### 3.1 中性阶（唯一的底色系统）
 
-2026-08 换色为 **Coastal Navy（Slate 冷调中性阶）**，取代此前的纯灰阶。它仍然是「无彩底色」——只是中性色带极轻的蓝调，比纯灰更有层次且不刺眼。**这些是 `tokens.ts` 的实际值，不要凭印象写 `#595959` 一类的旧灰。**
+本轮换为 **Quiet Luxury / Editorial Minimalism** 的暖中性色阶：纯白画布、近黑正文、低对比边界。**以下值与 `tokens.ts` 保持一致，不要凭印象补旧色。**
 
 | 语义 | 值 | 用途 |
 |---|---|---|
-| `foreground.primary` | `#0F172A` | 标题、主要操作、关键数据 |
-| `foreground.secondary` | `#1E293B` | 正文、重要标签 |
-| `foreground.tertiary` | `#334155` | 描述、元数据 |
-| `foreground.muted` | `#64748B` | 占位符、禁用、提示、对比基线 |
+| `foreground.primary` | `#111111` | 标题、主要操作、关键数据 |
+| `foreground.secondary` | `#2F3437` | 正文、重要标签 |
+| `foreground.tertiary` | `#5C605D` | 描述、元数据 |
+| `foreground.muted` | `#787774` | 占位符、禁用、提示、对比基线 |
 | `foreground.inverse` | `#FFFFFF` | 深色底上的文字 |
-| `border.strong` | `#64748B` | hover / 激活边框 |
-| `border.default` | `#E2E8F0` | 标准边框、卡片描边 |
-| `border.subtle` | `#F1F5F9` | 内部分隔线、表格行 |
-| `background.inset` | `#F1F5F9` | 表头、次级面板 |
+| `border.strong` | `#A4A6A2` | hover / 激活边框 |
+| `border.default` | `#EAEAEA` | 标准边框、卡片描边 |
+| `border.subtle` | `#F1F0ED` | 内部分隔线、表格行 |
+| `background.inset` | `#F7F6F3` | 表头、次级面板 |
 | `background.surface` | `#FFFFFF` | 卡片、面板 |
-| `background.page` | `#F8FAFC` | 页面画布 |
+| `background.page` | `#FFFFFF` | 页面画布 |
 
-**页面画布不是纯白。** `#F8FAFC` 与 `#FFFFFF` 的卡片形成层次，这是不靠边框分区的前提（§2 原则 5）。
+**页面画布与普通表面均为纯白。** 层次通过留白、细边界与排版建立，而不是大面积着色。
 
-**身份面（identity surface）例外**：`background.brandSlab` = `#000000` / `onBrandSlab` = `#FFFFFF`。登录页那块品牌黑板是**图形**不是前景色，两个主题下都保持黑底白字（DARK-003）。不要拿 `--fg-primary` 去画它，暗色模式会把它翻成白色。
+**身份面（identity surface）例外**：`background.brandSlab` = `#111111` / `onBrandSlab` = `#FFFFFF`。登录页品牌面是**图形**不是前景色；不要拿 `--fg-primary` 去画它，暗色模式会把它翻成白色。
 
 ### 3.2 语义色
 
@@ -82,15 +95,15 @@
 
 | 状态 | text | bg | border |
 |---|---|---|---|
-| success | `#065F46` | `#ECFDF5` | `#A7F3D0` |
-| processing / info | `#1E40AF` | `#EFF6FF` | `#BFDBFE` |
-| warning | `#92400E` | `#FFFBEB` | `#FDE68A` |
-| error | `#9F1239` | `#FFF1F2` | `#FECDD3` |
-| neutral | `#475569` | `#F1F5F9` | `#E2E8F0` |
+| success | `#45604C` | `#EEF3EE` | `#CCD9CD` |
+| processing / info | `#465A6C` | `#EEF1F4` | `#CCD6DF` |
+| warning | `#6B5A39` | `#FFFFFF` | `#E2D7BB` |
+| error | `#744C4C` | `#F6EEEE` | `#E3D0D0` |
+| neutral | `#5C605D` | `#F7F6F3` | `#EAEAEA` |
 
-全部 text 值在对应 bg 上通过 WCAG AA。
+全部 text 值在对应 bg 上通过 WCAG AA。警告底色保持白色，只保留文字、图标与细边界的语义强调。
 
-另有**独立的强调色** `state.*`，用于图标与细描边，不用于大面积填充：success `#059669`、warning `#D97706`、error `#E11D48`、info `#2563EB`。
+另有**独立的强调色** `state.*`，用于图标与细描边，不用于大面积填充：success `#5C7863`、warning `#826A38`、error `#9A5F5F`、info `#5A6F87`。
 
 > `colors.morandi.*` 是上一轮配色的遗留映射，标着 `legacy … backwards compatibility`。**新代码不要引用**，它随时会被删。
 
@@ -107,13 +120,13 @@
 
 | 令牌 | 值 | 语义 |
 |---|---|---|
-| `chart.primary` | `#0F172A` | 主序列 |
-| `chart.blue` | `#1E293B` | 次主序列（名字是历史遗留，它不是蓝色）|
-| `chart.purple` | `#334155` | 第三序列（同上，不是紫色）|
-| `chart.secondary` | `#64748B` | 对比基线、上年同期 |
-| `chart.accent` | `#2D4B46` | 需要区分的正向序列 |
-| `chart.negative` | `#7F473E` | 负向 / 恶化序列 |
-| `chart.fill` | `#E2E8F0` | 面积填充、参考带 |
+| `chart.primary` | `#111111` | 主序列 |
+| `chart.blue` | `#2F3437` | 次主序列（名字是历史遗留，它不是蓝色）|
+| `chart.purple` | `#5C605D` | 第三序列（同上，不是紫色）|
+| `chart.secondary` | `#787774` | 对比基线、上年同期 |
+| `chart.accent` | `#5C7863` | 需要区分的正向序列 |
+| `chart.negative` | `#8A5D5D` | 负向 / 恶化序列 |
+| `chart.fill` | `#EAEAEA` | 面积填充、参考带 |
 
 规则不变，且因为色板变深更要守住：
 
@@ -231,7 +244,7 @@ xs sm md  lg  xl  2xl 3xl 4xl
 |---|---|
 | `<AppLayout>` | 页面骨架。所有页面必须包在里面 |
 | `<ProtectedRoute>` | 鉴权包装 |
-| `<PageHeader title subtitle primaryAction secondaryAction>` | 页面标题区 |
+| `<PageHeader title primaryAction secondaryAction help>` | 页面标题区；不在标题下放副标题或说明句 |
 | `<StatusTag kind>` | 状态标签，唯一合法的彩色标签 |
 | `<GlobalSearch>` / `<NotificationBell>` / `<CommandPalette>` | 顶栏功能 |
 | `<ThemeToggle>` / `<LanguageToggle>` | 主题与语言切换 |
@@ -267,7 +280,7 @@ xs sm md  lg  xl  2xl 3xl 4xl
 **页面骨架，自上而下固定这个顺序：**
 
 ```
-PageHeader        标题 + 一句话副标题（口径声明，如「仅供 Working 经营分析，不作解释性判断」）
+PageHeader        标题（不放副标题或说明句）
                   右侧动作区：帮助 · 刷新 · 导出 · 交给 AI 分析 · 情景分析 · 返回上级
 筛选条            数据分类切换 · 主体选择 · 日期 · 窗口类型 · 窗口档位 · 数据源
 DataTrustBar      分类 · 口径 · 覆盖率 · decision-ready · 展开全部口径

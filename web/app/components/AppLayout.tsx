@@ -36,7 +36,6 @@ import NotificationBell from "./NotificationBell";
 import ThemeToggle from "./ThemeToggle";
 import LanguageToggle from "./LanguageToggle";
 import BrandIcon from "./BrandIcon";
-import { CommandPalette } from "./CommandPalette/CommandPalette";
 
 const { Header, Sider, Content } = Layout;
 
@@ -374,13 +373,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          {/* Sidebar Footer */}
-          {!collapsed && (
-            <div className="app-sider-footer">
-              <div>{t("app.title", language)}</div>
-              <div className="app-sider-footer-version">v0.1.0</div>
-            </div>
-          )}
         </Sider>}
 
         <Drawer
@@ -418,7 +410,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </Content>
       </Layout>
-      <CommandPalette />
     </Layout>
   );
 }

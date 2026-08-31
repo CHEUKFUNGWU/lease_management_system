@@ -14,7 +14,6 @@ import {
   Row,
   Space,
   Table,
-  Tag,
   Typography,
   message,
 } from "antd";
@@ -144,7 +143,7 @@ export default function DealComparePage() {
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
           <PageHeader
-            title={<>{t("deal_compare.title", language)}<span className="page-header-count">{t("deal_compare.header_count", language, { count: String(chartData.length) })}</span></>}
+            title={t("deal_compare.title", language)}
           />
 
           <Form
@@ -153,7 +152,7 @@ export default function DealComparePage() {
             onFinish={handleCompare}
             initialValues={{ offers: INITIAL_OFFERS }}
           >
-            <Card style={{ borderRadius: 10, marginBottom: 16 }}>
+            <Card className="deal-compare-form-card">
               <Row gutter={16}>
                 <Col xs={24} md={8}>
                   <Form.Item
@@ -162,7 +161,7 @@ export default function DealComparePage() {
                     rules={[{ required: true, message: t("deal_compare.err_rate", language) }]}
                     extra={t("deal_compare.hint_rate", language)}
                   >
-                    <InputNumber style={{ width: "100%" }} min={0.0001} max={1} step={0.005} precision={4} />
+                    <InputNumber className="deal-compare-full-input" min={0.0001} max={1} step={0.005} precision={4} />
                   </Form.Item>
                 </Col>
                 <Col xs={24} md={8}>
@@ -180,7 +179,6 @@ export default function DealComparePage() {
                     {fields.map((field, index) => (
                       <Col xs={24} lg={12} key={field.key}>
                         <Card
-                          style={{ borderRadius: 10 }}
                           title={
                             <Form.Item
                               {...field}
@@ -189,7 +187,7 @@ export default function DealComparePage() {
                               noStyle
                               rules={[{ required: true, message: t("deal_compare.err_name", language) }]}
                             >
-                              <Input variant="borderless" style={{ fontWeight: 600, padding: 0 }} />
+                              <Input variant="borderless" className="deal-compare-name-input" />
                             </Form.Item>
                           }
                           extra={
@@ -212,7 +210,7 @@ export default function DealComparePage() {
                                 name={[field.name, "term_months"]}
                                 rules={[{ required: true, message: t("deal_compare.err_term", language) }]}
                               >
-                                <InputNumber style={{ width: "100%" }} min={1} />
+                                <InputNumber className="deal-compare-full-input" min={1} />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
@@ -223,7 +221,7 @@ export default function DealComparePage() {
                                 name={[field.name, "base_monthly_rent"]}
                                 rules={[{ required: true, message: t("deal_compare.err_rent", language) }]}
                               >
-                                <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                                <InputNumber className="deal-compare-full-input" min={0} precision={2} />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
@@ -233,7 +231,7 @@ export default function DealComparePage() {
                                 label={t("deal_compare.label_free", language)}
                                 name={[field.name, "rent_free_months"]}
                               >
-                                <InputNumber style={{ width: "100%" }} min={0} />
+                                <InputNumber className="deal-compare-full-input" min={0} />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
@@ -243,7 +241,7 @@ export default function DealComparePage() {
                                 label={t("deal_compare.label_esc", language)}
                                 name={[field.name, "annual_escalation_percent"]}
                               >
-                                <InputNumber style={{ width: "100%" }} precision={2} />
+                                <InputNumber className="deal-compare-full-input" precision={2} />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
@@ -254,7 +252,7 @@ export default function DealComparePage() {
                                 name={[field.name, "other_monthly_cost"]}
                                 extra={t("deal_compare.hint_other", language)}
                               >
-                                <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                                <InputNumber className="deal-compare-full-input" min={0} precision={2} />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
@@ -265,7 +263,7 @@ export default function DealComparePage() {
                                 name={[field.name, "area_sqm"]}
                                 extra={t("deal_compare.hint_area", language)}
                               >
-                                <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                                <InputNumber className="deal-compare-full-input" min={0} precision={2} />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
@@ -275,7 +273,7 @@ export default function DealComparePage() {
                                 label={t("deal_compare.label_upfront", language)}
                                 name={[field.name, "upfront_cost"]}
                               >
-                                <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                                <InputNumber className="deal-compare-full-input" min={0} precision={2} />
                               </Form.Item>
                             </Col>
                             <Col span={12}>
@@ -285,7 +283,7 @@ export default function DealComparePage() {
                                 label={t("deal_compare.label_contrib", language)}
                                 name={[field.name, "landlord_contribution"]}
                               >
-                                <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                                <InputNumber className="deal-compare-full-input" min={0} precision={2} />
                               </Form.Item>
                             </Col>
                           </Row>
@@ -294,7 +292,7 @@ export default function DealComparePage() {
                     ))}
                   </Row>
 
-                  <Space style={{ margin: "16px 0" }}>
+                  <Space className="deal-compare-actions">
                     {fields.length < 5 && (
                       <Button
                         icon={<PlusOutlined />}
@@ -317,12 +315,12 @@ export default function DealComparePage() {
               <Alert
                 type={result.measures_disagree ? "warning" : "success"}
                 showIcon
-                style={{ marginBottom: 16, borderRadius: 10 }}
+                className="deal-compare-conclusion"
                 message={result.measures_disagree ? t("deal_compare.disagree", language) : t("deal_compare.agree", language)}
                 description={result.conclusion}
               />
 
-              <Card title={t("deal_compare.card_result", language)} style={{ borderRadius: 10, marginBottom: 16 }}>
+              <Card title={t("deal_compare.card_result", language)} className="deal-compare-result-card">
                 <Table
                   dataSource={result.offers}
                   rowKey="name"
@@ -381,11 +379,11 @@ export default function DealComparePage() {
                 />
               </Card>
 
-              <Card title={t("deal_compare.card_cash", language)} style={{ borderRadius: 10 }}>
-                <div style={{ color: "var(--fg-muted)", fontSize: 13, marginBottom: 12 }}>
+              <Card title={t("deal_compare.card_cash", language)} className="deal-compare-cash-card">
+                <div className="deal-compare-cash-note">
                   {t("deal_compare.cash_note", language)}
                 </div>
-                <div style={{ width: "100%", height: 320 }}>
+                <div className="deal-compare-chart">
                   <ResponsiveContainer>
                     <LineChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" />

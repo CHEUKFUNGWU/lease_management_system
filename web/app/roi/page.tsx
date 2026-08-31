@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button, Card, Col, Input, InputNumber, Row, Statistic, Table, Typography } from "antd";
+import { Button, Card, Col, Input, InputNumber, Row, Table, Typography } from "antd";
 import { CalculatorOutlined, ClockCircleOutlined, DollarOutlined, SafetyOutlined } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -9,7 +9,6 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { useLanguage } from "../context/LanguageContext";
 import { fmtMoney } from "../lib/format";
 import { t } from "../lib/i18n";
-import ScopeNote from "../components/ScopeNote";
 
 const { Text } = Typography;
 
@@ -83,21 +82,16 @@ export default function RoiPage() {
     <ProtectedRoute>
       <AppLayout>
         <PageHeader
-          title={<>{t("roi.title", language)}<span className="page-header-count">{t("roi.header_count", language, { count: contracts == null ? "—" : contracts.toLocaleString() })}</span></>}
-          meta={t("roi.meta_desc", language)}
+          title={t("roi.title", language)}
         />
-        {/* R0-3: scope note — internal project-approval tool, not store
-             operating analysis; this page is intentionally not in the nav. */}
-        <ScopeNote noteKey="roi.scope_note" className="roi-scope-note" language={language} />
-
         <Row gutter={[16, 16]}>
           <Col xs={24} lg={8}>
             <Card
               size="small"
               title={t("roi.preset_title", language)}
-              style={{ borderRadius: 10, marginBottom: 16 }}
+              className="roi-preset-card"
             >
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="roi-preset-actions">
                 <Button size="small" onClick={() => applyPreset(20, 100, 2.0, 0.5, 20)}>{t("roi.preset_small", language)}</Button>
                 <Button size="small" onClick={() => applyPreset(80, 120, 4.0, 0.5, 60)}>{t("roi.preset_medium", language)}</Button>
                 <Button size="small" onClick={() => applyPreset(200, 150, 6.0, 1.0, 120)}>{t("roi.preset_large", language)}</Button>
@@ -105,11 +99,11 @@ export default function RoiPage() {
               </div>
             </Card>
 
-            <Card title={t("roi.card_assumptions", language)} style={{ borderRadius: 10 }}>
-              <div style={{ display: "grid", gap: 16 }}>
+            <Card title={t("roi.card_assumptions", language)}>
+              <div className="roi-assumption-grid">
                 <label>
                   <Text strong>{t("roi.assumption_contracts", language)}</Text>
-                  <InputNumber min={1} value={contracts} onChange={(v) => setContracts(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber className="roi-input" min={1} value={contracts} onChange={(v) => setContracts(v == null ? null : Number(v))} />
                 </label>
                 <label>
                   <Text strong>{t("roi.label_currency", language)}</Text>
@@ -117,74 +111,66 @@ export default function RoiPage() {
                     value={currencyCode}
                     onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())}
                     placeholder="CNY"
-                    style={{ width: "100%", marginTop: 6 }}
+                    className="roi-input"
                   />
                 </label>
                 <label>
                   <Text strong>{t("roi.label_hourly_cost", language)}</Text>
-                  <InputNumber min={1} prefix={currencyCode} value={hourlyCost} onChange={(v) => setHourlyCost(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber className="roi-input" min={1} prefix={currencyCode} value={hourlyCost} onChange={(v) => setHourlyCost(v == null ? null : Number(v))} />
                 </label>
                 <label>
                   <Text strong>{t("roi.label_manual_hours", language)}</Text>
-                  <InputNumber min={0} step={0.1} value={manualHours} onChange={(v) => setManualHours(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber className="roi-input" min={0} step={0.1} value={manualHours} onChange={(v) => setManualHours(v == null ? null : Number(v))} />
                 </label>
                 <label>
                   <Text strong>{t("roi.label_ai_hours", language)}</Text>
-                  <InputNumber min={0} step={0.1} value={aiHours} onChange={(v) => setAiHours(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber className="roi-input" min={0} step={0.1} value={aiHours} onChange={(v) => setAiHours(v == null ? null : Number(v))} />
                 </label>
                 <label>
                   <Text strong>{t("roi.label_close_days", language)}</Text>
-                  <InputNumber min={0} step={0.5} value={monthlyCloseDays} onChange={(v) => setMonthlyCloseDays(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber className="roi-input" min={0} step={0.5} value={monthlyCloseDays} onChange={(v) => setMonthlyCloseDays(v == null ? null : Number(v))} />
                 </label>
                 <label>
                   <Text strong>{t("roi.label_system_close_days", language)}</Text>
-                  <InputNumber min={0} step={0.5} value={systemCloseDays} onChange={(v) => setSystemCloseDays(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber className="roi-input" min={0} step={0.5} value={systemCloseDays} onChange={(v) => setSystemCloseDays(v == null ? null : Number(v))} />
                 </label>
                 <label>
                   <Text strong>{t("roi.label_audit_hours", language)}</Text>
-                  <InputNumber min={0} value={auditReworkHours} onChange={(v) => setAuditReworkHours(v == null ? null : Number(v))} style={{ width: "100%", marginTop: 6 }} />
+                  <InputNumber className="roi-input" min={0} value={auditReworkHours} onChange={(v) => setAuditReworkHours(v == null ? null : Number(v))} />
                 </label>
               </div>
             </Card>
           </Col>
 
           <Col xs={24} lg={16}>
-            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", marginBottom: 16 }}>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_hours_saved", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {result ? `${Math.round(result.totalHoursSaved)} ${hoursUnit}` : "—"}
-                  </Typography.Text>
-                </div>
+            <div className="stripe-metric-grid roi-summary-grid">
+              <div className="pulse-kpi-card roi-summary-card">
+                <span className="roi-summary-label">{t("roi.stat_hours_saved", language)}</span>
+                <Typography.Text className="font-tabular roi-summary-value">
+                  {result ? `${Math.round(result.totalHoursSaved)} ${hoursUnit}` : "—"}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_labor_savings", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {result ? fmtMoney(Math.round(result.laborSavings), result.currency) : "—"}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card roi-summary-card">
+                <span className="roi-summary-label">{t("roi.stat_labor_savings", language)}</span>
+                <Typography.Text className="font-tabular roi-summary-value">
+                  {result ? fmtMoney(Math.round(result.laborSavings), result.currency) : "—"}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px", borderTop: "1px solid var(--border-subtle)" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_ai_saved", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {result ? `${Math.round(result.intakeHoursSaved)} ${hoursUnit}` : "—"}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card roi-summary-card">
+                <span className="roi-summary-label">{t("roi.stat_ai_saved", language)}</span>
+                <Typography.Text className="font-tabular roi-summary-value">
+                  {result ? `${Math.round(result.intakeHoursSaved)} ${hoursUnit}` : "—"}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 96, padding: "16px 20px", borderTop: "1px solid var(--border-subtle)" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("roi.stat_audit_reduced", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {result ? `${Math.round(result.auditHoursSaved)} ${hoursUnit}` : "—"}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card roi-summary-card">
+                <span className="roi-summary-label">{t("roi.stat_audit_reduced", language)}</span>
+                <Typography.Text className="font-tabular roi-summary-value">
+                  {result ? `${Math.round(result.auditHoursSaved)} ${hoursUnit}` : "—"}
+                </Typography.Text>
               </div>
             </div>
 
-            <Card title={t("roi.card_basis", language)} style={{ borderRadius: 10, marginTop: 16 }}>
+            <Card title={t("roi.card_basis", language)} className="roi-basis-card">
               <Table
                 columns={[
                   { title: t("roi.col_item", language), dataIndex: "item" },

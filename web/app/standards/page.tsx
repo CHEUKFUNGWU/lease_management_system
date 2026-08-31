@@ -2,8 +2,8 @@
 
 import { StatusTag } from "../components/StatusTag";
 
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Tag, Typography, message } from "antd";
+import { useMemo, useState } from "react";
+import { Button, Card, Col, Form, InputNumber, Row, Select, Space, Statistic, Table, Typography, message } from "antd";
 import { SafetyOutlined } from "@ant-design/icons";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import AppLayout from "../components/AppLayout";
@@ -13,6 +13,8 @@ import { contractApi, reportApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { fmtMoney } from "../lib/format";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { t } from "../lib/i18n";
 import { motion } from "framer-motion";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
@@ -40,9 +42,16 @@ interface StandardRow {
 }
 
 const fmt = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+const SCOPE_KEYS: Record<string, string> = {
+  in_scope: "contracts.scope_in_scope",
+  short_term_exempt: "contracts.scope_short_term_exempt",
+  low_value_exempt: "contracts.scope_low_value_exempt",
+  not_a_lease: "contracts.scope_not_a_lease",
+};
 
 export default function StandardsPage() {
   const { token } = useAuth();
+  const { language } = useLanguage();
   const [form] = Form.useForm();
   const [rows, setRows] = useState<StandardRow[]>([]);
   const [meta, setMeta] = useState<any>(null);
@@ -51,7 +60,7 @@ export default function StandardsPage() {
   const delta = useMemo(() => {
     const ifrs = rows.find((row) => row.standard === "ifrs16");
     const operating = rows.find((row) => row.standard === "asc842_operating");
-    if (!ifrs || !operating) return 0;
+    if (!ifrs || !operating) return null;
     return operating.first_period_expense - ifrs.first_period_expense;
   }, [rows]);
 
@@ -81,9 +90,9 @@ export default function StandardsPage() {
       );
       setRows(((res as unknown as { data?: StandardRow[] }).data) || []);
       setMeta(res);
-      message.success("多准则对比已生成");
+      message.success(t("standards.generated", language));
     } catch (error: any) {
-      notifyError(error.message || "多准则对比失败");
+      notifyError(error.message || t("standards.failed", language));
     } finally {
       setLoading(false);
     }
@@ -93,73 +102,72 @@ export default function StandardsPage() {
     <ProtectedRoute>
       <AppLayout>
         <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <div className="standards-page-stack">
             <PageHeader
-              title="多准则对比"
-
+              title={t("standards.title", language)}
             />
 
             <Card>
               <Form form={form} layout="inline" onFinish={runComparison}>
-                <Form.Item name="contract_id" rules={[{ required: true, message: "请选择合同" }]} style={{ minWidth: 360 }}>
+                <Form.Item name="contract_id" rules={[{ required: true, message: t("standards.contract_required", language) }]}>
                   <Select
                     showSearch
-                    placeholder="选择已审批合同"
+                    className="standards-contract-select"
+                    placeholder={t("standards.select_approved", language)}
                     optionFilterProp="label"
                     options={contracts.map((contract) => ({
                       value: contract.id,
-                      label: `${contract.contract_number} - ${contract.contract_name}`,
+                      label: `${contract.contract_number} · ${contract.contract_name}`,
                     }))}
                   />
                 </Form.Item>
-                <Form.Item name="discount_rate_percent" label="折现率">
-                  <InputNumber min={0} max={50} precision={2} addonAfter="%" placeholder="默认合同/系统利率" />
+                <Form.Item name="discount_rate_percent" label={t("standards.discount_rate", language)}>
+                  <InputNumber min={0} max={50} precision={2} addonAfter="%" placeholder={t("standards.rate_placeholder", language)} />
                 </Form.Item>
                 <Form.Item>
                   <Button type="primary" htmlType="submit" loading={loading} icon={<SafetyOutlined />}>
-                    生成对比
+                    {t("standards.generate", language)}
                   </Button>
                 </Form.Item>
               </Form>
             </Card>
 
-            <Alert
-              type="warning"
-              showIcon
-              message="这是管理对比视图，不替代完整法定准则子账"
-              description="IFRS 16 仍是受控计量基线。ASC 842 operating / finance 与本地准则行用于展示政策差异、售前沟通和管理层影响分析。"
-            />
+            <div className="standards-note" role="note">
+              <strong>{t("standards.note_title", language)}</strong>
+              <div>{t("standards.note_desc", language)}</div>
+            </div>
 
             {meta && (
-              <Alert
-                type="info"
-                showIcon
-                message={`${meta.contract_number} / ${meta.contract_name}`}
-                description={`范围判定 ${meta.lease_scope}，折现率 ${(meta.discount_rate * 100).toFixed(2)}%，币种 ${meta.currency}`}
-              />
+              <div className="card-context standards-result-meta" role="status">
+                <strong>{meta.contract_number}</strong>
+                <span>{meta.contract_name}</span>
+                <span>{t("standards.scope", language)}: {SCOPE_KEYS[meta.lease_scope] ? t(SCOPE_KEYS[meta.lease_scope], language) : meta.lease_scope || "—"}</span>
+                <span>{t("standards.discount_rate", language)}: {typeof meta.discount_rate === "number" ? `${(meta.discount_rate * 100).toFixed(2)}%` : "—"}</span>
+                <span>{t("standards.currency", language)}: {meta.currency || "—"}</span>
+              </div>
             )}
 
             <Row gutter={16}>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="准则视图数" value={rows.length} />
+                  <Statistic title={t("standards.view_count", language)} value={rows.length} />
                 </Card>
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="IFRS 初始负债" value={rows.find((row) => row.standard === "ifrs16")?.initial_liability || 0} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} />
+                  <Statistic title={t("standards.initial_liability", language)} value={rows.find((row) => row.standard === "ifrs16")?.initial_liability ?? undefined} precision={2} formatter={(v) => v == null ? "—" : fmtMoney(Number(v), meta?.currency)} />
                 </Card>
               </Col>
               <Col xs={24} md={8}>
                 <Card>
-                  <Statistic title="ASC Operating 首期损益差异" value={delta} precision={2} formatter={(v) => fmtMoney(Number(v), meta?.currency)} />
+                  <Statistic title={t("standards.expense_delta", language)} value={delta ?? undefined} precision={2} formatter={(v) => v == null ? "—" : fmtMoney(Number(v), meta?.currency)} />
                 </Card>
               </Col>
             </Row>
 
             {rows.length > 0 && (
-              <Card title="初始确认与首期损益">
-                <div style={{ width: "100%", height: 300 }}>
+              <Card title={t("standards.chart_title", language)}>
+                <div className="standards-chart">
                   <ResponsiveContainer>
                     <BarChart data={rows}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -167,15 +175,15 @@ export default function StandardsPage() {
                       <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} />
                       <Tooltip formatter={(value) => fmtMoney(Number(value || 0), meta?.currency)} />
                       <Legend />
-                      <Bar isAnimationActive={false} dataKey="initial_liability" fill="var(--chart-blue)" name="初始负债" />
-                      <Bar isAnimationActive={false} dataKey="first_period_expense" fill="var(--state-success-text)" name="首期费用" />
+                      <Bar isAnimationActive={false} dataKey="initial_liability" fill="var(--chart-blue)" name={t("standards.initial_liability", language)} />
+                      <Bar isAnimationActive={false} dataKey="first_period_expense" fill="var(--state-success-text)" name={t("standards.first_expense", language)} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
             )}
 
-            <Card title="准则差异明细">
+            <Card title={t("standards.detail_title", language)}>
               <Table
                 loading={loading}
                 dataSource={rows}
@@ -184,28 +192,28 @@ export default function StandardsPage() {
                 pagination={false}
                 scroll={tableScrollX((rows || []).length, 1320)}
                 columns={[
-                  { title: "准则", dataIndex: "standard_name", width: 210, fixed: "left" },
-                  { title: "分类", dataIndex: "classification", width: 160, render: (v: string) => <StatusTag kind="processing">{v}</StatusTag> },
-                  { title: "计量路径", dataIndex: "measurement_basis", width: 150 },
-                  { title: "初始负债", dataIndex: "initial_liability", width: 120, align: "right" as const, render: (v: number) => fmt(v) },
-                  { title: "ROU 资产", dataIndex: "initial_rou_asset", width: 120, align: "right" as const, render: (v: number) => fmt(v) },
-                  { title: "首期费用", dataIndex: "first_period_expense", width: 120, align: "right" as const, render: (v: number) => fmt(v) },
-                  { title: "总确认成本", dataIndex: "total_recognized_cost", width: 130, align: "right" as const, render: (v: number) => fmt(v) },
-                  { title: "资产负债表", dataIndex: "balance_sheet_treatment", width: 280 },
-                  { title: "损益模式", dataIndex: "pnl_pattern", width: 280 },
+                  { title: t("standards.standard", language), dataIndex: "standard_name", width: 210, fixed: "left" },
+                  { title: t("standards.classification", language), dataIndex: "classification", width: 160, render: (v: string) => <StatusTag kind="processing">{v}</StatusTag> },
+                  { title: t("standards.measurement_path", language), dataIndex: "measurement_basis", width: 150 },
+                  { title: t("standards.initial_liability", language), dataIndex: "initial_liability", width: 120, align: "right" as const, render: (v: number) => fmt(v) },
+                  { title: t("standards.rou_asset", language), dataIndex: "initial_rou_asset", width: 120, align: "right" as const, render: (v: number) => fmt(v) },
+                  { title: t("standards.first_expense", language), dataIndex: "first_period_expense", width: 120, align: "right" as const, render: (v: number) => fmt(v) },
+                  { title: t("standards.total_cost", language), dataIndex: "total_recognized_cost", width: 130, align: "right" as const, render: (v: number) => fmt(v) },
+                  { title: t("standards.balance_sheet", language), dataIndex: "balance_sheet_treatment", width: 280 },
+                  { title: t("standards.pnl_pattern", language), dataIndex: "pnl_pattern", width: 280 },
                 ]}
                 expandable={{
                   expandedRowRender: (record) => (
                     <Space direction="vertical" size={4}>
                       {record.key_differences.map((item) => (
-                        <Text key={item}>- {item}</Text>
+                        <Text key={item}>· {item}</Text>
                       ))}
                     </Space>
                   ),
                 }}
               />
             </Card>
-          </Space>
+          </div>
         </motion.div>
       </AppLayout>
     </ProtectedRoute>

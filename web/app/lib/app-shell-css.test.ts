@@ -3,13 +3,14 @@
  *
  * FIX-010: 搜索控件背景必须赢过 AntD 运行时 .ant-btn（靠 specificity，
  *   不引入 important 声明），kbd 收回按钮内。
- * FIX-011: 侧栏页脚回到正常流，菜单区成为内部滚动容器。
+ * FIX-011: 菜单区成为内部滚动容器；重复的版本页脚不占用首屏空间。
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
 const css = readFileSync(path.join(import.meta.dirname, "../globals.css"), "utf8");
+const appLayout = readFileSync(path.join(import.meta.dirname, "../components/AppLayout.tsx"), "utf8");
 
 function ruleBody(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -33,11 +34,19 @@ describe("FIX-010 global search trigger", () => {
     expect(kbd).toMatch(/height:\s*18px/);
     expect(kbd).toMatch(/line-height:\s*1/);
   });
+
+  it("hides only the mobile label, not the icon wrapper", () => {
+    const mobile = ruleBody("body .ant-layout-header .global-search-trigger > span:not(.ant-btn-icon)");
+    expect(mobile).toMatch(/display:\s*none/);
+    expect(mobile).not.toMatch(/anticon/);
+    expect(css).not.toMatch(/global-search-trigger\s*>\s*span:not\(\.anticon\)/);
+  });
 });
 
-describe("FIX-011 sider footer in normal flow", () => {
-  it("footer is no longer absolutely positioned", () => {
-    expect(ruleBody(".app-sider-footer")).not.toMatch(/position:\s*absolute/);
+describe("FIX-011 sider content density", () => {
+  it("does not render a duplicate version footer", () => {
+    expect(appLayout).not.toContain("app-sider-footer");
+    expect(css).not.toContain(".app-sider-footer");
   });
 
   it("menu container scrolls internally with flex: 1", () => {

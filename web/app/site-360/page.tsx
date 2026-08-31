@@ -2,14 +2,13 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Card, DatePicker, Descriptions, Empty, Segmented, Select, Space, Spin, Table, Tag, Typography } from "antd";
+import { Button, Card, DatePicker, Descriptions, Empty, Segmented, Select, Space, Spin, Table, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import DataTrustBar from "../components/DataTrustBar";
 import ProtectedRoute from "../components/ProtectedRoute";
-import ScopeNote from "../components/ScopeNote";
 import { StateBlock } from "../components/StateBlock";
 import { HelpTrigger } from "../components/HelpDrawer";
 import { ecomHelpContent } from "../components/help-content";
@@ -20,6 +19,8 @@ import { useRetailQuery } from "../retail/useRetailQuery";
 import { ecomApi, type EcomCurrencyPartition, type EcomDiagnosticsResponse, type EcomKpiValue, type EcomStorefront } from "../lib/api";
 import { ecomTrustEnvelope } from "../lib/ecom-trust";
 import { tableScrollX } from "../lib/tableScroll";
+import { StatusTag } from "../components/StatusTag";
+import { translateReason } from "../operating-pulse/logic";
 
 const DIAG_KPI_ORDER = ["net_revenue", "cm1_rate", "cm2_rate", "mer", "roas", "aov", "refund_rate", "cac_paid", "cac_blended"] as const;
 
@@ -82,7 +83,6 @@ function Site360Inner() {
             help={<HelpTrigger content={ecomHelpContent(language as any)} language={language as any} />}
             primaryAction={<Button icon={<ReloadOutlined />} onClick={() => setRefreshNonce((n) => n + 1)}>{t("common.refresh", language as any)}</Button>}
           />
-          <ScopeNote noteKey="ecom.diagnostics.subtitle" language={language as any} />
           <div className="precision-filter-bar pulse-block-margin">
             <div className="precision-filter-group">
               <span className="precision-filter-label">{t("ecom.common.site", language)}</span>
@@ -104,13 +104,13 @@ function Site360Inner() {
                   const next = v as "production" | "simulated";
                   updateQuery({ data_classification: next, dataset_version: next === "production" ? null : datasetVersion });
                 }}
-                options={[{ label: "Production", value: "production" }, { label: "Simulated", value: "simulated" }]}
+                options={[{ label: t("trust.classification_production", language), value: "production" }, { label: t("trust.classification_simulated", language), value: "simulated" }]}
               />
             </div>
             {classification === "simulated" && (
               <div className="precision-filter-group">
                 <span className="precision-filter-label">{t("ecom.common.dataset_version", language)}</span>
-                <Select size="small" className="ecom-filter-select" value={datasetVersion || undefined} onChange={(v) => updateQuery({ dataset_version: v })} options={[{ label: "ecom-sim-v1", value: "ecom-sim-v1" }]} allowClear />
+                <Select size="small" className="ecom-filter-select" value={datasetVersion || undefined} onChange={(v) => updateQuery({ dataset_version: v })} options={[{ label: t("trust.classification_simulated", language), value: "ecom-sim-v1" }]} allowClear />
               </div>
             )}
             <div className="precision-filter-group">
@@ -119,7 +119,7 @@ function Site360Inner() {
             </div>
             <div className="precision-filter-group">
               <span className="precision-filter-label">{t("ecom.common.window_days", language)}</span>
-              <Segmented className="precision-segmented" value={windowDays} onChange={(v) => updateQuery({ window_days: String(v) })} options={[7, 14, 30].map((d) => ({ label: `${d}d`, value: d }))} />
+              <Segmented className="precision-segmented" value={windowDays} onChange={(v) => updateQuery({ window_days: String(v) })} options={[7, 14, 30].map((d) => ({ label: `${d}${t("common.days_suffix", language)}`, value: d }))} />
             </div>
           </div>
 
@@ -143,9 +143,9 @@ function Site360Inner() {
                 <Card size="small" className="pulse-block-margin">
                   <Descriptions size="small" column={4}>
                     <Descriptions.Item label={t("ecom.common.site", language)}>{selectedSite.name}</Descriptions.Item>
-                    <Descriptions.Item label="Code">{selectedSite.code}</Descriptions.Item>
+                    <Descriptions.Item label={t("ecom.common.code", language)}>{selectedSite.code}</Descriptions.Item>
                     <Descriptions.Item label={t("ecom.common.currency", language)}>{selectedSite.currency}</Descriptions.Item>
-                    <Descriptions.Item label="Market">{selectedSite.market || "—"}</Descriptions.Item>
+                    <Descriptions.Item label={t("ecom.common.market", language)}>{selectedSite.market || "—"}</Descriptions.Item>
                   </Descriptions>
                 </Card>
               )}
@@ -159,19 +159,17 @@ function Site360Inner() {
                         const v: EcomKpiValue | undefined = partition.kpis[code];
                         return (
                           <div className="stripe-metric-card" key={code}>
-                            <div className="stripe-metric-label">{v?.name ?? code}</div>
-                            <div className="stripe-metric-value">{v?.value != null ? formatValue(v) : v?.reason ? `— ${v.reason}` : "—"}</div>
-                            {v?.numerator && (
+                            <div className="stripe-metric-label">{v?.name ?? t("ecom.common.unavailable", language)}</div>
+                            <div className="stripe-metric-value">{v?.value != null ? formatValue(v) : v?.reason ? `— ${translateReason(v.reason, language)}` : "—"}</div>
+                            {v?.numerator != null && v.denominator != null && (
                               <div className="stripe-metric-delta"><Typography.Text type="secondary">{v.numerator} ÷ {v.denominator}</Typography.Text></div>
                             )}
                           </div>
                         );
                       })}
                     </div>
-                    <Tag>Decision Ready = {String(partition.decision_ready)}</Tag>
                   </div>
                 ))}
-                {!response.decision_ready && <Tag>{t("ecom.common.no_data_reason", language)}</Tag>}
               </Card>
 
               <Card className="pulse-block-margin" size="small" title={`${t("ecom.diagnostics.break_even", language)} · ${t("ecom.diagnostics.cac_paid", language)} / ${t("ecom.diagnostics.cac_blended", language)}`}>
@@ -190,7 +188,7 @@ function Site360Inner() {
                     { title: t("ecom.diagnostics.metric", language), dataIndex: "label", key: "label" },
                     { title: t("ecom.diagnostics.value", language), dataIndex: "value", key: "value", render: (v: number | null) => (v == null ? "—" : v.toFixed(2)) },
                     { title: t("ecom.diagnostics.nd", language), key: "nd", render: (_, rec) => (rec.numerator ? `${rec.numerator} ÷ ${rec.denominator}` : "") },
-                    { title: "状态", dataIndex: "status", key: "status", render: (s: string) => (s === "unachievable" ? <Tag>{t("ecom.diagnostics.unachievable", language)}</Tag> : s === "complete" || s === "achieved" ? <Tag>OK</Tag> : <Tag>{s}</Tag>) },
+                    { title: t("pulse.col.status", language), dataIndex: "status", key: "status", render: (s: string) => s === "unachievable" ? <StatusTag kind="warning">{t("ecom.diagnostics.unachievable", language)}</StatusTag> : s === "complete" || s === "achieved" ? <StatusTag kind="success">{t("retail.status.complete", language)}</StatusTag> : <StatusTag>{t("ecom.common.unavailable", language)}</StatusTag> },
                   ]}
                 />
               </Card>

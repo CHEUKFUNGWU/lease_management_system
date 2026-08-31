@@ -2,7 +2,7 @@
  * D13 / DESIGN.md §11 双环焦点环守卫（UIUX 审查报告 2026-08-21 P0-A）。
  *
  * 历史缺陷：全站焦点环是单环 `outline: 2px solid var(--fg-primary)`（纯黑），
- * 在 --admin-surface #001529、代码块深色面以及整个暗色主题上不可见——键盘
+ * 在 --admin-surface、代码块深色面以及整个暗色主题上不可见——键盘
  * 用户在暗色模式下找不到焦点在哪。暗色模式（DARK-003）上线后，不可见范围
  * 从两个局部面扩大到整个主题，所以这条从 P2 升级成 P0。
  *
@@ -48,7 +48,7 @@ const FOCUS_RULES: Array<[string, string]> = [
 describe("双环焦点环（D13 / DESIGN.md §11）", () => {
   it(":root 定义了交互强调色与双环公式", () => {
     const root = ruleBody(":root");
-    expect(root).toContain("--accent-interactive: #2563EB;");
+    expect(root).toContain("--accent-interactive: #5A6F87;");
     expect(root).toContain(
       "--focus-ring: 0 0 0 2px var(--bg-page), 0 0 0 4px var(--accent-interactive);"
     );

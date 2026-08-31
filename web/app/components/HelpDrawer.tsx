@@ -12,8 +12,8 @@ import HelpFlowDiagram, { type FlowStep } from "./HelpFlowDiagram";
  * beside the page, like RetailAIDrawer). Content is structured and lives
  * outside the page code; all copy is trilingual.
  *
- * Red line: compliance wording never goes here — it stays pinned on the
- * page (FIX-017 moved those sentences into the PageHeader meta slot).
+ * Red line: compliance wording never goes here — it stays with the relevant
+ * data or workflow section; the page header intentionally stays title-only.
  */
 
 export interface HelpSection {

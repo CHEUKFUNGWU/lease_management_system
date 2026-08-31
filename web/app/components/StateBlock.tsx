@@ -1,4 +1,5 @@
-import { Alert, Button, Empty, Typography } from "antd";
+import { Button, Empty, Typography } from "antd";
+import { CloseCircleFilled, InfoCircleFilled, LockFilled } from "@ant-design/icons";
 import type { ReactNode } from "react";
 import { t, type Language } from "../lib/i18n";
 import type { DataState, DataStateKind } from "../lib/dataState";
@@ -49,53 +50,35 @@ export function StateBlock<T>({ state, onAction, onRetry, extra, language }: Sta
 
   const label = t(KIND_LABEL[kind] ?? "state.empty_label", language);
 
-  if (kind === "scope_denied") {
+  if (kind === "scope_denied" || kind === "failed" || kind === "actionable") {
+    const denied = kind === "scope_denied";
+    const failed = kind === "failed";
+    const description = extra ?? state.reason;
+    const action = failed && onRetry ? (
+      <Button size="small" onClick={onRetry}>
+        {t("common.retry", language)}
+      </Button>
+    ) : !failed && !denied && state.actionLabel && onAction ? (
+      <Button size="small" onClick={onAction}>
+        {state.actionLabel}
+      </Button>
+    ) : null;
+    const icon = denied ? <LockFilled /> : failed ? <CloseCircleFilled /> : <InfoCircleFilled />;
     return (
-      <Alert
-        type="error"
-        showIcon
-        className="state-block state-block-scope-denied"
-        message={state.message || label}
-        description={extra ?? state.reason}
-      />
-    );
-  }
-
-  if (kind === "failed") {
-    return (
-      <Alert
-        type="error"
-        showIcon
-        className="state-block state-block-failed"
-        message={state.message || label}
-        description={extra ?? state.reason}
-        action={
-          onRetry ? (
-            <Button size="small" onClick={onRetry}>
-              {t("common.retry", language)}
-            </Button>
-          ) : undefined
-        }
-      />
-    );
-  }
-
-  if (kind === "actionable") {
-    return (
-      <Alert
-        type="warning"
-        showIcon
-        className="state-block state-block-actionable"
-        message={state.message || label}
-        description={extra ?? state.reason}
-        action={
-          state.actionLabel && onAction ? (
-            <Button size="small" onClick={onAction}>
-              {state.actionLabel}
-            </Button>
-          ) : undefined
-        }
-      />
+      <div
+        className={`state-block state-block-${kind}`}
+        role={failed || denied ? "alert" : "status"}
+        aria-live={failed || denied ? "assertive" : "polite"}
+      >
+        <div className="state-block-main">
+          <span className="state-block-icon" aria-hidden="true">{icon}</span>
+          <div className="state-block-copy">
+            <div className="state-block-title">{state.message || label}</div>
+            {description ? <div className="state-block-description">{description}</div> : null}
+          </div>
+          {action}
+        </div>
+      </div>
     );
   }
 

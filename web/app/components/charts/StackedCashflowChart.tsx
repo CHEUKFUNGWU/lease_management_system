@@ -11,6 +11,8 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { useLanguage } from "../../context/LanguageContext";
+import { t } from "../../lib/i18n";
 import { fmtMoney } from "../../lib/format";
 
 export interface CashflowPeriodData {
@@ -37,40 +39,22 @@ export default function StackedCashflowChart({
   data,
   currency = "CNY",
   height = 300,
-  emptyText = "暂无现金流预测数据",
+  emptyText,
 }: StackedCashflowChartProps) {
+  const { language } = useLanguage();
+  const resolvedEmptyText = emptyText || t("cashflow.empty_title", language);
+
   if (!data || data.length === 0) {
-    return (
-      <div
-        className="chart-empty-state"
-        style={{ height }}
-      >
-        {emptyText}
-      </div>
-    );
+    return <div className="chart-empty-state" style={{ height }}>{resolvedEmptyText}</div>;
   }
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div className="chart-container" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
           margin={{ top: 16, right: 24, bottom: 8, left: 16 }}
         >
-          <defs>
-            <linearGradient id="fixedRentGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--chart-blue)" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="var(--chart-blue)" stopOpacity={0.05} />
-            </linearGradient>
-            <linearGradient id="variableRentGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--chart-accent)" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="var(--chart-accent)" stopOpacity={0.05} />
-            </linearGradient>
-            <linearGradient id="nonLeaseGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="var(--chart-purple)" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="var(--chart-purple)" stopOpacity={0.05} />
-            </linearGradient>
-          </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" opacity={0.6} />
           <XAxis
             dataKey="month"
@@ -95,30 +79,19 @@ export default function StackedCashflowChart({
               const total = fixed + variable + nonLease;
 
               return (
-                <div
-                  style={{
-                    background: "var(--bg-surface)",
-                    boxShadow: "var(--shadow-dropdown, 0 4px 12px rgba(0,0,0,0.08))",
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    fontSize: 12,
-                    border: "1px solid var(--border-default)",
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginBottom: 4 }}>
-                    月份: {label}
+                <div className="chart-tooltip is-compact">
+                  <div className="chart-tooltip-title">{t("cashflow.col_period", language)}: {label}</div>
+                  <div className="chart-tooltip-series is-blue">
+                    {t("cashflow.stat_fixed_rent", language)}: <strong>{fmtMoney(fixed, currency)}</strong>
                   </div>
-                  <div style={{ color: "var(--chart-blue)", marginBottom: 2 }}>
-                    固定租金: <strong>{fmtMoney(fixed, currency)}</strong>
+                  <div className="chart-tooltip-series is-accent">
+                    {t("cashflow.stat_variable_rent", language)}: <strong>{fmtMoney(variable, currency)}</strong>
                   </div>
-                  <div style={{ color: "var(--chart-accent)", marginBottom: 2 }}>
-                    变动租金: <strong>{fmtMoney(variable, currency)}</strong>
+                  <div className="chart-tooltip-series is-purple">
+                    {t("cashflow.stat_non_lease", language)}: <strong>{fmtMoney(nonLease, currency)}</strong>
                   </div>
-                  <div style={{ color: "var(--chart-purple)", marginBottom: 2 }}>
-                    非租及物业费: <strong>{fmtMoney(nonLease, currency)}</strong>
-                  </div>
-                  <div style={{ fontWeight: 600, color: "var(--fg-primary)", marginTop: 4, borderTop: "1px dashed var(--border-default)", paddingTop: 4 }}>
-                    当月总支出: <strong>{fmtMoney(total, currency)}</strong>
+                  <div className="chart-tooltip-total">
+                    {t("cashflow.stat_total_outflow", language)}: <strong>{fmtMoney(total, currency)}</strong>
                   </div>
                 </div>
               );
@@ -130,12 +103,12 @@ export default function StackedCashflowChart({
             iconType="circle"
             wrapperStyle={{ fontSize: 11, paddingBottom: 8 }}
             formatter={(value) => (
-              <span style={{ color: "var(--fg-secondary)", marginRight: 8 }}>
+              <span className="chart-legend-label">
                 {value === "fixedRent"
-                  ? "固定租金"
+                  ? t("cashflow.stat_fixed_rent", language)
                   : value === "variableRent"
-                  ? "预计变动租金"
-                  : "非租及物业费"}
+                  ? t("cashflow.stat_variable_rent", language)
+                  : t("cashflow.stat_non_lease", language)}
               </span>
             )}
           />
@@ -145,7 +118,8 @@ export default function StackedCashflowChart({
             stackId="cashflow"
             stroke="var(--chart-blue)"
             strokeWidth={1.8}
-            fill="url(#fixedRentGrad)"
+            fill="var(--chart-blue)"
+            fillOpacity={0.22}
             name="fixedRent"
             isAnimationActive={false}
           />
@@ -155,7 +129,8 @@ export default function StackedCashflowChart({
             stackId="cashflow"
             stroke="var(--chart-accent)"
             strokeWidth={1.8}
-            fill="url(#variableRentGrad)"
+            fill="var(--chart-accent)"
+            fillOpacity={0.22}
             name="variableRent"
             isAnimationActive={false}
           />
@@ -165,7 +140,8 @@ export default function StackedCashflowChart({
             stackId="cashflow"
             stroke="var(--chart-purple)"
             strokeWidth={1.8}
-            fill="url(#nonLeaseGrad)"
+            fill="var(--chart-purple)"
+            fillOpacity={0.22}
             name="nonLease"
             isAnimationActive={false}
           />

@@ -289,7 +289,6 @@ function ContractDrafts() {
         <div className="drafts-page">
           <PageHeader
             title={t("draftreview.title", language)}
-            meta={t("draftreview.meta", language)}
             primaryAction={
               <Button icon={<ReloadOutlined />} loading={listLoading} onClick={() => listRetry()}>
                 {t("common.refresh", language)}

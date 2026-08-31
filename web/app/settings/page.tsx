@@ -5,11 +5,11 @@ import { StatusTag, statusKindFromAntColor } from "../components/StatusTag";
 import { useState, useEffect, useMemo } from "react";
 import {
   Alert, Card, Typography, Table, Spin, Statistic, Row, Col, Input, InputNumber,
-  Button, Space, Tag, Modal, Empty, message, Select,
+  Button, Space, Modal, Empty, message, Select,
 } from "antd";
 import {
   SearchOutlined, CopyOutlined, EyeOutlined, BarChartOutlined,
-  TagOutlined, SettingOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
+  TagOutlined, FileTextOutlined, ReloadOutlined, LogoutOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
@@ -24,7 +24,7 @@ import { classifyDataState } from "../lib/dataState";
 import { notifyError } from "../lib/notify";
 import { MachineCredentialsPanel } from "./MachineCredentialsPanel";
 
-const { Title, Text, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 
 interface ContractRef {
   contract_id: string;
@@ -361,7 +361,7 @@ export default function SettingsPage() {
       dataIndex: "tag",
       width: 200,
       render: (tag: string) => (
-        <StatusTag kind="processing" style={{ fontSize: 13, padding: "1px 8px" }}>
+        <StatusTag kind="processing" className="settings-tag-value">
           {tag}
         </StatusTag>
       ),
@@ -427,12 +427,12 @@ export default function SettingsPage() {
     <ProtectedRoute>
       <AppLayout>
         <PageHeader
-          title={<><SettingOutlined style={{ marginRight: 8 }} />{t("settings.title", language)}</>}
+          title={t("settings.title", language)}
         />
 
         <Card
           title={t("settings.group_device_sessions", language)}
-          style={{ marginBottom: 24 }}
+          className="settings-section-card"
           extra={
             <Space>
               <Button
@@ -467,17 +467,17 @@ export default function SettingsPage() {
               {
                 title: t("settings.session_created", language),
                 dataIndex: "created_at",
-                render: (value: string) => new Date(value).toLocaleString(),
+                render: (value: string) => value ? new Date(value).toLocaleString(language) : "—",
               },
               {
                 title: t("settings.session_device", language),
                 dataIndex: "user_agent",
-                render: (value: string) => value || "-",
+                render: (value: string) => value || "—",
               },
               {
                 title: t("settings.session_ip", language),
                 dataIndex: "ip_address",
-                render: (value: string) => value || "-",
+                render: (value: string) => value || "—",
               },
               {
                 title: t("settings.session_status", language),
@@ -511,7 +511,7 @@ export default function SettingsPage() {
         {/* global discount rate card */}
         <Card
           title={t("settings.group_discount_rate", language)}
-          style={{ marginBottom: 24 }}
+          className="settings-section-card"
           extra={
             effectiveRate != null ? (
               <StatusTag kind="processing">{t("settings.current_effective", language)}{effectiveRate.toFixed(2)}%</StatusTag>
@@ -530,7 +530,7 @@ export default function SettingsPage() {
                 step={0.01}
                 min={0}
                 placeholder={t("settings.discount_rate_placeholder", language)}
-                style={{ width: 180 }}
+                className="settings-discount-rate-input"
               />
               <Button
                 type="primary"
@@ -545,7 +545,7 @@ export default function SettingsPage() {
 
         <Card
           title={t("settings.group_rent_to_sales", language)}
-          style={{ marginBottom: 24 }}
+          className="settings-section-card"
         >
           <Paragraph type="secondary">{t("settings.ratio_policy_desc", language)}</Paragraph>
           <Space align="center" size={12} wrap>
@@ -559,7 +559,7 @@ export default function SettingsPage() {
 
         <Card
           title={t("settings.group_variance_policy", language)}
-          style={{ marginBottom: 24 }}
+          className="settings-section-card"
         >
           <Paragraph type="secondary">{t("settings.variance_policy_desc", language)}</Paragraph>
           <Space align="center" size={12} wrap>
@@ -573,7 +573,7 @@ export default function SettingsPage() {
 
         <Card
           title={t("settings.group_journal_policy", language)}
-          style={{ marginBottom: 24 }}
+          className="settings-section-card"
         >
           <Paragraph type="secondary">{t("settings.journal_policy_desc", language)}</Paragraph>
           <Space align="center" size={12} wrap>
@@ -586,7 +586,7 @@ export default function SettingsPage() {
         {/* summary cards */}
         <Spin spinning={loading}>
           {tagLoadError && <Alert type="warning" showIcon className="settings-tags-actionable" message={tagLoadError} />}
-          <Row gutter={16} style={{ marginBottom: 24 }}>
+          <Row gutter={16} className="settings-summary-row">
             <Col span={8}>
               <Card size="small">
                 <Statistic
@@ -617,32 +617,32 @@ export default function SettingsPage() {
         </Spin>
 
         {/* exchange rates */}
-        <Card title={t("settings.fx_title", language)} style={{ marginBottom: 16 }}>
-          <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+        <Card title={t("settings.fx_title", language)} className="settings-fx-card">
+          <Paragraph type="secondary" className="settings-fx-description">
             {t("settings.fx_desc", language)}
           </Paragraph>
-          <Space wrap style={{ marginBottom: 16 }}>
+          <Space wrap className="settings-fx-form">
             <Input
-              style={{ width: 90 }}
+              className="settings-fx-currency-input"
               value={rateForm.from_currency}
               onChange={(e) => setRateForm({ ...rateForm, from_currency: e.target.value.toUpperCase() })}
               placeholder="CNY"
             />
             <span>→</span>
             <Input
-              style={{ width: 90 }}
+              className="settings-fx-currency-input"
               value={rateForm.to_currency}
               onChange={(e) => setRateForm({ ...rateForm, to_currency: e.target.value.toUpperCase() })}
               placeholder="CNY"
             />
             <Input
-              style={{ width: 140 }}
+              className="settings-fx-date-input"
               value={rateForm.rate_date}
               onChange={(e) => setRateForm({ ...rateForm, rate_date: e.target.value })}
               placeholder="YYYY-MM-DD"
             />
             <Select
-              style={{ width: 150 }}
+              className="settings-fx-type-select"
               value={rateForm.rate_type}
               onChange={(value) => setRateForm({ ...rateForm, rate_type: value })}
               options={[
@@ -651,7 +651,7 @@ export default function SettingsPage() {
               ]}
             />
             <InputNumber
-              style={{ width: 160 }}
+              className="settings-fx-rate-input"
               min={0}
               step={0.0001}
               value={rateForm.rate}
@@ -692,7 +692,7 @@ export default function SettingsPage() {
                 ),
               },
               { title: t("settings.fx_rate", language), dataIndex: "rate", align: "right" as const },
-              { title: t("settings.fx_source", language), dataIndex: "source", render: (v: string) => v || "-" },
+              { title: t("settings.fx_source", language), dataIndex: "source", render: (v: string) => v || "—" },
             ]}
           />
         </Card>
@@ -701,7 +701,7 @@ export default function SettingsPage() {
         <MachineCredentialsPanel />
 
         {/* filters */}
-        <Card style={{ marginBottom: 16 }}>
+        <Card className="settings-filter-card">
           <Row gutter={[16, 12]} align="middle">
             <Col>
               <Space>
@@ -712,7 +712,7 @@ export default function SettingsPage() {
                   placeholder={t("settings.search_tag_placeholder", language)}
                   prefix={<SearchOutlined />}
                   allowClear
-                  style={{ width: 220 }}
+                  className="settings-tag-search"
                 />
               </Space>
             </Col>
@@ -724,7 +724,7 @@ export default function SettingsPage() {
                   onChange={(v) => setMinContractCount(v)}
                   placeholder={t("settings.min_contract_all", language)}
                   min={0}
-                  style={{ width: 100 }}
+                  className="settings-min-contract-input"
                 />
               </Space>
             </Col>

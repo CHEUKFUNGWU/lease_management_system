@@ -5,7 +5,6 @@ import {
   Card,
   Row,
   Col,
-  Statistic,
   Table,
   Slider,
   InputNumber,
@@ -13,14 +12,7 @@ import {
   Typography,
   Flex,
   Select,
-  Tag,
 } from "antd";
-import {
-  DollarOutlined,
-  RiseOutlined,
-  FallOutlined,
-  ShopOutlined,
-} from "@ant-design/icons";
 import {
   Bar,
   Line,
@@ -167,12 +159,7 @@ export function StoreCashflowPanel({
       key: "netCashflow",
       align: "right" as const,
       render: (v: number) => (
-        <span
-          style={{
-            fontWeight: 600,
-            color: v >= 0 ? "var(--state-success-text, #216E39)" : "var(--state-error-text, #C93B2B)",
-          }}
-        >
+        <span className={`store-cashflow-net-value ${v >= 0 ? "is-positive" : "is-negative"}`}>
           {fmtMoney(Math.round(v), currency)}
         </span>
       ),
@@ -180,85 +167,54 @@ export function StoreCashflowPanel({
   ];
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="store-cashflow-panel">
       {/* Summary KPI Cards — Stripe-style Seamless Unified Strip */}
-      <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", marginBottom: 16 }}>
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-            {t("cashflow.stat_store_revenue", language)}
-          </span>
-          <div style={{ margin: "6px 0 2px" }}>
-            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--fg-primary)" }}>
-              {fmtMoney(summary.totalSales, currency)}
-            </Typography.Text>
+      <div className="stripe-metric-grid store-cashflow-kpi-grid">
+        <div className="pulse-kpi-card store-cashflow-kpi-card">
+          <span className="store-cashflow-kpi-label">{t("cashflow.stat_store_revenue", language)}</span>
+          <div className="store-cashflow-kpi-value-wrap">
+            <Typography.Text className="font-tabular store-cashflow-kpi-value is-primary">{fmtMoney(summary.totalSales, currency)}</Typography.Text>
           </div>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            {t("cashflow.store.sub_revenue", language)}
-          </Text>
+          <Text type="secondary" className="store-cashflow-kpi-subtext">{t("cashflow.store.sub_revenue", language)}</Text>
         </div>
 
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-            {t("cashflow.stat_store_margin", language)}
-          </span>
-          <div style={{ margin: "6px 0 2px" }}>
-            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--state-success-text, #216E39)" }}>
-              {fmtMoney(summary.totalGrossProfit, currency)}
-            </Typography.Text>
+        <div className="pulse-kpi-card store-cashflow-kpi-card">
+          <span className="store-cashflow-kpi-label">{t("cashflow.stat_store_margin", language)}</span>
+          <div className="store-cashflow-kpi-value-wrap">
+            <Typography.Text className="font-tabular store-cashflow-kpi-value is-positive">{fmtMoney(summary.totalGrossProfit, currency)}</Typography.Text>
           </div>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            {t("cashflow.store.sub_margin", language)}
-          </Text>
+          <Text type="secondary" className="store-cashflow-kpi-subtext">{t("cashflow.store.sub_margin", language)}</Text>
         </div>
 
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-            {t("cashflow.stat_store_occupancy", language)}
-          </span>
-          <div style={{ margin: "6px 0 2px" }}>
-            <Typography.Text className="font-tabular" style={{ fontSize: 20, fontWeight: 600, color: "var(--chart-negative, #DC2626)" }}>
-              -{fmtMoney(summary.totalRent, currency)}
-            </Typography.Text>
+        <div className="pulse-kpi-card store-cashflow-kpi-card">
+          <span className="store-cashflow-kpi-label">{t("cashflow.stat_store_occupancy", language)}</span>
+          <div className="store-cashflow-kpi-value-wrap">
+            <Typography.Text className="font-tabular store-cashflow-kpi-value is-negative">-{fmtMoney(summary.totalRent, currency)}</Typography.Text>
           </div>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            {t("cashflow.store.sub_occupancy", language)}
-          </Text>
+          <Text type="secondary" className="store-cashflow-kpi-subtext">{t("cashflow.store.sub_occupancy", language)}</Text>
         </div>
 
-        <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 84, padding: "14px 16px" }}>
+        <div className="pulse-kpi-card store-cashflow-kpi-card">
           <Flex justify="space-between" align="center">
-            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>
-              {t("cashflow.stat_store_net_cash", language)}
-            </span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "var(--fg-secondary)", background: "var(--bg-subtle, #F1F5F9)", padding: "1px 6px", borderRadius: 4 }}>
-              {summary.netMargin.toFixed(1)}%
-            </span>
+            <span className="store-cashflow-kpi-label">{t("cashflow.stat_store_net_cash", language)}</span>
+            <span className="store-cashflow-margin-badge">{summary.netMargin.toFixed(1)}%</span>
           </Flex>
-          <div style={{ margin: "6px 0 2px" }}>
-            <Typography.Text
-              className="font-tabular"
-              style={{
-                fontSize: 20,
-                fontWeight: 600,
-                color: summary.totalNetCash >= 0 ? "var(--fg-primary)" : "var(--state-error-text, #C93B2B)",
-              }}
-            >
+          <div className="store-cashflow-kpi-value-wrap">
+            <Typography.Text className={`font-tabular store-cashflow-kpi-value ${summary.totalNetCash >= 0 ? "is-primary" : "is-negative"}`}>
               {fmtMoney(summary.totalNetCash, currency)}
             </Typography.Text>
           </div>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            {t("cashflow.store.sub_net", language)}
-          </Text>
+          <Text type="secondary" className="store-cashflow-kpi-subtext">{t("cashflow.store.sub_net", language)}</Text>
         </div>
       </div>
 
       {/* Assumptions & Chart */}
-      <Row gutter={[16, 16]} align="stretch" style={{ display: "flex" }}>
-        <Col xs={24} lg={8} style={{ display: "flex" }}>
+      <Row gutter={[16, 16]} align="stretch" className="store-cashflow-row">
+        <Col xs={24} lg={8} className="store-cashflow-column">
           <Card
             title={
               <Flex justify="space-between" align="center">
-                <span style={{ fontWeight: 600, fontSize: 14 }}>{t("scenario.assumptions", language)}</span>
+                <span className="store-cashflow-card-title">{t("scenario.assumptions", language)}</span>
                 <Select
                   size="small"
                   value={horizonMonths}
@@ -267,34 +223,30 @@ export function StoreCashflowPanel({
                     value: m,
                   }))}
                   onChange={setHorizonMonths}
-                  style={{ width: 100 }}
+                  className="store-horizon-select"
                 />
               </Flex>
             }
-            style={{ width: "100%", borderRadius: 10, display: "flex", flexDirection: "column" }}
-            styles={{
-              header: { padding: "12px 20px", minHeight: 48 },
-              body: { flex: 1, padding: "16px 20px", display: "flex", flexDirection: "column", justifyContent: "space-between" },
-            }}
+            className="store-cashflow-card store-cashflow-assumptions-card"
           >
-            <Space direction="vertical" style={{ width: "100%" }} size={12}>
+            <Space direction="vertical" className="store-assumptions-space" size={12}>
               <div>
-                <Flex justify="space-between" align="center" style={{ marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.base_sales", language)}</Text>
+                <Flex justify="space-between" align="center" className="store-assumption-row has-bottom-gap">
+                  <Text className="store-assumption-label">{t("cashflow.store.base_sales", language)}</Text>
                   <InputNumber
                     size="small"
                     value={baseMonthlySales}
                     step={5000}
                     min={10000}
                     onChange={(v) => setBaseMonthlySales(v ?? 100000)}
-                    style={{ width: 110 }}
+                    className="store-input-money"
                   />
                 </Flex>
               </div>
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.gross_margin_rate", language)}</Text>
+                  <Text className="store-assumption-label">{t("cashflow.store.gross_margin_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={grossMarginPct}
@@ -302,7 +254,7 @@ export function StoreCashflowPanel({
                     min={10}
                     max={90}
                     onChange={(v) => setGrossMarginPct(v ?? 40)}
-                    style={{ width: 75 }}
+                    className="store-input-rate"
                   />
                 </Flex>
                 <Slider
@@ -310,27 +262,27 @@ export function StoreCashflowPanel({
                   max={90}
                   value={grossMarginPct}
                   onChange={setGrossMarginPct}
-                  style={{ margin: "6px 0 0 0" }}
+                  className="store-margin-slider"
                 />
               </div>
 
               <div>
-                <Flex justify="space-between" align="center" style={{ marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.fixed_rent", language)}</Text>
+                <Flex justify="space-between" align="center" className="store-assumption-row has-bottom-gap">
+                  <Text className="store-assumption-label">{t("cashflow.store.fixed_rent", language)}</Text>
                   <InputNumber
                     size="small"
                     value={fixedRent}
                     step={1000}
                     min={0}
                     onChange={(v) => setFixedRent(v ?? 10000)}
-                    style={{ width: 110 }}
+                    className="store-input-money"
                   />
                 </Flex>
               </div>
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.variable_rent_rate", language)}</Text>
+                  <Text className="store-assumption-label">{t("cashflow.store.variable_rent_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={variableRentPct}
@@ -338,14 +290,14 @@ export function StoreCashflowPanel({
                     min={0}
                     max={20}
                     onChange={(v) => setVariableRentPct(v ?? 2)}
-                    style={{ width: 75 }}
+                    className="store-input-rate"
                   />
                 </Flex>
               </div>
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.labor_cost_rate", language)}</Text>
+                  <Text className="store-assumption-label">{t("cashflow.store.labor_cost_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={laborCostPct}
@@ -353,14 +305,14 @@ export function StoreCashflowPanel({
                     min={0}
                     max={40}
                     onChange={(v) => setLaborCostPct(v ?? 12)}
-                    style={{ width: 75 }}
+                    className="store-input-rate"
                   />
                 </Flex>
               </div>
 
               <div>
                 <Flex justify="space-between" align="center">
-                  <Text style={{ fontSize: 13, color: "var(--fg-secondary)" }}>{t("cashflow.store.sales_growth_rate", language)}</Text>
+                  <Text className="store-assumption-label">{t("cashflow.store.sales_growth_rate", language)}</Text>
                   <InputNumber
                     size="small"
                     value={salesGrowthPct}
@@ -368,7 +320,7 @@ export function StoreCashflowPanel({
                     min={-20}
                     max={50}
                     onChange={(v) => setSalesGrowthPct(v ?? 0)}
-                    style={{ width: 75 }}
+                    className="store-input-rate"
                   />
                 </Flex>
               </div>
@@ -376,43 +328,28 @@ export function StoreCashflowPanel({
           </Card>
         </Col>
 
-        <Col xs={24} lg={16} style={{ display: "flex" }}>
+        <Col xs={24} lg={16} className="store-cashflow-column">
           <Card
-            title={<span style={{ fontWeight: 600, fontSize: 14 }}>{t("cashflow.store.chart_title", language)}</span>}
-            style={{ width: "100%", borderRadius: 10, display: "flex", flexDirection: "column" }}
-            styles={{
-              header: { padding: "12px 20px", minHeight: 48 },
-              body: { flex: 1, padding: "16px 20px 8px 20px", display: "flex", flexDirection: "column" },
-            }}
+            title={<span className="store-cashflow-card-title">{t("cashflow.store.chart_title", language)}</span>}
+            className="store-cashflow-card store-cashflow-chart-card"
           >
-            <div style={{ flex: 1, minHeight: 310, width: "100%" }}>
+            <div className="store-cashflow-chart-container">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={projection}
                   margin={{ top: 12, right: 12, left: 0, bottom: 4 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-default, #D9D9D9)" opacity={0.6} />
-                  <XAxis dataKey="month" tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary, #667085)" }} />
-                  <YAxis tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary, #667085)" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={48} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-default)" opacity={0.6} />
+                  <XAxis dataKey="month" tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary)" }} />
+                  <YAxis tickLine={false} tick={{ fontSize: 11, fill: "var(--fg-tertiary)" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={48} />
                   <ChartTooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload || !payload.length) return null;
                       return (
-                        <div
-                          style={{
-                            background: "var(--bg-surface, #FFFFFF)",
-                            boxShadow: "var(--shadow-dropdown, 0 4px 12px rgba(0,0,0,0.08))",
-                            borderRadius: 6,
-                            padding: "8px 12px",
-                            fontSize: 12,
-                            border: "1px solid var(--border-default, #D9D9D9)",
-                          }}
-                        >
-                          <div style={{ fontWeight: 600, color: "var(--fg-primary, #000000)", marginBottom: 4 }}>
-                            {t("cashflow.col_period", language)}: {label}
-                          </div>
+                        <div className="chart-tooltip is-compact">
+                          <div className="chart-tooltip-title">{t("cashflow.col_period", language)}: {label}</div>
                           {payload.map((item: any, idx: number) => (
-                            <div key={idx} style={{ color: item.color || "var(--fg-secondary)", marginBottom: 2 }}>
+                            <div key={idx} className="chart-tooltip-series" style={{ color: item.color }}>
                               {item.name}: <strong>{fmtMoney(Number(item.value), currency)}</strong>
                             </div>
                           ))}
@@ -421,9 +358,9 @@ export function StoreCashflowPanel({
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} />
-                  <Bar dataKey="grossProfit" name={t("cashflow.store.gross_inflow", language)} fill="var(--chart-accent, #2D4B46)" radius={[3, 3, 0, 0]} maxBarSize={26} />
-                  <Bar dataKey="totalOutflow" name={t("cashflow.store.rent_operating_outflow", language)} fill="var(--chart-negative, #7F473E)" radius={[3, 3, 0, 0]} maxBarSize={26} />
-                  <Line type="monotone" dataKey="netCashflow" name={t("cashflow.store.net_cashflow", language)} stroke="var(--chart-primary, #1E293B)" strokeWidth={2} dot={{ r: 3, fill: "var(--chart-primary, #1E293B)" }} />
+                  <Bar dataKey="grossProfit" name={t("cashflow.store.gross_inflow", language)} fill="var(--chart-accent)" radius={[3, 3, 0, 0]} maxBarSize={26} />
+                  <Bar dataKey="totalOutflow" name={t("cashflow.store.rent_operating_outflow", language)} fill="var(--chart-negative)" radius={[3, 3, 0, 0]} maxBarSize={26} />
+                  <Line type="monotone" dataKey="netCashflow" name={t("cashflow.store.net_cashflow", language)} stroke="var(--chart-primary)" strokeWidth={2} dot={{ r: 3, fill: "var(--chart-primary)" }} />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -435,7 +372,7 @@ export function StoreCashflowPanel({
       <Card
         size="small"
         title={t("cashflow.store.table_title", language)}
-        style={{ borderRadius: 10 }}
+        className="store-cashflow-table-card"
       >
         <Table
           columns={columns}

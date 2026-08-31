@@ -50,5 +50,6 @@ export interface EnterpriseTableProps<T> {
   batchActions?: Array<{ key: string; label: string; danger?: boolean; icon?: ReactNode }>;
   searchPlaceholder?: string;
   emptyText?: string;
+  language?: "zh-CN" | "zh-HK" | "en";
   scrollMaxHeight?: string | number;
 }

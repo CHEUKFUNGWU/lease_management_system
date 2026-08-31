@@ -593,7 +593,7 @@ export function ContractWorkspaceDialogs({
                     <Alert
                       type="info"
                       showIcon
-                      className="sty-a8f26b1e"
+                      className="contract-adjustment-emphasis"
                       message={
                         <span>
                           {clauseDraft.changed_count} 笔付款变动，合计{" "}
@@ -1004,7 +1004,7 @@ export function ContractWorkspaceDialogs({
           okText={t("contract.ok", language)}
           cancelText={t("contract.cancel", language)}
         >
-          <p className="sty-a8f26b1e">
+          <p className="contract-adjustment-emphasis">
             {eventRejectType === 'review' ? t("contract.review_reject_reason", language) : t("contract.approve_reject_reason", language)}
           </p>
           <Input.TextArea
@@ -1040,12 +1040,12 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_after", language)}>
                 {adjustmentModalData.liability_after != null ? (
-                  <span className="sty-a8f26b1e">{fmtMoney(adjustmentModalData.liability_after, adjustmentCurrency)}</span>
+                  <span className="contract-adjustment-emphasis">{fmtMoney(adjustmentModalData.liability_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.liability_change", language)}>
                 {adjustmentModalData.liability_change != null ? (
-                  <span className="sty-a8f26b1e">
+                  <span className="contract-adjustment-emphasis">
                     {adjustmentModalData.liability_change >= 0 ? "+" : ""}
                     {fmtMoney(adjustmentModalData.liability_change, adjustmentCurrency)}
                   </span>
@@ -1056,12 +1056,12 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_after", language)}>
                 {adjustmentModalData.asset_after != null ? (
-                  <span className="sty-a8f26b1e">{fmtMoney(adjustmentModalData.asset_after, adjustmentCurrency)}</span>
+                  <span className="contract-adjustment-emphasis">{fmtMoney(adjustmentModalData.asset_after, adjustmentCurrency)}</span>
                 ) : "-"}
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.asset_change", language)}>
                 {adjustmentModalData.asset_change != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.asset_change >= 0 ? "var(--fg-primary)" : "var(--fg-primary)" }}>
+                  <span className="contract-adjustment-emphasis">
                     {adjustmentModalData.asset_change >= 0 ? "+" : ""}
                     {fmtMoney(adjustmentModalData.asset_change, adjustmentCurrency)}
                   </span>
@@ -1069,7 +1069,7 @@ export function ContractWorkspaceDialogs({
               </Descriptions.Item>
               <Descriptions.Item label={t("contract_detail.pnl_impact", language)}>
                 {adjustmentModalData.pnl_impact != null ? (
-                  <span style={{ fontWeight: "bold", color: adjustmentModalData.pnl_impact >= 0 ? "var(--fg-primary)" : "var(--fg-primary)" }}>
+                  <span className="contract-adjustment-emphasis">
                     {adjustmentModalData.pnl_impact >= 0 ? "+" : ""}
                     {fmtMoney(adjustmentModalData.pnl_impact, adjustmentCurrency)}
                   </span>

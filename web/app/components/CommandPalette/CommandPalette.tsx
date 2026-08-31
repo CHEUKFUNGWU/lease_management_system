@@ -222,7 +222,7 @@ export function CommandPalette() {
                   justifyContent: "space-between",
                   padding: "9px 16px",
                   cursor: "pointer",
-                  background: isSelected ? "var(--bg-hover, #F5F5F5)" : "transparent",
+                  background: isSelected ? "var(--bg-inset)" : "transparent",
                   borderLeft: isSelected ? "3px solid var(--fg-secondary)" : "3px solid transparent",
                   transition: "all 0.1s ease",
                 }}
@@ -269,11 +269,11 @@ export function CommandPalette() {
         }}
       >
         <span>
-          按 <kbd style={{ padding: "1px 4px", background: "#E5E5E5", borderRadius: 3 }}>↑</kbd>{" "}
-          <kbd style={{ padding: "1px 4px", background: "#E5E5E5", borderRadius: 3 }}>↓</kbd> 切换选项
+          按 <kbd style={{ padding: "1px 4px", background: "var(--bg-inset)", borderRadius: 3 }}>↑</kbd>{" "}
+          <kbd style={{ padding: "1px 4px", background: "var(--bg-inset)", borderRadius: 3 }}>↓</kbd> 切换选项
         </span>
         <span>
-          按 <kbd style={{ padding: "1px 4px", background: "#E5E5E5", borderRadius: 3 }}>↵ Enter</kbd> 确认执行
+          按 <kbd style={{ padding: "1px 4px", background: "var(--bg-inset)", borderRadius: 3 }}>↵ Enter</kbd> 确认执行
         </span>
       </div>
     </Modal>

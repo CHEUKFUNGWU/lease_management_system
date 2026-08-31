@@ -2,8 +2,8 @@
 
 import { StatusTag } from "../components/StatusTag";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Statistic, Table, Tabs, Tag, Tooltip, Typography, Upload, message } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, Card, Col, Empty, Input, InputNumber, Row, Space, Table, Tabs, Tooltip, Typography, Upload, message } from "antd";
 import { ReloadOutlined, CheckCircleOutlined, DownloadOutlined, InfoCircleOutlined, UploadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
@@ -19,7 +19,6 @@ import { apiErrorMessage, operatingFactsApi, performanceApi } from "../lib/api";
 import { useRetailQuery } from "../retail/useRetailQuery";
 import { notifyError } from "../lib/notify";
 import { tableScrollX } from "../lib/tableScroll";
-import ScopeNote from "../components/ScopeNote";
 import PeerBenchmarkBlock, { type PeerBenchmarkItem } from "./PeerBenchmarkBlock";
 import { ActionCategoryText, ActionStatusTag, SeverityTag } from "./ActionCells";
 
@@ -181,12 +180,9 @@ export default function PerformancePage() {
         <div>
           <PageHeader
             title={t("perf.title", language)}
-            meta={t("perf.meta", language).replace("{period}", period).replace("{stamp}", dayjs().format("YYYY-MM-DD HH:mm"))}
             help={<HelpTrigger content={performanceHelpContent(language)} language={language} />}
           />
-          {/* R0-3: scope note — how this page differs from /operating-pulse */}
-          <ScopeNote noteKey="perf.scope_note" className="perf-scope-note" language={language} />
-          <div className="precision-filter-bar" style={{ marginBottom: 16 }}>
+          <div className="precision-filter-bar perf-filter-bar">
             <Space wrap size={12} align="center">
               <div className="precision-filter-group">
                 <span className="precision-filter-label">{t("perf.analysis_period", language)}:</span>
@@ -196,7 +192,7 @@ export default function PerformancePage() {
                   onChange={event => setPeriodDraft(event.target.value)}
                   onPressEnter={applyPeriod}
                   status={periodDraftValid ? undefined : "error"}
-                  style={{ width: 110 }}
+                  className="perf-period-input"
                   placeholder="YYYY-MM"
                 />
               </div>
@@ -217,8 +213,7 @@ export default function PerformancePage() {
                   value={importSource}
                   onChange={(event) => setImportSource(event.target.value)}
                   placeholder={t("perf.import_source", language)}
-                  className="perf-import-source"
-                  style={{ width: 130 }}
+                  className="perf-import-source perf-import-source-input"
                 />
               </div>
               <Upload
@@ -234,41 +229,35 @@ export default function PerformancePage() {
             </Space>
           </div>
           {overview && (
-            <div className="stripe-metric-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))", marginBottom: 16 }}>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.store_facts", language)}</span>
-                <div style={{ margin: "8px 0 0", display: "flex", alignItems: "baseline", gap: 6 }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
+            <div className="stripe-metric-grid perf-overview-grid">
+              <div className="pulse-kpi-card perf-overview-card">
+                <span className="perf-overview-label">{t("perf.kpi.store_facts", language)}</span>
+                <div className="perf-overview-value-row">
+                  <Typography.Text className="font-tabular perf-overview-value">
                     {overview.store_fact_count}
                   </Typography.Text>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  <Typography.Text type="secondary" className="perf-overview-suffix">
                     / {overview.store_fact_ready_count} {t("perf.kpi.reconciled_suffix", language)}
                   </Typography.Text>
                 </div>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.equipment_facts", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {overview.equipment_fact_count}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card perf-overview-card">
+                <span className="perf-overview-label">{t("perf.kpi.equipment_facts", language)}</span>
+                <Typography.Text className="font-tabular perf-overview-value">
+                  {overview.equipment_fact_count}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.open_actions", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {overview.open_action_count}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card perf-overview-card">
+                <span className="perf-overview-label">{t("perf.kpi.open_actions", language)}</span>
+                <Typography.Text className="font-tabular perf-overview-value">
+                  {overview.open_action_count}
+                </Typography.Text>
               </div>
-              <div className="pulse-kpi-card" style={{ height: "auto", minHeight: 90, padding: "16px 20px" }}>
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-secondary)" }}>{t("perf.kpi.open_impact", language)}</span>
-                <div style={{ margin: "8px 0 0" }}>
-                  <Typography.Text className="font-tabular" style={{ fontSize: 22, fontWeight: 600, color: "var(--fg-primary)" }}>
-                    {overview.open_action_impact.toFixed(2)}
-                  </Typography.Text>
-                </div>
+              <div className="pulse-kpi-card perf-overview-card">
+                <span className="perf-overview-label">{t("perf.kpi.open_impact", language)}</span>
+                <Typography.Text className="font-tabular perf-overview-value">
+                  {overview.open_action_impact.toFixed(2)}
+                </Typography.Text>
               </div>
             </div>
           )}
@@ -278,7 +267,6 @@ export default function PerformancePage() {
               type="warning"
               showIcon
               className="perf-governance-alert"
-              style={{ marginBottom: 16 }}
               message={
                 <Space wrap>
                   {governanceCounts.filter((item) => item.value > 0).map((item) => (
@@ -298,7 +286,7 @@ export default function PerformancePage() {
                 key: "actions",
                 label: `${t("perf.tab.actions", language)} (${actions.length})`,
                 children: actions.length ? (
-                  <Space direction="vertical" style={{ width: "100%" }}>
+                  <Space direction="vertical" className="perf-full-width">
                     <Space>
                       <Button size="small" icon={<CheckCircleOutlined />} disabled={!selectedActionIds.length} onClick={acknowledgeSelected}>
                         {t("perf.bulk_acknowledge", language)}
@@ -346,7 +334,7 @@ export default function PerformancePage() {
                 key: "scenario",
                 label: t("perf.tab.scenario", language),
                 children: (
-                  <Space direction="vertical" style={{ width: "100%" }} size={16}>
+                  <Space direction="vertical" className="perf-full-width" size={16}>
                     <Alert type="warning" showIcon message={t("perf.scenario.draft_title", language)} description={t("perf.scenario.draft_note", language)} />
                     <Space wrap>
                       <span>{t("perf.scenario.monthly_sales", language)}</span>
@@ -367,7 +355,7 @@ export default function PerformancePage() {
                         pagination={false}
                         columns={[
                           { title: t("perf.scenario.col_name", language), dataIndex: "name" },
-                          { title: "NPV 净现值", dataIndex: "npv", render: (value: number) => money(value, "CNY") },
+                          { title: t("perf.scenario.col_npv", language), dataIndex: "npv", render: (value: number) => money(value, "CNY") },
                           { title: t("perf.scenario.col_payback", language), dataIndex: "payback_months", render: (value: number) => value == null ? "—" : value.toFixed(1) },
                           { title: t("perf.scenario.col_breakeven", language), dataIndex: "break_even_monthly_rent", render: (value: number) => money(value, "CNY") },
                           { title: t("perf.scenario.col_negotiation", language), render: (_: unknown, row: any) => `${money(row.target_negotiation_low, "CNY")} – ${money(row.target_negotiation_high, "CNY")}` },

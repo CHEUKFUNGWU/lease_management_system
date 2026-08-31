@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Table, Tabs, Input, Button, Tag, Space, Typography } from "antd";
+import { Table, Tabs, Input, Button, Space, Typography } from "antd";
 import { StatusTag } from "../../components/StatusTag";
 import { SearchOutlined, ReloadOutlined } from "@ant-design/icons";
 import { t, type Language } from "../../lib/i18n";
 import { tableScrollX } from "../../lib/tableScroll";
+import { grainLabel, statusLabel } from "../labels";
 import type {
   FPnAAssumption,
   FPnAMasterDataMapping,
@@ -15,6 +16,12 @@ import type {
 } from "../types";
 
 const { Text } = Typography;
+
+function registryStatusLabel(value: string, language: Language): string {
+  if (value === "active") return t("fpna.status_active", language);
+  if (value === "inactive") return t("fpna.status_inactive", language);
+  return statusLabel(value, language);
+}
 
 interface Props {
   snapshot: WorkbenchSnapshot;
@@ -65,13 +72,13 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_formula", language),
       dataIndex: "formula",
       key: "formula",
-      render: (f: string) => (f ? <Text code>{f}</Text> : "-"),
+      render: (f: string) => (f ? <Text code>{f}</Text> : "—"),
     },
     {
       title: t("fpna.col_grain", language),
       dataIndex: "grain",
       key: "grain",
-      render: (g: string) => <StatusTag kind="processing">{g}</StatusTag>,
+      render: (g: string) => <StatusTag kind="processing">{grainLabel(g, language)}</StatusTag>,
     },
     {
       title: t("fpna.col_currency_policy", language),
@@ -83,25 +90,25 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_fiscal_period_rule", language),
       dataIndex: "fiscal_period_rule",
       key: "fiscal_period_rule",
-      render: (rule: string) => <Tag>{rule}</Tag>,
+      render: (rule: string) => <StatusTag kind="neutral">{rule}</StatusTag>,
     },
     {
       title: t("fpna.col_owner", language),
       dataIndex: "owner_name",
       key: "owner_name",
-      render: (owner: string) => owner || "-",
+      render: (owner: string) => owner || "—",
     },
     {
       title: t("fpna.col_status", language),
       dataIndex: "status",
       key: "status",
-      render: (st: string) => <StatusTag kind={st === "active" ? "success" : "neutral"}>{st.toUpperCase()}</StatusTag>,
+      render: (st: string) => <StatusTag kind={st === "active" ? "success" : "neutral"}>{registryStatusLabel(st, language)}</StatusTag>,
     },
   ];
 
   const assumptionColumns = [
     {
-      title: "Version Tag",
+      title: t("fpna.col_version", language),
       dataIndex: "version",
       key: "version",
       render: (tag: string) => <strong>{tag}</strong>,
@@ -127,7 +134,7 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       key: "effective_range",
       render: (_: unknown, record: FPnAAssumption) => (
         <span>
-          {record.effective_from || "Start"} ~ {record.effective_to || "End"}
+          {record.effective_from || "—"} ~ {record.effective_to || "—"}
         </span>
       ),
     },
@@ -135,7 +142,7 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_status", language),
       dataIndex: "status",
       key: "status",
-      render: (st: string) => <Tag>{st.toUpperCase()}</Tag>,
+      render: (st: string) => <StatusTag kind={st === "active" ? "success" : "neutral"}>{registryStatusLabel(st, language)}</StatusTag>,
     },
   ];
 
@@ -173,8 +180,8 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       key: "effective",
       render: (_: unknown, record: FPnAMasterDataMapping) => (
         <span>
-          {record.effective_from ? record.effective_from.slice(0, 10) : ""} ~{" "}
-          {record.effective_to ? record.effective_to.slice(0, 10) : "Indefinite"}
+          {record.effective_from ? record.effective_from.slice(0, 10) : "—"} ~{" "}
+          {record.effective_to ? record.effective_to.slice(0, 10) : "—"}
         </span>
       ),
     },
@@ -182,7 +189,7 @@ export function GovernanceRegistryTab({ snapshot, commands, language }: Props) {
       title: t("fpna.col_status", language),
       dataIndex: "status",
       key: "status",
-      render: (st: string) => <Tag>{st.toUpperCase()}</Tag>,
+      render: (st: string) => <StatusTag kind={st === "active" ? "success" : "neutral"}>{registryStatusLabel(st, language)}</StatusTag>,
     },
   ];
 

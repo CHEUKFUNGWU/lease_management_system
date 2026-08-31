@@ -53,16 +53,12 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <Row
-      justify="center"
-      align="middle"
-      style={{ minHeight: "100vh", background: "var(--admin-surface)" }}
-    >
+    <Row justify="center" align="middle" className="admin-login-page">
       <Col xs={24} sm={16} md={12} lg={8} xl={6}>
-        <Card>
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <SafetyOutlined style={{ fontSize: 48, color: "var(--state-error-text)" }} />
-              <Title level={3} style={{ marginTop: 16 }}>
+        <Card className="admin-login-card">
+          <div className="admin-login-brand">
+            <SafetyOutlined className="admin-login-icon" />
+              <Title level={3} className="admin-login-title">
                 {t("admin_login.title", language)}
               </Title>
               <Text type="secondary">
@@ -112,8 +108,8 @@ export default function AdminLoginPage() {
             </Form.Item>
           </Form>
 
-          <div style={{ textAlign: "center", marginTop: 16 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
+          <div className="admin-login-footer">
+            <Text type="secondary" className="admin-login-footer-text">
               <a href="/login">{t("admin_login.back_to_user", language)}</a>
             </Text>
           </div>

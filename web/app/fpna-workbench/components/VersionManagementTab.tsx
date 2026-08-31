@@ -6,13 +6,11 @@ import {
   Table,
   Button,
   Space,
-  Tag,
   Modal,
   Form,
   Input,
   Select,
   Segmented,
-  Radio,
   Typography,
   Descriptions,
   message,
@@ -29,6 +27,7 @@ import { StatusTag } from "../../components/StatusTag";
 import { t, type Language } from "../../lib/i18n";
 import { tableScrollX } from "../../lib/tableScroll";
 import { canFreeze, canPromoteToOfficial } from "../logic";
+import { scenarioTypeLabel, statusLabel, versionTypeLabel } from "../labels";
 import type {
   CreatePlanVersionInput,
   FPnAPlanVersion,
@@ -42,21 +41,6 @@ import type {
 import { VERSION_TYPES, SCENARIO_TYPES } from "../types";
 
 const { Text, Paragraph } = Typography;
-
-const VERSION_TYPE_KEYS: Record<string, string> = {
-  budget: "fpna.version_type_budget",
-  forecast: "fpna.version_type_forecast",
-  actual: "fpna.version_type_actual",
-  prior_year: "fpna.version_type_prior_year",
-  scenario: "fpna.version_type_scenario",
-};
-
-const SCENARIO_TYPE_KEYS: Record<string, string> = {
-  baseline: "fpna.scenario_baseline",
-  upside: "fpna.scenario_upside",
-  downside: "fpna.scenario_downside",
-  custom: "fpna.scenario_custom",
-};
 
 interface Props {
   snapshot: WorkbenchSnapshot;
@@ -159,7 +143,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
           </a>
           {record.is_official && (
             <StatusTag kind="success">
-              Official
+              {t("fpna.status_official", language)}
             </StatusTag>
           )}
         </Space>
@@ -170,14 +154,14 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
       dataIndex: "version_type",
       key: "version_type",
       render: (type: VersionType) => {
-        return <StatusTag kind="neutral">{type.toUpperCase()}</StatusTag>;
+        return <StatusTag kind="neutral">{versionTypeLabel(type, language)}</StatusTag>;
       },
     },
     {
       title: t("fpna.col_scenario", language),
       dataIndex: "scenario_type",
       key: "scenario_type",
-      render: (sc: ScenarioType) => <Tag>{sc}</Tag>,
+      render: (sc: ScenarioType) => <StatusTag kind="neutral">{scenarioTypeLabel(sc, language)}</StatusTag>,
     },
     {
       title: t("fpna.col_period_range", language),
@@ -186,7 +170,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
         <span>
           {record.from_period} ~ {record.to_period}
           <Text type="secondary" className="fpna-font-12">
-            {" "}(As of {record.as_of_period})
+            {" · "}{t("fpna.as_of_short", language)} {record.as_of_period}
           </Text>
         </span>
       ),
@@ -197,7 +181,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
       key: "status",
       render: (st: PlanVersionStatus) => (
         <StatusTag kind={statusKindMap[st] || "neutral"}>
-          {st.toUpperCase()}
+          {statusLabel(st, language)}
         </StatusTag>
       ),
     },
@@ -267,12 +251,12 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               {indent > 0 && <BranchesOutlined className="fpna-tree-icon" />}
               <Text strong>{node.version.name}</Text>
               <StatusTag kind="neutral">
-                {node.version.version_type.toUpperCase()}
+                {versionTypeLabel(node.version.version_type, language)}
               </StatusTag>
               <StatusTag kind={statusKindMap[node.version.status] || "neutral"}>
-                {node.version.status.toUpperCase()}
+                {statusLabel(node.version.status, language)}
               </StatusTag>
-              {node.version.is_official && <StatusTag kind="success">Official</StatusTag>}
+              {node.version.is_official && <StatusTag kind="success">{t("fpna.status_official", language)}</StatusTag>}
               <Text type="secondary" className="fpna-font-12">
                 ({node.version.from_period} ~ {node.version.to_period})
               </Text>
@@ -302,7 +286,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
 
   return (
     <div className="help-flow-vertical">
-      <div className="fpna-tree-card-inner precision-filter-bar" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <div className="fpna-tree-card-inner precision-filter-bar fpna-version-toolbar">
         <Space size={8}>
           <Segmented
             className="precision-segmented"
@@ -383,7 +367,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               <Select>
                 {VERSION_TYPES.map((vt) => (
                   <Select.Option key={vt} value={vt}>
-                    {VERSION_TYPE_KEYS[vt] ? t(VERSION_TYPE_KEYS[vt], language) : vt}
+                    {versionTypeLabel(vt, language)}
                   </Select.Option>
                 ))}
               </Select>
@@ -397,7 +381,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               <Select>
                 {SCENARIO_TYPES.map((st) => (
                   <Select.Option key={st} value={st}>
-                    {SCENARIO_TYPE_KEYS[st] ? t(SCENARIO_TYPE_KEYS[st], language) : st}
+                    {scenarioTypeLabel(st, language)}
                   </Select.Option>
                 ))}
               </Select>
@@ -437,7 +421,7 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
             <Select allowClear placeholder={t("fpna.placeholder_pick_prior_version", language)}>
               {snapshot.versions.map((v) => (
                 <Select.Option key={v.id} value={v.id}>
-                  {v.name} ({v.version_type} - {v.as_of_period})
+                  {v.name} ({versionTypeLabel(v.version_type, language)} · {t("fpna.as_of_short", language)} {v.as_of_period})
                 </Select.Option>
               ))}
             </Select>
@@ -475,18 +459,18 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               <code>{selectedVersion.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_type", language)}>
-              {VERSION_TYPE_KEYS[selectedVersion.version_type] ? t(VERSION_TYPE_KEYS[selectedVersion.version_type], language) : selectedVersion.version_type.toUpperCase()}
+              {versionTypeLabel(selectedVersion.version_type, language)}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_scenario", language)}>
-              {selectedVersion.scenario_type}
+              {scenarioTypeLabel(selectedVersion.scenario_type, language)}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_status", language)}>
               <StatusTag kind={statusKindMap[selectedVersion.status] || "neutral"}>
-                {selectedVersion.status.toUpperCase()}
+                {statusLabel(selectedVersion.status, language)}
               </StatusTag>
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.desc_official_status", language)}>
-              {selectedVersion.is_official ? <StatusTag kind="success">YES (Official)</StatusTag> : "NO (Working)"}
+              {selectedVersion.is_official ? <StatusTag kind="success">{t("fpna.status_published", language)}</StatusTag> : <StatusTag kind="neutral">{t("fpna.status_working", language)}</StatusTag>}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.form_as_of_period", language)}>{selectedVersion.as_of_period}</Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_period_range", language)}>
@@ -500,13 +484,13 @@ export function VersionManagementTab({ snapshot, commands, language }: Props) {
               )}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.form_assumption_version", language)}>
-              {selectedVersion.assumption_version || <Text type="secondary">N/A</Text>}
+              {selectedVersion.assumption_version || <Text type="secondary">—</Text>}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.form_fx_version", language)}>
-              {selectedVersion.exchange_rate_version || <Text type="secondary">N/A</Text>}
+              {selectedVersion.exchange_rate_version || <Text type="secondary">—</Text>}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.form_metric_version", language)} span={2}>
-              {selectedVersion.metric_definition_version || <Text type="secondary">N/A</Text>}
+              {selectedVersion.metric_definition_version || <Text type="secondary">—</Text>}
             </Descriptions.Item>
             <Descriptions.Item label={t("fpna.col_created_at", language)}>
               {new Date(selectedVersion.created_at).toLocaleString()}

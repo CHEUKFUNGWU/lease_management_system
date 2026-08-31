@@ -22,13 +22,13 @@
 // ─── Color Tokens ──────────────────────────────────────────────
 
 export const colors = {
-  // Warm neutral palette — quiet, editorial, and deliberately low-chroma.
+  // Neutral grayscale palette — quiet, editorial, and deliberately low-chroma.
   background: {
     page: "#FFFFFF",
     surface: "#FFFFFF",
     elevated: "#FFFFFF",
-    inset: "#F7F6F3",
-    code: "#FBFBFA",
+    inset: "#F7F7F7",
+    code: "#FBFBFB",
     // Identity surface: dark enough to anchor the login mark without pure black.
     brandSlab: "#111111",
     onBrandSlab: "#FFFFFF",
@@ -45,7 +45,7 @@ export const colors = {
   border: {
     default: "#EAEAEA",
     strong: "#A4A6A2",
-    subtle: "#F1F0ED",
+    subtle: "#F1F1F1",
     inverse: "rgba(255,255,255,0.12)",
   },
 
@@ -62,13 +62,13 @@ export const colors = {
     processing: { bg: "#EEF1F4", text: "#465A6C", border: "#CCD6DF" },
     warning: { bg: "#FFFFFF", text: "#6B5A39", border: "#E2D7BB" },
     error: { bg: "#F6EEEE", text: "#744C4C", border: "#E3D0D0" },
-    neutral: { bg: "#F7F6F3", text: "#5C605D", border: "#EAEAEA" },
+    neutral: { bg: "#F7F7F7", text: "#5C605D", border: "#EAEAEA" },
   },
 
   // Legacy names stay for compatibility; their values follow the new neutral system.
   morandi: {
     slate: "#111111",
-    cream: "#F7F6F3",
+    cream: "#F7F7F7",
     sand: "#5C7863",
     greige: "#787774",
     terracotta: "#8A5D5D",

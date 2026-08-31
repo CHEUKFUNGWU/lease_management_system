@@ -12,14 +12,14 @@
      is exactly what a palette-level contrast table cannot catch. */
   color-scheme: light;
 
-  /* Warm neutral scale — white canvas, near-black text, quiet contrast. */
+  /* Neutral grayscale scale — white canvas, near-black text, quiet contrast. */
   --mono-0: #111111;
   --mono-20: #2F3437;
   --mono-40: #5C605D;
   --mono-60: #787774;
   --mono-70: #A4A6A2;
   --mono-90: #EAEAEA;
-  --mono-95: #F7F6F3;
+  --mono-95: #F7F7F7;
   --mono-98: #FFFFFF;
   --mono-100: #FFFFFF;
 
@@ -28,7 +28,7 @@
   --bg-surface: var(--mono-98);
   --bg-elevated: var(--mono-98);
   --bg-inset: var(--mono-95);
-  --bg-code: #FBFBFA;
+  --bg-code: #FBFBFB;
   --bg-brand-slab: #111111;
   --fg-on-brand-slab: #FFFFFF;
 
@@ -42,7 +42,7 @@
   /* Border */
   --border-default: #EAEAEA;
   --border-strong: var(--mono-70);
-  --border-subtle: #F1F0ED;
+  --border-subtle: #F1F1F1;
 
   /* Semantic and visualization tokens */
   --state-success-bg: #EEF3EE;
@@ -60,7 +60,7 @@
 
   /* Chart tokens */
   --morandi-slate: #111111;
-  --morandi-cream: #F7F6F3;
+  --morandi-cream: #F7F7F7;
   --morandi-sand: #5C7863;
   --morandi-greige: #787774;
   --morandi-terracotta: #8A5D5D;
@@ -554,7 +554,7 @@ body {
 
 .pulse-kpi-card:hover,
 .store-360-kpi-card:hover {
-  background: var(--bg-inset, #F7F6F3);
+  background: var(--bg-inset, #F7F7F7);
 }
 
 /* Cash-plan panel */
@@ -8556,7 +8556,7 @@ body .app-content.app-content-full-bleed .app-content-inner {
 .drafts-row:hover,
 .drafts-row:focus-visible,
 .drafts-row-active {
-  background: var(--bg-inset, #F7F6F3);
+  background: var(--bg-inset, #F7F7F7);
 }
 
 .drafts-number {
@@ -8598,7 +8598,7 @@ body .app-content.app-content-full-bleed .app-content-inner {
   gap: 8px;
   padding: 40px 16px;
   border-radius: 10px;
-  background: var(--bg-inset, #F7F6F3);
+  background: var(--bg-inset, #F7F7F7);
   box-shadow: inset 0 0 0 1px var(--border-default, #EAEAEA);
   text-align: center;
 }

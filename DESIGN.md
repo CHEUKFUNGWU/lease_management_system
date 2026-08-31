@@ -69,7 +69,7 @@
 
 ### 3.1 中性阶（唯一的底色系统）
 
-本轮换为 **Quiet Luxury / Editorial Minimalism** 的暖中性色阶：纯白画布、近黑正文、低对比边界。**以下值与 `tokens.ts` 保持一致，不要凭印象补旧色。**
+本轮换为 **Quiet Luxury / Editorial Minimalism** 的中性灰阶：纯白画布、近黑正文、低对比边界。**以下值与 `tokens.ts` 保持一致，不要凭印象补旧色。**
 
 | 语义 | 值 | 用途 |
 |---|---|---|
@@ -80,8 +80,8 @@
 | `foreground.inverse` | `#FFFFFF` | 深色底上的文字 |
 | `border.strong` | `#A4A6A2` | hover / 激活边框 |
 | `border.default` | `#EAEAEA` | 标准边框、卡片描边 |
-| `border.subtle` | `#F1F0ED` | 内部分隔线、表格行 |
-| `background.inset` | `#F7F6F3` | 表头、次级面板 |
+| `border.subtle` | `#F1F1F1` | 内部分隔线、表格行 |
+| `background.inset` | `#F7F7F7` | 表头、次级面板 |
 | `background.surface` | `#FFFFFF` | 卡片、面板 |
 | `background.page` | `#FFFFFF` | 页面画布 |
 
@@ -99,7 +99,7 @@
 | processing / info | `#465A6C` | `#EEF1F4` | `#CCD6DF` |
 | warning | `#6B5A39` | `#FFFFFF` | `#E2D7BB` |
 | error | `#744C4C` | `#F6EEEE` | `#E3D0D0` |
-| neutral | `#5C605D` | `#F7F6F3` | `#EAEAEA` |
+| neutral | `#5C605D` | `#F7F7F7` | `#EAEAEA` |
 
 全部 text 值在对应 bg 上通过 WCAG AA。警告底色保持白色，只保留文字、图标与细边界的语义强调。
 

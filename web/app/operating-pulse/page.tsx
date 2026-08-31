@@ -189,7 +189,7 @@ function SignalMix({ attention, language }: { attention: RetailAttention[]; lang
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 16, left: 16, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle, #F1F0ED)" opacity={0.6} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle, #F1F1F1)" opacity={0.6} />
               <XAxis type="number" tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={140} interval={0} />
               <ChartTooltip formatter={(value, _name, item) => [`${Number(value).toFixed(2)} · ${t("pulse.signal_mix_stores", language, { count: String(item?.payload?.stores ?? 0) })}`, t("pulse.signal_mix_weight", language)]} />

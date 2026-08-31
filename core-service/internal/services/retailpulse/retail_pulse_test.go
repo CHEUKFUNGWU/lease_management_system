@@ -597,7 +597,7 @@ func TestPulseRegionGroupingAttention(t *testing.T) {
 
 type fakePlanReader struct{ set *retailkpi.PlanSet }
 
-func (f *fakePlanReader) ReadPlan(context.Context, string, string) (*retailkpi.PlanSet, error) {
+func (f *fakePlanReader) ReadPlan(context.Context, string, string, string, string) (*retailkpi.PlanSet, error) {
 	return f.set, nil
 }
 

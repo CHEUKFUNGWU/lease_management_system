@@ -7,7 +7,28 @@ import (
 
 	"github.com/lease-management-system/core-service/internal/agenttools"
 	agenttooldefs "github.com/lease-management-system/core-service/internal/agenttools/tools"
+	"github.com/lease-management-system/core-service/internal/pagefill"
 )
+
+func TestProjectResultPageFillWithoutEvidenceStaysIncomplete(t *testing.T) {
+	projected := ProjectResult(Response{
+		Model:    "deterministic-router",
+		PageFill: pagefill.New("retail-data-import", "POST /retail/import", "/retail-data-import?fill=artifact"),
+	})
+	if len(projected.Artifacts) != 1 {
+		t.Fatalf("page-fill artifacts = %d, want 1", len(projected.Artifacts))
+	}
+	artifact := projected.Artifacts[0]
+	if artifact.EvidenceComplete {
+		t.Fatal("page-fill without evidence references must not claim complete evidence")
+	}
+	if len(artifact.EvidenceRefs) != 0 {
+		t.Fatalf("evidence refs = %d, want none", len(artifact.EvidenceRefs))
+	}
+	if len(artifact.ReviewReasons) != 2 || artifact.ReviewReasons[1] != "evidence_incomplete" {
+		t.Fatalf("review reasons = %v, want evidence_incomplete", artifact.ReviewReasons)
+	}
+}
 
 func TestExtractSourceSystem(t *testing.T) {
 	if got := extractSourceSystem("我把门店销售数据传上来了，来源系统 pos-a"); got != "pos-a" {

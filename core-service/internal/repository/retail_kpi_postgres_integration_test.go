@@ -27,6 +27,7 @@ func TestRetailKPIPostgresGoldenVersionSourceCurrencyAndTenantBoundaries(t *test
 		// stores reference legal entities. Keep this order so a failed test
 		// cannot silently leak its tenant or registry rows.
 		cleanup(`DELETE FROM retail_store_day_facts f USING stores s WHERE f.store_id=s.id AND s.legal_entity_id IN ($1,$2)`, entityA, entityB)
+		cleanup(`DELETE FROM fpna_plan_versions WHERE legal_entity_id IN ($1,$2) AND source='retail_simulator_budget'`, entityA, entityB)
 		cleanup(`DELETE FROM retail_simulation_datasets WHERE legal_entity_id IN ($1,$2)`, entityA, entityB)
 		cleanup(`DELETE FROM operating_fact_batches WHERE legal_entity_id IN ($1,$2) AND source_system='retail_simulator'`, entityA, entityB)
 		cleanup(`DELETE FROM stores WHERE legal_entity_id IN ($1,$2)`, entityA, entityB)

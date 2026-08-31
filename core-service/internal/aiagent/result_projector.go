@@ -123,12 +123,18 @@ func ProjectResult(response Response) aichat.Result {
 		if response.PageFill.TargetPage == "contract-workspace" {
 			title = "付款计划预填"
 		}
+		evidenceComplete := len(response.EvidenceRefs) > 0
+		reviewReasons := []string{"import_mapping_review"}
+		if !evidenceComplete {
+			reviewReasons = append(reviewReasons, "evidence_incomplete")
+		}
 		result.Artifacts = append(result.Artifacts, aichat.ArtifactDraft{
 			Type: string(agentartifact.ArtifactPageFill), Title: title,
 			ReviewRequired:   true,
 			SchemaVersion:    agentartifact.SchemaVersion,
-			EvidenceComplete: true,
-			ReviewReasons:    []string{"import_mapping_review"},
+			EvidenceRefs:     response.EvidenceRefs,
+			EvidenceComplete: evidenceComplete,
+			ReviewReasons:    reviewReasons,
 			ModelVersion:     response.Model,
 			RuleVersion:      "page-fill-rule.v1",
 			Data:             response.PageFill,

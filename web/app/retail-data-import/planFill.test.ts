@@ -78,9 +78,12 @@ describe("applyPlanFill 安全边界", () => {
 describe("导入页接线（GUARD-001 源码断言）", () => {
   const page = readFileSync(path.join(import.meta.dirname, "page.tsx"), "utf8");
 
-  it("页面读取 ?plan_fill= 并取回 artifact", () => {
+  it("页面读取 ?plan_fill= 并经 usePageFill 消费", () => {
     expect(page).toContain('searchParams.get("plan_fill")');
-    expect(page).toContain("ai/chat/artifacts/");
+    // P0-C 起 artifact 取数在共享 hook 内；页面不再出现手写 artifact fetch。
+    expect(page).toContain("const planFill = usePageFill({");
+    const fetchSites = page.match(/ai\/chat\/artifacts\//g) ?? [];
+    expect(fetchSites.length).toBe(0);
   });
 
   it("artifact 必须经过 applyPlanFill 才能进表单", () => {

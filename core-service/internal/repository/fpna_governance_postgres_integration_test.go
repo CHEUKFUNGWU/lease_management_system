@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -47,6 +48,29 @@ func TestFPnAGovernanceTenantIsolationCharacterization(t *testing.T) {
 	}
 	if frozen, err := repo.FreezePlanVersion(ctx, createdVersion.ID, mustEntityFilter(t, pair.entityA), "user-a", false); err != nil || frozen == nil {
 		t.Fatalf("entity A freeze = %+v, err %v; want updated", frozen, err)
+	}
+	simulated, err := repo.CreatePlanVersion(ctx, &FPnAPlanVersion{
+		LegalEntityID: &pair.entityA, Name: "char-plan-simulated", VersionType: "budget", Source: "retail_simulator_budget",
+		CoverageScope: json.RawMessage(`{"data_classification":"simulated"}`), AsOfPeriod: "2026-01", FromPeriod: "2026-01", ToPeriod: "2026-12",
+	})
+	if err != nil {
+		t.Fatalf("seed simulated plan version: %v", err)
+	}
+	if resolved, err := repo.ResolvePlanVersionForPeriod(ctx, mustEntityFilter(t, pair.entityA), "2026-06", "budget", "production", ""); err != nil || resolved == nil || resolved.ID != createdVersion.ID {
+		t.Fatalf("production resolved simulated plan: %+v, err %v", resolved, err)
+	}
+	if resolved, err := repo.ResolvePlanVersionForPeriod(ctx, mustEntityFilter(t, pair.entityA), "2026-06", "budget", "simulated", "sim-dataset"); err != nil || resolved != nil {
+		t.Fatalf("simulated plan without matching dataset resolved: %+v, err %v", resolved, err)
+	}
+	simulated.CoverageScope = json.RawMessage(`{"data_classification":"simulated","simulation_dataset_version":"sim-dataset"}`)
+	if _, err := repo.db.Exec(ctx, `UPDATE fpna_plan_versions SET coverage_scope=$2 WHERE id=$1`, simulated.ID, simulated.CoverageScope); err != nil {
+		t.Fatalf("update simulated dataset scope: %v", err)
+	}
+	if resolved, err := repo.ResolvePlanVersionForPeriod(ctx, mustEntityFilter(t, pair.entityA), "2026-06", "budget", "simulated", "sim-dataset"); err != nil || resolved == nil || resolved.ID != simulated.ID {
+		t.Fatalf("simulated plan resolution = %+v, err %v", resolved, err)
+	}
+	if frozen, err := repo.FreezePlanVersion(ctx, simulated.ID, mustEntityFilter(t, pair.entityA), "user-a", true); err != nil || frozen != nil {
+		t.Fatalf("simulated plan became Official: %+v, err %v", frozen, err)
 	}
 
 	// Plan lines: list through the version's legal entity. Seeded with a

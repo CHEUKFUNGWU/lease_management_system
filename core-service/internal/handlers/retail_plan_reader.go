@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/repository"
@@ -26,14 +27,14 @@ func NewRetailPlanReader(repo *repository.FPnAGovernanceRepository) *RetailPlanR
 // (official first, then the newest as_of snapshot — spec decision 1/2),
 // then loads its store-grain lines. A nil set means no version covers the
 // period; that absence is reported as "no plan block", never a zero.
-func (r *RetailPlanReader) ReadPlan(ctx context.Context, legalEntityID, period string) (*retailkpi.PlanSet, error) {
+func (r *RetailPlanReader) ReadPlan(ctx context.Context, legalEntityID, period, classification, datasetVersion string) (*retailkpi.PlanSet, error) {
 	entity, err := access.EntityFilterFor(legalEntityID)
 	if err != nil {
 		return nil, err
 	}
 	var version *repository.FPnAPlanVersion
 	for _, versionType := range r.PreferredVersionTypes {
-		version, err = r.repo.ResolvePlanVersionForPeriod(ctx, entity, period, versionType)
+		version, err = r.repo.ResolvePlanVersionForPeriod(ctx, entity, period, versionType, classification, datasetVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -78,14 +79,40 @@ func (r *RetailPlanReader) ReadPlan(ctx context.Context, legalEntityID, period s
 			value := float64(*line.NonLeaseCost)
 			fact.NonLeaseCost = &value
 		}
+		fact.OtherControllableCost = operationalKPIValue(line.OperationalKPIs, "other_controllable_cost")
 		facts = append(facts, fact)
 	}
 	if len(facts) == 0 {
 		return nil, nil
 	}
+	planClass := planClassification(version.CoverageScope)
+	if planClass == "" {
+		planClass = classification
+	}
 	return &retailkpi.PlanSet{
 		VersionID: version.ID, VersionName: version.Name, VersionType: version.VersionType,
 		AsOfPeriod: version.AsOfPeriod, Source: version.Source, IsOfficial: version.IsOfficial,
-		Facts: facts,
+		Classification: planClass,
+		Facts:          facts,
 	}, nil
+}
+
+func planClassification(scope json.RawMessage) string {
+	var value struct {
+		DataClassification string `json:"data_classification"`
+	}
+	if json.Unmarshal(scope, &value) != nil {
+		return ""
+	}
+	return value.DataClassification
+}
+
+func planDatasetVersion(scope json.RawMessage) string {
+	var value struct {
+		SimulationDatasetVersion string `json:"simulation_dataset_version"`
+	}
+	if json.Unmarshal(scope, &value) != nil {
+		return ""
+	}
+	return value.SimulationDatasetVersion
 }

@@ -64,7 +64,7 @@ export function usePageFill(options: { artifactId?: string | null; page: string;
 					setError("empty prefill artifact");
 					return;
 				}
-				if ((data.target_page || "").split("?")[0] !== page) {
+				if (data.target_page !== page) {
 					setStatus("mismatch");
 					return;
 				}

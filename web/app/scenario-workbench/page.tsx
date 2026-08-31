@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Alert, Button, Card, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Result, Row, Segmented, Select, Slider, Space, Spin, Table, Typography, message } from "antd";
+import { Alert, Button, Card, Checkbox, Col, Collapse, DatePicker, Empty, Flex, Input, InputNumber, Modal, Radio, Result, Row, Segmented, Select, Slider, Space, Spin, Table, Typography, message } from "antd";
 import { ArrowLeftOutlined, CheckCircleFilled, ControlOutlined, PlayCircleOutlined, SaveOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import AppLayout from "../components/AppLayout";
@@ -16,7 +16,7 @@ import RetailAIDrawer from "../components/RetailAIDrawer";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { SparkleGlyph, SlidersGlyph } from "../components/MonochromeGlyphs";
 import WaterfallChart from "../components/charts/WaterfallChart";
-import { apiErrorMessage, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioAssumptions, type RetailScenarioResponse, type RetailStore360Option } from "../lib/api";
+import { apiErrorMessage, performanceApi, retailAnalyticsApi, type RetailDataClassification, type RetailScenarioAssumptions, type RetailScenarioResponse, type RetailStore360Option } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t, type Language } from "../lib/i18n";
@@ -267,6 +267,84 @@ function ScenarioPageInner() {
         }
       },
     });
+  };
+
+  // Scenario decision -> lease event draft (audit §E-2 last-mile wiring; same
+  // break-point family as feedback §7.2 P0-2 "scenario output cannot land in
+  // actions"). This is the only bridge from a commercial decision into lease
+  // accounting: it writes the draft layer only (formal_event_created stays
+  // false); approval and recalculation remain separate workflow steps. The
+  // backend requires approved=true — the human confirms it via an explicit
+  // checkbox, the UI never approves on their behalf.
+  const [eventDraftOpen, setEventDraftOpen] = useState(false);
+  const [eventDraftContract, setEventDraftContract] = useState("");
+  const [eventDraftType, setEventDraftType] = useState("lease_modification");
+  const [eventDraftDate, setEventDraftDate] = useState<string | null>(null);
+  const [eventDraftReason, setEventDraftReason] = useState("");
+  const [eventDraftDecision, setEventDraftDecision] = useState("");
+  const [eventDraftOriginal, setEventDraftOriginal] = useState("");
+  const [eventDraftNew, setEventDraftNew] = useState("");
+  const [eventDraftApproved, setEventDraftApproved] = useState(false);
+  const [eventDraftSubmitting, setEventDraftSubmitting] = useState(false);
+  const [eventDraftResult, setEventDraftResult] = useState<{ status: string; formalCreated: boolean } | null>(null);
+  const eventDraftIdempotencyKey = useRef<string>("");
+
+  const openEventDraftModal = () => {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      eventDraftIdempotencyKey.current = crypto.randomUUID();
+    } else {
+      eventDraftIdempotencyKey.current = `scenario-event-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+    setEventDraftDecision(title.trim());
+    setEventDraftResult(null);
+    setEventDraftOpen(true);
+  };
+
+  const evidenceRef = () => ({
+    page: "scenario-workbench",
+    store_id: query.storeID,
+    data_classification: query.classification,
+    dataset_version: query.datasetVersion || undefined,
+    as_of: query.asOf,
+    window_days: query.windowDays,
+    horizon_months: horizon,
+    scenario_key: selectedKey,
+    assumptions,
+    evaluation_snapshot: currentEvaluationKey,
+    ...(actionResult?.data?.id ? { saved_action_id: actionResult.data.id } : {}),
+  });
+
+  const submitEventDraft = async () => {
+    if (!token || !freshResponse) return;
+    if (!eventDraftContract.trim()) { message.warning(t("scenario.event.err_contract", language)); return; }
+    if (!eventDraftDate) { message.warning(t("scenario.event.err_date", language)); return; }
+    if (!eventDraftReason.trim()) { message.warning(t("scenario.event.err_reason", language)); return; }
+    if (!eventDraftApproved) { message.warning(t("scenario.event.err_approved", language)); return; }
+    setEventDraftSubmitting(true);
+    try {
+      const result = (await performanceApi.storeDecisionEventDraft(
+        {
+          contract_id: eventDraftContract.trim(),
+          approved: eventDraftApproved,
+          event_type: eventDraftType,
+          effective_date: eventDraftDate,
+          change_reason: eventDraftReason.trim(),
+          decision: eventDraftDecision.trim() || t("scenario.plan_title", language),
+          scenario_name: freshResponse.scenarios.find((item) => item.key === selectedKey)?.name || selectedKey,
+          original_value: eventDraftOriginal.trim() || undefined,
+          new_value: eventDraftNew.trim() || undefined,
+          evidence_ref: evidenceRef(),
+        },
+        token,
+        eventDraftIdempotencyKey.current,
+      )) as { data?: { status?: string }; formal_event_created?: boolean };
+      setEventDraftResult({ status: String(result.data?.status || "pending"), formalCreated: Boolean(result.formal_event_created) });
+      message.success(t("scenario.event.success", language));
+    } catch (err) {
+      message.error(apiErrorMessage(err));
+    } finally {
+      setEventDraftSubmitting(false);
+    }
   };
 
   const backURL = query.returnQuery ? `/store-360?${query.returnQuery}` : returnScenarioQuery(searchParams);
@@ -590,15 +668,23 @@ function ScenarioPageInner() {
                             onChange={(event) => setVerificationPeriod(event.target.value)}
                             placeholder={t("scenario.draft.period_placeholder", language)}
                           />
-                          <Button
-                            icon={<SaveOutlined />}
-                            type="primary"
-                            loading={saving}
-                            disabled={selectedKey === "baseline" || !canSaveScenario(response, selectedKey, responseKey, currentEvaluationKey) || !title.trim() || !plannedAction.trim()}
-                            onClick={saveAction}
-                          >
-                            {t("scenario.draft.save", language)}
-                          </Button>
+                          <Space>
+                            <Button
+                              icon={<SaveOutlined />}
+                              type="primary"
+                              loading={saving}
+                              disabled={selectedKey === "baseline" || !canSaveScenario(response, selectedKey, responseKey, currentEvaluationKey) || !title.trim() || !plannedAction.trim()}
+                              onClick={saveAction}
+                            >
+                              {t("scenario.draft.save", language)}
+                            </Button>
+                            <Button
+                              disabled={selectedKey === "baseline" || !canSaveScenario(response, selectedKey, responseKey, currentEvaluationKey)}
+                              onClick={openEventDraftModal}
+                            >
+                              {t("scenario.event.open", language)}
+                            </Button>
+                          </Space>
                         </Flex>
                         {actionResult && (
                           <Alert
@@ -614,6 +700,19 @@ function ScenarioPageInner() {
                             }
                           />
                         )}
+                        {eventDraftResult && (
+                          <Alert
+                            type="warning"
+                            showIcon
+                            message={t("scenario.event.success_title", language)}
+                            description={
+                              <Space direction="vertical" size={2}>
+                                <span>{t("scenario.event.success_status", language, { status: eventDraftResult.status })}</span>
+                                <span>{eventDraftResult.formalCreated ? t("scenario.event.formal_created", language) : t("scenario.event.formal_not_created", language)}</span>
+                              </Space>
+                            }
+                          />
+                        )}
                       </Space>
                     </Card>
                   </>
@@ -621,6 +720,80 @@ function ScenarioPageInner() {
               </Space>
             </Col>
           </Row>
+
+          <Modal
+            title={t("scenario.event.modal_title", language)}
+            open={eventDraftOpen}
+            onCancel={() => setEventDraftOpen(false)}
+            footer={
+              <Space>
+                <Button onClick={() => setEventDraftOpen(false)}>{t("scenario.event.cancel", language)}</Button>
+                <Button type="primary" loading={eventDraftSubmitting} onClick={submitEventDraft}>
+                  {t("scenario.event.submit", language)}
+                </Button>
+              </Space>
+            }
+            width={560}
+          >
+            <Space direction="vertical" size={10} className="scenario-event-fields">
+              <Typography.Text type="secondary" className="scenario-event-hint">
+                {t("scenario.event.modal_desc", language)}
+              </Typography.Text>
+              <Input
+                value={eventDraftContract}
+                onChange={(event) => setEventDraftContract(event.target.value)}
+                placeholder={t("scenario.event.contract_placeholder", language)}
+              />
+              <Flex gap={8}>
+                <Select
+                  className="scenario-event-half"
+                  value={eventDraftType}
+                  onChange={setEventDraftType}
+                  options={[
+                    { value: "lease_modification", label: t("scenario.event.type_lease_modification", language) },
+                    { value: "reassessment", label: t("scenario.event.type_reassessment", language) },
+                    { value: "fixed_rent_change", label: t("scenario.event.type_fixed_rent_change", language) },
+                    { value: "early_termination", label: t("scenario.event.type_early_termination", language) },
+                  ]}
+                />
+                <DatePicker
+                  className="scenario-event-half"
+                  value={eventDraftDate ? dayjs(eventDraftDate) : null}
+                  onChange={(value) => setEventDraftDate(value ? value.format("YYYY-MM-DD") : null)}
+                  placeholder={t("scenario.event.effective_date", language)}
+                />
+              </Flex>
+              <Input
+                value={eventDraftDecision}
+                onChange={(event) => setEventDraftDecision(event.target.value)}
+                placeholder={t("scenario.event.decision", language)}
+              />
+              <Input.TextArea
+                value={eventDraftReason}
+                onChange={(event) => setEventDraftReason(event.target.value)}
+                placeholder={t("scenario.event.change_reason", language)}
+                rows={2}
+              />
+              <Flex gap={8}>
+                <Input
+                  value={eventDraftOriginal}
+                  onChange={(event) => setEventDraftOriginal(event.target.value)}
+                  placeholder={t("scenario.event.original_value", language)}
+                />
+                <Input
+                  value={eventDraftNew}
+                  onChange={(event) => setEventDraftNew(event.target.value)}
+                  placeholder={t("scenario.event.new_value", language)}
+                />
+              </Flex>
+              <Checkbox checked={eventDraftApproved} onChange={(event) => setEventDraftApproved(event.target.checked)}>
+                {t("scenario.event.approved_label", language)}
+              </Checkbox>
+              <Typography.Text type="secondary" className="scenario-event-approved-hint">
+                {t("scenario.event.approved_hint", language)}
+              </Typography.Text>
+            </Space>
+          </Modal>
 
           <RetailAIDrawer
             open={aiOpen}

@@ -39,6 +39,7 @@ func TestRetailOperationsPostgresIsolationNoWrites(t *testing.T) {
 	runPattern := runPrefix + "%"
 	cleanupStatements := []string{
 		`DELETE FROM retail_store_day_facts WHERE store_id IN (SELECT s.id FROM stores s JOIN legal_entities le ON le.id=s.legal_entity_id WHERE le.code LIKE $1)`,
+		`DELETE FROM fpna_plan_versions WHERE legal_entity_id IN (SELECT id FROM legal_entities WHERE code LIKE $1) AND source='retail_simulator_budget'`,
 		`DELETE FROM retail_simulation_datasets WHERE legal_entity_id IN (SELECT id FROM legal_entities WHERE code LIKE $1)`,
 		`DELETE FROM operating_fact_batches WHERE legal_entity_id IN (SELECT id FROM legal_entities WHERE code LIKE $1)`,
 		`DELETE FROM stores WHERE legal_entity_id IN (SELECT id FROM legal_entities WHERE code LIKE $1)`,
@@ -66,6 +67,7 @@ func TestRetailOperationsPostgresIsolationNoWrites(t *testing.T) {
 			{"facts", `SELECT COUNT(*) FROM retail_store_day_facts f JOIN stores s ON s.id=f.store_id JOIN legal_entities le ON le.id=s.legal_entity_id WHERE le.code LIKE $1`},
 			{"datasets", `SELECT COUNT(*) FROM retail_simulation_datasets d JOIN legal_entities le ON le.id=d.legal_entity_id WHERE le.code LIKE $1`},
 			{"batches", `SELECT COUNT(*) FROM operating_fact_batches b JOIN legal_entities le ON le.id=b.legal_entity_id WHERE le.code LIKE $1`},
+			{"simulated_budgets", `SELECT COUNT(*) FROM fpna_plan_versions v JOIN legal_entities le ON le.id=v.legal_entity_id WHERE le.code LIKE $1 AND v.source='retail_simulator_budget'`},
 		}
 		for _, check := range checks {
 			var residual int64

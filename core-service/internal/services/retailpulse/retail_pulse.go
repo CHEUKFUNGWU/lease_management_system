@@ -356,7 +356,7 @@ func (s *Service) Build(ctx context.Context, query Query) (*Response, error) {
 // the absence is honest, not a zero.
 func (s *Service) attachPlanComparison(ctx context.Context, query Query, set *repository.RetailKPIFactSet, expectedStores int, response *Response) error {
 	planPeriod := currentEndOf(response).Format("2006-01")
-	planSet, err := s.planReader.ReadPlan(ctx, query.LegalEntityID, planPeriod)
+	planSet, err := s.planReader.ReadPlan(ctx, query.LegalEntityID, planPeriod, query.Classification, query.DatasetVersion)
 	if err != nil {
 		return err
 	}
@@ -380,6 +380,7 @@ func (s *Service) attachPlanComparison(ctx context.Context, query Query, set *re
 	comparison.PlanVersionType = planSet.VersionType
 	comparison.PlanAsOfPeriod = planSet.AsOfPeriod
 	comparison.PlanSource = planSet.Source
+	comparison.PlanClassification = planSet.Classification
 	comparison.PlanIsOfficial = planSet.IsOfficial
 	response.Plan = comparison
 	return nil

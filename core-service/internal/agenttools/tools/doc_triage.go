@@ -18,6 +18,8 @@ const (
 	DocAmendment          DocClass = "amendment"
 	DocContractLedger     DocClass = "contract_ledger"
 	DocOperatingData      DocClass = "operating_data"
+	DocTrialBalance       DocClass = "trial_balance"
+	DocBudgetPlan         DocClass = "budget_plan"
 	DocFinancialStatement DocClass = "financial_statement"
 	DocInvoice            DocClass = "invoice"
 	DocMeetingMinutes     DocClass = "meeting_minutes"
@@ -44,6 +46,7 @@ type TriageResult struct {
 	// Candidates is populated for unknown results so the UI can offer a
 	// choice instead of a bare refusal.
 	Candidates []DocClass `json:"candidates,omitempty"`
+	GapCode    string     `json:"gap_code,omitempty"`
 }
 
 // TriageThreshold is the confidence below which the pipeline must ask the
@@ -74,6 +77,8 @@ func DeterministicTriage(req TriageRequest) TriageResult {
 		terms []string
 	}
 	rules := []rule{
+		{DocTrialBalance, 0.9, []string{"试算平衡表", "trial balance", "trial_balance", "总账余额"}},
+		{DocBudgetPlan, 0.85, []string{"预算版本", "预算计划", "预算模板", "budget plan", "plan version", "forecast plan"}},
 		{DocRentSchedule, 0.85, []string{"租金表", "付款计划", "付款表", "rent schedule", "payment schedule", "rental schedule"}},
 		{DocContractLedger, 0.85, []string{"台账", "批量创建", "批量录入", "contract ledger", "批量导入合同", "导入台账"}},
 		{DocAmendment, 0.8, []string{"补充协议", "变更协议", "amendment", "修改协议", "终止协议", "续签协议"}},
@@ -100,7 +105,8 @@ func unknownResult() TriageResult {
 		DocClass:   DocUnknown,
 		Confidence: 0,
 		Reason:     "无法确定文件类型，请从候选中选择",
-		Candidates: []DocClass{DocLeaseContract, DocRentSchedule, DocContractLedger, DocOperatingData, DocFinancialStatement, DocInvoice, DocMeetingMinutes, DocAmendment},
+		Candidates: []DocClass{DocLeaseContract, DocRentSchedule, DocContractLedger, DocOperatingData, DocTrialBalance, DocBudgetPlan, DocFinancialStatement, DocInvoice, DocMeetingMinutes, DocAmendment},
+		GapCode:    "doc_class_unresolved",
 	}
 }
 

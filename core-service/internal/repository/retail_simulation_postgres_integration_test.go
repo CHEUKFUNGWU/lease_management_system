@@ -18,6 +18,7 @@ func TestRetailSimulationPostgresDefaultScaleIsolationIdempotencyAndIFRSBoundary
 	entityC, _ := seedRetailStoreDayFactsTenant(t, ctx, pool, "sim-c")
 	t.Cleanup(func() {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM retail_store_day_fact_requests WHERE scope_key IN ($1,$2,$3)`, entityA, entityB, entityC)
+		_, _ = pool.Exec(context.Background(), `DELETE FROM fpna_plan_versions WHERE legal_entity_id IN ($1,$2,$3) AND source='retail_simulator_budget'`, entityA, entityB, entityC)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM retail_simulation_datasets WHERE legal_entity_id IN ($1,$2,$3)`, entityA, entityB, entityC)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM retail_store_day_facts f USING stores s WHERE f.store_id=s.id AND s.legal_entity_id IN ($1,$2,$3)`, entityA, entityB, entityC)
 		_, _ = pool.Exec(context.Background(), `DELETE FROM operating_fact_batches WHERE legal_entity_id IN ($1,$2,$3) AND source_system='retail_simulator'`, entityA, entityB, entityC)
@@ -119,6 +120,18 @@ func TestRetailSimulationPostgresDefaultScaleIsolationIdempotencyAndIFRSBoundary
 	}
 	if simulatedStores != 60 || simulatedFacts != 10860 || linkedFacts != 10860 {
 		t.Fatalf("generated scale stores=%d facts=%d linked=%d", simulatedStores, simulatedFacts, linkedFacts)
+	}
+	var budgetVersions, budgetLines int
+	var budgetClassification, budgetStatus string
+	var budgetOfficial bool
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*),COALESCE(MAX(coverage_scope->>'data_classification'),''),COALESCE(MAX(status),''),COALESCE(bool_or(is_official),false) FROM fpna_plan_versions WHERE legal_entity_id=$1 AND source='retail_simulator_budget'`, entityA).Scan(&budgetVersions, &budgetClassification, &budgetStatus, &budgetOfficial); err != nil {
+		t.Fatalf("read simulated budget version: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM fpna_plan_lines l JOIN fpna_plan_versions v ON v.id=l.plan_version_id WHERE v.legal_entity_id=$1 AND v.source='retail_simulator_budget'`, entityA).Scan(&budgetLines); err != nil {
+		t.Fatalf("count simulated budget lines: %v", err)
+	}
+	if budgetVersions != 1 || budgetLines != 360 || budgetClassification != "simulated" || budgetStatus != "draft" || budgetOfficial {
+		t.Fatalf("simulated budget versions=%d lines=%d classification=%q status=%q official=%v", budgetVersions, budgetLines, budgetClassification, budgetStatus, budgetOfficial)
 	}
 	var sourceSystem, sourceRecord, factDataset, factClassification string
 	if err := pool.QueryRow(ctx, `SELECT source_system,source_record_id,simulation_dataset_version,data_classification FROM retail_store_day_facts WHERE simulation_dataset_version=$1 ORDER BY business_date LIMIT 1`, first.Dataset.DatasetVersion).Scan(&sourceSystem, &sourceRecord, &factDataset, &factClassification); err != nil {

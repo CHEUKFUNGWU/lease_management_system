@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -29,6 +30,10 @@ type StoreFactsSource interface {
 // the KPI pass and the per-row peer pass see the same semantic layer.
 type storePnlKPIAdapter struct {
 	facts StoreFactsSource
+	// aggregate narrows retail-store-360's fact population to the target
+	// store. Aggregate P&L has no peer column, so loading every store's facts
+	// for each member only adds latency and can exceed the web proxy timeout.
+	aggregate bool
 
 	mu             sync.Mutex
 	lastKey        string
@@ -40,6 +45,10 @@ type storePnlKPIAdapter struct {
 // satisfies storepnl.KPIReader and storepnl.PeerReader.
 func NewStorePnlKPIAdapter(facts StoreFactsSource) *storePnlKPIAdapter {
 	return &storePnlKPIAdapter{facts: facts}
+}
+
+func (a *storePnlKPIAdapter) forAggregate() *storePnlKPIAdapter {
+	return &storePnlKPIAdapter{facts: a.facts, aggregate: true}
 }
 
 func refKey(ref storepnl.StoreRef) string {
@@ -79,6 +88,9 @@ func (a *storePnlKPIAdapter) build(ctx context.Context, ref storepnl.StoreRef) (
 		}
 		query.DateFrom, query.DateTo = fromTime, toTime
 		query.AsOf = toTime
+		query.WindowDays = int(toTime.Sub(fromTime).Hours()/24) + 1
+		query.ComparisonDateTo = fromTime.AddDate(0, 0, -1)
+		query.ComparisonDateFrom = query.ComparisonDateTo.AddDate(0, 0, -(query.WindowDays - 1))
 		from, to = ref.DateFrom, ref.DateTo
 	} else {
 		asOf, err := time.Parse("2006-01-02", ref.AsOf)
@@ -88,6 +100,9 @@ func (a *storePnlKPIAdapter) build(ctx context.Context, ref storepnl.StoreRef) (
 		query.AsOf = asOf
 		query.WindowDays = ref.WindowDays
 		from, to = asOf.AddDate(0, 0, -(ref.WindowDays-1)).Format("2006-01-02"), asOf.Format("2006-01-02")
+	}
+	if a.aggregate && ref.StoreID != "" {
+		query.StoreIDs = []string{ref.StoreID}
 	}
 	response, err := retailstore360.NewService(a.facts).Build(ctx, query)
 	if err != nil {
@@ -218,9 +233,13 @@ func (a *storePnlKPIAdapter) Operating(ctx context.Context, ref storepnl.StoreRe
 	out.Revenue = code("revenue")
 	out.GrossProfit = code("gross_profit")
 	out.LaborCost = code("labor_cost")
+	out.FixedRent = code("fixed_rent")
+	out.VariableRent = code("variable_rent")
+	out.NonLeaseCost = code("non_lease_cost")
 	out.OtherControllable = code("other_controllable_cost")
-	// 门店 360 语义层不暴露 non_lease/fixed/variable/service 的分项与四墙
-	// EBITDA 聚合——这些行保持缺失（诚实降级），待合同级占用成本投影接入。
+	out.FourWallEBITDA = code("four_wall_ebitda")
+	// 服务费、营销与其他租赁/分摊行仍不由门店 360 语义层直接暴露，
+	// 这些行保持缺失（诚实降级），待合同级占用成本投影接入。
 	return out, nil
 }
 
@@ -239,7 +258,7 @@ func SetStorePnlPlanReader(repo *repository.FPnAGovernanceRepository, planVersio
 	return storePnlPlanAdapter{repo: repo, planVersionID: planVersionID}
 }
 
-func (a storePnlPlanAdapter) StoreValue(ctx context.Context, ref storepnl.StoreRef, column storepnl.ColumnRef, kpi string) (*float64, error) {
+func (a storePnlPlanAdapter) planLines(ctx context.Context, ref storepnl.StoreRef) ([]*repository.FPnAPlanLine, error) {
 	if a.repo == nil || a.planVersionID == "" {
 		return nil, nil
 	}
@@ -247,9 +266,64 @@ func (a storePnlPlanAdapter) StoreValue(ctx context.Context, ref storepnl.StoreR
 	if err != nil {
 		return nil, err
 	}
-	lines, err := a.repo.ListPlanLines(ctx, a.planVersionID, filter, monthOf(ref.AsOf), "store")
+	period := monthOf(ref.AsOf)
+	if ref.DateFrom != "" {
+		period = monthOf(ref.DateFrom)
+	}
+	return a.repo.ListPlanLines(ctx, a.planVersionID, filter, period, "store")
+}
+
+func (a storePnlPlanAdapter) PlanCurrency(ctx context.Context, ref storepnl.StoreRef, _ storepnl.ColumnRef) (string, error) {
+	lines, err := a.planLines(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	currencies := map[string]struct{}{}
+	for _, line := range lines {
+		if line.StoreID == nil || *line.StoreID != ref.StoreID {
+			continue
+		}
+		currency := strings.ToUpper(strings.TrimSpace(line.Currency))
+		if currency != "" {
+			currencies[currency] = struct{}{}
+		}
+	}
+	if len(currencies) > 1 {
+		return "", errors.New("budget_currency_mixed")
+	}
+	for currency := range currencies {
+		return currency, nil
+	}
+	return "", nil
+}
+
+func (a storePnlPlanAdapter) StoreValue(ctx context.Context, ref storepnl.StoreRef, column storepnl.ColumnRef, kpi string) (*float64, error) {
+	lines, err := a.planLines(ctx, ref)
 	if err != nil {
 		return nil, err
+	}
+	currencies := map[string]struct{}{}
+	for _, line := range lines {
+		if line.StoreID == nil || *line.StoreID != ref.StoreID {
+			continue
+		}
+		if currency := strings.ToUpper(strings.TrimSpace(line.Currency)); currency != "" {
+			currencies[currency] = struct{}{}
+		}
+	}
+	if len(currencies) > 1 {
+		return nil, nil
+	}
+	actualCurrency := strings.ToUpper(strings.TrimSpace(ref.Currency))
+	if actualCurrency == "" {
+		return nil, nil
+	}
+	if len(currencies) == 1 {
+		for currency := range currencies {
+			if actualCurrency != "" && currency != actualCurrency {
+				return nil, nil
+			}
+		}
 	}
 	for _, line := range lines {
 		if line.StoreID == nil || *line.StoreID != ref.StoreID {
@@ -278,8 +352,26 @@ func planLineField(line *repository.FPnAPlanLine, source string) *float64 {
 		return line.NonLeaseCost
 	case "fact.four_wall_ebitda":
 		return line.FourWallEBITDA
+	case "fact.other_controllable_cost":
+		return operationalKPIValue(line.OperationalKPIs, "other_controllable_cost")
 	}
 	return nil
+}
+
+func operationalKPIValue(raw json.RawMessage, key string) *float64 {
+	values := map[string]json.RawMessage{}
+	if json.Unmarshal(raw, &values) != nil {
+		return nil
+	}
+	payload, ok := values[key]
+	if !ok {
+		return nil
+	}
+	var value float64
+	if json.Unmarshal(payload, &value) != nil {
+		return nil
+	}
+	return &value
 }
 
 // storePnlOccupancyAdapter is the S1-5 production occupancy port: the

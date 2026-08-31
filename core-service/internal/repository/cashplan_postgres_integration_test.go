@@ -108,6 +108,7 @@ func TestCashPlanPostgresSimulationDatasetHighestVersion(t *testing.T) {
 			}
 		}
 		cleanup(`DELETE FROM retail_store_day_facts f USING stores s WHERE f.store_id=s.id AND s.legal_entity_id = $1`, entityA)
+		cleanup(`DELETE FROM fpna_plan_versions WHERE legal_entity_id = $1 AND source='retail_simulator_budget'`, entityA)
 		cleanup(`DELETE FROM retail_simulation_datasets WHERE legal_entity_id = $1`, entityA)
 		cleanup(`DELETE FROM operating_fact_batches WHERE legal_entity_id = $1 AND source_system='retail_simulator'`, entityA)
 		cleanup(`DELETE FROM stores WHERE legal_entity_id = $1`, entityA)

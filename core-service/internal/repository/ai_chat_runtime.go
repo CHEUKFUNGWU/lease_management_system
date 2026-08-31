@@ -889,7 +889,9 @@ func (r *AIChatRuntimeRepository) GetNextRunEventSequence(ctx context.Context, r
 }
 
 func (r *AIChatRuntimeRepository) CreateArtifact(ctx context.Context, artifact *AIChatArtifact) error {
-	artifact.ID = uuid.New().String()
+	if artifact.ID == "" {
+		artifact.ID = uuid.New().String()
+	}
 	if artifact.Status == "" {
 		artifact.Status = "ready"
 	}

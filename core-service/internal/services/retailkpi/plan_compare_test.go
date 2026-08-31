@@ -156,3 +156,26 @@ func TestComparePlanDayCoverageDowngrades(t *testing.T) {
 		t.Fatalf("zero gate introduced a day downgrade: %q", legacy.DowngradeReason)
 	}
 }
+
+func TestComparePlanContributionZeroPlanRefusesRate(t *testing.T) {
+	comparison, err := ComparePlan(monthFacts("s1", 1, 100), []PlanFact{{
+		StoreID: "s1", Period: "2026-07", Currency: "CNY",
+		GrossProfit: planPtr(100), LaborCost: planPtr(100),
+	}}, ComparePlanRequest{Period: "2026-07", ExpectedStoreCount: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, variance := range comparison.Variances {
+		if variance.KPI != "store_contribution" {
+			continue
+		}
+		if variance.VariancePct != nil || variance.AttainmentPct != nil || variance.DecisionReady {
+			t.Fatalf("zero contribution plan fabricated a rate: %+v", variance)
+		}
+		if !strings.Contains(variance.DowngradeReason, "zero_plan") {
+			t.Fatalf("zero contribution plan reason=%q", variance.DowngradeReason)
+		}
+		return
+	}
+	t.Fatal("store_contribution variance missing")
+}

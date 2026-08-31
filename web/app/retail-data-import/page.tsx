@@ -11,8 +11,8 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import { StateBlock } from "../components/StateBlock";
 import { StatusTag } from "../components/StatusTag";
 import { UploadGlyph, DownloadGlyph, SourceCircleGlyph } from "../components/MonochromeGlyphs";
-import { apiErrorMessage, apiRequest, fpnaPlanImportApi, operatingFactsApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
-import { usePageFill, type PageFillPayload } from "../lib/usePageFill";
+import { apiErrorMessage, fpnaPlanImportApi, operatingFactsApi, retailIngestApi, trialBalanceApi, type RetailIngestPreviewResponse, type RetailIngestCommitResponse } from "../lib/api";
+import { usePageFill } from "../lib/usePageFill";
 import { applyPlanFill, type PlanFillSummary } from "./planFill";
 import { tableScrollX } from "../lib/tableScroll";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +44,7 @@ export default function RetailDataImportPage() {
   const [asOf, setAsOf] = useState(dayjs().format("YYYY-MM-DD"));
   const [preview, setPreview] = useState<RetailIngestPreviewResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [aiSuggestedMapping, setAISuggestedMapping] = useState<Record<string, string>>({});
   const [previewing, setPreviewing] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [committing, setCommitting] = useState(false);
@@ -85,7 +86,8 @@ export default function RetailDataImportPage() {
     if (mapping && typeof mapping === "object" && mapping !== null) {
       const value = (mapping as { value?: unknown }).value;
       if (value && typeof value === "object" && value !== null) {
-        setMapping(value as Record<string, string>);
+        const suggested = value as Record<string, string>;
+        setAISuggestedMapping(suggested);
       }
     }
     message.info(t("retail_import.fill_loaded", language));
@@ -95,84 +97,92 @@ export default function RetailDataImportPage() {
     if (retailFill.status === "mismatch") {
       message.warning(t("retail_import.fill_mismatch", language));
     }
-  }, [retailFill.status]);
+  }, [retailFill.status, language]);
 
   // agent-universal-pagefill-v1 P0-B①：GL 试算平衡表的 Agent 预填，
-  // 经 ?tb_fill=<artifactId> 深链加载；payload 只含人提供的信封字段，
-  // 列结构建议仅作展示——提交永远由人点「导入试算平衡表」。
+  // 经 ?tb_fill=<artifactId> 深链加载。取数、target_page 校验、apply 一次
+  // 全在共享 usePageFill 里（P0-C 起三条通道同一条消费缝）；payload 只含
+  // 人提供的信封字段，列结构建议仅作展示——提交永远由人点「导入试算平衡表」。
   const tbFillId = new URLSearchParams(window.location.search).get("tb_fill");
+  const tbFill = usePageFill({
+    artifactId: tbFillId,
+    page: "retail-data-import",
+    token: token ?? undefined,
+    apply: (payload) => {
+      const readString = (key: string, pattern?: RegExp): string | undefined => {
+        const entry = payload[key];
+        if (!entry || typeof entry !== "object") return undefined;
+        const value = (entry as { value?: unknown }).value;
+        if (typeof value !== "string" || value === "") return undefined;
+        if (pattern && !pattern.test(value)) return undefined;
+        return value;
+      };
+      const name = readString("name");
+      if (name) setTbName(name);
+      const source = readString("source_system");
+      if (source) setTbSource(source);
+      const period = readString("period", /^\d{4}-\d{2}$/);
+      if (period) setTbPeriod(period);
+      const currency = readString("functional_currency", /^[A-Za-z]{3}$/);
+      if (currency) setTbCurrency(currency);
+      message.info(t("retail_import.fill_loaded", language));
+    },
+  });
+  // 跨页误投对用户可见，不静默丢弃；加载失败保持 best-effort 静默——
+  // 预填永远不得阻塞人工导入路径。
   useEffect(() => {
-    if (!tbFillId || !token) return;
-    let active = true;
-    (async () => {
-      try {
-        const body = await apiRequest<{ artifact?: { data?: PageFillPayload } }>(
-          `/api/v1/ai/chat/artifacts/${encodeURIComponent(tbFillId)}`,
-          { token },
-        );
-        const data = body?.artifact?.data;
-        if (!active || !data) return;
-        const applyString = (key: string, setter: (value: string) => void, pattern?: RegExp) => {
-          const entry = data.payload?.[key];
-          if (entry && typeof entry.value === "string" && (!pattern || pattern.test(entry.value))) {
-            setter(entry.value);
-          }
-        };
-        applyString("name", setTbName);
-        applyString("source_system", setTbSource);
-        applyString("period", setTbPeriod, /^\d{4}-\d{2}$/);
-        applyString("functional_currency", setTbCurrency, /^[A-Za-z]{3}$/);
-        message.info(t("retail_import.fill_loaded", language));
-      } catch {
-        // Best-effort prefill: a failed load must never block the human path.
-      }
-    })();
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tbFillId, token]);
+    if (tbFill.status !== "ready") return;
+    const entry = tbFill.suggestions.column_structure;
+    const value = entry && typeof entry === "object" ? (entry as { value?: unknown }).value : undefined;
+    if (!value || typeof value !== "object") return;
+    const summary = value as { headers?: unknown; row_count?: unknown; sample_codes?: unknown };
+    setTbFillSummary({
+      headers: Array.isArray(summary.headers) ? summary.headers.map(String) : [],
+      rowCount: typeof summary.row_count === "number" ? summary.row_count : null,
+      sampleCodes: Array.isArray(summary.sample_codes) ? summary.sample_codes.map(String) : [],
+    });
+  }, [tbFill.status, tbFill.suggestions.column_structure]);
+  useEffect(() => {
+    if (tbFill.status === "mismatch") {
+      message.warning(t("retail_import.fill_mismatch", language));
+    }
+  }, [tbFill.status, language]);
 
   // agent-universal-pagefill-v1 P0-B①：预算/计划版本的 Agent 预填，
-  // 经 ?plan_fill=<artifactId> 深链加载；信封字段（版本名/类型/覆盖期间）
-  // 进表单，行级计划数值只在摘要提示里呈现——提交永远由人点「导入」。
+  // 经 ?plan_fill=<artifactId> 深链加载。取数与 target_page 校验在共享
+  // usePageFill 里；信封字段（版本名/类型/覆盖期间）经 applyPlanFill 的
+  // 成套校验进表单，行级计划数值只在摘要提示里呈现——提交永远由人点「导入」。
   const searchParams = new URLSearchParams(window.location.search);
   const planFillId = searchParams.get("plan_fill");
   const [planFillSummary, setPlanFillSummary] = useState<PlanFillSummary | null>(null);
+  const planFill = usePageFill({ artifactId: planFillId, page: "retail-data-import", token: token ?? undefined });
   useEffect(() => {
-    if (!planFillId || !token) return;
-    let active = true;
-    (async () => {
-      try {
-        const body = await apiRequest<{ artifact?: { data?: unknown } }>(
-          `/api/v1/ai/chat/artifacts/${encodeURIComponent(planFillId)}`,
-          { token },
-        );
-        if (!active) return;
-        const result = applyPlanFill(body?.artifact?.data);
-        if (!result.ok) {
-          message.warning(t("plan_fill.refused", language));
-          return;
-        }
-        const values = result.formValues;
-        if (values.name) setPlanName(values.name);
-        if (values.version_type) setPlanType(values.version_type);
-        if (values.source) setPlanSource(values.source);
-        if (values.as_of_period) setPlanAsOf(values.as_of_period);
-        if (values.from_period) setPlanFrom(values.from_period);
-        if (values.to_period) setPlanTo(values.to_period);
-        if (values.is_official !== undefined) setPlanOfficial(values.is_official);
-        setPlanFillSummary(result.summary);
-        message.info(t("retail_import.fill_loaded", language));
-      } catch {
-        // Best-effort prefill: a failed load must never block the human path.
-      }
-    })();
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planFillId, token]);
+    if (planFill.status !== "ready") return;
+    // hook 已用真实 target_page 拒过跨页误投；这里按其校验结果如实重建
+    // 信封，applyPlanFill 的成套信封校验（类型/覆盖期间缺一角即拒）继续
+    // 作为第二道闸。
+    const result = applyPlanFill({ target_page: "retail-data-import", payload: planFill.payload, suggestions: planFill.suggestions });
+    if (!result.ok) {
+      message.warning(t("plan_fill.refused", language));
+      return;
+    }
+    const values = result.formValues;
+    if (values.name) setPlanName(values.name);
+    if (values.version_type) setPlanType(values.version_type);
+    if (values.source) setPlanSource(values.source);
+    if (values.as_of_period) setPlanAsOf(values.as_of_period);
+    if (values.from_period) setPlanFrom(values.from_period);
+    if (values.to_period) setPlanTo(values.to_period);
+    if (values.is_official !== undefined) setPlanOfficial(values.is_official);
+    setPlanFillSummary(result.summary);
+    message.info(t("retail_import.fill_loaded", language));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 每次进入 ready 应用一次即可
+  }, [planFill.status]);
+  useEffect(() => {
+    if (planFill.status === "mismatch") {
+      message.warning(t("retail_import.fill_mismatch", language));
+    }
+  }, [planFill.status, language]);
 
   const downloadStoreTemplate = async () => {
     if (!token) return;
@@ -212,6 +222,7 @@ export default function RetailDataImportPage() {
 
   const onFileSelected = async (selected: File) => {
     setFile(selected);
+    setAISuggestedMapping({});
     commitKeyRef.current = "";
     await runPreview(selected, null);
   };
@@ -271,6 +282,7 @@ export default function RetailDataImportPage() {
   const [tbCurrency, setTbCurrency] = useState("CNY");
   const [tbImporting, setTbImporting] = useState(false);
   const [tbResult, setTbResult] = useState<string | null>(null);
+  const [tbFillSummary, setTbFillSummary] = useState<{ headers: string[]; rowCount: number | null; sampleCodes: string[] } | null>(null);
 
   const importTrialBalance = async () => {
     if (!token || !tbFile || !tbName.trim()) return;
@@ -463,12 +475,20 @@ export default function RetailDataImportPage() {
                   columns={[
                     {
                       title: t("retail_import.field", language),
-                      render: (_: unknown, row: { field: string; required: boolean }) => (
-                        <Space>
-                          {row.required ? <StatusTag kind="error">{t("retail_import.required", language)}</StatusTag> : null}
-                          {fieldLabel(row.field, language)}
-                        </Space>
-                      ),
+                      render: (_: unknown, row: { field: string; required: boolean }) => {
+                        const suggestedHeader = Object.entries(aiSuggestedMapping).find(([, target]) => target === row.field)?.[0];
+                        return (
+                          <Space>
+                            {row.required ? <StatusTag kind="error">{t("retail_import.required", language)}</StatusTag> : null}
+                            {fieldLabel(row.field, language)}
+                            {suggestedHeader ? (
+                              <StatusTag kind="warning">
+                                {t("retail_import.mapping_source_ai", language)}: {suggestedHeader}
+                              </StatusTag>
+                            ) : null}
+                          </Space>
+                        );
+                      },
                     },
                     {
                       title: t("retail_import.file_column", language),
@@ -526,7 +546,7 @@ export default function RetailDataImportPage() {
                 message={t("plan_fill.title", language)}
                 description={t("plan_fill.desc", language, {
                   valid: String(planFillSummary.valid_rows),
-                  stores: String(planFillSummary.store_count ?? 0),
+                  stores: planFillSummary.store_count == null ? "—" : String(planFillSummary.store_count),
                   range:
                     planFillSummary.min_period && planFillSummary.max_period
                       ? `${planFillSummary.min_period} ~ ${planFillSummary.max_period}`
@@ -560,6 +580,21 @@ export default function RetailDataImportPage() {
 
           {/* 第三部分：总账试算平衡表导入 */}
           <Card size="small" className="retail-import-block-gap" title={t("tb_import.title", language)}>
+            {tbFillSummary && (
+              <Alert
+                className="retail-import-block-gap"
+                type="warning"
+                showIcon
+                closable
+                onClose={() => setTbFillSummary(null)}
+                message={t("tb_fill.title", language)}
+                description={t("tb_fill.desc", language, {
+                  rows: tbFillSummary.rowCount == null ? "—" : String(tbFillSummary.rowCount),
+                  headers: tbFillSummary.headers.join(", ") || "—",
+                  samples: tbFillSummary.sampleCodes.join(", ") || "—",
+                })}
+              />
+            )}
             <Flex gap={12} wrap="wrap" align="center">
               <Input aria-label={t("plan_import.name", language)} className="retail-import-source-input" style={{ width: 140 }} value={tbName} onChange={(event) => setTbName(event.target.value)} placeholder={t("plan_import.name", language)} />
               <Input aria-label={t("tb_import.source_system", language)} className="retail-import-source-input" style={{ width: 120 }} value={tbSource} onChange={(event) => setTbSource(event.target.value)} />

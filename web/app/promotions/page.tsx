@@ -52,6 +52,7 @@ import {
   type PromotionBreakevenResult,
 } from "../lib/api";
 import { BreakevenPanel, buildBreakevenRequest } from "./BreakevenPanel";
+import { PromotionROIReportPanel } from "./PromotionROIReportPanel";
 
 const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -330,6 +331,9 @@ export default function PromotionsPage() {
               pagination={{ pageSize: 10 }}
             />
           </Card>
+
+          {/* 报告版 ROI 假设测算（审计 §E-2 接线）：全局假设输入，不挂具体活动 */}
+          <PromotionROIReportPanel />
 
           {/* Promotion Detail & ROI Drawer */}
           <Drawer

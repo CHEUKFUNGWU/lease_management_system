@@ -29,22 +29,26 @@ func TestClaimedRunLeaseBindsTheRunRowAcrossEntities(t *testing.T) {
 	ctx := context.Background()
 
 	// 两个法人、一个横跨用户（SI1 形状），各一个会话 + 一个 queued run。
+	// created_at 使用一个远早于测试数据的固定时间并显式拉开一分钟：
+	// 测试不清理共享数据库中的其他队列行，也不会误删别人的工作；FIFO
+	// 断言由时间戳钉死，而不是由时钟精度或残留行决定。
 	entityA, entityB, userID := seedChatIsolationTenants(t, ctx, pool, "wax")
 	sessionA := seedChatSession(t, ctx, pool, userID, &entityA, "A 会话")
 	sessionB := seedChatSession(t, ctx, pool, userID, &entityB, "B 会话")
 
-	mkRun := func(sessionID string) string {
+	mkRun := func(sessionID string, createdAt time.Time) string {
 		t.Helper()
 		var runID string
 		if err := pool.QueryRow(ctx, `
-			INSERT INTO ai_chat_runs (session_id, status, agent_mode)
-			VALUES ($1, 'queued', true) RETURNING id`, sessionID).Scan(&runID); err != nil {
+			INSERT INTO ai_chat_runs (session_id, status, agent_mode, created_at)
+			VALUES ($1, 'queued', true, $2) RETURNING id`, sessionID, createdAt).Scan(&runID); err != nil {
 			t.Fatalf("seed queued run: %v", err)
 		}
 		return runID
 	}
-	runA := mkRun(sessionA)
-	runB := mkRun(sessionB)
+	queueBase := time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)
+	runA := mkRun(sessionA, queueBase)
+	runB := mkRun(sessionB, queueBase.Add(time.Minute))
 	t.Cleanup(func() {
 		cleanupCtx := context.Background()
 		_, _ = pool.Exec(cleanupCtx, `DELETE FROM ai_chat_runs WHERE session_id = ANY($1::uuid[])`, []string{sessionA, sessionB})
@@ -95,8 +99,8 @@ func TestClaimedRunSessionEntityIsRunBoundary(t *testing.T) {
 	sessionA := seedChatSession(t, ctx, pool, userID, &entityA, "A 会话")
 	var runID string
 	if err := pool.QueryRow(ctx, `
-		INSERT INTO ai_chat_runs (session_id, status, agent_mode)
-		VALUES ($1, 'queued', true) RETURNING id`, sessionA).Scan(&runID); err != nil {
+		INSERT INTO ai_chat_runs (session_id, status, agent_mode, created_at)
+		VALUES ($1, 'queued', true, $2) RETURNING id`, sessionA, time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)).Scan(&runID); err != nil {
 		t.Fatalf("seed run: %v", err)
 	}
 	t.Cleanup(func() {

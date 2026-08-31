@@ -2689,5 +2689,6 @@ INSERT INTO schema_migrations (version) VALUES
 ('057_async_run_progress'), ('058_assumption_draft_idempotency'),
 ('059_assumption_draft_idempotency_batch'), ('060_draft_review_isolation'),
 ('061_channel_identity_bindings'), ('062_session_data_classification'),
-('063_ai_chat_messages_tokens'), ('064_ecommerce_storefront_facts')
+('063_ai_chat_messages_tokens'), ('064_ecommerce_storefront_facts'),
+('065_simulated_retail_budgets')
 ON CONFLICT (version) DO NOTHING;

@@ -38,8 +38,8 @@ Agent 不操作 UI 控件，而是产出标准化的**页面预填 artifact**（
 | 1 | 付款计划 Excel | `/contracts/drafts`（付款计划草稿） | `lease.payment_schedule.fill.draft` | 已有 parse_payment_schedule + 草稿层 |
 | 2 | 合同 PDF/扫描件 | `/ai-chat` 草稿卡 → `/contracts` | 已有 `lease.contract.draft.create`（已绑定，作对照实现） | docparse + aiintake |
 | 3 | 门店日事实 Excel | `/retail-data-import`（现有消费者保留） | 已有 import.preview（P0-A 接活） | retailingest |
-| 4 | GL 试算平衡表 | `/fpna-workbench` 数据导入区 | `fpna.trial_balance.fill.draft` | trialBalanceApi.import |
-| 5 | 预算版本 Excel | `/fpna-workbench` 计划版本区 | `fpna.plan_lines.fill.draft` | fpnaPlanImportApi |
+| 4 | GL 试算平衡表 | `/retail-data-import` 数据导入区 | `fpna.trial_balance.fill.draft` | trialBalanceApi.import |
+| 5 | 预算版本 Excel | `/retail-data-import` 计划版本区 | `fpna.plan_lines.fill.draft` | fpnaPlanImportApi |
 
 规则（对每个新工具一致强制）：
 - 命名空间照 AGENTS.md 三根（`lease.*` / `fpna.*` / `retail.*`），二级段 `.fill.`；Level=Draft + ReviewPolicy{Required} + Idempotency-Key 必填；
@@ -69,6 +69,26 @@ web/app/lib/usePageFill.ts
 - 余下功能页逐个评估是否值得映射（判定式：这个表单员工多久手填一次 × 字段能否从文件可靠抽取；两者都低就不做，登记即可）;
 - 会话内「填好了」卡片直接挂 deep_link（已有 artifacts 动作位），员工一键跳转核对;
 - 转正式的确认动作沿用各页现有 review/approve 链，**Agent 不出现在批准路径上**。
+
+#### P1 覆盖面判定登记（2026-08-31）
+
+判定只看两项：员工手填频率，以及文件能否可靠抽取。页面有表单不等于值得做 pagefill。
+
+| 写入场景 | 手填频率 | 可抽取性 | 决定 | 理由 / 复用路径 |
+|---|---:|---:|---|---|
+| 合同新建 `/contracts/new` | 高 | 高 | 不新增 pagefill | 合同 PDF 已走 `contract_draft` 草稿卡与人工确认，另造 pagefill 会产生第二条合同录入路径 |
+| 既有合同付款计划 `/contracts/[id]` | 高 | 高 | 已做 | `lease.payment_schedule.fill.draft`；必须先绑定既有合同 |
+| 新合同随附付款计划 | 高 | 高 | 后做 | 先确认合同草稿取得 `contract_id`，再生成付款计划 Fill；当前返回 `contract_unbound`，不得猜合同或临时直写 |
+| 门店日事实 / 预算计划 / TB | 高 | 高 | 已做 | 统一落 `/retail-data-import`，不在脉搏、FP&A 工作台再建重复导入器 |
+| 月粒度旧经营导入 `/performance` | 中 | 高 | 不新增 pagefill | 新增经营指标必须走 store-day；旧月粒度入口只保兼容，不扩能力 |
+| 合同变更、续签、终止协议 | 中 | 高 | 后做 | 文件可抽取，但必须落事件草稿并沿既有审批链，不能预填后直接改合同 |
+| 促销活动与成本 `/promotions` | 中 | 中 | 后做 | 活动 brief/费用表可抽取；先统一活动与费用的文件模板，再接两个草稿入口 |
+| 新店 / 报价测算 `/pre-deal`、`/deal-compare` | 中 | 中 | 后做 | 报价单可抽取，但折现率缺失必须停在 human-in-the-loop，不给默认值 |
+| 电商结算导入 `/settlement-workbench` | 高 | 高 | 后做 | 独立业务域且模板已列明，适合作为第二批映射 |
+| 三表模型定义、公式与期初 `/financial-model` | 低 | 低 | 不做 | 定义受治理，公式只走后端 DSL 校验；期初优先来自 TB，不从任意文档猜值 |
+| 月结、审批、锁账 `/monthly-closing` | 高 | 低 | 不做 | 高频但属于控制动作，输入来自系统状态；pagefill 不得进入批准、过账或锁账路径 |
+| 参数、用户与权限 `/settings`、`/admin/users` | 低 | 低 | 不做 | 配置低频且涉及权限/政策，文件抽取收益低、风险高 |
+| 情景、敏感性、准则比较 | 低 | 低 | 不做 | 输入少且需要人的判断，直接表单比文件抽取更清楚 |
 
 ## 3. 明确不做（Non-Goals）
 

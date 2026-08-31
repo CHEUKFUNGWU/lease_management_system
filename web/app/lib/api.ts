@@ -322,6 +322,7 @@ export interface RetailPlanComparison {
   plan_version_type?: string;
   plan_as_of_period?: string;
   plan_source?: string;
+  plan_data_classification?: RetailDataClassification;
   plan_is_official: boolean;
   currency?: string;
   expected_store_count: number;
@@ -1330,6 +1331,13 @@ export const reportApi = {
     return apiRequest(`/api/v1/reports/close-pack?${qs.toString()}`, { token });
   },
 
+  // 审计交接用 ZIP（close_pack.json / disclosure.json / manifest.json 一体），
+  // 服务端同一 disclosure 投影的文件化快照；JSON 版 closePack 之上才有意义。
+  closePackExport: (params: { mode: "working" | "official"; period: string }, token: string) => {
+    const qs = new URLSearchParams({ mode: params.mode, period: params.period });
+    return downloadBlob(`/api/v1/reports/close-pack/export?${qs.toString()}`, token);
+  },
+
   // Projects portfolio outflow under an estates plan. The baseline is always
   // run alongside, because a scenario means nothing without what it moved from.
   cashflowScenario: <T = unknown>(
@@ -1467,8 +1475,13 @@ export const performanceApi = {
   },
   storeScenario: <T = unknown>(scenarios: Record<string, unknown>[], token: string) =>
     apiRequest<T>(`/api/v1/reports/store-decision-scenario`, { method: "POST", body: JSON.stringify({ scenarios }), token }),
-  storeDecisionEventDraft: (data: Record<string, unknown>, token: string) =>
-    apiRequest(`/api/v1/reports/store-decision-event-draft`, { method: "POST", body: JSON.stringify(data), token }),
+  storeDecisionEventDraft: (data: Record<string, unknown>, token: string, idempotencyKey?: string) =>
+    apiRequest(`/api/v1/reports/store-decision-event-draft`, {
+      method: "POST",
+      body: JSON.stringify(data),
+      token,
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+    }),
   equipmentScenario: (scenarios: Record<string, unknown>[], token: string) =>
     apiRequest(`/api/v1/reports/equipment-decision-scenario`, { method: "POST", body: JSON.stringify({ scenarios }), token }),
   actionRealizations: (id: string, token: string) =>
@@ -2094,11 +2107,70 @@ export interface StorePnlQueryParams {
   window_days: number;
   basis: string;
   secondary?: string;
+  primary?: string;
+  period?: string;
+  plan_version_id?: string;
   template_id?: string;
   // 数据环境与脉搏/门店 360 同轴；缺省时后端默认 production，
   // 模拟店会以 not visible 拒绝——页面必须显式携带。
   data_classification?: RetailDataClassification;
   dataset_version?: string;
+}
+
+export interface StorePnlRowValue {
+  key: string;
+  label: string;
+  kind: string;
+  basis: string;
+  actual?: number | null;
+  other?: number | null;
+  variance?: number | null;
+  pct?: number | null;
+}
+
+export interface StorePnlBlock {
+  basis: string;
+  rows: StorePnlRowValue[];
+}
+
+export interface StorePnlProjection {
+  store_id: string;
+  as_of: string;
+  window_days: number;
+  basis_mode: string;
+  period_label?: string;
+  period: { from: string; to: string };
+  columns: string[];
+  operating?: StorePnlBlock;
+  decision_ready: boolean;
+  decision_ready_reason?: string;
+  data_classification: RetailDataClassification;
+  dataset_version?: string;
+  currency?: string;
+  gaps?: string[];
+}
+
+export interface StorePnlAggregatePartition {
+  currency: string;
+  operating?: StorePnlBlock;
+  decision_ready: boolean;
+  decision_ready_reason?: string;
+  gaps?: string[];
+}
+
+export interface StorePnlAggregateResult {
+  group_by: "region" | "brand" | "legal_entity";
+  period: { from: string; to: string };
+  columns: string[];
+  groups: Array<{
+    key: string;
+    store_count: number;
+    partitions: StorePnlAggregatePartition[];
+    mixed_currency: boolean;
+    note?: string;
+  }>;
+  degraded_stores?: Array<{ store_id: string; reason: string }>;
+  note?: string;
 }
 
 export const storePnlApi = {
@@ -2110,11 +2182,31 @@ export const storePnlApi = {
       window_days: String(params.window_days),
       basis: params.basis,
     });
+    if (params.primary) query.set("primary", params.primary);
     if (params.secondary) query.set("secondary", params.secondary);
+    if (params.period) query.set("period", params.period);
+    if (params.plan_version_id) query.set("plan_version_id", params.plan_version_id);
     if (params.template_id) query.set("template_id", params.template_id);
     if (params.data_classification) query.set("data_classification", params.data_classification);
     if (params.dataset_version) query.set("dataset_version", params.dataset_version);
-    return apiRequest(`/api/v1/stores/${encodeURIComponent(params.store_id)}/pnl?${query.toString()}`, { token }) as Promise<{ pnl: unknown }>;
+    return apiRequest(`/api/v1/stores/${encodeURIComponent(params.store_id)}/pnl?${query.toString()}`, { token }) as Promise<{ pnl: StorePnlProjection }>;
+  },
+  getAggregate: (params: Omit<StorePnlQueryParams, "store_id"> & { group_by: "region" | "brand" | "legal_entity" }, token: string) => {
+    if (params.data_classification === "simulated" && !params.dataset_version) throw new Error("simulated store pnl aggregate requires dataset_version");
+    if (params.data_classification === "production" && params.dataset_version) throw new Error("production store pnl aggregate cannot include dataset_version");
+    const query = new URLSearchParams({
+      group_by: params.group_by,
+      as_of: params.as_of,
+      window_days: String(params.window_days),
+      basis: params.basis,
+    });
+    if (params.primary) query.set("primary", params.primary);
+    if (params.secondary) query.set("secondary", params.secondary);
+    if (params.period) query.set("period", params.period);
+    if (params.plan_version_id) query.set("plan_version_id", params.plan_version_id);
+    if (params.data_classification) query.set("data_classification", params.data_classification);
+    if (params.dataset_version) query.set("dataset_version", params.dataset_version);
+    return apiRequest(`/api/v1/store-pnl/aggregate?${query.toString()}`, { token }) as Promise<{ aggregate: StorePnlAggregateResult }>;
   },
 };
 

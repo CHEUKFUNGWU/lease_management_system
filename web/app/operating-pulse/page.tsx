@@ -33,7 +33,7 @@ import { tableScrollX } from "../lib/tableScroll";
 import { RetailExportMenu } from "../components/RetailExportMenu";
 import { retailExportApi } from "../lib/api";
 import { envelopeFromPulse, pulseRowsFromResponse } from "../lib/retail-export";
-import { PlanComparisonPanel } from "../components/PlanComparisonPanel";
+import { PlanComparisonPanel, PlanComparisonUnavailable } from "../components/PlanComparisonPanel";
 
 const WINDOW_OPTIONS = [1, 7, 14, 30, 90] as const;
 const DEFAULT_WINDOW_DAYS = 14;
@@ -691,11 +691,27 @@ function OperatingPulseInner() {
                 basis={response.basis}
                 detailExtra={latestMetadata ? <span>{t("trust.generator_version", language)}: {latestMetadata.generator_version || "—"}</span> : undefined}
               />
-              {response.plan && <PlanComparisonPanel plan={response.plan} currency={partition.currency || response.currency || ""} language={language} />}
+              {response.plan && (
+                <PlanComparisonPanel
+                  plan={response.plan}
+                  currency={partition.currency || response.currency || ""}
+                  language={language}
+                  token={token}
+                  dataClassification={currentClassification}
+                  datasetVersion={currentClassification === "simulated" ? datasetVersion : undefined}
+                  asOf={asOf || TODAY}
+                  storeId={storeIDs.length === 1 ? storeIDs[0] : undefined}
+                  groupBy={groupBy}
+                />
+              )}
               {!response.plan && !noFacts && (
-                <Alert className="pulse-block-gap" type="info" showIcon
-                  message={t("plan.absent_title", language)}
-                  description={t("plan.absent_desc", language)}
+                <PlanComparisonUnavailable
+                  period={partition.current.date_to.slice(0, 7)}
+                  currency={partition.currency || response.currency || ""}
+                  language={language}
+                  dataClassification={currentClassification}
+                  reason={t("plan.absent_desc", language)}
+                  actual={Object.fromEntries(Object.entries(partition.summary || {}).map(([key, metric]) => [key, metric.current.value]))}
                 />
               )}
               {noFacts ? (

@@ -74,12 +74,14 @@ describe("retailAnalyticsApi", () => {
   // FP&A 反馈 2026-08-27（P0-1）：store-pnl 过去不带数据环境参数，后端默认
   // production，模拟店一律 not visible。透传后与脉搏/门店 360 同一套互斥纪律。
   it("store pnl carries the data environment and keeps classification/dataset exclusive", async () => {
-    await storePnlApi.getPnl({ store_id: "st/7", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", secondary: "budget", data_classification: "simulated", dataset_version: "plan A/v1" }, "token");
+    await storePnlApi.getPnl({ store_id: "st/7", as_of: "2026-06-05", window_days: 7, period: "2026-06", basis: "side_by_side", primary: "actual", secondary: "budget", plan_version_id: "budget/v1", data_classification: "simulated", dataset_version: "plan A/v1" }, "token");
     const url = new URL(String(vi.mocked(fetch).mock.calls[0][0]));
     expect(url.pathname).toContain("/stores/st%2F7/pnl");
     expect(url.searchParams.get("data_classification")).toBe("simulated");
     expect(url.searchParams.get("dataset_version")).toBe("plan A/v1");
     expect(url.searchParams.get("window_days")).toBe("7");
+    expect(url.searchParams.get("period")).toBe("2026-06");
+    expect(url.searchParams.get("plan_version_id")).toBe("budget/v1");
 
     await storePnlApi.getPnl({ store_id: "s", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", data_classification: "production" }, "token");
     const prodURL = new URL(String(vi.mocked(fetch).mock.calls[1][0]));
@@ -87,5 +89,16 @@ describe("retailAnalyticsApi", () => {
 
     expect(() => storePnlApi.getPnl({ store_id: "s", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", data_classification: "simulated" }, "token")).toThrow("requires dataset_version");
     expect(() => storePnlApi.getPnl({ store_id: "s", as_of: "2026-06-05", window_days: 7, basis: "side_by_side", data_classification: "production", dataset_version: "v1" }, "token")).toThrow("cannot include dataset_version");
+  });
+
+  it("routes region and brand comparisons through store-pnl aggregate", async () => {
+    await storePnlApi.getAggregate({ group_by: "region", as_of: "2026-06-05", window_days: 1, period: "2026-06", basis: "operating", primary: "actual", secondary: "budget", plan_version_id: "budget-1", data_classification: "simulated", dataset_version: "sim-1" }, "token");
+    const url = new URL(String(vi.mocked(fetch).mock.calls[0][0]));
+    expect(url.pathname).toContain("/store-pnl/aggregate");
+    expect(url.searchParams.get("group_by")).toBe("region");
+    expect(url.searchParams.get("primary")).toBe("actual");
+    expect(url.searchParams.get("secondary")).toBe("budget");
+    expect(url.searchParams.get("plan_version_id")).toBe("budget-1");
+    expect(url.searchParams.get("data_classification")).toBe("simulated");
   });
 });

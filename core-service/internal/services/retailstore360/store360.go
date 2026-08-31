@@ -38,8 +38,12 @@ type StoreLifecycleReader interface {
 }
 
 type Query struct {
-	LegalEntityID  string
-	StoreID        string
+	LegalEntityID string
+	StoreID       string
+	// StoreIDs optionally narrows the fact reader population for callers that
+	// only need a store-local projection (for example store-pnl aggregation).
+	// The default nil value keeps the diagnostics page's peer population intact.
+	StoreIDs       []string
 	AsOf           time.Time
 	WindowDays     int
 	Classification string
@@ -206,7 +210,7 @@ func (s *Service) WithPlanReader(reader retailkpi.PlanReader) *Service {
 var (
 	benchmarkSurface = retailkpi.Surface{Codes: []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm", "sales_per_labor_hour"}}
 
-	summarySurface = retailkpi.Surface{Codes: []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost", "occupancy_cash_cost", "other_controllable_cost", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm", "sales_per_labor_hour", "labor_hours_per_transaction", "headcount"}}
+	summarySurface = retailkpi.Surface{Codes: []string{"revenue", "gross_profit", "gross_margin_rate", "footfall", "conversion_rate", "average_transaction_value", "labor_cost", "fixed_rent", "variable_rent", "non_lease_cost", "occupancy_cash_cost", "other_controllable_cost", "labor_cost_rate", "occupancy_cash_cost_rate", "store_contribution", "store_contribution_margin", "sales_per_sqm", "sales_per_labor_hour", "labor_hours_per_transaction", "headcount"}}
 )
 
 func init() {
@@ -240,7 +244,7 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 	}
 	_ = periodLabel
 	dateFrom, dateTo := comparisonStart.Format("2006-01-02"), currentEnd.Format("2006-01-02")
-	set, err := s.reader.QueryFacts(ctx, q.LegalEntityID, dateFrom, dateTo, q.Classification, q.DatasetVersion, q.SourceSystem, nil)
+	set, err := s.reader.QueryFacts(ctx, q.LegalEntityID, dateFrom, dateTo, q.Classification, q.DatasetVersion, q.SourceSystem, q.StoreIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +375,7 @@ func (s *Service) Build(ctx context.Context, q Query) (*Response, error) {
 // plan line for the calendar month (M4); the store's expected count is 1.
 func (s *Service) attachPlanComparison(ctx context.Context, q Query, facts []retailkpi.DailyFact, response *Response) error {
 	planPeriod := monthOf(response.Current.DateTo)
-	planSet, err := s.planReader.ReadPlan(ctx, q.LegalEntityID, planPeriod)
+	planSet, err := s.planReader.ReadPlan(ctx, q.LegalEntityID, planPeriod, q.Classification, q.DatasetVersion)
 	if err != nil {
 		return err
 	}
@@ -395,6 +399,7 @@ func (s *Service) attachPlanComparison(ctx context.Context, q Query, facts []ret
 	comparison.PlanVersionType = planSet.VersionType
 	comparison.PlanAsOfPeriod = planSet.AsOfPeriod
 	comparison.PlanSource = planSet.Source
+	comparison.PlanClassification = planSet.Classification
 	comparison.PlanIsOfficial = planSet.IsOfficial
 	response.Plan = comparison
 	return nil

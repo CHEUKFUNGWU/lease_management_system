@@ -17,15 +17,16 @@ import (
 
 // PlanFact is one plan line at store grain for a calendar month.
 type PlanFact struct {
-	StoreID      string
-	Period       string
-	Currency     string
-	Revenue      *float64
-	GrossProfit  *float64
-	LaborCost    *float64
-	FixedRent    *float64
-	VariableRent *float64
-	NonLeaseCost *float64
+	StoreID               string
+	Period                string
+	Currency              string
+	Revenue               *float64
+	GrossProfit           *float64
+	LaborCost             *float64
+	FixedRent             *float64
+	VariableRent          *float64
+	NonLeaseCost          *float64
+	OtherControllableCost *float64
 }
 
 // PlanVariance is one KPI's actual-vs-plan verdict.
@@ -49,6 +50,7 @@ type PlanComparison struct {
 	PlanVersionType    string         `json:"plan_version_type,omitempty"`
 	PlanAsOfPeriod     string         `json:"plan_as_of_period,omitempty"`
 	PlanSource         string         `json:"plan_source,omitempty"`
+	PlanClassification string         `json:"plan_data_classification,omitempty"`
 	PlanIsOfficial     bool           `json:"plan_is_official"`
 	Currency           string         `json:"currency,omitempty"`
 	ExpectedStoreCount int            `json:"expected_store_count"`
@@ -61,20 +63,22 @@ type PlanComparison struct {
 
 // PlanSet is the resolved plan basis for one calendar month.
 type PlanSet struct {
-	VersionID   string
-	VersionName string
-	VersionType string
-	AsOfPeriod  string
-	Source      string
-	IsOfficial  bool
-	Facts       []PlanFact
+	VersionID      string
+	VersionName    string
+	VersionType    string
+	AsOfPeriod     string
+	Source         string
+	Classification string
+	IsOfficial     bool
+	Facts          []PlanFact
 }
 
-// PlanReader resolves the authoritative plan basis for a period. The two
-// real adapters are the repository over fpna_plan_lines (store grain) and
-// the fixed-seed simulated plan; a nil set means no plan covers the period.
+// PlanReader resolves the authoritative plan basis for a period and data
+// environment. Simulated callers must pass their dataset version so the two
+// real adapters cannot borrow one another's plan lines; a nil set means no
+// plan covers the period.
 type PlanReader interface {
-	ReadPlan(ctx context.Context, legalEntityID, period string) (*PlanSet, error)
+	ReadPlan(ctx context.Context, legalEntityID, period, classification, datasetVersion string) (*PlanSet, error)
 }
 
 // ComparePlanRequest scopes one calendar-month comparison.
@@ -266,6 +270,9 @@ func compareContribution(actualByStore map[string][]DailyFact, planByStore map[s
 		variance.MaterialityExceeded = math.Abs(pct) >= request.MaterialityThresholdPct
 		attainment := actualTotal / planTotal * 100
 		variance.AttainmentPct = &attainment
+	} else {
+		reasons = append(reasons, "zero_plan")
+		variance.DecisionReady = false
 	}
 	if len(reasons) > 0 {
 		variance.DecisionReady = false
@@ -360,7 +367,7 @@ func contributionOfActual(facts []DailyFact) *float64 {
 }
 
 func contributionOfPlan(plan PlanFact) *float64 {
-	return subtractContribution(plan.GrossProfit, plan.LaborCost, addPtr(addPtr(plan.FixedRent, plan.VariableRent), plan.NonLeaseCost), nil)
+	return subtractContribution(plan.GrossProfit, plan.LaborCost, addPtr(addPtr(plan.FixedRent, plan.VariableRent), plan.NonLeaseCost), plan.OtherControllableCost)
 }
 
 func subtractContribution(gross, labor, occupancy, other *float64) *float64 {

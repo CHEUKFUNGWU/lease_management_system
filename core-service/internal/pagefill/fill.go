@@ -27,15 +27,18 @@ type FillValue struct {
 // Fill is one page prefill: confirmed/system values in Payload, unconfirmed
 // suggestions (mostly Exploratory) in Suggestions.
 type Fill struct {
-	SchemaVersion  string               `json:"schema_version"`
-	TargetPage     string               `json:"target_page"`
-	TargetAPI      string               `json:"target_api"`
-	DeepLink       string               `json:"deep_link"`
-	Payload        map[string]FillValue `json:"payload"`
-	Suggestions    map[string]FillValue `json:"suggestions,omitempty"`
-	Confidence     float64              `json:"confidence"`
-	ReviewRequired bool                 `json:"review_required"`
-	ReviewReasons  []string             `json:"review_reasons,omitempty"`
+	SchemaVersion   string               `json:"schema_version"`
+	TargetPage      string               `json:"target_page"`
+	TargetAPI       string               `json:"target_api"`
+	DeepLink        string               `json:"deep_link"`
+	Payload         map[string]FillValue `json:"payload"`
+	Suggestions     map[string]FillValue `json:"suggestions,omitempty"`
+	Confidence      float64              `json:"confidence"`
+	ReviewRequired  bool                 `json:"review_required"`
+	ReviewReasons   []string             `json:"review_reasons,omitempty"`
+	DocumentClass   string               `json:"document_class,omitempty"`
+	ClassConfidence float64              `json:"classification_confidence,omitempty"`
+	ClassReason     string               `json:"classification_reason,omitempty"`
 }
 
 // New builds an empty fill for a target page.

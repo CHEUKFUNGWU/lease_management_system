@@ -53,6 +53,7 @@ type StoreRef struct {
 	Classification string // production | simulated
 	DatasetVersion string
 	SourceSystem   string
+	Currency       string // currency of the actual KPI facts for this projection
 }
 
 // KPI aggregate port: the retailkpi semantic layer's per-store aggregates
@@ -106,6 +107,13 @@ type FactEnvelope struct {
 // PlanReader resolves budget/forecast/prior-year plan lines at store grain.
 type PlanReader interface {
 	StoreValue(ctx context.Context, ref StoreRef, column ColumnRef, kpi string) (*float64, error)
+}
+
+// PlanCurrencyReader is an optional production seam for checking that the
+// selected plan uses the same currency as the actual facts. A mismatch must
+// stay unavailable rather than rendering a number under the wrong currency.
+type PlanCurrencyReader interface {
+	PlanCurrency(ctx context.Context, ref StoreRef, column ColumnRef) (string, error)
 }
 
 // LeasePort is the shared lease projection port (same shape as SM2's), here
@@ -242,8 +250,26 @@ func Project(ctx context.Context, tmpl *template.Template, ref StoreRef, period 
 	pnl.DatasetVersion = facts.DatasetVersion
 	pnl.Currency = facts.Currency
 	pnl.Envelope = facts.Envelope
+	ref.Currency = facts.Currency
 	if !facts.DecisionReady {
 		pnl.Gaps = append(pnl.Gaps, "decision_ready=false："+facts.DecisionReadyReason)
+	}
+	if readers.Plan != nil && (pair[1] == ColBudget || pair[1] == ColForecast) {
+		if strings.TrimSpace(facts.Currency) == "" {
+			pnl.DecisionReady = false
+			pnl.Gaps = append(pnl.Gaps, "actual_currency_unavailable")
+		}
+		if currencyReader, ok := readers.Plan.(PlanCurrencyReader); ok {
+			planCurrency, currencyErr := currencyReader.PlanCurrency(ctx, ref, pair[1])
+			switch {
+			case currencyErr != nil:
+				pnl.DecisionReady = false
+				pnl.Gaps = append(pnl.Gaps, "budget_currency_unavailable:"+currencyErr.Error())
+			case planCurrency != "" && facts.Currency != "" && !strings.EqualFold(planCurrency, facts.Currency):
+				pnl.DecisionReady = false
+				pnl.Gaps = append(pnl.Gaps, fmt.Sprintf("budget_currency_mismatch:%s_vs_%s", planCurrency, facts.Currency))
+			}
+		}
 	}
 
 	var lease LeaseMonthValues

@@ -2686,6 +2686,7 @@ func (h *Agent) executeRetailIngestFill(ctx context.Context, req Request, triage
 	if !ok {
 		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页上传。"), nil
 	}
+	attachTriageToFill(fill, triage)
 	return Response{
 		Answer:     "已在「零售数据导入」页为你预填（来源系统、as-of）。列映射以建议形式呈现，请确认后入库——导入动作由你在页面上完成。",
 		Model:      "deterministic-router",
@@ -2801,7 +2802,7 @@ func (h *Agent) executePlanLinesFill(ctx context.Context, req Request, triage ag
 	}
 	args := map[string]any{
 		"file_id": req.FileID, "object_name": req.ObjectName, "content_type": req.ContentType,
-		"name":        fmt.Sprintf("%s %s ~ %s", versionType, fromPeriod, toPeriod),
+		"name":         fmt.Sprintf("%s %s ~ %s", versionType, fromPeriod, toPeriod),
 		"version_type": versionType,
 		"as_of_period": fromPeriod,
 		"from_period":  fromPeriod,
@@ -2838,6 +2839,7 @@ func (h *Agent) executePlanLinesFill(ctx context.Context, req Request, triage ag
 	if !ok {
 		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页的预算导入区上传。"), nil
 	}
+	attachTriageToFill(fill, triage)
 	return Response{
 		Answer:     "已在「零售数据导入」页为你预填预算版本导入表单（版本名、类型与覆盖期间）。行级计划数值以建议形式呈现，请核对后自行导入——导入动作由你在页面上完成。",
 		Model:      "deterministic-router",
@@ -2901,6 +2903,7 @@ func (h *Agent) executeTrialBalanceFill(ctx context.Context, req Request, triage
 	if !ok {
 		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接前往「零售数据导入」页上传。"), nil
 	}
+	attachTriageToFill(fill, triage)
 	return Response{
 		Answer:     "已在「零售数据导入」页为你预填试算平衡表导入表单（来源系统、期间）。列结构以建议形式呈现，请确认后入库——导入动作由你在页面上完成。",
 		Model:      "deterministic-router",
@@ -2919,6 +2922,12 @@ func fileTriageRefusalWithHint(req Request, triage agenttooldefs.TriageResult, h
 	resp := fileTriageRefusal(req, triage)
 	resp.Answer = hint
 	return resp
+}
+
+func attachTriageToFill(fill *pagefill.Fill, triage agenttooldefs.TriageResult) {
+	fill.DocumentClass = string(triage.DocClass)
+	fill.ClassConfidence = triage.Confidence
+	fill.ClassReason = triage.Reason
 }
 
 // executePaymentScheduleFill handles an explicit prefill request on a
@@ -2968,6 +2977,7 @@ func (h *Agent) executePaymentScheduleFill(ctx context.Context, req Request, tri
 	if !ok {
 		return fileTriageRefusalWithHint(req, triage, "预填结果格式无效，请直接在合同工作台手动录入付款计划。"), nil
 	}
+	attachTriageToFill(fill, triage)
 	return Response{
 		Answer:     "已在合同工作台为你预填付款计划表单（第 1 行）。行级数值以建议形式呈现，请逐行核对后自行提交——Agent 无权写库。",
 		Model:      "deterministic-router",

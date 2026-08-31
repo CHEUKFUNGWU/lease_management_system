@@ -441,6 +441,23 @@ func TestStartPersistsReviewArtifactBeforeWaitingForReview(t *testing.T) {
 	}
 }
 
+func TestBindPageFillArtifactID(t *testing.T) {
+	bound, err := bindPageFillArtifactID(json.RawMessage(`{
+		"target_page":"retail-data-import",
+		"deep_link":"/retail-data-import?section=plan&plan_fill=fpna.plan_lines.fill.draft-run-1"
+	}`), "2d8e1136-9c80-4d23-95b4-104ead531fa6")
+	if err != nil {
+		t.Fatalf("bindPageFillArtifactID returned error: %v", err)
+	}
+	var fill map[string]any
+	if err := json.Unmarshal(bound, &fill); err != nil {
+		t.Fatalf("unmarshal bound fill: %v", err)
+	}
+	if got, want := fill["deep_link"], "/retail-data-import?plan_fill=2d8e1136-9c80-4d23-95b4-104ead531fa6&section=plan"; got != want {
+		t.Fatalf("deep_link = %q, want %q", got, want)
+	}
+}
+
 func TestStartTurnsCompletionPersistenceFailureIntoTerminalFailure(t *testing.T) {
 	store := newMemoryStore()
 	store.failAssistantMessage = true

@@ -199,6 +199,9 @@ func (r *RetailSimulationRepository) Generate(ctx context.Context, legalEntityID
 	if _, err := tx.Exec(ctx, `UPDATE operating_fact_batches SET accepted_rows=$2,status='completed',reconciliation_status='matched' WHERE id=$1`, batchID, plan.FactCount); err != nil {
 		return nil, fmt.Errorf("complete retail simulation import batch: %w", err)
 	}
+	if err := r.ensureSimulationBudget(ctx, tx, legalEntityID, plan, storeIDs, createdBy); err != nil {
+		return nil, err
+	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE retail_simulation_datasets
 		SET fact_count=$2,status='completed',completed_at=NOW(),import_batch_id=$3
@@ -214,6 +217,83 @@ func (r *RetailSimulationRepository) Generate(ctx context.Context, legalEntityID
 		return nil, err
 	}
 	return &RetailSimulationGenerateResult{Dataset: dataset}, nil
+}
+
+// ensureSimulationBudget creates one store-month Budget alongside the fixed
+// seed facts. It stays Draft/non-Official and carries the simulated dataset in
+// both version and line provenance, so it can demonstrate Actual vs Budget
+// without ever looking like production planning data.
+func (r *RetailSimulationRepository) ensureSimulationBudget(ctx context.Context, tx DBTX, legalEntityID string, plan *retailsimulation.Plan, storeIDs []string, createdBy *string) error {
+	versionID := uuid.NewString()
+	name := "模拟预算 · " + plan.DatasetVersion
+	coverage, _ := json.Marshal(map[string]any{
+		"data_classification":        "simulated",
+		"simulation_dataset_version": plan.DatasetVersion,
+		"grain":                      "store_month",
+	})
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO fpna_plan_versions
+			(id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,currency,as_of_period,from_period,to_period,status,is_official,created_by)
+		VALUES ($1,$2,$3,'budget','baseline','retail_simulator_budget',$4::jsonb,$5,$6,$6,$7,'draft',false,$8)
+		ON CONFLICT (legal_entity_id,name,as_of_period) DO NOTHING`, versionID, legalEntityID, name, coverage, retailsimulation.DefaultCurrency, plan.DateFrom[:7], plan.DateTo[:7], createdBy); err != nil {
+		return fmt.Errorf("create simulated budget version: %w", err)
+	}
+
+	// A replay can hit the unique version. Resolve its id so line inserts stay
+	// idempotent. Budget factors vary by store and metric but are deterministic.
+	if err := tx.QueryRow(ctx, `SELECT id::text FROM fpna_plan_versions WHERE legal_entity_id=$1 AND name=$2 AND as_of_period=$3`, legalEntityID, name, plan.DateFrom[:7]).Scan(&versionID); err != nil {
+		return fmt.Errorf("resolve simulated budget version: %w", err)
+	}
+	type monthly struct {
+		period                                                                            string
+		revenue, grossProfit, laborCost, fixedRent, variableRent, nonLeaseCost, otherCost float64
+	}
+	byStore := make([]map[string]*monthly, len(storeIDs))
+	for i := range byStore {
+		byStore[i] = map[string]*monthly{}
+	}
+	for _, fact := range plan.Facts {
+		period := fact.BusinessDate[:7]
+		row := byStore[fact.StoreIndex][period]
+		if row == nil {
+			row = &monthly{period: period}
+			byStore[fact.StoreIndex][period] = row
+		}
+		row.revenue += fact.Revenue
+		row.grossProfit += fact.GrossProfit
+		row.laborCost += fact.LaborCost
+		row.fixedRent += fact.FixedRent
+		row.variableRent += fact.VariableRent
+		row.nonLeaseCost += fact.NonLeaseCost
+		row.otherCost += fact.OtherControllableCost
+	}
+	for storeIndex, periods := range byStore {
+		store := plan.Stores[storeIndex]
+		for _, row := range periods {
+			revenueFactor := 0.97 + float64(storeIndex%7)*0.01
+			grossFactor := revenueFactor + float64((storeIndex%3)-1)*0.01
+			costFactor := 0.98 + float64(storeIndex%5)*0.01
+			otherBudget := row.otherCost * costFactor
+			operationalKPIs, _ := json.Marshal(map[string]any{"other_controllable_cost": otherBudget, "data_classification": "simulated", "simulation_dataset_version": plan.DatasetVersion})
+			scenarioInputs, _ := json.Marshal(map[string]any{"data_classification": "simulated", "simulation_dataset_version": plan.DatasetVersion})
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO fpna_plan_lines
+					(plan_version_id,period,grain,legal_entity_id,brand,region,store_id,currency,revenue,gross_profit,labor_cost,fixed_rent,variable_rent,non_lease_cost,four_wall_ebitda,operational_kpis,source_system,source_record_id,as_of_at,actual_flag,forecast_flag,scenario_inputs)
+				SELECT $1::uuid,$2::text,'store',$3::uuid,$4::text,$5::text,$6::uuid,$7::text,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,'retail_simulator_budget',$16::text,NOW(),false,false,$17::jsonb
+				WHERE NOT EXISTS (
+					SELECT 1 FROM fpna_plan_lines existing
+					WHERE existing.plan_version_id=$1::uuid AND existing.period=$2::text AND existing.grain='store'
+					  AND existing.legal_entity_id=$3::uuid AND existing.brand=$4::text AND existing.region=$5::text
+					  AND existing.store_id=$6::uuid AND existing.currency=$7::text
+				)`, versionID, row.period, legalEntityID, store.Brand, store.Region, storeIDs[storeIndex], store.Currency,
+				row.revenue*revenueFactor, row.grossProfit*grossFactor, row.laborCost*costFactor, row.fixedRent, row.variableRent*revenueFactor, row.nonLeaseCost*costFactor,
+				row.grossProfit*grossFactor-row.laborCost*costFactor-row.fixedRent-row.variableRent*revenueFactor-row.nonLeaseCost*costFactor-otherBudget,
+				operationalKPIs, plan.DatasetVersion+":"+store.Code+":"+row.period, scenarioInputs); err != nil {
+				return fmt.Errorf("create simulated budget line %s/%s: %w", store.Code, row.period, err)
+			}
+		}
+	}
+	return nil
 }
 
 func (r *RetailSimulationRepository) ensureSimulationStore(ctx context.Context, tx DBTX, legalEntityID, datasetVersion string, store retailsimulation.StorePlan) (string, error) {

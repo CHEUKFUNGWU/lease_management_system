@@ -34,6 +34,7 @@ import { motion } from "framer-motion";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import { NewStoreFeasibilityPanel } from "./NewStoreFeasibilityPanel";
+import { DealComparePanel } from "./DealComparePanel";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { dealApi } from "../lib/api";
 import { fmtMoney } from "../lib/format";
@@ -223,6 +224,11 @@ export default function PreDealPage() {
               </Row>
             </Card>
           </Form>
+
+          {/* Pre-signing offer comparison (audit §E-2 wiring): reduces two or
+              more sets of terms to the same numbers; independent of the
+              single-offer briefing and always available. */}
+          <DealComparePanel />
 
           {briefing && (
             <>

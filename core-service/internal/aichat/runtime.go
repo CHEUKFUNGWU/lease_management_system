@@ -2,12 +2,15 @@ package aichat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lease-management-system/core-service/internal/access"
 	"github.com/lease-management-system/core-service/internal/agentartifact"
 	"github.com/lease-management-system/core-service/internal/repository"
@@ -385,6 +388,15 @@ func (r *Runtime[T]) complete(ctx context.Context, prepared *preparedRun, result
 	}
 	for _, draft := range result.Artifacts {
 		data := marshalJSON(draft.Data)
+		artifactID := ""
+		if draft.Type == string(agentartifact.ArtifactPageFill) {
+			artifactID = uuid.NewString()
+			var err error
+			data, err = bindPageFillArtifactID(data, artifactID)
+			if err != nil {
+				return fmt.Errorf("bind page-fill artifact deep link: %w", err)
+			}
+		}
 		artifactProtocol, err := agentartifact.Normalize(agentartifact.Artifact{
 			SchemaVersion: draft.SchemaVersion, ArtifactType: agentartifact.ArtifactType(draft.Type),
 			Title: draft.Title, Status: "ready", Data: data, EvidenceRefs: draft.EvidenceRefs,
@@ -397,6 +409,7 @@ func (r *Runtime[T]) complete(ctx context.Context, prepared *preparedRun, result
 		modelVersion := artifactProtocol.ModelVersion
 		ruleVersion := artifactProtocol.RuleVersion
 		artifact := &repository.AIChatArtifact{
+			ID:        artifactID,
 			SessionID: prepared.session.ID, RunID: prepared.run.ID, ArtifactType: draft.Type,
 			Title: draft.Title, Status: "ready", Data: data,
 			SchemaVersion: artifactProtocol.SchemaVersion, EvidenceRefs: marshalJSON(artifactProtocol.EvidenceRefs),
@@ -410,7 +423,7 @@ func (r *Runtime[T]) complete(ctx context.Context, prepared *preparedRun, result
 		if err := r.appendEvent(ctx, prepared, "artifact_ready", map[string]any{
 			"artifact_id": artifact.ID, "artifact_type": artifact.ArtifactType,
 			"title": artifact.Title, "status": artifact.Status, "schema_version": artifact.SchemaVersion,
-			"data": draft.Data, "evidence_refs": artifactProtocol.EvidenceRefs,
+			"data": data, "evidence_refs": artifactProtocol.EvidenceRefs,
 			"evidence_complete": artifactProtocol.EvidenceComplete, "review_required": artifactProtocol.ReviewRequired,
 			"review_reasons": artifactProtocol.ReviewReasons, "model_version": artifactProtocol.ModelVersion,
 			"rule_version": artifactProtocol.RuleVersion,
@@ -431,6 +444,37 @@ func (r *Runtime[T]) complete(ctx context.Context, prepared *preparedRun, result
 		"status": status, "review_required": result.ReviewRequired,
 		"artifact_present": len(result.Artifacts) > 0,
 	}, true)
+}
+
+// bindPageFillArtifactID makes the deep link address the persisted artifact,
+// not the earlier tool-call id used while the fill was being built.
+func bindPageFillArtifactID(data json.RawMessage, artifactID string) (json.RawMessage, error) {
+	var fill map[string]any
+	if err := json.Unmarshal(data, &fill); err != nil {
+		return nil, err
+	}
+	deepLink, ok := fill["deep_link"].(string)
+	if !ok || strings.TrimSpace(deepLink) == "" {
+		return nil, errors.New("deep_link is required")
+	}
+	parsed, err := url.Parse(deepLink)
+	if err != nil {
+		return nil, err
+	}
+	query := parsed.Query()
+	bound := false
+	for _, key := range []string{"fill", "schedule_fill", "tb_fill", "plan_fill"} {
+		if query.Has(key) {
+			query.Set(key, artifactID)
+			bound = true
+		}
+	}
+	if !bound {
+		return nil, errors.New("deep_link has no supported artifact query parameter")
+	}
+	parsed.RawQuery = query.Encode()
+	fill["deep_link"] = parsed.String()
+	return json.Marshal(fill)
 }
 
 func stringPointerOrNil(value string) *string {

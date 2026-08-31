@@ -75,4 +75,7 @@ echo "→ TEST_DATABASE_URL 已导出，开始跑测试"
 echo
 
 cd "$ROOT/core-service"
-GOCACHE="$(pwd)/.gocache" go test -count=1 "${@:-./...}"
+# All integration packages share this one disposable database. Serialise the
+# package binaries so global baseline assertions and cleanup cannot race with
+# a different package's fixture writes.
+GOCACHE="$(pwd)/.gocache" go test -p 1 -count=1 "${@:-./...}"

@@ -24,6 +24,7 @@ import {
   Descriptions,
   Empty,
   Skeleton,
+  Segmented,
   Select,
   Steps,
 } from "antd";
@@ -43,7 +44,7 @@ import { useRouter } from "next/navigation";
 import AppLayout from "../components/AppLayout";
 import PageHeader from "../components/PageHeader";
 import ProtectedRoute from "../components/ProtectedRoute";
-import { monthlyClosingApi } from "../lib/api";
+import { monthlyClosingApi, reportApi } from "../lib/api";
 import { hasRole, useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { t } from "../lib/i18n";
@@ -385,6 +386,34 @@ function MonthlyClosingPage() {
       notifyError(error.message || "ERP 分录导出失败");
     } finally {
       setActionLoading((prev) => ({ ...prev, export_entries: false }));
+    }
+  };
+
+  // 审计交接快照：锁账页签直接导出结账包（close-pack/export）。同一服务端
+  // disclosure 投影的文件化快照，只读，不改变审批/过账/锁账状态。
+  const [closePackMode, setClosePackMode] = useState<"working" | "official">("official");
+  const [closePackExporting, setClosePackExporting] = useState(false);
+  const handleExportClosePack = async () => {
+    if (!token || !selectedPeriod) {
+      message.warning(t("monthly.close_pack_need_period", language));
+      return;
+    }
+    setClosePackExporting(true);
+    try {
+      const blob = await reportApi.closePackExport({ mode: closePackMode, period: selectedPeriod }, token);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `IFRS16_Close_Pack_${selectedPeriod}_${closePackMode}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      message.success(t("monthly.close_pack_done", language));
+    } catch (error: any) {
+      notifyError(error?.message || t("monthly.close_pack_failed", language));
+    } finally {
+      setClosePackExporting(false);
     }
   };
 
@@ -1186,6 +1215,32 @@ function MonthlyClosingPage() {
                   {t("monthly.refresh_status", language)}
                 </Button>
               </Space>
+
+              {/* 结账包导出：审计交接快照（与报告口径 working/official 对齐） */}
+              <div className="monthly-closepack-section">
+                <Space wrap align="center">
+                  <span className="monthly-closepack-label">{t("monthly.close_pack_title", language)}</span>
+                  <Segmented
+                    className="precision-segmented"
+                    value={closePackMode}
+                    onChange={(val) => setClosePackMode(val as "working" | "official")}
+                    options={[
+                      { label: t("reports.working", language), value: "working" },
+                      { label: t("reports.official", language), value: "official" },
+                    ]}
+                  />
+                  <Button
+                    icon={<DownloadOutlined />}
+                    loading={closePackExporting}
+                    onClick={handleExportClosePack}
+                  >
+                    {t("monthly.close_pack_export", language)}
+                  </Button>
+                </Space>
+                <div className="monthly-closepack-desc">
+                  {t("monthly.close_pack_desc", language)}
+                </div>
+              </div>
 
               {!isAdmin && isLocked && (
                 <Alert

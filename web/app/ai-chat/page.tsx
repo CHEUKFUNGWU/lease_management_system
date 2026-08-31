@@ -285,6 +285,9 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
               复核项：{artifact.review_reasons.join("、")}
             </div>
           )}
+          {artifact.artifact_type === "page_fill" && artifact.data && (
+            <PageFillArtifactSummary artifact={artifact} onOpen={(url) => router.push(url)} />
+          )}
           {artifact.artifact_type === "chart_svg" && artifact.data?.chart_svg && (() => {
             // BG2 白名单消毒：剥离 script/on*/javascript:/foreignObject/外部引用。
             const { svg, stripped } = sanitizeSvg(String(artifact.data.chart_svg));
@@ -331,6 +334,49 @@ function ArtifactSummaryPanel({ artifacts }: { artifacts?: RuntimeArtifact[] }) 
         </div>
       ))}
     </div>
+  );
+}
+
+function PageFillArtifactSummary({ artifact, onOpen }: { artifact: RuntimeArtifact; onOpen: (url: string) => void }) {
+  const { language } = useLanguage();
+  const data = artifact.data || {};
+  const deepLink = typeof data.deep_link === "string" && data.deep_link.startsWith("/") && !data.deep_link.startsWith("//")
+    ? data.deep_link
+    : "";
+  const fields = [
+    ...Object.entries(data.payload || {}).map(([name, entry]) => ({ name, entry: entry as any, suggested: false })),
+    ...Object.entries(data.suggestions || {}).map(([name, entry]) => ({ name, entry: entry as any, suggested: true })),
+  ];
+  return (
+    <Space direction="vertical" size={8} className="sty-f82c4a7a">
+      <Space wrap>
+        <StatusTag kind="processing">{t("ai.page_fill.pending", language)}</StatusTag>
+        <StatusTag kind="neutral">{String(data.document_class || t("ai.page_fill.class_unknown", language))}</StatusTag>
+        <Text type="secondary">{String(data.target_page || "")}</Text>
+        {typeof data.classification_confidence === "number" && (
+          <Text type="secondary">{Math.round(data.classification_confidence * 100)}%</Text>
+        )}
+      </Space>
+      {fields.map(({ name, entry, suggested }) => (
+        <div key={`${suggested ? "suggestion" : "payload"}-${name}`} className="sty-2c2c74e0">
+          <Space wrap>
+            <StatusTag kind={suggested ? "warning" : "neutral"}>
+              {t(suggested ? "ai.page_fill.suggestion" : "ai.page_fill.confirmed", language)}
+            </StatusTag>
+            <Text strong>{name}</Text>
+            <Text code>{typeof entry?.value === "string" ? entry.value : JSON.stringify(entry?.value)}</Text>
+            <Text type="secondary">
+              {String(entry?.provenance?.basis || "")}
+              {entry?.provenance?.engine_version ? ` · ${entry.provenance.engine_version}` : ""}
+              {entry?.provenance?.confirmed_by ? ` · ${entry.provenance.confirmed_by}` : ""}
+            </Text>
+          </Space>
+        </div>
+      ))}
+      <Button type="primary" disabled={!deepLink} onClick={() => deepLink && onOpen(deepLink)}>
+        {t("ai.page_fill.open", language)}
+      </Button>
+    </Space>
   );
 }
 

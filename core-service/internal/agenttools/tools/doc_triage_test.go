@@ -21,6 +21,8 @@ func TestDeterministicTriageRoutes(t *testing.T) {
 		{"amendment", TriageRequest{ObjectName: "补充协议.pdf"}, DocAmendment},
 		{"invoice", TriageRequest{ObjectName: "发票_202607.pdf"}, DocInvoice},
 		{"financial", TriageRequest{ObjectName: "利润表.xlsx"}, DocFinancialStatement},
+		{"trial balance", TriageRequest{ObjectName: "GL试算平衡表_2026-07.xlsx"}, DocTrialBalance},
+		{"budget plan", TriageRequest{ObjectName: "门店预算版本_2026.xlsx"}, DocBudgetPlan},
 		{"minutes", TriageRequest{ObjectName: "会议纪要.docx"}, DocMeetingMinutes},
 		{"operating", TriageRequest{ObjectName: "门店销售数据.xlsx"}, DocOperatingData},
 		{"contract", TriageRequest{ObjectName: "租赁合同扫描件.pdf"}, DocLeaseContract},
@@ -43,6 +45,9 @@ func TestDeterministicTriageNeverDefaultsToContract(t *testing.T) {
 		}
 		if len(got.Candidates) == 0 {
 			t.Fatalf("%s: unknown result must carry candidates", name)
+		}
+		if got.GapCode != "doc_class_unresolved" {
+			t.Fatalf("%s: unknown result gap_code = %q", name, got.GapCode)
 		}
 	}
 }

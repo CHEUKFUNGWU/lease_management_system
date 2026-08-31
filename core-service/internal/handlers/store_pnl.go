@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -42,6 +43,8 @@ type StoreLookup interface {
 	GetStoreByID(ctx context.Context, storeID string) (repository.StoreOption, error)
 	ListStores(ctx context.Context, tenantID, legalEntityID string) ([]repository.StoreOption, error)
 }
+
+const aggregateProjectionWorkers = 8
 
 // NewStorePnlHandler builds the handler. The lease port arrives honest:
 // until the IFRS 16 per-store projection adapter lands, the ifrs16 block
@@ -149,12 +152,45 @@ func parseProjectionParams(c *gin.Context, storeID string) (projectionParams, bo
 }
 
 // planReaderFor resolves the comparison-column reader for the request.
-func (h *StorePnlHandler) planReaderFor(c *gin.Context) storepnl.PlanReader {
+func (h *StorePnlHandler) planReaderFor(c *gin.Context) (storepnl.PlanReader, bool) {
 	planReader := h.plan
-	if versionID := strings.TrimSpace(c.Query("plan_version_id")); versionID != "" && h.planRepo != nil {
+	if versionID := strings.TrimSpace(c.Query("plan_version_id")); versionID != "" {
+		if h.planRepo == nil {
+			writeCodedError(c, http.StatusServiceUnavailable, errcontract.CodeDataUnavailable, "plan version reader unavailable", nil)
+			return nil, false
+		}
+		entity, err := access.EntityFilterFor(middleware.GetTenantID(c))
+		if err != nil {
+			writeCodedError(c, http.StatusForbidden, errcontract.CodeScopeDenied, err.Error(), nil)
+			return nil, false
+		}
+		version, err := h.planRepo.GetPlanVersion(c.Request.Context(), versionID, entity)
+		if err != nil {
+			writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
+			return nil, false
+		}
+		if version == nil {
+			writeCodedError(c, http.StatusNotFound, errcontract.CodeNotFound, "plan version not found", nil)
+			return nil, false
+		}
+		actualClassification := strings.TrimSpace(c.DefaultQuery("data_classification", "production"))
+		planClass := planClassification(version.CoverageScope)
+		if planClass == "" {
+			planClass = "production"
+		}
+		if planClass != actualClassification {
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, "plan data classification does not match actual data classification", nil)
+			return nil, false
+		}
+		planDataset := planDatasetVersion(version.CoverageScope)
+		actualDataset := strings.TrimSpace(c.Query("dataset_version"))
+		if (actualClassification == "simulated" && planDataset != actualDataset) || (actualClassification == "production" && planDataset != "") {
+			writeCodedError(c, http.StatusConflict, errcontract.CodeConflict, "plan simulation dataset does not match actual data classification", nil)
+			return nil, false
+		}
 		planReader = SetStorePnlPlanReader(h.planRepo, versionID)
 	}
-	return planReader
+	return planReader, true
 }
 
 // Projection is GET /api/v1/stores/:id/pnl. The period grain (day/week/
@@ -174,8 +210,12 @@ func (h *StorePnlHandler) Projection(c *gin.Context) {
 	if renderErr != nil {
 		return
 	}
+	planReader, ok := h.planReaderFor(c)
+	if !ok {
+		return
+	}
 	pnl, err := storepnl.Project(c.Request.Context(), tmpl, params.ref, params.period, params.pair, params.basis, storepnl.Readers{
-		KPI: h.kpi, Plan: h.planReaderFor(c), Lease: h.lease, Peer: h.peer, Occupancy: h.occupancy, Governed: h.governedRows(c),
+		KPI: h.kpi, Plan: planReader, Lease: h.lease, Peer: h.peer, Occupancy: h.occupancy, Governed: h.governedRows(c),
 	})
 	if err != nil {
 		writeCodedError(c, http.StatusBadRequest, errcontract.CodeInvalidArguments, err.Error(), nil)
@@ -264,24 +304,62 @@ func (h *StorePnlHandler) AggregateProjection(c *gin.Context) {
 		writeCodedError(c, http.StatusInternalServerError, errcontract.CodeSystemFailure, err.Error(), nil)
 		return
 	}
-	planReader := h.planReaderFor(c)
+	planReader, ok := h.planReaderFor(c)
+	if !ok {
+		return
+	}
 	governed := h.governedRows(c)
+	aggregateKPI := h.kpi
+	if adapter, ok := h.kpi.(*storePnlKPIAdapter); ok {
+		aggregateKPI = adapter.forAggregate()
+	}
+	// Each store projection is independent. Keep the aggregate endpoint's
+	// contract and ordering, but bound concurrency so a 60-store simulated
+	// demo does not exceed the same-origin proxy timeout while still using the
+	// existing storepnl.Project implementation and semantic readers.
+	projected := make([]struct {
+		member   *storepnl.AggregateMember
+		degraded *storepnl.DegradedStore
+	}, len(stores))
+	workerCount := min(aggregateProjectionWorkers, len(stores))
+	jobs := make(chan int)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				store := stores[index]
+				ref := params.ref
+				ref.StoreID = store.ID
+				pnl, err := storepnl.Project(c.Request.Context(), h.tmpl, ref, params.period, params.pair, params.basis, storepnl.Readers{
+					KPI: aggregateKPI, Plan: planReader, Lease: h.lease, Governed: governed,
+				})
+				if err != nil {
+					projected[index].degraded = &storepnl.DegradedStore{StoreID: store.ID, Reason: err.Error()}
+					continue
+				}
+				projected[index].member = &storepnl.AggregateMember{
+					StoreID: store.ID, LegalEntityID: store.LegalEntityID,
+					Region: deref(store.Region), Brand: deref(store.Brand), Pnl: pnl,
+				}
+			}
+		}()
+	}
+	for index := range stores {
+		jobs <- index
+	}
+	close(jobs)
+	workers.Wait()
 	members := make([]storepnl.AggregateMember, 0, len(stores))
-	degraded := []storepnl.DegradedStore{}
-	for _, store := range stores {
-		ref := params.ref
-		ref.StoreID = store.ID
-		pnl, err := storepnl.Project(c.Request.Context(), h.tmpl, ref, params.period, params.pair, params.basis, storepnl.Readers{
-			KPI: h.kpi, Plan: planReader, Lease: h.lease, Governed: governed,
-		})
-		if err != nil {
-			degraded = append(degraded, storepnl.DegradedStore{StoreID: store.ID, Reason: err.Error()})
-			continue
+	degraded := make([]storepnl.DegradedStore, 0)
+	for _, result := range projected {
+		if result.member != nil {
+			members = append(members, *result.member)
 		}
-		members = append(members, storepnl.AggregateMember{
-			StoreID: store.ID, LegalEntityID: store.LegalEntityID,
-			Region: deref(store.Region), Brand: deref(store.Brand), Pnl: pnl,
-		})
+		if result.degraded != nil {
+			degraded = append(degraded, *result.degraded)
+		}
 	}
 	result, err := storepnl.Aggregate(groupBy, params.period, params.pair, members, degraded)
 	if err != nil {

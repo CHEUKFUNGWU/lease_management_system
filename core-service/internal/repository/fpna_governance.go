@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -407,6 +408,9 @@ func (r *FPnAGovernanceRepository) FreezePlanVersion(ctx context.Context, id str
 	} else if clause != "" {
 		query += " AND " + clause
 		args = append(args, arg)
+	}
+	if official {
+		query += ` AND COALESCE(coverage_scope->>'data_classification','production') NOT IN ('simulated','mixed')`
 	}
 	query += ` AND status IN ('draft','review','approved') RETURNING id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at`
 	err := r.db.QueryRow(ctx, query, args...).Scan(&item.ID, &item.LegalEntityID, &item.Name, &item.VersionType, &item.ScenarioType, &item.Source, &item.CoverageScope, &item.Currency, &item.AsOfPeriod, &item.FromPeriod, &item.ToPeriod, &item.ActualCutoffPeriod, &item.PriorVersionID, &item.AssumptionVersion, &item.ExchangeRateVersion, &item.MetricDefinitionVersion, &item.Status, &item.IsOfficial, &item.FrozenAt, &item.ApprovedAt, &item.CreatedBy, &item.CreatedAt)
@@ -964,8 +968,10 @@ func (r *FPnAGovernanceRepository) ListAgentSignals(ctx context.Context, entity 
 // ResolvePlanVersionForPeriod picks the authoritative plan version covering
 // one calendar month for a version type: official versions win, then the
 // newest as_of snapshot (spec decision 1/2: frozen versions, official is a
-// governance flag, comparison uses the same basis).
-func (r *FPnAGovernanceRepository) ResolvePlanVersionForPeriod(ctx context.Context, entity access.EntityFilter, period, versionType string) (*FPnAPlanVersion, error) {
+// governance flag, comparison uses the same basis). Simulated versions must
+// also carry the requested simulation dataset version so separate demo runs
+// can never borrow one another's Budget lines.
+func (r *FPnAGovernanceRepository) ResolvePlanVersionForPeriod(ctx context.Context, entity access.EntityFilter, period, versionType, classification, datasetVersion string) (*FPnAPlanVersion, error) {
 	args := []any{versionType, period}
 	query := `SELECT id,legal_entity_id,name,version_type,scenario_type,source,coverage_scope,COALESCE(currency,''),as_of_period,from_period,to_period,COALESCE(actual_cutoff_period,''),prior_version_id,COALESCE(assumption_version,''),COALESCE(exchange_rate_version,''),COALESCE(metric_definition_version,''),status,is_official,frozen_at,approved_at,created_by,created_at FROM fpna_plan_versions WHERE version_type=$1 AND from_period<=$2 AND to_period>=$2`
 	if clause, arg, err := entity.SQLClause("legal_entity_id", len(args)+1); err != nil {
@@ -973,6 +979,14 @@ func (r *FPnAGovernanceRepository) ResolvePlanVersionForPeriod(ctx context.Conte
 	} else if clause != "" {
 		query += " AND " + clause
 		args = append(args, arg)
+	}
+	switch classification {
+	case "simulated":
+		query += ` AND coverage_scope->>'data_classification'='simulated'`
+		query += ` AND coverage_scope->>'simulation_dataset_version'=$` + strconv.Itoa(len(args)+1)
+		args = append(args, datasetVersion)
+	case "production":
+		query += ` AND COALESCE(coverage_scope->>'data_classification','production')='production'`
 	}
 	query += ` ORDER BY is_official DESC, as_of_period DESC, created_at DESC LIMIT 1`
 	item := &FPnAPlanVersion{}

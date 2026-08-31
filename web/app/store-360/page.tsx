@@ -29,7 +29,7 @@ import { useRetailQuery } from "../retail/useRetailQuery";
 import { RetailExportMenu } from "../components/RetailExportMenu";
 import { retailExportApi } from "../lib/api";
 import { diagnosticsRowsFromResponse, envelopeFromDiagnostics } from "../lib/retail-export";
-import { PlanComparisonPanel } from "../components/PlanComparisonPanel";
+import { PlanComparisonPanel, PlanComparisonUnavailable } from "../components/PlanComparisonPanel";
 import { changeTone, formatChange, formatKPIValue, kpiLabel, latestAnomalyDate, lifecycleStatusLabel, storeFormatLabel, translateReason, type PulseMetricCode } from "../operating-pulse/logic";
 import { bridgeConservation, bridgeTone, bridgeWaterfall, bridgeWaterfallDomain, displayMetric, formatBridgeItem, formatPeerBenchmarkStatus, formatTrendTooltip, optionFields, returnPulseQuery, STORE360_AUX_CODES, STORE360_CODES, summaryStatus, trendValue, validWindow, WINDOW_OPTIONS } from "./logic";
 import ProfitFlowPanel from "./ProfitFlowPanel";
@@ -549,11 +549,26 @@ function Store360Inner() {
               detailExtra={latestMatches ? <span>generator: {latestMatches.generator_version} · anomaly: {latestAnomalyDate(latestMatches)}</span> : undefined}
             />
           )}
-          {response && response.plan && <PlanComparisonPanel plan={response.plan} currency={response.currency || ""} language={language} />}
+          {response && response.plan && (
+            <PlanComparisonPanel
+              plan={response.plan}
+              currency={response.currency || ""}
+              language={language}
+              token={token}
+              dataClassification={query.classification as RetailDataClassification}
+              datasetVersion={query.datasetVersion || undefined}
+              asOf={query.asOf || TODAY}
+              storeId={query.storeID}
+            />
+          )}
           {response && !response.plan && !(response.evidence && response.evidence.observed_store_days === 0) && (
-            <Alert className="store360-block-margin" type="info" showIcon
-              message={t("plan.absent_title", language)}
-              description={t("plan.absent_desc", language)}
+            <PlanComparisonUnavailable
+              period={response.current.date_to.slice(0, 7)}
+              currency={response.currency || ""}
+              language={language}
+              dataClassification={query.classification as RetailDataClassification}
+              reason={t("plan.absent_desc", language)}
+              actual={Object.fromEntries(Object.entries(response.summary || {}).map(([key, metric]) => [key, metric.current.value]))}
             />
           )}
           {noQuery && (

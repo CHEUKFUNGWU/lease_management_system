@@ -869,10 +869,10 @@ body {
 }
 
 body .precision-segmented {
-  background: var(--bg-inset, #F7F6F3);
+  background: var(--bg-surface, #FFFFFF);
   padding: 2px;
   border-radius: 6px;
-  border: 1px solid var(--border-subtle, #F1F0ED);
+  border: 1px solid var(--border-default, #EAEAEA);
 }
 
 body .precision-segmented .ant-segmented-item {

@@ -43,6 +43,15 @@ describe("FIX-010 global search trigger", () => {
   });
 });
 
+describe("segmented controls use a neutral surface", () => {
+  it("does not use the warm inset fill for precision filters", () => {
+    const segmented = ruleBody("body .precision-segmented");
+    expect(segmented).toMatch(/background:\s*var\(--bg-surface, #FFFFFF\)/);
+    expect(segmented).toMatch(/border:\s*1px solid var\(--border-default, #EAEAEA\)/);
+    expect(segmented).not.toContain("--bg-inset");
+  });
+});
+
 describe("FIX-011 sider content density", () => {
   it("does not render a duplicate version footer", () => {
     expect(appLayout).not.toContain("app-sider-footer");

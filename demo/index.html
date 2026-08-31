@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>前端重设计 demo · 零售经营工作站</title>
+<script>
+  try {
+    var d = document.documentElement, p = new URLSearchParams(location.search);
+    d.dataset.theme = p.get("theme") || localStorage.getItem("demo.theme") ||
+      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    d.dataset.skin = p.get("skin") || localStorage.getItem("demo.skin") || "restrained";
+  } catch (e) { document.documentElement.dataset.theme = "light"; document.documentElement.dataset.skin = "restrained"; }
+</script>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/base.css">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .wrap { max-width: 1080px; margin: 0 auto; padding: var(--space-12) var(--space-6) var(--space-16); }
+  .lede { max-width: 74ch; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-3); }
+  .entry {
+    display: block; padding: var(--space-4);
+    border-radius: var(--radius-card); background: var(--bg-surface);
+    box-shadow: var(--shadow-card); color: inherit; text-decoration: none;
+    transition: box-shadow var(--dur-normal) var(--ease-micro),
+                background-color var(--dur-normal) var(--ease-micro);
+  }
+  .entry:hover { background: var(--bg-hover); box-shadow: var(--shadow-raised); text-decoration: none; }
+  .entry__num {
+    font-family: var(--font-mono); font-size: var(--text-micro);
+    color: var(--fg-muted); letter-spacing: 0.06em;
+  }
+  .entry__title {
+    font-size: var(--text-h3); font-weight: var(--weight-semibold);
+    color: var(--fg-primary); letter-spacing: var(--tracking-tight);
+    margin: var(--space-1) 0 var(--space-2);
+  }
+  .entry__desc { font-size: var(--text-small); color: var(--fg-tertiary); }
+  .entry__tags { margin-top: var(--space-3); display: flex; gap: var(--space-1); flex-wrap: wrap; }
+
+  .verdict { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  @media (max-width: 860px) { .verdict { grid-template-columns: 1fr; } }
+  .verdict ul { display: flex; flex-direction: column; gap: var(--space-2); }
+  .verdict li { display: flex; gap: var(--space-2); font-size: var(--text-small); }
+  .verdict li span:first-child { flex: none; width: 16px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="row row--between" style="margin-bottom:var(--space-8);align-items:flex-start">
+    <div class="lede">
+      <div class="eyebrow" style="margin-bottom:var(--space-2)">前端重设计 · 静态原型</div>
+      <h1 class="t-display" style="margin-bottom:var(--space-3)">零售经营工作站</h1>
+      <p class="t-body fg-tertiary">
+        依据《现代高质感 SaaS 与企业级界面 UI/UX 设计趋势与架构范式研究报告》做的重新设计。
+        这是一个独立原型，不改动 <code class="t-mono">web/</code> 下任何一行现有代码。
+        两套视觉主张并排提供，供决策后再落地。
+      </p>
+    </div>
+    <div class="row">
+      <div class="segmented" role="group" aria-label="视觉风格">
+        <button data-skin-btn="restrained" aria-pressed="false">克制</button>
+        <button data-skin-btn="expressive" aria-pressed="false">高质感</button>
+      </div>
+      <div class="segmented" role="group" aria-label="明暗主题">
+        <button data-theme-btn="light" aria-pressed="false">浅色</button>
+        <button data-theme-btn="dark" aria-pressed="false">深色</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note note--info" style="margin-bottom:var(--space-8)">
+    全站快捷键：<span class="kbd">⌘K</span> 命令面板 ·
+    <span class="kbd">G</span> 然后 <span class="kbd">P</span> 直达经营脉搏 ·
+    <span class="kbd">⇧</span><span class="kbd">S</span> 切换视觉风格 ·
+    <span class="kbd">⇧</span><span class="kbd">D</span> 切换明暗 ·
+    <span class="kbd">[</span> 收起侧栏
+  </div>
+
+  <h2 class="t-h1" style="margin-bottom:var(--space-4)">页面</h2>
+  <div class="cards" style="margin-bottom:var(--space-12)">
+
+    <a class="entry" href="home.html">
+      <div class="entry__num">01</div>
+      <div class="entry__title">工作台</div>
+      <p class="entry__desc">
+        Bento 非对称网格。切换三种角色，看同一批数据如何按责任重排空间权重。
+      </p>
+      <div class="entry__tags">
+        <span class="tag tag--neutral">Bento Grid</span>
+        <span class="tag tag--neutral">角色导向</span>
+        <span class="tag tag--neutral">AI 简报</span>
+      </div>
+    </a>
+
+    <a class="entry" href="pulse.html">
+      <div class="entry__num">02</div>
+      <div class="entry__title">经营脉搏</div>
+      <p class="entry__desc">
+        高密度分析页。数据可信度条、关注排名、被抑制的关注、可见的数据缺口。
+      </p>
+      <div class="entry__tags">
+        <span class="tag tag--neutral">可信度一等公民</span>
+        <span class="tag tag--neutral">缺口可见</span>
+      </div>
+    </a>
+
+    <a class="entry" href="store360.html">
+      <div class="entry__num">03</div>
+      <div class="entry__title">门店 360</div>
+      <p class="entry__desc">
+        Fact Sheet 范式。贡献桥（含未配平残差）、同类分位、观察结论与证据链。
+      </p>
+      <div class="entry__tags">
+        <span class="tag tag--neutral">Fact Sheet</span>
+        <span class="tag tag--neutral">证据链</span>
+      </div>
+    </a>
+
+    <a class="entry" href="contracts.html">
+      <div class="entry__num">04</div>
+      <div class="entry__title">合同台账</div>
+      <p class="entry__desc">
+        企业级表格四件套：固定表头与首列、行内编辑（乐观 UI）、高级筛选、保存视图。
+      </p>
+      <div class="entry__tags">
+        <span class="tag tag--neutral">行内编辑</span>
+        <span class="tag tag--neutral">保存视图</span>
+        <span class="tag tag--neutral">批量操作</span>
+      </div>
+    </a>
+
+    <a class="entry" href="closing.html">
+      <div class="entry__num">05</div>
+      <div class="entry__title">任务中心与月结</div>
+      <p class="entry__desc">
+        统一收件箱，五个来源汇到一处。结账流程条如实显示阻断，未评估对象必须带原因。
+      </p>
+      <div class="entry__tags">
+        <span class="tag tag--neutral">统一收件箱</span>
+        <span class="tag tag--neutral">流程可见</span>
+      </div>
+    </a>
+
+    <a class="entry" href="tokens.html">
+      <div class="entry__num">06</div>
+      <div class="entry__title">设计令牌</div>
+      <p class="entry__desc">
+        活的令牌页：色阶、字阶、深度、间距全部实时读取当前生效的 CSS 变量。
+      </p>
+      <div class="entry__tags">
+        <span class="tag tag--neutral">三层令牌</span>
+        <span class="tag tag--neutral">对错并置</span>
+      </div>
+    </a>
+
+    <a class="entry" href="compare.html">
+      <div class="entry__num">07</div>
+      <div class="entry__title">A/B 并排对比</div>
+      <p class="entry__desc">
+        两套视觉主张锁定在左右两栏同时呈现，可切页面与明暗。决策用这一页。
+      </p>
+      <div class="entry__tags">
+        <span class="tag tag--info">决策入口</span>
+      </div>
+    </a>
+
+  </div>
+
+  <h2 class="t-h1" style="margin-bottom:var(--space-2)">对报告的取舍</h2>
+  <p class="t-small fg-tertiary" style="max-width:76ch;margin-bottom:var(--space-4)">
+    报告面向的是通用 SaaS 与开发者工具。本产品是一个受审计约束、双口径并行、以"数据能不能
+    拿去做决策"为核心差异化的企业系统。以下是逐条判断，完整论证见
+    <code class="t-mono">demo/README.md</code>。
+  </p>
+
+  <div class="verdict">
+    <section class="card">
+      <div class="card__head">
+        <h3 class="card__title">采纳</h3>
+        <span class="tag tag--success">9 项</span>
+      </div>
+      <ul>
+        <li><span>✓</span><span>Bento 网格按<b>数据优先级</b>而非数据体积分配空间</span></li>
+        <li><span>✓</span><span>⌘K 命令面板作为操作枢纽，含动态操作执行器</span></li>
+        <li><span>✓</span><span>键盘优先：g 前缀序列、双环焦点、面板内焦点约束</span></li>
+        <li><span>✓</span><span>深色分层体系（非纯黑基底 + 表面叠层 + 半透明发丝边）</span></li>
+        <li><span>✓</span><span>三层语义化令牌，单一真相源</span></li>
+        <li><span>✓</span><span>企业级表格四件套</span></li>
+        <li><span>✓</span><span>统一任务中心（跨模块收件箱）</span></li>
+        <li><span>✓</span><span>角色导向的情境化分层</span></li>
+        <li><span>✓</span><span>乐观 UI + 即时反馈，消解阻断感</span></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <div class="card__head">
+        <h3 class="card__title">拒绝或改写</h3>
+        <span class="tag tag--warning">5 项</span>
+      </div>
+      <ul>
+        <li><span>✕</span><span><b>玻璃拟物</b>不用于数据卡片，只用于命令面板与抽屉遮罩</span></li>
+        <li><span>✕</span><span><b>品牌色弥散光晕</b>不覆盖任何数值区域；彩色必须留给异常</span></li>
+        <li><span>✕</span><span><b>Dark-First 作为默认</b>改为明暗等权、跟随系统</span></li>
+        <li><span>✕</span><span><b>Tremor 图表库</b>不用：默认多彩序列与本产品配色规则冲突，且默认平滑掉数据缺口</span></li>
+        <li><span>＋</span><span><b>报告的盲区：数据可信度</b>。全文没有这个概念，但它是本产品最核心的差异化，必须补为一等组件</span></li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="note note--warning" style="margin-top:var(--space-6);max-width:76ch">
+    <b>关于第五条。</b>报告默认"界面呈现的就是事实"。在一个要过审计、要向 ERP 回写、
+    要区分模拟与正式数据的系统里，这个默认不成立。一个看起来很高级但没说清覆盖率只有 88%
+    的仪表盘，比一个朴素但标了"不足以支撑决策"的仪表盘危险得多。
+  </div>
+
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+document.querySelectorAll("[data-theme-btn]").forEach((btn) =>
+  btn.addEventListener("click", () => App.setTheme(btn.dataset.themeBtn))
+);
+document.querySelectorAll("[data-skin-btn]").forEach((btn) =>
+  btn.addEventListener("click", () => App.setSkin(btn.dataset.skinBtn))
+);
+App.mountCmdK();
+App.bindGlobalKeys();
+App.syncToggles();
+</script>
+</body>
+</html>

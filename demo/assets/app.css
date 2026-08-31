@@ -1,0 +1,813 @@
+/* ============================================================================
+   app.css — 应用骨架、Bento 网格、命令面板、可信度条
+   ========================================================================== */
+
+/* ── 骨架 ─────────────────────────────────────────────────────────── */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-areas:
+    "brand topbar"
+    "side  main";
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.shell[data-nav="collapsed"] {
+  --sidebar-w: var(--sidebar-w-collapsed);
+}
+
+/* ── 品牌区 ───────────────────────────────────────────────────────── */
+
+.brand {
+  grid-area: brand;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  background: var(--bg-sunken);
+  box-shadow: inset -1px 0 0 var(--border-hairline),
+    inset 0 -1px 0 var(--border-hairline);
+  overflow: hidden;
+}
+
+.brand__mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 5px;
+  background: var(--action-bg);
+  color: var(--action-fg);
+  display: grid;
+  place-items: center;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.04em;
+}
+
+.brand__name {
+  font-size: var(--text-small);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg-primary);
+  white-space: nowrap;
+}
+.shell[data-nav="collapsed"] .brand__name {
+  display: none;
+}
+
+/* ── 顶栏 ─────────────────────────────────────────────────────────── */
+
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  background: var(--bg-sunken);
+  box-shadow: inset 0 -1px 0 var(--border-hairline);
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-small);
+  color: var(--fg-muted);
+  min-width: 0;
+}
+.crumbs__sep {
+  color: var(--fg-muted);
+  opacity: 0.5;
+}
+.crumbs__current {
+  color: var(--fg-primary);
+  font-weight: var(--weight-medium);
+}
+
+/* 命令面板触发器就是搜索框 —— 一个入口，不做两套 */
+.cmd-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 28px;
+  min-width: 220px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-static);
+  color: var(--fg-muted);
+  font-size: var(--text-caption);
+  cursor: pointer;
+  transition: box-shadow var(--dur-fast) var(--ease-micro),
+    color var(--dur-fast) var(--ease-micro);
+}
+.cmd-trigger:hover {
+  box-shadow: var(--shadow-hover);
+  color: var(--fg-secondary);
+}
+.cmd-trigger .kbd {
+  margin-left: auto;
+}
+
+/* ── 侧栏 ─────────────────────────────────────────────────────────── */
+
+.side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sunken);
+  box-shadow: inset -1px 0 0 var(--border-hairline);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-3) var(--space-2) var(--space-4);
+  gap: var(--space-4);
+}
+
+.nav-group__label {
+  padding: 0 var(--space-2) var(--space-1);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.shell[data-nav="collapsed"] .nav-group__label {
+  height: 1px;
+  padding: 0;
+  margin: var(--space-2) var(--space-2);
+  overflow: hidden;
+  color: transparent;
+  background: var(--border-hairline);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--fg-tertiary);
+  font-size: var(--text-small);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease-micro),
+    color var(--dur-fast) var(--ease-micro);
+}
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--fg-primary);
+  text-decoration: none;
+}
+.nav-item[aria-current="page"] {
+  background: var(--bg-selected);
+  color: var(--fg-primary);
+  font-weight: var(--weight-medium);
+}
+
+.nav-item__icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: currentColor;
+}
+.nav-item__badge {
+  margin-left: auto;
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+.shell[data-nav="collapsed"] .nav-item__text,
+.shell[data-nav="collapsed"] .nav-item__badge {
+  display: none;
+}
+
+/* ── 主内容 ───────────────────────────────────────────────────────── */
+
+.main {
+  grid-area: main;
+  overflow-y: auto;
+  background: var(--bg-canvas);
+}
+
+.main__inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-6) var(--space-16);
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.page-head__sub {
+  margin-top: var(--space-1);
+  font-size: var(--text-small);
+  color: var(--fg-tertiary);
+  max-width: 76ch;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--bg-sunken);
+  box-shadow: var(--shadow-static);
+}
+.filter-bar__label {
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.section-gap { margin-top: var(--space-5); }
+
+/* ============================================================================
+   Bento 网格
+   ----------------------------------------------------------------------------
+   12 列。空间按"数据优先级"分配，不按"数据体积"分配——这是报告 §2.1 的
+   核心主张，也是它相对传统等宽卡片平铺的唯一实质差异。
+   ========================================================================== */
+
+.bento {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.bento > * { min-width: 0; }
+
+/* Hero：4–6 列 × 2 行，承载页面第一视觉焦点 */
+.t-hero    { grid-column: span 6; grid-row: span 2; }
+/* Feature：3–4 列，解释主指标背后的因果 */
+.t-feature { grid-column: span 4; }
+.t-feature-tall { grid-column: span 4; grid-row: span 2; }
+/* Metric：2–3 列 × 1 行，离散次级指标 */
+.t-metric  { grid-column: span 3; }
+.t-metric-sm { grid-column: span 2; }
+/* Accent：快捷触点 */
+.t-accent  { grid-column: span 2; }
+/* 满幅：表格这类必须完整宽度的内容 */
+.t-full    { grid-column: span 12; }
+.t-half    { grid-column: span 6; }
+.t-third   { grid-column: span 4; }
+.t-two-thirds { grid-column: span 8; }
+
+/* KPI 单元格内部 */
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  height: 100%;
+}
+.kpi__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--fg-tertiary);
+}
+.kpi__value {
+  font-size: var(--text-h1);
+  line-height: var(--leading-h1);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-display);
+  color: var(--fg-primary);
+  font-variant-numeric: tabular-nums;
+}
+.kpi__value--hero {
+  font-size: var(--text-hero);
+  line-height: var(--leading-hero);
+}
+.kpi__meta {
+  font-size: var(--text-caption);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.kpi__foot {
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+/* decision_ready = false 时的统一角标：不能藏在第五个 span 里 */
+.kpi[data-ready="false"] .kpi__value {
+  color: var(--fg-tertiary);
+}
+.not-ready-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  box-shadow: inset 0 0 0 1px var(--warning-border);
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  flex: none;
+}
+
+/* ============================================================================
+   数据可信度条 —— 本产品相对通用 BI 的核心差异化
+   ----------------------------------------------------------------------------
+   报告通篇没有这个组件，因为它面向的是不受审计约束的通用 SaaS。
+   对本产品而言，"这个数字能不能拿去做决策"必须是一等视觉公民。
+   ========================================================================== */
+
+.trust {
+  border-radius: var(--radius-card);
+  background: var(--bg-sunken);
+  box-shadow: var(--shadow-static);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+
+/* decision_ready = false：整条降级变色，而不是加一行小字 */
+.trust[data-ready="false"] {
+  background: var(--warning-bg);
+  box-shadow: inset 0 0 0 1px var(--warning-border);
+}
+
+.trust__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: var(--text-caption);
+  color: var(--fg-tertiary);
+}
+.trust__verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  color: var(--fg-primary);
+}
+.trust[data-ready="false"] .trust__verdict {
+  color: var(--warning-fg);
+}
+.trust__field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-variant-numeric: tabular-nums;
+}
+.trust__field b {
+  font-weight: var(--weight-medium);
+  color: var(--fg-secondary);
+}
+.trust__toggle {
+  margin-left: auto;
+  color: var(--fg-muted);
+  font-size: var(--text-caption);
+}
+
+.trust__detail {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3);
+  box-shadow: inset 0 1px 0 var(--border-hairline);
+}
+.trust[data-open="true"] .trust__detail {
+  display: grid;
+}
+.trust__dl dt {
+  font-size: var(--text-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.trust__dl dd {
+  margin: 2px 0 0;
+  font-size: var(--text-small);
+  color: var(--fg-secondary);
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+/* 覆盖率细条 */
+.coverage-bar {
+  position: relative;
+  height: 4px;
+  width: 100%;
+  min-width: 60px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+.coverage-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-pill);
+  background: var(--fg-tertiary);
+}
+.coverage-bar[data-tone="warning"] .coverage-bar__fill {
+  background: var(--warning-fg);
+}
+.coverage-bar[data-tone="error"] .coverage-bar__fill {
+  background: var(--error-fg);
+}
+
+/* ============================================================================
+   命令面板 (Cmd+K)
+   ========================================================================== */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--bg-scrim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-overlay) var(--ease-micro);
+}
+.scrim[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cmdk {
+  position: fixed;
+  z-index: 100;
+  top: 14vh;
+  left: 50%;
+  width: min(640px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  border-radius: var(--radius-overlay);
+  /* 模糊只用在这里：短暂浮层，不承载需要精读的数值 */
+  background: var(--bg-overlay);
+  -webkit-backdrop-filter: var(--overlay-blur);
+  backdrop-filter: var(--overlay-blur);
+  box-shadow: var(--shadow-overlay);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-overlay) var(--ease-micro);
+}
+.cmdk[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cmdk__input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: inset 0 -1px 0 var(--border-hairline);
+}
+.cmdk__input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--fg-primary);
+  font-family: inherit;
+  font-size: var(--text-h3);
+  line-height: var(--leading-h3);
+}
+.cmdk__input:focus {
+  outline: none;
+}
+.cmdk__input::placeholder {
+  color: var(--fg-muted);
+}
+
+.cmdk__list {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding: var(--space-2);
+}
+
+.cmdk__group-label {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-size: var(--text-micro);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.cmdk__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--fg-secondary);
+  font-size: var(--text-small);
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+}
+.cmdk__item[data-active="true"] {
+  background: var(--bg-selected);
+  color: var(--fg-primary);
+  text-decoration: none;
+}
+.cmdk__item-icon {
+  width: 20px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--fg-muted);
+}
+.cmdk__item[data-active="true"] .cmdk__item-icon {
+  color: var(--accent-fg);
+}
+.cmdk__item-sub {
+  font-size: var(--text-caption);
+  color: var(--fg-muted);
+}
+.cmdk__item-tail {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.cmdk__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  box-shadow: inset 0 1px 0 var(--border-hairline);
+  font-size: var(--text-micro);
+  color: var(--fg-muted);
+}
+.cmdk__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 高亮匹配片段 */
+.cmdk mark {
+  background: transparent;
+  color: var(--accent-fg);
+  font-weight: var(--weight-medium);
+}
+
+/* ============================================================================
+   右侧抽屉 —— AI 出现在工作发生的地方，而不是跳走丢掉上下文
+   ========================================================================== */
+
+.drawer {
+  position: fixed;
+  z-index: 95;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 92vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-overlay);
+  transform: translateX(100%);
+  transition: transform var(--dur-slow) var(--ease-exit);
+}
+.drawer[data-open="true"] {
+  transform: translateX(0);
+  transition-timing-function: var(--ease-enter);
+}
+.drawer__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: inset 0 -1px 0 var(--border-hairline);
+}
+.drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+/* AI 产出必须与系统正式数据视觉可分：左侧强调色标尺 + 不同底色 */
+.ai-block {
+  border-radius: var(--radius-card);
+  background: var(--accent-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+  padding: var(--space-3);
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+  box-shadow: inset 0 0 0 1px var(--border-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: var(--fg-tertiary);
+}
+
+/* 置信度：0.40 与 0.90 必须一眼看出差别，且能看到降级原因 */
+.confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.confidence__track {
+  width: 44px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+  overflow: hidden;
+}
+.confidence__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--fg-tertiary);
+}
+.confidence[data-tone="low"] .confidence__fill { background: var(--error-fg); }
+.confidence[data-tone="mid"] .confidence__fill { background: var(--warning-fg); }
+.confidence[data-tone="high"] .confidence__fill { background: var(--success-fg); }
+
+/* ── 统一任务中心 ─────────────────────────────────────────────────── */
+
+.task-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 -1px 0 var(--border-hairline);
+  transition: background-color var(--dur-fast) var(--ease-micro);
+}
+.task-item:hover {
+  background: var(--bg-hover);
+}
+.task-item__source {
+  font-size: var(--text-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.task-item__title {
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  color: var(--fg-primary);
+}
+.task-item__meta {
+  font-size: var(--text-caption);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.task-item__actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ── 提示条 ───────────────────────────────────────────────────────── */
+
+/* 刻意用 block 而不是 flex：正文里出现一个 <b> 时，flex 会把它和前后文本
+   拆成三个匿名 flex item，各自换行——这条注释是为了别人不要"顺手改回 flex"。 */
+.note {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  font-size: var(--text-caption);
+  line-height: var(--leading-small);
+}
+.note--info {
+  background: var(--info-bg);
+  color: var(--info-fg);
+  box-shadow: inset 0 0 0 1px var(--info-border);
+}
+.note--warning {
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  box-shadow: inset 0 0 0 1px var(--warning-border);
+}
+.note--neutral {
+  background: var(--bg-inset);
+  color: var(--fg-tertiary);
+}
+
+/* ── 吐司 ─────────────────────────────────────────────────────────── */
+
+.toaster {
+  position: fixed;
+  z-index: 120;
+  bottom: var(--space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: center;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-overlay);
+  color: var(--fg-primary);
+  font-size: var(--text-small);
+  animation: toast-in var(--dur-slow) var(--ease-enter);
+}
+@keyframes toast-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ============================================================================
+   响应式：12 列在窄视口下退化，但组件内部语义不变
+   ========================================================================== */
+
+/* 1280 档：12 栏骨架保持不变——Hero 6 + Metric 3×2 仍然刚好填满一行。
+   只放宽最窄的两种瓦片，它们在 2 栏（约 160px）下装不下一个数值。 */
+@media (max-width: 1280px) {
+  .t-metric-sm { grid-column: span 3; }
+  .t-accent { grid-column: span 3; }
+}
+
+@media (max-width: 1024px) {
+  .shell { --sidebar-w: var(--sidebar-w-collapsed); }
+  .shell .nav-item__text,
+  .shell .nav-item__badge,
+  .shell .brand__name { display: none; }
+  .t-hero,
+  .t-feature,
+  .t-feature-tall,
+  .t-two-thirds,
+  .t-half { grid-column: span 12; }
+  .t-hero { grid-row: span 1; }
+  .t-metric,
+  .t-third { grid-column: span 6; }
+  .t-metric-sm,
+  .t-accent { grid-column: span 6; }
+  .main__inner { padding: var(--space-4) var(--space-4) var(--space-12); }
+}
+
+/* 被并排对比页嵌入时：风格由外层锁定，页内切换器会造成两侧不一致，直接移除。
+   面包屑同样移除——外层已经标了这是哪一页。 */
+[data-embed] .topbar .segmented,
+[data-embed] .crumbs {
+  display: none;
+}
+
+/* 顶栏在窄视口下必须只有一行。面包屑和风格切换器是这里最先该让位的两项：
+   面包屑的信息在页面标题里已经有了，风格切换器是 demo 专用控件。 */
+@media (max-width: 900px) {
+  .topbar { gap: var(--space-1); padding: 0 var(--space-3); }
+  .crumbs { display: none; }
+  .topbar .segmented[aria-label="视觉风格"] { display: none; }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "topbar"
+      "main";
+  }
+  .brand,
+  .side { display: none; }
+  /* 同特异性、靠源序覆盖前面的断点规则——不需要 !important */
+  .bento > * { grid-column: span 12; grid-row: auto; }
+  .cmd-trigger { min-width: 0; }
+  .cmd-trigger__text { display: none; }
+}

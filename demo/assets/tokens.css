@@ -1,0 +1,419 @@
+/* ============================================================================
+   tokens.css — 三层设计令牌
+   ----------------------------------------------------------------------------
+   L1 原语 (primitive)  : 原始色阶与尺度，不直接被组件消费
+   L2 语义 (semantic)   : 组件唯一允许消费的层，随 theme × skin 变化
+   L3 组件 (component)  : 少量成分复杂的组合值
+
+   两个正交维度：
+     data-theme = light | dark        —— 明暗，等权，跟随系统
+     data-skin  = restrained | expressive  —— A/B 两套视觉主张
+
+   注意：这一层不含任何布局与组件规则，可整体移植回 web/。
+   ========================================================================== */
+
+:root {
+  /* ── L1 原语：无彩阶 ─────────────────────────────────────────────── */
+  --mono-0: #000000;
+  --mono-20: #262626;
+  --mono-40: #595959;
+  --mono-60: #737373;
+  --mono-70: #a6a6a6;
+  --mono-90: #d9d9d9;
+  --mono-95: #f0f0f0;
+  --mono-98: #f7f7f7;
+  --mono-100: #ffffff;
+
+  /* ── L1 原语：字阶（两套 skin 共用，字阶不是风格问题，是密度问题）── */
+  --text-micro: 11px;
+  --text-caption: 12px;
+  --text-small: 13px;
+  --text-body: 14px;
+  --text-h3: 15px;
+  --text-h2: 18px;
+  --text-h1: 24px;
+  --text-display: 28px;
+  --text-hero: 34px;
+
+  --leading-micro: 14px;
+  --leading-caption: 16px;
+  --leading-small: 20px;
+  --leading-body: 22px;
+  --leading-h3: 24px;
+  --leading-h2: 26px;
+  --leading-h1: 32px;
+  --leading-display: 36px;
+  --leading-hero: 40px;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* ── L1 原语：间距（4px 基数，两套共用）────────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── L1 原语：动效 ─────────────────────────────────────────────── */
+  --ease-micro: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 100ms;
+  --dur-normal: 150ms;
+  --dur-slow: 250ms;
+  --dur-overlay: 200ms;
+
+  /* ── L1 原语：布局常量 ─────────────────────────────────────────── */
+  --sidebar-w: 232px;
+  --sidebar-w-collapsed: 56px;
+  --topbar-h: 52px;
+  --content-max: 1520px;
+
+  /* ── 字体族 ────────────────────────────────────────────────────── */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/* ==========================================================================
+   L2 语义层 · restrained（克制演进版）
+   --------------------------------------------------------------------------
+   主张：延续现有 DESIGN.md 的单色骨架。界面基本只有黑白灰，彩色是信息不是
+   装饰。深度靠环形阴影而非 border，交互只改颜色不做位移。
+   本 skin 的唯一"新增"是补齐了一套真正的深色分层——原系统完全没有暗色模式。
+   ========================================================================== */
+
+[data-skin="restrained"][data-theme="light"] {
+  --bg-canvas: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-sunken: #f7f7f7;
+  --bg-inset: #f0f0f0;
+  --bg-raised: #ffffff;
+  --bg-overlay: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.07);
+  --bg-selected: rgba(0, 0, 0, 0.05);
+  --bg-scrim: rgba(0, 0, 0, 0.32);
+
+  --fg-primary: #000000;
+  --fg-secondary: #262626;
+  --fg-tertiary: #595959;
+  --fg-muted: #737373;
+  --fg-onaccent: #ffffff;
+
+  --border-hairline: rgba(0, 0, 0, 0.09);
+  --border-default: rgba(0, 0, 0, 0.14);
+  --border-strong: rgba(0, 0, 0, 0.26);
+
+  /* 蓝色只表示"可交互"，不表示"好" */
+  --accent: #1f4e9c;
+  --accent-hover: #17407f;
+  --accent-fg: #1f4e9c;
+  --accent-bg: #edf2fa;
+  --accent-glow: transparent; /* restrained：无光晕 */
+
+  /* 主操作按钮在 restrained 下是近黑，不是品牌蓝——蓝色留给"可点" */
+  --action-bg: #000000;
+  --action-bg-hover: #262626;
+  --action-fg: #ffffff;
+
+  --success-fg: #216e39;
+  --success-bg: #ecf5ee;
+  --success-border: #cfe5d6;
+  --info-fg: #1f4e9c;
+  --info-bg: #edf2fa;
+  --info-border: #cfddf2;
+  --warning-fg: #8a5300;
+  --warning-bg: #fdf3e3;
+  --warning-border: #f0dcb8;
+  --error-fg: #a8071a;
+  --error-bg: #fdeded;
+  --error-border: #f5c9c9;
+
+  --chart-primary: #1f4e9c;
+  --chart-grid: rgba(0, 0, 0, 0.07);
+  --chart-axis: #737373;
+  --chart-neutral: #a6a6a6;
+  --chart-positive: #216e39;
+  --chart-negative: #a8071a;
+
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-overlay: 10px;
+  --radius-pill: 9999px;
+
+  --shadow-static: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-raised: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 12px 32px rgba(0, 0, 0, 0.12);
+
+  --hero-surface: var(--bg-surface);
+  --hero-accent-wash: transparent;
+  --overlay-blur: none;
+  --tracking-tight: -0.01em;
+  --tracking-display: -0.03em;
+}
+
+[data-skin="restrained"][data-theme="dark"] {
+  /* 不用纯黑 #000：纯黑会让叠层无法表达物理深度，且在 OLED 上拖影 */
+  --bg-canvas: #0b0b0c;
+  --bg-surface: #141416;
+  --bg-sunken: #101012;
+  --bg-inset: #1c1c1f;
+  --bg-raised: #1c1c1f;
+  --bg-overlay: #1c1c1f;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.1);
+  --bg-selected: rgba(255, 255, 255, 0.08);
+  --bg-scrim: rgba(0, 0, 0, 0.6);
+
+  --fg-primary: #f5f5f6;
+  --fg-secondary: #d4d4d6;
+  --fg-tertiary: #a1a1a6;
+  --fg-muted: #7c7c82;
+  --fg-onaccent: #0b0b0c;
+
+  --border-hairline: rgba(255, 255, 255, 0.09);
+  --border-default: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.28);
+
+  --accent: #7aa2e8;
+  --accent-hover: #96b7ee;
+  --accent-fg: #9dbdf0;
+  --accent-bg: rgba(122, 162, 232, 0.14);
+  --accent-glow: transparent;
+
+  --action-bg: #f5f5f6;
+  --action-bg-hover: #ffffff;
+  --action-fg: #0b0b0c;
+
+  /* 深色下的状态色：提高明度以在深底上过 AA，底色改用低透明度着色 */
+  --success-fg: #6bd598;
+  --success-bg: rgba(107, 213, 152, 0.13);
+  --success-border: rgba(107, 213, 152, 0.28);
+  --info-fg: #8ab4f8;
+  --info-bg: rgba(138, 180, 248, 0.13);
+  --info-border: rgba(138, 180, 248, 0.28);
+  --warning-fg: #e3b264;
+  --warning-bg: rgba(227, 178, 100, 0.13);
+  --warning-border: rgba(227, 178, 100, 0.28);
+  --error-fg: #f68a8a;
+  --error-bg: rgba(246, 138, 138, 0.13);
+  --error-border: rgba(246, 138, 138, 0.28);
+
+  --chart-primary: #7aa2e8;
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --chart-axis: #7c7c82;
+  --chart-neutral: #56565c;
+  --chart-positive: #6bd598;
+  --chart-negative: #f68a8a;
+
+  --radius-control: 6px;
+  --radius-card: 8px;
+  --radius-overlay: 10px;
+  --radius-pill: 9999px;
+
+  --shadow-static: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-raised: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 12px 32px rgba(0, 0, 0, 0.6);
+
+  --hero-surface: var(--bg-surface);
+  --hero-accent-wash: transparent;
+  --overlay-blur: none;
+  --tracking-tight: -0.01em;
+  --tracking-display: -0.03em;
+}
+
+/* ==========================================================================
+   L2 语义层 · expressive（报告式高质感版）
+   --------------------------------------------------------------------------
+   主张：吸收 Linear / Vercel / Stripe 的工程化质感——冷调基底、递进表面
+   分层、1px 半透明边线、更大的圆角与更紧的字距、靛青强调色。
+
+   已刻意收敛的两项（理由见 demo/README.md §2）：
+     · backdrop-blur 只用于命令面板与抽屉遮罩，绝不用于数据卡片
+     · 品牌色弥散光晕只出现在焦点与 Hero 单元格，且不覆盖任何数值区域
+   ========================================================================== */
+
+[data-skin="expressive"][data-theme="light"] {
+  --bg-canvas: #fafafb;
+  --bg-surface: #ffffff;
+  --bg-sunken: #f4f4f6;
+  --bg-inset: #eeeef1;
+  --bg-raised: #ffffff;
+  --bg-overlay: rgba(255, 255, 255, 0.86);
+  --bg-hover: rgba(15, 23, 42, 0.045);
+  --bg-active: rgba(15, 23, 42, 0.08);
+  --bg-selected: rgba(79, 70, 229, 0.07);
+  --bg-scrim: rgba(15, 23, 42, 0.28);
+
+  --fg-primary: #0b0d12;
+  --fg-secondary: #2b2f38;
+  --fg-tertiary: #565c68;
+  --fg-muted: #7a808c;
+  --fg-onaccent: #ffffff;
+
+  --border-hairline: rgba(15, 23, 42, 0.08);
+  --border-default: rgba(15, 23, 42, 0.13);
+  --border-strong: rgba(15, 23, 42, 0.24);
+
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-fg: #4338ca;
+  --accent-bg: rgba(79, 70, 229, 0.09);
+  --accent-glow: rgba(79, 70, 229, 0.16);
+
+  --action-bg: #4f46e5;
+  --action-bg-hover: #4338ca;
+  --action-fg: #ffffff;
+
+  --success-fg: #16744a;
+  --success-bg: rgba(22, 163, 106, 0.1);
+  --success-border: rgba(22, 163, 106, 0.24);
+  --info-fg: #2f5fd0;
+  --info-bg: rgba(47, 95, 208, 0.1);
+  --info-border: rgba(47, 95, 208, 0.24);
+  --warning-fg: #8a5300;
+  --warning-bg: rgba(191, 122, 0, 0.11);
+  --warning-border: rgba(191, 122, 0, 0.26);
+  --error-fg: #b0111f;
+  --error-bg: rgba(200, 25, 40, 0.09);
+  --error-border: rgba(200, 25, 40, 0.24);
+
+  --chart-primary: #4f46e5;
+  --chart-grid: rgba(15, 23, 42, 0.07);
+  --chart-axis: #7a808c;
+  --chart-neutral: #b4b8c2;
+  --chart-positive: #16a36a;
+  --chart-negative: #c81928;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-overlay: 14px;
+  --radius-pill: 9999px;
+
+  --shadow-static: 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --shadow-hover: 0 0 0 1px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 8px 24px -12px rgba(15, 23, 42, 0.12);
+  --shadow-raised: 0 0 0 1px rgba(15, 23, 42, 0.07), 0 8px 24px -6px rgba(15, 23, 42, 0.14);
+  --shadow-overlay: 0 0 0 1px rgba(15, 23, 42, 0.08), 0 24px 64px -12px rgba(15, 23, 42, 0.28);
+
+  --hero-surface: linear-gradient(160deg, #ffffff 0%, #fbfbfe 58%, #f6f5ff 100%);
+  --hero-accent-wash: radial-gradient(
+    120% 90% at 88% -20%,
+    rgba(79, 70, 229, 0.11) 0%,
+    rgba(79, 70, 229, 0) 62%
+  );
+  --overlay-blur: saturate(180%) blur(20px);
+  --tracking-tight: -0.015em;
+  --tracking-display: -0.035em;
+}
+
+[data-skin="expressive"][data-theme="dark"] {
+  /* 冷调黑而非中性黑：报告 §2.3 的做法，也是 Linear/Vercel 的做法 */
+  --bg-canvas: #08090c;
+  --bg-surface: #0e1015;
+  --bg-sunken: #0a0b0f;
+  --bg-inset: #14171e;
+  --bg-raised: #14171e;
+  --bg-overlay: rgba(20, 23, 30, 0.82);
+  --bg-hover: rgba(255, 255, 255, 0.055);
+  --bg-active: rgba(255, 255, 255, 0.1);
+  --bg-selected: rgba(129, 140, 248, 0.13);
+  --bg-scrim: rgba(3, 4, 6, 0.68);
+
+  --fg-primary: #f2f3f7;
+  --fg-secondary: #cbcdd6;
+  --fg-tertiary: #9aa0ae;
+  --fg-muted: #737a89;
+  --fg-onaccent: #ffffff;
+
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.13);
+  --border-strong: rgba(255, 255, 255, 0.26);
+
+  --accent: #818cf8;
+  --accent-hover: #a5aefb;
+  --accent-fg: #a5aefb;
+  --accent-bg: rgba(129, 140, 248, 0.15);
+  --accent-glow: rgba(129, 140, 248, 0.3);
+
+  --action-bg: #6366f1;
+  --action-bg-hover: #818cf8;
+  --action-fg: #ffffff;
+
+  --success-fg: #5fd39a;
+  --success-bg: rgba(95, 211, 154, 0.13);
+  --success-border: rgba(95, 211, 154, 0.28);
+  --info-fg: #8ab4f8;
+  --info-bg: rgba(138, 180, 248, 0.13);
+  --info-border: rgba(138, 180, 248, 0.28);
+  --warning-fg: #e8b76b;
+  --warning-bg: rgba(232, 183, 107, 0.13);
+  --warning-border: rgba(232, 183, 107, 0.28);
+  --error-fg: #f98d8d;
+  --error-bg: rgba(249, 141, 141, 0.13);
+  --error-border: rgba(249, 141, 141, 0.28);
+
+  --chart-primary: #818cf8;
+  --chart-grid: rgba(255, 255, 255, 0.07);
+  --chart-axis: #737a89;
+  --chart-neutral: #4a505e;
+  --chart-positive: #5fd39a;
+  --chart-negative: #f98d8d;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-overlay: 14px;
+  --radius-pill: 9999px;
+
+  --shadow-static: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-hover: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 12px 32px -16px rgba(0, 0, 0, 0.8);
+  --shadow-raised: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 12px 32px -8px rgba(0, 0, 0, 0.7);
+  --shadow-overlay: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 32px 80px -16px rgba(0, 0, 0, 0.9);
+
+  --hero-surface: linear-gradient(160deg, #141720 0%, #10131a 55%, #0d0f16 100%);
+  --hero-accent-wash: radial-gradient(
+    120% 90% at 88% -20%,
+    rgba(129, 140, 248, 0.16) 0%,
+    rgba(129, 140, 248, 0) 62%
+  );
+  --overlay-blur: saturate(180%) blur(20px);
+  --tracking-tight: -0.015em;
+  --tracking-display: -0.035em;
+}
+
+/* ==========================================================================
+   L3 组件层 · 跨 skin 共用的复合值
+   ========================================================================== */
+:root {
+  /* 焦点环用双环：内环取页面底色，外环取强调色。单环在深色面板上不可见，
+     这是现有系统 DESIGN.md §11 记录的待修项，这里直接修掉。 */
+  --focus-ring: 0 0 0 2px var(--bg-canvas), 0 0 0 4px var(--accent);
+  --focus-ring-inset: inset 0 0 0 1px var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
